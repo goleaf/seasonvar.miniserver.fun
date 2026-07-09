@@ -26,6 +26,7 @@ class SeasonvarImportPipeline
         private readonly SeasonvarTitleMerger $titleMerger,
         private readonly SeasonvarMediaAvailabilityChecker $mediaAvailabilityChecker,
         private readonly ExternalMediaMetadata $mediaMetadata,
+        private readonly SeasonvarRefreshPlanner $refreshPlanner,
     ) {}
 
     /**
@@ -330,34 +331,15 @@ class SeasonvarImportPipeline
         $batchSize = max(1, (int) config('seasonvar.import.parse_batch_size', 25));
         $refreshAfter = now()->subHours(max(1, (int) config('seasonvar.import.refresh_after_hours', 168)));
 
-        $pages = SourcePage::query()
-            ->with('source')
-            ->where('page_type', 'serial')
-            ->when(! $force, function ($query) use ($refreshAfter): void {
-                $query->where(function ($query) use ($refreshAfter): void {
-                    $query->where('parse_status', 'pending')
-                        ->orWhere('import_status', 'missing_data')
-                        ->orWhere(function ($query): void {
-                            $query->where('parse_status', 'failed')
-                                ->where(function ($query): void {
-                                    $query->whereNull('retry_after_at')
-                                        ->orWhere('retry_after_at', '<=', now());
-                                });
-                        })
-                        ->orWhere(function ($query) use ($refreshAfter): void {
-                            $query->where('parse_status', 'parsed')
-                                ->where(function ($query) use ($refreshAfter): void {
-                                    $query->whereNull('last_imported_at')
-                                        ->orWhere('last_imported_at', '<=', $refreshAfter);
-                                });
-                        });
-                });
-            })
-            ->orderByRaw("CASE import_status WHEN 'pending' THEN 0 WHEN 'missing_data' THEN 1 WHEN 'failed' THEN 2 ELSE 3 END")
-            ->oldest('last_imported_at')
-            ->oldest()
-            ->limit($batchSize)
-            ->get();
+        $pages = $force
+            ? SourcePage::query()
+                ->with('source')
+                ->where('page_type', 'serial')
+                ->oldest('last_imported_at')
+                ->oldest()
+                ->limit($batchSize)
+                ->get()
+            : $this->refreshPlanner->pagesForImportCycle($batchSize, $refreshAfter, $progress);
 
         foreach ($pages as $page) {
             $this->recordProgress(null, $progress, 'source-page-selected', [

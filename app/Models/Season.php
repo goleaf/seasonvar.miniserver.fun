@@ -57,4 +57,12 @@ class Season extends Model
     {
         return $this->hasMany(Episode::class);
     }
+
+    /**
+     * @return HasMany<LicensedMedia, $this>
+     */
+    public function licensedMedia(): HasMany
+    {
+        return $this->hasMany(LicensedMedia::class);
+    }
 }

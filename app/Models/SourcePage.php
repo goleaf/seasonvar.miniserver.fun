@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'source_id',
@@ -40,6 +42,22 @@ class SourcePage extends Model
     public function source(): BelongsTo
     {
         return $this->belongsTo(Source::class);
+    }
+
+    /**
+     * @return HasOne<CatalogTitle, $this>
+     */
+    public function catalogTitle(): HasOne
+    {
+        return $this->hasOne(CatalogTitle::class);
+    }
+
+    /**
+     * @return HasMany<Season, $this>
+     */
+    public function seasons(): HasMany
+    {
+        return $this->hasMany(Season::class);
     }
 
     /**

@@ -24,7 +24,9 @@ use App\Models\Translation;
 use App\Services\Crawler\PoliteHttpClient;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\ExternalPlaylistImporter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -455,7 +457,7 @@ class SeasonvarCatalogImporter
 
         $existingCatalogTitle = $this->findCatalogTitleBySourceUrlHash($page, $this->seasonvarUrl->hash($page->url));
         $needsMediaRefresh = $existingCatalogTitle !== null
-            && ! $existingCatalogTitle->licensedMedia()->exists();
+            && $this->catalogTitleNeedsMediaRefresh($existingCatalogTitle);
 
         if (! $force && ! $contentChanged && $page->parse_status === 'parsed' && $existingCatalogTitle !== null && ! $needsMediaRefresh) {
             $page->update([
@@ -539,7 +541,7 @@ class SeasonvarCatalogImporter
         $page->update([
             'import_status' => $missingDataFlags === [] ? 'parsed' : 'missing_data',
             'missing_data_flags' => $missingDataFlags,
-            'retry_after_at' => null,
+            'retry_after_at' => $missingDataFlags === [] ? null : $this->missingDataRetryAfter(),
             'failure_count' => 0,
             'last_imported_at' => now(),
             'last_import_run_id' => $importRunId,
@@ -1019,9 +1021,19 @@ class SeasonvarCatalogImporter
                 ]];
             });
 
-        if ($rowsByNumber->isNotEmpty()) {
+        $existingSeasons = $rowsByNumber->isNotEmpty()
+            ? Season::query()
+                ->where('catalog_title_id', $catalogTitle->id)
+                ->whereIn('number', $rowsByNumber->keys())
+                ->get()
+                ->keyBy(fn (Season $season): int => (int) $season->number)
+            : collect();
+        $rowsForUpsert = $rowsByNumber
+            ->filter(fn (array $row, int $number): bool => $this->seasonRowChanged($existingSeasons->get($number), $row));
+
+        if ($rowsForUpsert->isNotEmpty()) {
             Season::query()->upsert(
-                $rowsByNumber->values()->all(),
+                $rowsForUpsert->values()->all(),
                 ['catalog_title_id', 'number'],
                 [
                     'source_page_id',
@@ -1049,6 +1061,7 @@ class SeasonvarCatalogImporter
             'catalog_title_id' => $catalogTitle->id,
             'source_page_id' => $page->id,
             'synced' => count($syncedSeasons),
+            'changed' => $rowsForUpsert->count(),
         ]);
 
         return $syncedSeasons;
@@ -1097,9 +1110,20 @@ class SeasonvarCatalogImporter
             ]];
         });
 
-        if ($rowsByKey->isNotEmpty()) {
+        $seasonIds = $rowsByKey->pluck('season_id')->unique()->values();
+        $existingEpisodes = $rowsByKey->isNotEmpty()
+            ? Episode::query()
+                ->whereIn('season_id', $seasonIds)
+                ->whereIn('number', $rowsByKey->pluck('number')->unique())
+                ->get()
+                ->keyBy(fn (Episode $episode): string => $episode->season_id.'|'.$episode->number)
+            : collect();
+        $rowsForUpsert = $rowsByKey
+            ->filter(fn (array $row, string $key): bool => $this->episodeRowChanged($existingEpisodes->get($key), $row));
+
+        if ($rowsForUpsert->isNotEmpty()) {
             Episode::query()->upsert(
-                $rowsByKey->values()->all(),
+                $rowsForUpsert->values()->all(),
                 ['season_id', 'number'],
                 [
                     'source_page_id',
@@ -1114,8 +1138,68 @@ class SeasonvarCatalogImporter
         $this->report($progress, 'episode-sync-complete', [
             'source_page_id' => $page->id,
             'synced' => $rowsByKey->count(),
+            'changed' => $rowsForUpsert->count(),
             'skipped' => $skipped,
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function seasonRowChanged(?Season $season, array $row): bool
+    {
+        if ($season === null) {
+            return true;
+        }
+
+        foreach ([
+            'source_page_id',
+            'title',
+            'source_url',
+            'source_url_hash',
+            'latest_episode_released_at',
+            'episodes_released',
+            'episodes_total',
+            'translation_name',
+            'release_status_text',
+        ] as $field) {
+            if ($this->comparableImportValue($field, $season->{$field}) !== $this->comparableImportValue($field, $row[$field] ?? null)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function episodeRowChanged(?Episode $episode, array $row): bool
+    {
+        if ($episode === null) {
+            return true;
+        }
+
+        foreach (['source_page_id', 'title', 'source_url', 'source_url_hash'] as $field) {
+            if ($this->comparableImportValue($field, $episode->{$field}) !== $this->comparableImportValue($field, $row[$field] ?? null)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function comparableImportValue(string $field, mixed $value): mixed
+    {
+        if ($value instanceof Carbon) {
+            return $value->toDateString();
+        }
+
+        if (in_array($field, ['source_page_id', 'episodes_released', 'episodes_total'], true)) {
+            return $value === null ? null : (int) $value;
+        }
+
+        return $value;
     }
 
     /**
@@ -1641,6 +1725,45 @@ class SeasonvarCatalogImporter
         return min(1440, 15 * (2 ** min($failures, 6)));
     }
 
+    private function missingDataRetryAfter(): Carbon
+    {
+        $hours = max(1, (int) config('seasonvar.import.missing_data_retry_hours', 24));
+
+        return now()->addHours($hours);
+    }
+
+    private function catalogTitleNeedsMediaRefresh(CatalogTitle $catalogTitle): bool
+    {
+        return ! $catalogTitle->licensedMedia()->published()->exists()
+            || $this->episodesWithoutPublishedMedia($catalogTitle)->exists()
+            || $this->unavailableMedia($catalogTitle)->exists();
+    }
+
+    /**
+     * @return Builder<Episode>
+     */
+    private function episodesWithoutPublishedMedia(CatalogTitle $catalogTitle): Builder
+    {
+        return Episode::query()
+            ->whereHas('season', function (Builder $query) use ($catalogTitle): void {
+                $query->where('catalog_title_id', $catalogTitle->id);
+            })
+            ->whereDoesntHave('licensedMedia', fn (Builder $query): Builder => $query->published());
+    }
+
+    /**
+     * @return Builder<LicensedMedia>
+     */
+    private function unavailableMedia(CatalogTitle $catalogTitle): Builder
+    {
+        return LicensedMedia::query()
+            ->where('catalog_title_id', $catalogTitle->id)
+            ->where(function (Builder $query): void {
+                $query->where('status', 'unavailable')
+                    ->orWhereIn('check_status', ['check_failed', 'unavailable']);
+            });
+    }
+
     private function storeSnapshot(SourcePage $page, string $body, string $contentHash, int $httpStatus, ?int $importRunId): void
     {
         SourcePageSnapshot::query()->updateOrCreate(
@@ -1665,17 +1788,42 @@ class SeasonvarCatalogImporter
     private function missingDataFlags(CatalogTitle $catalogTitle): array
     {
         $flags = [];
+        $seasons = $catalogTitle->seasons;
+        $episodes = $seasons->flatMap->episodes;
+        $media = $catalogTitle->licensedMedia;
+        $publishedMedia = $media->where('status', 'published');
 
-        if (! $catalogTitle->seasons->isNotEmpty()) {
+        if (! $seasons->isNotEmpty()) {
             $flags[] = 'no_seasons';
         }
 
-        if (! $catalogTitle->seasons->flatMap->episodes->isNotEmpty()) {
+        if (! $episodes->isNotEmpty()) {
             $flags[] = 'no_episodes';
         }
 
-        if (! $catalogTitle->licensedMedia->isNotEmpty()) {
+        if (! $media->isNotEmpty()) {
             $flags[] = 'no_video';
+        }
+
+        if ($media->isNotEmpty() && ! $publishedMedia->isNotEmpty()) {
+            $flags[] = 'no_published_video';
+        }
+
+        if ($episodes->isNotEmpty()) {
+            $publishedEpisodeIds = $publishedMedia
+                ->pluck('episode_id')
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($episodes->whereNotIn('id', $publishedEpisodeIds)->isNotEmpty()) {
+                $flags[] = 'episodes_without_video';
+            }
+        }
+
+        if ($media->contains(fn (LicensedMedia $media): bool => $media->status === 'unavailable'
+            || in_array($media->check_status, ['check_failed', 'unavailable'], true))) {
+            $flags[] = 'unavailable_video';
         }
 
         return $flags;

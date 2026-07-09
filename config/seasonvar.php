@@ -9,6 +9,7 @@ return [
         'sleep_seconds' => (int) env('SEASONVAR_IMPORT_SLEEP_SECONDS', 60),
         'refresh_after_hours' => (int) env('SEASONVAR_IMPORT_REFRESH_AFTER_HOURS', 168),
         'season_url_limit' => (int) env('SEASONVAR_IMPORT_SEASON_URL_LIMIT', 200),
+        'missing_data_retry_hours' => (int) env('SEASONVAR_IMPORT_MISSING_DATA_RETRY_HOURS', 24),
         'lock_seconds' => (int) env('SEASONVAR_IMPORT_LOCK_SECONDS', 604800),
         'stale_after_minutes' => (int) env('SEASONVAR_IMPORT_STALE_AFTER_MINUTES', 15),
         'source_status_backfill_per_cycle' => (int) env('SEASONVAR_SOURCE_STATUS_BACKFILL_PER_CYCLE', 1000),
