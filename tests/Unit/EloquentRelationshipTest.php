@@ -108,7 +108,6 @@ class EloquentRelationshipTest extends TestCase
             'status' => 'running',
             'force' => '1',
             'forever' => '0',
-            'process_id' => '1234',
             'cycles' => '2',
             'discovered' => '3',
             'stored' => '4',
@@ -166,7 +165,6 @@ class EloquentRelationshipTest extends TestCase
         $this->assertSame(['timeout' => 15], $source->settings);
         $this->assertTrue($run->refresh()->force);
         $this->assertFalse($run->forever);
-        $this->assertSame(1234, $run->process_id);
         $this->assertSame(2, $run->cycles);
         $this->assertSame(10, $run->media_failed);
         $this->assertSame(['ok' => true], $run->summary);
