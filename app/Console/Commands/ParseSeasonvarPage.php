@@ -6,7 +6,6 @@ use App\Console\Commands\Concerns\OutputsSeasonvarProgress;
 use App\Models\CatalogTitle;
 use App\Models\Season;
 use App\Models\SourcePage;
-use App\Services\Media\LicensedMediaAutoAttacher;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -54,7 +53,7 @@ class ParseSeasonvarPage extends Command
     /**
      * Execute the console command.
      */
-    public function handle(SeasonvarCatalogImporter $importer, LicensedMediaAutoAttacher $mediaAttacher): int
+    public function handle(SeasonvarCatalogImporter $importer): int
     {
         $url = trim((string) ($this->argument('url') ?: self::DEFAULT_URL));
         $progress = $this->seasonvarProgress();
@@ -76,7 +75,6 @@ class ParseSeasonvarPage extends Command
                 return self::FAILURE;
             }
 
-            $mediaResult = $mediaAttacher->attachForTitle($catalogTitle, max(1, (int) $this->option('season-limit')), $progress);
             $catalogTitle = $this->freshCatalogTitle($catalogTitle) ?? $catalogTitle;
 
             $this->info(sprintf(
@@ -85,7 +83,7 @@ class ParseSeasonvarPage extends Command
                 route('titles.show', $catalogTitle, false),
                 $catalogTitle->seasons_count,
                 $catalogTitle->episodes_count,
-                $catalogTitle->licensed_media_count ?? ($mediaResult['attached'] + $mediaResult['updated']),
+                $catalogTitle->licensed_media_count,
                 $this->catalogRelationCount($catalogTitle),
                 $parsedUrls->count(),
             ));

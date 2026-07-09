@@ -17,7 +17,7 @@ class ExternalPlaylistImporter
     /**
      * @var list<string>
      */
-    private array $mediaExtensions = ['mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi', 'm3u8'];
+    private array $mediaExtensions = ['mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi', 'm3u', 'm3u8'];
 
     /**
      * @return array{

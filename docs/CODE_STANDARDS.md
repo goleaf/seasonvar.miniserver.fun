@@ -42,6 +42,8 @@ Update these files together when relevant:
 - Importer discovered URL storage must process URLs chunk by chunk, use batch `upsert`, and must not reset existing source pages to pending.
 - Importer title upsert must try exact `source_url_hash` lookup before wider title-based duplicate detection.
 - Importer must skip HTML parsing and catalog writes for unchanged pages that are already parsed and have an existing catalog title.
+- Age rating relation values must be strict short ratings like `18+`, `16+`, `12+`; long text must never be stored as an age rating.
+- Filter relation values for genre, country, status, network, studio, and tag must stay short and must not contain description-like sentences.
 - Store season/episode structure as `seasons` and `episodes`, not as tags.
 
 ## Query standards

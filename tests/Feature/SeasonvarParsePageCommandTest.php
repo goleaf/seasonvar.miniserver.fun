@@ -13,21 +13,15 @@ class SeasonvarParsePageCommandTest extends TestCase
     public function test_it_parses_requested_page_and_all_detected_seasons_into_one_title(): void
     {
         config(['seasonvar.crawl_delay_seconds' => 0]);
-        config(['licensed_media.playlist_urls' => ['https://playlist.example.com/kitchen.m3u']]);
         Http::preventStrayRequests();
         Http::fake([
             'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html' => Http::response($this->seasonPageHtml(4, [
                 1 => 'Пробуждение',
                 2 => 'Проверка',
-            ])),
+            ], ['https://media.example.com/kitchen/cernyi-spisok-na-kuxne-s04e02.mp4'])),
             'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-1-season.html' => Http::response($this->seasonPageHtml(1, [
                 1 => 'Начало',
             ])),
-            'playlist.example.com/*' => Http::response(<<<'M3U'
-                #EXTM3U
-                #EXTINF:-1,Черный список: На кухне S04E02
-                https://media.example.com/kitchen/s04e02.mp4
-                M3U),
         ]);
 
         $this->artisan('seasonvar:parse-page', [
@@ -58,9 +52,8 @@ class SeasonvarParsePageCommandTest extends TestCase
             'title' => 'Проверка',
         ]);
         $this->assertDatabaseHas('licensed_media', [
-            'title' => 'Черный список: На кухне S04E02',
-            'storage_disk' => 'external_playlist',
-            'playback_url' => 'https://media.example.com/kitchen/s04e02.mp4',
+            'storage_disk' => 'seasonvar_parsed',
+            'playback_url' => 'https://media.example.com/kitchen/cernyi-spisok-na-kuxne-s04e02.mp4',
             'status' => 'published',
         ]);
         $this->assertDatabaseHas('source_pages', [
@@ -73,10 +66,39 @@ class SeasonvarParsePageCommandTest extends TestCase
         ]);
     }
 
+    public function test_it_imports_m3u_playlist_discovered_in_page_html(): void
+    {
+        config(['seasonvar.crawl_delay_seconds' => 0]);
+        Http::preventStrayRequests();
+        Http::fake([
+            'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html' => Http::response($this->seasonPageHtml(4, [
+                2 => 'Проверка',
+            ], ['https://playlist.example.com/kitchen.m3u'])),
+            'playlist.example.com/*' => Http::response(<<<'M3U'
+                #EXTM3U
+                #EXTINF:-1,Черный список: На кухне S04E02
+                https://media.example.com/kitchen/s04e02.mp4
+                M3U),
+        ]);
+
+        $this->artisan('seasonvar:parse-page', [
+            'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
+            '--page-only' => true,
+        ])->assertExitCode(0);
+
+        $this->assertDatabaseHas('licensed_media', [
+            'title' => 'Черный список: На кухне S04E02',
+            'storage_disk' => 'external_playlist',
+            'playback_url' => 'https://media.example.com/kitchen/s04e02.mp4',
+            'status' => 'published',
+        ]);
+    }
+
     /**
      * @param  array<int, string>  $episodes
+     * @param  list<string>  $mediaUrls
      */
-    private function seasonPageHtml(int $seasonNumber, array $episodes): string
+    private function seasonPageHtml(int $seasonNumber, array $episodes, array $mediaUrls = []): string
     {
         $episodeItems = collect($episodes)
             ->mapWithKeys(fn (string $title, int $number): array => [
@@ -84,6 +106,7 @@ class SeasonvarParsePageCommandTest extends TestCase
             ])
             ->all();
         $episodesJson = json_encode([$episodeItems], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+        $mediaJson = json_encode($mediaUrls, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 
         return <<<HTML
             <html>
@@ -107,6 +130,7 @@ class SeasonvarParsePageCommandTest extends TestCase
                     </div>
                     <script>
                         var arEpisodes = {$episodesJson};
+                        var parsedMedia = {$mediaJson};
                     </script>
                 </body>
             </html>

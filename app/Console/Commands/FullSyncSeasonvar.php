@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use App\Console\Commands\Concerns\OutputsSeasonvarProgress;
 use App\Models\SourcePage;
-use App\Services\Media\LicensedMediaAutoAttacher;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarSitemapMirror;
 use Illuminate\Console\Attributes\Description;
@@ -13,7 +12,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Throwable;
 
-#[Signature('seasonvar:full-sync {--discover= : Сколько ссылок из карты сайта добавлять за цикл} {--parse= : Сколько страниц из очереди разбирать за цикл} {--sleep= : Пауза между циклами в секундах} {--once : Выполнить один цикл и остановиться} {--no-media : Не подключать медиа автоматически из настроенного хранилища}')]
+#[Signature('seasonvar:full-sync {--discover= : Сколько ссылок из карты сайта добавлять за цикл} {--parse= : Сколько страниц из очереди разбирать за цикл} {--sleep= : Пауза между циклами в секундах} {--once : Выполнить один цикл и остановиться}')]
 #[Description('Постоянно находит, сохраняет и разбирает каталог seasonvar.ru из sitemap_index.xml')]
 class FullSyncSeasonvar extends Command
 {
@@ -27,7 +26,6 @@ class FullSyncSeasonvar extends Command
     public function handle(
         SeasonvarCatalogImporter $importer,
         SeasonvarSitemapMirror $sitemapMirror,
-        LicensedMediaAutoAttacher $mediaAttacher,
     ): int {
         $this->registerSignalHandlers();
 
@@ -48,7 +46,7 @@ class FullSyncSeasonvar extends Command
             $cycle++;
 
             try {
-                $this->runCycle($importer, $sitemapMirror, $mediaAttacher, $cycle, $discoverLimit, $parseLimit);
+                $this->runCycle($importer, $sitemapMirror, $cycle, $discoverLimit, $parseLimit);
             } catch (Throwable $exception) {
                 $this->writeSeasonvarProgress('full-sync-cycle-failed', [
                     'cycle' => $cycle,
@@ -78,7 +76,6 @@ class FullSyncSeasonvar extends Command
     private function runCycle(
         SeasonvarCatalogImporter $importer,
         SeasonvarSitemapMirror $sitemapMirror,
-        LicensedMediaAutoAttacher $mediaAttacher,
         int $cycle,
         int $discoverLimit,
         int $parseLimit,
@@ -94,9 +91,6 @@ class FullSyncSeasonvar extends Command
         $stored = $importer->storeDiscoveredUrls($urls);
         $pages = $this->pagesForParseCycle($importer, $parseLimit, $progress);
         $parseResult = $importer->parsePages($pages, $progress);
-        $mediaResult = (bool) $this->option('no-media')
-            ? ['attached' => 0, 'updated' => 0, 'skipped' => 0, 'failed' => 0]
-            : $mediaAttacher->attachRecent($parseLimit, $progress);
 
         foreach ($parseResult['failures'] as $failure) {
             $this->warn("Ошибка: {$failure}");
@@ -113,7 +107,9 @@ class FullSyncSeasonvar extends Command
             'selected_for_parse' => $pages->count(),
             'parsed' => $parseResult['parsed'],
             'failed' => $parseResult['failed'],
-            'media_attached' => $mediaResult['attached'] + $mediaResult['updated'],
+            'media_attached' => $parseResult['media_attached'] + $parseResult['media_updated'],
+            'media_skipped' => $parseResult['media_skipped'],
+            'media_failed' => $parseResult['media_failed'],
         ]);
     }
 

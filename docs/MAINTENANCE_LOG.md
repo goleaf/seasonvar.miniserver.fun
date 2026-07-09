@@ -2,6 +2,8 @@
 
 ## 2026-07-09
 
+- Removed description text that had been imported as countries and blocked description-like relation names from future imports.
+- Blocked long text from being imported as age rating relations.
 - Fixed chunked discovered URL `upsert` payload handling and kept sitemap URL storage memory-bounded.
 - Added unchanged-page fast path to skip HTML parsing and catalog writes when parsed content hash is unchanged.
 - Optimized Seasonvar catalog-title upsert with exact `source_url_hash` lookup before title-based duplicate detection.

@@ -42,6 +42,33 @@ class SeasonvarCatalogParserTest extends TestCase
         $this->assertSame('https://seasonvar.ru/serial-1276--6_kadrov-1-season.html', $data['seasons'][0]['source_url']);
     }
 
+    public function test_it_extracts_public_media_candidates_from_page_scripts(): void
+    {
+        $parser = app(SeasonvarCatalogParser::class);
+
+        $data = $parser->parse(
+            <<<'HTML'
+            <html>
+                <head><title>6 кадров 2 сезон смотреть онлайн</title></head>
+                <body>
+                    <h1>6 кадров 2 сезон</h1>
+                    <script>
+                        var arEpisodes = [{"1_seriya":{"n":"1","next":"2"},"2_seriya":{"n":"2"}}];
+                        var visibleFiles = ["https://media.example.com/files/6-kadrov-s02e02.mp4"];
+                    </script>
+                </body>
+            </html>
+            HTML,
+            'https://seasonvar.ru/serial-1277--6_kadrov-2-season.html',
+        );
+
+        $this->assertCount(1, $data['media']);
+        $this->assertSame('https://media.example.com/files/6-kadrov-s02e02.mp4', $data['media'][0]['url']);
+        $this->assertSame(2, $data['media'][0]['season_number']);
+        $this->assertSame(2, $data['media'][0]['episode_number']);
+        $this->assertSame('file', $data['media'][0]['kind']);
+    }
+
     public function test_it_normalizes_root_relative_urls_against_the_site_origin(): void
     {
         $url = app(SeasonvarUrl::class);

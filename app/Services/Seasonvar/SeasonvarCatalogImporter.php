@@ -10,6 +10,7 @@ use App\Models\Country;
 use App\Models\Director;
 use App\Models\Episode;
 use App\Models\Genre;
+use App\Models\LicensedMedia;
 use App\Models\Network;
 use App\Models\Season;
 use App\Models\SourcePage;
@@ -17,6 +18,7 @@ use App\Models\Studio;
 use App\Models\Tag;
 use App\Models\Translation;
 use App\Services\Crawler\PoliteHttpClient;
+use App\Services\Media\ExternalPlaylistImporter;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +47,7 @@ class SeasonvarCatalogImporter
         private readonly SeasonvarUrl $seasonvarUrl,
         private readonly PoliteHttpClient $httpClient,
         private readonly SeasonvarCatalogParser $parser,
+        private readonly ExternalPlaylistImporter $playlistImporter,
     ) {}
 
     /**
@@ -276,12 +279,16 @@ class SeasonvarCatalogImporter
     /**
      * @param  Collection<int, SourcePage>  $pages
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
-     * @return array{parsed: int, failed: int, failures: list<string>}
+     * @return array{parsed: int, failed: int, media_attached: int, media_updated: int, media_skipped: int, media_failed: int, failures: list<string>}
      */
     public function parsePages(Collection $pages, ?callable $progress = null): array
     {
         $parsed = 0;
         $failed = 0;
+        $mediaAttached = 0;
+        $mediaUpdated = 0;
+        $mediaSkipped = 0;
+        $mediaFailed = 0;
         $failures = [];
         $total = $pages->count();
 
@@ -302,7 +309,11 @@ class SeasonvarCatalogImporter
             ]);
 
             try {
-                $this->parsePage($page, $progress);
+                $pageResult = $this->parsePage($page, $progress);
+                $mediaAttached += $pageResult['media_attached'];
+                $mediaUpdated += $pageResult['media_updated'];
+                $mediaSkipped += $pageResult['media_skipped'];
+                $mediaFailed += $pageResult['media_failed'];
                 $parsed++;
 
                 $this->report($progress, 'parse-batch-item-complete', [
@@ -311,6 +322,8 @@ class SeasonvarCatalogImporter
                     'source_page_id' => $page->id,
                     'parsed' => $parsed,
                     'failed' => $failed,
+                    'media_attached' => $mediaAttached,
+                    'media_updated' => $mediaUpdated,
                 ]);
             } catch (Throwable $exception) {
                 $page->update([
@@ -338,19 +351,28 @@ class SeasonvarCatalogImporter
             'total' => $total,
             'parsed' => $parsed,
             'failed' => $failed,
+            'media_attached' => $mediaAttached,
+            'media_updated' => $mediaUpdated,
+            'media_skipped' => $mediaSkipped,
+            'media_failed' => $mediaFailed,
         ]);
 
         return [
             'parsed' => $parsed,
             'failed' => $failed,
+            'media_attached' => $mediaAttached,
+            'media_updated' => $mediaUpdated,
+            'media_skipped' => $mediaSkipped,
+            'media_failed' => $mediaFailed,
             'failures' => $failures,
         ];
     }
 
     /**
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @return array{catalog_title: CatalogTitle|null, media_attached: int, media_updated: int, media_skipped: int, media_failed: int}
      */
-    public function parsePage(SourcePage $page, ?callable $progress = null): void
+    public function parsePage(SourcePage $page, ?callable $progress = null): array
     {
         $source = $page->source;
         $crawlDelaySeconds = (int) $source->crawl_delay_seconds;
@@ -414,8 +436,10 @@ class SeasonvarCatalogImporter
         }
 
         $existingCatalogTitle = $this->findCatalogTitleBySourceUrlHash($page, $this->seasonvarUrl->hash($page->url));
+        $needsMediaRefresh = $existingCatalogTitle !== null
+            && ! $existingCatalogTitle->licensedMedia()->exists();
 
-        if (! $contentChanged && $page->parse_status === 'parsed' && $existingCatalogTitle !== null) {
+        if (! $contentChanged && $page->parse_status === 'parsed' && $existingCatalogTitle !== null && ! $needsMediaRefresh) {
             $this->report($progress, 'page-parse-skipped-unchanged', [
                 'source_page_id' => $page->id,
                 'catalog_title_id' => $existingCatalogTitle->id,
@@ -424,7 +448,13 @@ class SeasonvarCatalogImporter
                 'url' => $page->url,
             ]);
 
-            return;
+            return [
+                'catalog_title' => $existingCatalogTitle,
+                'media_attached' => 0,
+                'media_updated' => 0,
+                'media_skipped' => 0,
+                'media_failed' => 0,
+            ];
         }
 
         $this->report($progress, 'html-parse-started', [
@@ -444,30 +474,52 @@ class SeasonvarCatalogImporter
             'poster_url' => $data['poster_url'],
             'seasons' => count($data['seasons']),
             'episodes' => count($data['episodes']),
+            'media_candidates' => count($data['media']),
             'taxonomies' => count($data['taxonomies']),
         ]);
 
-        $catalogTitle = DB::transaction(function () use ($page, $data, $contentHash, $progress): CatalogTitle {
+        $transactionResult = DB::transaction(function () use ($page, $data, $contentHash, $progress): array {
             $catalogTitle = $this->upsertCatalogTitle($page, $data, $contentHash, $progress);
             $this->syncCatalogRelations($catalogTitle, $data['taxonomies'], $progress);
             $seasons = $this->syncSeasons($catalogTitle, $page, $data['seasons'], $progress);
             $this->syncEpisodes($seasons, $page, $data['episodes'], $progress);
+            $mediaResult = $this->syncParsedMedia($catalogTitle, $seasons, $data['media'], $progress);
 
             $page->update([
                 'parse_status' => 'parsed',
                 'error_message' => null,
             ]);
 
-            return $catalogTitle;
+            return [
+                'catalog_title' => $catalogTitle,
+                'media' => $mediaResult,
+            ];
         });
+        $catalogTitle = $transactionResult['catalog_title'];
+        $mediaResult = $this->mergeMediaResult(
+            $transactionResult['media'],
+            $this->importParsedPlaylists($catalogTitle, $data['media'], $progress),
+        );
 
         $this->report($progress, 'page-parse-complete', [
             'source_page_id' => $page->id,
             'catalog_title_id' => $catalogTitle->id,
             'title' => $catalogTitle->title,
             'slug' => $catalogTitle->slug,
+            'media_attached' => $mediaResult['attached'],
+            'media_updated' => $mediaResult['updated'],
+            'media_skipped' => $mediaResult['skipped'],
+            'media_failed' => $mediaResult['failed'],
             'url' => $page->url,
         ]);
+
+        return [
+            'catalog_title' => $catalogTitle,
+            'media_attached' => $mediaResult['attached'],
+            'media_updated' => $mediaResult['updated'],
+            'media_skipped' => $mediaResult['skipped'],
+            'media_failed' => $mediaResult['failed'],
+        ];
     }
 
     /**
@@ -482,6 +534,7 @@ class SeasonvarCatalogImporter
      *     current_season_number: int,
      *     seasons: list<array{number: int, title: string|null, source_url: string|null, latest_episode_released_at: string|null, episodes_released: int|null, episodes_total: int|null, translation_name: string|null, release_status_text: string|null}>,
      *     episodes: list<array{season_number: int, number: int, title: string|null, source_url: string|null}>,
+     *     media: list<array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string}>,
      *     taxonomies: list<array{type: string, name: string, source_url: string|null}>
      * } $data
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
@@ -661,6 +714,7 @@ class SeasonvarCatalogImporter
             ->all();
         $relationsByType = collect($taxonomies)
             ->filter(fn (array $item): bool => isset(self::RELATION_TYPES[$item['type']]))
+            ->filter(fn (array $item): bool => $this->isValidRelationName($item['type'], $item['name']))
             ->groupBy('type');
 
         foreach ($relationsByType as $type => $items) {
@@ -735,6 +789,22 @@ class SeasonvarCatalogImporter
     private function relationSlug(string $type, string $name): string
     {
         return Str::slug($name) ?: Str::substr(hash('sha256', $type.'|'.$name), 0, 16);
+    }
+
+    private function isValidRelationName(string $type, string $name): bool
+    {
+        $name = Str::squish($name);
+
+        if ($name === '' || Str::length($name) > 120) {
+            return false;
+        }
+
+        return match ($type) {
+            'age_rating' => preg_match('/^\d{1,2}\+?$/u', $name) === 1,
+            'genre', 'country', 'status', 'network', 'studio', 'tag' => Str::length($name) <= 80
+                && preg_match('/[.!?]|(?:главн|добро пожаловать|типичная жизнь|сериал)/iu', $name) !== 1,
+            default => true,
+        };
     }
 
     /**
@@ -870,6 +940,222 @@ class SeasonvarCatalogImporter
             'synced' => $rowsByKey->count(),
             'skipped' => $skipped,
         ]);
+    }
+
+    /**
+     * @param  array<int, Season>  $seasons
+     * @param  list<array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string}>  $mediaItems
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @return array{attached: int, updated: int, skipped: int, failed: int}
+     */
+    private function syncParsedMedia(CatalogTitle $catalogTitle, array $seasons, array $mediaItems, ?callable $progress = null): array
+    {
+        $result = $this->emptyMediaResult();
+
+        $this->report($progress, 'seasonvar-media-sync-started', [
+            'catalog_title_id' => $catalogTitle->id,
+            'candidates' => count($mediaItems),
+        ]);
+
+        if ($mediaItems === [] || $seasons === []) {
+            $this->report($progress, 'seasonvar-media-sync-complete', [
+                'catalog_title_id' => $catalogTitle->id,
+                'attached' => 0,
+                'updated' => 0,
+                'skipped' => count($mediaItems),
+                'failed' => 0,
+            ]);
+
+            return [
+                'attached' => 0,
+                'updated' => 0,
+                'skipped' => count($mediaItems),
+                'failed' => 0,
+            ];
+        }
+
+        $seasonIds = collect($seasons)
+            ->map(fn (Season $season): int => (int) $season->id)
+            ->values();
+        $episodesBySeasonAndNumber = Episode::query()
+            ->whereIn('season_id', $seasonIds)
+            ->get()
+            ->keyBy(fn (Episode $episode): string => $episode->season_id.'|'.$episode->number);
+
+        foreach ($mediaItems as $item) {
+            if (! $this->isDirectPlayerMediaUrl($item['url'])) {
+                $result['skipped']++;
+
+                continue;
+            }
+
+            try {
+                $playbackUrl = $this->playlistImporter->safeExternalUrl($item['url']);
+            } catch (Throwable $exception) {
+                $result['skipped']++;
+                $this->report($progress, 'seasonvar-media-skipped', [
+                    'catalog_title_id' => $catalogTitle->id,
+                    'url' => $item['url'],
+                    'reason' => $exception->getMessage(),
+                ]);
+
+                continue;
+            }
+
+            $seasonNumber = $item['season_number'];
+            $episodeNumber = $item['episode_number'];
+            $season = $seasonNumber !== null ? ($seasons[$seasonNumber] ?? null) : null;
+            $episode = $season !== null && $episodeNumber !== null
+                ? $episodesBySeasonAndNumber->get($season->id.'|'.$episodeNumber)
+                : null;
+
+            if ($season === null || $episode === null) {
+                $result['skipped']++;
+                $this->report($progress, 'seasonvar-media-skipped', [
+                    'catalog_title_id' => $catalogTitle->id,
+                    'url' => $playbackUrl,
+                    'season_number' => $seasonNumber,
+                    'episode_number' => $episodeNumber,
+                    'reason' => 'серия для медиа не найдена',
+                ]);
+
+                continue;
+            }
+
+            $wasExisting = LicensedMedia::query()
+                ->where('catalog_title_id', $catalogTitle->id)
+                ->where('playback_url', $playbackUrl)
+                ->exists();
+
+            $media = LicensedMedia::query()->updateOrCreate(
+                [
+                    'catalog_title_id' => $catalogTitle->id,
+                    'playback_url' => $playbackUrl,
+                ],
+                [
+                    'season_id' => $season->id,
+                    'episode_id' => $episode->id,
+                    'title' => $item['title'] ?: $this->mediaTitle($catalogTitle, $season, $episode),
+                    'storage_disk' => 'seasonvar_parsed',
+                    'path' => $playbackUrl,
+                    'status' => 'published',
+                    'published_at' => now(),
+                ],
+            );
+
+            $result[$wasExisting ? 'updated' : 'attached']++;
+            $this->report($progress, $media->wasRecentlyCreated ? 'seasonvar-media-attached' : 'seasonvar-media-updated', [
+                'catalog_title_id' => $catalogTitle->id,
+                'licensed_media_id' => $media->id,
+                'season_number' => $season->number,
+                'episode_number' => $episode->number,
+                'playback_url' => $playbackUrl,
+            ]);
+        }
+
+        $this->report($progress, 'seasonvar-media-sync-complete', [
+            'catalog_title_id' => $catalogTitle->id,
+            'attached' => $result['attached'],
+            'updated' => $result['updated'],
+            'skipped' => $result['skipped'],
+            'failed' => $result['failed'],
+        ]);
+
+        return $result;
+    }
+
+    /**
+     * @param  list<array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string}>  $mediaItems
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @return array{attached: int, updated: int, skipped: int, failed: int}
+     */
+    private function importParsedPlaylists(CatalogTitle $catalogTitle, array $mediaItems, ?callable $progress = null): array
+    {
+        $result = $this->emptyMediaResult();
+        $playlistUrls = collect($mediaItems)
+            ->filter(fn (array $item): bool => $item['kind'] === 'playlist' && $this->parsedMediaExtension($item['url']) === 'm3u')
+            ->pluck('url')
+            ->unique(fn (string $url): string => Str::lower($url))
+            ->values();
+
+        if ($playlistUrls->isEmpty()) {
+            return $result;
+        }
+
+        foreach ($playlistUrls as $playlistUrl) {
+            try {
+                $playlistResult = $this->playlistImporter->importFromUrl(
+                    (string) $playlistUrl,
+                    $catalogTitle->loadMissing(['seasons.episodes']),
+                );
+
+                $result['attached'] += $playlistResult['imported'];
+                $result['updated'] += $playlistResult['updated'];
+                $result['skipped'] += $playlistResult['skipped'] + $playlistResult['unmatched'];
+
+                $this->report($progress, 'seasonvar-media-playlist-import-complete', [
+                    'catalog_title_id' => $catalogTitle->id,
+                    'url' => $playlistUrl,
+                    'imported' => $playlistResult['imported'],
+                    'updated' => $playlistResult['updated'],
+                    'skipped' => $playlistResult['skipped'],
+                    'unmatched' => $playlistResult['unmatched'],
+                ]);
+            } catch (Throwable $exception) {
+                $result['failed']++;
+                $this->report($progress, 'seasonvar-media-playlist-import-failed', [
+                    'catalog_title_id' => $catalogTitle->id,
+                    'url' => $playlistUrl,
+                    'exception' => $exception::class,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        return $result;
+    }
+
+    private function mediaTitle(CatalogTitle $catalogTitle, Season $season, Episode $episode): string
+    {
+        return sprintf('%s - %d сезон %d серия', $catalogTitle->title, $season->number, $episode->number);
+    }
+
+    private function isDirectPlayerMediaUrl(string $url): bool
+    {
+        return in_array($this->parsedMediaExtension($url), ['mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi', 'm3u8'], true);
+    }
+
+    private function parsedMediaExtension(string $url): string
+    {
+        return Str::lower(pathinfo((string) parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION));
+    }
+
+    /**
+     * @return array{attached: int, updated: int, skipped: int, failed: int}
+     */
+    private function emptyMediaResult(): array
+    {
+        return [
+            'attached' => 0,
+            'updated' => 0,
+            'skipped' => 0,
+            'failed' => 0,
+        ];
+    }
+
+    /**
+     * @param  array{attached: int, updated: int, skipped: int, failed: int}  $left
+     * @param  array{attached: int, updated: int, skipped: int, failed: int}  $right
+     * @return array{attached: int, updated: int, skipped: int, failed: int}
+     */
+    private function mergeMediaResult(array $left, array $right): array
+    {
+        return [
+            'attached' => $left['attached'] + $right['attached'],
+            'updated' => $left['updated'] + $right['updated'],
+            'skipped' => $left['skipped'] + $right['skipped'],
+            'failed' => $left['failed'] + $right['failed'],
+        ];
     }
 
     /**

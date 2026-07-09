@@ -7,7 +7,6 @@ use App\Models\Episode;
 use App\Models\Season;
 use App\Models\Source;
 use App\Models\SourcePage;
-use App\Services\Media\LicensedMediaAutoAttacher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -139,50 +138,5 @@ class ExternalPlaylistImportTest extends TestCase
             ->assertSeeText('Выбрана 3 серия')
             ->assertSeeText('Файл для выбранной серии еще не подключен')
             ->assertSeeText('без файла');
-    }
-
-    public function test_it_auto_attaches_episode_media_from_configured_url_pattern(): void
-    {
-        config([
-            'licensed_media.remote_base_url' => 'https://media.example.com/files',
-            'licensed_media.default_extension' => 'mp4',
-            'licensed_media.episode_path_patterns' => ['{slug}/s{season_pad2}e{episode_pad2}.{extension}'],
-            'licensed_media.verify_remote_files' => false,
-        ]);
-
-        $source = Source::factory()->create(['code' => 'seasonvar']);
-        $page = SourcePage::factory()->create(['source_id' => $source->id]);
-        $catalogTitle = CatalogTitle::factory()->create([
-            'source_id' => $source->id,
-            'source_page_id' => $page->id,
-            'slug' => '6-kadrov',
-            'title' => '6 кадров',
-        ]);
-        $season = Season::factory()->create([
-            'catalog_title_id' => $catalogTitle->id,
-            'number' => 1,
-        ]);
-        $episode = Episode::factory()->create([
-            'season_id' => $season->id,
-            'number' => 2,
-        ]);
-
-        $result = app(LicensedMediaAutoAttacher::class)->attachForTitle($catalogTitle);
-
-        $this->assertSame(1, $result['attached']);
-        $this->assertDatabaseHas('licensed_media', [
-            'catalog_title_id' => $catalogTitle->id,
-            'season_id' => $season->id,
-            'episode_id' => $episode->id,
-            'title' => '6 кадров - 1 сезон 2 серия',
-            'storage_disk' => 'remote_pattern',
-            'playback_url' => 'https://media.example.com/files/6-kadrov/s01e02.mp4',
-            'status' => 'published',
-        ]);
-
-        $this->get(route('titles.show', ['catalogTitle' => $catalogTitle, 'episode' => $episode->id]))
-            ->assertOk()
-            ->assertSeeText('видео найдено')
-            ->assertSee('https://media.example.com/files/6-kadrov/s01e02.mp4');
     }
 }
