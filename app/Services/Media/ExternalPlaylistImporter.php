@@ -31,7 +31,7 @@ class ExternalPlaylistImporter
      *     items: list<array<string, mixed>>
      * }
      */
-    public function importFromUrl(string $playlistUrl, ?CatalogTitle $forcedTitle = null, int $limit = 500, bool $dryRun = false): array
+    public function importFromUrl(string $playlistUrl, ?CatalogTitle $forcedTitle = null, bool $dryRun = false): array
     {
         $safePlaylistUrl = $this->safeExternalUrl($playlistUrl);
         $response = Http::timeout(10)
@@ -43,7 +43,7 @@ class ExternalPlaylistImporter
             throw new RuntimeException('Плейлист вернул HTTP '.$response->status().'.');
         }
 
-        return $this->importFromContent($response->body(), $safePlaylistUrl, $forcedTitle, $limit, $dryRun);
+        return $this->importFromContent($response->body(), $safePlaylistUrl, $forcedTitle, $dryRun);
     }
 
     /**
@@ -56,9 +56,9 @@ class ExternalPlaylistImporter
      *     items: list<array<string, mixed>>
      * }
      */
-    public function importFromContent(string $content, string $baseUrl, ?CatalogTitle $forcedTitle = null, int $limit = 500, bool $dryRun = false): array
+    public function importFromContent(string $content, string $baseUrl, ?CatalogTitle $forcedTitle = null, bool $dryRun = false): array
     {
-        $entries = array_slice($this->parse($content, $baseUrl), 0, max(1, $limit));
+        $entries = $this->parse($content, $baseUrl);
         $titles = $forcedTitle === null
             ? CatalogTitle::query()->with(['seasons.episodes'])->get()
             : new EloquentCollection([$forcedTitle->loadMissing(['seasons.episodes'])]);

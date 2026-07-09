@@ -1,12 +1,12 @@
-# Upgrade Notes
+# Обновление Laravel 13
 
-Updated: 2026-07-09
+Обновлено: 09.07.2026
 
-## Laravel 13 Status
+## Состояние Laravel 13
 
-The application is already upgraded to Laravel 13 and was verified against the official Laravel 13 upgrade guide through Laravel Boost documentation search.
+Приложение уже обновлено до Laravel 13 и проверено по официальному руководству обновления Laravel через документацию Laravel Boost.
 
-Verified local versions:
+Проверенные локальные версии:
 
 - PHP 8.5.7
 - Laravel Framework 13.19.0
@@ -16,32 +16,32 @@ Verified local versions:
 - PHPUnit 12.5.31
 - Tailwind CSS 4.3.2
 
-## Dependency Requirements
+## Требования зависимостей
 
-The Laravel 13 guide requires these project-level constraints, which are already present:
+Руководство Laravel 13 требует эти ограничения пакетов, и они уже указаны в проекте:
 
 - `laravel/framework`: `^13.8`
 - `laravel/boost`: `^2.4`
 - `laravel/tinker`: `^3.0`
 - `phpunit/phpunit`: `^12.5`
 
-Pest is not installed in this project, so the Laravel 13 Pest constraint does not apply. PHPUnit 13 is available upstream, but this project intentionally stays on PHPUnit 12 because that is the Laravel 13 upgrade-guide target and the current test suite is configured for PHPUnit 12.
+Pest в проекте не установлен, поэтому требование Laravel 13 для Pest не применяется. PHPUnit 13 уже доступен выше по цепочке, но проект остается на PHPUnit 12, потому что это целевая версия из руководства обновления Laravel 13 и текущий набор тестов настроен под PHPUnit 12.
 
-## Compatibility Review
+## Проверка совместимости
 
-Reviewed Laravel 13 breaking-change areas that apply to this application:
+Проверены зоны изменений Laravel 13, которые относятся к этому приложению:
 
-- No direct application references to deprecated `VerifyCsrfToken` or `ValidateCsrfToken` middleware aliases.
-- Cache config already includes `serializable_classes => false`.
-- Cache, Redis, and session prefixes are explicitly configured in application config files.
-- No custom queue driver, cache store, dispatcher, response factory, notification, or `MustVerifyEmail` implementations were found.
-- No direct references to the old Bootstrap pagination view names were found.
-- No domain routes are registered, so Laravel 13 domain route precedence does not affect current routes.
-- No custom model `boot()` methods instantiate models during model booting.
+- Нет прямых ссылок приложения на устаревшие alias middleware `VerifyCsrfToken` или `ValidateCsrfToken`.
+- В конфигурации cache уже есть `serializable_classes => false`.
+- Префиксы cache, Redis и session явно заданы в конфигурационных файлах приложения.
+- Не найдены собственные реализации queue driver, cache store, dispatcher, response factory, notification или `MustVerifyEmail`.
+- Не найдены прямые ссылки на старые имена Bootstrap pagination views.
+- Domain routes не зарегистрированы, поэтому приоритет domain routes в Laravel 13 не влияет на текущие маршруты.
+- Не найдены собственные методы `boot()` моделей, которые создают модели во время boot модели.
 
 ## MCP
 
-Laravel Boost is the only required MCP server for Laravel upgrade work. The project config is:
+Для обслуживания Laravel в этом проекте нужен Laravel Boost. Конфигурация проекта:
 
 ```toml
 [mcp_servers.laravel-boost]
@@ -49,11 +49,11 @@ command = "php"
 args = ["artisan", "boost:mcp", "--env=local"]
 ```
 
-The `--env=local` flag is required because Laravel Boost only registers its MCP command in local/debug environments.
+Флаг `--env=local` нужен, потому что Laravel Boost регистрирует свою MCP-команду только в local/debug окружении.
 
-## Commands Used
+## Команды
 
-Use these commands for future Laravel 13 maintenance:
+Для будущего обслуживания Laravel 13 использовать:
 
 ```bash
 composer update laravel/framework laravel/boost laravel/tinker laravel/pint phpunit/phpunit --with-all-dependencies
@@ -64,19 +64,19 @@ php artisan test
 npm run build
 ```
 
-The 2026-07-09 targeted Composer update changed only `league/mime-type-detection` from 1.16.0 to 1.17.0.
+Точечное обновление Composer от 09.07.2026 изменило только `league/mime-type-detection` с `1.16.0` до `1.17.0`.
 
-## Verification Results
+## Результаты проверки
 
-The Laravel 13 verification pass completed with:
+Проверка Laravel 13 завершена так:
 
-- `composer validate --strict` passed.
-- `composer audit` found no security advisories.
-- `./vendor/bin/pint --dirty --format agent` passed.
-- `php artisan test` passed: 37 tests, 151 assertions.
-- `npm run build` passed. Vite still reports the existing large JavaScript chunk warning.
+- `composer validate --strict` прошел.
+- `composer audit` не нашел advisories безопасности.
+- `./vendor/bin/pint --dirty --format agent` прошел.
+- `php artisan test` прошел: 37 тестов, 151 assertion.
+- `npm run build` прошел. Vite по-прежнему показывает существующее предупреждение о большом JavaScript chunk.
 
-Not installed in this project:
+В проекте не установлены:
 
 - Pest
 - PHPStan

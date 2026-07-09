@@ -10,7 +10,9 @@ use App\Models\SeasonvarImportRun;
 use App\Models\Source;
 use App\Models\SourcePage;
 use App\Services\Media\ExternalMediaMetadata;
+use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarRefreshPlanner;
+use App\Services\Seasonvar\SeasonvarSitemapMirror;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -26,9 +28,9 @@ class SeasonvarImportMaintenanceTest extends TestCase
 
         config([
             'seasonvar.crawl_delay_seconds' => 0,
-            'seasonvar.import.parse_batch_size' => 5,
-            'seasonvar.media_check.backfill_per_cycle' => 5,
-            'seasonvar.media_identity.backfill_per_cycle' => 5,
+            'seasonvar.import.chunk_size' => 5,
+            'seasonvar.media_check.chunk_size' => 5,
+            'seasonvar.media_identity.chunk_size' => 5,
         ]);
     }
 
@@ -163,6 +165,129 @@ class SeasonvarImportMaintenanceTest extends TestCase
 
         $this->assertSame('parsed', $page->import_status);
         $this->assertNotNull($page->last_imported_at);
+    }
+
+    public function test_it_processes_all_pending_pages_across_import_chunks(): void
+    {
+        Http::preventStrayRequests();
+        config([
+            'seasonvar.import.chunk_size' => 1,
+            'seasonvar.media_check.enabled' => false,
+        ]);
+
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $urls = collect(range(47915, 47917))
+            ->map(fn (int $id): string => "https://seasonvar.ru/serial-{$id}-CHernyj_spisok_Na_kuhne-1-season.html");
+        $body = $this->refreshPlannerSeasonPageHtml([
+            1 => 'Начало',
+        ]);
+
+        foreach ($urls as $url) {
+            SourcePage::factory()->create([
+                'source_id' => $source->id,
+                'url' => $url,
+                'url_hash' => hash('sha256', $url),
+                'page_type' => 'serial',
+                'parse_status' => 'pending',
+                'import_status' => 'pending',
+                'last_imported_at' => null,
+            ]);
+        }
+
+        Http::fake([
+            'seasonvar.ru/*' => Http::response($body),
+        ]);
+
+        $this->artisan('seasonvar:import', ['--no-discovery' => true])
+            ->assertExitCode(0);
+
+        $run = SeasonvarImportRun::query()->latest('id')->firstOrFail();
+
+        $this->assertSame(3, $run->selected);
+        $this->assertSame(3, SourcePage::query()->whereIn('url', $urls)->where('parse_status', 'parsed')->count());
+    }
+
+    public function test_it_backfills_all_legacy_source_page_statuses_across_chunks(): void
+    {
+        Http::preventStrayRequests();
+        config([
+            'seasonvar.import.chunk_size' => 1,
+            'seasonvar.media_check.enabled' => false,
+        ]);
+
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+
+        foreach (range(1, 3) as $index) {
+            $url = "https://seasonvar.ru/serial-615--Bez_sleda_pssmtlk-{$index}-season.html";
+
+            SourcePage::factory()->create([
+                'source_id' => $source->id,
+                'url' => $url,
+                'url_hash' => hash('sha256', $url),
+                'page_type' => 'serial',
+                'parse_status' => 'parsed',
+                'import_status' => 'pending',
+                'last_crawled_at' => now()->subDay(),
+                'last_imported_at' => null,
+            ]);
+        }
+
+        $this->artisan('seasonvar:import', ['--no-discovery' => true])
+            ->assertExitCode(0);
+
+        $this->assertSame(3, SourcePage::query()->where('parse_status', 'parsed')->where('import_status', 'parsed')->count());
+    }
+
+    public function test_it_stores_all_urls_from_recursive_sitemap_completely(): void
+    {
+        Http::preventStrayRequests();
+
+        $serialUrls = collect(range(1, 6))
+            ->map(fn (int $index): string => "https://seasonvar.ru/serial-700{$index}-Polnyj_import-1-season.html");
+        $actorUrl = 'https://seasonvar.ru/actor/ivan-ivanov';
+
+        Http::fake([
+            'seasonvar.ru/sitemap_index.xml' => Http::response($this->sitemapIndexXml([
+                'https://seasonvar.ru/nested-index.xml',
+                'https://seasonvar.ru/plain-urlset.xml',
+            ])),
+            'seasonvar.ru/nested-index.xml' => Http::response($this->sitemapIndexXml([
+                'https://seasonvar.ru/serials.xml.gz',
+            ])),
+            'seasonvar.ru/serials.xml.gz' => Http::response(gzencode($this->sitemapUrlsetXml([
+                ...$serialUrls->take(4)->all(),
+                $actorUrl,
+            ]))),
+            'seasonvar.ru/plain-urlset.xml' => Http::response($this->sitemapUrlsetXml(
+                $serialUrls->skip(4)->values()->all(),
+            )),
+        ]);
+
+        $mirror = app(SeasonvarSitemapMirror::class)->mirror();
+        $stored = app(SeasonvarCatalogImporter::class)->storeDiscoveredUrls($mirror['urls']);
+
+        $this->assertSame(7, count($mirror['urls']));
+        $this->assertSame(7, $stored);
+        $this->assertSame(6, SourcePage::query()->where('page_type', 'serial')->count());
+        $this->assertDatabaseHas('source_pages', [
+            'url' => $actorUrl,
+            'page_type' => 'actor',
+        ]);
+
+        foreach ($serialUrls as $serialUrl) {
+            $this->assertDatabaseHas('source_pages', [
+                'url' => $serialUrl,
+                'page_type' => 'serial',
+            ]);
+        }
     }
 
     public function test_it_rechecks_recent_parsed_page_when_existing_episode_has_no_video(): void
@@ -449,21 +574,26 @@ class SeasonvarImportMaintenanceTest extends TestCase
         ]);
         $events = [];
 
-        $pages = app(SeasonvarRefreshPlanner::class)->pagesForImportCycle(
-            2,
+        $pages = collect();
+
+        foreach (app(SeasonvarRefreshPlanner::class)->pageChunksForImportCycle(
+            1,
             now()->subHours(168),
+            null,
             function (string $event, array $context) use (&$events): void {
                 $events[] = ['event' => $event, 'context' => $context];
             },
-        );
+        ) as $chunk) {
+            $pages = $pages->merge($chunk);
+        }
 
         $selectedReasons = collect($events)
             ->filter(fn (array $event): bool => $event['context']['selected'] > 0)
             ->pluck('context.reason')
             ->all();
 
-        $this->assertSame([$missingVideoPage->id, $pendingPage->id], $pages->pluck('id')->all());
-        $this->assertSame(['episodes_without_video', 'pending'], $selectedReasons);
+        $this->assertSame([$missingVideoPage->id, $pendingPage->id], $pages->take(2)->pluck('id')->all());
+        $this->assertSame(['episodes_without_video', 'pending', 'stale'], $selectedReasons);
     }
 
     public function test_it_backfills_missing_media_quality_and_format_during_import_cycle(): void
@@ -490,6 +620,36 @@ class SeasonvarImportMaintenanceTest extends TestCase
 
         $this->assertSame('1080p', $media->quality);
         $this->assertSame('mp4', $media->format);
+    }
+
+    public function test_it_backfills_all_missing_media_metadata_across_chunks(): void
+    {
+        Http::preventStrayRequests();
+        config([
+            'seasonvar.media_metadata.chunk_size' => 1,
+            'seasonvar.media_check.enabled' => false,
+        ]);
+
+        $catalogTitle = CatalogTitle::factory()->create();
+
+        foreach (range(1, 3) as $episodeNumber) {
+            LicensedMedia::factory()->create([
+                'catalog_title_id' => $catalogTitle->id,
+                'title' => "{$episodeNumber} серия WEB-DL",
+                'playback_url' => "https://media.example.com/video/series.s01e0{$episodeNumber}.1920x1080.mp4",
+                'path' => "https://media.example.com/video/series.s01e0{$episodeNumber}.1920x1080.mp4",
+                'status' => 'published',
+                'check_status' => 'available',
+                'checked_at' => now(),
+                'quality' => null,
+                'format' => null,
+            ]);
+        }
+
+        $this->artisan('seasonvar:import', ['--no-discovery' => true])
+            ->assertExitCode(0);
+
+        $this->assertSame(3, LicensedMedia::query()->where('quality', '1080p')->where('format', 'mp4')->count());
     }
 
     public function test_it_detects_dvd_media_quality_during_import_cycle(): void
@@ -609,5 +769,39 @@ class SeasonvarImportMaintenanceTest extends TestCase
                 </body>
             </html>
             HTML;
+    }
+
+    /**
+     * @param  list<string>  $urls
+     */
+    private function sitemapIndexXml(array $urls): string
+    {
+        $items = collect($urls)
+            ->map(fn (string $url): string => "        <sitemap><loc>{$url}</loc></sitemap>")
+            ->implode("\n");
+
+        return <<<XML
+            <?xml version="1.0" encoding="UTF-8"?>
+            <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+            {$items}
+            </sitemapindex>
+            XML;
+    }
+
+    /**
+     * @param  list<string>  $urls
+     */
+    private function sitemapUrlsetXml(array $urls): string
+    {
+        $items = collect($urls)
+            ->map(fn (string $url): string => "        <url><loc>{$url}</loc></url>")
+            ->implode("\n");
+
+        return <<<XML
+            <?xml version="1.0" encoding="UTF-8"?>
+            <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+            {$items}
+            </urlset>
+            XML;
     }
 }

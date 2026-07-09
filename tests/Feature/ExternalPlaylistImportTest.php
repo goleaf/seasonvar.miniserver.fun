@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\CatalogTitle;
 use App\Models\Episode;
+use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\Source;
 use App\Models\SourcePage;
@@ -110,6 +111,30 @@ class ExternalPlaylistImportTest extends TestCase
             'playback_url' => 'https://media.example.com/files/episode-2.mp4',
             'status' => 'published',
         ]);
+    }
+
+    public function test_it_imports_all_playlist_entries_by_default(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create([
+            'slug' => 'bolshoi-pleilist',
+            'title' => 'Большой плейлист',
+        ]);
+        $playlistLines = collect(['#EXTM3U']);
+
+        foreach (range(1, 501) as $index) {
+            $playlistLines->push("#EXTINF:-1,Большой плейлист {$index}");
+            $playlistLines->push("https://media.example.com/files/big-playlist-{$index}.mp4");
+        }
+
+        $result = app(ExternalPlaylistImporter::class)->importFromContent(
+            $playlistLines->implode("\n"),
+            'https://playlist.example.com/list.m3u',
+            $catalogTitle,
+        );
+
+        $this->assertSame(501, $result['total']);
+        $this->assertSame(501, $result['imported']);
+        $this->assertSame(501, LicensedMedia::query()->where('catalog_title_id', $catalogTitle->id)->count());
     }
 
     public function test_it_shows_selected_episode_without_media_as_not_connected(): void

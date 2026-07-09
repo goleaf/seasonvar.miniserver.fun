@@ -103,6 +103,22 @@ class CatalogPageTest extends TestCase
             ->assertDontSeeText('Другой сериал');
     }
 
+    public function test_invalid_year_filter_does_not_fall_back_to_full_catalog(): void
+    {
+        CatalogTitle::factory()->create([
+            'title' => 'Видимый сериал',
+            'slug' => 'vidimyi-serial',
+            'year' => 2024,
+        ]);
+
+        $response = $this->get(route('titles.index', ['year' => 'abcd']));
+
+        $response
+            ->assertOk()
+            ->assertSeeText('Год: abcd не найден')
+            ->assertDontSeeText('Видимый сериал');
+    }
+
     public function test_title_page_renders_selected_episode_media_state(): void
     {
         $catalogTitle = CatalogTitle::factory()->create([

@@ -173,50 +173,37 @@ class SeasonvarImportPipeline
      */
     private function backfillParsedSourcePageStatuses(callable $progress): array
     {
-        $limit = max(0, (int) config('seasonvar.import.source_status_backfill_per_cycle', 1000));
-
-        if ($limit === 0) {
-            return [
-                'selected' => 0,
-                'backfilled' => 0,
-            ];
-        }
-
-        $ids = SourcePage::query()
-            ->where('parse_status', 'parsed')
-            ->where('import_status', 'pending')
-            ->oldest('last_imported_at')
-            ->oldest()
-            ->limit($limit)
-            ->pluck('id');
+        $chunkSize = $this->importChunkSize();
+        $selected = 0;
+        $backfilled = 0;
 
         $progress('source-pages-status-backfill-started', [
-            'selected' => $ids->count(),
-            'limit' => $limit,
+            'chunk_size' => $chunkSize,
         ]);
 
-        if ($ids->isEmpty()) {
-            $result = [
-                'selected' => 0,
-                'backfilled' => 0,
-            ];
+        SourcePage::query()
+            ->where('parse_status', 'parsed')
+            ->where('import_status', 'pending')
+            ->lazyById($chunkSize)
+            ->chunk($chunkSize)
+            ->each(function ($pages) use (&$selected, &$backfilled, $progress): void {
+                $pages = $pages instanceof Collection ? $pages : $pages->collect();
+                $selected += $pages->count();
+                $backfilled += SourcePage::query()->whereKey($pages->pluck('id')->all())->update([
+                    'import_status' => 'parsed',
+                    'retry_after_at' => null,
+                    'last_imported_at' => DB::raw('COALESCE(last_imported_at, last_crawled_at, updated_at)'),
+                    'updated_at' => now(),
+                ]);
 
-            $progress('source-pages-status-backfill-complete', $result);
-
-            return $result;
-        }
-
-        $backfilled = SourcePage::query()
-            ->whereKey($ids)
-            ->update([
-                'import_status' => 'parsed',
-                'retry_after_at' => null,
-                'last_imported_at' => DB::raw('COALESCE(last_imported_at, last_crawled_at, updated_at)'),
-                'updated_at' => now(),
-            ]);
+                $progress('source-pages-status-backfill-chunk-complete', [
+                    'selected' => $selected,
+                    'backfilled' => $backfilled,
+                ]);
+            });
 
         $result = [
-            'selected' => $ids->count(),
+            'selected' => $selected,
             'backfilled' => $backfilled,
         ];
 
@@ -242,13 +229,32 @@ class SeasonvarImportPipeline
         }
 
         $cleaned = $this->cleanupMalformedSourcePages($progress);
-        $pages = $this->pagesForImportCycle($force, $progress);
-        $parseResult = $this->importer->parsePages($pages, $progress, $force, $run->id);
+        $selected = 0;
+        $parseResult = [
+            'parsed' => 0,
+            'failed' => 0,
+            'media_attached' => 0,
+            'media_updated' => 0,
+            'media_skipped' => 0,
+            'media_failed' => 0,
+        ];
+
+        foreach ($this->pageChunksForImportCycle($force, $run->id, $progress) as $pages) {
+            $selected += $pages->count();
+            $chunkResult = $this->importer->parsePages($pages, $progress, $force, $run->id);
+
+            $parseResult['parsed'] += $chunkResult['parsed'];
+            $parseResult['failed'] += $chunkResult['failed'];
+            $parseResult['media_attached'] += $chunkResult['media_attached'];
+            $parseResult['media_updated'] += $chunkResult['media_updated'];
+            $parseResult['media_skipped'] += $chunkResult['media_skipped'];
+            $parseResult['media_failed'] += $chunkResult['media_failed'];
+        }
 
         return [
             'discovered' => $discovered,
             'stored' => $stored,
-            'selected' => $pages->count(),
+            'selected' => $selected,
             'parsed' => $parseResult['parsed'],
             'failed' => $parseResult['failed'],
             'media_attached' => $parseResult['media_attached'],
@@ -324,36 +330,32 @@ class SeasonvarImportPipeline
 
     /**
      * @param  callable(string, array<string, mixed>): void  $progress
-     * @return Collection<int, SourcePage>
+     * @return iterable<Collection<int, SourcePage>>
      */
-    private function pagesForImportCycle(bool $force, callable $progress): Collection
+    private function pageChunksForImportCycle(bool $force, ?int $importRunId, callable $progress): iterable
     {
-        $batchSize = max(1, (int) config('seasonvar.import.parse_batch_size', 25));
+        $chunkSize = $this->importChunkSize();
         $refreshAfter = now()->subHours(max(1, (int) config('seasonvar.import.refresh_after_hours', 168)));
 
-        $pages = $force
-            ? SourcePage::query()
-                ->with('source')
-                ->where('page_type', 'serial')
-                ->oldest('last_imported_at')
-                ->oldest()
-                ->limit($batchSize)
-                ->get()
-            : $this->refreshPlanner->pagesForImportCycle($batchSize, $refreshAfter, $progress);
+        $chunks = $force
+            ? $this->refreshPlanner->forcedPageChunks($chunkSize, $importRunId, $progress)
+            : $this->refreshPlanner->pageChunksForImportCycle($chunkSize, $refreshAfter, $importRunId, $progress);
 
-        foreach ($pages as $page) {
-            $this->recordProgress(null, $progress, 'source-page-selected', [
-                'source_page_id' => $page->id,
-                'page_type' => $page->page_type,
-                'parse_status' => $page->parse_status,
-                'import_status' => $page->import_status,
-                'http_status' => $page->http_status,
-                'last_crawled_at' => $page->last_crawled_at,
-                'url' => $page->url,
-            ]);
+        foreach ($chunks as $pages) {
+            foreach ($pages as $page) {
+                $this->recordProgress(null, $progress, 'source-page-selected', [
+                    'source_page_id' => $page->id,
+                    'page_type' => $page->page_type,
+                    'parse_status' => $page->parse_status,
+                    'import_status' => $page->import_status,
+                    'http_status' => $page->http_status,
+                    'last_crawled_at' => $page->last_crawled_at,
+                    'url' => $page->url,
+                ]);
+            }
+
+            yield $pages;
         }
-
-        return $pages;
     }
 
     /**
@@ -397,9 +399,7 @@ class SeasonvarImportPipeline
      */
     private function refreshMediaBacklog(callable $progress): array
     {
-        $limit = max(0, (int) config('seasonvar.media_check.backfill_per_cycle', 25));
-
-        if ($limit === 0 || ! (bool) config('seasonvar.media_check.enabled', true)) {
+        if (! (bool) config('seasonvar.media_check.enabled', true)) {
             return [
                 'media_checked' => 0,
                 'media_available' => 0,
@@ -409,8 +409,9 @@ class SeasonvarImportPipeline
             ];
         }
 
+        $chunkSize = $this->mediaCheckChunkSize();
         $refreshAfter = now()->subHours(max(1, (int) config('seasonvar.media_check.refresh_after_hours', 168)));
-        $mediaItems = LicensedMedia::query()
+        $mediaQuery = LicensedMedia::query()
             ->where(function ($query) use ($refreshAfter): void {
                 $query->whereNull('check_status')
                     ->orWhereNull('checked_at')
@@ -420,18 +421,14 @@ class SeasonvarImportPipeline
             ->where(function ($query): void {
                 $query->whereNotNull('playback_url')
                     ->orWhereNotNull('path');
-            })
-            ->oldest('checked_at')
-            ->oldest()
-            ->limit($limit)
-            ->get();
+            });
 
         $progress('seasonvar-media-backlog-started', [
-            'selected' => $mediaItems->count(),
-            'limit' => $limit,
+            'chunk_size' => $chunkSize,
         ]);
 
         $result = [
+            'selected' => 0,
             'media_checked' => 0,
             'media_available' => 0,
             'media_unavailable' => 0,
@@ -439,44 +436,64 @@ class SeasonvarImportPipeline
             'media_failed' => 0,
         ];
 
-        foreach ($mediaItems as $media) {
-            $url = $media->playback_url ?: $media->path;
+        foreach ($mediaQuery->lazyById($chunkSize)->chunk($chunkSize) as $mediaItems) {
+            $mediaItems = $mediaItems instanceof Collection ? $mediaItems : $mediaItems->collect();
+            $result['selected'] += $mediaItems->count();
 
-            if (! is_string($url) || trim($url) === '') {
+            foreach ($mediaItems as $media) {
+                $url = $media->playback_url ?: $media->path;
+
+                if (! is_string($url) || trim($url) === '') {
+                    $media->fill([
+                        'check_status' => 'invalid_url',
+                        'status' => 'unavailable',
+                        'checked_at' => now(),
+                    ])->save();
+
+                    $result['media_failed']++;
+
+                    continue;
+                }
+
+                $availability = $this->mediaAvailabilityChecker->check($url, $progress);
                 $media->fill([
-                    'check_status' => 'invalid_url',
-                    'status' => 'unavailable',
-                    'checked_at' => now(),
+                    'status' => $availability['available'] ? 'published' : 'unavailable',
+                    'check_status' => $availability['status'],
+                    'last_http_status' => $availability['http_status'],
+                    'checked_at' => $availability['checked_at'],
+                    'published_at' => $availability['available'] ? ($media->published_at ?? now()) : $media->published_at,
                 ])->save();
 
-                $result['media_failed']++;
+                $result['media_checked']++;
+                $result['media_updated']++;
 
-                continue;
+                if ($availability['available']) {
+                    $result['media_available']++;
+                } else {
+                    $result['media_unavailable']++;
+                    $result['media_failed']++;
+                }
             }
 
-            $availability = $this->mediaAvailabilityChecker->check($url, $progress);
-            $media->fill([
-                'status' => $availability['available'] ? 'published' : 'unavailable',
-                'check_status' => $availability['status'],
-                'last_http_status' => $availability['http_status'],
-                'checked_at' => $availability['checked_at'],
-                'published_at' => $availability['available'] ? ($media->published_at ?? now()) : $media->published_at,
-            ])->save();
-
-            $result['media_checked']++;
-            $result['media_updated']++;
-
-            if ($availability['available']) {
-                $result['media_available']++;
-            } else {
-                $result['media_unavailable']++;
-                $result['media_failed']++;
-            }
+            $progress('seasonvar-media-backlog-chunk-complete', $result);
         }
 
-        $progress('seasonvar-media-backlog-complete', $result);
+        $progress('seasonvar-media-backlog-complete', [
+            'media_checked' => $result['media_checked'],
+            'media_available' => $result['media_available'],
+            'media_unavailable' => $result['media_unavailable'],
+            'media_updated' => $result['media_updated'],
+            'media_failed' => $result['media_failed'],
+            'selected' => $result['selected'],
+        ]);
 
-        return $result;
+        return [
+            'media_checked' => $result['media_checked'],
+            'media_available' => $result['media_available'],
+            'media_unavailable' => $result['media_unavailable'],
+            'media_updated' => $result['media_updated'],
+            'media_failed' => $result['media_failed'],
+        ];
     }
 
     /**
@@ -485,16 +502,8 @@ class SeasonvarImportPipeline
      */
     private function refreshMediaMetadataBacklog(callable $progress): array
     {
-        $limit = max(0, (int) config('seasonvar.media_metadata.backfill_per_cycle', 100));
-
-        if ($limit === 0) {
-            return [
-                'media_checked' => 0,
-                'media_updated' => 0,
-            ];
-        }
-
-        $mediaItems = LicensedMedia::query()
+        $chunkSize = $this->mediaMetadataChunkSize();
+        $mediaQuery = LicensedMedia::query()
             ->where(function ($query): void {
                 $query->whereNull('quality')
                     ->orWhereNull('format')
@@ -504,67 +513,77 @@ class SeasonvarImportPipeline
             ->where(function ($query): void {
                 $query->whereNotNull('playback_url')
                     ->orWhereNotNull('path');
-            })
-            ->oldest('updated_at')
-            ->oldest()
-            ->limit($limit)
-            ->get();
+            });
 
         $progress('seasonvar-media-metadata-backlog-started', [
-            'selected' => $mediaItems->count(),
-            'limit' => $limit,
+            'chunk_size' => $chunkSize,
         ]);
 
         $result = [
+            'selected' => 0,
             'media_checked' => 0,
             'media_updated' => 0,
         ];
 
-        foreach ($mediaItems as $media) {
-            $url = $media->playback_url ?: $media->path;
+        foreach ($mediaQuery->lazyById($chunkSize)->chunk($chunkSize) as $mediaItems) {
+            $mediaItems = $mediaItems instanceof Collection ? $mediaItems : $mediaItems->collect();
+            $result['selected'] += $mediaItems->count();
 
-            if (! is_string($url) || trim($url) === '') {
-                continue;
+            foreach ($mediaItems as $media) {
+                $url = $media->playback_url ?: $media->path;
+
+                if (! is_string($url) || trim($url) === '') {
+                    continue;
+                }
+
+                $updates = [];
+                $quality = $this->mediaMetadata->quality($media->title, $url);
+                $format = $this->mediaMetadata->format($url);
+                $translationName = $this->mediaMetadata->translationName($media->title);
+
+                if ($quality !== null && $quality !== $media->quality) {
+                    $updates['quality'] = $quality;
+                }
+
+                if ($format !== '' && $format !== $media->format) {
+                    $updates['format'] = $format;
+                }
+
+                if ($translationName !== null && $translationName !== $media->translation_name) {
+                    $updates['translation_name'] = $translationName;
+                }
+
+                $result['media_checked']++;
+
+                if ($updates === []) {
+                    continue;
+                }
+
+                $media->fill($updates)->save();
+                $result['media_updated']++;
+
+                $progress('seasonvar-media-metadata-updated', [
+                    'licensed_media_id' => $media->id,
+                    'quality' => $media->quality,
+                    'format' => $media->format,
+                    'translation_name' => $media->translation_name,
+                    'url' => $url,
+                ]);
             }
 
-            $updates = [];
-            $quality = $this->mediaMetadata->quality($media->title, $url);
-            $format = $this->mediaMetadata->format($url);
-            $translationName = $this->mediaMetadata->translationName($media->title);
-
-            if ($quality !== null && $quality !== $media->quality) {
-                $updates['quality'] = $quality;
-            }
-
-            if ($format !== '' && $format !== $media->format) {
-                $updates['format'] = $format;
-            }
-
-            if ($translationName !== null && $translationName !== $media->translation_name) {
-                $updates['translation_name'] = $translationName;
-            }
-
-            $result['media_checked']++;
-
-            if ($updates === []) {
-                continue;
-            }
-
-            $media->fill($updates)->save();
-            $result['media_updated']++;
-
-            $progress('seasonvar-media-metadata-updated', [
-                'licensed_media_id' => $media->id,
-                'quality' => $media->quality,
-                'format' => $media->format,
-                'translation_name' => $media->translation_name,
-                'url' => $url,
-            ]);
+            $progress('seasonvar-media-metadata-backlog-chunk-complete', $result);
         }
 
-        $progress('seasonvar-media-metadata-backlog-complete', $result);
+        $progress('seasonvar-media-metadata-backlog-complete', [
+            'media_checked' => $result['media_checked'],
+            'media_updated' => $result['media_updated'],
+            'selected' => $result['selected'],
+        ]);
 
-        return $result;
+        return [
+            'media_checked' => $result['media_checked'],
+            'media_updated' => $result['media_updated'],
+        ];
     }
 
     /**
@@ -573,17 +592,8 @@ class SeasonvarImportPipeline
      */
     private function backfillMediaSourceKeys(callable $progress): array
     {
-        $limit = max(0, (int) config('seasonvar.media_identity.backfill_per_cycle', 250));
-
-        if ($limit === 0) {
-            return [
-                'media_checked' => 0,
-                'media_updated' => 0,
-                'collisions' => 0,
-            ];
-        }
-
-        $mediaItems = LicensedMedia::query()
+        $chunkSize = $this->mediaIdentityChunkSize();
+        $mediaQuery = LicensedMedia::query()
             ->with([
                 'catalogTitle:id,source_url_hash,source_url',
                 'season:id,number',
@@ -596,78 +606,90 @@ class SeasonvarImportPipeline
             ->where(function ($query): void {
                 $query->whereNotNull('playback_url')
                     ->orWhereNotNull('path');
-            })
-            ->oldest('updated_at')
-            ->oldest()
-            ->limit($limit)
-            ->get();
+            });
 
         $progress('seasonvar-media-source-key-backlog-started', [
-            'selected' => $mediaItems->count(),
-            'limit' => $limit,
+            'chunk_size' => $chunkSize,
         ]);
 
         $result = [
+            'selected' => 0,
             'media_checked' => 0,
             'media_updated' => 0,
             'collisions' => 0,
         ];
 
-        foreach ($mediaItems as $media) {
-            $url = $media->playback_url ?: $media->path;
+        foreach ($mediaQuery->lazyById($chunkSize)->chunk($chunkSize) as $mediaItems) {
+            $mediaItems = $mediaItems instanceof Collection ? $mediaItems : $mediaItems->collect();
+            $result['selected'] += $mediaItems->count();
 
-            if (! is_string($url) || trim($url) === '') {
-                continue;
+            foreach ($mediaItems as $media) {
+                $url = $media->playback_url ?: $media->path;
+
+                if (! is_string($url) || trim($url) === '') {
+                    continue;
+                }
+
+                $quality = $media->quality ?: $this->mediaMetadata->quality($media->title, $url);
+                $format = $media->format ?: $this->mediaMetadata->format($url);
+                $source = $this->mediaIdentitySource($media);
+                $sourceMediaKey = $this->mediaMetadata->sourceMediaKey(
+                    $source,
+                    $media->catalogTitle?->source_url_hash ?: $media->catalog_title_id,
+                    $media->season?->number,
+                    $media->episode?->number,
+                    $media->source_url,
+                    $url,
+                    $media->title,
+                    $quality,
+                    $format,
+                );
+
+                if ($this->sourceMediaKeyAlreadyExists($media, $sourceMediaKey)) {
+                    $sourceMediaKey = hash('sha256', implode('|', ['legacy_media_row', $media->id, $sourceMediaKey]));
+                    $result['collisions']++;
+                }
+
+                $updates = [
+                    'source_media_key' => $sourceMediaKey,
+                ];
+
+                if ($quality !== null && $quality !== $media->quality) {
+                    $updates['quality'] = $quality;
+                }
+
+                if ($format !== '' && $format !== $media->format) {
+                    $updates['format'] = $format;
+                }
+
+                $media->fill($updates)->save();
+                $result['media_checked']++;
+                $result['media_updated']++;
+
+                $progress('seasonvar-media-source-key-updated', [
+                    'licensed_media_id' => $media->id,
+                    'source_media_key' => $sourceMediaKey,
+                    'quality' => $media->quality,
+                    'format' => $media->format,
+                    'url' => $url,
+                ]);
             }
 
-            $quality = $media->quality ?: $this->mediaMetadata->quality($media->title, $url);
-            $format = $media->format ?: $this->mediaMetadata->format($url);
-            $source = $this->mediaIdentitySource($media);
-            $sourceMediaKey = $this->mediaMetadata->sourceMediaKey(
-                $source,
-                $media->catalogTitle?->source_url_hash ?: $media->catalog_title_id,
-                $media->season?->number,
-                $media->episode?->number,
-                $media->source_url,
-                $url,
-                $media->title,
-                $quality,
-                $format,
-            );
-
-            if ($this->sourceMediaKeyAlreadyExists($media, $sourceMediaKey)) {
-                $sourceMediaKey = hash('sha256', implode('|', ['legacy_media_row', $media->id, $sourceMediaKey]));
-                $result['collisions']++;
-            }
-
-            $updates = [
-                'source_media_key' => $sourceMediaKey,
-            ];
-
-            if ($quality !== null && $quality !== $media->quality) {
-                $updates['quality'] = $quality;
-            }
-
-            if ($format !== '' && $format !== $media->format) {
-                $updates['format'] = $format;
-            }
-
-            $media->fill($updates)->save();
-            $result['media_checked']++;
-            $result['media_updated']++;
-
-            $progress('seasonvar-media-source-key-updated', [
-                'licensed_media_id' => $media->id,
-                'source_media_key' => $sourceMediaKey,
-                'quality' => $media->quality,
-                'format' => $media->format,
-                'url' => $url,
-            ]);
+            $progress('seasonvar-media-source-key-backlog-chunk-complete', $result);
         }
 
-        $progress('seasonvar-media-source-key-backlog-complete', $result);
+        $progress('seasonvar-media-source-key-backlog-complete', [
+            'media_checked' => $result['media_checked'],
+            'media_updated' => $result['media_updated'],
+            'collisions' => $result['collisions'],
+            'selected' => $result['selected'],
+        ]);
 
-        return $result;
+        return [
+            'media_checked' => $result['media_checked'],
+            'media_updated' => $result['media_updated'],
+            'collisions' => $result['collisions'],
+        ];
     }
 
     private function mediaIdentitySource(LicensedMedia $media): string
@@ -694,7 +716,7 @@ class SeasonvarImportPipeline
      */
     private function parseUrl(SeasonvarImportRun $run, string $url, bool $force, callable $progress, Collection $parsedUrls): ?CatalogTitle
     {
-        $pages = $this->importer->pagesForArgument($url, 1, $progress);
+        $pages = $this->importer->pagesForArgument($url, $progress);
         $page = $pages->first();
 
         if ($page === null) {
@@ -727,13 +749,11 @@ class SeasonvarImportPipeline
      */
     private function parseSeasonUrls(SeasonvarImportRun $run, CatalogTitle $catalogTitle, bool $force, callable $progress, Collection $parsedUrls): void
     {
-        $seasonLimit = max(1, (int) config('seasonvar.import.season_url_limit', 200));
         $seasonUrls = $catalogTitle->fresh(['seasons'])?->seasons
             ->pluck('source_url')
             ->filter()
             ->unique()
             ->filter(fn (string $seasonUrl): bool => $this->isDirectSeasonvarSeasonUrl($seasonUrl))
-            ->take($seasonLimit)
             ->values() ?? collect();
 
         $progress('seasonvar-import-season-urls-selected', [
@@ -763,6 +783,26 @@ class SeasonvarImportPipeline
                 ]);
             }
         }
+    }
+
+    private function importChunkSize(): int
+    {
+        return max(1, (int) config('seasonvar.import.chunk_size', 100));
+    }
+
+    private function mediaCheckChunkSize(): int
+    {
+        return max(1, (int) config('seasonvar.media_check.chunk_size', 25));
+    }
+
+    private function mediaMetadataChunkSize(): int
+    {
+        return max(1, (int) config('seasonvar.media_metadata.chunk_size', 100));
+    }
+
+    private function mediaIdentityChunkSize(): int
+    {
+        return max(1, (int) config('seasonvar.media_identity.chunk_size', 250));
     }
 
     private function isDirectSeasonvarSeasonUrl(string $url): bool

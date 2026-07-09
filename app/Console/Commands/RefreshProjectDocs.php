@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use RuntimeException;
 
-#[Signature('project:docs-refresh {--check : Проверить Markdown без записи изменений}')]
-#[Description('Обновляет управляемые Markdown-разделы проекта')]
+#[Signature('project:docs-refresh {--check : Проверить документацию без записи изменений}')]
+#[Description('Обновляет управляемые разделы документации проекта')]
 class RefreshProjectDocs extends Command
 {
     private const START_MARKER = '<!-- project-docs:start -->';

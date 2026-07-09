@@ -9,6 +9,7 @@
 Обновлять вместе, когда это относится к изменению:
 
 - `docs/CODE_STANDARDS.md` для правил кода и архитектуры.
+- `docs/architecture.md` для текущего деления контроллеров, page-builder сервисов, запросов и SEO.
 - `docs/UI_STANDARDS.md` для правил интерфейса и Blade-компонентов.
 - `docs/views.md` для правил Blade-шаблонов и view-model/view-data слоя.
 - `docs/DATA_RELATIONS.md` для полей импортера, Eloquent-связей, фильтров и смысла данных.

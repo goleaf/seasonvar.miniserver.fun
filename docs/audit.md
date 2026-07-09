@@ -31,7 +31,7 @@ args = ["artisan", "boost:mcp", "--env=local"]
 
 - Безопасные расчеты Blade-компонентов перенесены из `resources/views/components/title-card.blade.php`, `resources/views/components/title-list-row.blade.php` и `resources/views/components/ui/taxonomy-chip.blade.php` в классы компонентов `app/View/Components`.
 - В не-production окружении включены проверки Eloquent на ленивую загрузку связей и тихо отброшенные атрибуты через `AppServiceProvider`.
-- Общие metadata Laravel skeleton в `composer.json` заменены на metadata проекта.
+- Общие метаданные стартового шаблона Laravel в `composer.json` заменены на метаданные проекта.
 - Добавлен этот audit-документ и разрешено отслеживание существующей настройки Laravel Boost MCP.
 
 ## Проверка
@@ -41,7 +41,7 @@ args = ["artisan", "boost:mcp", "--env=local"]
 - `php artisan test` прошел: 34 tests, 143 assertions.
 - `composer validate --strict` прошел.
 - `composer audit` не нашел advisories.
-- `npm run build` прошел. Vite вывел существующее предупреждение о крупном frontend chunk.
+- `npm run build` прошел. Vite вывел существующее предупреждение о крупном JavaScript-фрагменте.
 - `php artisan route:list` прошел. Опция `--compact` недоступна в этой установке Laravel, поэтому использован обычный route list.
 
 ## Критично
@@ -67,7 +67,7 @@ args = ["artisan", "boost:mcp", "--env=local"]
 ## Низкий приоритет
 
 - CI workflow отсутствует. Минимальный набор: `composer validate`, Pint, `php artisan test`, `npm run build`.
-- В `composer.json` нет static analysis или Rector scripts. PHPStan/Larastan или Rector стоит добавлять только когда будет готовность поддерживать baseline.
+- В `composer.json` нет команд статического анализа или Rector. PHPStan/Larastan или Rector стоит добавлять только когда будет готовность поддерживать базовый уровень проверок.
 - [resources/views/catalog/index.blade.php](/www/wwwroot/seasonvar.miniserver.fun/resources/views/catalog/index.blade.php:3) все еще группирует последние тайтлы внутри Blade. При следующей чистке главной каталога это стоит перенести в контроллер или небольшой view model.
 - Все публичные маршруты находятся в `routes/web.php`; для текущего приложения это нормально, но перед JSON endpoints нужно добавить `routes/api.php` и явные API Resources.
 

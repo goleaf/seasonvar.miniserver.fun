@@ -27,6 +27,7 @@ class SeasonvarParsePageCommandTest extends TestCase
     {
         $this->travelTo('2026-07-09 10:11:00');
         Http::preventStrayRequests();
+
         Http::fake([
             'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html' => Http::response($this->seasonPageHtml(4, [
                 1 => 'Пробуждение',

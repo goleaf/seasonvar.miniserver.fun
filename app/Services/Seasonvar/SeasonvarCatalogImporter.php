@@ -63,10 +63,9 @@ class SeasonvarCatalogImporter
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return list<string>
      */
-    public function discover(int $limit, ?callable $progress = null): array
+    public function discover(?callable $progress = null): array
     {
         $source = $this->seasonvarSource->current();
-        $limit = max(1, $limit);
 
         $this->report($progress, 'source-ready', [
             'source_id' => $source->id,
@@ -78,7 +77,6 @@ class SeasonvarCatalogImporter
 
         return $this->discovery->discoverFromSitemap(
             $this->seasonvarSource->sitemapUrl(),
-            $limit,
             (int) $source->crawl_delay_seconds,
             $progress,
         );
@@ -151,17 +149,14 @@ class SeasonvarCatalogImporter
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return Collection<int, SourcePage>
      */
-    public function pagesForArgument(mixed $argument, int $limit, ?callable $progress = null): Collection
+    public function pagesForArgument(mixed $argument, ?callable $progress = null): Collection
     {
-        $limit = max(1, $limit);
-
         if ($argument === null) {
             $this->report($progress, 'page-selection-started', [
                 'mode' => 'pending',
-                'limit' => $limit,
             ]);
 
-            return $this->pendingPages($limit, $progress);
+            return $this->pendingPages($progress);
         }
 
         if (is_numeric($argument)) {
@@ -249,12 +244,9 @@ class SeasonvarCatalogImporter
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return Collection<int, SourcePage>
      */
-    public function pendingPages(int $limit, ?callable $progress = null): Collection
+    public function pendingPages(?callable $progress = null): Collection
     {
-        $limit = max(1, $limit);
-
         $this->report($progress, 'pending-pages-query-started', [
-            'limit' => $limit,
             'parse_status' => 'pending',
             'page_type' => 'serial',
         ]);
@@ -264,7 +256,6 @@ class SeasonvarCatalogImporter
             ->where('parse_status', 'pending')
             ->where('page_type', 'serial')
             ->oldest()
-            ->limit($limit)
             ->get();
 
         $this->report($progress, 'pending-pages-query-complete', [

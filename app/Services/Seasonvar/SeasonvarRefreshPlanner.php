@@ -12,54 +12,103 @@ class SeasonvarRefreshPlanner
 {
     /**
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
-     * @return Collection<int, SourcePage>
+     * @return iterable<Collection<int, SourcePage>>
      */
-    public function pagesForImportCycle(int $limit, Carbon $refreshAfter, ?callable $progress = null): Collection
+    public function pageChunksForImportCycle(int $chunkSize, Carbon $refreshAfter, ?int $importRunId = null, ?callable $progress = null): iterable
     {
-        $limit = max(1, $limit);
-        $selected = collect();
-        $seenIds = [];
+        $chunkSize = max(1, $chunkSize);
+        $totalSelected = 0;
+        $selectedIds = [];
 
         foreach ($this->candidateQueries($refreshAfter) as $reason => $callback) {
-            $remaining = $limit - $selected->count();
+            $reasonSelected = 0;
+            $query = $this->baseQuery($importRunId)->tap($callback);
 
-            if ($remaining <= 0) {
-                break;
+            foreach ($query->lazyById($chunkSize)->chunk($chunkSize) as $pages) {
+                $pages = $pages instanceof Collection ? $pages : $pages->collect();
+                $pages = $this->rejectAlreadySelectedPages($pages, $selectedIds);
+
+                if ($pages->isEmpty()) {
+                    continue;
+                }
+
+                $reasonSelected += $pages->count();
+                $totalSelected += $pages->count();
+
+                $this->report($progress, 'seasonvar-refresh-candidates-selected', [
+                    'reason' => $reason,
+                    'selected' => $pages->count(),
+                    'reason_selected' => $reasonSelected,
+                    'total_selected' => $totalSelected,
+                    'chunk_size' => $chunkSize,
+                ]);
+
+                yield $pages->values();
             }
-
-            $pages = $this->baseQuery($seenIds)
-                ->tap($callback)
-                ->limit($remaining)
-                ->get();
-
-            foreach ($pages as $page) {
-                $seenIds[] = (int) $page->id;
-                $selected->push($page);
-            }
-
-            $this->report($progress, 'seasonvar-refresh-candidates-selected', [
-                'reason' => $reason,
-                'selected' => $pages->count(),
-                'total_selected' => $selected->count(),
-                'limit' => $limit,
-            ]);
         }
-
-        return $selected;
     }
 
     /**
-     * @param  list<int>  $excludeIds
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @return iterable<Collection<int, SourcePage>>
+     */
+    public function forcedPageChunks(int $chunkSize, ?int $importRunId = null, ?callable $progress = null): iterable
+    {
+        $chunkSize = max(1, $chunkSize);
+        $totalSelected = 0;
+
+        foreach ($this->baseQuery($importRunId)->lazyById($chunkSize)->chunk($chunkSize) as $pages) {
+            $pages = $pages instanceof Collection ? $pages : $pages->collect();
+            $totalSelected += $pages->count();
+
+            $this->report($progress, 'seasonvar-refresh-candidates-selected', [
+                'reason' => 'force',
+                'selected' => $pages->count(),
+                'reason_selected' => $totalSelected,
+                'total_selected' => $totalSelected,
+                'chunk_size' => $chunkSize,
+            ]);
+
+            yield $pages->values();
+        }
+    }
+
+    /**
+     * @param  Collection<int, SourcePage>  $pages
+     * @param  array<int, true>  $selectedIds
+     * @return Collection<int, SourcePage>
+     */
+    private function rejectAlreadySelectedPages(Collection $pages, array &$selectedIds): Collection
+    {
+        return $pages
+            ->reject(function (SourcePage $page) use (&$selectedIds): bool {
+                $id = (int) $page->id;
+
+                if (isset($selectedIds[$id])) {
+                    return true;
+                }
+
+                $selectedIds[$id] = true;
+
+                return false;
+            })
+            ->values();
+    }
+
+    /**
      * @return Builder<SourcePage>
      */
-    private function baseQuery(array $excludeIds): Builder
+    private function baseQuery(?int $importRunId): Builder
     {
         return SourcePage::query()
             ->with('source')
             ->where('page_type', 'serial')
-            ->when($excludeIds !== [], fn (Builder $query): Builder => $query->whereNotIn('id', $excludeIds))
-            ->oldest('last_imported_at')
-            ->oldest();
+            ->when($importRunId !== null, function (Builder $query) use ($importRunId): Builder {
+                return $query->where(function (Builder $query) use ($importRunId): void {
+                    $query->whereNull('last_import_run_id')
+                        ->orWhere('last_import_run_id', '!=', $importRunId);
+                });
+            });
     }
 
     /**

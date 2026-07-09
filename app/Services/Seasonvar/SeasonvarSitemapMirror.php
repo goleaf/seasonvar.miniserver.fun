@@ -4,7 +4,6 @@ namespace App\Services\Seasonvar;
 
 use App\Services\Crawler\PoliteHttpClient;
 use RuntimeException;
-use SimpleXMLElement;
 use Throwable;
 use XMLReader;
 
@@ -38,40 +37,66 @@ class SeasonvarSitemapMirror
             throw new RuntimeException('Не удалось скачать индекс карты сайта: HTTP '.$indexResponse->status());
         }
 
-        $indexPath = $this->basePath('sitemap_index.xml');
-        file_put_contents($indexPath, $indexResponse->body());
-
-        $archiveUrls = $this->archiveUrls($indexResponse->body(), $indexUrl);
+        $indexFile = $this->writeSitemapFile($indexUrl, $indexResponse->body(), 'sitemap_index.xml');
+        $indexPath = $indexFile['xml_path'];
 
         $this->report($progress, 'sitemap-mirror-index-ready', [
             'index_url' => $indexUrl,
             'index_path' => $indexPath,
-            'archive_count' => count($archiveUrls),
         ]);
 
         $allUrls = [];
         $archives = [];
+        $visited = [];
+        $queue = [$indexUrl => $indexFile];
 
-        foreach ($archiveUrls as $archiveUrl) {
-            $archive = $this->downloadArchive($archiveUrl, (int) $source->crawl_delay_seconds, $progress);
+        while ($queue !== []) {
+            $currentUrl = array_key_first($queue);
+            $currentFile = array_shift($queue);
+
+            if ($currentUrl === null || isset($visited[$currentUrl])) {
+                continue;
+            }
+
+            $currentXmlPath = $currentFile['xml_path'];
+            $visited[$currentUrl] = true;
             $urlCount = 0;
 
-            foreach ($this->urlsFromXmlFile($archive['xml_path'], $archiveUrl) as $url) {
+            foreach ($this->urlsFromXmlFile($currentXmlPath, $currentUrl) as $url) {
                 $allUrls[$url] = $url;
                 $urlCount++;
             }
 
+            foreach ($this->sitemapUrlsFromXmlFile($currentXmlPath, $currentUrl) as $sitemapUrl) {
+                if (isset($visited[$sitemapUrl]) || array_key_exists($sitemapUrl, $queue)) {
+                    $this->report($progress, 'child-sitemap-skipped', [
+                        'reason' => 'уже посещена или уже в очереди',
+                        'url' => $sitemapUrl,
+                    ]);
+
+                    continue;
+                }
+
+                $sitemapFile = $this->downloadSitemap($sitemapUrl, (int) $source->crawl_delay_seconds, $progress);
+                $queue[$sitemapUrl] = $sitemapFile;
+
+                $this->report($progress, 'child-sitemap-queued', [
+                    'url' => $sitemapUrl,
+                    'queue_size' => count($queue),
+                ]);
+            }
+
             $archives[] = [
-                'url' => $archiveUrl,
-                'archive_path' => $archive['archive_path'],
-                'xml_path' => $archive['xml_path'],
+                'url' => $currentUrl,
+                'archive_path' => $currentFile['archive_path'],
+                'xml_path' => $currentXmlPath,
                 'url_count' => $urlCount,
             ];
 
             $this->report($progress, 'sitemap-mirror-archive-ready', [
-                'url' => $archiveUrl,
-                'archive_path' => $archive['archive_path'],
-                'xml_path' => $archive['xml_path'],
+                'url' => $currentUrl,
+                'archive_path' => $currentFile['archive_path'],
+                'xml_path' => $currentXmlPath,
                 'url_count' => $urlCount,
             ]);
         }
@@ -87,6 +112,7 @@ class SeasonvarSitemapMirror
         $this->report($progress, 'sitemap-mirror-complete', [
             'archive_count' => count($archives),
             'unique_urls' => count($urls),
+            'visited_sitemaps' => count($visited),
             'all_urls_path' => $allUrlsPath,
             'counts_path' => $countsPath,
             'counts' => $counts,
@@ -120,36 +146,10 @@ class SeasonvarSitemapMirror
     }
 
     /**
-     * @return list<string>
-     */
-    private function archiveUrls(string $body, string $baseUrl): array
-    {
-        $previous = libxml_use_internal_errors(true);
-        $xml = simplexml_load_string($body);
-        libxml_use_internal_errors($previous);
-
-        if (! $xml instanceof SimpleXMLElement) {
-            throw new RuntimeException('Не удалось разобрать XML индекса карты сайта.');
-        }
-
-        $urls = [];
-
-        foreach ($xml->xpath('//*[local-name()="sitemap"]/*[local-name()="loc"]') ?: [] as $loc) {
-            $url = $this->safeUrl((string) $loc, $baseUrl);
-
-            if ($url !== null && str_ends_with($url, '.xml.gz')) {
-                $urls[$url] = $url;
-            }
-        }
-
-        return array_values($urls);
-    }
-
-    /**
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return array{archive_path: string, xml_path: string}
      */
-    private function downloadArchive(string $url, int $crawlDelaySeconds, ?callable $progress = null): array
+    private function downloadSitemap(string $url, int $crawlDelaySeconds, ?callable $progress = null): array
     {
         $response = $this->httpClient->get($url, $crawlDelaySeconds, $progress);
 
@@ -157,10 +157,17 @@ class SeasonvarSitemapMirror
             throw new RuntimeException("Не удалось скачать архив карты сайта {$url}: HTTP ".$response->status());
         }
 
-        $archiveName = basename(parse_url($url, PHP_URL_PATH) ?: md5($url).'.xml.gz');
-        $archivePath = $this->basePath('archives/'.$archiveName);
-        $xmlPath = $this->basePath('xml/'.preg_replace('/\.gz$/', '', $archiveName));
-        $body = $response->body();
+        return $this->writeSitemapFile($url, $response->body());
+    }
+
+    /**
+     * @return array{archive_path: string, xml_path: string}
+     */
+    private function writeSitemapFile(string $url, string $body, ?string $preferredName = null): array
+    {
+        $fileName = $preferredName ?? basename(parse_url($url, PHP_URL_PATH) ?: md5($url).'.xml');
+        $archivePath = $this->basePath('archives/'.$fileName);
+        $xmlPath = $this->basePath('xml/'.preg_replace('/\.gz$/', '', $fileName));
 
         file_put_contents($archivePath, $body);
 
@@ -168,13 +175,18 @@ class SeasonvarSitemapMirror
             $decoded = gzdecode($body);
 
             if (! is_string($decoded)) {
-                throw new RuntimeException("Не удалось распаковать архив карты сайта {$url}");
+                throw new RuntimeException("Не удалось распаковать карту сайта {$url}");
             }
 
             file_put_contents($xmlPath, $decoded);
-        } else {
-            file_put_contents($xmlPath, $body);
+
+            return [
+                'archive_path' => $archivePath,
+                'xml_path' => $xmlPath,
+            ];
         }
+
+        file_put_contents($xmlPath, $body);
 
         return [
             'archive_path' => $archivePath,
@@ -185,9 +197,26 @@ class SeasonvarSitemapMirror
     /**
      * @return \Generator<int, string>
      */
+    private function sitemapUrlsFromXmlFile(string $path, string $baseUrl): \Generator
+    {
+        yield from $this->locationsFromXmlFile($path, $baseUrl, 'sitemap');
+    }
+
+    /**
+     * @return \Generator<int, string>
+     */
     private function urlsFromXmlFile(string $path, string $baseUrl): \Generator
     {
+        yield from $this->locationsFromXmlFile($path, $baseUrl, 'url');
+    }
+
+    /**
+     * @return \Generator<int, string>
+     */
+    private function locationsFromXmlFile(string $path, string $baseUrl, string $parentElement): \Generator
+    {
         $reader = new XMLReader;
+        $insideParent = false;
 
         if (! $reader->open($path, null, LIBXML_NONET | LIBXML_COMPACT)) {
             throw new RuntimeException("Не удалось открыть XML-файл карты сайта: {$path}");
@@ -195,7 +224,15 @@ class SeasonvarSitemapMirror
 
         try {
             while ($reader->read()) {
-                if ($reader->nodeType !== XMLReader::ELEMENT || $reader->localName !== 'loc') {
+                if ($reader->nodeType === XMLReader::ELEMENT && $reader->localName === $parentElement) {
+                    $insideParent = true;
+                }
+
+                if ($reader->nodeType === XMLReader::END_ELEMENT && $reader->localName === $parentElement) {
+                    $insideParent = false;
+                }
+
+                if (! $insideParent || $reader->nodeType !== XMLReader::ELEMENT || $reader->localName !== 'loc') {
                     continue;
                 }
 

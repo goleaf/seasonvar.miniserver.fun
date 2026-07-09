@@ -20,7 +20,6 @@ class SeasonvarDiscovery
      */
     public function discoverFromSitemap(
         string $sitemapUrl,
-        int $limit = 500,
         int $crawlDelaySeconds = 3,
         ?callable $progress = null,
     ): array {
@@ -28,7 +27,6 @@ class SeasonvarDiscovery
 
         $this->report($progress, 'sitemap-discovery-started', [
             'sitemap_url' => $normalizedSitemapUrl,
-            'limit' => $limit,
             'crawl_delay_seconds' => $crawlDelaySeconds,
         ]);
 
@@ -44,7 +42,7 @@ class SeasonvarDiscovery
         $visited = [];
         $discovered = [];
 
-        while ($queue !== [] && count($discovered) < $limit) {
+        while ($queue !== []) {
             $currentUrl = array_shift($queue);
 
             if (isset($visited[$currentUrl])) {
@@ -161,7 +159,6 @@ class SeasonvarDiscovery
                         'url' => $url,
                         'page_type' => $pageType,
                         'discovered' => count($discovered),
-                        'limit' => $limit,
                     ]);
                 } else {
                     $this->report($progress, 'catalog-url-skipped', [
@@ -169,15 +166,6 @@ class SeasonvarDiscovery
                         'page_type' => $pageType,
                         'url' => $url,
                     ]);
-                }
-
-                if (count($discovered) >= $limit) {
-                    $this->report($progress, 'sitemap-discovery-limit-reached', [
-                        'limit' => $limit,
-                        'discovered' => count($discovered),
-                    ]);
-
-                    break;
                 }
             }
         }
