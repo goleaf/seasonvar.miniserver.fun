@@ -35,6 +35,14 @@ GOOGLE_APPLICATION_CREDENTIALS=
 
 Runtime-код должен читать значения через `config('services.google.search_console.*')`.
 
+Локальная read-only проверка после настройки credentials:
+
+```bash
+php artisan google:search-console:summary --days=7 --limit=10
+```
+
+Команда использует service-account JSON из `GOOGLE_APPLICATION_CREDENTIALS`, запрашивает OAuth token через JWT bearer flow и читает `searchAnalytics/query`. Если Search Console выключен, команда завершается успешно и не делает внешних HTTP-запросов.
+
 ## Google Analytics 4
 
 Для GA4 reporting использовать Google Analytics Data API. Официальный quickstart использует GA4 property ID и Application Default Credentials через `GOOGLE_APPLICATION_CREDENTIALS`.
@@ -54,6 +62,14 @@ GOOGLE_APPLICATION_CREDENTIALS=
 - Не сохранять user-level raw exports в репозиторий.
 - В базе хранить только агрегаты, если появится синхронизация.
 - Не выводить internal source/media URLs в аналитические отчеты.
+
+Локальная read-only проверка после настройки credentials:
+
+```bash
+php artisan google:analytics:summary --days=7 --limit=10
+```
+
+Команда использует GA4 Data API `runReport` и выводит страницы, просмотры и пользователей. Если GA4 выключен, команда завершается успешно и не делает внешних HTTP-запросов.
 
 ## Google Analytics MCP
 
@@ -119,6 +135,8 @@ Google ведет каталог remote MCP servers для Google Cloud products
 3. Хранить credentials во внешнем secret store или приватном `.env`, не в Git.
 4. Добавить tests с fake HTTP/client layer до реального API-вызова.
 5. Только после стабильного read-only слоя добавлять команды синхронизации или dashboard.
+
+Текущее состояние: read-only summary-команды для Search Console и GA4 добавлены, но sync-таблиц и scheduled writes пока нет.
 
 ## Чего не делать
 

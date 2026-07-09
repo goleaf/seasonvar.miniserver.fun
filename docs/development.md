@@ -42,6 +42,8 @@ composer dev
 - `php artisan seasonvar:import --forever --sleep=60` — непрерывный локальный цикл импорта.
 - `php artisan seasonvar:import "https://seasonvar.ru/..." --force` — принудительное обновление одной страницы.
 - `php artisan integrations:doctor` — read-only диагностика MCP, Google, CLI tools и проектных skills без вывода секретов.
+- `php artisan google:search-console:summary` — read-only сводка Search Console, если Google credentials настроены вне Git.
+- `php artisan google:analytics:summary` — read-only сводка GA4, если Google credentials настроены вне Git.
 - `php artisan project:docs-refresh` — обновляет управляемые блоки документации.
 - `php artisan project:docs-refresh --check` — проверяет документацию без записи изменений.
 
