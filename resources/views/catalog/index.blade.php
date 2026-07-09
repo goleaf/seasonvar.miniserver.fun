@@ -92,7 +92,9 @@
                                             <span class="rounded bg-[#f8fafb] px-2 py-1 text-zinc-500 ring-1 ring-[#e5eaed]">{{ $catalogTitle->year }}</span>
                                         @endif
                                         <span class="rounded bg-emerald-100 px-2 py-1 text-emerald-800">{{ $seasonsCount }} сезон(ов)</span>
-                                        <span class="rounded bg-sky-100 px-2 py-1 text-sky-800">{{ $episodesCount }} серий</span>
+                                        <span class="rounded bg-sky-100 px-2 py-1 text-sky-800">
+                                            {{ $episodesCount > 0 ? $episodesCount.' серий' : 'серии разбираются' }}
+                                        </span>
                                     </div>
                                 </div>
                             </a>
