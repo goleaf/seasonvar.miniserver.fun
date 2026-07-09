@@ -9,6 +9,7 @@ use App\Models\SeasonvarImportEvent;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use App\Services\Media\ExternalMediaMetadata;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -16,6 +17,8 @@ use Throwable;
 class SeasonvarImportPipeline
 {
     private bool $stopRequested = false;
+
+    private ?Carbon $lastRunHeartbeatAt = null;
 
     public function __construct(
         private readonly SeasonvarCatalogImporter $importer,
@@ -840,6 +843,21 @@ class SeasonvarImportPipeline
     private function recordProgress(?SeasonvarImportRun $run, ?callable $progress, string $event, array $context = []): void
     {
         if ($run !== null) {
+            $this->touchRunHeartbeat($run);
+            $this->recordImportEvent($run, $event, $context);
+        }
+
+        if ($progress !== null) {
+            $progress($event, $context);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function recordImportEvent(SeasonvarImportRun $run, string $event, array $context): void
+    {
+        try {
             SeasonvarImportEvent::query()->create([
                 'seasonvar_import_run_id' => $run->id,
                 'source_page_id' => $context['source_page_id'] ?? null,
@@ -848,10 +866,26 @@ class SeasonvarImportPipeline
                 'level' => $this->eventLevel($event),
                 'context' => $context,
             ]);
+        } catch (Throwable) {
+            // Журнал событий не должен останавливать обновление каталога.
+        }
+    }
+
+    private function touchRunHeartbeat(SeasonvarImportRun $run): void
+    {
+        $now = now();
+
+        if ($this->lastRunHeartbeatAt !== null && $this->lastRunHeartbeatAt->greaterThan($now->copy()->subSeconds(30))) {
+            return;
         }
 
-        if ($progress !== null) {
-            $progress($event, $context);
+        try {
+            SeasonvarImportRun::query()
+                ->whereKey($run->id)
+                ->update(['updated_at' => $now]);
+            $this->lastRunHeartbeatAt = $now;
+        } catch (Throwable) {
+            // Отметка активности не должна останавливать обновление каталога.
         }
     }
 

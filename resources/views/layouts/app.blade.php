@@ -9,6 +9,28 @@
     $seoDescription = trim((string) ($seo['description'] ?? 'Каталог сериалов онлайн с фильтрами по жанрам, странам, актерам, годам, сезонам и сериям.'));
     $seoDescription = \Illuminate\Support\Str::limit(preg_replace('/\s+/u', ' ', strip_tags($seoDescription)) ?: $seoDescription, 180, '...');
     $canonicalUrl = $seo['canonical'] ?? url()->current();
+    $seoSearchContext = collect($seo['search_context'] ?? []);
+    $seoSearchContextTitle = trim((string) $seoSearchContext->get('title', ''));
+    $seoSearchContextSlug = trim((string) $seoSearchContext->get('slug', ''));
+    $seoSearchUrl = function ($query) use ($seoSearchContextTitle, $seoSearchContextSlug) {
+        $query = trim(preg_replace('/\s+/u', ' ', strip_tags((string) $query)) ?: '');
+
+        if ($query === '') {
+            return route('titles.index');
+        }
+
+        $params = ['q' => $query];
+
+        if ($query !== '{search_term_string}' && $seoSearchContextTitle !== '' && $seoSearchContextSlug !== '') {
+            if (! str_contains(mb_strtolower($query), mb_strtolower($seoSearchContextTitle))) {
+                $params['q'] = trim($seoSearchContextTitle.' '.$query);
+            }
+
+            $params['title'] = $seoSearchContextSlug;
+        }
+
+        return route('titles.index', $params);
+    };
     $robots = $seo['robots'] ?? 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
     $seoType = $seo['type'] ?? 'website';
     $seoImage = $seo['image'] ?? null;
@@ -40,7 +62,7 @@
     $semanticEntities = $topicTerms->take(24)->map(fn ($term) => [
         '@type' => 'Thing',
         'name' => $term,
-        'url' => route('titles.index', ['q' => $term]),
+        'url' => $seoSearchUrl($term),
     ])->values();
     $longTailQueries = $topicTerms->take(10)
         ->flatMap(fn ($term) => collect([
@@ -169,7 +191,7 @@
             'type' => 'SearchAction',
             'name' => 'Найти сериалы по странице «'.$pageTitle.'»',
             'label' => 'Найти по теме страницы',
-            'url' => route('titles.index', ['q' => $pageTitle]),
+            'url' => $seoSearchUrl($pageTitle),
             'description' => 'Поиск сериалов, сезонов, серий и связанных материалов по теме этой страницы.',
         ],
         [
@@ -197,12 +219,12 @@
         'type' => 'SearchAction',
         'name' => 'Найти сериалы: '.$term,
         'label' => $term,
-        'url' => route('titles.index', ['q' => $term]),
+        'url' => $seoSearchUrl($term),
         'description' => 'Поиск сериалов и страниц каталога по теме «'.$term.'».',
     ]))->filter(fn ($action) => ! empty($action['name']) && ! empty($action['url']))->unique('name')->take(24)->values();
     $semanticGlossary = $topicTerms->take(18)->map(fn ($term) => [
         'term' => $term,
-        'url' => route('titles.index', ['q' => $term]),
+        'url' => $seoSearchUrl($term),
         'description' => 'Тема «'.$term.'» связана со страницей «'.$pageTitle.'» и помогает найти сериалы, сезоны, серии, описания, актеров и похожие подборки.',
     ])->values();
     $quickAnswers = collect([
@@ -451,13 +473,13 @@
         [
             'name' => 'Новые серии онлайн',
             'query' => 'новые серии смотреть онлайн',
-            'url' => route('titles.index', ['q' => 'новые серии смотреть онлайн']),
+            'url' => $seoSearchUrl('новые серии смотреть онлайн'),
             'description' => 'Поиск свежих серий, последних выпусков, переводов и обновленных страниц каталога.',
         ],
         [
             'name' => 'Дата выхода серий',
             'query' => 'дата выхода серий',
-            'url' => route('titles.index', ['q' => 'дата выхода серий']),
+            'url' => $seoSearchUrl('дата выхода серий'),
             'description' => 'Запросы для поиска дат выхода, новых эпизодов, сезонов и информации об обновлениях.',
         ],
         [
@@ -470,13 +492,13 @@
         [
             'name' => $term.' '.$currentSeoYear,
             'query' => $term.' '.$currentSeoYear.' смотреть онлайн',
-            'url' => route('titles.index', ['q' => $term.' '.$currentSeoYear.' смотреть онлайн']),
+            'url' => $seoSearchUrl($term.' '.$currentSeoYear.' смотреть онлайн'),
             'description' => 'Актуальный поиск по теме «'.$term.'» для '.$currentSeoYear.' года.',
         ],
         [
             'name' => $term.' новые серии',
             'query' => $term.' новые серии',
-            'url' => route('titles.index', ['q' => $term.' новые серии']),
+            'url' => $seoSearchUrl($term.' новые серии'),
             'description' => 'Поиск новых серий, переводов и обновлений по теме «'.$term.'».',
         ],
     ])))->filter(fn ($item) => ! empty($item['name']) && ! empty($item['query']) && ! empty($item['url']))
@@ -509,13 +531,13 @@
         [
             'name' => 'Сериалы по жанрам',
             'query' => $pageTitle.' жанры сериалов',
-            'url' => route('titles.index', ['q' => $pageTitle.' жанры сериалов']),
+            'url' => $seoSearchUrl($pageTitle.' жанры сериалов'),
             'description' => 'Переход к жанрам, тематическим страницам и похожим сериалам каталога.',
         ],
         [
             'name' => 'Сериалы по странам',
             'query' => $pageTitle.' страны сериалы',
-            'url' => route('titles.index', ['q' => $pageTitle.' страны сериалы']),
+            'url' => $seoSearchUrl($pageTitle.' страны сериалы'),
             'description' => 'Поиск сериалов по странам, регионам, языкам, производству и связанным темам.',
         ],
         [
@@ -527,31 +549,31 @@
         [
             'name' => 'Актеры и роли',
             'query' => $pageTitle.' актеры роли',
-            'url' => route('titles.index', ['q' => $pageTitle.' актеры роли']),
+            'url' => $seoSearchUrl($pageTitle.' актеры роли'),
             'description' => 'Поиск страниц по актерам, ролям, персонажам и связанным сериалам.',
         ],
         [
             'name' => 'Режиссеры и студии',
             'query' => $pageTitle.' режиссер студия',
-            'url' => route('titles.index', ['q' => $pageTitle.' режиссер студия']),
+            'url' => $seoSearchUrl($pageTitle.' режиссер студия'),
             'description' => 'Поиск информации по режиссерам, студиям, каналам и производству.',
         ],
         [
             'name' => 'Переводы и озвучка',
             'query' => $pageTitle.' перевод озвучка',
-            'url' => route('titles.index', ['q' => $pageTitle.' перевод озвучка']),
+            'url' => $seoSearchUrl($pageTitle.' перевод озвучка'),
             'description' => 'Переход к страницам по переводам, озвучке, субтитрам и версиям просмотра.',
         ],
         [
             'name' => 'Возрастные ограничения',
             'query' => $pageTitle.' возрастное ограничение',
-            'url' => route('titles.index', ['q' => $pageTitle.' возрастное ограничение']),
+            'url' => $seoSearchUrl($pageTitle.' возрастное ограничение'),
             'description' => 'Поиск страниц с возрастными отметками, рейтингами и описанием ограничений.',
         ],
     ])->merge($topicTerms->take(8)->map(fn ($term) => [
         'name' => 'Каталог по теме: '.$term,
         'query' => $term.' каталог сериалов',
-        'url' => route('titles.index', ['q' => $term.' каталог сериалов']),
+        'url' => $seoSearchUrl($term.' каталог сериалов'),
         'description' => 'Внутреннее направление каталога по теме «'.$term.'» с сериалами, описаниями и подборками.',
     ]))->filter(fn ($item) => ! empty($item['name']) && ! empty($item['query']) && ! empty($item['url']))
         ->unique('query')
@@ -979,7 +1001,7 @@
             'hasDefinedTerm' => $topicTerms->take(35)->map(fn ($term) => [
                 '@type' => 'DefinedTerm',
                 'name' => $term,
-                'url' => route('titles.index', ['q' => $term]),
+                'url' => $seoSearchUrl($term),
             ])->values()->all(),
         ];
         $jsonLdItems[] = [
@@ -990,7 +1012,7 @@
                 '@type' => 'ListItem',
                 'position' => $index + 1,
                 'name' => $term,
-                'url' => route('titles.index', ['q' => $term]),
+                'url' => $seoSearchUrl($term),
             ])->values()->all(),
         ];
         $jsonLdItems[] = [
@@ -1038,7 +1060,7 @@
                 '@type' => 'ListItem',
                 'position' => $index + 1,
                 'name' => $query,
-                'url' => route('titles.index', ['q' => $query]),
+                'url' => $seoSearchUrl($query),
             ])->values()->all(),
         ];
     }
@@ -1055,7 +1077,7 @@
                 '@type' => 'CollectionPage',
                 'name' => $collection['name'],
                 'description' => $collection['description'] ?? $collection['name'],
-                'url' => route('titles.index', ['q' => $collection['query']]),
+                'url' => $seoSearchUrl($collection['query']),
             ])->values()->all(),
         ];
     }
@@ -1126,7 +1148,7 @@
                 'position' => $index + 1,
                 'name' => $entry['hub'].': '.$entry['item']['name'],
                 'description' => $entry['item']['description'] ?? $entry['item']['name'],
-                'url' => route('titles.index', ['q' => $entry['item']['query']]),
+                'url' => $seoSearchUrl($entry['item']['query']),
             ])->values()->all(),
         ];
     }
@@ -1148,7 +1170,7 @@
                     'about' => [
                         '@type' => 'Thing',
                         'name' => $block['query'],
-                        'url' => route('titles.index', ['q' => $block['query']]),
+                        'url' => $seoSearchUrl($block['query']),
                     ],
                 ],
             ])->values()->all(),
@@ -1169,7 +1191,7 @@
                     'name' => $signal['name'],
                     'value' => $signal['value'],
                     'description' => $signal['description'],
-                    'url' => route('titles.index', ['q' => $signal['query']]),
+                    'url' => $seoSearchUrl($signal['query']),
                 ],
             ])->values()->all(),
         ];
@@ -1189,7 +1211,7 @@
                 'position' => $index + 1,
                 'name' => $entry['path']['name'].': '.$entry['item'],
                 'description' => $entry['path']['description'],
-                'url' => route('titles.index', ['q' => $entry['item']]),
+                'url' => $seoSearchUrl($entry['item']),
             ])->values()->all(),
         ];
     }
@@ -1204,7 +1226,7 @@
                 '@type' => 'ListItem',
                 'position' => $index + 1,
                 'name' => $query,
-                'url' => route('titles.index', ['q' => $query]),
+                'url' => $seoSearchUrl($query),
             ])->values()->all(),
         ];
     }
@@ -1241,7 +1263,7 @@
                 'position' => $index + 1,
                 'name' => $entry['group']['name'].': '.$entry['query'],
                 'description' => $entry['group']['description'],
-                'url' => route('titles.index', ['q' => $entry['query']]),
+                'url' => $seoSearchUrl($entry['query']),
             ])->values()->all(),
         ];
     }
@@ -1329,7 +1351,7 @@
                 '@type' => 'ListItem',
                 'position' => $index + 1,
                 'name' => $query,
-                'url' => route('titles.index', ['q' => $query]),
+                'url' => $seoSearchUrl($query),
             ])->values()->all(),
         ];
     }
@@ -1361,7 +1383,7 @@
                 'position' => $index + 1,
                 'name' => $item['name'],
                 'description' => $item['description'],
-                'url' => route('titles.index', ['q' => $item['query']]),
+                'url' => $seoSearchUrl($item['query']),
             ])->values()->all(),
         ];
     }
@@ -1377,7 +1399,7 @@
                 'position' => $index + 1,
                 'name' => $item['name'],
                 'description' => $item['description'],
-                'url' => route('titles.index', ['q' => $item['query']]),
+                'url' => $seoSearchUrl($item['query']),
             ])->values()->all(),
         ];
     }
@@ -1393,7 +1415,7 @@
                 'position' => $index + 1,
                 'name' => $item['name'],
                 'description' => $item['description'],
-                'url' => route('titles.index', ['q' => $item['query']]),
+                'url' => $seoSearchUrl($item['query']),
             ])->values()->all(),
         ];
     }
@@ -1409,7 +1431,7 @@
                 'position' => $index + 1,
                 'name' => $item['name'],
                 'description' => $item['description'],
-                'url' => route('titles.index', ['q' => $item['query']]),
+                'url' => $seoSearchUrl($item['query']),
             ])->values()->all(),
         ];
     }
@@ -1425,7 +1447,7 @@
                 'position' => $index + 1,
                 'name' => $item['name'],
                 'description' => $item['description'],
-                'url' => route('titles.index', ['q' => $item['query']]),
+                'url' => $seoSearchUrl($item['query']),
             ])->values()->all(),
         ];
     }
@@ -1441,7 +1463,7 @@
                 'position' => $index + 1,
                 'name' => $item['name'],
                 'description' => $item['description'],
-                'url' => route('titles.index', ['q' => $item['query']]),
+                'url' => $seoSearchUrl($item['query']),
             ])->values()->all(),
         ];
     }
@@ -1457,7 +1479,7 @@
                 'position' => $index + 1,
                 'name' => $item['name'],
                 'description' => $item['description'],
-                'url' => route('titles.index', ['q' => $item['query']]),
+                'url' => $seoSearchUrl($item['query']),
             ])->values()->all(),
         ];
     }
@@ -1752,7 +1774,7 @@
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($topicTerms as $term)
-                            <a href="{{ route('titles.index', ['q' => $term]) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-100 hover:bg-emerald-50 hover:text-emerald-700 hover:ring-emerald-100">
+                            <a href="{{ $seoSearchUrl($term) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-100 hover:bg-emerald-50 hover:text-emerald-700 hover:ring-emerald-100">
                                 <i class="fa-solid fa-hashtag text-[0.8em] text-amber-500" aria-hidden="true"></i>
                                 <span itemprop="name">{{ $term }}</span>
                             </a>
@@ -1786,7 +1808,7 @@
                     </div>
                     <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                         @foreach ($seoIntents->take(16) as $intent)
-                            <a href="{{ route('titles.index', ['q' => $intent]) }}" itemprop="url" class="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700">
+                            <a href="{{ $seoSearchUrl($intent) }}" itemprop="url" class="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700">
                                 <i class="fa-solid fa-arrow-up-right-from-square text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                 <span itemprop="name">{{ $intent }}</span>
                             </a>
@@ -1802,7 +1824,7 @@
                     </div>
                     <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                         @foreach ($longTailQueries->take(24) as $query)
-                            <a href="{{ route('titles.index', ['q' => $query]) }}" itemprop="url" class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700">
+                            <a href="{{ $seoSearchUrl($query) }}" itemprop="url" class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700">
                                 <i class="fa-solid fa-magnifying-glass text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                 <span itemprop="name">{{ $query }}</span>
                             </a>
@@ -1818,13 +1840,13 @@
                     </div>
                     <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         @foreach ($relatedCollections->take(18) as $collection)
-                            <a href="{{ route('titles.index', ['q' => $collection['query']]) }}" class="block rounded-lg border border-slate-200 bg-slate-50 p-3 hover:border-emerald-100 hover:bg-emerald-50" itemprop="hasPart" itemscope itemtype="https://schema.org/CollectionPage">
+                            <a href="{{ $seoSearchUrl($collection['query']) }}" class="block rounded-lg border border-slate-200 bg-slate-50 p-3 hover:border-emerald-100 hover:bg-emerald-50" itemprop="hasPart" itemscope itemtype="https://schema.org/CollectionPage">
                                 <span class="flex items-center gap-2 text-sm font-bold text-slate-800" itemprop="name">
                                     <i class="fa-solid fa-folder-open text-[0.85em] text-emerald-700" aria-hidden="true"></i>
                                     {{ $collection['name'] }}
                                 </span>
                                 <span class="mt-2 block text-xs leading-5 text-slate-600" itemprop="description">{{ $collection['description'] }}</span>
-                                <meta itemprop="url" content="{{ route('titles.index', ['q' => $collection['query']]) }}">
+                                <meta itemprop="url" content="{{ $seoSearchUrl($collection['query']) }}">
                             </a>
                         @endforeach
                     </div>
@@ -1843,7 +1865,7 @@
                                 <p class="mt-1 text-xs leading-5 text-slate-600">{{ $hub['description'] }}</p>
                                 <div class="mt-3 flex flex-wrap gap-2">
                                     @foreach ($hub['items'] as $item)
-                                        <a href="{{ route('titles.index', ['q' => $item['query']]) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                                        <a href="{{ $seoSearchUrl($item['query']) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
                                             <i class="fa-solid fa-link text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                             <span>{{ $item['name'] }}</span>
                                         </a>
@@ -1881,7 +1903,7 @@
                             <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                 <h2 class="text-sm font-bold text-slate-800">{{ $block['title'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $block['text'] }}</p>
-                                <a href="{{ route('titles.index', ['q' => $block['query']]) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                <a href="{{ $seoSearchUrl($block['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
                                     <i class="fa-solid fa-magnifying-glass text-[0.8em]" aria-hidden="true"></i>
                                     <span>Найти: {{ $block['query'] }}</span>
                                 </a>
@@ -1904,7 +1926,7 @@
                                     <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">{{ $signal['value'] }}</span>
                                 </div>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $signal['description'] }}</p>
-                                <a href="{{ route('titles.index', ['q' => $signal['query']]) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                <a href="{{ $seoSearchUrl($signal['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
                                     <i class="fa-solid fa-arrow-up-right-from-square text-[0.8em]" aria-hidden="true"></i>
                                     <span>Открыть связанный поиск</span>
                                 </a>
@@ -1927,13 +1949,13 @@
                                         <h2 class="text-sm font-bold text-slate-800">{{ $path['name'] }}</h2>
                                         <p class="mt-1 text-xs leading-5 text-slate-600">{{ $path['description'] }}</p>
                                     </div>
-                                    <a href="{{ route('titles.index', ['q' => $path['query']]) }}" class="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-100">
+                                    <a href="{{ $seoSearchUrl($path['query']) }}" class="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-100">
                                         Открыть
                                     </a>
                                 </div>
                                 <div class="mt-3 flex flex-wrap gap-2">
                                     @foreach ($path['items'] as $item)
-                                        <a href="{{ route('titles.index', ['q' => $item]) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                                        <a href="{{ $seoSearchUrl($item) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
                                             <i class="fa-solid fa-compass text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                             <span>{{ $item }}</span>
                                         </a>
@@ -1952,7 +1974,7 @@
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($alsoSearches->take(36) as $query)
-                            <a href="{{ route('titles.index', ['q' => $query]) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                            <a href="{{ $seoSearchUrl($query) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
                                 <i class="fa-solid fa-magnifying-glass-plus text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                 <span itemprop="name">{{ $query }}</span>
                             </a>
@@ -1994,7 +2016,7 @@
                                 <p class="mt-1 text-xs leading-5 text-slate-600">{{ $group['description'] }}</p>
                                 <div class="mt-3 flex flex-wrap gap-2">
                                     @foreach ($group['items'] as $query)
-                                        <a href="{{ route('titles.index', ['q' => $query]) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                                        <a href="{{ $seoSearchUrl($query) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
                                             <i class="fa-solid fa-table-cells text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                             <span>{{ $query }}</span>
                                         </a>
@@ -2074,7 +2096,7 @@
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($russianQueryVariants->take(42) as $query)
-                            <a href="{{ route('titles.index', ['q' => $query]) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                            <a href="{{ $seoSearchUrl($query) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
                                 <i class="fa-solid fa-spell-check text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                 <span itemprop="name">{{ $query }}</span>
                             </a>
@@ -2113,7 +2135,7 @@
                             <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                 <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
-                                <a href="{{ route('titles.index', ['q' => $item['query']]) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
                                     <i class="fa-solid fa-magnifying-glass text-[0.8em]" aria-hidden="true"></i>
                                     <span>{{ $item['query'] }}</span>
                                 </a>
@@ -2133,7 +2155,7 @@
                             <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                 <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
-                                <a href="{{ route('titles.index', ['q' => $item['query']]) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
                                     <i class="fa-solid fa-magnifying-glass text-[0.8em]" aria-hidden="true"></i>
                                     <span>{{ $item['query'] }}</span>
                                 </a>
@@ -2153,7 +2175,7 @@
                             <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                 <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
-                                <a href="{{ route('titles.index', ['q' => $item['query']]) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
                                     <i class="fa-solid fa-play text-[0.8em]" aria-hidden="true"></i>
                                     <span>{{ $item['query'] }}</span>
                                 </a>
@@ -2173,7 +2195,7 @@
                             <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                 <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
-                                <a href="{{ route('titles.index', ['q' => $item['query']]) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
                                     <i class="fa-solid fa-language text-[0.8em]" aria-hidden="true"></i>
                                     <span>{{ $item['query'] }}</span>
                                 </a>
@@ -2193,7 +2215,7 @@
                             <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                 <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
-                                <a href="{{ route('titles.index', ['q' => $item['query']]) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
                                     <i class="fa-solid fa-magnifying-glass text-[0.8em]" aria-hidden="true"></i>
                                     <span>{{ $item['query'] }}</span>
                                 </a>
@@ -2213,7 +2235,7 @@
                             <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                 <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
-                                <a href="{{ route('titles.index', ['q' => $item['query']]) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
                                     <i class="fa-solid fa-magnifying-glass text-[0.8em]" aria-hidden="true"></i>
                                     <span>{{ $item['query'] }}</span>
                                 </a>
@@ -2233,7 +2255,7 @@
                             <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                 <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
-                                <a href="{{ route('titles.index', ['q' => $item['query']]) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
                                     <i class="fa-solid fa-clock text-[0.8em]" aria-hidden="true"></i>
                                     <span>{{ $item['query'] }}</span>
                                 </a>
@@ -2270,7 +2292,7 @@
                                 <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ $cluster['title'] }}</div>
                                 <div class="mt-2 flex flex-wrap gap-1.5">
                                     @foreach (collect($cluster['items'] ?? [])->filter()->unique()->take(8) as $item)
-                                        <a href="{{ route('titles.index', ['q' => $item]) }}" class="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">{{ $item }}</a>
+                                        <a href="{{ $seoSearchUrl($item) }}" class="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">{{ $item }}</a>
                                     @endforeach
                                 </div>
                             </div>
@@ -2286,7 +2308,7 @@
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach (collect($seo['search_phrases'])->filter()->unique()->take(18) as $phrase)
-                            <a href="{{ route('titles.index', ['q' => $phrase]) }}" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                            <a href="{{ $seoSearchUrl($phrase) }}" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
                                 <i class="fa-solid fa-key text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                 <span>{{ $phrase }}</span>
                             </a>

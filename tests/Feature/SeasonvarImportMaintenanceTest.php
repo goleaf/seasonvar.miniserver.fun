@@ -6,6 +6,7 @@ use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
+use App\Models\SeasonvarImportRun;
 use App\Models\Source;
 use App\Models\SourcePage;
 use App\Services\Media\ExternalMediaMetadata;
@@ -42,6 +43,37 @@ class SeasonvarImportMaintenanceTest extends TestCase
         } finally {
             $lock->release();
         }
+    }
+
+    public function test_it_recovers_a_stale_import_lock_when_previous_run_stopped_without_finishing(): void
+    {
+        Http::preventStrayRequests();
+        config(['seasonvar.import.stale_after_minutes' => 5]);
+        $lock = Cache::lock('seasonvar-import', 60);
+        $this->assertTrue($lock->get());
+        $staleRun = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'status' => 'running',
+            'force' => false,
+            'forever' => false,
+            'started_at' => now()->subHour(),
+        ]);
+        SeasonvarImportRun::query()
+            ->whereKey($staleRun->id)
+            ->update([
+                'created_at' => now()->subHour(),
+                'updated_at' => now()->subMinutes(10),
+            ]);
+
+        $this->artisan('seasonvar:import', ['--no-discovery' => true])
+            ->expectsOutputToContain('Найден зависший запуск импорта')
+            ->assertExitCode(0);
+
+        $staleRun->refresh();
+
+        $this->assertSame('failed', $staleRun->status);
+        $this->assertSame('Предыдущий запуск остановился без завершения и был закрыт автоматически.', $staleRun->last_error);
+        $this->assertNotNull($staleRun->finished_at);
     }
 
     public function test_it_marks_malformed_nested_source_urls_as_unavailable_without_requesting_them(): void

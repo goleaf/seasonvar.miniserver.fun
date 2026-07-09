@@ -37,4 +37,69 @@ class ExampleTest extends TestCase
             ->assertSee('object-contain', false)
             ->assertDontSee('object-cover transition group-hover:scale-[1.02]', false);
     }
+
+    public function test_generated_title_search_links_keep_the_current_title_context(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Знахарь',
+            'slug' => 'znaxar',
+        ]);
+
+        $response = $this->get(route('titles.show', $catalogTitle));
+
+        $response
+            ->assertOk()
+            ->assertSee(e(route('titles.index', [
+                'q' => 'Знахарь смотреть онлайн',
+                'title' => 'znaxar',
+            ])), false);
+    }
+
+    public function test_title_scoped_catalog_search_stays_on_one_title(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Знахарь',
+            'slug' => 'znaxar',
+        ]);
+        CatalogTitle::factory()->create([
+            'title' => 'Другой сериал',
+            'slug' => 'drugoi-serial',
+            'description' => 'В описании встречается слово Знахарь, но это другая карточка.',
+        ]);
+
+        $response = $this->get(route('titles.index', [
+            'q' => 'смотреть онлайн',
+            'title' => $catalogTitle->slug,
+        ]));
+
+        $response
+            ->assertOk()
+            ->assertSeeText('Знахарь')
+            ->assertSee('name="title"', false)
+            ->assertSee('value="znaxar"', false)
+            ->assertSee('title=znaxar', false)
+            ->assertDontSeeText('Другой сериал');
+    }
+
+    public function test_catalog_search_prefers_exact_cyrillic_title_over_broad_description_matches(): void
+    {
+        CatalogTitle::factory()->create([
+            'title' => 'Знахарь',
+            'slug' => 'znaxar',
+        ]);
+        CatalogTitle::factory()->create([
+            'title' => 'Другой сериал',
+            'slug' => 'drugoi-serial',
+            'description' => 'В описании встречается слово Знахарь, но название не совпадает.',
+        ]);
+
+        $response = $this->get(route('titles.index', [
+            'q' => 'сериал знахарь описание жанры',
+        ]));
+
+        $response
+            ->assertOk()
+            ->assertSeeText('Знахарь')
+            ->assertDontSeeText('Другой сериал');
+    }
 }

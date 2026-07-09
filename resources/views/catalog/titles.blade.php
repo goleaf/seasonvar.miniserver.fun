@@ -31,9 +31,11 @@
     $activeTaxonomies = $activeTaxonomies ?? collect();
     $activeFilterSlugs = $activeFilterSlugs ?? [];
     $invalidFilterSlugs = $invalidFilterSlugs ?? [];
+    $titleContext = $titleContext ?? null;
+    $baseQuery = $titleContext === null ? [] : ['title' => $titleContext->slug];
     $allFilterSlugs = array_merge($activeFilterSlugs, $invalidFilterSlugs);
-    $filterQuery = function (string $filterType, ?string $slug = null) use ($allFilterSlugs, $search, $year, $invalidYear, $requestedYear): array {
-        $query = $allFilterSlugs;
+    $filterQuery = function (string $filterType, ?string $slug = null) use ($baseQuery, $allFilterSlugs, $search, $year, $invalidYear, $requestedYear): array {
+        $query = array_merge($baseQuery, $allFilterSlugs);
 
         if ($slug === null) {
             unset($query[$filterType]);
@@ -55,13 +57,24 @@
 
         return $query;
     };
-    $withoutYearQuery = $allFilterSlugs;
+    $withoutYearQuery = array_merge($baseQuery, $allFilterSlugs);
+    $withoutTitleQuery = $allFilterSlugs;
 
     if ($search !== '') {
         $withoutYearQuery['q'] = $search;
+        $withoutTitleQuery['q'] = $search;
     }
-    $yearQuery = function (?int $selectedYear) use ($allFilterSlugs, $search): array {
-        $query = $allFilterSlugs;
+
+    if ($year !== null) {
+        $withoutTitleQuery['year'] = $year;
+    }
+
+    if ($invalidYear) {
+        $withoutTitleQuery['year'] = $requestedYear;
+    }
+
+    $yearQuery = function (?int $selectedYear) use ($baseQuery, $allFilterSlugs, $search): array {
+        $query = array_merge($baseQuery, $allFilterSlugs);
 
         if ($search !== '') {
             $query['q'] = $search;
@@ -73,8 +86,8 @@
 
         return $query;
     };
-    $invalidFilterQuery = function (string $filterType) use ($allFilterSlugs, $search, $year, $invalidYear, $requestedYear): array {
-        $query = $allFilterSlugs;
+    $invalidFilterQuery = function (string $filterType) use ($baseQuery, $allFilterSlugs, $search, $year, $invalidYear, $requestedYear): array {
+        $query = array_merge($baseQuery, $allFilterSlugs);
         unset($query[$filterType]);
 
         if ($search !== '') {
@@ -176,9 +189,12 @@
                             <span>{{ $seo['h1'] ?? 'Сериалы' }}</span>
                         </h1>
                         <p class="mt-2 text-sm text-slate-500">{{ $seo['lead'] ?? 'Поиск по названиям, описаниям, актерам, жанрам и связям каталога.' }}</p>
-                        @if ($activeTaxonomies->isNotEmpty() || $year !== null || $invalidYear || $invalidFilterSlugs !== [])
+                        @if ($activeTaxonomies->isNotEmpty() || $titleContext !== null || $year !== null || $invalidYear || $invalidFilterSlugs !== [])
                             <div class="mt-3 space-y-3 text-sm">
                                 <div class="flex flex-wrap items-center gap-2">
+                                    @if ($titleContext !== null)
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $withoutTitleQuery)" active icon="fa-solid fa-clapperboard">Сериал: {{ $titleContext->title }} x</x-ui.taxonomy-chip>
+                                    @endif
                                     @if ($year !== null)
                                         <x-ui.taxonomy-chip :href="route('titles.index', $withoutYearQuery)" active icon="fa-solid fa-calendar-days">Год: {{ $year }} x</x-ui.taxonomy-chip>
                                     @endif
@@ -203,6 +219,9 @@
                                     @if ($year !== null)
                                         <span><i class="fa-solid fa-calendar-days text-slate-400" aria-hidden="true"></i> Год: {{ $year }}</span>
                                     @endif
+                                    @if ($titleContext !== null)
+                                        <span><i class="fa-solid fa-clapperboard text-slate-400" aria-hidden="true"></i> Сериал: {{ $titleContext->title }}</span>
+                                    @endif
                                     <span><i class="fa-solid fa-magnifying-glass text-slate-400" aria-hidden="true"></i> Найдено сейчас: {{ $titles->total() }}</span>
                                     <a href="{{ route('titles.index') }}" class="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-600">
                                         <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
@@ -219,6 +238,9 @@
                     </div>
 
                     <form method="GET" action="{{ route('titles.index') }}" class="flex w-full max-w-md flex-col gap-2 sm:flex-row">
+                        @if ($titleContext !== null)
+                            <input type="hidden" name="title" value="{{ $titleContext->slug }}">
+                        @endif
                         @foreach ($activeFilterSlugs as $filterType => $slug)
                             <input type="hidden" name="{{ $filterType }}" value="{{ $slug }}">
                         @endforeach

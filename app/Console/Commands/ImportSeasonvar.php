@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Console\Commands\Concerns\OutputsSeasonvarProgress;
+use App\Models\SeasonvarImportRun;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -16,6 +17,8 @@ class ImportSeasonvar extends Command
 {
     use OutputsSeasonvarProgress;
 
+    private const LOCK_KEY = 'seasonvar-import';
+
     private ?SeasonvarImportPipeline $pipeline = null;
 
     /**
@@ -25,12 +28,19 @@ class ImportSeasonvar extends Command
     {
         $this->pipeline = $pipeline;
         $this->registerSignalHandlers();
-        $lock = Cache::lock('seasonvar-import', (int) config('seasonvar.import.lock_seconds', 604800));
+        $lockSeconds = (int) config('seasonvar.import.lock_seconds', 604800);
+        $lock = Cache::lock(self::LOCK_KEY, $lockSeconds);
 
         if (! $lock->get()) {
-            $this->warn('Обновление уже запущено. Дождитесь завершения текущего запуска.');
+            if ($this->recoverStaleLock($lockSeconds)) {
+                $lock = Cache::lock(self::LOCK_KEY, $lockSeconds);
+            }
 
-            return self::FAILURE;
+            if (! $lock->get()) {
+                $this->warn('Обновление уже запущено. Дождитесь завершения текущего запуска.');
+
+                return self::FAILURE;
+            }
         }
 
         try {
@@ -62,6 +72,35 @@ class ImportSeasonvar extends Command
         } finally {
             $lock->release();
         }
+    }
+
+    private function recoverStaleLock(int $lockSeconds): bool
+    {
+        $staleAfterMinutes = max(1, (int) config('seasonvar.import.stale_after_minutes', 15));
+        $staleCutoff = now()->subMinutes($staleAfterMinutes);
+        $staleRunIds = SeasonvarImportRun::query()
+            ->where('status', 'running')
+            ->where('updated_at', '<=', $staleCutoff)
+            ->pluck('id');
+
+        if ($staleRunIds->isEmpty()) {
+            return false;
+        }
+
+        Cache::lock(self::LOCK_KEY, $lockSeconds)->forceRelease();
+
+        SeasonvarImportRun::query()
+            ->whereKey($staleRunIds)
+            ->update([
+                'status' => 'failed',
+                'last_error' => 'Предыдущий запуск остановился без завершения и был закрыт автоматически.',
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        $this->warn('Найден зависший запуск импорта. Старая блокировка снята, можно продолжать обновление.');
+
+        return true;
     }
 
     private function sleepSeconds(): ?int

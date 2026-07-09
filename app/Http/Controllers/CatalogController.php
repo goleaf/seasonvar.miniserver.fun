@@ -102,6 +102,10 @@ class CatalogController extends Controller
             ? $parsedYear
             : null;
         $invalidYear = $requestedYear !== '' && $year === null;
+        $titleContextSlug = $this->normalizeFilterSlug($request->query('title', ''));
+        $titleContext = $titleContextSlug === null || $titleContextSlug === ''
+            ? null
+            : CatalogTitle::query()->select(['id', 'slug', 'title'])->where('slug', $titleContextSlug)->first();
         $filterTypes = array_keys(self::FILTER_RELATIONS);
         $legacyType = $this->normalizeLegacyType($request->query('type', ''), $filterTypes);
         $legacyTaxonomy = $this->normalizeFilterSlug($request->query('taxonomy', ''));
@@ -158,7 +162,7 @@ class CatalogController extends Controller
 
         $querySearch = $search;
         $searchFallback = false;
-        $titles = $this->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $querySearch, $year, null, $invalidYear)
+        $titles = $this->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $querySearch, $year, null, $invalidYear, $titleContext?->id)
             ->with($this->cardRelations())
             ->withCount(['seasons', 'episodes'])
             ->latest('indexed_at')
@@ -168,7 +172,7 @@ class CatalogController extends Controller
         if ($search !== '' && $titles->total() === 0) {
             $querySearch = '';
             $searchFallback = true;
-            $titles = $this->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $querySearch, $year, null, $invalidYear)
+            $titles = $this->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $querySearch, $year, null, $invalidYear, $titleContext?->id)
                 ->with($this->cardRelations())
                 ->withCount(['seasons', 'episodes'])
                 ->latest('indexed_at')
@@ -197,7 +201,7 @@ class CatalogController extends Controller
             }
         });
 
-        $taxonomyContextCounts = $this->relationContextCounts($filterTaxonomies, $activeTaxonomies, $invalidFilterSlugs, $querySearch, $year, $invalidYear);
+        $taxonomyContextCounts = $this->relationContextCounts($filterTaxonomies, $activeTaxonomies, $invalidFilterSlugs, $querySearch, $year, $invalidYear, $titleContext?->id);
         $filterTaxonomies = $filterTaxonomies->map(function (Collection $items, string $filterType) use ($taxonomyContextCounts): Collection {
             return $items->map(function (Model $record) use ($filterType, $taxonomyContextCounts): Model {
                 $record->context_titles_count = (int) ($taxonomyContextCounts->get($filterType.'|'.$record->id) ?? 0);
@@ -230,7 +234,7 @@ class CatalogController extends Controller
             ]);
         }
 
-        $yearContextCounts = $this->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $querySearch, null, null, $invalidYear)
+        $yearContextCounts = $this->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $querySearch, null, null, $invalidYear, $titleContext?->id)
             ->select('year')
             ->selectRaw('count(*) as context_titles_count')
             ->whereNotNull('year')
@@ -250,6 +254,7 @@ class CatalogController extends Controller
             'requestedYear' => $requestedYear,
             'invalidYear' => $invalidYear,
             'searchFallback' => $searchFallback,
+            'titleContext' => $titleContext,
             'selectedTaxonomy' => $activeTaxonomies->first(),
             'activeTaxonomies' => $activeTaxonomies,
             'activeFilterSlugs' => $activeFilterSlugs,
@@ -272,6 +277,7 @@ class CatalogController extends Controller
                 $titles->nextPageUrl(),
                 $titles->getCollection(),
                 (int) ($titles->firstItem() ?? 1),
+                $titleContext,
             ),
         ]);
     }
@@ -332,6 +338,7 @@ class CatalogController extends Controller
         ?int $year = null,
         ?string $exceptTaxonomyType = null,
         bool $invalidYear = false,
+        ?int $titleContextId = null,
     ): Builder {
         $query = CatalogTitle::query();
 
@@ -341,6 +348,10 @@ class CatalogController extends Controller
 
         if ($year !== null) {
             $query->where('year', $year);
+        }
+
+        if ($titleContextId !== null) {
+            $query->whereKey($titleContextId);
         }
 
         $this->applySearchFilter($query, $search);
@@ -361,10 +372,19 @@ class CatalogController extends Controller
             return;
         }
 
+        $exactTitleIds = $this->exactTitleSearchIds($terms);
+
+        if ($exactTitleIds->isNotEmpty()) {
+            $query->whereKey($exactTitleIds);
+
+            return;
+        }
+
         $query->where(function (Builder $query) use ($search, $terms): void {
             $query->where('title', 'like', "%{$search}%")
                 ->orWhere('original_title', 'like', "%{$search}%")
-                ->orWhere('description', 'like', "%{$search}%");
+                ->orWhere('description', 'like', "%{$search}%")
+                ->orWhere('slug', 'like', "%{$search}%");
 
             foreach ($this->filterRelationNames() as $relation) {
                 $query->orWhereHas($relation, function (Builder $query) use ($search): void {
@@ -377,17 +397,80 @@ class CatalogController extends Controller
                     $query->orWhere('year', (int) $term);
                 }
 
-                $query->orWhere('title', 'like', "%{$term}%")
-                    ->orWhere('original_title', 'like', "%{$term}%")
-                    ->orWhere('description', 'like', "%{$term}%");
+                $this->searchTermVariants($term)->each(function (string $variant) use ($query): void {
+                    $query->orWhere('title', 'like', "%{$variant}%")
+                        ->orWhere('original_title', 'like', "%{$variant}%")
+                        ->orWhere('description', 'like', "%{$variant}%")
+                        ->orWhere('slug', 'like', "%{$variant}%");
 
-                foreach ($this->filterRelationNames() as $relation) {
-                    $query->orWhereHas($relation, function (Builder $query) use ($term): void {
-                        $query->where('name', 'like', "%{$term}%");
-                    });
-                }
+                    foreach ($this->filterRelationNames() as $relation) {
+                        $query->orWhereHas($relation, function (Builder $query) use ($variant): void {
+                            $query->where('name', 'like', "%{$variant}%");
+                        });
+                    }
+                });
             });
         });
+    }
+
+    /**
+     * @param  Collection<int, string>  $terms
+     * @return Collection<int, int>
+     */
+    private function exactTitleSearchIds(Collection $terms): Collection
+    {
+        $titleTerms = $terms
+            ->reject(fn (string $term): bool => preg_match('/^\d{4}$/', $term) === 1)
+            ->values();
+
+        if ($titleTerms->isEmpty()) {
+            return collect();
+        }
+
+        $ids = CatalogTitle::query()
+            ->select('id')
+            ->where(function (Builder $query) use ($titleTerms): void {
+                $titleTerms->each(function (string $term) use ($query): void {
+                    $variants = $this->searchTermVariants($term);
+
+                    $query->where(function (Builder $query) use ($variants): void {
+                        $variants->each(function (string $variant) use ($query): void {
+                            $query->orWhere('title', 'like', "%{$variant}%")
+                                ->orWhere('original_title', 'like', "%{$variant}%")
+                                ->orWhere('slug', 'like', "%{$variant}%");
+                        });
+                    });
+                });
+            })
+            ->orderBy('id')
+            ->limit(6)
+            ->pluck('id');
+
+        if ($ids->isNotEmpty() && $ids->count() <= 3) {
+            return $ids->values();
+        }
+
+        foreach ($titleTerms as $term) {
+            $variants = $this->searchTermVariants($term);
+            $ids = CatalogTitle::query()
+                ->select('id')
+                ->where(function (Builder $query) use ($variants): void {
+                    $variants->each(function (string $variant) use ($query): void {
+                        $query->orWhere('title', 'like', "%{$variant}%")
+                            ->orWhere('original_title', 'like', "%{$variant}%")
+                            ->orWhere('slug', 'like', "%{$variant}%");
+                    });
+                })
+                ->orderBy('id')
+                ->limit(6)
+                ->pluck('id');
+
+            if ($ids->isNotEmpty() && $ids->count() <= 3) {
+                return $ids->values();
+            }
+        }
+
+        return collect();
     }
 
     /**
@@ -395,16 +478,32 @@ class CatalogController extends Controller
      */
     private function searchTerms(string $search): Collection
     {
-        $normalized = mb_strtolower($search);
-        $normalized = preg_replace('/[^\pL\pN]+/u', ' ', $normalized) ?: '';
+        $normalized = preg_replace('/[^\pL\pN]+/u', ' ', $search) ?: '';
 
         return collect(explode(' ', $normalized))
             ->map(fn (string $term): string => trim($term))
             ->filter()
-            ->reject(fn (string $term): bool => in_array($term, self::SEARCH_STOP_WORDS, true))
+            ->reject(fn (string $term): bool => in_array(mb_strtolower($term), self::SEARCH_STOP_WORDS, true))
             ->filter(fn (string $term): bool => preg_match('/^\d{4}$/', $term) === 1 || mb_strlen($term) >= 3)
-            ->unique()
+            ->unique(fn (string $term): string => mb_strtolower($term))
             ->take(8)
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, string>
+     */
+    private function searchTermVariants(string $term): Collection
+    {
+        return collect([
+            $term,
+            mb_strtolower($term),
+            mb_convert_case($term, MB_CASE_TITLE, 'UTF-8'),
+            mb_strtoupper($term),
+        ])
+            ->map(fn (string $variant): string => trim($variant))
+            ->filter()
+            ->unique()
             ->values();
     }
 
@@ -429,6 +528,7 @@ class CatalogController extends Controller
         string $search,
         ?int $year,
         bool $invalidYear,
+        ?int $titleContextId = null,
     ): Collection {
         $visibleIdsByType = $filterTaxonomies
             ->map(fn (Collection $items): Collection => $items->pluck('id')->values())
@@ -440,14 +540,14 @@ class CatalogController extends Controller
 
         $catalogTitleTable = (new CatalogTitle)->getTable();
         $contextQueries = $visibleIdsByType
-            ->map(function (Collection $recordIds, string $filterType) use ($activeTaxonomies, $invalidFilterSlugs, $search, $year, $invalidYear, $catalogTitleTable) {
+            ->map(function (Collection $recordIds, string $filterType) use ($activeTaxonomies, $invalidFilterSlugs, $search, $year, $invalidYear, $titleContextId, $catalogTitleTable) {
                 $relationName = self::FILTER_RELATIONS[$filterType]['relation'];
                 $catalogTitleRelation = (new CatalogTitle)->{$relationName}();
                 $pivotTable = $catalogTitleRelation->getTable();
                 $titlePivotKey = $catalogTitleRelation->getForeignPivotKeyName();
                 $relatedPivotKey = $catalogTitleRelation->getRelatedPivotKeyName();
                 $filteredTitlesQuery = $this
-                    ->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, $year, $filterType, $invalidYear)
+                    ->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, $year, $filterType, $invalidYear, $titleContextId)
                     ->select($catalogTitleTable.'.id');
                 $alias = 'filtered_titles_'.preg_replace('/[^a-z0-9_]+/i', '_', $filterType);
 
@@ -705,16 +805,19 @@ class CatalogController extends Controller
         ?string $nextPageUrl,
         Collection $pageTitles,
         int $firstItemPosition,
+        ?CatalogTitle $titleContext,
     ): array {
         $activeLabels = $activeTaxonomies
             ->map(fn (Model $record, string $filterType): string => $this->filterTypeLabel($filterType).': '.$record->name)
             ->values();
         $filterText = $activeLabels->implode(', ');
         $title = match (true) {
+            $search !== '' && $titleContext !== null => 'Поиск "'.$search.'" по сериалу '.$titleContext->title,
             $search !== '' => 'Поиск "'.$search.'" - сериалы онлайн',
             $filterText !== '' && $year !== null => 'Сериалы '.$year.' - '.$filterText,
             $filterText !== '' => 'Сериалы - '.$filterText,
             $year !== null => 'Сериалы '.$year.' года онлайн',
+            $titleContext !== null => 'Подборка по сериалу '.$titleContext->title,
             default => 'Все сериалы онлайн',
         };
 
@@ -724,6 +827,7 @@ class CatalogController extends Controller
 
         $descriptionParts = collect([
             $total.' сериалов найдено в каталоге.',
+            $titleContext !== null ? 'Показаны результаты по сериалу '.$titleContext->title.'.' : null,
             $filterText !== '' ? 'Фильтры: '.$filterText.'.' : null,
             $year !== null ? 'Год выхода: '.$year.'.' : null,
             $search !== '' ? 'Поисковый запрос: '.$search.'.' : null,
@@ -731,11 +835,12 @@ class CatalogController extends Controller
             $invalidYear ? 'Год '.$requestedYear.' не найден.' : null,
             $invalidFilterSlugs !== [] ? 'Часть фильтров не найдена.' : null,
         ])->filter()->implode(' ');
-        $canonical = $this->catalogCanonicalUrl($request, $activeTaxonomies, $year, $currentPage);
+        $canonical = $this->catalogCanonicalUrl($request, $activeTaxonomies, $year, $currentPage, $titleContext);
         $robots = $search === '' && $invalidFilterSlugs === [] && ! $invalidYear && $activeTaxonomies->count() <= 1
             ? $this->indexRobots()
             : 'noindex,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
         $keywords = collect(['сериалы онлайн', 'каталог сериалов', 'смотреть сериалы'])
+            ->when($titleContext !== null, fn (Collection $items): Collection => $items->push($titleContext->title))
             ->merge($activeTaxonomies->pluck('name'))
             ->when($year !== null, fn (Collection $items): Collection => $items->push('сериалы '.$year))
             ->filter()
@@ -766,6 +871,11 @@ class CatalogController extends Controller
             'search_phrases' => $this->catalogSearchPhrases($search, $year, $activeTaxonomies),
             'keyword_clusters' => $this->catalogKeywordClusters($search, $year, $activeTaxonomies),
             'related_links' => $this->catalogRelatedLinks($search, $year, $activeTaxonomies),
+            'search_context' => $titleContext === null ? null : [
+                'type' => 'title',
+                'title' => $titleContext->title,
+                'slug' => $titleContext->slug,
+            ],
             'breadcrumbs' => [
                 ['name' => 'Главная', 'url' => route('home')],
                 ['name' => 'Сериалы', 'url' => route('titles.index')],
@@ -904,6 +1014,11 @@ class CatalogController extends Controller
             'search_phrases' => $searchPhrases,
             'keyword_clusters' => $this->titleKeywordClusters($catalogTitle, $genres, $countries, $actors, $directors, $seasons->count(), $episodeCount, $mediaCount),
             'related_links' => $this->titleRelatedLinks($catalogTitle, $taxonomiesByType),
+            'search_context' => [
+                'type' => 'title',
+                'title' => $catalogTitle->title,
+                'slug' => $catalogTitle->slug,
+            ],
             'breadcrumbs' => [
                 ['name' => 'Главная', 'url' => route('home')],
                 ['name' => 'Сериалы', 'url' => route('titles.index')],
@@ -946,9 +1061,13 @@ class CatalogController extends Controller
             : $request->url().'?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986);
     }
 
-    private function catalogCanonicalUrl(Request $request, Collection $activeTaxonomies, ?int $year, int $currentPage): string
+    private function catalogCanonicalUrl(Request $request, Collection $activeTaxonomies, ?int $year, int $currentPage, ?CatalogTitle $titleContext = null): string
     {
         $query = [];
+
+        if ($titleContext !== null) {
+            $query['title'] = $titleContext->slug;
+        }
 
         if ($year !== null) {
             $query['year'] = $year;
@@ -975,7 +1094,7 @@ class CatalogController extends Controller
                 $query['q'] = trim((string) $search);
             }
 
-            if ($year !== null && ! isset($query['q']) && $currentPage === 1) {
+            if ($titleContext === null && $year !== null && ! isset($query['q']) && $currentPage === 1) {
                 return route('titles.year', ['year' => $year]);
             }
 

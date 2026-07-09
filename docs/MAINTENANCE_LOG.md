@@ -1,90 +1,94 @@
-# Maintenance Log
+# Журнал обслуживания
 
 ## 2026-07-09
 
 - Добавлено автоматическое дозаполнение `source_media_key` для старых медиа внутри `seasonvar:import`, общий генератор ключей медиа для импорта Seasonvar и playlist-импорта, а также русские сообщения прогресса для этого этапа обслуживания.
 - Обновлены правила проекта и настройки источника: единственная команда импорта явно сохраняет внешние видео-ссылки без скачивания видеофайлов.
-- Replaced separate Seasonvar public commands with `php artisan seasonvar:import`, including URL mode, forced refresh, forever mode, database-backed run logs, sitemap discovery, page updates, season-page updates, media collection, and title merging.
-- Added import state tables and fields for run events, source-page retry state, missing-data flags, raw HTML snapshots, reviews, and stable media updates through `source_media_key`.
-- Updated Seasonvar media storage to keep external playback links, quality, translation, format, availability checks, and all variants without downloading video files.
-- Moved duplicated season-title merging into an internal service so one catalog title owns all seasons.
-- Updated title pages with season accordions, visitor-friendly Russian empty states, media variant selection, and Plyr/HLS video playback.
-- Removed the manual playlist import command from the public Artisan command list while keeping the playlist importer as an internal service.
-- Added importer support for Seasonvar IMDb/KinoPoisk ratings and alternative title aliases through concrete tables.
-- Improved Seasonvar info-block parsing for labels, ratings, age ratings, countries, genres, directors, actors, and episode fallback extraction.
-- Removed decorative catalog labels that did not provide navigation, filtering, counts, or actionable status.
-- Added local FontAwesome icons through npm/Vite and wired icon props into shared UI components without CDN usage.
+- Отдельные публичные команды Seasonvar заменены на `php artisan seasonvar:import`: режим одного URL, принудительное обновление, бесконечный режим, журналы запусков в базе, обнаружение sitemap, обновление страниц, обновление сезонных страниц, сбор медиа и объединение дублей тайтлов.
+- Добавлены таблицы и поля состояния импорта для событий запусков, повторов страниц источника, признаков недостающих данных, HTML-снимков, отзывов и стабильного обновления медиа через `source_media_key`.
+- Хранение медиа Seasonvar переведено на внешние ссылки воспроизведения, качество, перевод, формат, проверки доступности и все варианты без скачивания видеофайлов.
+- Объединение сезонных дублей вынесено во внутренний сервис, чтобы один сериал владел всеми сезонами.
+- Страницы тайтлов обновлены: аккордеоны сезонов, понятные русские сообщения для посетителей, выбор варианта медиа и воспроизведение через Plyr/HLS.
+- Ручная команда импорта плейлистов убрана из публичного списка Artisan, при этом импорт плейлистов оставлен как внутренний сервис.
+- Добавлена поддержка рейтингов IMDb/КиноПоиск и альтернативных названий Seasonvar через отдельные таблицы.
+- Улучшен разбор информационных блоков Seasonvar: подписи, рейтинги, возрастные ограничения, страны, жанры, режиссеры, актеры и запасное извлечение серий.
+- Убраны декоративные подписи каталога, которые не давали навигации, фильтров, счетчиков или полезного состояния.
+- Добавлены локальные иконки FontAwesome через npm/Vite, параметры иконок подключены к общим UI-компонентам без CDN.
 - Удален текст описаний, который раньше попадал в страны, и закрыт повторный импорт описательных текстов как названий связей.
-- Blocked long text from being imported as age rating relations.
-- Fixed chunked discovered URL `upsert` payload handling and kept sitemap URL storage memory-bounded.
-- Added unchanged-page fast path to skip HTML parsing and catalog writes when parsed content hash is unchanged.
-- Optimized Seasonvar catalog-title upsert with exact `source_url_hash` lookup before title-based duplicate detection.
-- Optimized discovered Seasonvar URL storage with chunked batch `upsert` instead of per-URL `firstOrNew()`.
-- Optimized Seasonvar importer seasons and episodes sync with batch `upsert` operations.
-- Wrapped Seasonvar importer catalog writes in a transaction and split concrete relation syncing into a typed batch helper.
-- Extracted catalog poster rendering into shared `x-title-poster` and reused it on home, card, and show pages.
-- Extracted responsive home-page title rows with poster thumbnails into a shared `x-title-list-row` component.
-- Improved responsive catalog layouts and added poster thumbnails beside title rows on the home page.
-- Optimized Seasonvar importer relation syncing for concrete catalog relation tables with grouped upserts and one pivot sync per relation.
-- Added concrete catalog relation tables and Eloquent `belongsToMany` relations for genres, countries, actors, directors, age ratings, translations, statuses, networks, studios, and tags without morph relations.
-- Added Seasonvar season-list status parsing for latest episode date, released episode count, known/unknown total count, season translation, and raw status text.
-- Reduced title show query load by removing unused `source`, nested season source pages, episode source pages, and recommendation eager-loads.
-- Added query indexes for taxonomy filters, newest lists, source-page sync queues, and title media lists.
-- Reduced taxonomy sidebar context-count calculation from per-type SQL queries to one aggregated union query over the pivot relation.
-- Optimized catalog filter taxonomy lookup into one batched query for active filters.
-- Optimized sidebar context counts from per-item count queries to per-taxonomy-type batched `withCount()` queries.
-- Optimized year context counts into one grouped query.
-- Optimized title show page by removing duplicate typed taxonomy eager-loads and preparing taxonomy groups once in the controller.
-- Kept catalog UI light-only and component-based.
-- Added documentation standards for code, UI, relations, parser behavior, and future maintenance updates.
-## 2026-07-09
-
-- Added portal-wide SEO metadata: canonical URLs, robots directives, OpenGraph/Twitter tags, schema.org JSON-LD, a dynamic Laravel sitemap, and a robots.txt sitemap declaration.
-- Added SEO payloads for the home page, catalog listing/filter pages, and individual title pages, including TVSeries, VideoObject, CollectionPage, WebSite, and BreadcrumbList structured data.
-- Expanded SEO automation with sitemap index files, static/year/taxonomy/title sitemap sections, image sitemap entries for posters, an RSS feed for recently updated titles, canonical de-duplication for filter pages, and richer OpenGraph video/image metadata.
-- Added OpenSearch metadata so browsers and crawlers can discover catalog search automatically.
-- Added automatic ItemList structured data for home and catalog pages, plus season and episode structured data for title pages using already-loaded relations.
-- Added automatic WebPage and Organization structured data, hreflang alternates, last-modified metadata, article tags, richer TVSeries publisher/language/free-access fields, and source sameAs links.
-- Added visible breadcrumb navigation, SiteNavigationElement structured data, and automatic visible FAQ blocks with matching FAQPage JSON-LD on title pages.
-- Added automatic long-tail keyword generation from titles, aliases, genres, countries, actors, directors, years, seasons, episodes, and media availability, with visible search phrase blocks plus keywords/news_keywords metadata.
-- Added automatic visible SEO summary text and related internal links for home, catalog, and title pages, plus speakable WebPage selectors so generated keywords are supported by readable page content.
-- Added video sitemap chunks, LLM discovery text, Dublin Core metadata, semantic keyword clusters, and visible cluster blocks generated from catalog/title facts.
-- Added clean year landing URLs, dynamic catalog H1/lead text for every filter/year/search state, sitemap links to year landing pages, and clickable semantic/search phrase chips for internal discovery.
-- Added programmatic SEO landing sitemap for real taxonomy-plus-year combinations, covering high-value pages such as genre/year, country/year, actor/year, director/year, translation/year, and age-rating/year.
-- Added portal-wide topical SEO expansion with subject/classification/page-topic meta tags, schema.org DefinedTermSet data, and visible key-topic internal links generated from existing tags, search phrases, and semantic clusters.
-- Added global search-intent SEO expansion with article tags, target/search-intent metadata, schema.org ItemList thematic navigation, and visible query-navigation links generated automatically for every SEO-enabled page.
-- Added global entity SEO expansion with canonical URL summary metadata, repeated entity meta tags, schema.org WebPage `about`/`mentions`, and microdata on visible internal navigation blocks.
-- Added global quick-answer SEO expansion with visible page-specific answer cards and matching schema.org FAQPage data generated from each page title, description, topics, and search intent terms.
-- Added global page-structure SEO expansion with automatic visible table-of-contents links, section anchors, `toc-count` metadata, schema.org ItemList contents, and WebPageElement `hasPart` data for every SEO block.
-- Added global long-tail SEO expansion with automatic visible query-phrase links, `long-tail-keywords` metadata, `query-count` metadata, and schema.org ItemList data generated from page topics and search intent terms.
-- Added global related-collection SEO expansion with automatic visible thematic collection cards, `related-collection-count` metadata, and schema.org CollectionPage `hasPart` data generated from page topics and search intents.
-- Added global expanded-keyword SEO normalization that merges page keywords, topics, intents, long-tail phrases, and related collections into `keywords`, `news_keywords`, schema.org WebPage keywords, keyphrases, keyword aliases, and keyword-count metadata.
-- Added global action-intent SEO expansion with visible page actions, `action-count` metadata, schema.org WebPage `potentialAction`, SearchAction/ReadAction/ViewAction/WatchAction data, and ItemList action navigation.
-- Added global semantic-glossary SEO expansion with visible DefinedTerm cards, `defined-terms` metadata, `glossary-count` metadata, and schema.org DefinedTermSet data generated from page topics.
-- Added global semantic-hub SEO expansion with grouped visible topic hubs, `semantic-hub-count` metadata, expanded keyword integration, and schema.org ItemList data for watch, season, description, actor, genre, and related collection queries.
-- Added global snippet-block SEO expansion with visible page-specific thesis cards, `snippet-count` and `snippet-topics` metadata, expanded keyword integration, and schema.org WebPageElement ItemList data.
-- Added global content-signal SEO expansion with visible quality/scope metrics, `content-signal-count` and `content-signal-summary` metadata, main-content microdata, expanded keyword integration, and schema.org PropertyValue ItemList data.
-- Fixed SEO variable dependency order and added global audience-path SEO expansion with visible search paths, `audience-path-count` metadata, expanded keyword integration, keyword aliases, and schema.org ItemList data.
-- Added global also-search SEO expansion with visible related query chips, `also-search-count` metadata, expanded keyword and alias integration, table-of-contents integration, and schema.org ItemList data.
-- Added global discovery/freshness SEO expansion with visible indexing/update signals, sitemap/feed/opensearch/llms links, `discovery-signal-count` metadata, expanded keyword integration, and schema.org DataCatalog/Dataset data.
-- Added global query-matrix SEO expansion with grouped visible search-intent matrices, `query-matrix-count` metadata, expanded keyword and alias integration, table-of-contents integration, and schema.org ItemList data.
-- Added global media SEO expansion with normalized image/video signals, `media-signal-count` and `media-assets` metadata, expanded keyword integration, visible media preview links, and schema.org ImageObject/VideoObject ItemList data.
-- Added global publisher-trust SEO expansion with visible publisher/indexing/search signals, `publisher-signal-count` metadata, expanded keyword integration, and schema.org CreativeWork/WebSite/Organization data.
-- Added global freshness SEO expansion with current-year/new-episode/update queries, `freshness-query-count` and `freshness-year` metadata, expanded keyword and alias integration, visible freshness cards, and schema.org ItemList data.
-- Added global Russian query variant SEO expansion with visible language/quality/subtitle/voiceover/internal-search chips, `russian-query-variant-count` metadata, expanded keyword and alias integration, and schema.org ItemList data.
-- Added global catalog-direction SEO expansion with visible genre/country/year/actor/director/translation/age/topic direction cards, `catalog-direction-count` metadata, expanded keyword and alias integration, and schema.org ItemList data.
-- Added global comparison SEO expansion with visible similar/alternative/what-to-watch cards, `comparison-query-count` metadata, expanded keyword and alias integration, and schema.org ItemList data.
-- Added global episode-intent SEO expansion with visible season/episode/latest/schedule cards, `episode-intent-count` and `episode-keywords` metadata, expanded keyword and alias integration, and schema.org ItemList data.
-- Added global watch-mode SEO expansion with visible web-player/mobile/quality/remote-video cards, `watch-mode-count` and `watch-mode-keywords` metadata, expanded keyword and alias integration, and schema.org ItemList data.
-- Added global translation SEO expansion with visible voiceover/subtitle/dubbing/translation cards, `translation-query-count` and `translation-keywords` metadata, expanded keyword and alias integration, and schema.org ItemList data.
-- Added global voice-search SEO expansion with visible conversational question cards, `voice-search-query-count` and `voice-search-keywords` metadata, expanded keyword and alias integration, and schema.org ItemList data.
-- Added global topic-authority SEO expansion with visible description/facts/navigation/update/similar-topic cards, `topic-authority-count` and `topic-authority-keywords` metadata, expanded keyword and alias integration, and schema.org ItemList data.
-- Added global release-calendar SEO expansion with visible today/tomorrow/week/date-release cards, `release-calendar-query-count` and `release-calendar-keywords` metadata, expanded keyword and alias integration, and schema.org ItemList data.
-- Fixed internal SEO search landing pages by tokenizing long generated query phrases, ignoring generic stop words, matching meaningful terms across title/original title/description/taxonomy relations/year, and falling back to broad catalog results when generated SEO phrases would otherwise return zero titles.
-- Added import maintenance backfills for old parsed source-page statuses and missing media metadata, plus title/season-level trailer media preservation when no episode number is present.
-- Added cache-lock protection for the single Seasonvar import command so overlapping CLI runs fail fast instead of processing the same queue in parallel.
-- Added automatic malformed nested Seasonvar URL cleanup for stored source pages and URL validation so `.html/...` catalog links are not requested again.
-- Added media availability backfill inside each import cycle to gradually check older `licensed_media` rows with missing or stale `check_status`.
-- Added HLS master playlist expansion so discovered `.m3u8` playlists can create separate quality variants while preserving the source season and episode.
-- Improved Seasonvar season URL parsing for `season`, `sezon`, `сезон`, and zero-padded season numbers like `00005-sezon`, so playlist media defaults to the correct current season.
-- Preserved canonical catalog title content hashes when importing additional season pages for the same series, preventing non-canonical season pages from overwriting title-level sync state.
+- Запрещен импорт длинных текстов как возрастных ограничений.
+- Исправлена пакетная обработка `upsert` для найденных URL и сохранено экономное использование памяти при записи sitemap-ссылок.
+- Добавлен быстрый путь для неизмененных страниц: HTML-разбор и запись каталога пропускаются, если хэш контента не изменился.
+- Оптимизирован `upsert` тайтлов Seasonvar: сначала выполняется точный поиск по `source_url_hash`, затем проверка дублей по названию.
+- Найденные URL Seasonvar сохраняются пакетным `upsert`, а не через отдельный `firstOrNew()` для каждой ссылки.
+- Сезоны и серии импортера Seasonvar синхронизируются пакетными `upsert`-операциями.
+- Запись каталога в импортере Seasonvar обернута в транзакцию, синхронизация конкретных связей вынесена в типизированный пакетный помощник.
+- Отрисовка постеров каталога вынесена в общий компонент `x-title-poster` и переиспользуется на главной, карточках и страницах тайтлов.
+- Адаптивные строки тайтлов главной страницы с миниатюрами постеров вынесены в общий компонент `x-title-list-row`.
+- Улучшены адаптивные макеты каталога, на главной добавлены миниатюры постеров рядом с названиями.
+- Синхронизация конкретных связей каталога в импортере Seasonvar оптимизирована через групповые `upsert` и одну синхронизацию pivot-связей на тип.
+- Добавлены конкретные таблицы связей каталога и отношения Eloquent `belongsToMany` для жанров, стран, актеров, режиссеров, возрастов, переводов, статусов, каналов, студий и тегов без morph-связей.
+- Добавлен разбор статуса списка сезонов Seasonvar: дата последней серии, количество вышедших серий, известное или неизвестное общее количество, перевод сезона и исходный текст статуса.
+- Снижена нагрузка страницы тайтла: убраны неиспользуемые `source`, вложенные страницы источника сезонов, страницы источника серий и лишние eager-load связи рекомендаций.
+- Добавлены индексы запросов для фильтров таксономий, новых списков, очередей синхронизации страниц источника и списков медиа тайтлов.
+- Подсчет контекстных счетчиков в боковой панели сокращен с отдельных SQL-запросов по типам до одного агрегированного union-запроса по pivot-связям.
+- Поиск активных таксономий фильтров оптимизирован в один пакетный запрос.
+- Счетчики боковой панели оптимизированы с отдельных запросов по элементам до пакетных `withCount()` по типам таксономий.
+- Контекстные счетчики годов оптимизированы в один групповой запрос.
+- Страница тайтла оптимизирована: убраны повторные eager-load связи типизированных таксономий, группы таксономий готовятся в контроллере.
+- Интерфейс каталога оставлен светлым и компонентным.
+- Добавлены стандарты документации для кода, интерфейса, связей, поведения парсера и будущих записей обслуживания.
+- Добавлены SEO-метаданные портала: canonical URL, robots-правила, OpenGraph/Twitter-теги, JSON-LD schema.org, динамическая карта сайта Laravel и объявление sitemap в robots.txt.
+- Добавлены SEO-данные для главной, списка/фильтров каталога и отдельных страниц тайтлов: TVSeries, VideoObject, CollectionPage, WebSite и BreadcrumbList.
+- Расширена SEO-автоматизация: индекс sitemap, разделы статических страниц, годов, таксономий и тайтлов, image sitemap для постеров, RSS обновленных тайтлов, устранение дублей canonical для фильтров и расширенные OpenGraph-данные видео/изображений.
+- Добавлены метаданные OpenSearch, чтобы браузеры и поисковые системы могли находить поиск по каталогу автоматически.
+- Добавлена автоматическая структура ItemList для главной и каталога, а также структура сезонов и серий на страницах тайтлов с уже загруженными связями.
+- Добавлены автоматические данные WebPage и Organization, hreflang-альтернативы, last-modified, article tags, расширенные поля TVSeries для издателя, языка, бесплатного доступа и ссылки `sameAs` на источник.
+- Добавлены видимые хлебные крошки, структура SiteNavigationElement и автоматические FAQ-блоки на страницах тайтлов с соответствующим FAQPage JSON-LD.
+- Добавлена автоматическая генерация длинных поисковых фраз из названий, алиасов, жанров, стран, актеров, режиссеров, годов, сезонов, серий и доступности медиа; добавлены видимые блоки поисковых фраз и метаданные keywords/news_keywords.
+- Добавлены автоматические SEO-описания и внутренние связанные ссылки для главной, каталога и страниц тайтлов, а также speakable WebPage-селекторы для читаемого контента.
+- Добавлены video sitemap, текст для LLM-обнаружения, Dublin Core, семантические кластеры ключевых слов и видимые блоки кластеров на основе фактов каталога/тайтла.
+- Добавлены чистые URL страниц годов, динамические H1/lead для каждого состояния фильтра, года и поиска, ссылки sitemap на страницы годов и кликабельные семантические/поисковые чипы.
+- Добавлен sitemap программных SEO-страниц для реальных сочетаний таксономии и года: жанр/год, страна/год, актер/год, режиссер/год, перевод/год и возраст/год.
+- Добавлено тематическое SEO-расширение портала с meta-тегами subject/classification/page-topic, данными schema.org DefinedTermSet и видимыми тематическими внутренними ссылками.
+- Добавлено SEO-расширение поисковых намерений с article tags, target/search-intent metadata, тематической навигацией schema.org ItemList и видимыми query-ссылками.
+- Добавлено entity SEO-расширение с метаданными canonical summary, повторяемыми entity meta tags, schema.org WebPage `about`/`mentions` и microdata во видимой внутренней навигации.
+- Добавлено SEO-расширение быстрых ответов с видимыми карточками ответов страницы и соответствующими данными FAQPage на основе заголовка, описания, тем и поисковых намерений.
+- Добавлено SEO-расширение структуры страницы: автоматическое оглавление, якоря секций, metadata `toc-count`, schema.org ItemList contents и WebPageElement `hasPart` для каждого SEO-блока.
+- Добавлено long-tail SEO-расширение с автоматическими ссылками поисковых фраз, metadata `long-tail-keywords`, metadata `query-count` и schema.org ItemList.
+- Добавлено related-collection SEO-расширение с тематическими карточками подборок, metadata `related-collection-count` и schema.org CollectionPage `hasPart`.
+- Добавлена нормализация расширенных ключевых слов: keywords, topics, intents, long-tail phrases и related collections объединяются в `keywords`, `news_keywords`, schema.org WebPage keywords, keyphrases, keyword aliases и metadata `keyword-count`.
+- Добавлено action-intent SEO-расширение с видимыми действиями страницы, metadata `action-count`, schema.org WebPage `potentialAction`, SearchAction/ReadAction/ViewAction/WatchAction и ItemList action navigation.
+- Добавлено semantic-glossary SEO-расширение с видимыми карточками DefinedTerm, metadata `defined-terms`, metadata `glossary-count` и schema.org DefinedTermSet.
+- Добавлено semantic-hub SEO-расширение с группами тематических хабов, metadata `semantic-hub-count`, расширенной интеграцией ключевых слов и schema.org ItemList для просмотра, сезонов, описаний, актеров, жанров и связанных подборок.
+- Добавлено snippet-block SEO-расширение с тезисными карточками страницы, metadata `snippet-count` и `snippet-topics`, расширенной интеграцией ключевых слов и schema.org WebPageElement ItemList.
+- Добавлено content-signal SEO-расширение с видимыми метриками качества/охвата, metadata `content-signal-count` и `content-signal-summary`, main-content microdata, расширенной интеграцией ключевых слов и schema.org PropertyValue ItemList.
+- Исправлен порядок зависимостей SEO-переменных и добавлено audience-path SEO-расширение с видимыми путями поиска, metadata `audience-path-count`, расширенной интеграцией ключевых слов, keyword aliases и schema.org ItemList.
+- Добавлено also-search SEO-расширение с видимыми чипами связанных запросов, metadata `also-search-count`, расширенной интеграцией ключевых слов и алиасов, интеграцией оглавления и schema.org ItemList.
+- Добавлено discovery/freshness SEO-расширение с видимыми сигналами индексации/обновления, ссылками sitemap/feed/opensearch/llms, metadata `discovery-signal-count`, расширенной интеграцией ключевых слов и schema.org DataCatalog/Dataset.
+- Добавлено query-matrix SEO-расширение с группами матриц поисковых намерений, metadata `query-matrix-count`, расширенной интеграцией ключевых слов и алиасов, интеграцией оглавления и schema.org ItemList.
+- Добавлено media SEO-расширение с нормализованными сигналами изображений/видео, metadata `media-signal-count` и `media-assets`, расширенной интеграцией ключевых слов, видимыми ссылками предпросмотра медиа и schema.org ImageObject/VideoObject ItemList.
+- Добавлено publisher-trust SEO-расширение с видимыми сигналами издателя/индексации/поиска, metadata `publisher-signal-count`, расширенной интеграцией ключевых слов и schema.org CreativeWork/WebSite/Organization.
+- Добавлено freshness SEO-расширение с запросами текущего года, новых серий и обновлений, metadata `freshness-query-count` и `freshness-year`, расширенной интеграцией ключевых слов и алиасов, видимыми карточками актуальности и schema.org ItemList.
+- Добавлено SEO-расширение русских вариантов запросов с чипами языка, качества, субтитров, озвучки и внутреннего поиска, metadata `russian-query-variant-count`, расширенной интеграцией ключевых слов и алиасов, а также schema.org ItemList.
+- Добавлено catalog-direction SEO-расширение с карточками направлений жанров, стран, годов, актеров, режиссеров, переводов, возраста и тем, metadata `catalog-direction-count`, расширенной интеграцией ключевых слов и алиасов, а также schema.org ItemList.
+- Добавлено comparison SEO-расширение с карточками похожего, альтернатив и рекомендаций, metadata `comparison-query-count`, расширенной интеграцией ключевых слов и алиасов, а также schema.org ItemList.
+- Добавлено episode-intent SEO-расширение с карточками сезонов, серий, последних выпусков и расписания, metadata `episode-intent-count` и `episode-keywords`, расширенной интеграцией ключевых слов и алиасов, а также schema.org ItemList.
+- Добавлено watch-mode SEO-расширение с карточками веб-плеера, мобильного просмотра, качества и внешнего видео, metadata `watch-mode-count` и `watch-mode-keywords`, расширенной интеграцией ключевых слов и алиасов, а также schema.org ItemList.
+- Добавлено translation SEO-расширение с карточками озвучки, субтитров, дубляжа и перевода, metadata `translation-query-count` и `translation-keywords`, расширенной интеграцией ключевых слов и алиасов, а также schema.org ItemList.
+- Добавлено voice-search SEO-расширение с карточками разговорных вопросов, metadata `voice-search-query-count` и `voice-search-keywords`, расширенной интеграцией ключевых слов и алиасов, а также schema.org ItemList.
+- Добавлено topic-authority SEO-расширение с карточками описания, фактов, навигации, обновлений и похожих тем, metadata `topic-authority-count` и `topic-authority-keywords`, расширенной интеграцией ключевых слов и алиасов, а также schema.org ItemList.
+- Добавлено release-calendar SEO-расширение с карточками дат выхода на сегодня, завтра, неделю и конкретную дату, metadata `release-calendar-query-count` и `release-calendar-keywords`, расширенной интеграцией ключевых слов и алиасов, а также schema.org ItemList.
+- Исправлены внутренние SEO-страницы поиска: длинные сгенерированные фразы разбиваются на токены, общие стоп-слова игнорируются, значимые слова ищутся по названию, оригинальному названию, описанию, связям и году, а при отсутствии точных совпадений показываются ближайшие результаты каталога.
+- Добавлены сервисные дозаполнения импорта для старых статусов страниц источника и недостающих метаданных медиа, а также сохранение трейлеров на уровне тайтла/сезона, когда номер серии отсутствует.
+- Добавлена защита единственной команды импорта Seasonvar через cache-lock: параллельные CLI-запуски быстро завершаются ошибкой вместо одновременной обработки одной очереди.
+- Добавлена автоматическая очистка некорректных вложенных URL Seasonvar и проверка URL, чтобы ссылки вида `.html/...` больше не запрашивались.
+- В каждый цикл импорта добавлено дозаполнение доступности медиа, чтобы постепенно проверять старые строки `licensed_media` с отсутствующим или устаревшим `check_status`.
+- Добавлено разворачивание master-playlist HLS: найденные `.m3u8` плейлисты создают отдельные варианты качества с сохранением исходного сезона и серии.
+- Улучшен разбор URL сезонов Seasonvar для `season`, `sezon`, `сезон` и номеров с ведущими нулями вроде `00005-sezon`, чтобы медиа из плейлиста по умолчанию привязывались к правильному текущему сезону.
+- Сохранены канонические хэши контента тайтлов при импорте дополнительных сезонных страниц того же сериала, чтобы неканонические страницы сезонов не перезаписывали состояние синхронизации тайтла.
+- SEO-фразы поиска сохраняют варианты регистра кириллицы и сначала выбирают точные совпадения по названию, поэтому запросы вроде `сериал Знахарь описание жанры` ведут к конкретной карточке, а не к общему каталогу.
+- Страницы тайтлов передают `search_context` в общий SEO-layout; сгенерированные ссылки поиска добавляют текущий slug тайтла, а контроллер каталога применяет этот контекст, чтобы переходы из конкретной страницы оставались внутри этого тайтла.
+- Для контекстных поисковых страниц сохранен параметр `title` в canonical URL, форме поиска, ссылках фильтров и ссылках годов.
+- Безопасный размер пачки разбора по умолчанию для `seasonvar:import` уменьшен до 100 страниц за цикл, чтобы одиночная команда не перегружала свой и внешний сервер.
+- Команда `seasonvar:import` получила heartbeat активного запуска и автоматическое восстановление зависшей блокировки, если прошлый процесс остановился без завершения.
+- Для SQLite включены `busy_timeout`, WAL-журнал и нормальный synchronous-режим по умолчанию, чтобы импорт устойчивее переживал краткие блокировки базы.
