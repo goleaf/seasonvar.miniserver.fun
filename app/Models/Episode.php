@@ -1,0 +1,34 @@
+<?php
+
+namespace App\Models;
+
+use Database\Factories\EpisodeFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+#[Fillable(['season_id', 'source_page_id', 'number', 'title', 'source_url', 'source_url_hash', 'released_at', 'summary'])]
+class Episode extends Model
+{
+    /** @use HasFactory<EpisodeFactory> */
+    use HasFactory;
+
+    /**
+     * @return BelongsTo<Season, $this>
+     */
+    public function season(): BelongsTo
+    {
+        return $this->belongsTo(Season::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'released_at' => 'date',
+        ];
+    }
+}
