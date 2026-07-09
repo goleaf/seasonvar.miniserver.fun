@@ -18,6 +18,20 @@ use Illuminate\Support\Str;
 #[Description('Объединяет сезонные страницы одного сериала в одну карточку каталога')]
 class MergeSeasonvarTitles extends Command
 {
+    private const CATALOG_RELATIONS = [
+        'taxonomies',
+        'genres',
+        'countries',
+        'actors',
+        'directors',
+        'ageRatings',
+        'translations',
+        'statuses',
+        'networks',
+        'studios',
+        'tags',
+    ];
+
     /**
      * Execute the console command.
      */
@@ -38,7 +52,7 @@ class MergeSeasonvarTitles extends Command
 
         foreach ($groups as $group) {
             $titles = CatalogTitle::query()
-                ->with(['taxonomies', 'seasons.episodes'])
+                ->with([...self::CATALOG_RELATIONS, 'seasons.episodes'])
                 ->whereKey($group->pluck('id'))
                 ->orderBy('id')
                 ->get();
@@ -117,13 +131,15 @@ class MergeSeasonvarTitles extends Command
         $mergedTitles = 0;
         $mergedSeasons = 0;
         $movedEpisodes = 0;
-        $taxonomyIds = $canonical->taxonomies->pluck('id')->all();
+        $relationIds = $this->relationIds($canonical);
 
         foreach ($titles->slice(1) as $duplicate) {
-            $taxonomyIds = array_values(array_unique([
-                ...$taxonomyIds,
-                ...$duplicate->taxonomies->pluck('id')->all(),
-            ]));
+            foreach ($this->relationIds($duplicate) as $relation => $ids) {
+                $relationIds[$relation] = array_values(array_unique([
+                    ...$relationIds[$relation],
+                    ...$ids,
+                ]));
+            }
 
             foreach ($duplicate->seasons as $season) {
                 $targetSeason = Season::query()->firstOrCreate(
@@ -169,7 +185,10 @@ class MergeSeasonvarTitles extends Command
             $mergedTitles++;
         }
 
-        $canonical->taxonomies()->sync($taxonomyIds);
+        foreach ($relationIds as $relation => $ids) {
+            $canonical->{$relation}()->sync($ids);
+        }
+
         $this->refreshCanonicalTitle($canonical, $titles);
 
         return [
@@ -177,6 +196,18 @@ class MergeSeasonvarTitles extends Command
             'seasons' => $mergedSeasons,
             'episodes' => $movedEpisodes,
         ];
+    }
+
+    /**
+     * @return array<string, list<int>>
+     */
+    private function relationIds(CatalogTitle $title): array
+    {
+        return collect(self::CATALOG_RELATIONS)
+            ->mapWithKeys(fn (string $relation): array => [
+                $relation => $title->{$relation}->pluck('id')->all(),
+            ])
+            ->all();
     }
 
     private function mergeEpisodes(Season $fromSeason, Season $targetSeason): int

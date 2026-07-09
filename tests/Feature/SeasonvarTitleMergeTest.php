@@ -3,12 +3,13 @@
 namespace Tests\Feature;
 
 use App\Models\CatalogTitle;
+use App\Models\Country;
 use App\Models\Episode;
+use App\Models\Genre;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\Source;
 use App\Models\SourcePage;
-use App\Models\Taxonomy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -31,13 +32,11 @@ class SeasonvarTitleMergeTest extends TestCase
             'url' => $secondUrl,
             'url_hash' => hash('sha256', $secondUrl),
         ]);
-        $country = Taxonomy::factory()->create([
-            'type' => 'country',
+        $country = Country::query()->create([
             'name' => 'Россия',
             'slug' => 'rossiia',
         ]);
-        $genre = Taxonomy::factory()->create([
-            'type' => 'genre',
+        $genre = Genre::query()->create([
             'name' => 'Комедия',
             'slug' => 'komediia',
         ]);
@@ -62,8 +61,9 @@ class SeasonvarTitleMergeTest extends TestCase
             'source_url' => $secondUrl,
             'source_url_hash' => hash('sha256', $secondUrl),
         ]);
-        $canonical->taxonomies()->attach($country->id);
-        $duplicate->taxonomies()->attach([$country->id, $genre->id]);
+        $canonical->countries()->attach($country->id);
+        $duplicate->countries()->attach($country->id);
+        $duplicate->genres()->attach($genre->id);
 
         $firstSeason = Season::factory()->create([
             'catalog_title_id' => $canonical->id,
@@ -103,16 +103,16 @@ class SeasonvarTitleMergeTest extends TestCase
             ->assertExitCode(0);
 
         $this->assertDatabaseMissing('catalog_titles', ['id' => $duplicate->id]);
-        $this->assertDatabaseHas('catalog_title_taxonomy', [
+        $this->assertDatabaseHas('catalog_title_country', [
             'catalog_title_id' => $canonical->id,
-            'taxonomy_id' => $country->id,
+            'country_id' => $country->id,
         ]);
-        $this->assertDatabaseHas('catalog_title_taxonomy', [
+        $this->assertDatabaseHas('catalog_title_genre', [
             'catalog_title_id' => $canonical->id,
-            'taxonomy_id' => $genre->id,
+            'genre_id' => $genre->id,
         ]);
 
-        $canonical->refresh()->load(['seasons.episodes', 'taxonomies']);
+        $canonical->refresh()->load(['seasons.episodes', 'countries', 'genres']);
         $this->assertSame([1, 2], $canonical->seasons->sortBy('number')->pluck('number')->values()->all());
         $this->assertSame(2, $canonical->episodes()->count());
 

@@ -2,10 +2,20 @@
 
 namespace App\Services\Seasonvar;
 
+use App\Models\Actor;
+use App\Models\AgeRating;
+use App\Models\CatalogStatus;
 use App\Models\CatalogTitle;
+use App\Models\Country;
+use App\Models\Director;
 use App\Models\Episode;
+use App\Models\Genre;
+use App\Models\Network;
 use App\Models\Season;
 use App\Models\SourcePage;
+use App\Models\Studio;
+use App\Models\Tag;
+use App\Models\Translation;
 use App\Services\Crawler\PoliteHttpClient;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -17,16 +27,16 @@ use Throwable;
 class SeasonvarCatalogImporter
 {
     private const RELATION_TYPES = [
-        'genre' => ['model' => \App\Models\Genre::class, 'relation' => 'genres'],
-        'country' => ['model' => \App\Models\Country::class, 'relation' => 'countries'],
-        'actor' => ['model' => \App\Models\Actor::class, 'relation' => 'actors'],
-        'director' => ['model' => \App\Models\Director::class, 'relation' => 'directors'],
-        'age_rating' => ['model' => \App\Models\AgeRating::class, 'relation' => 'ageRatings'],
-        'translation' => ['model' => \App\Models\Translation::class, 'relation' => 'translations'],
-        'status' => ['model' => \App\Models\CatalogStatus::class, 'relation' => 'statuses'],
-        'network' => ['model' => \App\Models\Network::class, 'relation' => 'networks'],
-        'studio' => ['model' => \App\Models\Studio::class, 'relation' => 'studios'],
-        'tag' => ['model' => \App\Models\Tag::class, 'relation' => 'tags'],
+        'genre' => ['model' => Genre::class, 'relation' => 'genres'],
+        'country' => ['model' => Country::class, 'relation' => 'countries'],
+        'actor' => ['model' => Actor::class, 'relation' => 'actors'],
+        'director' => ['model' => Director::class, 'relation' => 'directors'],
+        'age_rating' => ['model' => AgeRating::class, 'relation' => 'ageRatings'],
+        'translation' => ['model' => Translation::class, 'relation' => 'translations'],
+        'status' => ['model' => CatalogStatus::class, 'relation' => 'statuses'],
+        'network' => ['model' => Network::class, 'relation' => 'networks'],
+        'studio' => ['model' => Studio::class, 'relation' => 'studios'],
+        'tag' => ['model' => Tag::class, 'relation' => 'tags'],
     ];
 
     public function __construct(
@@ -69,42 +79,52 @@ class SeasonvarCatalogImporter
     public function storeDiscoveredUrls(array $urls, ?callable $progress = null): int
     {
         $source = $this->seasonvarSource->current();
+        $urls = collect($urls)->unique()->values();
+        $total = $urls->count();
         $stored = 0;
-        $total = count($urls);
+        $processed = 0;
 
         $this->report($progress, 'store-discovered-urls-started', [
             'source_id' => $source->id,
             'total' => $total,
         ]);
 
-        foreach ($urls as $index => $url) {
-            $urlHash = $this->seasonvarUrl->hash($url);
-            $page = SourcePage::query()->firstOrNew(['url_hash' => $urlHash]);
-            $wasExisting = $page->exists;
-            $page->fill([
-                'source_id' => $source->id,
-                'url' => $url,
-                'page_type' => $this->seasonvarUrl->pageType($url),
-                'discovered_from_url' => $this->seasonvarSource->sitemapUrl(),
-            ]);
+        $urls->chunk(500)->each(function (Collection $chunk) use ($source, $total, &$stored, &$processed, $progress): void {
+            $now = now();
+            $rowsByHash = $chunk->mapWithKeys(function (string $url) use ($source, $now): array {
+                $urlHash = $this->seasonvarUrl->hash($url);
 
-            if (! $page->exists) {
-                $page->parse_status = 'pending';
-                $stored++;
-            }
+                return [$urlHash => [
+                    'source_id' => $source->id,
+                    'url' => $url,
+                    'url_hash' => $urlHash,
+                    'page_type' => $this->seasonvarUrl->pageType($url),
+                    'parse_status' => 'pending',
+                    'discovered_from_url' => $this->seasonvarSource->sitemapUrl(),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]];
+            });
+            $existingHashes = SourcePage::query()
+                ->whereIn('url_hash', $rowsByHash->keys())
+                ->pluck('url_hash');
+            $stored += $rowsByHash->keys()->diff($existingHashes)->count();
+            $processed += $rowsByHash->count();
 
-            $page->save();
+            SourcePage::query()->upsert(
+                $rowsByHash->values()->all(),
+                ['url_hash'],
+                ['source_id', 'url', 'page_type', 'discovered_from_url', 'updated_at'],
+            );
 
-            $this->report($progress, $wasExisting ? 'source-page-updated' : 'source-page-created', [
-                'index' => $index + 1,
+            $this->report($progress, 'store-discovered-urls-chunk-complete', [
+                'processed' => $processed,
                 'total' => $total,
-                'source_page_id' => $page->id,
-                'page_type' => $page->page_type,
-                'parse_status' => $page->parse_status,
-                'url_hash' => $urlHash,
-                'url' => $url,
+                'chunk' => $rowsByHash->count(),
+                'stored' => $stored,
+                'updated' => $processed - $stored,
             ]);
-        }
+        });
 
         $this->report($progress, 'store-discovered-urls-complete', [
             'total' => $total,
@@ -185,19 +205,23 @@ class SeasonvarCatalogImporter
         $source = $this->seasonvarSource->current();
         $urlHash = $this->seasonvarUrl->hash($url);
 
-        $page = SourcePage::query()->updateOrCreate(
-            ['url_hash' => $urlHash],
-            [
-                'source_id' => $source->id,
-                'url' => $url,
-                'page_type' => $this->seasonvarUrl->pageType($url),
-                'parse_status' => 'pending',
-                'discovered_from_url' => $this->seasonvarSource->sitemapUrl(),
-            ],
-        );
+        $page = SourcePage::query()->firstOrNew(['url_hash' => $urlHash]);
+        $wasExisting = $page->exists;
+        $page->fill([
+            'source_id' => $source->id,
+            'url' => $url,
+            'page_type' => $this->seasonvarUrl->pageType($url),
+            'discovered_from_url' => $this->seasonvarSource->sitemapUrl(),
+        ]);
+
+        if (! $wasExisting) {
+            $page->parse_status = 'pending';
+        }
+
+        $page->save();
         $page->load('source');
 
-        $this->report($progress, $page->wasRecentlyCreated ? 'source-page-created' : 'source-page-updated', [
+        $this->report($progress, $wasExisting ? 'source-page-updated' : 'source-page-created', [
             'mode' => 'url-argument',
             'source_page_id' => $page->id,
             'page_type' => $page->page_type,
@@ -389,6 +413,20 @@ class SeasonvarCatalogImporter
             throw new RuntimeException('HTTP '.$response->status());
         }
 
+        $existingCatalogTitle = $this->findCatalogTitleBySourceUrlHash($page, $this->seasonvarUrl->hash($page->url));
+
+        if (! $contentChanged && $page->parse_status === 'parsed' && $existingCatalogTitle !== null) {
+            $this->report($progress, 'page-parse-skipped-unchanged', [
+                'source_page_id' => $page->id,
+                'catalog_title_id' => $existingCatalogTitle->id,
+                'slug' => $existingCatalogTitle->slug,
+                'content_hash' => $contentHash,
+                'url' => $page->url,
+            ]);
+
+            return;
+        }
+
         $this->report($progress, 'html-parse-started', [
             'source_page_id' => $page->id,
             'url' => $page->url,
@@ -451,8 +489,9 @@ class SeasonvarCatalogImporter
     private function upsertCatalogTitle(SourcePage $page, array $data, string $contentHash, ?callable $progress = null): CatalogTitle
     {
         $sourceUrlHash = $this->seasonvarUrl->hash($page->url);
-        $catalogTitle = $this->findExistingCatalogTitle($page, $data['type'], $data['title'])
-            ?? CatalogTitle::query()->firstOrNew([
+        $catalogTitle = $this->findCatalogTitleBySourceUrlHash($page, $sourceUrlHash)
+            ?? $this->findExistingCatalogTitle($page, $data['type'], $data['title'])
+            ?? new CatalogTitle([
                 'source_id' => $page->source_id,
                 'source_url_hash' => $sourceUrlHash,
             ]);
@@ -506,6 +545,14 @@ class SeasonvarCatalogImporter
         ]);
 
         return $catalogTitle;
+    }
+
+    private function findCatalogTitleBySourceUrlHash(SourcePage $page, string $sourceUrlHash): ?CatalogTitle
+    {
+        return CatalogTitle::query()
+            ->where('source_id', $page->source_id)
+            ->where('source_url_hash', $sourceUrlHash)
+            ->first();
     }
 
     private function findExistingCatalogTitle(SourcePage $page, string $type, string $title): ?CatalogTitle
@@ -793,15 +840,15 @@ class SeasonvarCatalogImporter
             }
 
             return [$season->id.'|'.$number => [
-                    'season_id' => $season->id,
-                    'number' => $number,
-                    'source_page_id' => $page->id,
-                    'title' => $episode['title'],
-                    'source_url' => $episode['source_url'],
-                    'source_url_hash' => $episode['source_url'] ? $this->seasonvarUrl->hash($episode['source_url']) : null,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]];
+                'season_id' => $season->id,
+                'number' => $number,
+                'source_page_id' => $page->id,
+                'title' => $episode['title'],
+                'source_url' => $episode['source_url'],
+                'source_url_hash' => $episode['source_url'] ? $this->seasonvarUrl->hash($episode['source_url']) : null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]];
         });
 
         if ($rowsByKey->isNotEmpty()) {

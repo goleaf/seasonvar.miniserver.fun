@@ -1,0 +1,103 @@
+<?php
+
+namespace Tests\Feature;
+
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
+
+class SeasonvarParsePageCommandTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_it_parses_requested_page_and_all_detected_seasons_into_one_title(): void
+    {
+        config(['seasonvar.crawl_delay_seconds' => 0]);
+        Http::preventStrayRequests();
+        Http::fake([
+            'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html' => Http::response($this->seasonPageHtml(4, [
+                1 => 'Пробуждение',
+                2 => 'Проверка',
+            ])),
+            'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-1-season.html' => Http::response($this->seasonPageHtml(1, [
+                1 => 'Начало',
+            ])),
+        ]);
+
+        $this->artisan('seasonvar:parse-page', [
+            'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
+        ])->assertExitCode(0);
+
+        $this->assertDatabaseHas('catalog_titles', [
+            'title' => 'Черный список: На кухне',
+            'external_id' => '47915',
+        ]);
+        $this->assertDatabaseHas('genres', [
+            'name' => 'Кулинария',
+        ]);
+        $this->assertDatabaseHas('countries', [
+            'name' => 'Россия',
+        ]);
+        $this->assertDatabaseHas('translations', [
+            'name' => 'Оригинал',
+        ]);
+        $this->assertDatabaseHas('seasons', ['number' => 1]);
+        $this->assertDatabaseHas('seasons', ['number' => 4]);
+        $this->assertDatabaseHas('episodes', [
+            'number' => 1,
+            'title' => 'Начало',
+        ]);
+        $this->assertDatabaseHas('episodes', [
+            'number' => 2,
+            'title' => 'Проверка',
+        ]);
+        $this->assertDatabaseHas('source_pages', [
+            'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
+            'parse_status' => 'parsed',
+        ]);
+        $this->assertDatabaseHas('source_pages', [
+            'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-1-season.html',
+            'parse_status' => 'parsed',
+        ]);
+    }
+
+    /**
+     * @param  array<int, string>  $episodes
+     */
+    private function seasonPageHtml(int $seasonNumber, array $episodes): string
+    {
+        $episodeItems = collect($episodes)
+            ->mapWithKeys(fn (string $title, int $number): array => [
+                "{$number}_seriya" => ['n' => (string) $number, 'title' => $title],
+            ])
+            ->all();
+        $episodesJson = json_encode([$episodeItems], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+
+        return <<<HTML
+            <html>
+                <head>
+                    <title>Черный список: На кухне {$seasonNumber} сезон смотреть онлайн</title>
+                    <meta name="description" content="Описание передачи">
+                </head>
+                <body>
+                    <h1>Сериал Черный список: На кухне {$seasonNumber} сезон онлайн</h1>
+                    <div class="pgs-sinfo_list">
+                        Жанр: Кулинария
+                        Страна: Россия
+                        Вышел: 2024
+                        Перевод: Оригинал
+                        Статус: идет
+                        Канал: Пятница
+                    </div>
+                    <div class="pgs-seaslist">
+                        <a href="/serial-47915-CHernyj_spisok_Na_kuhne-1-season.html">1 сезон (Оригинал)</a>
+                        <a href="/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html">4 сезон (Оригинал)</a>
+                    </div>
+                    <script>
+                        var arEpisodes = {$episodesJson};
+                    </script>
+                </body>
+            </html>
+            HTML;
+    }
+}

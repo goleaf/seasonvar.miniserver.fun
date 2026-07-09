@@ -2,6 +2,10 @@
 
 ## 2026-07-09
 
+- Fixed chunked discovered URL `upsert` payload handling and kept sitemap URL storage memory-bounded.
+- Added unchanged-page fast path to skip HTML parsing and catalog writes when parsed content hash is unchanged.
+- Optimized Seasonvar catalog-title upsert with exact `source_url_hash` lookup before title-based duplicate detection.
+- Optimized discovered Seasonvar URL storage with chunked batch `upsert` instead of per-URL `firstOrNew()`.
 - Optimized Seasonvar importer seasons and episodes sync with batch `upsert` operations.
 - Wrapped Seasonvar importer catalog writes in a transaction and split concrete relation syncing into a typed batch helper.
 - Extracted catalog poster rendering into shared `x-title-poster` and reused it on home, card, and show pages.

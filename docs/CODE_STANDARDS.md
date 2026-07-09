@@ -39,6 +39,9 @@ Update these files together when relevant:
 - Importer relation sync must group parsed relation values by type, batch `upsert` lookup rows, fetch IDs in one query per type, and `sync()` each pivot relation once.
 - Importer catalog writes after successful HTTP parsing must run in one database transaction: title, relation pivots, seasons, episodes, and final source-page parsed status.
 - Importer season and episode sync must use batch `upsert` for parsed page payloads instead of per-row `updateOrCreate()`.
+- Importer discovered URL storage must process URLs chunk by chunk, use batch `upsert`, and must not reset existing source pages to pending.
+- Importer title upsert must try exact `source_url_hash` lookup before wider title-based duplicate detection.
+- Importer must skip HTML parsing and catalog writes for unchanged pages that are already parsed and have an existing catalog title.
 - Store season/episode structure as `seasons` and `episodes`, not as tags.
 
 ## Query standards
