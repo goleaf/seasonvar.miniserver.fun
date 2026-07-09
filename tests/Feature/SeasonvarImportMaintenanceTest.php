@@ -98,4 +98,59 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $this->assertSame(206, $media->last_http_status);
         $this->assertNotNull($media->checked_at);
     }
+
+    public function test_it_marks_legacy_parsed_source_pages_as_imported(): void
+    {
+        Http::preventStrayRequests();
+
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $url = 'https://seasonvar.ru/serial-615--Bez_sleda_pssmtlk-1-season.html';
+        $page = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+            'page_type' => 'serial',
+            'parse_status' => 'parsed',
+            'import_status' => 'pending',
+            'last_crawled_at' => now()->subDay(),
+        ]);
+
+        $this->artisan('seasonvar:import', ['--no-discovery' => true])
+            ->assertExitCode(0);
+
+        $page->refresh();
+
+        $this->assertSame('parsed', $page->import_status);
+        $this->assertNotNull($page->last_imported_at);
+    }
+
+    public function test_it_backfills_missing_media_quality_and_format_during_import_cycle(): void
+    {
+        Http::preventStrayRequests();
+
+        $catalogTitle = CatalogTitle::factory()->create();
+        $media = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'title' => 'Серия 1 WEB-DL',
+            'playback_url' => 'https://media.example.com/video/series.s01e01.1920x1080.mp4',
+            'path' => 'https://media.example.com/video/series.s01e01.1920x1080.mp4',
+            'status' => 'published',
+            'check_status' => 'available',
+            'checked_at' => now(),
+            'quality' => null,
+            'format' => null,
+        ]);
+
+        $this->artisan('seasonvar:import', ['--no-discovery' => true])
+            ->assertExitCode(0);
+
+        $media->refresh();
+
+        $this->assertSame('1080p', $media->quality);
+        $this->assertSame('mp4', $media->format);
+    }
 }

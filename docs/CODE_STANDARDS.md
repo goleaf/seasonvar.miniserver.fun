@@ -47,7 +47,10 @@ Update these files together when relevant:
 - Importer title upsert must try exact `source_url_hash` lookup before wider title-based duplicate detection.
 - Importer must skip HTML parsing and catalog writes for unchanged pages that are already parsed and have an existing catalog title.
 - Importer must check a small backlog of older media records with missing or stale `check_status` during each cycle.
+- Importer must backfill old parsed `source_pages` from pending import state to parsed import state during each cycle.
+- Importer must backfill missing media quality, format, and translation metadata during each cycle without re-downloading source pages.
 - Importer must preserve season and episode context when expanding HLS master playlists into playable quality variants.
+- Importer must save trailer or announcement media even when no episode number is present; normal episode video still requires a matching season and episode.
 - Age rating relation values must be strict short ratings like `18+`, `16+`, `12+`; long text must never be stored as an age rating.
 - Filter relation values for genre, country, status, network, studio, and tag must stay short and must not contain description-like sentences.
 - Store season/episode structure as `seasons` and `episodes`, not as tags.

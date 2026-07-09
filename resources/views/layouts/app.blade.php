@@ -597,6 +597,264 @@
         ->unique('query')
         ->take(24)
         ->values();
+    $episodeIntentQueries = collect([
+        [
+            'name' => 'Все серии '.$pageTitle,
+            'query' => $pageTitle.' все серии',
+            'description' => 'Поиск всех серий, сезонов, выпусков и страниц просмотра по текущей теме.',
+        ],
+        [
+            'name' => 'Последняя серия '.$pageTitle,
+            'query' => $pageTitle.' последняя серия',
+            'description' => 'Поиск последних серий, свежих выпусков, переводов и обновлений.',
+        ],
+        [
+            'name' => 'Сезоны '.$pageTitle,
+            'query' => $pageTitle.' сезоны',
+            'description' => 'Поиск сезонов, эпизодов, описаний сезонов и связанных страниц каталога.',
+        ],
+        [
+            'name' => 'Расписание серий '.$pageTitle,
+            'query' => $pageTitle.' расписание серий',
+            'description' => 'Поиск расписания, дат выхода, обновлений и информации о новых сериях.',
+        ],
+    ])->merge($topicTerms->take(8)->flatMap(fn ($term) => collect([
+        [
+            'name' => $term.' все серии',
+            'query' => $term.' все серии смотреть онлайн',
+            'description' => 'Поиск всех серий и сезонов по теме «'.$term.'».',
+        ],
+        [
+            'name' => $term.' последняя серия',
+            'query' => $term.' последняя серия',
+            'description' => 'Поиск последних выпусков и обновлений по теме «'.$term.'».',
+        ],
+        [
+            'name' => $term.' 1 сезон 1 серия',
+            'query' => $term.' 1 сезон 1 серия',
+            'description' => 'Поиск стартовых сезонов, первых серий и связанных страниц по теме «'.$term.'».',
+        ],
+    ])))->map(fn ($item) => [
+        'name' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['name']))),
+        'query' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['query']))),
+        'description' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['description']))),
+    ])->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
+        ->unique('query')
+        ->take(28)
+        ->values();
+    $watchModeQueries = collect([
+        [
+            'name' => 'Смотреть через веб-плеер',
+            'query' => $pageTitle.' веб плеер смотреть',
+            'description' => 'Поиск страниц, где просмотр связан с веб-плеером, удаленными видео и доступными сериями.',
+        ],
+        [
+            'name' => 'Смотреть на телефоне',
+            'query' => $pageTitle.' смотреть на телефоне',
+            'description' => 'Поиск страниц и серий, удобных для мобильного просмотра и адаптивного интерфейса.',
+        ],
+        [
+            'name' => 'Смотреть в хорошем качестве',
+            'query' => $pageTitle.' смотреть в хорошем качестве',
+            'description' => 'Поиск страниц с видео, качеством, плейлистами и доступными вариантами просмотра.',
+        ],
+        [
+            'name' => 'Удаленное видео',
+            'query' => $pageTitle.' удаленное видео',
+            'description' => 'Поиск страниц, где медиафайлы лежат удаленно и открываются через собственный веб-плеер.',
+        ],
+    ])->merge($topicTerms->take(8)->flatMap(fn ($term) => collect([
+        [
+            'name' => $term.' веб-плеер',
+            'query' => $term.' веб плеер смотреть',
+            'description' => 'Поиск просмотра через веб-плеер по теме «'.$term.'».',
+        ],
+        [
+            'name' => $term.' хорошее качество',
+            'query' => $term.' смотреть в хорошем качестве',
+            'description' => 'Поиск качественных вариантов просмотра и связанных страниц по теме «'.$term.'».',
+        ],
+        [
+            'name' => $term.' мобильный просмотр',
+            'query' => $term.' смотреть на телефоне',
+            'description' => 'Поиск мобильных страниц просмотра, серий и сезонов по теме «'.$term.'».',
+        ],
+    ])))->map(fn ($item) => [
+        'name' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['name']))),
+        'query' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['query']))),
+        'description' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['description']))),
+    ])->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
+        ->unique('query')
+        ->take(28)
+        ->values();
+    $translationQueries = collect([
+        [
+            'name' => 'Русская озвучка '.$pageTitle,
+            'query' => $pageTitle.' русская озвучка',
+            'description' => 'Поиск страниц, переводов, озвучек и версий просмотра на русском языке.',
+        ],
+        [
+            'name' => 'Субтитры '.$pageTitle,
+            'query' => $pageTitle.' субтитры',
+            'description' => 'Поиск страниц с субтитрами, переводами, версиями просмотра и описанием серий.',
+        ],
+        [
+            'name' => 'Дубляж '.$pageTitle,
+            'query' => $pageTitle.' дубляж',
+            'description' => 'Поиск дубляжа, многоголосой озвучки, любительских и профессиональных переводов.',
+        ],
+        [
+            'name' => 'Перевод серий '.$pageTitle,
+            'query' => $pageTitle.' перевод серий',
+            'description' => 'Поиск переводов серий, сезонов, новых выпусков и доступных вариантов озвучки.',
+        ],
+    ])->merge($topicTerms->take(8)->flatMap(fn ($term) => collect([
+        [
+            'name' => $term.' русская озвучка',
+            'query' => $term.' русская озвучка смотреть',
+            'description' => 'Поиск русской озвучки и переводов по теме «'.$term.'».',
+        ],
+        [
+            'name' => $term.' субтитры',
+            'query' => $term.' субтитры смотреть',
+            'description' => 'Поиск субтитров, переводов и версий просмотра по теме «'.$term.'».',
+        ],
+        [
+            'name' => $term.' перевод серий',
+            'query' => $term.' перевод серий',
+            'description' => 'Поиск переводов серий, сезонов и обновлений по теме «'.$term.'».',
+        ],
+    ])))->map(fn ($item) => [
+        'name' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['name']))),
+        'query' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['query']))),
+        'description' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['description']))),
+    ])->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
+        ->unique('query')
+        ->take(28)
+        ->values();
+    $voiceSearchQueries = collect([
+        [
+            'name' => 'Где смотреть '.$pageTitle.'?',
+            'query' => 'где смотреть '.$pageTitle,
+            'description' => 'Разговорный запрос для поиска страницы просмотра, сезонов, серий и доступного видео.',
+        ],
+        [
+            'name' => 'Когда выйдет новая серия '.$pageTitle.'?',
+            'query' => 'когда выйдет новая серия '.$pageTitle,
+            'description' => 'Разговорный запрос по новым сериям, датам выхода, расписанию и обновлениям.',
+        ],
+        [
+            'name' => 'Сколько серий в '.$pageTitle.'?',
+            'query' => 'сколько серий в '.$pageTitle,
+            'description' => 'Разговорный запрос по количеству серий, сезонов, выпусков и описанию страницы.',
+        ],
+        [
+            'name' => 'Какая озвучка у '.$pageTitle.'?',
+            'query' => 'какая озвучка у '.$pageTitle,
+            'description' => 'Разговорный запрос по переводам, озвучкам, субтитрам и версиям просмотра.',
+        ],
+    ])->merge($topicTerms->take(8)->flatMap(fn ($term) => collect([
+        [
+            'name' => 'Где смотреть '.$term.'?',
+            'query' => 'где смотреть '.$term,
+            'description' => 'Голосовой запрос для поиска просмотра и связанных страниц по теме «'.$term.'».',
+        ],
+        [
+            'name' => 'Что посмотреть про '.$term.'?',
+            'query' => 'что посмотреть про '.$term,
+            'description' => 'Голосовой запрос для поиска похожих сериалов и подборок по теме «'.$term.'».',
+        ],
+        [
+            'name' => 'Какие сериалы похожи на '.$term.'?',
+            'query' => 'какие сериалы похожи на '.$term,
+            'description' => 'Голосовой запрос для поиска похожих сериалов и тематических подборок.',
+        ],
+    ])))->map(fn ($item) => [
+        'name' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['name']))),
+        'query' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['query']))),
+        'description' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['description']))),
+    ])->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
+        ->unique('query')
+        ->take(28)
+        ->values();
+    $topicAuthoritySignals = collect([
+        [
+            'name' => 'Описание и факты',
+            'query' => $pageTitle.' описание факты',
+            'description' => 'Сводный поисковый переход к описанию, фактам, жанрам, странам и основным сведениям страницы.',
+        ],
+        [
+            'name' => 'Навигация по каталогу',
+            'query' => $pageTitle.' каталог сериалов',
+            'description' => 'Переход к связанным страницам каталога, подборкам, фильтрам и внутренним направлениям.',
+        ],
+        [
+            'name' => 'Обновления и серии',
+            'query' => $pageTitle.' обновления серии '.$currentSeoYear,
+            'description' => 'Поиск новых серий, свежих обновлений, дат выхода и сезонной информации.',
+        ],
+        [
+            'name' => 'Похожие темы',
+            'query' => $pageTitle.' похожие темы',
+            'description' => 'Поиск похожих сериалов, альтернатив, связанных тем и рекомендационных переходов.',
+        ],
+    ])->merge($topicTerms->take(8)->map(fn ($term) => [
+        'name' => 'Тематический авторитет: '.$term,
+        'query' => $term.' описание факты сериалы',
+        'description' => 'Семантический переход по теме «'.$term.'» для описаний, фактов, похожих сериалов и связанных страниц.',
+    ]))->map(fn ($item) => [
+        'name' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['name']))),
+        'query' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['query']))),
+        'description' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['description']))),
+    ])->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
+        ->unique('query')
+        ->take(24)
+        ->values();
+    $releaseCalendarQueries = collect([
+        [
+            'name' => 'Новые серии сегодня',
+            'query' => $pageTitle.' новые серии сегодня',
+            'description' => 'Поиск свежих серий, обновлений и выпусков, которые пользователи ищут сегодня.',
+        ],
+        [
+            'name' => 'Новые серии завтра',
+            'query' => $pageTitle.' новые серии завтра',
+            'description' => 'Поиск ожидаемых серий, расписания и ближайших обновлений каталога.',
+        ],
+        [
+            'name' => 'Релизы на этой неделе',
+            'query' => $pageTitle.' серии на этой неделе',
+            'description' => 'Поиск серий, сезонов и обновлений, актуальных в течение недели.',
+        ],
+        [
+            'name' => 'Календарь выхода серий',
+            'query' => $pageTitle.' календарь выхода серий',
+            'description' => 'Поиск дат выхода, расписания серий, новых сезонов и обновлений страницы.',
+        ],
+    ])->merge($topicTerms->take(8)->flatMap(fn ($term) => collect([
+        [
+            'name' => $term.' дата выхода',
+            'query' => $term.' дата выхода серии',
+            'description' => 'Поиск дат выхода и календаря серий по теме «'.$term.'».',
+        ],
+        [
+            'name' => $term.' новые серии сегодня',
+            'query' => $term.' новые серии сегодня',
+            'description' => 'Поиск сегодняшних обновлений, новых серий и выпусков по теме «'.$term.'».',
+        ],
+        [
+            'name' => $term.' расписание серий '.$currentSeoYear,
+            'query' => $term.' расписание серий '.$currentSeoYear,
+            'description' => 'Поиск расписания, релизов и сезонных обновлений '.$currentSeoYear.' года.',
+        ],
+    ])))->map(fn ($item) => [
+        'name' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['name']))),
+        'query' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['query']))),
+        'description' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['description']))),
+    ])->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
+        ->unique('query')
+        ->take(28)
+        ->values();
     $expandedKeywords = collect(explode(',', (string) ($seo['keywords'] ?? '')))
         ->merge($topicTerms)
         ->merge($seoIntents)
@@ -620,6 +878,18 @@
         ->merge($catalogDirections->pluck('query'))
         ->merge($comparisonQueries->pluck('name'))
         ->merge($comparisonQueries->pluck('query'))
+        ->merge($episodeIntentQueries->pluck('name'))
+        ->merge($episodeIntentQueries->pluck('query'))
+        ->merge($watchModeQueries->pluck('name'))
+        ->merge($watchModeQueries->pluck('query'))
+        ->merge($translationQueries->pluck('name'))
+        ->merge($translationQueries->pluck('query'))
+        ->merge($voiceSearchQueries->pluck('name'))
+        ->merge($voiceSearchQueries->pluck('query'))
+        ->merge($topicAuthoritySignals->pluck('name'))
+        ->merge($topicAuthoritySignals->pluck('query'))
+        ->merge($releaseCalendarQueries->pluck('name'))
+        ->merge($releaseCalendarQueries->pluck('query'))
         ->map(fn ($keyword) => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $keyword))))
         ->filter(fn ($keyword) => $keyword !== '' && mb_strlen($keyword) <= 120)
         ->unique()
@@ -647,6 +917,12 @@
         ->merge($russianQueryVariants)
         ->merge($catalogDirections->pluck('query'))
         ->merge($comparisonQueries->pluck('query'))
+        ->merge($episodeIntentQueries->pluck('query'))
+        ->merge($watchModeQueries->pluck('query'))
+        ->merge($translationQueries->pluck('query'))
+        ->merge($voiceSearchQueries->pluck('query'))
+        ->merge($topicAuthoritySignals->pluck('query'))
+        ->merge($releaseCalendarQueries->pluck('query'))
         ->map(fn ($keyword) => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $keyword))))
         ->filter(fn ($keyword) => $keyword !== '' && mb_strlen($keyword) <= 120)
         ->unique()
@@ -673,6 +949,12 @@
         ['id' => 'russian-query-variants', 'name' => 'Русские варианты поиска', 'enabled' => $russianQueryVariants->isNotEmpty()],
         ['id' => 'catalog-directions', 'name' => 'Направления каталога', 'enabled' => $catalogDirections->isNotEmpty()],
         ['id' => 'comparison-seo', 'name' => 'Похожие и сравнения', 'enabled' => $comparisonQueries->isNotEmpty()],
+        ['id' => 'episode-intents', 'name' => 'Серии и сезоны', 'enabled' => $episodeIntentQueries->isNotEmpty()],
+        ['id' => 'watch-mode-seo', 'name' => 'Способы просмотра', 'enabled' => $watchModeQueries->isNotEmpty()],
+        ['id' => 'translation-seo', 'name' => 'Переводы и озвучки', 'enabled' => $translationQueries->isNotEmpty()],
+        ['id' => 'voice-search-seo', 'name' => 'Голосовые запросы', 'enabled' => $voiceSearchQueries->isNotEmpty()],
+        ['id' => 'topic-authority-seo', 'name' => 'Тематический авторитет', 'enabled' => $topicAuthoritySignals->isNotEmpty()],
+        ['id' => 'release-calendar-seo', 'name' => 'Календарь релизов', 'enabled' => $releaseCalendarQueries->isNotEmpty()],
         ['id' => 'quick-answers', 'name' => 'Быстрые ответы', 'enabled' => $quickAnswers->isNotEmpty()],
         ['id' => 'semantic-clusters', 'name' => 'Семантические подборки', 'enabled' => ! empty($seo['keyword_clusters'])],
         ['id' => 'popular-searches', 'name' => 'Популярные запросы', 'enabled' => ! empty($seo['search_phrases'])],
@@ -1084,6 +1366,102 @@
         ];
     }
 
+    if ($episodeIntentQueries->isNotEmpty()) {
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            '@id' => $canonicalUrl.'#episode-intents-schema',
+            'name' => $fullTitle.' - серии и сезоны',
+            'itemListElement' => $episodeIntentQueries->map(fn ($item, $index) => [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $item['name'],
+                'description' => $item['description'],
+                'url' => route('titles.index', ['q' => $item['query']]),
+            ])->values()->all(),
+        ];
+    }
+
+    if ($watchModeQueries->isNotEmpty()) {
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            '@id' => $canonicalUrl.'#watch-mode-seo-schema',
+            'name' => $fullTitle.' - способы просмотра',
+            'itemListElement' => $watchModeQueries->map(fn ($item, $index) => [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $item['name'],
+                'description' => $item['description'],
+                'url' => route('titles.index', ['q' => $item['query']]),
+            ])->values()->all(),
+        ];
+    }
+
+    if ($translationQueries->isNotEmpty()) {
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            '@id' => $canonicalUrl.'#translation-seo-schema',
+            'name' => $fullTitle.' - переводы и озвучки',
+            'itemListElement' => $translationQueries->map(fn ($item, $index) => [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $item['name'],
+                'description' => $item['description'],
+                'url' => route('titles.index', ['q' => $item['query']]),
+            ])->values()->all(),
+        ];
+    }
+
+    if ($voiceSearchQueries->isNotEmpty()) {
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            '@id' => $canonicalUrl.'#voice-search-seo-schema',
+            'name' => $fullTitle.' - голосовые запросы',
+            'itemListElement' => $voiceSearchQueries->map(fn ($item, $index) => [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $item['name'],
+                'description' => $item['description'],
+                'url' => route('titles.index', ['q' => $item['query']]),
+            ])->values()->all(),
+        ];
+    }
+
+    if ($topicAuthoritySignals->isNotEmpty()) {
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            '@id' => $canonicalUrl.'#topic-authority-seo-schema',
+            'name' => $fullTitle.' - тематический авторитет',
+            'itemListElement' => $topicAuthoritySignals->map(fn ($item, $index) => [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $item['name'],
+                'description' => $item['description'],
+                'url' => route('titles.index', ['q' => $item['query']]),
+            ])->values()->all(),
+        ];
+    }
+
+    if ($releaseCalendarQueries->isNotEmpty()) {
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            '@id' => $canonicalUrl.'#release-calendar-seo-schema',
+            'name' => $fullTitle.' - календарь релизов',
+            'itemListElement' => $releaseCalendarQueries->map(fn ($item, $index) => [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $item['name'],
+                'description' => $item['description'],
+                'url' => route('titles.index', ['q' => $item['query']]),
+            ])->values()->all(),
+        ];
+    }
+
     if ($seoSections->isNotEmpty()) {
         $jsonLdItems[] = [
             '@context' => 'https://schema.org',
@@ -1148,6 +1526,12 @@
         <meta name="russian-query-variant-count" content="{{ $russianQueryVariants->count() }}">
         <meta name="catalog-direction-count" content="{{ $catalogDirections->count() }}">
         <meta name="comparison-query-count" content="{{ $comparisonQueries->count() }}">
+        <meta name="episode-intent-count" content="{{ $episodeIntentQueries->count() }}">
+        <meta name="watch-mode-count" content="{{ $watchModeQueries->count() }}">
+        <meta name="translation-query-count" content="{{ $translationQueries->count() }}">
+        <meta name="voice-search-query-count" content="{{ $voiceSearchQueries->count() }}">
+        <meta name="topic-authority-count" content="{{ $topicAuthoritySignals->count() }}">
+        <meta name="release-calendar-query-count" content="{{ $releaseCalendarQueries->count() }}">
         @if ($expandedKeywords->isNotEmpty())
             <meta name="keywords" content="{{ $expandedKeywords->take(60)->implode(', ') }}">
             <meta name="news_keywords" content="{{ $newsKeywords->implode(', ') }}">
@@ -1186,6 +1570,12 @@
             <meta name="catalog-directions" content="{{ $catalogDirections->pluck('name')->implode(', ') }}">
             <meta name="catalog-direction-keywords" content="{{ $catalogDirections->pluck('query')->take(30)->implode(', ') }}">
             <meta name="comparison-keywords" content="{{ $comparisonQueries->pluck('query')->take(30)->implode(', ') }}">
+            <meta name="episode-keywords" content="{{ $episodeIntentQueries->pluck('query')->take(35)->implode(', ') }}">
+            <meta name="watch-mode-keywords" content="{{ $watchModeQueries->pluck('query')->take(35)->implode(', ') }}">
+            <meta name="translation-keywords" content="{{ $translationQueries->pluck('query')->take(35)->implode(', ') }}">
+            <meta name="voice-search-keywords" content="{{ $voiceSearchQueries->pluck('query')->take(35)->implode(', ') }}">
+            <meta name="topic-authority-keywords" content="{{ $topicAuthoritySignals->pluck('query')->take(35)->implode(', ') }}">
+            <meta name="release-calendar-keywords" content="{{ $releaseCalendarQueries->pluck('query')->take(35)->implode(', ') }}">
             <meta name="resource-type" content="document">
             <meta name="language" content="Russian">
         @endif
@@ -1725,6 +2115,126 @@
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
                                 <a href="{{ route('titles.index', ['q' => $item['query']]) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
                                     <i class="fa-solid fa-magnifying-glass text-[0.8em]" aria-hidden="true"></i>
+                                    <span>{{ $item['query'] }}</span>
+                                </a>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if ($episodeIntentQueries->isNotEmpty())
+                <section id="episode-intents" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Серии и сезоны">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-film text-emerald-700" aria-hidden="true"></i>
+                        <span>Серии и сезоны</span>
+                    </div>
+                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        @foreach ($episodeIntentQueries as $item)
+                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
+                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
+                                <a href="{{ route('titles.index', ['q' => $item['query']]) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                    <i class="fa-solid fa-magnifying-glass text-[0.8em]" aria-hidden="true"></i>
+                                    <span>{{ $item['query'] }}</span>
+                                </a>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if ($watchModeQueries->isNotEmpty())
+                <section id="watch-mode-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Способы просмотра">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-display text-emerald-700" aria-hidden="true"></i>
+                        <span>Способы просмотра</span>
+                    </div>
+                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        @foreach ($watchModeQueries as $item)
+                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
+                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
+                                <a href="{{ route('titles.index', ['q' => $item['query']]) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                    <i class="fa-solid fa-play text-[0.8em]" aria-hidden="true"></i>
+                                    <span>{{ $item['query'] }}</span>
+                                </a>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if ($translationQueries->isNotEmpty())
+                <section id="translation-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Переводы и озвучки">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-microphone-lines text-emerald-700" aria-hidden="true"></i>
+                        <span>Переводы и озвучки</span>
+                    </div>
+                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        @foreach ($translationQueries as $item)
+                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
+                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
+                                <a href="{{ route('titles.index', ['q' => $item['query']]) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                    <i class="fa-solid fa-language text-[0.8em]" aria-hidden="true"></i>
+                                    <span>{{ $item['query'] }}</span>
+                                </a>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if ($voiceSearchQueries->isNotEmpty())
+                <section id="voice-search-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Голосовые запросы">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-comments text-emerald-700" aria-hidden="true"></i>
+                        <span>Голосовые запросы</span>
+                    </div>
+                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        @foreach ($voiceSearchQueries as $item)
+                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
+                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
+                                <a href="{{ route('titles.index', ['q' => $item['query']]) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                    <i class="fa-solid fa-magnifying-glass text-[0.8em]" aria-hidden="true"></i>
+                                    <span>{{ $item['query'] }}</span>
+                                </a>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if ($topicAuthoritySignals->isNotEmpty())
+                <section id="topic-authority-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Тематический авторитет">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-award text-emerald-700" aria-hidden="true"></i>
+                        <span>Тематический авторитет</span>
+                    </div>
+                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        @foreach ($topicAuthoritySignals as $item)
+                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
+                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
+                                <a href="{{ route('titles.index', ['q' => $item['query']]) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                    <i class="fa-solid fa-magnifying-glass text-[0.8em]" aria-hidden="true"></i>
+                                    <span>{{ $item['query'] }}</span>
+                                </a>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if ($releaseCalendarQueries->isNotEmpty())
+                <section id="release-calendar-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Календарь релизов">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-calendar-days text-emerald-700" aria-hidden="true"></i>
+                        <span>Календарь релизов</span>
+                    </div>
+                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        @foreach ($releaseCalendarQueries as $item)
+                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
+                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
+                                <a href="{{ route('titles.index', ['q' => $item['query']]) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                    <i class="fa-solid fa-clock text-[0.8em]" aria-hidden="true"></i>
                                     <span>{{ $item['query'] }}</span>
                                 </a>
                             </article>

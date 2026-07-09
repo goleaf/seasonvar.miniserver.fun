@@ -22,6 +22,7 @@ use App\Models\Studio;
 use App\Models\Tag;
 use App\Models\Translation;
 use App\Services\Crawler\PoliteHttpClient;
+use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\ExternalPlaylistImporter;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -53,6 +54,7 @@ class SeasonvarCatalogImporter
         private readonly SeasonvarCatalogParser $parser,
         private readonly ExternalPlaylistImporter $playlistImporter,
         private readonly SeasonvarMediaAvailabilityChecker $mediaAvailabilityChecker,
+        private readonly ExternalMediaMetadata $mediaMetadata,
     ) {}
 
     /**
@@ -1183,7 +1185,9 @@ class SeasonvarCatalogImporter
                 ? $episodesBySeasonAndNumber->get($season->id.'|'.$episodeNumber)
                 : null;
 
-            if ($season === null || $episode === null) {
+            $isTrailer = $this->mediaMetadata->isTrailer($item['title'], $playbackUrl);
+
+            if (($season === null || $episode === null) && ! $isTrailer) {
                 $result['skipped']++;
                 $this->report($progress, 'seasonvar-media-skipped', [
                     'catalog_title_id' => $catalogTitle->id,
@@ -1216,9 +1220,9 @@ class SeasonvarCatalogImporter
 
             $media->fill([
                 'catalog_title_id' => $catalogTitle->id,
-                'season_id' => $season->id,
-                'episode_id' => $episode->id,
-                'title' => $item['title'] ?: $this->mediaTitle($catalogTitle, $season, $episode),
+                'season_id' => $season?->id,
+                'episode_id' => $episode?->id,
+                'title' => $item['title'] ?: $this->mediaTitle($catalogTitle, $season, $episode, $isTrailer),
                 'storage_disk' => 'seasonvar_parsed',
                 'path' => $playbackUrl,
                 'playback_url' => $playbackUrl,
@@ -1238,8 +1242,8 @@ class SeasonvarCatalogImporter
             $this->report($progress, $media->wasRecentlyCreated ? 'seasonvar-media-attached' : 'seasonvar-media-updated', [
                 'catalog_title_id' => $catalogTitle->id,
                 'licensed_media_id' => $media->id,
-                'season_number' => $season->number,
-                'episode_number' => $episode->number,
+                'season_number' => $season?->number,
+                'episode_number' => $episode?->number,
                 'playback_url' => $playbackUrl,
                 'quality' => $media->quality,
                 'format' => $media->format,
@@ -1560,8 +1564,20 @@ class SeasonvarCatalogImporter
         return null;
     }
 
-    private function mediaTitle(CatalogTitle $catalogTitle, Season $season, Episode $episode): string
+    private function mediaTitle(CatalogTitle $catalogTitle, ?Season $season, ?Episode $episode, bool $isTrailer = false): string
     {
+        if ($isTrailer) {
+            return collect([
+                $catalogTitle->title,
+                $season !== null ? $season->number.' сезон' : null,
+                'трейлер',
+            ])->filter()->implode(' - ');
+        }
+
+        if ($season === null || $episode === null) {
+            return $catalogTitle->title.' - видео';
+        }
+
         return sprintf('%s - %d сезон %d серия', $catalogTitle->title, $season->number, $episode->number);
     }
 
@@ -1570,8 +1586,8 @@ class SeasonvarCatalogImporter
      */
     private function sourceMediaKey(
         CatalogTitle $catalogTitle,
-        Season $season,
-        Episode $episode,
+        ?Season $season,
+        ?Episode $episode,
         array $item,
         string $playbackUrl,
         ?string $quality,
@@ -1582,8 +1598,9 @@ class SeasonvarCatalogImporter
         return hash('sha256', implode('|', [
             'seasonvar',
             $catalogTitle->source_url_hash ?: $catalogTitle->id,
-            $season->number,
-            $episode->number,
+            $season?->number ?? '',
+            $episode?->number ?? '',
+            $this->mediaMetadata->isTrailer($item['title'], $playbackUrl) ? 'trailer' : 'episode',
             $sourceIdentity,
             Str::slug((string) ($item['title'] ?? '')),
             $quality ?? '',
@@ -1593,34 +1610,12 @@ class SeasonvarCatalogImporter
 
     private function mediaQuality(?string $title, string $url): ?string
     {
-        $value = Str::lower(($title ?? '').' '.$url);
-
-        if (preg_match('/(?<quality>2160p|1440p|1080p|720p|480p|360p|240p)/iu', $value, $matches) === 1) {
-            return Str::lower($matches['quality']);
-        }
-
-        if (preg_match('/(?<height>\d{3,4})\s*[xх]\s*\d{3,4}/u', $value, $matches) === 1) {
-            return $matches['height'].'p';
-        }
-
-        return null;
+        return $this->mediaMetadata->quality($title, $url);
     }
 
     private function mediaTranslationName(?string $title): ?string
     {
-        if ($title === null) {
-            return null;
-        }
-
-        if (preg_match('/(?:озвучка|перевод)\s*[:\-]\s*(?<name>[^,;|]{2,80})/iu', $title, $matches) === 1) {
-            return Str::substr(Str::squish($matches['name']), 0, 120);
-        }
-
-        if (preg_match('/\[(?<name>[^\]]{2,80})\]/u', $title, $matches) === 1) {
-            return Str::substr(Str::squish($matches['name']), 0, 120);
-        }
-
-        return null;
+        return $this->mediaMetadata->translationName($title);
     }
 
     /**

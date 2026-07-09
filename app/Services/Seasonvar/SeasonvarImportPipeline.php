@@ -8,6 +8,7 @@ use App\Models\Season;
 use App\Models\SeasonvarImportEvent;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
+use App\Services\Media\ExternalMediaMetadata;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -21,6 +22,7 @@ class SeasonvarImportPipeline
         private readonly SeasonvarSitemapMirror $sitemapMirror,
         private readonly SeasonvarTitleMerger $titleMerger,
         private readonly SeasonvarMediaAvailabilityChecker $mediaAvailabilityChecker,
+        private readonly ExternalMediaMetadata $mediaMetadata,
     ) {}
 
     /**
@@ -122,9 +124,11 @@ class SeasonvarImportPipeline
             'cycle' => $cycle,
         ]);
 
+        $sourceStatusBackfillResult = $this->backfillParsedSourcePageStatuses($progress);
         $cycleResult = $argument === null
             ? $this->runSitemapCycle($run, $force, $discover, $progress)
             : $this->runUrlCycle($run, $argument, $force, $progress);
+        $mediaMetadataResult = $this->refreshMediaMetadataBacklog($progress);
         $mediaBacklogResult = $this->refreshMediaBacklog($progress);
         $mergeResult = $this->titleMerger->merge($progress);
 
@@ -135,12 +139,17 @@ class SeasonvarImportPipeline
             'media_failed' => $cycleResult['media_failed'] + $mediaBacklogResult['media_failed'],
         ], [
             'last_merge' => $mergeResult,
+            'last_source_status_backfill' => $sourceStatusBackfillResult,
+            'last_media_metadata_backlog' => $mediaMetadataResult,
             'last_media_backlog' => $mediaBacklogResult,
         ]);
 
         $progress('seasonvar-import-cycle-complete', [
             'cycle' => $cycle,
             ...$cycleResult,
+            'source_status_backfilled' => $sourceStatusBackfillResult['backfilled'],
+            'media_metadata_checked' => $mediaMetadataResult['media_checked'],
+            'media_metadata_updated' => $mediaMetadataResult['media_updated'],
             'media_checked' => $mediaBacklogResult['media_checked'],
             'media_check_available' => $mediaBacklogResult['media_available'],
             'media_check_unavailable' => $mediaBacklogResult['media_unavailable'],
@@ -148,6 +157,64 @@ class SeasonvarImportPipeline
             'merged_seasons' => $mergeResult['seasons'],
             'merged_episodes' => $mergeResult['episodes'],
         ]);
+    }
+
+    /**
+     * @param  callable(string, array<string, mixed>): void  $progress
+     * @return array{selected: int, backfilled: int}
+     */
+    private function backfillParsedSourcePageStatuses(callable $progress): array
+    {
+        $limit = max(0, (int) config('seasonvar.import.source_status_backfill_per_cycle', 1000));
+
+        if ($limit === 0) {
+            return [
+                'selected' => 0,
+                'backfilled' => 0,
+            ];
+        }
+
+        $ids = SourcePage::query()
+            ->where('parse_status', 'parsed')
+            ->where('import_status', 'pending')
+            ->oldest('last_imported_at')
+            ->oldest()
+            ->limit($limit)
+            ->pluck('id');
+
+        $progress('source-pages-status-backfill-started', [
+            'selected' => $ids->count(),
+            'limit' => $limit,
+        ]);
+
+        if ($ids->isEmpty()) {
+            $result = [
+                'selected' => 0,
+                'backfilled' => 0,
+            ];
+
+            $progress('source-pages-status-backfill-complete', $result);
+
+            return $result;
+        }
+
+        $backfilled = SourcePage::query()
+            ->whereKey($ids)
+            ->update([
+                'import_status' => 'parsed',
+                'retry_after_at' => null,
+                'last_imported_at' => DB::raw('COALESCE(last_imported_at, last_crawled_at, updated_at)'),
+                'updated_at' => now(),
+            ]);
+
+        $result = [
+            'selected' => $ids->count(),
+            'backfilled' => $backfilled,
+        ];
+
+        $progress('source-pages-status-backfill-complete', $result);
+
+        return $result;
     }
 
     /**
@@ -419,6 +486,94 @@ class SeasonvarImportPipeline
         }
 
         $progress('seasonvar-media-backlog-complete', $result);
+
+        return $result;
+    }
+
+    /**
+     * @param  callable(string, array<string, mixed>): void  $progress
+     * @return array{media_checked: int, media_updated: int}
+     */
+    private function refreshMediaMetadataBacklog(callable $progress): array
+    {
+        $limit = max(0, (int) config('seasonvar.media_metadata.backfill_per_cycle', 100));
+
+        if ($limit === 0) {
+            return [
+                'media_checked' => 0,
+                'media_updated' => 0,
+            ];
+        }
+
+        $mediaItems = LicensedMedia::query()
+            ->where(function ($query): void {
+                $query->whereNull('quality')
+                    ->orWhereNull('format')
+                    ->orWhere('format', '')
+                    ->orWhereNull('translation_name');
+            })
+            ->where(function ($query): void {
+                $query->whereNotNull('playback_url')
+                    ->orWhereNotNull('path');
+            })
+            ->oldest('updated_at')
+            ->oldest()
+            ->limit($limit)
+            ->get();
+
+        $progress('seasonvar-media-metadata-backlog-started', [
+            'selected' => $mediaItems->count(),
+            'limit' => $limit,
+        ]);
+
+        $result = [
+            'media_checked' => 0,
+            'media_updated' => 0,
+        ];
+
+        foreach ($mediaItems as $media) {
+            $url = $media->playback_url ?: $media->path;
+
+            if (! is_string($url) || trim($url) === '') {
+                continue;
+            }
+
+            $updates = [];
+            $quality = $this->mediaMetadata->quality($media->title, $url);
+            $format = $this->mediaMetadata->format($url);
+            $translationName = $this->mediaMetadata->translationName($media->title);
+
+            if ($quality !== null && $quality !== $media->quality) {
+                $updates['quality'] = $quality;
+            }
+
+            if ($format !== '' && $format !== $media->format) {
+                $updates['format'] = $format;
+            }
+
+            if ($translationName !== null && $translationName !== $media->translation_name) {
+                $updates['translation_name'] = $translationName;
+            }
+
+            $result['media_checked']++;
+
+            if ($updates === []) {
+                continue;
+            }
+
+            $media->fill($updates)->save();
+            $result['media_updated']++;
+
+            $progress('seasonvar-media-metadata-updated', [
+                'licensed_media_id' => $media->id,
+                'quality' => $media->quality,
+                'format' => $media->format,
+                'translation_name' => $media->translation_name,
+                'url' => $url,
+            ]);
+        }
+
+        $progress('seasonvar-media-metadata-backlog-complete', $result);
 
         return $result;
     }

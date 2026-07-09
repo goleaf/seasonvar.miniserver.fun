@@ -131,6 +131,37 @@ class SeasonvarParsePageCommandTest extends TestCase
             'title' => '2 серия SD/HD',
             'storage_disk' => 'seasonvar_parsed',
             'playback_url' => 'https://media.example.com/kitchen/s04e02.mp4',
+            'quality' => '720p',
+            'status' => 'published',
+        ]);
+    }
+
+    public function test_it_saves_trailer_media_without_episode_number(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake([
+            'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html' => Http::response($this->seasonPageHtml(4, [
+                2 => 'Проверка',
+            ], seasonvarPlaylists: ['/playls2/hash/trans%D0%A2%D1%80%D0%B5%D0%B9%D0%BB%D0%B5%D1%80%D1%8B/47915/plist.txt?time=1783594881'])),
+            'seasonvar.ru/playls2/hash/trans%D0%A2%D1%80%D0%B5%D0%B9%D0%BB%D0%B5%D1%80%D1%8B/47915/plist.txt?time=1783594881' => Http::response(json_encode([
+                [
+                    'title' => 'Трейлер',
+                    'file' => $this->encodedSeasonvarPlayerFile('//media.example.com/kitchen/trailers/cernyi-spisok-na-kuxne.mp4'),
+                    'id' => '',
+                ],
+            ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)),
+        ]);
+
+        $this->artisan('seasonvar:import', [
+            'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
+        ])->assertExitCode(0);
+
+        $this->assertDatabaseHas('licensed_media', [
+            'title' => 'Трейлер',
+            'storage_disk' => 'seasonvar_parsed',
+            'playback_url' => 'https://media.example.com/kitchen/trailers/cernyi-spisok-na-kuxne.mp4',
+            'episode_id' => null,
+            'format' => 'mp4',
             'status' => 'published',
         ]);
     }

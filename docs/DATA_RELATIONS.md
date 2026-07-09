@@ -92,6 +92,7 @@ Current Seasonvar parser stores:
 - episodes
 - media candidates, external playback URLs, quality, format, translation, and availability status
 - HLS master playlist variants as separate `licensed_media` records when quality variants are discoverable
+- trailers and announcements as title-level or season-level `licensed_media` records when no episode number is available
 - parsed relation values for genres, countries, actors, directors, age ratings, translations, statuses, networks, studios, and tags
 - raw HTML snapshots for diagnostics
 
@@ -118,3 +119,4 @@ Current parser relation sources:
 - Duplicate season pages are merged into one `CatalogTitle`; seasons remain internal records.
 - One import run holds a cache lock so two copies of `seasonvar:import` cannot update the same queue at the same time.
 - Each import cycle marks malformed nested Seasonvar URLs as unavailable and checks a limited backlog of older media records with empty or stale availability status.
+- Each import cycle normalizes old parsed source-page import states and fills missing media quality, format, and translation metadata.

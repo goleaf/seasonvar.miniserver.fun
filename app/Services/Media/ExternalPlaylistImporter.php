@@ -19,6 +19,8 @@ class ExternalPlaylistImporter
      */
     private array $mediaExtensions = ['mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi', 'm3u', 'm3u8'];
 
+    public function __construct(private readonly ExternalMediaMetadata $mediaMetadata) {}
+
     /**
      * @return array{
      *     total: int,
@@ -128,8 +130,8 @@ class ExternalPlaylistImporter
                 'playback_url' => $entry['url'],
                 'source_media_key' => $sourceMediaKey,
                 'source_url' => $baseUrl,
-                'quality' => $this->mediaQuality($entry['title'], $entry['url']),
-                'format' => $this->mediaFormat($entry['url']),
+                'quality' => $this->mediaMetadata->quality($entry['title'], $entry['url']),
+                'format' => $this->mediaMetadata->format($entry['url']),
                 'check_status' => 'not_checked',
                 'status' => 'published',
                 'published_at' => $media->published_at ?? now(),
@@ -408,25 +410,9 @@ class ExternalPlaylistImporter
             $entry['season_number'] ?? '',
             $entry['episode_number'] ?? '',
             Str::slug($entry['title']),
-            $this->mediaQuality($entry['title'], $entry['url']) ?? '',
-            $this->mediaFormat($entry['url']),
+            $this->mediaMetadata->quality($entry['title'], $entry['url']) ?? '',
+            $this->mediaMetadata->format($entry['url']),
         ]));
-    }
-
-    private function mediaQuality(string $title, string $url): ?string
-    {
-        $value = Str::lower($title.' '.$url);
-
-        if (preg_match('/(?<quality>2160p|1440p|1080p|720p|480p|360p|240p)/iu', $value, $matches) === 1) {
-            return Str::lower($matches['quality']);
-        }
-
-        return null;
-    }
-
-    private function mediaFormat(string $url): string
-    {
-        return Str::lower(pathinfo((string) parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION));
     }
 
     private function isMediaFileUrl(string $url): bool

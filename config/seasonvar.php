@@ -10,6 +10,7 @@ return [
         'refresh_after_hours' => (int) env('SEASONVAR_IMPORT_REFRESH_AFTER_HOURS', 168),
         'season_url_limit' => (int) env('SEASONVAR_IMPORT_SEASON_URL_LIMIT', 200),
         'lock_seconds' => (int) env('SEASONVAR_IMPORT_LOCK_SECONDS', 604800),
+        'source_status_backfill_per_cycle' => (int) env('SEASONVAR_SOURCE_STATUS_BACKFILL_PER_CYCLE', 1000),
     ],
     'media_check' => [
         'enabled' => filter_var(env('SEASONVAR_MEDIA_CHECK_ENABLED', true), FILTER_VALIDATE_BOOL),
@@ -18,5 +19,8 @@ return [
         'connect_timeout_seconds' => (int) env('SEASONVAR_MEDIA_CHECK_CONNECT_TIMEOUT', 5),
         'backfill_per_cycle' => (int) env('SEASONVAR_MEDIA_CHECK_BACKFILL_PER_CYCLE', 25),
         'refresh_after_hours' => (int) env('SEASONVAR_MEDIA_CHECK_REFRESH_AFTER_HOURS', 168),
+    ],
+    'media_metadata' => [
+        'backfill_per_cycle' => (int) env('SEASONVAR_MEDIA_METADATA_BACKFILL_PER_CYCLE', 100),
     ],
 ];

@@ -44,6 +44,18 @@ class CatalogController extends Controller
 
     private const VIDEO_SITEMAP_PAGE_SIZE = 5000;
 
+    private const SEARCH_STOP_WORDS = [
+        'a', 'an', 'and', 'by', 'for', 'from', 'in', 'of', 'on', 'or', 'the', 'to', 'with',
+        'актеры', 'альтернативы', 'без', 'в', 'веб', 'все', 'выхода', 'где', 'год', 'года',
+        'дат', 'дата', 'для', 'жанр', 'жанры', 'и', 'какая', 'какие', 'календарь',
+        'каталог', 'когда', 'качество', 'качестве', 'лучшие', 'мобильный', 'на', 'новая',
+        'новые', 'онлайн', 'описание', 'плеер', 'по',
+        'подборка', 'подряд', 'после', 'последняя', 'похожие', 'про', 'расписание', 'роли',
+        'русском', 'с', 'сезон', 'сезона', 'сезоны', 'серии', 'серий', 'сериал',
+        'сериала', 'сериалы', 'сколько', 'смотреть', 'страна', 'страны', 'тема',
+        'темы', 'телефоне', 'хорошем', 'что',
+    ];
+
     public function index(): View
     {
         $stats = [
@@ -144,12 +156,23 @@ class CatalogController extends Controller
             ->mapWithKeys(fn (Model $record, string $filterType): array => [$filterType => $record->slug])
             ->all();
 
-        $titles = $this->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, $year, null, $invalidYear)
+        $querySearch = $search;
+        $titles = $this->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $querySearch, $year, null, $invalidYear)
             ->with($this->cardRelations())
             ->withCount(['seasons', 'episodes'])
             ->latest('indexed_at')
             ->paginate(24)
             ->withQueryString();
+
+        if ($search !== '' && $titles->total() === 0) {
+            $querySearch = '';
+            $titles = $this->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $querySearch, $year, null, $invalidYear)
+                ->with($this->cardRelations())
+                ->withCount(['seasons', 'episodes'])
+                ->latest('indexed_at')
+                ->paginate(24)
+                ->withQueryString();
+        }
 
         $filterTaxonomies = collect($filterTypes)->mapWithKeys(function (string $filterType): array {
             $modelClass = $this->filterModelClass($filterType);
@@ -172,7 +195,7 @@ class CatalogController extends Controller
             }
         });
 
-        $taxonomyContextCounts = $this->relationContextCounts($filterTaxonomies, $activeTaxonomies, $invalidFilterSlugs, $search, $year, $invalidYear);
+        $taxonomyContextCounts = $this->relationContextCounts($filterTaxonomies, $activeTaxonomies, $invalidFilterSlugs, $querySearch, $year, $invalidYear);
         $filterTaxonomies = $filterTaxonomies->map(function (Collection $items, string $filterType) use ($taxonomyContextCounts): Collection {
             return $items->map(function (Model $record) use ($filterType, $taxonomyContextCounts): Model {
                 $record->context_titles_count = (int) ($taxonomyContextCounts->get($filterType.'|'.$record->id) ?? 0);
@@ -205,8 +228,7 @@ class CatalogController extends Controller
             ]);
         }
 
-        $yearContextCounts = $this
-            ->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, null, null, $invalidYear)
+        $yearContextCounts = $this->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $querySearch, null, null, $invalidYear)
             ->select('year')
             ->selectRaw('count(*) as context_titles_count')
             ->whereNotNull('year')
@@ -329,7 +351,13 @@ class CatalogController extends Controller
             return;
         }
 
-        $query->where(function (Builder $query) use ($search): void {
+        $terms = $this->searchTerms($search);
+
+        if ($terms->isEmpty()) {
+            return;
+        }
+
+        $query->where(function (Builder $query) use ($search, $terms): void {
             $query->where('title', 'like', "%{$search}%")
                 ->orWhere('original_title', 'like', "%{$search}%")
                 ->orWhere('description', 'like', "%{$search}%");
@@ -339,7 +367,41 @@ class CatalogController extends Controller
                     $query->where('name', 'like', "%{$search}%");
                 });
             }
+
+            $terms->each(function (string $term) use ($query): void {
+                if (preg_match('/^\d{4}$/', $term) === 1) {
+                    $query->orWhere('year', (int) $term);
+                }
+
+                $query->orWhere('title', 'like', "%{$term}%")
+                    ->orWhere('original_title', 'like', "%{$term}%")
+                    ->orWhere('description', 'like', "%{$term}%");
+
+                foreach ($this->filterRelationNames() as $relation) {
+                    $query->orWhereHas($relation, function (Builder $query) use ($term): void {
+                        $query->where('name', 'like', "%{$term}%");
+                    });
+                }
+            });
         });
+    }
+
+    /**
+     * @return Collection<int, string>
+     */
+    private function searchTerms(string $search): Collection
+    {
+        $normalized = mb_strtolower($search);
+        $normalized = preg_replace('/[^\pL\pN]+/u', ' ', $normalized) ?: '';
+
+        return collect(explode(' ', $normalized))
+            ->map(fn (string $term): string => trim($term))
+            ->filter()
+            ->reject(fn (string $term): bool => in_array($term, self::SEARCH_STOP_WORDS, true))
+            ->filter(fn (string $term): bool => preg_match('/^\d{4}$/', $term) === 1 || mb_strlen($term) >= 3)
+            ->unique()
+            ->take(8)
+            ->values();
     }
 
     private function applyRelationFilters(Builder $query, Collection $activeTaxonomies, ?string $exceptTaxonomyType = null): void
