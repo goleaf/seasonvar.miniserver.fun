@@ -12,7 +12,7 @@
 - Основная база данных SQLite; тесты используют SQLite в памяти.
 - PHPUnit 12.5; Pest не установлен.
 - Tailwind CSS 4.3 с Vite 8, локальными FontAwesome, Plyr и HLS-ресурсами.
-- В проекте сейчас нет `routes/api.php`, политик приложения, задач очереди, событий, слушателей, писем, уведомлений и API Resources. Публичные query-параметры каталога проверяются Form Request-классами.
+- В проекте сейчас нет `routes/api.php`, политик приложения, задач очереди, событий, слушателей, писем, уведомлений и API Resources. Публичные query-параметры каталога проверяются Form Request-классами, а служебная статистика защищена gate.
 - CI-файлы не найдены.
 
 ## MCP
@@ -35,6 +35,7 @@ args = ["artisan", "boost:mcp", "--env=local"]
 - Добавлен этот audit-документ и разрешено отслеживание существующей настройки Laravel Boost MCP.
 - Посадочные страницы sitemap больше не выполняют `exists()` для каждой пары справочник/год; реальные пары считаются grouped join-запросами по pivot-таблицам и покрыты query-count regression test.
 - Валидация публичных query-параметров вынесена в `CatalogTitlesRequest` и `CatalogShowRequest`; slug-фильтры используют reusable Rule, а типы фильтров перечислены enum.
+- Служебная страница `/stats` закрыта Laravel gate `viewCatalogStats` через route middleware; добавлены allowed/denied authorization tests.
 
 ## Проверка
 
@@ -55,7 +56,7 @@ args = ["artisan", "boost:mcp", "--env=local"]
 - [resources/views/layouts/app.blade.php](/www/wwwroot/seasonvar.miniserver.fun/resources/views/layouts/app.blade.php:1) содержит слишком большой `@php`-блок: там собираются SEO-метаданные, URL поиска, JSON-LD, навигационные блоки и производное состояние страницы. Это нужно вынести в отдельный SEO-сервис или view model перед дальнейшим расширением SEO.
 - [app/Http/Controllers/CatalogController.php](/www/wwwroot/seasonvar.miniserver.fun/app/Http/Controllers/CatalogController.php:1) остается слишком большим и смешивает нормализацию запроса, query building, SEO/JSON-LD, sitemap-делегирование, рекомендации и состояние страницы. Его нужно постепенно делить на query objects, SEO builders и меньшие контроллеры.
 - [resources/views/catalog/titles.blade.php](/www/wwwroot/seasonvar.miniserver.fun/resources/views/catalog/titles.blade.php:3) и [resources/views/catalog/show.blade.php](/www/wwwroot/seasonvar.miniserver.fun/resources/views/catalog/show.blade.php:3) все еще собирают URL фильтров, подписи таксономий, данные плеера, бейджи сезонов и состояние вариантов медиа внутри Blade. Перед новым UI-поведением это лучше перенести в подготовленные DTO, классы компонентов или view models.
-- В приложении нет policies или gates. Для текущей публичной read-only поверхности это допустимо, но перед любыми write/admin/moderation/import-control эндпоинтами нужно добавить авторизацию.
+- В приложении появился gate для служебной статистики. Перед любыми write/admin/moderation/import-control эндпоинтами все еще нужно добавлять отдельную авторизацию.
 
 ## Средний приоритет
 

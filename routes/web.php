@@ -21,7 +21,9 @@ Route::get('/sitemap-videos-{page}.xml', [CatalogSitemapController::class, 'site
 Route::get('/feed.xml', [CatalogSitemapController::class, 'feed'])->name('feed');
 Route::get('/opensearch.xml', [CatalogSitemapController::class, 'openSearch'])->name('opensearch');
 Route::get('/llms.txt', [CatalogSitemapController::class, 'llms'])->name('llms');
-Route::get('/stats', [CatalogController::class, 'stats'])->name('stats');
+Route::get('/stats', [CatalogController::class, 'stats'])
+    ->can('viewCatalogStats')
+    ->name('stats');
 Route::get('/titles', [CatalogController::class, 'titles'])->name('titles.index');
 Route::get('/titles/year/{year}', [CatalogController::class, 'titlesByYear'])
     ->where('year', '(?:19|20)\d{2}')

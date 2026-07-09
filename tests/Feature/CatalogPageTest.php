@@ -9,6 +9,7 @@ use App\Models\Season;
 use App\Models\SeasonvarImportEvent;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -90,6 +91,8 @@ class CatalogPageTest extends TestCase
             'level' => 'error',
             'context' => ['url' => $eventContextUrl, 'secret' => 'private context secret'],
         ]);
+
+        $this->actingAs(User::factory()->create());
 
         $response = $this->get(route('stats'));
 
