@@ -158,13 +158,13 @@ class CatalogController extends Controller
                 ->groupBy('year')
                 ->first();
 
-            $yearBuckets->prepend($selectedYearBucket ?? new CatalogTitle([
+            $yearBuckets->prepend($selectedYearBucket ?? (object) [
                 'year' => $year,
                 'titles_count' => 0,
-            ]));
+            ]);
         }
 
-        $yearBuckets->each(function (CatalogTitle $bucket) use ($activeTaxonomies, $invalidFilterSlugs, $search, $invalidYear): void {
+        $yearBuckets->each(function (object $bucket) use ($activeTaxonomies, $invalidFilterSlugs, $search, $invalidYear): void {
             $bucket->context_titles_count = $this
                 ->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, (int) $bucket->year, null, $invalidYear)
                 ->count();
