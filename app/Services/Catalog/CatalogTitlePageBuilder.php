@@ -2,11 +2,11 @@
 
 namespace App\Services\Catalog;
 
+use App\Http\Requests\CatalogShowRequest;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
 use App\View\ViewModels\CatalogShowViewModel;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
 class CatalogTitlePageBuilder
@@ -20,7 +20,7 @@ class CatalogTitlePageBuilder
     /**
      * @return array<string, mixed>
      */
-    public function data(Request $request, CatalogTitle $catalogTitle): array
+    public function data(CatalogShowRequest $request, CatalogTitle $catalogTitle): array
     {
         $catalogTitle->load(array_merge([
             'sourcePage',
@@ -45,8 +45,8 @@ class CatalogTitlePageBuilder
                 $media->title,
             ))
             ->values();
-        $requestedEpisodeId = $request->integer('episode');
-        $requestedMediaId = $request->integer('media');
+        $requestedEpisodeId = $request->episodeId();
+        $requestedMediaId = $request->mediaId();
         $selectedEpisode = $requestedEpisodeId > 0
             ? $episodes->firstWhere('id', $requestedEpisodeId)
             : null;

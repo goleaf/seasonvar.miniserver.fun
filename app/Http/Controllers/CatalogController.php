@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CatalogShowRequest;
 use App\Http\Requests\CatalogTitlesRequest;
 use App\Models\CatalogTitle;
 use App\Services\Catalog\CatalogHomePageBuilder;
 use App\Services\Catalog\CatalogStatsPageBuilder;
 use App\Services\Catalog\CatalogTitlePageBuilder;
 use App\Services\Catalog\CatalogTitlesPageBuilder;
-use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class CatalogController extends Controller
@@ -37,7 +37,7 @@ class CatalogController extends Controller
         return view('catalog.titles', $this->titlesPage->data($request));
     }
 
-    public function show(Request $request, CatalogTitle $catalogTitle): View
+    public function show(CatalogShowRequest $request, CatalogTitle $catalogTitle): View
     {
         return view('catalog.show', $this->titlePage->data($request, $catalogTitle));
     }

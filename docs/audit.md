@@ -12,7 +12,7 @@
 - Основная база данных SQLite; тесты используют SQLite в памяти.
 - PHPUnit 12.5; Pest не установлен.
 - Tailwind CSS 4.3 с Vite 8, локальными FontAwesome, Plyr и HLS-ресурсами.
-- В проекте сейчас нет `routes/api.php`, политик приложения, задач очереди, событий, слушателей, писем, уведомлений, Form Request-классов и API Resources.
+- В проекте сейчас нет `routes/api.php`, политик приложения, задач очереди, событий, слушателей, писем, уведомлений и API Resources. Публичные query-параметры каталога проверяются Form Request-классами.
 - CI-файлы не найдены.
 
 ## MCP
@@ -34,6 +34,7 @@ args = ["artisan", "boost:mcp", "--env=local"]
 - Общие метаданные стартового шаблона Laravel в `composer.json` заменены на метаданные проекта.
 - Добавлен этот audit-документ и разрешено отслеживание существующей настройки Laravel Boost MCP.
 - Посадочные страницы sitemap больше не выполняют `exists()` для каждой пары справочник/год; реальные пары считаются grouped join-запросами по pivot-таблицам и покрыты query-count regression test.
+- Валидация публичных query-параметров вынесена в `CatalogTitlesRequest` и `CatalogShowRequest`; slug-фильтры используют reusable Rule, а типы фильтров перечислены enum.
 
 ## Проверка
 
@@ -61,7 +62,6 @@ args = ["artisan", "boost:mcp", "--env=local"]
 - [app/Services/Seasonvar/SeasonvarTitleMerger.php](/www/wwwroot/seasonvar.miniserver.fun/app/Services/Seasonvar/SeasonvarTitleMerger.php:82) загружает все тайтлы в память перед группировкой дублей. Для большого каталога лучше перейти на группировку кандидатных дублей в базе или chunk-обработку.
 - Поиск в `CatalogController::applySearchFilter()` использует несколько `LIKE` с ведущим `%` и повторные `orWhereHas()` по связям. Для маленькой базы это нормально, но при росте каталога стоит рассмотреть SQLite FTS или отдельную поисковую таблицу.
 - Снимки страниц источника хранят raw HTML. Они должны оставаться непубличными; нужна политика retention/cleanup и запрет на вывод таких данных через будущие API или диагностику.
-- Валидация запроса сейчас встроена в `CatalogController`. Текущие read-only маршруты нормализуют scalar input, но фильтры каталога будет проще тестировать и переиспользовать через отдельные filter DTO или Form Request-классы, если появятся write/API endpoints.
 - JSON-LD выводится через `{!! !!}` в [resources/views/layouts/app.blade.php](/www/wwwroot/seasonvar.miniserver.fun/resources/views/layouts/app.blade.php:1667). Сейчас используются JSON_HEX-флаги, это правильная защита, но после рефакторинга SEO нужны regression tests на escaping.
 
 ## Низкий приоритет

@@ -2,6 +2,7 @@
 
 namespace App\Services\Catalog;
 
+use App\Enums\CatalogFilterType;
 use App\Models\Actor;
 use App\Models\AgeRating;
 use App\Models\CatalogStatus;
@@ -45,7 +46,7 @@ class CatalogTaxonomyRegistry
      */
     public function filterTypes(): array
     {
-        return array_keys(self::FILTER_RELATIONS);
+        return CatalogFilterType::values();
     }
 
     /**

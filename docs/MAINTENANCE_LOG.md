@@ -2,6 +2,7 @@
 
 ## 2026-07-09
 
+- Валидация публичных query-параметров каталога оформлена через Laravel Form Request-классы: `CatalogTitlesRequest` получил правила для фильтров, `CatalogShowRequest` проверяет выбранную серию/медиа, slug-фильтры вынесены в reusable Rule, а типы фильтров — в enum; добавлена документация `docs/validation.md`.
 - Оптимизирована карта посадочных страниц: пары справочник/год для `sitemap-landings.xml` считаются grouped join-запросами по pivot-таблицам вместо `exists()` в цикле; добавлена документация `docs/performance.md` и regression test на количество запросов.
 - `CatalogController` разделен на тонкий web-контроллер, `CatalogSitemapController`, Form Request для фильтров каталога, page-builder сервисы, query-сервис и SEO-builder; добавлена документация `docs/architecture.md`.
 - Удалены все `@php`/`@endphp` из Blade-шаблонов: SEO/layout данные вынесены в `AppLayoutData`, состояние фильтров и страницы тайтла вынесено в view-model классы, добавлен тест запрета inline PHP в Blade.

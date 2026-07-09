@@ -12,6 +12,7 @@
 - `docs/architecture.md` для текущего деления контроллеров, page-builder сервисов, запросов и SEO.
 - `docs/UI_STANDARDS.md` для правил интерфейса и Blade-компонентов.
 - `docs/views.md` для правил Blade-шаблонов и view-model/view-data слоя.
+- `docs/validation.md` для Form Request-классов, правил ввода и reusable validation rules.
 - `docs/DATA_RELATIONS.md` для полей импортера, Eloquent-связей, фильтров и смысла данных.
 - `docs/performance.md` для query patterns, N+1-рисков, sitemap/feed и агрегированных счетчиков.
 - `docs/MAINTENANCE_LOG.md` для короткого датированного описания важных изменений.
@@ -29,6 +30,7 @@
 - Считать количества пакетно, когда это возможно, а не отдельным запросом на каждый видимый фильтр.
 - Фильтры маршрутов должны оставаться локальными: `/titles/{type}/{taxonomy}` и `/titles?...` всегда ведут на страницы местного каталога.
 - Нормализовать и проверять все входные параметры перед применением фильтров.
+- Размещать request validation в Form Request-классах; reusable/сложные проверки оформлять Rule-классами.
 
 ## Правила импортера
 

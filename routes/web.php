@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\CatalogFilterType;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogSitemapController;
 use Illuminate\Http\Request;
@@ -26,7 +27,7 @@ Route::get('/titles/year/{year}', [CatalogController::class, 'titlesByYear'])
     ->where('year', '(?:19|20)\d{2}')
     ->name('titles.year');
 Route::get('/titles/{type}/{taxonomy}', [CatalogController::class, 'titles'])
-    ->where('type', 'genre|country|actor|director|age_rating|translation|status|network|studio|tag')
+    ->where('type', CatalogFilterType::routePattern())
     ->where('taxonomy', '[a-z0-9][a-z0-9-]*')
     ->name('titles.taxonomy');
 Route::get('/titles/{catalogTitle:slug}', [CatalogController::class, 'show'])->name('titles.show');

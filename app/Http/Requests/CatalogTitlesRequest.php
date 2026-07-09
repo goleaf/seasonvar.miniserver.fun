@@ -2,7 +2,12 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\CatalogFilterType;
+use App\Rules\CatalogFilterSlug;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Enum;
 
 class CatalogTitlesRequest extends FormRequest
 {
@@ -12,16 +17,80 @@ class CatalogTitlesRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<int, string>>
+     * @return array<string, list<string|ValidationRule|Enum>>
      */
     public function rules(): array
     {
-        return [];
+        $rules = [
+            'q' => ['nullable', 'string', 'max:160'],
+            'year' => ['nullable', 'string', 'max:16'],
+            'title' => $this->slugRules(),
+            'type' => ['nullable', Rule::enum(CatalogFilterType::class)],
+            'taxonomy' => $this->slugRules(),
+        ];
+
+        foreach (CatalogFilterType::values() as $filterType) {
+            $rules[$filterType] = $this->slugRules();
+        }
+
+        return $rules;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'q.string' => 'Поисковый запрос должен быть строкой.',
+            'q.max' => 'Поисковый запрос слишком длинный.',
+            'year.string' => 'Год должен быть строкой.',
+            'year.max' => 'Год слишком длинный.',
+            'type.enum' => 'Выбран неподдерживаемый тип фильтра.',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        $attributes = [
+            'q' => 'поиск',
+            'year' => 'год',
+            'title' => 'контекст карточки',
+            'type' => 'тип фильтра',
+            'taxonomy' => 'значение фильтра',
+        ];
+
+        foreach (CatalogFilterType::cases() as $filterType) {
+            $attributes[$filterType->value] = $filterType->label();
+        }
+
+        return $attributes;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $normalized = [];
+
+        foreach (array_merge(['q', 'year', 'title', 'type', 'taxonomy'], CatalogFilterType::values()) as $key) {
+            if (! $this->query->has($key) || ! is_scalar($this->query($key))) {
+                continue;
+            }
+
+            $value = trim((string) $this->query($key));
+            $normalized[$key] = $key === 'q'
+                ? (preg_replace('/\s+/u', ' ', $value) ?: '')
+                : $value;
+        }
+
+        $this->merge($normalized);
     }
 
     public function normalizedSearch(): string
     {
-        $search = is_scalar($this->query('q')) ? (string) $this->query('q') : '';
+        $search = $this->stringQuery('q');
         $search = preg_replace('/\s+/u', ' ', trim($search)) ?: '';
 
         if (mb_strlen($search) < 2) {
@@ -33,9 +102,7 @@ class CatalogTitlesRequest extends FormRequest
 
     public function requestedYear(): string
     {
-        $requestedYear = $this->query('year');
-
-        return is_scalar($requestedYear) ? trim((string) $requestedYear) : '';
+        return $this->stringQuery('year');
     }
 
     public function year(): ?int
@@ -63,13 +130,7 @@ class CatalogTitlesRequest extends FormRequest
      */
     public function legacyType(array $filterTypes): string
     {
-        $value = $this->query('type', '');
-
-        if (! is_scalar($value)) {
-            return '';
-        }
-
-        $value = trim((string) $value);
+        $value = $this->stringQuery('type');
 
         return in_array($value, $filterTypes, true) ? $value : '';
     }
@@ -81,20 +142,21 @@ class CatalogTitlesRequest extends FormRequest
 
     public function filterSlug(mixed $value): ?string
     {
-        if (! is_scalar($value)) {
-            return null;
-        }
+        return CatalogFilterSlug::normalize($value);
+    }
 
-        $value = trim((string) $value);
+    /**
+     * @return list<string|ValidationRule>
+     */
+    private function slugRules(): array
+    {
+        return ['nullable', 'string', 'max:'.CatalogFilterSlug::MAX_LENGTH, new CatalogFilterSlug];
+    }
 
-        if ($value === '') {
-            return '';
-        }
+    private function stringQuery(string $key): string
+    {
+        $value = $this->query($key, '');
 
-        if (mb_strlen($value) > 120 || preg_match('/^[a-z0-9][a-z0-9-]*$/', $value) !== 1) {
-            return null;
-        }
-
-        return $value;
+        return is_scalar($value) ? trim((string) $value) : '';
     }
 }
