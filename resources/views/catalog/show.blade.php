@@ -1,85 +1,5 @@
 @extends('layouts.app', ['title' => $seo['title'] ?? $title->title, 'seo' => $seo ?? []])
 
-@php
-    $taxonomiesByType = $taxonomiesByType ?? collect([
-        'genre' => $title->relationLoaded('genres') ? $title->genres : collect(),
-        'country' => $title->relationLoaded('countries') ? $title->countries : collect(),
-        'actor' => $title->relationLoaded('actors') ? $title->actors : collect(),
-        'director' => $title->relationLoaded('directors') ? $title->directors : collect(),
-        'age_rating' => $title->relationLoaded('ageRatings') ? $title->ageRatings : collect(),
-        'translation' => $title->relationLoaded('translations') ? $title->translations : collect(),
-        'status' => $title->relationLoaded('statuses') ? $title->statuses : collect(),
-        'network' => $title->relationLoaded('networks') ? $title->networks : collect(),
-        'studio' => $title->relationLoaded('studios') ? $title->studios : collect(),
-        'tag' => $title->relationLoaded('tags') ? $title->tags : collect(),
-    ]);
-    $taxonomyGroups = $taxonomyGroups ?? $taxonomiesByType;
-    $genres = $taxonomiesByType->get('genre', collect());
-    $countries = $taxonomiesByType->get('country', collect());
-    $actors = $taxonomiesByType->get('actor', collect());
-    $directors = $taxonomiesByType->get('director', collect());
-    $ageRatings = $taxonomiesByType->get('age_rating', collect());
-    $translations = $taxonomiesByType->get('translation', collect());
-    $statuses = $taxonomiesByType->get('status', collect());
-    $networks = $taxonomiesByType->get('network', collect());
-    $studios = $taxonomiesByType->get('studio', collect());
-    $tags = $taxonomiesByType->get('tag', collect());
-    $taxonomyLabels = [
-        'genre' => 'Жанры',
-        'country' => 'Страны',
-        'actor' => 'Актеры',
-        'director' => 'Режиссеры',
-        'age_rating' => 'Возраст',
-        'translation' => 'Перевод',
-        'status' => 'Статус',
-        'network' => 'Каналы',
-        'studio' => 'Студии',
-        'tag' => 'Теги',
-    ];
-    $taxonomyIcons = [
-        'genre' => 'fa-solid fa-masks-theater',
-        'country' => 'fa-solid fa-earth-europe',
-        'actor' => 'fa-solid fa-user-group',
-        'director' => 'fa-solid fa-video',
-        'age_rating' => 'fa-solid fa-shield-halved',
-        'translation' => 'fa-solid fa-language',
-        'status' => 'fa-solid fa-signal',
-        'network' => 'fa-solid fa-tower-broadcast',
-        'studio' => 'fa-solid fa-building',
-        'tag' => 'fa-solid fa-tag',
-    ];
-    $taxonomyRows = [
-        ['label' => 'Жанр', 'items' => $genres, 'icon' => $taxonomyIcons['genre']],
-        ['label' => 'Ограничение', 'items' => $ageRatings, 'icon' => $taxonomyIcons['age_rating']],
-        ['label' => 'Страна', 'items' => $countries, 'icon' => $taxonomyIcons['country']],
-        ['label' => 'Режиссер', 'items' => $directors, 'icon' => $taxonomyIcons['director']],
-        ['label' => 'Перевод', 'items' => $translations, 'icon' => $taxonomyIcons['translation']],
-        ['label' => 'Статус', 'items' => $statuses, 'icon' => $taxonomyIcons['status']],
-        ['label' => 'Канал', 'items' => $networks, 'icon' => $taxonomyIcons['network']],
-        ['label' => 'Студия', 'items' => $studios, 'icon' => $taxonomyIcons['studio']],
-    ];
-    $seasons = $seasons ?? $title->seasons->sortBy('number')->values();
-    $mediaItems = $mediaItems ?? collect();
-    $selectedEpisode = $selectedEpisode ?? null;
-    $mediaByEpisodeId = $mediaItems->whereNotNull('episode_id')->groupBy('episode_id');
-    $selectedMediaUrl = $selectedMedia ? ($selectedMedia->playback_url ?: $selectedMedia->path) : null;
-    $selectedMediaFormat = strtolower($selectedMedia?->format ?: pathinfo((string) parse_url((string) $selectedMediaUrl, PHP_URL_PATH), PATHINFO_EXTENSION));
-    $selectedMediaType = match ($selectedMediaFormat) {
-        'm3u8' => 'application/x-mpegURL',
-        'mp4', 'm4v' => 'video/mp4',
-        'webm' => 'video/webm',
-        'mov' => 'video/quicktime',
-        default => null,
-    };
-    $selectedEpisodeMediaItems = $selectedEpisode ? $mediaByEpisodeId->get($selectedEpisode->id, collect()) : collect();
-    $selectedSeasonId = $selectedEpisode?->season_id ?? $selectedMedia?->season_id;
-    $episodeCount = $episodeCount ?? $seasons->sum(fn ($season) => (int) $season->episodes->count());
-    $taxonomyCount = $taxonomyCount ?? $taxonomiesByType->sum(fn ($items) => $items->count());
-    $mediaCount = $mediaCount ?? $mediaItems->count();
-    $parsedSeasonCount = $parsedSeasonCount ?? $seasons->filter(fn ($season) => $season->episodes->isNotEmpty())->count();
-    $topTaxonomies = $genres->merge($countries)->merge($ageRatings)->merge($translations)->merge($statuses)->merge($tags)->take(16);
-@endphp
-
 @section('content')
     <section class="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_300px]">
         <main class="min-w-0 space-y-5">
@@ -211,31 +131,7 @@
             <x-ui.panel title="Сезоны" icon="fa-solid fa-layer-group" :pad="false">
                 <div class="divide-y divide-slate-200">
                     @forelse ($seasons as $season)
-                        @php
-                            $seasonEpisodeCount = (int) $season->episodes->count();
-                            $isSelectedSeason = (int) $selectedSeasonId === (int) $season->id || ($selectedSeasonId === null && $loop->first);
-                            $releasedEpisodeLabel = null;
-
-                            if ($season->episodes_released !== null) {
-                                $releasedEpisodeLabel = $season->episodes_released.' '.match (true) {
-                                    $season->episodes_released % 10 === 1 && $season->episodes_released % 100 !== 11 => 'серия',
-                                    in_array($season->episodes_released % 10, [2, 3, 4], true) && ! in_array($season->episodes_released % 100, [12, 13, 14], true) => 'серии',
-                                    default => 'серий',
-                                };
-                            }
-
-                            $totalEpisodeLabel = $season->episodes_released !== null
-                                ? ($season->episodes_total !== null ? 'из '.$season->episodes_total : null)
-                                : null;
-                            $seasonStatusBadges = collect([
-                                $season->latest_episode_released_at?->format('d.m.Y'),
-                                $releasedEpisodeLabel,
-                                $totalEpisodeLabel,
-                                $season->translation_name,
-                            ])->filter()->values();
-                        @endphp
-
-                        <details class="group" @if ($isSelectedSeason) open @endif>
+                        <details class="group" @if ($showView->isSelectedSeason($season, $loop->first)) open @endif>
                             <summary class="flex cursor-pointer list-none flex-col gap-2 px-4 py-3 hover:bg-emerald-50 sm:flex-row sm:items-center sm:justify-between">
                                 <span class="min-w-0">
                                     <span class="inline-flex items-center gap-2 font-bold text-slate-700">
@@ -248,28 +144,23 @@
                                 </span>
                                 <span class="flex flex-wrap gap-1">
                                     <span class="rounded-full bg-slate-50 px-2 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200">
-                                        {{ $seasonEpisodeCount > 0 ? $seasonEpisodeCount.' серий' : 'серии скоро появятся' }}
+                                        {{ $showView->seasonEpisodeCount($season) > 0 ? $showView->seasonEpisodeCount($season).' серий' : 'серии скоро появятся' }}
                                     </span>
-                                    @foreach ($seasonStatusBadges as $badge)
+                                    @foreach ($showView->seasonStatusBadges($season) as $badge)
                                         <span class="rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">{{ $badge }}</span>
                                     @endforeach
                                 </span>
                             </summary>
 
                             <div class="px-4 pb-4">
-                                @if ($seasonEpisodeCount > 0)
+                                @if ($showView->seasonEpisodeCount($season) > 0)
                                     <div id="season-{{ $season->number }}" class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                                         @foreach ($season->episodes->sortBy('number')->values() as $episode)
-                                            @php
-                                                $episodeMediaItems = $mediaByEpisodeId->get($episode->id, collect());
-                                                $episodeHasMedia = $episodeMediaItems->isNotEmpty();
-                                                $isSelectedEpisode = $selectedEpisode?->id === $episode->id;
-                                            @endphp
                                             <a href="{{ route('titles.show', ['catalogTitle' => $title, 'episode' => $episode->id]) }}#player" @class([
                                                 'block rounded-lg px-3 py-2 text-sm ring-1 transition',
-                                                'bg-emerald-50 ring-emerald-200' => $isSelectedEpisode,
-                                                'bg-white ring-slate-200 hover:bg-emerald-50 hover:ring-emerald-200' => ! $isSelectedEpisode,
-                                            ]) @if ($isSelectedEpisode) aria-current="true" @endif>
+                                                'bg-emerald-50 ring-emerald-200' => $showView->isSelectedEpisode($episode),
+                                                'bg-white ring-slate-200 hover:bg-emerald-50 hover:ring-emerald-200' => ! $showView->isSelectedEpisode($episode),
+                                            ]) @if ($showView->isSelectedEpisode($episode)) aria-current="true" @endif>
                                                 <div class="flex items-start justify-between gap-2">
                                                     <div class="inline-flex min-w-0 items-center gap-2 font-bold text-slate-700">
                                                         <i class="fa-solid fa-circle-play text-emerald-700" aria-hidden="true"></i>
@@ -277,11 +168,11 @@
                                                     </div>
                                                     <span @class([
                                                         'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ring-1',
-                                                        'bg-emerald-100 text-emerald-700 ring-emerald-200' => $episodeHasMedia,
-                                                        'bg-slate-50 text-slate-500 ring-slate-200' => ! $episodeHasMedia,
+                                                        'bg-emerald-100 text-emerald-700 ring-emerald-200' => $showView->episodeHasMedia($episode),
+                                                        'bg-slate-50 text-slate-500 ring-slate-200' => ! $showView->episodeHasMedia($episode),
                                                     ])>
-                                                        <i class="{{ $episodeHasMedia ? 'fa-solid fa-play' : 'fa-solid fa-clock' }}" aria-hidden="true"></i>
-                                                        <span>{{ $episodeHasMedia ? 'видео' : 'готовится' }}</span>
+                                                        <i class="{{ $showView->episodeHasMedia($episode) ? 'fa-solid fa-play' : 'fa-solid fa-clock' }}" aria-hidden="true"></i>
+                                                        <span>{{ $showView->episodeHasMedia($episode) ? 'видео' : 'готовится' }}</span>
                                                     </span>
                                                 </div>
                                                 @if ($episode->title)
@@ -375,25 +266,13 @@
                             </div>
                             <div class="flex flex-wrap gap-2">
                                 @foreach ($selectedEpisodeMediaItems as $episodeMedia)
-                                    @php
-                                        $variantQuery = [
-                                            'catalogTitle' => $title,
-                                            'episode' => $selectedEpisode?->id,
-                                            'media' => $episodeMedia->id,
-                                        ];
-                                        $variantLabel = collect([
-                                            $episodeMedia->quality ? strtoupper($episodeMedia->quality) : null,
-                                            $episodeMedia->translation_name,
-                                            $episodeMedia->format ? strtoupper($episodeMedia->format) : null,
-                                        ])->filter()->implode(' / ') ?: 'Видео';
-                                    @endphp
-                                    <a href="{{ route('titles.show', $variantQuery) }}#player" @class([
+                                    <a href="{{ route('titles.show', $showView->variantQuery($episodeMedia)) }}#player" @class([
                                         'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ring-1 transition',
                                         'bg-emerald-600 text-white ring-emerald-600' => $selectedMedia?->id === $episodeMedia->id,
                                         'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:ring-emerald-200' => $selectedMedia?->id !== $episodeMedia->id,
                                     ])>
                                         <i class="fa-solid fa-file-video" aria-hidden="true"></i>
-                                        <span>{{ $variantLabel }}</span>
+                                        <span>{{ $showView->variantLabel($episodeMedia) }}</span>
                                     </a>
                                 @endforeach
                             </div>
@@ -415,20 +294,7 @@
                         </div>
                         <div class="max-h-80 divide-y divide-slate-200 overflow-y-auto">
                             @foreach ($mediaItems as $media)
-                                @php
-	                                    $mediaDetails = collect([
-	                                        $media->season ? 'Сезон '.$media->season->number : null,
-	                                        $media->episode ? 'Серия '.$media->episode->number : null,
-                                            $media->quality ? strtoupper($media->quality) : null,
-                                            $media->format ? strtoupper($media->format) : null,
-	                                    ])->filter()->implode(' / ');
-                                    $mediaQuery = ['catalogTitle' => $title, 'media' => $media->id];
-
-                                    if ($media->episode_id) {
-                                        $mediaQuery['episode'] = $media->episode_id;
-                                    }
-                                @endphp
-                                <a href="{{ route('titles.show', $mediaQuery) }}#player" @class([
+                                <a href="{{ route('titles.show', $showView->mediaQuery($media)) }}#player" @class([
                                     'block px-4 py-3 hover:bg-emerald-50',
                                     'bg-emerald-50' => $selectedMedia?->id === $media->id,
                                 ])>
@@ -439,7 +305,7 @@
                                         </span>
                                         <span class="inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
                                             <i class="fa-solid fa-circle-info text-slate-400" aria-hidden="true"></i>
-	                                            <span>{{ $mediaDetails !== '' ? $mediaDetails : 'Видео сериала' }}</span>
+	                                            <span>{{ $showView->mediaDetailsLabel($media) }}</span>
 	                                        </span>
                                     </div>
                                 </a>

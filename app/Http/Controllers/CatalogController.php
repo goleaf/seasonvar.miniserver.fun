@@ -16,6 +16,8 @@ use App\Models\Studio;
 use App\Models\Tag;
 use App\Models\Translation;
 use App\Services\Catalog\CatalogSitemapResponder;
+use App\View\ViewModels\CatalogShowViewModel;
+use App\View\ViewModels\CatalogTitlesViewModel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -67,10 +69,12 @@ class CatalogController extends Controller
             ->latest('indexed_at')
             ->limit(64)
             ->get();
+        $latestByDate = $latestTitles->groupBy(fn (CatalogTitle $catalogTitle): string => $catalogTitle->indexed_at?->format('d.m.Y') ?? now()->format('d.m.Y'));
 
         return view('catalog.index', [
             'stats' => $stats,
             'latestTitles' => $latestTitles,
+            'latestByDate' => $latestByDate,
             'genres' => Genre::query()
                 ->withCount('catalogTitles')
                 ->orderByDesc('catalog_titles_count')
@@ -244,6 +248,17 @@ class CatalogController extends Controller
             $bucket->context_titles_count = (int) ($yearContextCounts->get((int) $bucket->year) ?? 0);
         });
 
+        $filterView = new CatalogTitlesViewModel(
+            search: $search,
+            year: $year,
+            requestedYear: $requestedYear,
+            invalidYear: $invalidYear,
+            activeTaxonomies: $activeTaxonomies,
+            activeFilterSlugs: $activeFilterSlugs,
+            invalidFilterSlugs: $invalidFilterSlugs,
+            titleContext: $titleContext,
+        );
+
         return view('catalog.titles', [
             'titles' => $titles,
             'search' => $search,
@@ -258,6 +273,7 @@ class CatalogController extends Controller
             'invalidFilterSlugs' => $invalidFilterSlugs,
             'filterTaxonomies' => $filterTaxonomies,
             'filterTypes' => $filterTypes,
+            'filterView' => $filterView,
             'yearBuckets' => $yearBuckets,
             'seo' => $this->titlesSeo(
                 $request,
@@ -580,7 +596,6 @@ class CatalogController extends Controller
         ], $this->filterRelationNames()));
         $taxonomiesByType = collect(self::FILTER_RELATIONS)
             ->mapWithKeys(fn (array $config, string $filterType): array => [$filterType => $catalogTitle->{$config['relation']}->values()]);
-        $taxonomyGroups = $taxonomiesByType;
         $seasons = $catalogTitle->seasons->sortBy('number')->values();
         $episodes = $seasons
             ->flatMap(fn ($season): Collection => $season->episodes->sortBy('number')->values())
@@ -646,18 +661,50 @@ class CatalogController extends Controller
             });
         }
 
+        $showView = new CatalogShowViewModel(
+            title: $catalogTitle,
+            taxonomiesByType: $taxonomiesByType,
+            seasons: $seasons,
+            mediaItems: $mediaItems,
+            selectedEpisode: $selectedEpisode,
+            selectedMedia: $selectedMedia,
+            episodeCount: $episodeCount,
+            taxonomyCount: $taxonomyCount,
+            parsedSeasonCount: $parsedSeasonCount,
+            mediaCount: $mediaCount,
+        );
+
         return view('catalog.show', [
             'title' => $catalogTitle,
             'taxonomiesByType' => $taxonomiesByType,
-            'taxonomyGroups' => $taxonomyGroups,
+            'taxonomyGroups' => $showView->taxonomyGroups,
+            'genres' => $showView->genres,
+            'countries' => $showView->countries,
+            'actors' => $showView->actors,
+            'directors' => $showView->directors,
+            'ageRatings' => $showView->ageRatings,
+            'translations' => $showView->translations,
+            'statuses' => $showView->statuses,
+            'networks' => $showView->networks,
+            'studios' => $showView->studios,
+            'tags' => $showView->tags,
+            'taxonomyLabels' => $showView->taxonomyLabels,
+            'taxonomyIcons' => $showView->taxonomyIcons,
+            'taxonomyRows' => $showView->taxonomyRows,
             'seasons' => $seasons,
             'episodeCount' => $episodeCount,
             'taxonomyCount' => $taxonomyCount,
             'parsedSeasonCount' => $parsedSeasonCount,
             'selectedEpisode' => $selectedEpisode,
             'selectedMedia' => $selectedMedia,
+            'selectedMediaUrl' => $showView->selectedMediaUrl,
+            'selectedMediaFormat' => $showView->selectedMediaFormat,
+            'selectedMediaType' => $showView->selectedMediaType,
+            'selectedEpisodeMediaItems' => $showView->selectedEpisodeMediaItems,
             'mediaItems' => $mediaItems,
             'mediaCount' => $mediaCount,
+            'topTaxonomies' => $showView->topTaxonomies,
+            'showView' => $showView,
             'recommendedTitles' => $recommendedTitlesQuery
                 ->latest('indexed_at')
                 ->limit(6)

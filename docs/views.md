@@ -1,0 +1,18 @@
+# Blade-шаблоны
+
+Обновлено: 09.07.2026
+
+## Правило без inline PHP
+
+- В файлах `resources/views/**/*.blade.php` нельзя использовать `@php` и `@endphp`.
+- Blade-шаблоны должны оставаться декларативными: обычные директивы `@if`, `@foreach`, `@class`, `@isset`, компоненты и безопасный вывод `{{ }}`.
+- Request-specific данные готовятся в контроллере или action-классе.
+- Данные представления, SEO-переменные, подписи, query-string для ссылок, MIME-типы и активные состояния готовятся в `app/View/ViewData`, `app/View/ViewModels` или классах Blade-компонентов.
+- Логика модели, которая является устойчивым свойством данных, должна жить в модели, accessor/cast, enum или отдельном сервисе.
+- Проверка правила покрыта тестом `Tests\Unit\BladeTemplateTest`.
+
+## Текущая структура
+
+- `App\View\ViewData\AppLayoutData` готовит SEO, JSON-LD, метаданные и поисковые блоки для `layouts.app` через view composer в `AppServiceProvider`.
+- `App\View\ViewModels\CatalogTitlesViewModel` готовит подписи фильтров и параметры ссылок каталога.
+- `App\View\ViewModels\CatalogShowViewModel` готовит состояние страницы тайтла: группы таксономий, выбранную серию, варианты медиа, MIME-тип видео и бейджи сезонов.

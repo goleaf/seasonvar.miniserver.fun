@@ -3,6 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\CatalogTitle;
+use App\Models\Episode;
+use App\Models\LicensedMedia;
+use App\Models\Season;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -98,5 +101,53 @@ class CatalogPageTest extends TestCase
             ->assertOk()
             ->assertSeeText('Знахарь')
             ->assertDontSeeText('Другой сериал');
+    }
+
+    public function test_title_page_renders_selected_episode_media_state(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Видео сериал',
+            'slug' => 'video-serial',
+            'poster_url' => 'https://media.example.com/poster.jpg',
+        ]);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 1,
+            'title' => 'Сезон 1',
+            'episodes_released' => 2,
+            'episodes_total' => 8,
+            'translation_name' => 'Дубляж',
+            'latest_episode_released_at' => now(),
+        ]);
+        $episode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 2,
+            'title' => 'Вторая серия',
+        ]);
+        $media = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'title' => 'Видео 720p',
+            'path' => 'https://media.example.com/video.m3u8',
+            'quality' => '720p',
+            'translation_name' => 'Дубляж',
+            'format' => 'm3u8',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $response = $this->get(route('titles.show', [
+            'catalogTitle' => $catalogTitle,
+            'episode' => $episode->id,
+            'media' => $media->id,
+        ]));
+
+        $response
+            ->assertOk()
+            ->assertSeeText('Выбрана 2 серия')
+            ->assertSeeText('720P / Дубляж / M3U8')
+            ->assertSee('data-hls-src="https://media.example.com/video.m3u8"', false)
+            ->assertSee('type="application/x-mpegURL"', false);
     }
 }

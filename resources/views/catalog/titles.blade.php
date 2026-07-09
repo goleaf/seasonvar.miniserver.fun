@@ -1,111 +1,5 @@
 @extends('layouts.app', ['title' => $seo['title'] ?? 'Сериалы', 'seo' => $seo ?? []])
 
-@php
-    $typeLabels = [
-        'genre' => 'Жанры',
-        'country' => 'Страны',
-        'actor' => 'Актеры',
-        'director' => 'Режиссеры',
-        'age_rating' => 'Возраст',
-        'translation' => 'Перевод',
-        'status' => 'Статус',
-        'network' => 'Каналы',
-        'studio' => 'Студии',
-        'tag' => 'Теги',
-    ];
-    $typeIcons = [
-        'genre' => 'fa-solid fa-masks-theater',
-        'country' => 'fa-solid fa-earth-europe',
-        'actor' => 'fa-solid fa-user-group',
-        'director' => 'fa-solid fa-video',
-        'age_rating' => 'fa-solid fa-shield-halved',
-        'translation' => 'fa-solid fa-language',
-        'status' => 'fa-solid fa-signal',
-        'network' => 'fa-solid fa-tower-broadcast',
-        'studio' => 'fa-solid fa-building',
-        'tag' => 'fa-solid fa-tag',
-    ];
-    $year = $year ?? null;
-    $requestedYear = $requestedYear ?? null;
-    $invalidYear = $invalidYear ?? false;
-    $activeTaxonomies = $activeTaxonomies ?? collect();
-    $activeFilterSlugs = $activeFilterSlugs ?? [];
-    $invalidFilterSlugs = $invalidFilterSlugs ?? [];
-    $titleContext = $titleContext ?? null;
-    $baseQuery = $titleContext === null ? [] : ['title' => $titleContext->slug];
-    $allFilterSlugs = array_merge($activeFilterSlugs, $invalidFilterSlugs);
-    $filterQuery = function (string $filterType, ?string $slug = null) use ($baseQuery, $allFilterSlugs, $search, $year, $invalidYear, $requestedYear): array {
-        $query = array_merge($baseQuery, $allFilterSlugs);
-
-        if ($slug === null) {
-            unset($query[$filterType]);
-        } else {
-            $query[$filterType] = $slug;
-        }
-
-        if ($search !== '') {
-            $query['q'] = $search;
-        }
-
-        if ($year !== null) {
-            $query['year'] = $year;
-        }
-
-        if ($invalidYear) {
-            $query['year'] = $requestedYear;
-        }
-
-        return $query;
-    };
-    $withoutYearQuery = array_merge($baseQuery, $allFilterSlugs);
-    $withoutTitleQuery = $allFilterSlugs;
-
-    if ($search !== '') {
-        $withoutYearQuery['q'] = $search;
-        $withoutTitleQuery['q'] = $search;
-    }
-
-    if ($year !== null) {
-        $withoutTitleQuery['year'] = $year;
-    }
-
-    if ($invalidYear) {
-        $withoutTitleQuery['year'] = $requestedYear;
-    }
-
-    $yearQuery = function (?int $selectedYear) use ($baseQuery, $allFilterSlugs, $search): array {
-        $query = array_merge($baseQuery, $allFilterSlugs);
-
-        if ($search !== '') {
-            $query['q'] = $search;
-        }
-
-        if ($selectedYear !== null) {
-            $query['year'] = $selectedYear;
-        }
-
-        return $query;
-    };
-    $invalidFilterQuery = function (string $filterType) use ($baseQuery, $allFilterSlugs, $search, $year, $invalidYear, $requestedYear): array {
-        $query = array_merge($baseQuery, $allFilterSlugs);
-        unset($query[$filterType]);
-
-        if ($search !== '') {
-            $query['q'] = $search;
-        }
-
-        if ($year !== null) {
-            $query['year'] = $year;
-        }
-
-        if ($invalidYear) {
-            $query['year'] = $requestedYear;
-        }
-
-        return $query;
-    };
-@endphp
-
 @section('content')
     <section class="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]">
         <aside class="space-y-4">
@@ -118,18 +12,14 @@
                         </div>
                         <div class="space-y-1">
                             @forelse ($yearBuckets as $bucket)
-                                @php
-                                    $bucketYear = (int) $bucket->year;
-                                    $isActiveYear = $year === $bucketYear;
-                                @endphp
-                                <a href="{{ route('titles.index', $isActiveYear ? $yearQuery(null) : $yearQuery($bucketYear)) }}" @class([
+                                <a href="{{ route('titles.index', $filterView->isActiveYear($bucket) ? $filterView->yearQuery(null) : $filterView->yearQuery($filterView->bucketYear($bucket))) }}" @class([
                                     'flex items-center justify-between rounded-lg px-3 py-2 text-sm ring-1 transition',
-                                    'bg-emerald-50 font-bold text-emerald-700 ring-emerald-100' => $isActiveYear,
-                                    'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700' => ! $isActiveYear,
+                                    'bg-emerald-50 font-bold text-emerald-700 ring-emerald-100' => $filterView->isActiveYear($bucket),
+                                    'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveYear($bucket),
                                 ])>
                                     <span class="inline-flex min-w-0 items-center gap-2">
                                         <i class="fa-solid fa-calendar-days shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
-                                        <span>{{ $bucketYear }}</span>
+                                        <span>{{ $filterView->bucketYear($bucket) }}</span>
                                     </span>
                                     <span class="flex items-center gap-1 text-xs">
                                         <span class="font-bold">{{ $bucket->context_titles_count }}</span>
@@ -142,27 +32,21 @@
                         </div>
                     </div>
 
-                    @foreach ($typeLabels as $filterType => $label)
-                        @php
-                            $currentTaxonomy = $activeTaxonomies->get($filterType);
-                        @endphp
+                    @foreach ($filterView->typeLabels as $filterType => $label)
                         <div>
                             <div class="mb-2 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                                <i class="{{ $typeIcons[$filterType] ?? 'fa-solid fa-tag' }} text-slate-400" aria-hidden="true"></i>
+                                <i class="{{ $filterView->icon($filterType) }} text-slate-400" aria-hidden="true"></i>
                                 <span>{{ $label }}</span>
                             </div>
                             <div class="space-y-1">
                                 @forelse ($filterTaxonomies->get($filterType, collect()) as $taxonomy)
-                                    @php
-                                        $isActive = $currentTaxonomy?->id === $taxonomy->id;
-                                    @endphp
-                                    <a href="{{ route('titles.index', $filterQuery($filterType, $isActive ? null : $taxonomy->slug)) }}" @class([
+                                    <a href="{{ route('titles.index', $filterView->filterQuery($filterType, $filterView->isActiveTaxonomy($filterType, $taxonomy) ? null : $taxonomy->slug)) }}" @class([
                                         'flex items-center justify-between rounded-lg px-3 py-2 text-sm ring-1 transition',
-                                        'bg-emerald-50 font-bold text-emerald-700 ring-emerald-100' => $isActive,
-                                        'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700' => ! $isActive,
+                                        'bg-emerald-50 font-bold text-emerald-700 ring-emerald-100' => $filterView->isActiveTaxonomy($filterType, $taxonomy),
+                                        'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveTaxonomy($filterType, $taxonomy),
                                     ])>
                                         <span class="inline-flex min-w-0 items-center gap-2">
-                                            <i class="{{ $typeIcons[$filterType] ?? 'fa-solid fa-tag' }} shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
+                                            <i class="{{ $filterView->icon($filterType) }} shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
                                             <span class="truncate">{{ $taxonomy->name }}</span>
                                         </span>
                                         <span class="flex items-center gap-1 text-xs">
@@ -193,19 +77,19 @@
                             <div class="mt-3 space-y-3 text-sm">
                                 <div class="flex flex-wrap items-center gap-2">
                                     @if ($titleContext !== null)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $withoutTitleQuery)" active icon="fa-solid fa-clapperboard">Сериал: {{ $titleContext->title }} x</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutTitleQuery)" active icon="fa-solid fa-clapperboard">Сериал: {{ $titleContext->title }} x</x-ui.taxonomy-chip>
                                     @endif
                                     @if ($year !== null)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $withoutYearQuery)" active icon="fa-solid fa-calendar-days">Год: {{ $year }} x</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutYearQuery)" active icon="fa-solid fa-calendar-days">Год: {{ $year }} x</x-ui.taxonomy-chip>
                                     @endif
                                     @if ($invalidYear)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $withoutYearQuery)" active icon="fa-solid fa-calendar-days">Год: {{ $requestedYear }} не найден</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutYearQuery)" active icon="fa-solid fa-calendar-days">Год: {{ $requestedYear }} не найден</x-ui.taxonomy-chip>
                                     @endif
                                     @foreach ($activeTaxonomies as $filterType => $taxonomy)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterQuery($filterType, null))" :icon="$typeIcons[$filterType] ?? 'fa-solid fa-tag'" active>{{ $typeLabels[$filterType] ?? $filterType }}: {{ $taxonomy->name }} x</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->filterQuery($filterType, null))" :icon="$filterView->icon($filterType)" active>{{ $filterView->label($filterType) }}: {{ $taxonomy->name }} x</x-ui.taxonomy-chip>
                                     @endforeach
                                     @foreach ($invalidFilterSlugs as $filterType => $slug)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $invalidFilterQuery($filterType))" :icon="$typeIcons[$filterType] ?? 'fa-solid fa-tag'" active>{{ $typeLabels[$filterType] ?? $filterType }}: {{ $slug }} не найден</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->invalidFilterQuery($filterType))" :icon="$filterView->icon($filterType)" active>{{ $filterView->label($filterType) }}: {{ $slug }} не найден</x-ui.taxonomy-chip>
                                     @endforeach
                                 </div>
                                 <div class="flex flex-wrap gap-3 text-slate-500">

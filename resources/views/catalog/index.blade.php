@@ -1,9 +1,5 @@
 @extends('layouts.app', ['title' => $seo['title'] ?? 'Сериалы тут', 'seo' => $seo ?? []])
 
-@php
-    $latestByDate = $latestTitles->groupBy(fn ($catalogTitle) => $catalogTitle->indexed_at?->format('d.m.Y') ?? now()->format('d.m.Y'));
-@endphp
-
 @section('content')
     <div class="space-y-5">
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
