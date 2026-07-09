@@ -13,7 +13,7 @@
             <x-stat label="В очереди" :value="$stats['pendingPages']" />
         </div>
 
-        <section class="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)_320px]">
+        <section class="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_minmax(420px,520px)] 2xl:grid-cols-[280px_minmax(0,1fr)_minmax(520px,620px)]">
             <aside class="space-y-4 lg:order-1">
                 <x-ui.panel title="Навигация">
                     <nav class="space-y-2">
@@ -82,7 +82,7 @@
                 <x-ui.panel title="Новые серии" subtitle="Последние страницы с постерами" :pad="false">
                     <div class="divide-y divide-slate-200">
                         @forelse ($posterTitles as $posterTitle)
-                            <x-title-list-row :title="$posterTitle" compact :show-description="false" />
+                            <x-title-list-row :title="$posterTitle" readable />
                         @empty
                             <p class="p-3 text-sm text-slate-500">Постеры появятся после синхронизации.</p>
                         @endforelse

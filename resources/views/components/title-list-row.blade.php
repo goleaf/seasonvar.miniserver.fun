@@ -1,4 +1,4 @@
-@props(['title', 'compact' => false, 'showDescription' => true])
+@props(['title', 'compact' => false, 'showDescription' => true, 'readable' => false])
 
 @php
     $seasonsCount = (int) ($title->seasons_count ?? ($title->relationLoaded('seasons') ? $title->seasons->count() : 0));
@@ -15,9 +15,15 @@
         <div class="min-w-0 flex-1">
             <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                 <div class="min-w-0">
-                    <span class="line-clamp-2 font-bold leading-5 text-slate-700">{{ $title->title }}</span>
+                    <span @class([
+                        'font-bold leading-5 text-slate-700',
+                        'line-clamp-2' => ! $readable,
+                    ])>{{ $title->title }}</span>
                     @if ($title->original_title)
-                        <span class="line-clamp-1 text-sm text-slate-500">{{ $title->original_title }}</span>
+                        <span @class([
+                            'text-sm text-slate-500',
+                            'line-clamp-1' => ! $readable,
+                        ])>{{ $title->original_title }}</span>
                     @endif
                     @if ($latestSeason)
                         <span class="text-sm text-slate-500">Сезон {{ $latestSeason->number }}</span>
@@ -40,7 +46,11 @@
             </div>
 
             @if ($showDescription && $title->description)
-                <p class="mt-2 line-clamp-2 text-sm leading-5 text-slate-500">{{ $title->description }}</p>
+                <p @class([
+                    'mt-2 text-sm leading-5 text-slate-500',
+                    'line-clamp-2' => ! $readable,
+                    'line-clamp-3' => $readable,
+                ])>{{ $title->description }}</p>
             @endif
         </div>
     </div>

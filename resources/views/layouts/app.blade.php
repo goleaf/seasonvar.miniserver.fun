@@ -8,11 +8,11 @@
     </head>
     <body class="min-h-screen bg-slate-50 text-slate-700 antialiased">
         <header class="border-b border-slate-200 bg-white shadow-sm shadow-slate-200/70">
-            <div class="mx-auto max-w-7xl px-4 py-2 text-xs text-slate-500 sm:px-6 lg:px-8">
+            <div class="mx-auto max-w-[1760px] px-4 py-2 text-xs text-slate-500 sm:px-6 lg:px-8">
                 <span class="font-semibold text-emerald-700">Каталог сериалов</span>
             </div>
 
-            <div class="mx-auto flex max-w-7xl flex-col gap-3 px-3 pb-4 sm:px-6 lg:flex-row lg:items-center lg:px-8">
+            <div class="mx-auto flex max-w-[1760px] flex-col gap-3 px-3 pb-4 sm:px-6 lg:flex-row lg:items-center lg:px-8">
                 <a href="{{ route('home') }}" class="flex min-w-0 items-center gap-3">
                     <span class="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-emerald-50 text-xl font-black text-emerald-700 ring-1 ring-emerald-100 sm:h-12 sm:w-12">К</span>
                     <span>
@@ -33,7 +33,7 @@
             </div>
         </header>
 
-        <main class="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
+        <main class="mx-auto max-w-[1760px] px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
             @yield('content')
         </main>
     </body>
