@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\CatalogTitle;
 use App\Models\Season;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -18,7 +19,9 @@ class SeasonFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'catalog_title_id' => CatalogTitle::factory(),
+            'number' => fake()->numberBetween(1, 12),
+            'title' => 'Season '.fake()->numberBetween(1, 12),
         ];
     }
 }

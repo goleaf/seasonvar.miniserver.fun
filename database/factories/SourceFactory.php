@@ -18,7 +18,12 @@ class SourceFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'code' => fake()->unique()->slug(2),
+            'name' => fake()->company(),
+            'base_url' => fake()->url(),
+            'is_active' => true,
+            'crawl_delay_seconds' => 3,
+            'settings' => [],
         ];
     }
 }
