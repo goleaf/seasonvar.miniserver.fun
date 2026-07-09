@@ -1,13 +1,3 @@
-@props(['title', 'compact' => false, 'showDescription' => true, 'readable' => false])
-
-@php
-    $seasonsCount = (int) ($title->seasons_count ?? ($title->relationLoaded('seasons') ? $title->seasons->count() : 0));
-    $episodesCount = (int) ($title->episodes_count ?? 0);
-    $latestSeason = $title->relationLoaded('seasons') ? $title->seasons->sortByDesc('number')->first() : null;
-    $posterClass = $compact ? 'h-24 w-16' : 'h-20 w-14 sm:h-24 sm:w-16';
-    $baseClass = $compact ? 'block p-3 hover:bg-emerald-50' : 'block px-4 py-3 hover:bg-emerald-50';
-@endphp
-
 <a href="{{ route('titles.show', $title) }}" {{ $attributes->merge(['class' => $baseClass]) }}>
     <div class="flex min-w-0 gap-3">
         <x-title-poster :title="$title" class="{{ $posterClass }} shrink-0" empty-class="grid h-full place-items-center px-2 text-center text-[10px] font-semibold text-slate-400" />

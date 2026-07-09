@@ -1,17 +1,3 @@
-@props(['title'])
-
-@php
-    $seasonsCount = (int) ($title->seasons_count ?? ($title->relationLoaded('seasons') ? $title->seasons->count() : 0));
-    $episodesCount = (int) ($title->episodes_count ?? 0);
-    $cardRelations = collect()
-        ->merge($title->relationLoaded('genres') ? $title->genres : collect())
-        ->merge($title->relationLoaded('countries') ? $title->countries : collect())
-        ->merge($title->relationLoaded('ageRatings') ? $title->ageRatings : collect())
-        ->merge($title->relationLoaded('translations') ? $title->translations : collect())
-        ->merge($title->relationLoaded('tags') ? $title->tags : collect())
-        ->take(3);
-@endphp
-
 <a href="{{ route('titles.show', $title) }}" class="group flex h-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-200/60 transition hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100">
     <x-title-poster :title="$title" class="aspect-[2/3] rounded-none bg-white" image-class="h-full w-full object-contain" empty-class="flex h-full items-center justify-center text-sm text-slate-400" />
 

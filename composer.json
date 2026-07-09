@@ -1,9 +1,9 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "seasonvar/catalog",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
+    "description": "Laravel catalog application for Seasonvar series, seasons, episodes, metadata, SEO endpoints, and external video links.",
+    "keywords": ["laravel", "seasonvar", "catalog", "series"],
     "license": "MIT",
     "require": {
         "php": "^8.3",
