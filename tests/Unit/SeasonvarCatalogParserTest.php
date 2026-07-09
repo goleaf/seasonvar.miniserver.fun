@@ -18,8 +18,10 @@ class SeasonvarCatalogParserTest extends TestCase
                 <head><title>6 кадров 2 сезон смотреть онлайн</title></head>
                 <body>
                     <h1>6 кадров 2 сезон</h1>
-                    <a href="/serial-1276--6_kadrov-1-season.html">1 сезон</a>
-                    <a href="/serial-1277--6_kadrov-2-season.html">2 сезон</a>
+                    <div class="pgs-seaslist">
+                        <a href="/serial-1276--6_kadrov-1-season.html">1 сезон</a>
+                        <a href="/serial-1277--6_kadrov-2-season.html">2 сезон</a>
+                    </div>
                     <script>
                         var arEpisodes = [{"1_seriya":{"n":"1","next":"2"},"":{"next":"1"},"2_seriya":{"n":"2"}}];
                     </script>

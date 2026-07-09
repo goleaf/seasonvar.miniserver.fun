@@ -219,7 +219,7 @@ class SeasonvarCatalogParser
     {
         $seasons = [];
 
-        foreach ($xpath->query('//a[@href]') ?: [] as $node) {
+        foreach ($xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " pgs-seaslist ")]//a[@href]') ?: [] as $node) {
             $href = $node->attributes?->getNamedItem('href')?->nodeValue;
             $text = trim($node->textContent);
             $number = ($href !== null ? $this->seasonNumberFromUrl($href) : null) ?? $this->seasonNumber($text);
