@@ -133,6 +133,7 @@ class ParseSeasonvarPage extends Command
             ->pluck('source_url')
             ->filter()
             ->unique()
+            ->filter(fn (string $seasonUrl): bool => $this->isDirectSeasonvarSeasonUrl($seasonUrl))
             ->take($seasonLimit)
             ->values() ?? collect();
 
@@ -141,6 +142,21 @@ class ParseSeasonvarPage extends Command
         foreach ($seasonUrls as $seasonUrl) {
             $this->parseUrl($importer, (string) $seasonUrl, $progress, $parsedUrls);
         }
+    }
+
+    private function isDirectSeasonvarSeasonUrl(string $url): bool
+    {
+        $parts = parse_url($url);
+
+        if (! is_array($parts) || ! isset($parts['host'])) {
+            return false;
+        }
+
+        $host = strtolower($parts['host']);
+        $path = $parts['path'] ?? '';
+
+        return in_array($host, ['seasonvar.ru', 'www.seasonvar.ru'], true)
+            && preg_match('~^/serial-\d+-[^/]+-\d+-season\.html$~iu', $path) === 1;
     }
 
     private function catalogTitleForPage(SourcePage $page): ?CatalogTitle
