@@ -2,15 +2,23 @@
 
 Laravel-приложение для локального каталога сериалов, сезонов, серий, постеров, связей каталога, отзывов и внешних видео-ссылок.
 
+## Версии
+
+- Laravel 13.19 на PHP 8.5.
+- Laravel Boost 2.4 и Laravel MCP 0.8 используются для локальной документации и MCP-подсказок.
+- PHPUnit 12.5 используется для тестов; Pest в проекте не установлен.
+
 ## Основные команды
 
 ```bash
+composer install
 php artisan seasonvar:import
 php artisan seasonvar:import "https://seasonvar.ru/serial-615--Bez_sleda_pssmtlk-1-season.html" --force
 php artisan seasonvar:import --forever
 php artisan project:docs-refresh
 php artisan test --compact
 vendor/bin/pint --dirty --format agent
+npm run build
 ```
 
 ## Импорт
@@ -32,6 +40,10 @@ vendor/bin/pint --dirty --format agent
 Если на странице найден HLS master playlist, импорт пробует сохранить отдельные варианты качества для той же серии.
 
 Трейлеры и анонсы сохраняются как медиа карточки или сезона даже тогда, когда у них нет номера серии.
+
+## Laravel 13
+
+Проект уже обновлен и проверен на Laravel 13. Подробности по зависимостям, MCP и проверкам описаны в `docs/upgrade.md`.
 
 <!-- project-docs:start -->
 ## Автоматически обновляемое состояние
