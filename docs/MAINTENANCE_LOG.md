@@ -2,6 +2,7 @@
 
 ## 2026-07-09
 
+- Добавлен GitHub Actions CI workflow: backend проверяет Composer, Pint, PHP syntax lint, Laravel cache-команды и тесты; frontend выполняет `npm ci`, `npm audit` и `npm run build` через официальный npm registry.
 - Добавлена authorization-граница для служебной статистики: `/stats` защищен gate `viewCatalogStats` через route `can` middleware, публичные страницы каталога оставлены гостевыми, добавлены allowed/denied tests и документация `docs/authorization.md`.
 - Валидация публичных query-параметров каталога оформлена через Laravel Form Request-классы: `CatalogTitlesRequest` получил правила для фильтров, `CatalogShowRequest` проверяет выбранную серию/медиа, slug-фильтры вынесены в reusable Rule, а типы фильтров — в enum; добавлена документация `docs/validation.md`.
 - Оптимизирована карта посадочных страниц: пары справочник/год для `sitemap-landings.xml` считаются grouped join-запросами по pivot-таблицам вместо `exists()` в цикле; добавлена документация `docs/performance.md` и regression test на количество запросов.

@@ -1,0 +1,50 @@
+# CI
+
+Обновлено: 09.07.2026
+
+## Workflow
+
+GitHub Actions workflow находится в `.github/workflows/ci.yml` и запускается для `push`, `pull_request` в `main`, а также вручную через `workflow_dispatch`.
+
+## Backend
+
+Backend job использует PHP 8.5 и выполняет:
+
+```bash
+composer install --no-interaction --prefer-dist --no-progress
+composer validate --strict
+composer audit
+./vendor/bin/pint --test --format=github
+find app bootstrap config database routes tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+php artisan config:clear
+php artisan route:clear
+php artisan view:clear
+php artisan test
+```
+
+Тесты используют SQLite в памяти через `phpunit.xml`; workflow не требует отдельного database service.
+
+## Frontend
+
+Frontend job использует Node 26 и выполняет:
+
+```bash
+npm ci
+npm audit --audit-level=high
+npm run build
+```
+
+`NPM_CONFIG_REGISTRY` явно задан как `https://registry.npmjs.org/`, чтобы security audit работал через официальный npm registry.
+
+## Caching
+
+- Composer кеширует только download-cache Composer, ключ зависит от `composer.lock`.
+- npm кешируется через `actions/setup-node`, ключ зависит от `package-lock.json`.
+- `vendor` и `node_modules` не кешируются и не коммитятся.
+
+## Static Analysis
+
+PHPStan, Larastan и Rector пока не установлены. CI выполняет доступную статическую проверку синтаксиса через `php -l` и форматирование через Pint.

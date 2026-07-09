@@ -13,7 +13,7 @@
 - PHPUnit 12.5; Pest не установлен.
 - Tailwind CSS 4.3 с Vite 8, локальными FontAwesome, Plyr и HLS-ресурсами.
 - В проекте есть read-only JSON API в `routes/api.php` для опубликованных карточек каталога и Laravel API Resources для форматирования ответов. Политик приложения, событий, слушателей, писем и уведомлений сейчас нет. Публичные query-параметры каталога проверяются Form Request-классами, а служебная статистика защищена gate.
-- CI-файлы не найдены.
+- GitHub Actions workflow находится в `.github/workflows/ci.yml` и проверяет Composer, Pint, Laravel tests, PHP syntax lint, npm audit/build и dependency audits.
 
 ## MCP
 
@@ -67,7 +67,7 @@ args = ["artisan", "boost:mcp", "--env=local"]
 
 ## Низкий приоритет
 
-- CI workflow отсутствует. Минимальный набор: `composer validate`, Pint, `php artisan test`, `npm run build`.
+- CI workflow добавлен. При расширении набора инструментов стоит подключить PHPStan/Larastan или Rector отдельным шагом.
 - В `composer.json` нет команд статического анализа или Rector. PHPStan/Larastan или Rector стоит добавлять только когда будет готовность поддерживать базовый уровень проверок.
 - [resources/views/catalog/index.blade.php](/www/wwwroot/seasonvar.miniserver.fun/resources/views/catalog/index.blade.php:3) все еще группирует последние тайтлы внутри Blade. При следующей чистке главной каталога это стоит перенести в контроллер или небольшой view model.
 - API пока ограничен read-only карточками тайтлов. Перед write/admin/moderation/import-control JSON endpoints нужно добавить отдельную авторизацию, Form Requests и явные ресурсы ответа.

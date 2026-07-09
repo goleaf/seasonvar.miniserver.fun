@@ -2,6 +2,7 @@
 
 ## 2026-07-09
 
+- Added a GitHub Actions CI workflow for Composer, Pint, Laravel tests, PHP syntax linting, npm audit/build, and dependency audits.
 - Documented deployment environment requirements, expanded non-secret `.env.example` defaults, and added a regression test that keeps `env()` calls inside config files.
 - Improved the Vite frontend build by using one app entry, lazy-loading Plyr/HLS player assets, loading generated Vite fonts, and documenting frontend commands.
 - Added a read-only catalog titles JSON API with explicit Laravel API Resources, eager-loaded relationships, pagination metadata, and sensitive-field regression tests.
