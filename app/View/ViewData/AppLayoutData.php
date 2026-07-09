@@ -24,6 +24,10 @@ class AppLayoutData
         $seoDescription = trim((string) ($seo['description'] ?? 'Каталог сериалов онлайн с фильтрами по жанрам, странам, актерам, годам, сезонам и сериям.'));
         $seoDescription = preg_replace('/\s+/u', ' ', strip_tags($seoDescription)) ?: $seoDescription;
         $canonicalUrl = $seo['canonical'] ?? url()->current();
+        $layoutSearchValue = request()->query('q', '');
+        $layoutSearchQuery = is_scalar($layoutSearchValue)
+            ? mb_substr(Str::squish((string) $layoutSearchValue), 0, 160)
+            : '';
         $seoSearchContext = collect($seo['search_context'] ?? []);
         $seoSearchContextTitle = trim((string) $seoSearchContext->get('title', ''));
         $seoSearchContextSlug = trim((string) $seoSearchContext->get('slug', ''));
@@ -1543,7 +1547,7 @@ class AppLayoutData
         }
 
         $data = get_defined_vars();
-        unset($data['viewData'], $data['data']);
+        unset($data['viewData'], $data['data'], $data['layoutSearchValue']);
 
         return $data;
     }

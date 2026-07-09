@@ -10,6 +10,41 @@ class CatalogValidationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_catalog_search_form_filters_results_and_renders_normalized_query(): void
+    {
+        CatalogTitle::factory()->create([
+            'slug' => 'znaxar',
+            'title' => 'Знахарь',
+            'description' => 'Медицинская драма',
+        ]);
+        CatalogTitle::factory()->create([
+            'slug' => 'drugoi-serial',
+            'title' => 'Другой сериал',
+            'description' => 'Описание без точного совпадения',
+        ]);
+
+        $this
+            ->get(route('titles.index', ['q' => '  Знахарь   ']))
+            ->assertOk()
+            ->assertSeeText('Знахарь')
+            ->assertSee('value="Знахарь"', false)
+            ->assertDontSeeText('Другой сериал');
+    }
+
+    public function test_catalog_search_form_shows_validation_error_and_preserves_old_input(): void
+    {
+        $longSearch = str_repeat('я', 161);
+
+        $this
+            ->followingRedirects()
+            ->from(route('titles.index'))
+            ->get(route('titles.index', ['q' => $longSearch]))
+            ->assertOk()
+            ->assertSeeText('Поисковый запрос слишком длинный.')
+            ->assertSee('aria-invalid="true"', false)
+            ->assertSee('value="'.$longSearch.'"', false);
+    }
+
     public function test_catalog_filter_request_rejects_malformed_filter_slug(): void
     {
         $this

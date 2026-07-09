@@ -140,17 +140,14 @@
                         @if ($sort !== 'updated')
                             <input type="hidden" name="sort" value="{{ $sort }}">
                         @endif
-                        <div class="relative min-w-0 flex-1">
-                            <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
-                                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                            </span>
-                            <input
-                                name="q"
-                                value="{{ $search }}"
-                                placeholder="Название, описание или тег"
-                                class="w-full min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 pl-9 text-sm text-slate-700 placeholder:text-slate-400 focus:border-emerald-300 focus:outline-none"
-                            >
-                        </div>
+                        <x-form.search-field
+                            id="catalog-search"
+                            name="q"
+                            :value="$search"
+                            label="Поиск по каталогу"
+                            placeholder="Название, описание или тег"
+                            container-class="min-w-0 flex-1"
+                        />
                         <button class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-100">
                             <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
                             <span>Найти</span>

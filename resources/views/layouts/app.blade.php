@@ -172,12 +172,19 @@
                     </span>
                 </a>
 
-                <form action="{{ route('titles.index') }}" method="GET" class="flex min-w-0 w-full flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white lg:mx-6">
-                    <span class="flex shrink-0 items-center pl-4 text-slate-400">
-                        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                    </span>
-                    <input type="search" name="q" value="{{ request('q') }}" placeholder="Поиск сериала..." class="min-w-0 flex-1 border-0 px-3 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400">
-                    <button type="submit" class="inline-flex shrink-0 items-center gap-2 bg-emerald-50 px-4 text-sm font-bold text-emerald-700 hover:bg-emerald-100 sm:px-5">
+                <form action="{{ route('titles.index') }}" method="GET" class="flex min-w-0 w-full flex-1 items-start gap-2 lg:mx-6">
+                    <x-form.search-field
+                        id="site-search"
+                        name="q"
+                        :value="$layoutSearchQuery"
+                        label="Поиск сериала"
+                        placeholder="Поиск сериала..."
+                        container-class="min-w-0 flex-1"
+                        frame-class="flex min-w-0 items-center overflow-hidden rounded-lg border bg-white shadow-sm shadow-slate-200/40"
+                        icon-class="flex shrink-0 items-center pl-4 text-slate-400"
+                        input-class="min-w-0 flex-1 border-0 bg-transparent px-3 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                    />
+                    <button type="submit" class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-100 sm:px-5">
                         <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
                         <span>Найти</span>
                     </button>

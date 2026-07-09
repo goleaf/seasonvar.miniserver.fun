@@ -2,6 +2,7 @@
 
 ## 2026-07-09
 
+- Improved catalog search form UX with reusable Blade form components, visible validation errors, and preserved old input after validation redirects.
 - Cleaned up Eloquent relationship inverses for catalog source pages and Seasonvar import runs, added schema-aligned casts, and documented model query rules in `docs/models.md`.
 - Synchronized Markdown documentation with the current Laravel 13 routes, setup, MCP, deployment, testing, API, Blade, and CI conventions.
 - Added a GitHub Actions CI workflow for Composer, Pint, Laravel tests, PHP syntax linting, npm audit/build, and dependency audits.

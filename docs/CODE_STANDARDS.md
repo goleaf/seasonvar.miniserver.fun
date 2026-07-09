@@ -12,6 +12,7 @@
 - `docs/architecture.md` для текущего деления контроллеров, page-builder сервисов, запросов и SEO.
 - `docs/UI_STANDARDS.md` для правил интерфейса и Blade-компонентов.
 - `docs/views.md` для правил Blade-шаблонов и view-model/view-data слоя.
+- `docs/forms.md` для Form Request, old input, ошибок и компонентных правил форм.
 - `docs/authorization.md` для gates, policies, middleware и правил доступа к служебным страницам.
 - `docs/validation.md` для Form Request-классов, правил ввода и reusable validation rules.
 - `docs/DATA_RELATIONS.md` для полей импортера, Eloquent-связей, фильтров и смысла данных.
