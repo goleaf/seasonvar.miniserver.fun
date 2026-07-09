@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
@@ -27,16 +28,16 @@ use Throwable;
 class CatalogSitemapResponder
 {
     private const FILTER_RELATIONS = [
-        'genre' => ['model' => Genre::class],
-        'country' => ['model' => Country::class],
-        'actor' => ['model' => Actor::class],
-        'director' => ['model' => Director::class],
-        'age_rating' => ['model' => AgeRating::class],
-        'translation' => ['model' => Translation::class],
-        'status' => ['model' => CatalogStatus::class],
-        'network' => ['model' => Network::class],
-        'studio' => ['model' => Studio::class],
-        'tag' => ['model' => Tag::class],
+        'genre' => ['model' => Genre::class, 'relation' => 'genres'],
+        'country' => ['model' => Country::class, 'relation' => 'countries'],
+        'actor' => ['model' => Actor::class, 'relation' => 'actors'],
+        'director' => ['model' => Director::class, 'relation' => 'directors'],
+        'age_rating' => ['model' => AgeRating::class, 'relation' => 'ageRatings'],
+        'translation' => ['model' => Translation::class, 'relation' => 'translations'],
+        'status' => ['model' => CatalogStatus::class, 'relation' => 'statuses'],
+        'network' => ['model' => Network::class, 'relation' => 'networks'],
+        'studio' => ['model' => Studio::class, 'relation' => 'studios'],
+        'tag' => ['model' => Tag::class, 'relation' => 'tags'],
     ];
 
     private const SITEMAP_PAGE_SIZE = 10000;
@@ -130,33 +131,77 @@ class CatalogSitemapResponder
             foreach ($this->landingFilterTypes() as $filterType) {
                 $modelClass = self::FILTER_RELATIONS[$filterType]['model'];
 
-                $modelClass::query()
+                $taxonomies = $modelClass::query()
                     ->select(['id', 'slug'])
                     ->withCount(['catalogTitles as catalog_titles_count' => fn (Builder $query): Builder => $query->where('is_published', true)])
                     ->whereHas('catalogTitles', fn (Builder $query): Builder => $query->where('is_published', true))
                     ->orderByDesc('catalog_titles_count')
                     ->limit(80)
-                    ->get()
-                    ->each(function (Model $taxonomy) use ($filterType, $years): void {
-                        foreach ($years as $year) {
-                            $hasTitlesForYear = $taxonomy
-                                ->catalogTitles()
-                                ->where('is_published', true)
-                                ->where('year', $year)
-                                ->exists();
+                    ->get();
+                $yearsByTaxonomyId = $this->landingYearsByTaxonomy($filterType, $taxonomies->pluck('id'), $years);
 
-                            if (! $hasTitlesForYear) {
-                                continue;
-                            }
+                $taxonomies->each(function (Model $taxonomy) use ($filterType, $years, $yearsByTaxonomyId): void {
+                    $taxonomyYears = $yearsByTaxonomyId->get((int) $taxonomy->getKey(), collect());
 
-                            $url = route('titles.taxonomy', ['type' => $filterType, 'taxonomy' => $taxonomy->slug]).'?year='.$year;
-                            $this->writeSitemapUrl($url, now(), 'weekly', '0.65');
+                    if ($taxonomyYears->isEmpty()) {
+                        return;
+                    }
+
+                    $taxonomyYearLookup = $taxonomyYears->flip();
+
+                    foreach ($years as $year) {
+                        if (! $taxonomyYearLookup->has($year)) {
+                            continue;
                         }
-                    });
+
+                        $url = route('titles.taxonomy', ['type' => $filterType, 'taxonomy' => $taxonomy->slug]).'?year='.$year;
+                        $this->writeSitemapUrl($url, now(), 'weekly', '0.65');
+                    }
+                });
             }
 
             echo '</urlset>'."\n";
         }, 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
+    }
+
+    /**
+     * @param  Collection<int, int|string>  $taxonomyIds
+     * @param  Collection<int, int>  $years
+     * @return Collection<int, Collection<int, int>>
+     */
+    private function landingYearsByTaxonomy(string $filterType, Collection $taxonomyIds, Collection $years): Collection
+    {
+        $taxonomyIds = $taxonomyIds
+            ->map(fn (mixed $id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->values();
+
+        if ($taxonomyIds->isEmpty() || $years->isEmpty()) {
+            return collect();
+        }
+
+        $catalogTitleTable = (new CatalogTitle)->getTable();
+        $catalogTitleRelation = (new CatalogTitle)->{self::FILTER_RELATIONS[$filterType]['relation']}();
+        $pivotTable = $catalogTitleRelation->getTable();
+        $titlePivotKey = $catalogTitleRelation->getForeignPivotKeyName();
+        $relatedPivotKey = $catalogTitleRelation->getRelatedPivotKeyName();
+
+        return DB::table($pivotTable)
+            ->join($catalogTitleTable, $catalogTitleTable.'.id', '=', $pivotTable.'.'.$titlePivotKey)
+            ->where($catalogTitleTable.'.is_published', true)
+            ->whereIn($pivotTable.'.'.$relatedPivotKey, $taxonomyIds)
+            ->whereIn($catalogTitleTable.'.year', $years)
+            ->select([
+                $pivotTable.'.'.$relatedPivotKey.' as taxonomy_id',
+                $catalogTitleTable.'.year as year',
+            ])
+            ->groupBy($pivotTable.'.'.$relatedPivotKey, $catalogTitleTable.'.year')
+            ->get()
+            ->groupBy(fn (object $row): int => (int) $row->taxonomy_id)
+            ->map(fn (Collection $rows): Collection => $rows
+                ->pluck('year')
+                ->map(fn (mixed $year): int => (int) $year)
+                ->values());
     }
 
     public function titles(int $page): StreamedResponse

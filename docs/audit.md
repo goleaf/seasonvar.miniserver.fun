@@ -33,6 +33,7 @@ args = ["artisan", "boost:mcp", "--env=local"]
 - В не-production окружении включены проверки Eloquent на ленивую загрузку связей и тихо отброшенные атрибуты через `AppServiceProvider`.
 - Общие метаданные стартового шаблона Laravel в `composer.json` заменены на метаданные проекта.
 - Добавлен этот audit-документ и разрешено отслеживание существующей настройки Laravel Boost MCP.
+- Посадочные страницы sitemap больше не выполняют `exists()` для каждой пары справочник/год; реальные пары считаются grouped join-запросами по pivot-таблицам и покрыты query-count regression test.
 
 ## Проверка
 
@@ -57,7 +58,6 @@ args = ["artisan", "boost:mcp", "--env=local"]
 
 ## Средний приоритет
 
-- [app/Services/Catalog/CatalogSitemapResponder.php](/www/wwwroot/seasonvar.miniserver.fun/app/Services/Catalog/CatalogSitemapResponder.php:122) может выполнять много `exists()`-проверок при сборке посадочных страниц карты сайта. Перед ростом каталога лучше заменить это grouped counts или заранее собранными парами taxonomy/year.
 - [app/Services/Seasonvar/SeasonvarTitleMerger.php](/www/wwwroot/seasonvar.miniserver.fun/app/Services/Seasonvar/SeasonvarTitleMerger.php:82) загружает все тайтлы в память перед группировкой дублей. Для большого каталога лучше перейти на группировку кандидатных дублей в базе или chunk-обработку.
 - Поиск в `CatalogController::applySearchFilter()` использует несколько `LIKE` с ведущим `%` и повторные `orWhereHas()` по связям. Для маленькой базы это нормально, но при росте каталога стоит рассмотреть SQLite FTS или отдельную поисковую таблицу.
 - Снимки страниц источника хранят raw HTML. Они должны оставаться непубличными; нужна политика retention/cleanup и запрет на вывод таких данных через будущие API или диагностику.

@@ -3,8 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\CatalogTitle;
+use App\Models\Country;
+use App\Models\Genre;
 use App\Models\LicensedMedia;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class SitemapAndRobotsTest extends TestCase
@@ -117,6 +121,55 @@ class SitemapAndRobotsTest extends TestCase
         $this->assertStringContainsString('<video:video>', $content);
         $this->assertStringContainsString('https://media.example.com/serial/s01e02.mp4', $content);
         $this->assertStringNotContainsString('licensed/local-video.mp4', $content);
+    }
+
+    public function test_landing_sitemap_uses_grouped_taxonomy_year_queries(): void
+    {
+        $genres = collect(range(1, 8))->map(fn (int $number): Genre => Genre::query()->create([
+            'name' => 'Жанр '.$number,
+            'slug' => 'zhanr-'.$number,
+        ]));
+        $countries = collect(range(1, 8))->map(fn (int $number): Country => Country::query()->create([
+            'name' => 'Страна '.$number,
+            'slug' => 'strana-'.$number,
+        ]));
+
+        $genres->each(function (Genre $genre, int $index) use ($countries): void {
+            $title = CatalogTitle::factory()->create([
+                'slug' => 'landing-title-'.$index,
+                'title' => 'Посадочная карточка '.$index,
+                'year' => 2020 + ($index % 4),
+                'is_published' => true,
+            ]);
+
+            $title->genres()->attach($genre);
+            $title->countries()->attach($countries->get($index));
+        });
+
+        $draft = CatalogTitle::factory()->create([
+            'slug' => 'landing-draft',
+            'title' => 'Черновик посадочной',
+            'year' => 2026,
+            'is_published' => false,
+        ]);
+        $draft->genres()->attach($genres->first());
+
+        $queries = [];
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            $queries[] = $query->sql;
+        });
+
+        $response = $this->get('/sitemap-landings.xml');
+
+        $response->assertOk();
+        $response->assertStreamed();
+
+        $content = $response->streamedContent();
+
+        $this->assertStringContainsString('/titles/genre/zhanr-1?year=2020', $content);
+        $this->assertStringContainsString('/titles/country/strana-2?year=2021', $content);
+        $this->assertStringNotContainsString('/titles/genre/zhanr-1?year=2026', $content);
+        $this->assertLessThanOrEqual(14, count($queries), 'Landing sitemap should not execute one query per taxonomy/year pair.');
     }
 
     public function test_public_robots_declares_only_stable_sitemap_index(): void

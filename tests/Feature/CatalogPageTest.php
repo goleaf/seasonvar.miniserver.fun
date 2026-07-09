@@ -21,6 +21,54 @@ class CatalogPageTest extends TestCase
         $response->assertDontSeeText('Состояние базы');
     }
 
+    public function test_stats_page_shows_database_statistics_without_raw_source_urls(): void
+    {
+        $sourceUrl = 'https://seasonvar.ru/serial-777-Skrytyj_url-1-season.html';
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Статистический сериал',
+            'slug' => 'statisticheskii-serial',
+            'source_url' => $sourceUrl,
+            'source_url_hash' => hash('sha256', $sourceUrl),
+        ]);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 1,
+            'episodes_total' => 8,
+            'episodes_released' => 2,
+        ]);
+        $episode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 1,
+            'released_at' => now(),
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'title' => 'Видео 1080p',
+            'path' => 'https://media.example.com/video.m3u8',
+            'quality' => '1080p',
+            'format' => 'm3u8',
+            'status' => 'published',
+            'check_status' => 'available',
+            'checked_at' => now(),
+            'published_at' => now(),
+        ]);
+
+        $response = $this->get(route('stats'));
+
+        $response
+            ->assertOk()
+            ->assertSeeText('Сводка каталога')
+            ->assertSeeText('Карточек каталога')
+            ->assertSeeText('Сезоны и серии')
+            ->assertSeeText('Видео')
+            ->assertSeeText('Разделы базы')
+            ->assertDontSee('catalog_titles', false)
+            ->assertDontSeeText('Сводка каталога смотреть онлайн')
+            ->assertDontSee($sourceUrl, false);
+    }
+
     public function test_titles_page_shows_posters_without_cropping_in_equal_size_area(): void
     {
         CatalogTitle::factory()->create([

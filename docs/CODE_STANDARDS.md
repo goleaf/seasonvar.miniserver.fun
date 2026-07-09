@@ -13,6 +13,7 @@
 - `docs/UI_STANDARDS.md` для правил интерфейса и Blade-компонентов.
 - `docs/views.md` для правил Blade-шаблонов и view-model/view-data слоя.
 - `docs/DATA_RELATIONS.md` для полей импортера, Eloquent-связей, фильтров и смысла данных.
+- `docs/performance.md` для query patterns, N+1-рисков, sitemap/feed и агрегированных счетчиков.
 - `docs/MAINTENANCE_LOG.md` для короткого датированного описания важных изменений.
 
 ## Правила Laravel

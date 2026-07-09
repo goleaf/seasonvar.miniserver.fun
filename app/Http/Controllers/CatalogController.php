@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\CatalogTitlesRequest;
 use App\Models\CatalogTitle;
 use App\Services\Catalog\CatalogHomePageBuilder;
+use App\Services\Catalog\CatalogStatsPageBuilder;
 use App\Services\Catalog\CatalogTitlePageBuilder;
 use App\Services\Catalog\CatalogTitlesPageBuilder;
 use Illuminate\Http\Request;
@@ -16,6 +17,7 @@ class CatalogController extends Controller
         private readonly CatalogHomePageBuilder $homePage,
         private readonly CatalogTitlesPageBuilder $titlesPage,
         private readonly CatalogTitlePageBuilder $titlePage,
+        private readonly CatalogStatsPageBuilder $statsPage,
     ) {}
 
     public function index(): View
@@ -38,5 +40,10 @@ class CatalogController extends Controller
     public function show(Request $request, CatalogTitle $catalogTitle): View
     {
         return view('catalog.show', $this->titlePage->data($request, $catalogTitle));
+    }
+
+    public function stats(): View
+    {
+        return view('catalog.stats', $this->statsPage->data());
     }
 }

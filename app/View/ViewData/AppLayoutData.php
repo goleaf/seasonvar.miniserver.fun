@@ -15,6 +15,7 @@ class AppLayoutData
         extract($viewData, EXTR_SKIP);
         $siteName = config('app.name', 'Каталог сериалов');
         $seo = $seo ?? [];
+        $extendedSeo = ($seo['extended_seo'] ?? true) !== false;
         $pageTitle = trim((string) ($seo['title'] ?? $title ?? $siteName));
         $pageTitle = $pageTitle !== '' ? $pageTitle : $siteName;
         $fullTitle = Str::contains(Str::lower($pageTitle), Str::lower($siteName))
@@ -964,6 +965,41 @@ class AppLayoutData
             ->unique()
             ->take(70)
             ->values();
+
+        if (! $extendedSeo) {
+            $seoTags = collect();
+            $topicTerms = collect();
+            $seoIntents = collect();
+            $semanticEntities = collect();
+            $longTailQueries = collect();
+            $relatedCollections = collect();
+            $semanticHubs = collect();
+            $snippetBlocks = collect();
+            $seoActions = collect();
+            $semanticGlossary = collect();
+            $quickAnswers = collect();
+            $contentSignals = collect();
+            $audiencePaths = collect();
+            $alsoSearches = collect();
+            $discoverySignals = collect();
+            $queryMatrix = collect();
+            $mediaSignals = collect();
+            $publisherSignals = collect();
+            $freshnessQueries = collect();
+            $russianQueryVariants = collect();
+            $catalogDirections = collect();
+            $comparisonQueries = collect();
+            $episodeIntentQueries = collect();
+            $watchModeQueries = collect();
+            $translationQueries = collect();
+            $voiceSearchQueries = collect();
+            $topicAuthoritySignals = collect();
+            $releaseCalendarQueries = collect();
+            $expandedKeywords = collect();
+            $newsKeywords = collect();
+            $keywordAliases = collect();
+        }
+
         $seoSections = collect([
             ['id' => 'seo-summary', 'name' => 'Описание страницы', 'enabled' => ! empty($seo['seo_text']) || ! empty($seo['related_links'])],
             ['id' => 'key-topics', 'name' => 'Ключевые темы', 'enabled' => $topicTerms->isNotEmpty()],
