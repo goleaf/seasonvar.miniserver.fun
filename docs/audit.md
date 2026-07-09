@@ -12,7 +12,7 @@
 - Основная база данных SQLite; тесты используют SQLite в памяти.
 - PHPUnit 12.5; Pest не установлен.
 - Tailwind CSS 4.3 с Vite 8, локальными FontAwesome, Plyr и HLS-ресурсами.
-- В проекте сейчас нет `routes/api.php`, политик приложения, задач очереди, событий, слушателей, писем, уведомлений и API Resources. Публичные query-параметры каталога проверяются Form Request-классами, а служебная статистика защищена gate.
+- В проекте есть read-only JSON API в `routes/api.php` для опубликованных карточек каталога и Laravel API Resources для форматирования ответов. Политик приложения, событий, слушателей, писем и уведомлений сейчас нет. Публичные query-параметры каталога проверяются Form Request-классами, а служебная статистика защищена gate.
 - CI-файлы не найдены.
 
 ## MCP
@@ -70,7 +70,7 @@ args = ["artisan", "boost:mcp", "--env=local"]
 - CI workflow отсутствует. Минимальный набор: `composer validate`, Pint, `php artisan test`, `npm run build`.
 - В `composer.json` нет команд статического анализа или Rector. PHPStan/Larastan или Rector стоит добавлять только когда будет готовность поддерживать базовый уровень проверок.
 - [resources/views/catalog/index.blade.php](/www/wwwroot/seasonvar.miniserver.fun/resources/views/catalog/index.blade.php:3) все еще группирует последние тайтлы внутри Blade. При следующей чистке главной каталога это стоит перенести в контроллер или небольшой view model.
-- Все публичные маршруты находятся в `routes/web.php`; для текущего приложения это нормально, но перед JSON endpoints нужно добавить `routes/api.php` и явные API Resources.
+- API пока ограничен read-only карточками тайтлов. Перед write/admin/moderation/import-control JSON endpoints нужно добавить отдельную авторизацию, Form Requests и явные ресурсы ответа.
 
 ## Можно улучшить позже
 

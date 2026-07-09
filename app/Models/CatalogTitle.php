@@ -79,6 +79,14 @@ class CatalogTitle extends Model
     }
 
     /**
+     * @return HasMany<LicensedMedia, $this>
+     */
+    public function publishedLicensedMedia(): HasMany
+    {
+        return $this->licensedMedia()->published();
+    }
+
+    /**
      * @return HasMany<CatalogTitleReview, $this>
      */
     public function reviews(): HasMany

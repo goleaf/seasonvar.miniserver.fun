@@ -16,7 +16,8 @@
 - Read-only страницы проверять через HTTP helpers: `get()`, `getJson()`, `assertOk()`, `assertRedirect()`, `assertInvalid()` и `assertSessionHasErrors()`.
 - Для importer, crawler, playlist и media-check тестов блокировать реальные сетевые вызовы через `Http::preventStrayRequests()` и задавать `Http::fake()` для ожидаемых URL.
 - Если тестируемая логика окажется внутри Blade, сначала перенести ее в request, service, view-model, component class, accessor или enum, а затем тестировать PHP-код.
-- В проекте сейчас нет app-specific jobs, events, notifications или JSON API resources; добавлять их тесты нужно вместе с соответствующей функциональностью.
+- JSON API покрывается feature-тестами через `getJson()` и fluent JSON assertions; тесты ресурсов должны проверять отсутствие приватных source/media/importer полей.
+- В проекте сейчас нет app-specific events, notifications или mailables; добавлять их тесты нужно вместе с соответствующей функциональностью.
 
 ## Команды
 

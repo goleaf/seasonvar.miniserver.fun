@@ -9,8 +9,8 @@
 - PHP 8.5, Laravel 13.19, Laravel Boost 2.4, Laravel Pint 1.29, PHPUnit 12.5.
 - Tailwind CSS 4.3 с Vite 8; локальные FontAwesome, Plyr и HLS-ресурсы установлены через npm.
 - SQLite используется локально и в тестах; PHPUnit использует SQLite в памяти.
-- Web-маршруты находятся в `routes/web.php`; файла `routes/api.php` сейчас нет.
-- Сейчас нет файлов `app/Http/Requests`, `app/Policies`, `app/Http/Resources`, `app/Jobs` и `routes/api.php`.
+- Web-маршруты находятся в `routes/web.php`; read-only JSON API находится в `routes/api.php`.
+- Сейчас нет project-specific policies, events, listeners, notifications или mailables. Form Requests, API Resources и jobs используются для существующих read-only API, публичных фильтров каталога и очередного импорта.
 - Основная публичная команда импорта: `php artisan seasonvar:import`.
 - Документация проекта находится в `README.md` и `docs/*.md`; она должна быть конкретной для проекта, а не текстом стартового шаблона Laravel.
 
@@ -60,8 +60,7 @@
 
 ## API Resources
 
-- Сейчас нет API route file и JSON resource layer.
-- Если добавляется API, использовать `routes/api.php`.
+- API-маршруты находятся в `routes/api.php`.
 - При возврате Eloquent-моделей или коллекций из API использовать Laravel API Resources в `app/Http/Resources`.
 - Для ответов с пагинацией включать метаданные пагинации и держать форму ответа явной.
 - Не раскрывать через API внутреннее состояние импортера, source HTML snapshots, raw remote URLs, secrets или stack traces.
