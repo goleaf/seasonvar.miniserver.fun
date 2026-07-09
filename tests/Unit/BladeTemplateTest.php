@@ -19,4 +19,14 @@ class BladeTemplateTest extends TestCase
 
         $this->assertSame([], $offendingFiles, 'Blade templates must move PHP logic into controllers, view-models, or component classes.');
     }
+
+    public function test_status_pill_component_renders_slot_icon_and_variant_classes(): void
+    {
+        $view = $this->blade('<x-ui.status-pill icon="fa-solid fa-circle-check" variant="success">Готово</x-ui.status-pill>');
+
+        $view
+            ->assertSeeText('Готово')
+            ->assertSee('fa-solid fa-circle-check', false)
+            ->assertSee('bg-emerald-50', false);
+    }
 }
