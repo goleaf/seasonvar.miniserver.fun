@@ -15,14 +15,29 @@ class SeasonvarDiscovery
     ) {}
 
     /**
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return list<string>
      */
-    public function discoverFromSitemap(string $sitemapUrl, int $limit = 500, int $crawlDelaySeconds = 3): array
-    {
+    public function discoverFromSitemap(
+        string $sitemapUrl,
+        int $limit = 500,
+        int $crawlDelaySeconds = 3,
+        ?callable $progress = null,
+    ): array {
         $normalizedSitemapUrl = $this->seasonvarUrl->normalize($sitemapUrl);
 
+        $this->report($progress, 'sitemap-discovery-started', [
+            'sitemap_url' => $normalizedSitemapUrl,
+            'limit' => $limit,
+            'crawl_delay_seconds' => $crawlDelaySeconds,
+        ]);
+
         if (! $this->seasonvarUrl->isAllowed($normalizedSitemapUrl)) {
-            throw new RuntimeException('Sitemap URL is outside the allowed Seasonvar hosts.');
+            $this->report($progress, 'sitemap-discovery-blocked', [
+                'sitemap_url' => $normalizedSitemapUrl,
+            ]);
+
+            throw new RuntimeException('Ссылка карты сайта находится вне разрешенных хостов Seasonvar.');
         }
 
         $queue = [$normalizedSitemapUrl];
@@ -33,57 +48,180 @@ class SeasonvarDiscovery
             $currentUrl = array_shift($queue);
 
             if (isset($visited[$currentUrl])) {
+                $this->report($progress, 'sitemap-already-visited', [
+                    'url' => $currentUrl,
+                ]);
+
                 continue;
             }
 
             $visited[$currentUrl] = true;
-            $response = $this->httpClient->get($currentUrl, $crawlDelaySeconds);
+
+            $this->report($progress, 'sitemap-fetch-started', [
+                'url' => $currentUrl,
+                'queue_remaining' => count($queue),
+                'visited' => count($visited),
+                'discovered' => count($discovered),
+            ]);
+
+            $response = $this->httpClient->get($currentUrl, $crawlDelaySeconds, $progress);
+
+            $this->report($progress, 'sitemap-fetch-complete', [
+                'url' => $currentUrl,
+                'http_status' => $response->status(),
+                'successful' => $response->successful(),
+                'body_bytes' => mb_strlen($response->body(), '8bit'),
+            ]);
 
             if (! $response->successful()) {
+                $this->report($progress, 'sitemap-fetch-failed', [
+                    'url' => $currentUrl,
+                    'http_status' => $response->status(),
+                ]);
+
                 continue;
             }
 
-            $xml = $this->parseXml($response->body(), $currentUrl);
+            try {
+                $xml = $this->parseXml($response->body(), $currentUrl, $progress);
+            } catch (RuntimeException $exception) {
+                $this->report($progress, 'sitemap-xml-failed', [
+                    'url' => $currentUrl,
+                    'message' => $exception->getMessage(),
+                ]);
 
-            foreach ($xml->xpath('//*[local-name()="sitemap"]/*[local-name()="loc"]') ?: [] as $loc) {
-                $childSitemap = $this->safeUrl((string) $loc, $currentUrl);
-
-                if ($childSitemap !== null && ! isset($visited[$childSitemap])) {
-                    $queue[] = $childSitemap;
+                if ($currentUrl === $normalizedSitemapUrl) {
+                    throw $exception;
                 }
+
+                continue;
             }
 
-            foreach ($xml->xpath('//*[local-name()="url"]/*[local-name()="loc"]') ?: [] as $loc) {
-                $url = $this->safeUrl((string) $loc, $currentUrl);
+            $childSitemapLocations = $xml->xpath('//*[local-name()="sitemap"]/*[local-name()="loc"]') ?: [];
+            $urlLocations = $xml->xpath('//*[local-name()="url"]/*[local-name()="loc"]') ?: [];
+
+            $this->report($progress, 'sitemap-xml-parsed', [
+                'url' => $currentUrl,
+                'child_sitemaps' => count($childSitemapLocations),
+                'url_locations' => count($urlLocations),
+            ]);
+
+            foreach ($childSitemapLocations as $loc) {
+                $rawUrl = (string) $loc;
+                $childSitemap = $this->safeUrl($rawUrl, $currentUrl);
+
+                if ($childSitemap === null) {
+                    $this->report($progress, 'child-sitemap-skipped', [
+                        'reason' => 'некорректная или заблокированная ссылка',
+                        'raw_url' => $rawUrl,
+                        'base_url' => $currentUrl,
+                    ]);
+
+                    continue;
+                }
+
+                if (! isset($visited[$childSitemap])) {
+                    $queue[] = $childSitemap;
+
+                    $this->report($progress, 'child-sitemap-queued', [
+                        'url' => $childSitemap,
+                        'queue_size' => count($queue),
+                    ]);
+
+                    continue;
+                }
+
+                $this->report($progress, 'child-sitemap-skipped', [
+                    'reason' => 'уже посещена',
+                    'url' => $childSitemap,
+                ]);
+            }
+
+            foreach ($urlLocations as $loc) {
+                $rawUrl = (string) $loc;
+                $url = $this->safeUrl($rawUrl, $currentUrl);
 
                 if ($url === null) {
+                    $this->report($progress, 'catalog-url-skipped', [
+                        'reason' => 'некорректная или заблокированная ссылка',
+                        'raw_url' => $rawUrl,
+                        'base_url' => $currentUrl,
+                    ]);
+
                     continue;
                 }
 
                 $pageType = $this->seasonvarUrl->pageType($url);
-                $path = strtolower(parse_url($url, PHP_URL_PATH) ?: '');
 
-                if ($pageType === 'serial' || str_ends_with($path, '.html')) {
+                if ($pageType === 'serial') {
+                    $isDuplicate = array_key_exists($url, $discovered);
                     $discovered[$url] = $url;
+
+                    $this->report($progress, $isDuplicate ? 'catalog-url-duplicate' : 'catalog-url-discovered', [
+                        'url' => $url,
+                        'page_type' => $pageType,
+                        'discovered' => count($discovered),
+                        'limit' => $limit,
+                    ]);
+                } else {
+                    $this->report($progress, 'catalog-url-skipped', [
+                        'reason' => 'не сериал',
+                        'page_type' => $pageType,
+                        'url' => $url,
+                    ]);
                 }
 
                 if (count($discovered) >= $limit) {
+                    $this->report($progress, 'sitemap-discovery-limit-reached', [
+                        'limit' => $limit,
+                        'discovered' => count($discovered),
+                    ]);
+
                     break;
                 }
             }
         }
 
+        $this->report($progress, 'sitemap-discovery-complete', [
+            'visited_sitemaps' => count($visited),
+            'queued_sitemaps_remaining' => count($queue),
+            'discovered' => count($discovered),
+        ]);
+
         return array_values($discovered);
     }
 
-    private function parseXml(string $body, string $url): SimpleXMLElement
+    /**
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     */
+    private function parseXml(string $body, string $url, ?callable $progress = null): SimpleXMLElement
     {
+        if (substr($body, 0, 2) === chr(31).chr(139)) {
+            $this->report($progress, 'sitemap-xml-gzip-detected', [
+                'url' => $url,
+                'compressed_bytes' => mb_strlen($body, '8bit'),
+            ]);
+
+            $decoded = gzdecode($body);
+
+            if (! is_string($decoded)) {
+                throw new RuntimeException("Не удалось распаковать XML карты сайта: {$url}");
+            }
+
+            $body = $decoded;
+
+            $this->report($progress, 'sitemap-xml-decompressed', [
+                'url' => $url,
+                'xml_bytes' => mb_strlen($body, '8bit'),
+            ]);
+        }
+
         $previous = libxml_use_internal_errors(true);
         $xml = simplexml_load_string($body);
         libxml_use_internal_errors($previous);
 
         if (! $xml instanceof SimpleXMLElement) {
-            throw new RuntimeException("Unable to parse sitemap XML: {$url}");
+            throw new RuntimeException("Не удалось разобрать XML карты сайта: {$url}");
         }
 
         return $xml;
@@ -98,5 +236,18 @@ class SeasonvarDiscovery
         }
 
         return $this->seasonvarUrl->isAllowed($normalized) ? $normalized : null;
+    }
+
+    /**
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @param  array<string, mixed>  $context
+     */
+    private function report(?callable $progress, string $event, array $context = []): void
+    {
+        if ($progress === null) {
+            return;
+        }
+
+        $progress($event, $context);
     }
 }

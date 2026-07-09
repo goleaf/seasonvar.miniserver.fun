@@ -5,12 +5,12 @@
         @if ($title->poster_url)
             <img src="{{ $title->poster_url }}" alt="{{ $title->title }}" class="h-full w-full object-cover opacity-90 transition group-hover:opacity-100">
         @else
-            <div class="flex h-full items-center justify-center text-sm text-zinc-500">No poster</div>
+            <div class="flex h-full items-center justify-center text-sm text-zinc-500">Нет постера</div>
         @endif
     </div>
     <div class="p-4">
-        <div class="flex items-center gap-2 text-xs uppercase text-zinc-500">
-            <span>{{ $title->type }}</span>
+        <div class="flex items-center gap-2 text-xs text-zinc-500">
+            <span>{{ $title->type === 'serial' ? 'сериал' : $title->type }}</span>
             @if ($title->year)
                 <span>{{ $title->year }}</span>
             @endif

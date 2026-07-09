@@ -32,6 +32,11 @@ class CatalogTitle extends Model
     /** @use HasFactory<CatalogTitleFactory> */
     use HasFactory;
 
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
+
     /**
      * @return BelongsTo<Source, $this>
      */

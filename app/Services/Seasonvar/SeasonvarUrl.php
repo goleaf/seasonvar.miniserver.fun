@@ -13,8 +13,6 @@ class SeasonvarUrl
     private const ALLOWED_HOSTS = [
         'seasonvar.ru',
         'www.seasonvar.ru',
-        'seasonvar.net',
-        'www.seasonvar.net',
     ];
 
     /**
@@ -30,12 +28,14 @@ class SeasonvarUrl
         'list.xml',
     ];
 
+    public function __construct(private readonly SeasonvarSource $source) {}
+
     public function normalize(string $url, ?string $baseUrl = null): string
     {
         $url = trim($url);
 
         if ($url === '') {
-            throw new InvalidArgumentException('URL cannot be empty.');
+            throw new InvalidArgumentException('Ссылка не может быть пустой.');
         }
 
         if (Str::startsWith($url, '//')) {
@@ -44,16 +44,34 @@ class SeasonvarUrl
 
         if (! Str::startsWith($url, ['http://', 'https://'])) {
             if ($baseUrl === null) {
-                throw new InvalidArgumentException('Relative URL requires a base URL.');
+                throw new InvalidArgumentException('Для относительной ссылки нужна базовая ссылка.');
             }
 
-            $url = rtrim($baseUrl, '/').'/'.ltrim($url, '/');
+            $baseParts = parse_url($baseUrl);
+
+            if (! is_array($baseParts) || ! isset($baseParts['scheme'], $baseParts['host'])) {
+                throw new InvalidArgumentException('Некорректная базовая ссылка.');
+            }
+
+            $origin = strtolower($baseParts['scheme']).'://'.strtolower($baseParts['host']);
+
+            if (isset($baseParts['port'])) {
+                $origin .= ':'.$baseParts['port'];
+            }
+
+            if (Str::startsWith($url, '/')) {
+                $url = $origin.$url;
+            } else {
+                $basePath = $baseParts['path'] ?? '/';
+                $baseDirectory = Str::beforeLast($basePath, '/');
+                $url = $origin.'/'.trim($baseDirectory.'/'.$url, '/');
+            }
         }
 
         $parts = parse_url($url);
 
         if (! is_array($parts) || ! isset($parts['scheme'], $parts['host'])) {
-            throw new InvalidArgumentException('Invalid URL.');
+            throw new InvalidArgumentException('Некорректная ссылка.');
         }
 
         $scheme = strtolower($parts['scheme']);
@@ -98,6 +116,10 @@ class SeasonvarUrl
             str_contains($path, '/actor') => 'actor',
             str_contains($path, '/genre') => 'genre',
             str_contains($path, '/country') => 'country',
+            str_contains($path, '/tag') => 'tag',
+            str_contains($path, '/st/') => 'static',
+            str_contains($path, 'rss') => 'rss',
+            str_contains($path, 'search') => 'search',
             default => 'unknown',
         };
     }
@@ -116,5 +138,15 @@ class SeasonvarUrl
     public function hash(string $url): string
     {
         return hash('sha256', $url);
+    }
+
+    public function baseUrl(): string
+    {
+        return $this->source->baseUrl();
+    }
+
+    public function sitemapUrl(): string
+    {
+        return $this->source->sitemapUrl();
     }
 }

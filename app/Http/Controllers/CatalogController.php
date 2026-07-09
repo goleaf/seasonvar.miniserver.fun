@@ -37,14 +37,30 @@ class CatalogController extends Controller
     public function titles(Request $request): View
     {
         $search = trim((string) $request->query('q', ''));
+        $taxonomySlug = trim((string) $request->query('taxonomy', ''));
+        $taxonomyType = trim((string) $request->query('type', ''));
+        $selectedTaxonomy = $taxonomySlug === ''
+            ? null
+            : Taxonomy::query()
+                ->where('slug', $taxonomySlug)
+                ->when($taxonomyType !== '', fn ($query) => $query->where('type', $taxonomyType))
+                ->first();
 
         $titles = CatalogTitle::query()
             ->with(['taxonomies', 'seasons'])
+            ->when($selectedTaxonomy !== null, function ($query) use ($selectedTaxonomy): void {
+                $query->whereHas('taxonomies', function ($query) use ($selectedTaxonomy): void {
+                    $query->whereKey($selectedTaxonomy->id);
+                });
+            })
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($query) use ($search): void {
                     $query->where('title', 'like', "%{$search}%")
                         ->orWhere('original_title', 'like', "%{$search}%")
-                        ->orWhere('description', 'like', "%{$search}%");
+                        ->orWhere('description', 'like', "%{$search}%")
+                        ->orWhereHas('taxonomies', function ($query) use ($search): void {
+                            $query->where('name', 'like', "%{$search}%");
+                        });
                 });
             })
             ->latest('indexed_at')
@@ -54,15 +70,53 @@ class CatalogController extends Controller
         return view('catalog.titles', [
             'titles' => $titles,
             'search' => $search,
+            'selectedTaxonomy' => $selectedTaxonomy,
         ]);
     }
 
-    public function show(CatalogTitle $catalogTitle): View
+    public function show(Request $request, CatalogTitle $catalogTitle): View
     {
-        $catalogTitle->load(['source', 'taxonomies', 'seasons.episodes', 'licensedMedia']);
+        $catalogTitle->load([
+            'source',
+            'taxonomies',
+            'seasons.episodes',
+            'licensedMedia' => fn ($query) => $query->published()->latest('published_at')->latest(),
+        ]);
+
+        $selectedMedia = $catalogTitle->licensedMedia->firstWhere('id', $request->integer('media'))
+            ?? $catalogTitle->licensedMedia->first();
+        $relatedTaxonomyIds = $catalogTitle->taxonomies
+            ->whereIn('type', ['genre', 'country'])
+            ->pluck('id');
+        $seasonUrls = $catalogTitle->seasons
+            ->pluck('source_url')
+            ->filter()
+            ->unique()
+            ->values();
+        $episodeCountsBySeasonUrl = CatalogTitle::query()
+            ->select('catalog_titles.source_url')
+            ->selectRaw('count(episodes.id) as episodes_count')
+            ->join('seasons', 'seasons.catalog_title_id', '=', 'catalog_titles.id')
+            ->leftJoin('episodes', 'episodes.season_id', '=', 'seasons.id')
+            ->whereIn('catalog_titles.source_url', $seasonUrls)
+            ->groupBy('catalog_titles.source_url')
+            ->pluck('episodes_count', 'source_url');
 
         return view('catalog.show', [
             'title' => $catalogTitle,
+            'selectedMedia' => $selectedMedia,
+            'episodeCountsBySeasonUrl' => $episodeCountsBySeasonUrl,
+            'recommendedTitles' => CatalogTitle::query()
+                ->with(['taxonomies', 'seasons'])
+                ->whereKeyNot($catalogTitle->id)
+                ->when($relatedTaxonomyIds->isNotEmpty(), function ($query) use ($relatedTaxonomyIds): void {
+                    $query->whereHas('taxonomies', function ($query) use ($relatedTaxonomyIds): void {
+                        $query->whereIn('taxonomies.id', $relatedTaxonomyIds);
+                    });
+                })
+                ->latest('indexed_at')
+                ->limit(4)
+                ->get(),
         ]);
     }
 }
