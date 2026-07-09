@@ -2,6 +2,7 @@
 
 ## 2026-07-09
 
+- Added a private upload storage foundation with explicit image validation rules, generated filenames, fake-storage tests, and storage documentation.
 - Improved catalog search form UX with reusable Blade form components, visible validation errors, and preserved old input after validation redirects.
 - Cleaned up Eloquent relationship inverses for catalog source pages and Seasonvar import runs, added schema-aligned casts, and documented model query rules in `docs/models.md`.
 - Synchronized Markdown documentation with the current Laravel 13 routes, setup, MCP, deployment, testing, API, Blade, and CI conventions.

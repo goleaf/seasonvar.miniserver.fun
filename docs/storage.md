@@ -1,0 +1,32 @@
+# Хранилище и uploads
+
+Обновлено: 09.07.2026
+
+## Текущее состояние
+
+- Публичных upload-форм и upload-маршрутов сейчас нет.
+- Основной filesystem disk остается `local` и указывает на `storage/app/private`.
+- Локальная выдача temporary storage URLs выключена через `LOCAL_FILESYSTEM_SERVE=false`.
+- Для будущих пользовательских upload-файлов добавлен отдельный private disk `uploads` с корнем `storage/app/private/uploads`.
+
+## Правила upload-функций
+
+- Новый upload endpoint должен быть write/admin/moderation-функцией с явной авторизацией через Form Request, policy, gate или middleware.
+- Файл нужно проверять до сохранения: обязательность, тип, расширение, MIME, размер и доменное ограничение конкретной функции.
+- Для приватных изображений используйте `App\Support\Uploads\PrivateImageUploadRules`; SVG не разрешен.
+- Сохраняйте файлы через `App\Services\Storage\PrivateUploadStorage`, чтобы имя генерировал Laravel, а не клиент.
+- Не используйте `getClientOriginalName()` или `getClientOriginalExtension()` для формирования пути хранения.
+- Не отдавайте private paths, абсолютные пути storage или raw upload metadata в публичный HTML/API.
+- Публичная выдача upload-файла должна быть отдельным signed/authorized endpoint с проверкой владельца или права доступа.
+
+## Cleanup
+
+- Если upload заменяет старый файл, новый файл нужно сначала успешно сохранить, а потом удалить старый через `PrivateUploadStorage::delete()`.
+- При удалении модели, которая владеет upload-файлом, добавляйте cleanup в service/action или model observer с тестом.
+- Для временных upload-областей нужна отдельная команда cleanup с ограниченным scope и тестом на безопасное удаление.
+
+## Тесты
+
+- Upload-тесты используют `Storage::fake('uploads')` и `UploadedFile::fake()`.
+- Проверяйте, что сохраненный путь не содержит клиентское имя файла.
+- Проверяйте private visibility и cleanup через `Storage::disk('uploads')->assertExists()` / `assertMissing()`.

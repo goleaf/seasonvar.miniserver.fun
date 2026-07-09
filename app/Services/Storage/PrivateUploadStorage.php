@@ -1,0 +1,65 @@
+<?php
+
+namespace App\Services\Storage;
+
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use InvalidArgumentException;
+use RuntimeException;
+
+final class PrivateUploadStorage
+{
+    public function store(UploadedFile $file, string $directory): StoredPrivateUpload
+    {
+        $disk = (string) config('uploads.disk', 'uploads');
+        $visibility = (string) config('uploads.visibility', 'private');
+
+        if ($visibility !== 'private') {
+            throw new RuntimeException('Uploaded files must use private visibility.');
+        }
+
+        $path = Storage::disk($disk)->putFile(
+            $this->normalizeDirectory($directory),
+            $file,
+            ['visibility' => $visibility],
+        );
+
+        if (! is_string($path) || $path === '') {
+            throw new RuntimeException('Не удалось сохранить загруженный файл.');
+        }
+
+        return new StoredPrivateUpload(
+            disk: $disk,
+            path: $path,
+            visibility: $visibility,
+            mimeType: $file->getMimeType(),
+            size: $file->getSize() ?: 0,
+        );
+    }
+
+    public function delete(StoredPrivateUpload|string $upload): bool
+    {
+        $disk = $upload instanceof StoredPrivateUpload
+            ? $upload->disk
+            : (string) config('uploads.disk', 'uploads');
+
+        $path = $upload instanceof StoredPrivateUpload ? $upload->path : $upload;
+
+        if ($path === '' || str_contains($path, '..')) {
+            return false;
+        }
+
+        return Storage::disk($disk)->delete($path);
+    }
+
+    private function normalizeDirectory(string $directory): string
+    {
+        $directory = trim(str_replace('\\', '/', $directory), '/');
+
+        if ($directory === '' || str_contains($directory, '..')) {
+            throw new InvalidArgumentException('Некорректный каталог загрузки.');
+        }
+
+        return $directory;
+    }
+}

@@ -30,6 +30,23 @@ class ConfigurationEnvironmentTest extends TestCase
         $this->assertIsArray(config('services.google.analytics'));
     }
 
+    public function test_private_upload_storage_configuration_is_documented(): void
+    {
+        $envExample = File::get(base_path('.env.example'));
+
+        foreach ([
+            'UPLOADS_DISK=uploads',
+            'UPLOADS_MAX_IMAGE_KILOBYTES=2048',
+        ] as $placeholder) {
+            $this->assertStringContainsString($placeholder, $envExample);
+        }
+
+        $this->assertSame('uploads', config('uploads.disk'));
+        $this->assertSame('private', config('uploads.visibility'));
+        $this->assertSame('private', config('filesystems.disks.uploads.visibility'));
+        $this->assertFalse(config('filesystems.disks.uploads.serve'));
+    }
+
     public function test_env_helper_is_only_used_in_configuration_files(): void
     {
         $directories = [

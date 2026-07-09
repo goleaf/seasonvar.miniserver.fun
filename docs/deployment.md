@@ -18,6 +18,8 @@ Production-значения должны задаваться сервером, 
 - `SESSION_DRIVER=database`
 - `FILESYSTEM_DISK=local`
 - `LOCAL_FILESYSTEM_SERVE=false`
+- `UPLOADS_DISK=uploads`
+- `UPLOADS_MAX_IMAGE_KILOBYTES=2048`
 - `LOG_CHANNEL`, `LOG_STACK` и `LOG_LEVEL`
 
 Проектные ключи Seasonvar описаны в `.env.example`. Значения по умолчанию консервативные: `SEASONVAR_BASE_URL=https://seasonvar.ru`, `SEASONVAR_IMPORT_CHUNK_SIZE=100`, `SEASONVAR_CRAWL_DELAY=3`, а проверки медиа включены с ограниченными тайм-аутами.
@@ -39,6 +41,8 @@ Google-интеграции по умолчанию выключены. Если
 - `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_PROJECT_ID` — runtime credential/project значения для Google API или локальных MCP, если они включены.
 - `GOOGLE_SEARCH_CONSOLE_*` — read-only настройки Search Console.
 - `GOOGLE_ANALYTICS_*` — read-only настройки GA4 reporting.
+- `UPLOADS_DISK` — приватный disk для будущих user-upload файлов; по умолчанию `uploads`.
+- `UPLOADS_MAX_IMAGE_KILOBYTES` — максимальный размер изображения для reusable upload-валидации.
 
 В коде приложения эти значения читаются через `config('seasonvar.*')`, `config('queue.*')`, `config('database.*')` и другие config-файлы, а не через прямой `env()`.
 
