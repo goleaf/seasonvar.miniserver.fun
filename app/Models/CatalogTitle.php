@@ -87,6 +87,86 @@ class CatalogTitle extends Model
     }
 
     /**
+     * @return BelongsToMany<Genre, $this>
+     */
+    public function genres(): BelongsToMany
+    {
+        return $this->belongsToMany(Genre::class, 'catalog_title_genre');
+    }
+
+    /**
+     * @return BelongsToMany<Country, $this>
+     */
+    public function countries(): BelongsToMany
+    {
+        return $this->belongsToMany(Country::class, 'catalog_title_country');
+    }
+
+    /**
+     * @return BelongsToMany<Actor, $this>
+     */
+    public function actors(): BelongsToMany
+    {
+        return $this->belongsToMany(Actor::class, 'catalog_title_actor');
+    }
+
+    /**
+     * @return BelongsToMany<Director, $this>
+     */
+    public function directors(): BelongsToMany
+    {
+        return $this->belongsToMany(Director::class, 'catalog_title_director');
+    }
+
+    /**
+     * @return BelongsToMany<AgeRating, $this>
+     */
+    public function ageRatings(): BelongsToMany
+    {
+        return $this->belongsToMany(AgeRating::class, 'age_rating_catalog_title');
+    }
+
+    /**
+     * @return BelongsToMany<Translation, $this>
+     */
+    public function translations(): BelongsToMany
+    {
+        return $this->belongsToMany(Translation::class, 'catalog_title_translation');
+    }
+
+    /**
+     * @return BelongsToMany<CatalogStatus, $this>
+     */
+    public function statuses(): BelongsToMany
+    {
+        return $this->belongsToMany(CatalogStatus::class, 'catalog_status_catalog_title');
+    }
+
+    /**
+     * @return BelongsToMany<Network, $this>
+     */
+    public function networks(): BelongsToMany
+    {
+        return $this->belongsToMany(Network::class, 'catalog_title_network');
+    }
+
+    /**
+     * @return BelongsToMany<Studio, $this>
+     */
+    public function studios(): BelongsToMany
+    {
+        return $this->belongsToMany(Studio::class, 'catalog_title_studio');
+    }
+
+    /**
+     * @return BelongsToMany<Tag, $this>
+     */
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(Tag::class, 'catalog_title_tag');
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array

@@ -22,7 +22,7 @@ class SeasonvarCatalogParser
      *     poster_url: string|null,
      *     external_id: string|null,
      *     current_season_number: int,
-     *     seasons: list<array{number: int, title: string|null, source_url: string|null}>,
+     *     seasons: list<array{number: int, title: string|null, source_url: string|null, latest_episode_released_at: string|null, episodes_released: int|null, episodes_total: int|null, translation_name: string|null, release_status_text: string|null}>,
      *     episodes: list<array{season_number: int, number: int, title: string|null, source_url: string|null}>,
      *     taxonomies: list<array{type: string, name: string, source_url: string|null}>
      * }
@@ -203,6 +203,72 @@ class SeasonvarCatalogParser
         return trim($title);
     }
 
+    private function cleanSeasonTitle(string $title): string
+    {
+        $title = html_entity_decode($title, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $title = (string) Str::of($title)->replace("\xc2\xa0", ' ')->squish();
+        $title = preg_replace('/^\s*>+\s*/u', '', $title) ?: $title;
+        $title = preg_replace('/\s*\(\d{2}\.\d{2}\.\d{4}.*$/u', '', $title) ?: $title;
+        $title = preg_replace('/\s+онлайн\s*$/iu', '', $title) ?: $title;
+
+        return trim($title);
+    }
+
+    /**
+     * @return array{latest_episode_released_at: string|null, episodes_released: int|null, episodes_total: int|null, translation_name: string|null, release_status_text: string|null}
+     */
+    private function emptySeasonReleaseStatus(): array
+    {
+        return [
+            'latest_episode_released_at' => null,
+            'episodes_released' => null,
+            'episodes_total' => null,
+            'translation_name' => null,
+            'release_status_text' => null,
+        ];
+    }
+
+    /**
+     * @return array{latest_episode_released_at: string|null, episodes_released: int|null, episodes_total: int|null, translation_name: string|null, release_status_text: string|null}
+     */
+    private function seasonReleaseStatus(string $text): array
+    {
+        $status = $this->emptySeasonReleaseStatus();
+        $normalized = (string) Str::of(html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8'))
+            ->replace("\xc2\xa0", ' ')
+            ->squish();
+
+        if ($normalized === '') {
+            return $status;
+        }
+
+        if (preg_match('/\(\s*(\d{2}\.\d{2}\.\d{4}.*?)\s*\)\s*$/u', $normalized, $matches) === 1) {
+            $status['release_status_text'] = $this->stringValue($matches[1]);
+        }
+
+        if (preg_match('/(\d{2})\.(\d{2})\.(\d{4})/u', $normalized, $matches) === 1) {
+            $day = (int) $matches[1];
+            $month = (int) $matches[2];
+            $year = (int) $matches[3];
+
+            if (checkdate($month, $day, $year)) {
+                $status['latest_episode_released_at'] = sprintf('%04d-%02d-%02d', $year, $month, $day);
+            }
+        }
+
+        if (preg_match('/(\d+)\s*сер(?:ия|ии|ий)/iu', $normalized, $matches) === 1) {
+            $status['episodes_released'] = (int) $matches[1];
+        }
+
+        if (preg_match('/из\s*(\d+)/iu', $normalized, $matches) === 1) {
+            $status['episodes_total'] = (int) $matches[1];
+        }
+
+        $status['translation_name'] = Arr::first($this->translationNamesFromText($normalized));
+
+        return $status;
+    }
+
     private function extractYear(?string $text): ?int
     {
         if ($text === null || preg_match('/\b(19|20)\d{2}\b/', $text, $matches) !== 1) {
@@ -213,7 +279,7 @@ class SeasonvarCatalogParser
     }
 
     /**
-     * @return list<array{number: int, title: string|null, source_url: string|null}>
+     * @return list<array{number: int, title: string|null, source_url: string|null, latest_episode_released_at: string|null, episodes_released: int|null, episodes_total: int|null, translation_name: string|null, release_status_text: string|null}>
      */
     private function seasons(DOMXPath $xpath, string $baseUrl): array
     {
@@ -221,8 +287,14 @@ class SeasonvarCatalogParser
 
         foreach ($xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " pgs-seaslist ")]//a[@href]') ?: [] as $node) {
             $href = $node->attributes?->getNamedItem('href')?->nodeValue;
-            $text = trim($node->textContent);
+            $rawText = $this->stringValue($node->textContent) ?? '';
+            $text = $this->cleanSeasonTitle($rawText);
+            $releaseStatus = $this->seasonReleaseStatus($rawText);
             $number = ($href !== null ? $this->seasonNumberFromUrl($href) : null) ?? $this->seasonNumber($text);
+
+            if ($number === null && $seasons === []) {
+                $number = 1;
+            }
 
             if ($number === null || $number <= 0) {
                 continue;
@@ -233,14 +305,26 @@ class SeasonvarCatalogParser
                 'number' => $number,
                 'title' => $text !== '' ? $text : "Сезон {$number}",
                 'source_url' => $sourceUrl,
+                'latest_episode_released_at' => $releaseStatus['latest_episode_released_at'],
+                'episodes_released' => $releaseStatus['episodes_released'],
+                'episodes_total' => $releaseStatus['episodes_total'],
+                'translation_name' => $releaseStatus['translation_name'],
+                'release_status_text' => $releaseStatus['release_status_text'],
             ];
         }
 
         if ($seasons === []) {
+            $releaseStatus = $this->emptySeasonReleaseStatus();
+
             $seasons[1] = [
                 'number' => 1,
                 'title' => 'Сезон 1',
                 'source_url' => $baseUrl,
+                'latest_episode_released_at' => $releaseStatus['latest_episode_released_at'],
+                'episodes_released' => $releaseStatus['episodes_released'],
+                'episodes_total' => $releaseStatus['episodes_total'],
+                'translation_name' => $releaseStatus['translation_name'],
+                'release_status_text' => $releaseStatus['release_status_text'],
             ];
         }
 
@@ -311,10 +395,15 @@ class SeasonvarCatalogParser
                 }
 
                 $episodeSlug = is_string($slug) && $slug !== '' ? $slug : $number.'_seriya';
+                $episodeTitle = $this->firstNonEmpty([
+                    $episode['title'] ?? null,
+                    $episode['name'] ?? null,
+                    $episode['t'] ?? null,
+                ]);
                 $episodes[$number] = [
                     'season_number' => $seasonNumber,
                     'number' => $number,
-                    'title' => $number.' серия',
+                    'title' => $episodeTitle ?? $number.' серия',
                     'source_url' => $baseUrl.'#'.$episodeSlug,
                 ];
             }
@@ -379,20 +468,31 @@ class SeasonvarCatalogParser
             $items[$key] = ['type' => 'studio', 'name' => $name, 'source_url' => null];
         }
 
+        foreach ($this->seasonListTranslations($xpath) as $name) {
+            $key = 'translation|'.Str::lower($name);
+            $items[$key] = ['type' => 'translation', 'name' => $name, 'source_url' => null];
+        }
+
         foreach ($this->valueList($this->firstText($xpath, ['//*[@itemprop="directors"]//*[@itemprop="name"]'])) as $name) {
             $key = 'director|'.Str::lower($name);
             $items[$key] = ['type' => 'director', 'name' => $name, 'source_url' => null];
         }
 
-        foreach ($xpath->query('//*[@data-info="actor"]//*[@itemprop="name"]') ?: [] as $node) {
-            $name = $this->stringValue($node->textContent);
+        foreach ([
+            '//*[@data-info="actor"]//*[@itemprop="name"]',
+            '//*[@itemprop="actor"]//*[@itemprop="name"]',
+            '//*[@itemprop="actors"]//*[@itemprop="name"]',
+        ] as $actorQuery) {
+            foreach ($xpath->query($actorQuery) ?: [] as $node) {
+                $name = $this->stringValue($node->textContent);
 
-            if ($name === null) {
-                continue;
+                if ($name === null) {
+                    continue;
+                }
+
+                $key = 'actor|'.Str::lower($name);
+                $items[$key] = ['type' => 'actor', 'name' => $name, 'source_url' => null];
             }
-
-            $key = 'actor|'.Str::lower($name);
-            $items[$key] = ['type' => 'actor', 'name' => $name, 'source_url' => null];
         }
 
         foreach ($xpath->query('//a[@href]') ?: [] as $node) {
@@ -424,8 +524,88 @@ class SeasonvarCatalogParser
             ];
         }
 
+        foreach ($this->tagListTaxonomies($xpath, $baseUrl) as $item) {
+            $key = 'tag|'.Str::lower($item['name']);
+            $items[$key] = $item;
+        }
+
         if ($this->hasSubtitles($xpath)) {
             $items['tag|субтитры'] = ['type' => 'tag', 'name' => 'субтитры', 'source_url' => null];
+        }
+
+        return array_values($items);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function seasonListTranslations(DOMXPath $xpath): array
+    {
+        $translations = [];
+
+        foreach ($xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " pgs-seaslist ")]//a') ?: [] as $node) {
+            $text = $this->stringValue($node->textContent);
+
+            if ($text === null) {
+                continue;
+            }
+
+            foreach ($this->translationNamesFromText($text) as $name) {
+                $translations[Str::lower($name)] = $name;
+            }
+        }
+
+        return array_values($translations);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function translationNamesFromText(string $text): array
+    {
+        if (preg_match_all('/\(([^()]{2,80})\)/u', $text, $matches) !== 1) {
+            return [];
+        }
+
+        $translations = [];
+
+        foreach ($matches[1] as $match) {
+            $name = $this->stringValue($match);
+
+            if ($name === null || preg_match('/^\d{2}\.\d{2}\.\d{4}/u', $name) === 1) {
+                continue;
+            }
+
+            if (preg_match('/(?:сер(?:ия|ии|ий)|из|\?\?)/iu', $name) === 1) {
+                continue;
+            }
+
+            $translations[Str::lower($name)] = $name;
+        }
+
+        return array_values($translations);
+    }
+
+    /**
+     * @return list<array{type: string, name: string, source_url: string|null}>
+     */
+    private function tagListTaxonomies(DOMXPath $xpath, string $baseUrl): array
+    {
+        $items = [];
+
+        foreach ($xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " b-taglist ")]//a[@href]') ?: [] as $node) {
+            $name = $this->stringValue($node->textContent);
+            $href = $node->attributes?->getNamedItem('href')?->nodeValue;
+
+            if ($name === null || $href === null || mb_strlen($name) > 80) {
+                continue;
+            }
+
+            $items[Str::lower($name)] = [
+                'type' => 'tag',
+                'name' => $name,
+                'source_url' => $this->normalizeRelative($href, $baseUrl),
+            ];
         }
 
         return array_values($items);
@@ -494,8 +674,8 @@ class SeasonvarCatalogParser
      */
     private function valueList(mixed $value): array
     {
-        if (is_string($value) && Str::contains($value, ',')) {
-            $value = explode(',', $value);
+        if (is_string($value) && preg_match('/[,;|]/u', $value) === 1) {
+            $value = preg_split('/\s*[,;|]\s*/u', $value) ?: [$value];
         }
 
         if (! is_array($value)) {

@@ -2,18 +2,42 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Actor;
+use App\Models\AgeRating;
+use App\Models\CatalogStatus;
 use App\Models\CatalogTitle;
+use App\Models\Country;
+use App\Models\Director;
 use App\Models\Episode;
+use App\Models\Genre;
 use App\Models\LicensedMedia;
+use App\Models\Network;
 use App\Models\SourcePage;
-use App\Models\Taxonomy;
+use App\Models\Studio;
+use App\Models\Tag;
+use App\Models\Translation;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class CatalogController extends Controller
 {
+    private const FILTER_RELATIONS = [
+        'genre' => ['model' => Genre::class, 'relation' => 'genres'],
+        'country' => ['model' => Country::class, 'relation' => 'countries'],
+        'actor' => ['model' => Actor::class, 'relation' => 'actors'],
+        'director' => ['model' => Director::class, 'relation' => 'directors'],
+        'age_rating' => ['model' => AgeRating::class, 'relation' => 'ageRatings'],
+        'translation' => ['model' => Translation::class, 'relation' => 'translations'],
+        'status' => ['model' => CatalogStatus::class, 'relation' => 'statuses'],
+        'network' => ['model' => Network::class, 'relation' => 'networks'],
+        'studio' => ['model' => Studio::class, 'relation' => 'studios'],
+        'tag' => ['model' => Tag::class, 'relation' => 'tags'],
+    ];
+
     public function index(): View
     {
         return view('catalog.index', [
@@ -25,32 +49,29 @@ class CatalogController extends Controller
                 'episodes' => Episode::query()->count(),
             ],
             'latestTitles' => CatalogTitle::query()
-                ->with(['taxonomies', 'seasons'])
+                ->with($this->cardRelations())
                 ->withCount(['seasons', 'episodes'])
                 ->latest('indexed_at')
                 ->limit(64)
                 ->get(),
             'posterTitles' => CatalogTitle::query()
-                ->with(['taxonomies', 'seasons'])
+                ->with($this->cardRelations())
                 ->withCount(['seasons', 'episodes'])
                 ->whereNotNull('poster_url')
                 ->latest('indexed_at')
                 ->limit(18)
                 ->get(),
-            'genres' => Taxonomy::query()
-                ->where('type', 'genre')
+            'genres' => Genre::query()
                 ->withCount('catalogTitles')
                 ->orderByDesc('catalog_titles_count')
                 ->limit(18)
                 ->get(),
-            'countries' => Taxonomy::query()
-                ->where('type', 'country')
+            'countries' => Country::query()
                 ->withCount('catalogTitles')
                 ->orderByDesc('catalog_titles_count')
                 ->limit(10)
                 ->get(),
-            'subtitleTag' => Taxonomy::query()
-                ->where('type', 'tag')
+            'subtitleTag' => Tag::query()
                 ->where('slug', 'subtitry')
                 ->withCount('catalogTitles')
                 ->first(),
@@ -67,7 +88,7 @@ class CatalogController extends Controller
             ? $parsedYear
             : null;
         $invalidYear = $requestedYear !== '' && $year === null;
-        $filterTypes = ['genre', 'country', 'actor', 'director', 'age_rating', 'translation', 'status', 'network', 'studio', 'tag'];
+        $filterTypes = array_keys(self::FILTER_RELATIONS);
         $legacyType = $this->normalizeLegacyType($request->query('type', ''), $filterTypes);
         $legacyTaxonomy = $this->normalizeFilterSlug($request->query('taxonomy', ''));
         $invalidInputFilterSlugs = [];
@@ -98,58 +119,64 @@ class CatalogController extends Controller
             })
             ->all();
 
-        $activeTaxonomies = collect($activeFilterSlugs)
-            ->map(function (string $slug, string $filterType): ?Taxonomy {
-                return Taxonomy::query()
-                    ->where('type', $filterType)
-                    ->where('slug', $slug)
-                    ->withCount('catalogTitles')
-                    ->first();
-            })
-            ->filter();
-        $invalidFilterSlugs = $invalidInputFilterSlugs + array_diff_key($activeFilterSlugs, $activeTaxonomies->all());
-
         if ($taxonomy !== null && ! in_array($type, $filterTypes, true)) {
             abort(404);
         }
 
+        $activeTaxonomies = collect();
+
+        foreach ($activeFilterSlugs as $filterType => $slug) {
+            $modelClass = $this->filterModelClass($filterType);
+            $record = $modelClass::query()
+                ->where('slug', $slug)
+                ->withCount('catalogTitles')
+                ->first();
+
+            if ($record !== null) {
+                $activeTaxonomies->put($filterType, $record);
+            }
+        }
+
+        $invalidFilterSlugs = $invalidInputFilterSlugs + array_diff_key($activeFilterSlugs, $activeTaxonomies->all());
         $activeFilterSlugs = $activeTaxonomies
-            ->mapWithKeys(fn (Taxonomy $taxonomy, string $filterType): array => [$filterType => $taxonomy->slug])
+            ->mapWithKeys(fn (Model $record, string $filterType): array => [$filterType => $record->slug])
             ->all();
 
         $titles = $this->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, $year, null, $invalidYear)
-            ->with(['taxonomies', 'seasons'])
+            ->with($this->cardRelations())
             ->withCount(['seasons', 'episodes'])
             ->latest('indexed_at')
             ->paginate(24)
             ->withQueryString();
-        $filterTaxonomies = Taxonomy::query()
-            ->whereIn('type', $filterTypes)
-            ->withCount('catalogTitles')
-            ->orderBy('type')
-            ->orderByDesc('catalog_titles_count')
-            ->get()
-            ->filter(fn (Taxonomy $taxonomy): bool => $taxonomy->catalog_titles_count > 0)
-            ->groupBy('type')
-            ->map(fn ($items) => $items->take(12)->values());
 
-        $activeTaxonomies->each(function (Taxonomy $activeTaxonomy, string $filterType) use ($filterTaxonomies): void {
+        $filterTaxonomies = collect($filterTypes)->mapWithKeys(function (string $filterType): array {
+            $modelClass = $this->filterModelClass($filterType);
+            $items = $modelClass::query()
+                ->withCount('catalogTitles')
+                ->orderByDesc('catalog_titles_count')
+                ->limit(12)
+                ->get()
+                ->filter(fn (Model $record): bool => $record->catalog_titles_count > 0)
+                ->values();
+
+            return [$filterType => $items];
+        });
+
+        $activeTaxonomies->each(function (Model $activeTaxonomy, string $filterType) use ($filterTaxonomies): void {
             $items = $filterTaxonomies->get($filterType, collect());
 
-            if (! $items->contains(fn (Taxonomy $taxonomy): bool => $taxonomy->id === $activeTaxonomy->id)) {
+            if (! $items->contains(fn (Model $record): bool => $record->id === $activeTaxonomy->id)) {
                 $filterTaxonomies->put($filterType, $items->prepend($activeTaxonomy)->values());
             }
         });
 
-        $filterTaxonomies->each(function (Collection $items) use ($activeTaxonomies, $invalidFilterSlugs, $search, $year, $invalidYear): void {
-            foreach ($items as $candidateTaxonomy) {
-                $candidateTaxonomy->context_titles_count = $this
-                    ->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, $year, $candidateTaxonomy->type, $invalidYear)
-                    ->whereHas('taxonomies', function (Builder $query) use ($candidateTaxonomy): void {
-                        $query->whereKey($candidateTaxonomy->id);
-                    })
-                    ->count();
-            }
+        $taxonomyContextCounts = $this->relationContextCounts($filterTaxonomies, $activeTaxonomies, $invalidFilterSlugs, $search, $year, $invalidYear);
+        $filterTaxonomies = $filterTaxonomies->map(function (Collection $items, string $filterType) use ($taxonomyContextCounts): Collection {
+            return $items->map(function (Model $record) use ($filterType, $taxonomyContextCounts): Model {
+                $record->context_titles_count = (int) ($taxonomyContextCounts->get($filterType.'|'.$record->id) ?? 0);
+
+                return $record;
+            });
         });
         $yearBuckets = CatalogTitle::query()
             ->select('year')
@@ -176,10 +203,18 @@ class CatalogController extends Controller
             ]);
         }
 
-        $yearBuckets->each(function (object $bucket) use ($activeTaxonomies, $invalidFilterSlugs, $search, $invalidYear): void {
-            $bucket->context_titles_count = $this
-                ->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, (int) $bucket->year, null, $invalidYear)
-                ->count();
+        $yearContextCounts = $this
+            ->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, null, null, $invalidYear)
+            ->select('year')
+            ->selectRaw('count(*) as context_titles_count')
+            ->whereNotNull('year')
+            ->where('year', '>=', 1900)
+            ->where('year', '<=', (int) now()->format('Y') + 1)
+            ->groupBy('year')
+            ->pluck('context_titles_count', 'year');
+
+        $yearBuckets->each(function (object $bucket) use ($yearContextCounts): void {
+            $bucket->context_titles_count = (int) ($yearContextCounts->get((int) $bucket->year) ?? 0);
         });
 
         return view('catalog.titles', [
@@ -259,7 +294,7 @@ class CatalogController extends Controller
         }
 
         $this->applySearchFilter($query, $search);
-        $this->applyTaxonomyFilters($query, $activeTaxonomies, $exceptTaxonomyType);
+        $this->applyRelationFilters($query, $activeTaxonomies, $exceptTaxonomyType);
 
         return $query;
     }
@@ -273,34 +308,91 @@ class CatalogController extends Controller
         $query->where(function (Builder $query) use ($search): void {
             $query->where('title', 'like', "%{$search}%")
                 ->orWhere('original_title', 'like', "%{$search}%")
-                ->orWhere('description', 'like', "%{$search}%")
-                ->orWhereHas('taxonomies', function (Builder $query) use ($search): void {
+                ->orWhere('description', 'like', "%{$search}%");
+
+            foreach ($this->filterRelationNames() as $relation) {
+                $query->orWhereHas($relation, function (Builder $query) use ($search): void {
                     $query->where('name', 'like', "%{$search}%");
                 });
+            }
         });
     }
 
-    private function applyTaxonomyFilters(Builder $query, Collection $activeTaxonomies, ?string $exceptTaxonomyType = null): void
+    private function applyRelationFilters(Builder $query, Collection $activeTaxonomies, ?string $exceptTaxonomyType = null): void
     {
         foreach ($activeTaxonomies as $filterType => $activeTaxonomy) {
             if ($filterType === $exceptTaxonomyType) {
                 continue;
             }
 
-            $query->whereHas('taxonomies', function (Builder $query) use ($activeTaxonomy): void {
+            $relation = self::FILTER_RELATIONS[$filterType]['relation'];
+            $query->whereHas($relation, function (Builder $query) use ($activeTaxonomy): void {
                 $query->whereKey($activeTaxonomy->id);
             });
         }
     }
 
+    private function relationContextCounts(
+        Collection $filterTaxonomies,
+        Collection $activeTaxonomies,
+        array $invalidFilterSlugs,
+        string $search,
+        ?int $year,
+        bool $invalidYear,
+    ): Collection {
+        $visibleIdsByType = $filterTaxonomies
+            ->map(fn (Collection $items): Collection => $items->pluck('id')->values())
+            ->filter(fn (Collection $ids): bool => $ids->isNotEmpty());
+
+        if ($visibleIdsByType->isEmpty()) {
+            return collect();
+        }
+
+        $catalogTitleTable = (new CatalogTitle)->getTable();
+        $contextQueries = $visibleIdsByType
+            ->map(function (Collection $recordIds, string $filterType) use ($activeTaxonomies, $invalidFilterSlugs, $search, $year, $invalidYear, $catalogTitleTable) {
+                $relationName = self::FILTER_RELATIONS[$filterType]['relation'];
+                $catalogTitleRelation = (new CatalogTitle)->{$relationName}();
+                $pivotTable = $catalogTitleRelation->getTable();
+                $titlePivotKey = $catalogTitleRelation->getForeignPivotKeyName();
+                $relatedPivotKey = $catalogTitleRelation->getRelatedPivotKeyName();
+                $filteredTitlesQuery = $this
+                    ->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, $year, $filterType, $invalidYear)
+                    ->select($catalogTitleTable.'.id');
+                $alias = 'filtered_titles_'.preg_replace('/[^a-z0-9_]+/i', '_', $filterType);
+
+                return DB::table($pivotTable)
+                    ->selectRaw('? as filter_type, '.$pivotTable.'.'.$relatedPivotKey.' as relation_id, count(distinct '.$pivotTable.'.'.$titlePivotKey.') as context_titles_count', [$filterType])
+                    ->joinSub($filteredTitlesQuery, $alias, function ($join) use ($alias, $pivotTable, $titlePivotKey): void {
+                        $join->on($alias.'.id', '=', $pivotTable.'.'.$titlePivotKey);
+                    })
+                    ->whereIn($pivotTable.'.'.$relatedPivotKey, $recordIds)
+                    ->groupBy($pivotTable.'.'.$relatedPivotKey);
+            })
+            ->values();
+        $unionQuery = $contextQueries->shift();
+
+        foreach ($contextQueries as $contextQuery) {
+            $unionQuery->unionAll($contextQuery);
+        }
+
+        return DB::query()
+            ->fromSub($unionQuery, 'relation_context_counts')
+            ->get()
+            ->mapWithKeys(fn (object $row): array => [$row->filter_type.'|'.$row->relation_id => (int) $row->context_titles_count]);
+    }
+
     public function show(Request $request, CatalogTitle $catalogTitle): View
     {
-        $catalogTitle->load([
-            'source',
-            'taxonomies',
+        $catalogTitle->load(array_merge([
+            'sourcePage',
             'seasons.episodes',
             'licensedMedia' => fn ($query) => $query->published()->with(['season', 'episode'])->latest('published_at')->latest(),
-        ]);
+        ], $this->filterRelationNames()));
+        $taxonomiesByType = collect(self::FILTER_RELATIONS)
+            ->mapWithKeys(fn (array $config, string $filterType): array => [$filterType => $catalogTitle->{$config['relation']}->values()]);
+        $taxonomyGroups = $taxonomiesByType;
+        $seasons = $catalogTitle->seasons->sortBy('number')->values();
 
         $mediaItems = $catalogTitle->licensedMedia
             ->sortBy(fn (LicensedMedia $media): string => sprintf(
@@ -312,26 +404,63 @@ class CatalogController extends Controller
             ->values();
         $selectedMedia = $mediaItems->firstWhere('id', $request->integer('media'))
             ?? $mediaItems->first();
-        $relatedTaxonomyIds = $catalogTitle->taxonomies
-            ->whereIn('type', ['genre', 'country'])
-            ->pluck('id');
+        $relatedIdsByType = $taxonomiesByType
+            ->map(fn (Collection $items): Collection => $items->pluck('id')->unique()->values())
+            ->filter(fn (Collection $ids): bool => $ids->isNotEmpty());
+        $recommendedTitlesQuery = CatalogTitle::query()
+            ->select(['id', 'slug', 'title', 'description', 'poster_url', 'indexed_at'])
+            ->whereKeyNot($catalogTitle->id);
+
+        if ($relatedIdsByType->isNotEmpty()) {
+            $recommendedTitlesQuery->where(function (Builder $query) use ($relatedIdsByType): void {
+                foreach ($relatedIdsByType as $filterType => $ids) {
+                    $relation = self::FILTER_RELATIONS[$filterType]['relation'];
+                    $query->orWhereHas($relation, function (Builder $query) use ($ids): void {
+                        $query->whereKey($ids);
+                    });
+                }
+            });
+        }
 
         return view('catalog.show', [
             'title' => $catalogTitle,
+            'taxonomiesByType' => $taxonomiesByType,
+            'taxonomyGroups' => $taxonomyGroups,
+            'seasons' => $seasons,
+            'episodeCount' => $seasons->sum(fn ($season): int => (int) $season->episodes->count()),
+            'taxonomyCount' => $taxonomiesByType->sum(fn (Collection $items): int => $items->count()),
+            'parsedSeasonCount' => $seasons->filter(fn ($season): bool => $season->episodes->isNotEmpty())->count(),
             'selectedMedia' => $selectedMedia,
             'mediaItems' => $mediaItems,
-            'recommendedTitles' => CatalogTitle::query()
-                ->with(['taxonomies', 'seasons'])
-                ->withCount(['seasons', 'episodes'])
-                ->whereKeyNot($catalogTitle->id)
-                ->when($relatedTaxonomyIds->isNotEmpty(), function ($query) use ($relatedTaxonomyIds): void {
-                    $query->whereHas('taxonomies', function ($query) use ($relatedTaxonomyIds): void {
-                        $query->whereIn('taxonomies.id', $relatedTaxonomyIds);
-                    });
-                })
+            'mediaCount' => $mediaItems->count(),
+            'recommendedTitles' => $recommendedTitlesQuery
                 ->latest('indexed_at')
-                ->limit(4)
+                ->limit(6)
                 ->get(),
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function filterRelationNames(): array
+    {
+        return collect(self::FILTER_RELATIONS)->pluck('relation')->values()->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function cardRelations(): array
+    {
+        return ['genres', 'countries', 'ageRatings', 'translations', 'tags', 'seasons'];
+    }
+
+    /**
+     * @return class-string<Model>
+     */
+    private function filterModelClass(string $filterType): string
+    {
+        return self::FILTER_RELATIONS[$filterType]['model'];
     }
 }

@@ -6,34 +6,34 @@
         <title>{{ $title ?? config('app.name', 'Каталог сериалов') }}</title>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
-        <div class="border-b border-[#26333b] bg-[#17242c] text-zinc-100 shadow-lg shadow-zinc-900/20">
-            <div class="mx-auto max-w-7xl px-4 py-2 text-xs text-zinc-300 sm:px-6 lg:px-8">
-                <span class="font-semibold text-emerald-300">Каталог сериалов</span>
+    <body class="min-h-screen bg-slate-50 text-slate-700 antialiased">
+        <header class="border-b border-slate-200 bg-white shadow-sm shadow-slate-200/70">
+            <div class="mx-auto max-w-7xl px-4 py-2 text-xs text-slate-500 sm:px-6 lg:px-8">
+                <span class="font-semibold text-emerald-700">Каталог сериалов</span>
             </div>
 
-            <div class="mx-auto flex max-w-7xl flex-col gap-3 px-4 pb-4 sm:px-6 lg:flex-row lg:items-center lg:px-8">
-                <a href="{{ route('home') }}" class="flex items-center gap-3">
-	                    <span class="grid h-12 w-12 place-items-center rounded bg-emerald-400 text-xl font-black text-[#17242c]">К</span>
-	                    <span>
-	                        <span class="block text-2xl font-black tracking-tight text-white">Каталог сериалов</span>
-	                        <span class="block text-xs tracking-[0.25em] text-emerald-300">список сезонов</span>
+            <div class="mx-auto flex max-w-7xl flex-col gap-3 px-3 pb-4 sm:px-6 lg:flex-row lg:items-center lg:px-8">
+                <a href="{{ route('home') }}" class="flex min-w-0 items-center gap-3">
+                    <span class="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-emerald-50 text-xl font-black text-emerald-700 ring-1 ring-emerald-100 sm:h-12 sm:w-12">К</span>
+                    <span>
+                        <span class="block text-xl font-black tracking-tight text-slate-700 sm:text-2xl">Каталог сериалов</span>
+                        <span class="block text-xs tracking-[0.25em] text-slate-400">список сезонов</span>
                     </span>
                 </a>
 
-                <form action="{{ route('titles.index') }}" method="GET" class="flex min-w-0 flex-1 overflow-hidden rounded border border-white/10 bg-white shadow-inner shadow-black/20 lg:mx-6">
-                    <input type="search" name="q" value="{{ request('q') }}" placeholder="Поиск сериала..." class="min-w-0 flex-1 border-0 px-4 py-3 text-sm text-zinc-900 outline-none placeholder:text-zinc-500">
-                    <button type="submit" class="bg-emerald-400 px-5 text-sm font-bold text-[#17242c] hover:bg-emerald-300">Найти</button>
+                <form action="{{ route('titles.index') }}" method="GET" class="flex min-w-0 w-full flex-1 overflow-hidden rounded-lg border border-slate-200 bg-white lg:mx-6">
+                    <input type="search" name="q" value="{{ request('q') }}" placeholder="Поиск сериала..." class="min-w-0 flex-1 border-0 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400">
+                    <button type="submit" class="shrink-0 bg-emerald-50 px-4 text-sm font-bold text-emerald-700 hover:bg-emerald-100 sm:px-5">Найти</button>
                 </form>
 
-                <nav class="flex flex-wrap items-center gap-2 text-sm font-semibold">
-                    <a href="{{ route('home') }}" class="rounded bg-white/10 px-3 py-2 text-zinc-100 hover:bg-white/20">Главная</a>
-                    <a href="{{ route('titles.index') }}" class="rounded bg-white/10 px-3 py-2 text-zinc-100 hover:bg-white/20">Все сериалы</a>
+                <nav class="flex w-full flex-wrap items-center gap-2 text-sm font-semibold lg:w-auto">
+                    <a href="{{ route('home') }}" class="rounded-lg bg-slate-50 px-3 py-2 text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">Главная</a>
+                    <a href="{{ route('titles.index') }}" class="rounded-lg bg-slate-50 px-3 py-2 text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">Все сериалы</a>
                 </nav>
             </div>
-        </div>
+        </header>
 
-        <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <main class="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
             @yield('content')
         </main>
     </body>

@@ -3,33 +3,35 @@
 @php
     $seasonsCount = (int) ($title->seasons_count ?? ($title->relationLoaded('seasons') ? $title->seasons->count() : 0));
     $episodesCount = (int) ($title->episodes_count ?? 0);
+    $cardRelations = collect()
+        ->merge($title->relationLoaded('genres') ? $title->genres : collect())
+        ->merge($title->relationLoaded('countries') ? $title->countries : collect())
+        ->merge($title->relationLoaded('ageRatings') ? $title->ageRatings : collect())
+        ->merge($title->relationLoaded('translations') ? $title->translations : collect())
+        ->merge($title->relationLoaded('tags') ? $title->tags : collect())
+        ->take(3);
 @endphp
 
-<a href="{{ route('titles.show', $title) }}" class="group block overflow-hidden border border-white/10 bg-white/[0.04] hover:border-emerald-300/60">
-    <div class="aspect-[16/10] bg-zinc-900">
-        @if ($title->poster_url)
-            <img src="{{ $title->poster_url }}" alt="{{ $title->title }}" class="h-full w-full object-cover opacity-90 transition group-hover:opacity-100">
-        @else
-            <div class="flex h-full items-center justify-center text-sm text-zinc-500">Нет постера</div>
-        @endif
-    </div>
-    <div class="p-4">
-        <div class="flex items-center gap-2 text-xs text-zinc-500">
+<a href="{{ route('titles.show', $title) }}" class="group flex h-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-200/60 transition hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100">
+    <x-title-poster :title="$title" class="aspect-[3/2] rounded-none sm:aspect-[16/10]" image-class="h-full w-full object-cover transition group-hover:scale-[1.02]" empty-class="flex h-full items-center justify-center text-sm text-slate-400" />
+
+    <div class="flex flex-1 flex-col p-3 sm:p-4">
+        <div class="flex items-center gap-2 text-xs text-slate-500">
             <span>{{ $title->type === 'serial' ? 'сериал' : $title->type }}</span>
             @if ($title->year)
                 <span>{{ $title->year }}</span>
             @endif
         </div>
-        <h3 class="mt-2 line-clamp-2 text-base font-semibold text-white">{{ $title->title }}</h3>
-        <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-zinc-300">
-            <span class="rounded bg-emerald-400/15 px-2 py-1 text-emerald-200">{{ $seasonsCount }} сезон(ов)</span>
-            <span class="rounded bg-sky-400/15 px-2 py-1 text-sky-200">
+        <h3 class="mt-2 line-clamp-2 text-base font-bold text-slate-700">{{ $title->title }}</h3>
+        <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+            <span class="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 ring-1 ring-emerald-100">{{ $seasonsCount }} сезон(ов)</span>
+            <span class="rounded-full bg-sky-50 px-2 py-1 text-sky-700 ring-1 ring-sky-100">
                 {{ $episodesCount > 0 ? $episodesCount.' серий' : 'серии разбираются' }}
             </span>
         </div>
         <div class="mt-3 flex flex-wrap gap-1">
-            @foreach ($title->taxonomies->take(3) as $taxonomy)
-                <span class="rounded-full bg-white/10 px-2 py-1 text-xs text-zinc-300">{{ $taxonomy->name }}</span>
+            @foreach ($cardRelations as $taxonomy)
+                <span class="rounded-full bg-slate-50 px-2 py-1 text-xs text-slate-500 ring-1 ring-slate-200">{{ $taxonomy->name }}</span>
             @endforeach
         </div>
     </div>

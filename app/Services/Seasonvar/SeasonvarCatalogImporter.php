@@ -6,15 +6,29 @@ use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\Season;
 use App\Models\SourcePage;
-use App\Models\Taxonomy;
 use App\Services\Crawler\PoliteHttpClient;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
 class SeasonvarCatalogImporter
 {
+    private const RELATION_TYPES = [
+        'genre' => ['model' => \App\Models\Genre::class, 'relation' => 'genres'],
+        'country' => ['model' => \App\Models\Country::class, 'relation' => 'countries'],
+        'actor' => ['model' => \App\Models\Actor::class, 'relation' => 'actors'],
+        'director' => ['model' => \App\Models\Director::class, 'relation' => 'directors'],
+        'age_rating' => ['model' => \App\Models\AgeRating::class, 'relation' => 'ageRatings'],
+        'translation' => ['model' => \App\Models\Translation::class, 'relation' => 'translations'],
+        'status' => ['model' => \App\Models\CatalogStatus::class, 'relation' => 'statuses'],
+        'network' => ['model' => \App\Models\Network::class, 'relation' => 'networks'],
+        'studio' => ['model' => \App\Models\Studio::class, 'relation' => 'studios'],
+        'tag' => ['model' => \App\Models\Tag::class, 'relation' => 'tags'],
+    ];
+
     public function __construct(
         private readonly SeasonvarSource $seasonvarSource,
         private readonly SeasonvarDiscovery $discovery,
@@ -395,15 +409,19 @@ class SeasonvarCatalogImporter
             'taxonomies' => count($data['taxonomies']),
         ]);
 
-        $catalogTitle = $this->upsertCatalogTitle($page, $data, $contentHash, $progress);
-        $this->syncTaxonomies($catalogTitle, $data['taxonomies'], $progress);
-        $seasons = $this->syncSeasons($catalogTitle, $page, $data['seasons'], $progress);
-        $this->syncEpisodes($seasons, $page, $data['episodes'], $progress);
+        $catalogTitle = DB::transaction(function () use ($page, $data, $contentHash, $progress): CatalogTitle {
+            $catalogTitle = $this->upsertCatalogTitle($page, $data, $contentHash, $progress);
+            $this->syncCatalogRelations($catalogTitle, $data['taxonomies'], $progress);
+            $seasons = $this->syncSeasons($catalogTitle, $page, $data['seasons'], $progress);
+            $this->syncEpisodes($seasons, $page, $data['episodes'], $progress);
 
-        $page->update([
-            'parse_status' => 'parsed',
-            'error_message' => null,
-        ]);
+            $page->update([
+                'parse_status' => 'parsed',
+                'error_message' => null,
+            ]);
+
+            return $catalogTitle;
+        });
 
         $this->report($progress, 'page-parse-complete', [
             'source_page_id' => $page->id,
@@ -424,7 +442,7 @@ class SeasonvarCatalogImporter
      *     poster_url: string|null,
      *     external_id: string|null,
      *     current_season_number: int,
-     *     seasons: list<array{number: int, title: string|null, source_url: string|null}>,
+     *     seasons: list<array{number: int, title: string|null, source_url: string|null, latest_episode_released_at: string|null, episodes_released: int|null, episodes_total: int|null, translation_name: string|null, release_status_text: string|null}>,
      *     episodes: list<array{season_number: int, number: int, title: string|null, source_url: string|null}>,
      *     taxonomies: list<array{type: string, name: string, source_url: string|null}>
      * } $data
@@ -584,94 +602,160 @@ class SeasonvarCatalogImporter
      * @param  list<array{type: string, name: string, source_url: string|null}>  $taxonomies
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      */
-    private function syncTaxonomies(CatalogTitle $catalogTitle, array $taxonomies, ?callable $progress = null): void
+    private function syncCatalogRelations(CatalogTitle $catalogTitle, array $taxonomies, ?callable $progress = null): void
     {
-        $ids = [];
-
         $this->report($progress, 'taxonomy-sync-started', [
             'catalog_title_id' => $catalogTitle->id,
             'total' => count($taxonomies),
         ]);
 
-        foreach ($taxonomies as $index => $item) {
-            $slug = Str::slug($item['name']) ?: Str::substr(hash('sha256', $item['type'].'|'.$item['name']), 0, 16);
+        $idsByRelation = collect(self::RELATION_TYPES)
+            ->mapWithKeys(fn (array $config): array => [$config['relation'] => []])
+            ->all();
+        $relationsByType = collect($taxonomies)
+            ->filter(fn (array $item): bool => isset(self::RELATION_TYPES[$item['type']]))
+            ->groupBy('type');
 
-            $taxonomy = Taxonomy::query()->updateOrCreate(
-                ['type' => $item['type'], 'slug' => $slug],
-                ['name' => $item['name'], 'source_url' => $item['source_url']],
-            );
-
-            $ids[] = $taxonomy->id;
-
-            $this->report($progress, $taxonomy->wasRecentlyCreated ? 'taxonomy-created' : 'taxonomy-updated', [
-                'index' => $index + 1,
-                'total' => count($taxonomies),
-                'taxonomy_id' => $taxonomy->id,
-                'catalog_title_id' => $catalogTitle->id,
-                'type' => $taxonomy->type,
-                'name' => $taxonomy->name,
-                'slug' => $taxonomy->slug,
-                'source_url' => $taxonomy->source_url,
-            ]);
+        foreach ($relationsByType as $type => $items) {
+            $config = self::RELATION_TYPES[$type];
+            $idsByRelation[$config['relation']] = $this->syncCatalogRelationType($catalogTitle, $type, $items, $progress);
         }
 
-        $catalogTitle->taxonomies()->sync($ids);
+        foreach ($idsByRelation as $relation => $ids) {
+            $catalogTitle->{$relation}()->sync($ids);
+        }
+
+        $syncedIds = collect($idsByRelation)->flatten()->values();
 
         $this->report($progress, 'taxonomy-sync-complete', [
             'catalog_title_id' => $catalogTitle->id,
-            'synced' => count($ids),
-            'taxonomy_ids' => $ids,
+            'synced' => $syncedIds->count(),
+            'taxonomy_ids' => $syncedIds->all(),
         ]);
     }
 
     /**
-     * @param  list<array{number: int, title: string|null, source_url: string|null}>  $seasons
+     * @param  Collection<int, array{type: string, name: string, source_url: string|null}>  $items
+     * @return list<int>
+     */
+    private function syncCatalogRelationType(CatalogTitle $catalogTitle, string $type, Collection $items, ?callable $progress = null): array
+    {
+        $config = self::RELATION_TYPES[$type];
+        /** @var class-string<Model> $modelClass */
+        $modelClass = $config['model'];
+        $now = now();
+        $rowsBySlug = $items
+            ->filter(fn (array $item): bool => trim($item['name']) !== '')
+            ->mapWithKeys(function (array $item) use ($type, $now): array {
+                $slug = $this->relationSlug($type, $item['name']);
+
+                return [$slug => [
+                    'name' => $item['name'],
+                    'slug' => $slug,
+                    'source_url' => $item['source_url'],
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]];
+            });
+
+        if ($rowsBySlug->isEmpty()) {
+            return [];
+        }
+
+        $modelClass::query()->upsert(
+            $rowsBySlug->values()->all(),
+            ['slug'],
+            ['name', 'source_url', 'updated_at'],
+        );
+
+        $relationIds = $modelClass::query()
+            ->whereIn('slug', $rowsBySlug->keys())
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+
+        $this->report($progress, 'taxonomy-type-synced', [
+            'catalog_title_id' => $catalogTitle->id,
+            'type' => $type,
+            'relation' => $config['relation'],
+            'records' => $rowsBySlug->count(),
+            'synced' => count($relationIds),
+        ]);
+
+        return array_values(array_unique($relationIds));
+    }
+
+    private function relationSlug(string $type, string $name): string
+    {
+        return Str::slug($name) ?: Str::substr(hash('sha256', $type.'|'.$name), 0, 16);
+    }
+
+    /**
+     * @param  list<array{number: int, title: string|null, source_url: string|null, latest_episode_released_at: string|null, episodes_released: int|null, episodes_total: int|null, translation_name: string|null, release_status_text: string|null}>  $seasons
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return array<int, Season>
      */
     private function syncSeasons(CatalogTitle $catalogTitle, SourcePage $page, array $seasons, ?callable $progress = null): array
     {
-        $syncedSeasons = [];
-
         $this->report($progress, 'season-sync-started', [
             'catalog_title_id' => $catalogTitle->id,
             'source_page_id' => $page->id,
             'total' => count($seasons),
         ]);
 
-        foreach ($seasons as $index => $season) {
-            $syncedSeason = Season::query()->updateOrCreate(
-                [
+        $now = now();
+        $rowsByNumber = collect($seasons)
+            ->filter(fn (array $season): bool => (int) $season['number'] > 0)
+            ->mapWithKeys(function (array $season) use ($catalogTitle, $page, $now): array {
+                $number = (int) $season['number'];
+
+                return [$number => [
                     'catalog_title_id' => $catalogTitle->id,
-                    'number' => $season['number'],
-                ],
-                [
+                    'number' => $number,
                     'source_page_id' => $page->id,
                     'title' => $season['title'],
                     'source_url' => $season['source_url'],
                     'source_url_hash' => $season['source_url'] ? $this->seasonvarUrl->hash($season['source_url']) : null,
+                    'latest_episode_released_at' => $season['latest_episode_released_at'] ?? null,
+                    'episodes_released' => $season['episodes_released'] ?? null,
+                    'episodes_total' => $season['episodes_total'] ?? null,
+                    'translation_name' => $season['translation_name'] ?? null,
+                    'release_status_text' => $season['release_status_text'] ?? null,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]];
+            });
+
+        if ($rowsByNumber->isNotEmpty()) {
+            Season::query()->upsert(
+                $rowsByNumber->values()->all(),
+                ['catalog_title_id', 'number'],
+                [
+                    'source_page_id',
+                    'title',
+                    'source_url',
+                    'source_url_hash',
+                    'latest_episode_released_at',
+                    'episodes_released',
+                    'episodes_total',
+                    'translation_name',
+                    'release_status_text',
+                    'updated_at',
                 ],
             );
-
-            $this->report($progress, $syncedSeason->wasRecentlyCreated ? 'season-created' : 'season-updated', [
-                'index' => $index + 1,
-                'total' => count($seasons),
-                'season_id' => $syncedSeason->id,
-                'catalog_title_id' => $catalogTitle->id,
-                'source_page_id' => $page->id,
-                'number' => $syncedSeason->number,
-                'title' => $syncedSeason->title,
-                'source_url' => $syncedSeason->source_url,
-                'source_url_hash' => $syncedSeason->source_url_hash,
-            ]);
-
-            $syncedSeasons[(int) $syncedSeason->number] = $syncedSeason;
         }
+
+        $syncedSeasons = Season::query()
+            ->where('catalog_title_id', $catalogTitle->id)
+            ->whereIn('number', $rowsByNumber->keys())
+            ->get()
+            ->keyBy(fn (Season $season): int => (int) $season->number)
+            ->all();
 
         $this->report($progress, 'season-sync-complete', [
             'catalog_title_id' => $catalogTitle->id,
             'source_page_id' => $page->id,
-            'synced' => count($seasons),
+            'synced' => count($syncedSeasons),
         ]);
 
         return $syncedSeasons;
@@ -689,51 +773,55 @@ class SeasonvarCatalogImporter
             'total' => count($episodes),
         ]);
 
-        foreach ($episodes as $index => $episode) {
+        $now = now();
+        $skipped = 0;
+        $rowsByKey = collect($episodes)->mapWithKeys(function (array $episode) use ($seasons, $page, $now, &$skipped): array {
             $season = $seasons[$episode['season_number']] ?? null;
 
             if ($season === null) {
-                $this->report($progress, 'episode-sync-skipped', [
-                    'index' => $index + 1,
-                    'total' => count($episodes),
-                    'source_page_id' => $page->id,
-                    'season_number' => $episode['season_number'],
-                    'episode_number' => $episode['number'],
-                    'reason' => 'сезон не найден',
-                ]);
+                $skipped++;
 
-                continue;
+                return [];
             }
 
-            $syncedEpisode = Episode::query()->updateOrCreate(
-                [
+            $number = (int) $episode['number'];
+
+            if ($number <= 0) {
+                $skipped++;
+
+                return [];
+            }
+
+            return [$season->id.'|'.$number => [
                     'season_id' => $season->id,
-                    'number' => $episode['number'],
-                ],
-                [
+                    'number' => $number,
                     'source_page_id' => $page->id,
                     'title' => $episode['title'],
                     'source_url' => $episode['source_url'],
                     'source_url_hash' => $episode['source_url'] ? $this->seasonvarUrl->hash($episode['source_url']) : null,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]];
+        });
+
+        if ($rowsByKey->isNotEmpty()) {
+            Episode::query()->upsert(
+                $rowsByKey->values()->all(),
+                ['season_id', 'number'],
+                [
+                    'source_page_id',
+                    'title',
+                    'source_url',
+                    'source_url_hash',
+                    'updated_at',
                 ],
             );
-
-            $this->report($progress, $syncedEpisode->wasRecentlyCreated ? 'episode-created' : 'episode-updated', [
-                'index' => $index + 1,
-                'total' => count($episodes),
-                'episode_id' => $syncedEpisode->id,
-                'season_id' => $season->id,
-                'source_page_id' => $page->id,
-                'season_number' => $episode['season_number'],
-                'number' => $syncedEpisode->number,
-                'title' => $syncedEpisode->title,
-                'source_url' => $syncedEpisode->source_url,
-            ]);
         }
 
         $this->report($progress, 'episode-sync-complete', [
             'source_page_id' => $page->id,
-            'synced' => count($episodes),
+            'synced' => $rowsByKey->count(),
+            'skipped' => $skipped,
         ]);
     }
 

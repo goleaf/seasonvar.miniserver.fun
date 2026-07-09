@@ -23,6 +23,14 @@ class Episode extends Model
     }
 
     /**
+     * @return BelongsTo<SourcePage, $this>
+     */
+    public function sourcePage(): BelongsTo
+    {
+        return $this->belongsTo(SourcePage::class);
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array

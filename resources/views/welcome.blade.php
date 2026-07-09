@@ -11,7 +11,7 @@
             <section class="w-full rounded border border-[#d4dce0] bg-white p-6 shadow-sm">
                 <h1 class="text-2xl font-black">Каталог сериалов</h1>
                 <p class="mt-3 text-sm leading-6 text-zinc-600">Откройте локальный каталог сериалов, сезонов и серий.</p>
-                <a href="{{ route('home') }}" class="mt-5 inline-flex rounded bg-emerald-500 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600">
+                <a href="{{ route('home') }}" class="mt-5 inline-flex rounded-lg bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-100">
                     Перейти в каталог
                 </a>
             </section>
