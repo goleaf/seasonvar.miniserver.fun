@@ -1,76 +1,77 @@
-# Code Standards
+# Стандарты кода
 
-Last updated: 2026-07-09
+Обновлено: 09.07.2026
 
-## Required workflow
+## Обязательный процесс
 
-Every future code change must update this documentation set when it changes architecture, parser rules, UI components, relations, commands, or query patterns.
+Каждое будущее изменение кода должно обновлять этот набор документации, если меняет архитектуру, правила импортера, компоненты интерфейса, связи, команды или запросы.
 
-Update these files together when relevant:
+Обновлять вместе, когда это относится к изменению:
 
-- `docs/CODE_STANDARDS.md` for coding conventions and architecture rules.
-- `docs/UI_STANDARDS.md` for visual and Blade component rules.
-- `docs/DATA_RELATIONS.md` for parser fields, Eloquent relations, filters, and database meaning.
-- `docs/MAINTENANCE_LOG.md` for a short dated summary of important changes.
+- `docs/CODE_STANDARDS.md` для правил кода и архитектуры.
+- `docs/UI_STANDARDS.md` для правил интерфейса и Blade-компонентов.
+- `docs/DATA_RELATIONS.md` для полей импортера, Eloquent-связей, фильтров и смысла данных.
+- `docs/MAINTENANCE_LOG.md` для короткого датированного описания важных изменений.
 
-## Laravel standards
+## Правила Laravel
 
-- Keep server configuration unchanged from application work.
-- Do not use seeders for production catalog data.
-- Keep `php artisan seasonvar:import` as the single public Seasonvar import entry point.
-- Prefer Eloquent relationships over raw queries.
-- Eager-load all relationships used by Blade views.
-- Do not run database queries in Blade views.
-- Use `withCount()` for relation counts shown in lists.
-- Batch count calculations where possible instead of running one query per visible filter item.
-- Keep route filters internal: `/titles/{type}/{taxonomy}` and `/titles?...` should always resolve to local catalog pages.
-- Normalize and validate all query inputs before applying filters.
+- Не менять серверную конфигурацию в рамках прикладных задач.
+- Не использовать сидеры для производственных данных каталога.
+- Держать `php artisan seasonvar:import` единственной публичной командой импорта Seasonvar.
+- Предпочитать Eloquent-связи сырым запросам.
+- Загружать заранее все связи, которые используются Blade-страницами.
+- Не выполнять запросы к базе внутри Blade-шаблонов.
+- Использовать `withCount()` для счетчиков связей в списках.
+- Считать количества пакетно, когда это возможно, а не отдельным запросом на каждый видимый фильтр.
+- Фильтры маршрутов должны оставаться локальными: `/titles/{type}/{taxonomy}` и `/titles?...` всегда ведут на страницы местного каталога.
+- Нормализовать и проверять все входные параметры перед применением фильтров.
 
-## Parser standards
+## Правила импортера
 
-- Use only `https://seasonvar.ru/` as the Seasonvar source domain.
-- Parse metadata, relations, ratings, aliases, reviews, seasons, episodes, poster URLs, source page state, HTML snapshots, and video candidates.
-- Do not depend on external player pages for local navigation.
-- Store external video links only; never download video files into the application.
-- Store `source_media_key`, quality, translation, format, and availability check fields for media records.
-- Route all video URL availability checks through `SeasonvarMediaAvailabilityChecker`; do not duplicate Range-check HTTP logic in import services.
-- Preserve existing actors, episodes, and media records when Seasonvar no longer returns them.
-- Clean titles before storage: remove `>>>`, trailing online text, date noise, and Seasonvar suffixes.
-- Store season-list update text like `(09.07.2026 1 серия (AniDub) из ??)` as structured season fields plus the raw status text.
-- Store relation-like values in concrete relation tables when they are filterable: genre, country, actor, director, age rating, translation, status, network, studio, tag.
-- Do not introduce morph or polymorphic relations for catalog metadata; use explicit `belongsToMany` relations and pivot tables.
-- Importer relation sync must group parsed relation values by type, batch `upsert` lookup rows, fetch IDs in one query per type, and attach new pivot records without removing older missing relations.
-- Importer catalog writes after successful HTTP parsing must run in one database transaction: title, relation pivots, seasons, episodes, and final source-page parsed status.
-- Importer season and episode sync must use batch `upsert` for parsed page payloads instead of per-row `updateOrCreate()`.
-- Importer discovered URL storage must process URLs chunk by chunk, use batch `upsert`, and must not reset existing source pages to pending.
-- Importer must reject malformed Seasonvar catalog URLs such as nested `.html/...` links and mark already stored malformed source pages as unavailable instead of requesting them.
-- Importer title upsert must try exact `source_url_hash` lookup before wider title-based duplicate detection.
-- Importer must skip HTML parsing and catalog writes for unchanged pages that are already parsed and have an existing catalog title.
-- Importer must check a small backlog of older media records with missing or stale `check_status` during each cycle.
-- Importer must backfill old parsed `source_pages` from pending import state to parsed import state during each cycle.
-- Importer must backfill missing media quality, format, and translation metadata during each cycle without re-downloading source pages.
-- Importer must preserve season and episode context when expanding HLS master playlists into playable quality variants.
-- Importer must save trailer or announcement media even when no episode number is present; normal episode video still requires a matching season and episode.
-- Age rating relation values must be strict short ratings like `18+`, `16+`, `12+`; long text must never be stored as an age rating.
-- Filter relation values for genre, country, status, network, studio, and tag must stay short and must not contain description-like sentences.
-- Store season/episode structure as `seasons` and `episodes`, not as tags.
-- Merge duplicated season pages into one `CatalogTitle`; seasons must stay internal to that title.
+- Использовать только `https://seasonvar.ru/` как домен источника Seasonvar.
+- Собирать метаданные, связи, рейтинги, дополнительные названия, отзывы, сезоны, серии, постеры, состояние страницы источника, HTML-снимки и видео-кандидаты.
+- Не зависеть от внешних страниц плеера для локальной навигации.
+- Сохранять только внешние видео-ссылки; никогда не скачивать видеофайлы в приложение.
+- Для медиа хранить `source_media_key`, качество, перевод, формат и поля проверки доступности.
+- Все проверки доступности видео-ссылок проводить через `SeasonvarMediaAvailabilityChecker`; не дублировать HTTP-логику Range-проверок в сервисах импорта.
+- Сохранять уже существующих актеров, серии и медиа, даже если Seasonvar перестал возвращать их на странице.
+- Очищать названия перед сохранением: убирать `>>>`, хвосты про онлайн-просмотр, шум дат и суффиксы Seasonvar.
+- Текст обновления сезона вроде `(09.07.2026 1 серия (AniDub) из ??)` хранить как структурированные поля сезона плюс исходный текст статуса.
+- Значения, похожие на связи, хранить в конкретных таблицах связей, если они фильтруются: жанр, страна, актер, режиссер, возраст, перевод, статус, сеть, студия, метка.
+- Не вводить morph- или polymorphic-связи для метаданных каталога; использовать явные `belongsToMany`-связи и pivot-таблицы.
+- Синхронизация связей должна группировать разобранные значения по типу, пакетно выполнять `upsert`, получать ID одним запросом на тип и добавлять новые pivot-записи без удаления старых отсутствующих связей.
+- Запись карточки после успешного HTTP-разбора должна выполняться в одной транзакции базы: карточка, связи, сезоны, серии и финальный parsed-статус страницы источника.
+- Синхронизация сезонов и серий должна использовать пакетный `upsert` вместо построчного `updateOrCreate()`.
+- Сохранение найденных URL должно идти пакетами, через `upsert`, и не должно сбрасывать существующие страницы источника в pending.
+- Импортер должен отклонять неправильные ссылки каталога Seasonvar вроде вложенных `.html/...` и помечать уже сохраненные неправильные страницы как недоступные, не запрашивая их снова.
+- Обновление карточки должно сначала искать точное совпадение по `source_url_hash`, а уже потом выполнять более широкий поиск дублей по названию.
+- Импортер должен пропускать HTML-разбор и запись каталога для неизменившихся страниц, которые уже разобраны и имеют карточку.
+- В каждом цикле импортер должен проверять небольшой backlog старых медиа с пустым или устаревшим `check_status`.
+- В каждом цикле импортер должен переводить старые разобранные `source_pages` из pending-состояния импорта в parsed-состояние.
+- В каждом цикле импортер должен дозаполнять отсутствующие качество, формат и перевод медиа без повторного скачивания страниц источника.
+- В каждом цикле импортер должен дозаполнять отсутствующие `source_media_key` у старых медиа и сохранять стабильность ключа для будущих обновлений видео-ссылок.
+- При раскрытии HLS master playlist в варианты качества импортер должен сохранять контекст сезона и серии.
+- Импортер должен сохранять трейлеры и анонсы даже без номера серии; обычное видео серии по-прежнему требует совпавший сезон и серию.
+- Возрастные значения должны быть короткими строгими рейтингами вроде `18+`, `16+`, `12+`; длинный текст нельзя сохранять как возрастной рейтинг.
+- Значения связей для жанра, страны, статуса, сети, студии и метки должны оставаться короткими и не содержать описательных предложений.
+- Структуру сезонов и серий хранить как `seasons` и `episodes`, а не как метки.
+- Дублированные страницы сезонов объединять в одну `CatalogTitle`; сезоны должны оставаться внутренними записями этой карточки.
 
-## Query standards
+## Правила запросов
 
-- `CatalogController::titles()` must resolve active filters through the concrete relation model for that filter type.
-- Filter sidebar context counts must be calculated by aggregated/union queries over relation pivot tables, not per item loops.
-- Year context counts must be calculated by grouped year query, not per year row loops.
-- `CatalogController::show()` must prepare grouped relation collections once and pass them to Blade.
-- `CatalogController::show()` must eager-load only relations used by the current Blade blocks.
-- Recommended-title queries must not eager-load seasons or relation collections unless the recommendation block displays them.
-- Many-to-many catalog relation filters must keep a reverse pivot index on related ID and `catalog_title_id`.
-- Lists ordered by `indexed_at` must keep an index that supports the ordering and common year filters.
-- Media lookups for title pages must keep an index on title, status, and published timestamp.
+- `CatalogController::titles()` должен определять активные фильтры через конкретную модель связи для этого типа фильтра.
+- Счетчики контекста боковых фильтров должны считаться агрегированными или union-запросами по pivot-таблицам, а не циклами по каждому элементу.
+- Счетчики по годам должны считаться сгруппированным запросом по году, а не циклом по строкам года.
+- `CatalogController::show()` должен один раз готовить сгруппированные коллекции связей и передавать их в Blade.
+- `CatalogController::show()` должен заранее загружать только те связи, которые используются текущими Blade-блоками.
+- Запросы рекомендованных карточек не должны заранее загружать сезоны или коллекции связей, если блок рекомендаций их не показывает.
+- Many-to-many фильтры каталога должны иметь обратный pivot-индекс по связанному ID и `catalog_title_id`.
+- Списки, отсортированные по `indexed_at`, должны иметь индекс, который поддерживает сортировку и частые фильтры по году.
+- Поиск медиа для страниц карточек должен иметь индекс по карточке, статусу и дате публикации.
 
-## Naming standards
+## Правила именования
 
-- Models are singular: `CatalogTitle`, `Genre`, `Country`, `Actor`, `Director`, `AgeRating`, `Translation`, `CatalogStatus`, `Network`, `Studio`, `Tag`, `Season`, `Episode`.
-- Collections use plural descriptive names: `$recommendedTitles`, `$taxonomiesByType`.
-- View data names should describe prepared data, not implementation details.
-- Blade components live under `resources/views/components` and reusable UI under `resources/views/components/ui`.
+- Модели называются в единственном числе: `CatalogTitle`, `Genre`, `Country`, `Actor`, `Director`, `AgeRating`, `Translation`, `CatalogStatus`, `Network`, `Studio`, `Tag`, `Season`, `Episode`.
+- Коллекции используют описательные имена во множественном числе: `$recommendedTitles`, `$taxonomiesByType`.
+- Имена данных для view должны описывать подготовленные данные, а не детали реализации.
+- Blade-компоненты лежат в `resources/views/components`, переиспользуемый интерфейс лежит в `resources/views/components/ui`.

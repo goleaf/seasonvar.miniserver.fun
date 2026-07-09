@@ -28,7 +28,7 @@ class ExternalMediaMetadata
             preg_match('/\b(?:2k|qhd)\b/u', $value) === 1 => '1440p',
             preg_match('/\b(?:full\s*hd|fhd)\b/u', $value) === 1 => '1080p',
             preg_match('/\b(?:hd|hdtv|hdrip|web[\s.-]*dl|web[\s.-]*rip|bdrip)\b/u', $value) === 1 => '720p',
-            preg_match('/\b(?:sd|sat[\s.-]*rip|tv[\s.-]*rip|dvd[\s.-]*rip|dvdrip)\b/u', $value) === 1 => '480p',
+            preg_match('/\b(?:sd|dvd|sat[\s.-]*rip|tv[\s.-]*rip|dvd[\s.-]*rip|dvdrip|vhs[\s.-]*rip|vhsrip)\b/u', $value) === 1 => '480p',
             default => null,
         };
     }
@@ -64,6 +64,32 @@ class ExternalMediaMetadata
 
         return str_contains($path, '/trailers/')
             || preg_match('/\b(?:trailer|trailers|preview|teaser|promo|анонс|трейлер|промо)\b/u', $value) === 1;
+    }
+
+    public function sourceMediaKey(
+        string $source,
+        string|int|null $catalogIdentity,
+        ?int $seasonNumber,
+        ?int $episodeNumber,
+        ?string $sourceUrl,
+        string $playbackUrl,
+        ?string $title,
+        ?string $quality,
+        string $format,
+    ): string {
+        $sourceIdentity = $sourceUrl ?: 'direct:'.hash('sha256', $playbackUrl);
+
+        return hash('sha256', implode('|', [
+            Str::lower($source),
+            (string) ($catalogIdentity ?? ''),
+            $seasonNumber ?? '',
+            $episodeNumber ?? '',
+            $this->isTrailer($title, $playbackUrl) ? 'trailer' : 'episode',
+            $sourceIdentity,
+            Str::slug((string) ($title ?? '')),
+            $quality ?? '',
+            $format,
+        ]));
     }
 
     private function normalizedValue(string $value): string

@@ -11,14 +11,15 @@ class SeasonvarSource
         return Source::query()->updateOrCreate(
             ['code' => 'seasonvar'],
             [
-                'name' => 'Метаданные Seasonvar',
+                'name' => 'Каталог Seasonvar',
                 'base_url' => $this->baseUrl(),
                 'is_active' => true,
                 'crawl_delay_seconds' => $this->crawlDelaySeconds(),
                 'settings' => [
-                    'scope' => 'только публичные метаданные каталога seasonvar.ru',
+                    'scope' => 'публичные страницы каталога, сезоны, серии, отзывы и внешние видео-ссылки seasonvar.ru',
                     'sitemap_url' => $this->sitemapUrl(),
-                    'blocked' => ['плеер', 'плейлист', 'сеть доставки', 'видеопотоки'],
+                    'stores' => ['metadata', 'relations', 'reviews', 'external_video_links'],
+                    'downloads_video_files' => false,
                 ],
             ],
         );

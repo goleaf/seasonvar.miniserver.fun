@@ -1,66 +1,66 @@
-# UI Standards
+# Стандарты интерфейса
 
-Last updated: 2026-07-09
+Обновлено: 09.07.2026
 
-## Theme
+## Тема
 
-The catalog UI is light-only.
+Интерфейс каталога только светлый.
 
-Do not use:
+Не использовать:
 
 - `bg-black`
 - `bg-zinc-900`, `bg-zinc-950`
 - `bg-slate-900`, `bg-gray-900`, `bg-neutral-900`
-- `text-white` for normal UI blocks
-- `bg-white/[...]`, `border-white/...`, dark translucent panels
-- dark page backgrounds
+- `text-white` для обычных блоков интерфейса
+- `bg-white/[...]`, `border-white/...`, темные полупрозрачные панели
+- темные фоны страниц
 
-Use instead:
+Использовать:
 
-- Page background: `bg-slate-50`
-- Panels: `bg-white`, `border-slate-200`, `shadow-slate-200/60`
-- Muted blocks: `bg-slate-50`
-- Primary accent: `emerald-50`, `emerald-100`, `emerald-700`
-- Text: `text-slate-700`, `text-slate-600`, `text-slate-500`
+- фон страницы: `bg-slate-50`
+- панели: `bg-white`, `border-slate-200`, `shadow-slate-200/60`
+- приглушенные блоки: `bg-slate-50`
+- основной акцент: `emerald-50`, `emerald-100`, `emerald-700`
+- текст: `text-slate-700`, `text-slate-600`, `text-slate-500`
 
-## Icons
+## Иконки
 
-- Use FontAwesome from the local npm package `@fortawesome/fontawesome-free`.
-- Import icon CSS through Vite from `resources/js/app.js`; never use CDN links.
-- Prefer component icon props: `x-ui.panel icon="..."`, `x-ui.taxonomy-chip icon="..."`, and `x-stat icon="..."`.
-- Icons are decorative by default and should use `aria-hidden="true"` while visible text remains present.
-- Keep icons in the light palette: `text-emerald-700`, `text-slate-400`, `text-slate-500`, or semantic light-state colors.
+- Использовать FontAwesome из локального npm-пакета `@fortawesome/fontawesome-free`.
+- Подключать CSS иконок через Vite из `resources/js/app.js`; CDN-ссылки не использовать.
+- Предпочитать параметры иконок в компонентах: `x-ui.panel icon="..."`, `x-ui.taxonomy-chip icon="..."` и `x-stat icon="..."`.
+- Иконки по умолчанию декоративные и должны иметь `aria-hidden="true"`, при этом видимый текст должен оставаться на месте.
+- Держать иконки в светлой палитре: `text-emerald-700`, `text-slate-400`, `text-slate-500` или семантические светлые цвета состояния.
 
-## Shared components
+## Общие компоненты
 
-Use shared Blade components before writing repeated markup:
+Перед повторной версткой использовать общие Blade-компоненты:
 
-- `x-ui.panel` for all bordered sections and side blocks.
-- `x-ui.taxonomy-chip` for every taxonomy link or pill.
-- `x-ui.section-title` for section heading blocks when a full panel header is not needed.
-- `x-title-poster` for every catalog poster image or placeholder.
-- `x-title-card` for title grid cards.
-- `x-title-list-row` for responsive list rows with poster thumbnail, title metadata, and counters.
-- `x-stat` for dashboard counters.
-- Title pages use season accordions and keep every season inside one title page.
-- Video playback uses the local Plyr/HLS bundle initialized from `resources/js/app.js`.
+- `x-ui.panel` для всех секций с рамкой и боковых блоков.
+- `x-ui.taxonomy-chip` для каждой ссылки или плашки справочника.
+- `x-ui.section-title` для заголовков секций, когда полный заголовок панели не нужен.
+- `x-title-poster` для каждого постера каталога или заглушки постера.
+- `x-title-card` для карточек сетки каталога.
+- `x-title-list-row` для адаптивных строк списка с миниатюрой постера, данными карточки и счетчиками.
+- `x-stat` для счетчиков панели состояния.
+- Страницы карточек используют аккордеоны сезонов и держат все сезоны внутри одной страницы карточки.
+- Воспроизведение видео использует локальный пакет Plyr/HLS, который инициализируется из `resources/js/app.js`.
 
-## Readability rules
+## Читаемость
 
-- Every major block needs a short visible title.
-- Relation links must look clickable and stay readable on mobile.
-- Long descriptions use normal line height and slate text, not small low-contrast text.
-- Dense metadata should use label/value layout or chips, not raw comma strings.
-- Player placeholder must remain light even when no media is connected.
-- Visitor-facing empty states must be written in plain Russian and avoid implementation words like parser, import, command, or sync.
+- У каждого крупного блока должен быть короткий видимый заголовок.
+- Ссылки связей должны выглядеть кликабельными и оставаться читаемыми на мобильных экранах.
+- Длинные описания используют нормальную высоту строки и slate-текст, а не мелкий малоконтрастный текст.
+- Плотные метаданные должны выводиться как label/value или плашки, а не сырой строкой через запятые.
+- Заглушка плеера должна оставаться светлой даже без подключенного медиа.
+- Пустые состояния для посетителей должны быть написаны простым русским языком и не должны использовать технические слова вроде «парсер», «импорт», «команда» или «синхронизация».
 
-## Layout rules
+## Правила раскладки
 
-- Use `gap` utilities for spacing between siblings.
-- Prefer `grid` for page layout and responsive card lists.
-- Avoid duplicating panel header classes inside pages; use `x-ui.panel`.
-- Keep mobile layout single-column before desktop grids.
-- Main catalog lists should show a compact poster thumbnail beside each title when a poster is available.
-- Use `minmax(0, 1fr)` in multi-column page grids to avoid horizontal overflow.
-- Tablet layouts should avoid forcing three dense columns before `xl`.
-- Episode lists must remain readable on mobile and may use two or three columns only from medium desktop widths upward.
+- Использовать `gap`-утилиты для расстояний между соседними элементами.
+- Предпочитать `grid` для структуры страниц и адаптивных списков карточек.
+- Не дублировать классы заголовков панелей внутри страниц; использовать `x-ui.panel`.
+- До широких сеток мобильная раскладка должна оставаться в одну колонку.
+- Основные списки каталога должны показывать компактную миниатюру постера рядом с названием, если постер есть.
+- Использовать `minmax(0, 1fr)` в многоколоночных сетках страниц, чтобы избежать горизонтального переполнения.
+- Планшетные раскладки не должны принудительно включать три плотные колонки до `xl`.
+- Списки серий должны оставаться читаемыми на мобильных экранах и могут использовать две или три колонки только начиная со средних широких экранов.

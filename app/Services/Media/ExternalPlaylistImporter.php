@@ -403,16 +403,17 @@ class ExternalPlaylistImporter
 
     private function sourceMediaKey(CatalogTitle $catalogTitle, array $entry, string $baseUrl): string
     {
-        return hash('sha256', implode('|', [
+        return $this->mediaMetadata->sourceMediaKey(
             'external_playlist',
             $catalogTitle->source_url_hash ?: $catalogTitle->id,
+            $entry['season_number'],
+            $entry['episode_number'],
             $baseUrl,
-            $entry['season_number'] ?? '',
-            $entry['episode_number'] ?? '',
-            Str::slug($entry['title']),
-            $this->mediaMetadata->quality($entry['title'], $entry['url']) ?? '',
+            $entry['url'],
+            $entry['title'],
+            $this->mediaMetadata->quality($entry['title'], $entry['url']),
             $this->mediaMetadata->format($entry['url']),
-        ]));
+        );
     }
 
     private function isMediaFileUrl(string $url): bool

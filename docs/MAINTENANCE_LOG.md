@@ -2,6 +2,8 @@
 
 ## 2026-07-09
 
+- Добавлено автоматическое дозаполнение `source_media_key` для старых медиа внутри `seasonvar:import`, общий генератор ключей медиа для импорта Seasonvar и playlist-импорта, а также русские сообщения прогресса для этого этапа обслуживания.
+- Обновлены правила проекта и настройки источника: единственная команда импорта явно сохраняет внешние видео-ссылки без скачивания видеофайлов.
 - Replaced separate Seasonvar public commands with `php artisan seasonvar:import`, including URL mode, forced refresh, forever mode, database-backed run logs, sitemap discovery, page updates, season-page updates, media collection, and title merging.
 - Added import state tables and fields for run events, source-page retry state, missing-data flags, raw HTML snapshots, reviews, and stable media updates through `source_media_key`.
 - Updated Seasonvar media storage to keep external playback links, quality, translation, format, availability checks, and all variants without downloading video files.
@@ -12,7 +14,7 @@
 - Improved Seasonvar info-block parsing for labels, ratings, age ratings, countries, genres, directors, actors, and episode fallback extraction.
 - Removed decorative catalog labels that did not provide navigation, filtering, counts, or actionable status.
 - Added local FontAwesome icons through npm/Vite and wired icon props into shared UI components without CDN usage.
-- Removed description text that had been imported as countries and blocked description-like relation names from future imports.
+- Удален текст описаний, который раньше попадал в страны, и закрыт повторный импорт описательных текстов как названий связей.
 - Blocked long text from being imported as age rating relations.
 - Fixed chunked discovered URL `upsert` payload handling and kept sitemap URL storage memory-bounded.
 - Added unchanged-page fast path to skip HTML parsing and catalog writes when parsed content hash is unchanged.

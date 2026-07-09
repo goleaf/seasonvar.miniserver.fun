@@ -157,6 +157,7 @@ class CatalogController extends Controller
             ->all();
 
         $querySearch = $search;
+        $searchFallback = false;
         $titles = $this->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $querySearch, $year, null, $invalidYear)
             ->with($this->cardRelations())
             ->withCount(['seasons', 'episodes'])
@@ -166,6 +167,7 @@ class CatalogController extends Controller
 
         if ($search !== '' && $titles->total() === 0) {
             $querySearch = '';
+            $searchFallback = true;
             $titles = $this->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $querySearch, $year, null, $invalidYear)
                 ->with($this->cardRelations())
                 ->withCount(['seasons', 'episodes'])
@@ -247,6 +249,7 @@ class CatalogController extends Controller
             'year' => $year,
             'requestedYear' => $requestedYear,
             'invalidYear' => $invalidYear,
+            'searchFallback' => $searchFallback,
             'selectedTaxonomy' => $activeTaxonomies->first(),
             'activeTaxonomies' => $activeTaxonomies,
             'activeFilterSlugs' => $activeFilterSlugs,
@@ -258,6 +261,7 @@ class CatalogController extends Controller
                 $request,
                 (int) $titles->total(),
                 $search,
+                $searchFallback,
                 $year,
                 $activeTaxonomies,
                 $invalidFilterSlugs,
@@ -690,6 +694,7 @@ class CatalogController extends Controller
         Request $request,
         int $total,
         string $search,
+        bool $searchFallback,
         ?int $year,
         Collection $activeTaxonomies,
         array $invalidFilterSlugs,
@@ -722,6 +727,7 @@ class CatalogController extends Controller
             $filterText !== '' ? 'Фильтры: '.$filterText.'.' : null,
             $year !== null ? 'Год выхода: '.$year.'.' : null,
             $search !== '' ? 'Поисковый запрос: '.$search.'.' : null,
+            $searchFallback ? 'Точных совпадений не найдено, поэтому показаны ближайшие страницы каталога.' : null,
             $invalidYear ? 'Год '.$requestedYear.' не найден.' : null,
             $invalidFilterSlugs !== [] ? 'Часть фильтров не найдена.' : null,
         ])->filter()->implode(' ');
@@ -739,8 +745,10 @@ class CatalogController extends Controller
 
         return [
             'title' => $title,
-            'h1' => $this->catalogSeoHeading($search, $year, $activeTaxonomies),
-            'lead' => $this->catalogSeoLead($total, $search, $year, $activeTaxonomies),
+            'h1' => $searchFallback ? 'Поиск "'.$search.'" - ближайшие результаты каталога' : $this->catalogSeoHeading($search, $year, $activeTaxonomies),
+            'lead' => $searchFallback
+                ? 'По точному запросу совпадений не найдено, поэтому ниже показаны ближайшие страницы каталога, популярные сериалы и связанные подборки.'
+                : $this->catalogSeoLead($total, $search, $year, $activeTaxonomies),
             'description' => $this->seoDescription($descriptionParts),
             'keywords' => $keywords->implode(', '),
             'news_keywords' => $keywords->take(10)->implode(', '),
@@ -752,7 +760,9 @@ class CatalogController extends Controller
             'updated_time' => now()->toAtomString(),
             'section' => 'Сериалы',
             'tags' => $tags,
-            'seo_text' => $this->catalogSeoText($total, $search, $year, $activeTaxonomies),
+            'seo_text' => collect($searchFallback ? [
+                'По точному запросу «'.$search.'» совпадений пока нет, поэтому страница автоматически показывает ближайшие результаты каталога и связанные SEO-направления.',
+            ] : [])->merge($this->catalogSeoText($total, $search, $year, $activeTaxonomies))->values()->all(),
             'search_phrases' => $this->catalogSearchPhrases($search, $year, $activeTaxonomies),
             'keyword_clusters' => $this->catalogKeywordClusters($search, $year, $activeTaxonomies),
             'related_links' => $this->catalogRelatedLinks($search, $year, $activeTaxonomies),

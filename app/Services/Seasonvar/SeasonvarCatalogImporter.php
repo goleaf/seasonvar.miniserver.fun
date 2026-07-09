@@ -1593,19 +1593,17 @@ class SeasonvarCatalogImporter
         ?string $quality,
         string $format,
     ): string {
-        $sourceIdentity = $item['source_url'] ?: 'direct:'.hash('sha256', $playbackUrl);
-
-        return hash('sha256', implode('|', [
+        return $this->mediaMetadata->sourceMediaKey(
             'seasonvar',
             $catalogTitle->source_url_hash ?: $catalogTitle->id,
-            $season?->number ?? '',
-            $episode?->number ?? '',
-            $this->mediaMetadata->isTrailer($item['title'], $playbackUrl) ? 'trailer' : 'episode',
-            $sourceIdentity,
-            Str::slug((string) ($item['title'] ?? '')),
-            $quality ?? '',
+            $season?->number,
+            $episode?->number,
+            $item['source_url'],
+            $playbackUrl,
+            $item['title'],
+            $quality,
             $format,
-        ]));
+        );
     }
 
     private function mediaQuality(?string $title, string $url): ?string

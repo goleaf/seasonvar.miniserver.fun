@@ -3,9 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\CatalogTitle;
+use App\Models\Episode;
 use App\Models\LicensedMedia;
+use App\Models\Season;
 use App\Models\Source;
 use App\Models\SourcePage;
+use App\Services\Media\ExternalMediaMetadata;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -23,6 +26,7 @@ class SeasonvarImportMaintenanceTest extends TestCase
             'seasonvar.crawl_delay_seconds' => 0,
             'seasonvar.import.parse_batch_size' => 5,
             'seasonvar.media_check.backfill_per_cycle' => 5,
+            'seasonvar.media_identity.backfill_per_cycle' => 5,
         ]);
     }
 
@@ -151,6 +155,85 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $media->refresh();
 
         $this->assertSame('1080p', $media->quality);
+        $this->assertSame('mp4', $media->format);
+    }
+
+    public function test_it_detects_dvd_media_quality_during_import_cycle(): void
+    {
+        Http::preventStrayRequests();
+
+        $catalogTitle = CatalogTitle::factory()->create();
+        $media = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'title' => '2 серия [DVD]',
+            'playback_url' => 'https://media.example.com/video/show.s01e02.dvd.mp4',
+            'path' => 'https://media.example.com/video/show.s01e02.dvd.mp4',
+            'status' => 'published',
+            'check_status' => 'available',
+            'checked_at' => now(),
+            'quality' => null,
+            'format' => null,
+        ]);
+
+        $this->artisan('seasonvar:import', ['--no-discovery' => true])
+            ->assertExitCode(0);
+
+        $media->refresh();
+
+        $this->assertSame('480p', $media->quality);
+        $this->assertSame('mp4', $media->format);
+    }
+
+    public function test_it_backfills_missing_media_source_keys_during_import_cycle(): void
+    {
+        Http::preventStrayRequests();
+
+        $catalogTitle = CatalogTitle::factory()->create([
+            'source_url_hash' => hash('sha256', 'https://seasonvar.ru/serial-615--Bez_sleda_pssmtlk-1-season.html'),
+        ]);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 1,
+        ]);
+        $episode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 1,
+        ]);
+        $media = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'title' => '1 серия SD/HD',
+            'storage_disk' => 'seasonvar_parsed',
+            'playback_url' => 'https://media.example.com/video/without-a-trace.s01e01.720p.mp4',
+            'path' => 'https://media.example.com/video/without-a-trace.s01e01.720p.mp4',
+            'source_url' => 'https://seasonvar.ru/playls2/hash/trans/123/plist.txt?time=1',
+            'source_media_key' => null,
+            'quality' => null,
+            'format' => null,
+            'status' => 'published',
+            'check_status' => 'available',
+            'checked_at' => now(),
+        ]);
+
+        $this->artisan('seasonvar:import', ['--no-discovery' => true])
+            ->assertExitCode(0);
+
+        $media->refresh();
+        $expectedSourceMediaKey = app(ExternalMediaMetadata::class)->sourceMediaKey(
+            'seasonvar',
+            $catalogTitle->source_url_hash,
+            $season->number,
+            $episode->number,
+            'https://seasonvar.ru/playls2/hash/trans/123/plist.txt?time=1',
+            'https://media.example.com/video/without-a-trace.s01e01.720p.mp4',
+            '1 серия SD/HD',
+            '720p',
+            'mp4',
+        );
+
+        $this->assertSame($expectedSourceMediaKey, $media->source_media_key);
+        $this->assertSame('720p', $media->quality);
         $this->assertSame('mp4', $media->format);
     }
 }

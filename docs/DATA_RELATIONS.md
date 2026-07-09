@@ -1,8 +1,8 @@
-# Data Relations And Filters
+# Связи данных и фильтры
 
-Last updated: 2026-07-09
+Обновлено: 09.07.2026
 
-## Core relations
+## Основные связи
 
 - `CatalogTitle belongsTo Source`
 - `CatalogTitle belongsTo SourcePage`
@@ -32,12 +32,12 @@ Last updated: 2026-07-09
 - `LicensedMedia belongsTo Episode`
 - `SourcePage hasMany SourcePageSnapshot`
 - `SeasonvarImportRun hasMany SeasonvarImportEvent`
-- Every catalog relation model belongs to many `CatalogTitle` records through an explicit pivot table.
-- No morph or polymorphic relations are used for catalog metadata.
+- Каждая модель связи каталога относится ко многим `CatalogTitle` через явную pivot-таблицу.
+- Для метаданных каталога не используются morph- или polymorphic-связи.
 
-## Taxonomy filter types
+## Типы фильтров справочников
 
-These taxonomy types are filterable and should have local pages:
+Эти типы справочников участвуют в фильтрах и должны иметь локальные страницы:
 
 - `genre`
 - `country`
@@ -50,73 +50,73 @@ These taxonomy types are filterable and should have local pages:
 - `studio`
 - `tag`
 
-## Filter behavior
+## Поведение фильтров
 
-- `/titles/{type}/{taxonomy}` must show only titles connected to that exact taxonomy.
-- Multiple query filters must combine as AND conditions.
-- Counts in filter sidebars have two meanings: current filtered count and global count.
-- Invalid filter values must not fall back to full catalog results.
-- Year filters must validate four-digit years from 1900 through next year.
+- `/titles/{type}/{taxonomy}` должен показывать только карточки, связанные с точным значением справочника.
+- Несколько query-фильтров должны объединяться через условие AND.
+- Счетчики в боковых фильтрах имеют два значения: количество в текущем фильтре и глобальное количество.
+- Неверные значения фильтров не должны откатываться к полной выдаче каталога.
+- Фильтры года должны принимать четырехзначный год от 1900 до следующего года.
 
-## Query indexes
+## Индексы запросов
 
-The catalog depends on these query indexes for stable filtering and sync performance:
+Каталог зависит от этих индексов для стабильных фильтров и быстрого обновления:
 
-- Per-relation reverse pivot indexes on related ID and `catalog_title_id` for filters and recommendations.
-- `catalog_titles_indexed_at_idx` on `indexed_at` for newest title lists.
-- `catalog_titles_year_indexed_idx` on `year, indexed_at` for year-filtered title lists.
-- `source_pages_status_type_id_idx` on `parse_status, page_type, id` for pending source-page selection.
-- `source_pages_type_status_crawled_id_idx` on `page_type, parse_status, last_crawled_at, id` for refresh cycles.
-- `licensed_media_title_status_published_idx` on `catalog_title_id, status, published_at` for title media lists.
-- `licensed_media_episode_status_quality_idx` on `episode_id, status, quality` for episode media selection.
-- Unique `licensed_media.catalog_title_id + source_media_key` for stable video URL updates.
-- Source-page import state indexes on `import_status`, `retry_after_at`, and `last_imported_at` for the single import command.
+- Обратные pivot-индексы каждой связи по связанному ID и `catalog_title_id` нужны для фильтров и рекомендаций.
+- `catalog_titles_indexed_at_idx` по `indexed_at` нужен для списков новых карточек.
+- `catalog_titles_year_indexed_idx` по `year, indexed_at` нужен для списков с фильтром года.
+- `source_pages_status_type_id_idx` по `parse_status, page_type, id` нужен для выбора страниц источника из очереди.
+- `source_pages_type_status_crawled_id_idx` по `page_type, parse_status, last_crawled_at, id` нужен для циклов обновления.
+- `licensed_media_title_status_published_idx` по `catalog_title_id, status, published_at` нужен для списков медиа карточки.
+- `licensed_media_episode_status_quality_idx` по `episode_id, status, quality` нужен для выбора медиа серии.
+- Уникальная пара `licensed_media.catalog_title_id + source_media_key` нужна для стабильного обновления видео-ссылок.
+- Индексы состояния страниц источника по `import_status`, `retry_after_at` и `last_imported_at` нужны для единственной команды импорта.
 
-## Parser fields
+## Поля импортера
 
-Current Seasonvar parser stores:
+Текущий импортер Seasonvar сохраняет:
 
-- title
-- original title
-- type
-- year
-- description
-- poster URL
-- external source ID
-- aliases
-- IMDb and KinoPoisk ratings
-- reviews
-- current season number
-- seasons
-- season release status: latest episode date, released episode count, total episode count when known, season translation, raw status text
-- episodes
-- media candidates, external playback URLs, quality, format, translation, and availability status
-- HLS master playlist variants as separate `licensed_media` records when quality variants are discoverable
-- trailers and announcements as title-level or season-level `licensed_media` records when no episode number is available
-- parsed relation values for genres, countries, actors, directors, age ratings, translations, statuses, networks, studios, and tags
-- raw HTML snapshots for diagnostics
+- название
+- оригинальное название
+- тип
+- год
+- описание
+- ссылку постера
+- внешний ID источника
+- дополнительные названия
+- рейтинги IMDb и КиноПоиск
+- отзывы
+- номер текущего сезона
+- сезоны
+- статус выхода сезона: дата последней серии, количество вышедших серий, общее количество серий, если известно, перевод сезона и исходный текст статуса
+- серии
+- видео-кандидаты, внешние ссылки воспроизведения, стабильный `source_media_key`, качество, формат, перевод и состояние доступности
+- варианты HLS master playlist как отдельные записи `licensed_media`, если варианты качества удается определить
+- трейлеры и анонсы как медиа карточки или сезона, если номер серии отсутствует
+- разобранные значения связей для жанров, стран, актеров, режиссеров, возрастов, переводов, статусов, сетей, студий и меток
+- исходные HTML-снимки для диагностики
 
-## Parser relation extraction
+## Извлечение связей
 
-Current parser relation sources:
+Текущие источники связей:
 
-- structured JSON-LD genre, actor, director, country
-- `pgs-sinfo_list` labels for genre, country, age, translation, status, network, studio
-- `itemprop=directors` for directors
-- `data-info=actor` and schema actor blocks for actors
-- Season list translation markers such as `(AniDub)`
-- Season list update markers such as `(09.07.2026 1 серия (AniDub) из ??)` as structured `seasons` fields
-- Seasonvar tag list links when present
-- Subtitle text markers as `tag=субтитры`
+- структурированный JSON-LD для жанра, актера, режиссера и страны
+- метки `pgs-sinfo_list` для жанра, страны, возраста, перевода, статуса, сети и студии
+- `itemprop=directors` для режиссеров
+- `data-info=actor` и schema-блоки актеров
+- маркеры перевода в списке сезонов, например `(AniDub)`
+- маркеры обновления сезона вроде `(09.07.2026 1 серия (AniDub) из ??)` как структурированные поля `seasons`
+- ссылки списка меток Seasonvar, если они есть
+- текстовые маркеры субтитров как `tag=субтитры`
 
-## Import behavior
+## Поведение импорта
 
-- The only public Seasonvar command is `php artisan seasonvar:import`.
-- Without arguments, the command reads the Seasonvar sitemap, stores all found serial-page URLs, then processes queued pages one request at a time.
-- With a URL argument, the command updates that title and detected direct season pages.
-- Existing relations, episodes, and media are preserved when they disappear from the source page.
-- Changed title, description, poster, rating, and video URL fields are updated.
-- Duplicate season pages are merged into one `CatalogTitle`; seasons remain internal records.
-- One import run holds a cache lock so two copies of `seasonvar:import` cannot update the same queue at the same time.
-- Each import cycle marks malformed nested Seasonvar URLs as unavailable and checks a limited backlog of older media records with empty or stale availability status.
-- Each import cycle normalizes old parsed source-page import states and fills missing media quality, format, and translation metadata.
+- Единственная публичная команда Seasonvar: `php artisan seasonvar:import`.
+- Без аргументов команда читает sitemap Seasonvar, сохраняет все найденные ссылки страниц каталога, затем обрабатывает очередь по одному запросу.
+- С URL-аргументом команда обновляет эту карточку и найденные прямые страницы сезонов.
+- Существующие связи, серии и медиа сохраняются, если они исчезли со страницы источника.
+- Измененные название, описание, постер, рейтинг и поля видео-ссылок обновляются.
+- Дубли страниц сезонов объединяются в одну `CatalogTitle`; сезоны остаются внутренними записями.
+- Один запуск импорта держит cache lock, чтобы две копии `seasonvar:import` не обновляли одну очередь одновременно.
+- Каждый цикл импорта помечает неправильные вложенные ссылки Seasonvar как недоступные и проверяет ограниченный backlog старых медиа с пустым или устаревшим статусом доступности.
+- Каждый цикл импорта нормализует старые состояния разобранных страниц источника и дозаполняет отсутствующие ключи медиа, качество, формат и перевод.

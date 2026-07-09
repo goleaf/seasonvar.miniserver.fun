@@ -129,6 +129,7 @@ class SeasonvarImportPipeline
             ? $this->runSitemapCycle($run, $force, $discover, $progress)
             : $this->runUrlCycle($run, $argument, $force, $progress);
         $mediaMetadataResult = $this->refreshMediaMetadataBacklog($progress);
+        $mediaSourceKeyResult = $this->backfillMediaSourceKeys($progress);
         $mediaBacklogResult = $this->refreshMediaBacklog($progress);
         $mergeResult = $this->titleMerger->merge($progress);
 
@@ -141,6 +142,7 @@ class SeasonvarImportPipeline
             'last_merge' => $mergeResult,
             'last_source_status_backfill' => $sourceStatusBackfillResult,
             'last_media_metadata_backlog' => $mediaMetadataResult,
+            'last_media_source_key_backlog' => $mediaSourceKeyResult,
             'last_media_backlog' => $mediaBacklogResult,
         ]);
 
@@ -150,6 +152,8 @@ class SeasonvarImportPipeline
             'source_status_backfilled' => $sourceStatusBackfillResult['backfilled'],
             'media_metadata_checked' => $mediaMetadataResult['media_checked'],
             'media_metadata_updated' => $mediaMetadataResult['media_updated'],
+            'media_source_keys_checked' => $mediaSourceKeyResult['media_checked'],
+            'media_source_keys_updated' => $mediaSourceKeyResult['media_updated'],
             'media_checked' => $mediaBacklogResult['media_checked'],
             'media_check_available' => $mediaBacklogResult['media_available'],
             'media_check_unavailable' => $mediaBacklogResult['media_unavailable'],
@@ -576,6 +580,127 @@ class SeasonvarImportPipeline
         $progress('seasonvar-media-metadata-backlog-complete', $result);
 
         return $result;
+    }
+
+    /**
+     * @param  callable(string, array<string, mixed>): void  $progress
+     * @return array{media_checked: int, media_updated: int, collisions: int}
+     */
+    private function backfillMediaSourceKeys(callable $progress): array
+    {
+        $limit = max(0, (int) config('seasonvar.media_identity.backfill_per_cycle', 250));
+
+        if ($limit === 0) {
+            return [
+                'media_checked' => 0,
+                'media_updated' => 0,
+                'collisions' => 0,
+            ];
+        }
+
+        $mediaItems = LicensedMedia::query()
+            ->with([
+                'catalogTitle:id,source_url_hash,source_url',
+                'season:id,number',
+                'episode:id,number',
+            ])
+            ->where(function ($query): void {
+                $query->whereNull('source_media_key')
+                    ->orWhere('source_media_key', '');
+            })
+            ->where(function ($query): void {
+                $query->whereNotNull('playback_url')
+                    ->orWhereNotNull('path');
+            })
+            ->oldest('updated_at')
+            ->oldest()
+            ->limit($limit)
+            ->get();
+
+        $progress('seasonvar-media-source-key-backlog-started', [
+            'selected' => $mediaItems->count(),
+            'limit' => $limit,
+        ]);
+
+        $result = [
+            'media_checked' => 0,
+            'media_updated' => 0,
+            'collisions' => 0,
+        ];
+
+        foreach ($mediaItems as $media) {
+            $url = $media->playback_url ?: $media->path;
+
+            if (! is_string($url) || trim($url) === '') {
+                continue;
+            }
+
+            $quality = $media->quality ?: $this->mediaMetadata->quality($media->title, $url);
+            $format = $media->format ?: $this->mediaMetadata->format($url);
+            $source = $this->mediaIdentitySource($media);
+            $sourceMediaKey = $this->mediaMetadata->sourceMediaKey(
+                $source,
+                $media->catalogTitle?->source_url_hash ?: $media->catalog_title_id,
+                $media->season?->number,
+                $media->episode?->number,
+                $media->source_url,
+                $url,
+                $media->title,
+                $quality,
+                $format,
+            );
+
+            if ($this->sourceMediaKeyAlreadyExists($media, $sourceMediaKey)) {
+                $sourceMediaKey = hash('sha256', implode('|', ['legacy_media_row', $media->id, $sourceMediaKey]));
+                $result['collisions']++;
+            }
+
+            $updates = [
+                'source_media_key' => $sourceMediaKey,
+            ];
+
+            if ($quality !== null && $quality !== $media->quality) {
+                $updates['quality'] = $quality;
+            }
+
+            if ($format !== '' && $format !== $media->format) {
+                $updates['format'] = $format;
+            }
+
+            $media->fill($updates)->save();
+            $result['media_checked']++;
+            $result['media_updated']++;
+
+            $progress('seasonvar-media-source-key-updated', [
+                'licensed_media_id' => $media->id,
+                'source_media_key' => $sourceMediaKey,
+                'quality' => $media->quality,
+                'format' => $media->format,
+                'url' => $url,
+            ]);
+        }
+
+        $progress('seasonvar-media-source-key-backlog-complete', $result);
+
+        return $result;
+    }
+
+    private function mediaIdentitySource(LicensedMedia $media): string
+    {
+        return match ($media->storage_disk) {
+            'seasonvar_parsed' => 'seasonvar',
+            'external_playlist' => 'external_playlist',
+            default => $media->storage_disk ?: 'legacy_media',
+        };
+    }
+
+    private function sourceMediaKeyAlreadyExists(LicensedMedia $media, string $sourceMediaKey): bool
+    {
+        return LicensedMedia::query()
+            ->where('catalog_title_id', $media->catalog_title_id)
+            ->where('source_media_key', $sourceMediaKey)
+            ->whereKeyNot($media->id)
+            ->exists();
     }
 
     /**
