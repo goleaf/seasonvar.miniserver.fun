@@ -2,6 +2,7 @@
 
 ## 2026-07-09
 
+- Добавлена команда `php artisan integrations:doctor` для read-only диагностики MCP, Google Search Console/Analytics config, user-level MCP registration и CLI-инструментов без раскрытия секретов; глобально зарегистрированы `openaiDeveloperDocs` и Google Workspace MCP endpoints, но Google OAuth login требует отдельный OAuth client ID.
 - Добавлен безопасный слой MCP/Google-интеграций: проектные skills `seasonvar-importer`, `seasonvar-ui`, `seasonvar-seo`, `seasonvar-mcp-ops`, шаблон `.codex/mcp.example.toml`, документация `docs/integrations/mcp-catalog.md` и `docs/integrations/google.md`, а также выключенные read-only Google placeholders в `.env.example` и `config/services.php`.
 - Eloquent-модели дополнены обратными связями для `SourcePage`, `SeasonvarImportRun` и событий импорта, числовые поля приведены к явным casts, а правила моделей и query usage вынесены в `docs/models.md`.
 - Синхронизирована Markdown-документация с текущими маршрутами, командами, Laravel/Livewire архитектурой, MCP-настройкой, CI, setup/testing/deployment правилами и no-`@php` Blade-подходом.

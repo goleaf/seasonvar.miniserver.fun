@@ -77,6 +77,18 @@ Google Workspace remote MCP servers дают доступ к Gmail, Drive, Calen
 
 Источник: <https://developers.google.com/workspace/guides/configure-mcp-servers>
 
+User-level Codex registration уже выполнен для этих endpoints:
+
+```bash
+codex mcp add google-gmail --url https://gmailmcp.googleapis.com/mcp/v1
+codex mcp add google-drive --url https://drivemcp.googleapis.com/mcp/v1
+codex mcp add google-calendar --url https://calendarmcp.googleapis.com/mcp/v1
+codex mcp add google-chat --url https://chatmcp.googleapis.com/mcp/v1
+codex mcp add google-people --url https://people.googleapis.com/mcp/v1
+```
+
+Автоматический OAuth login сейчас не завершен: Google endpoints вернули `Dynamic client registration not supported`. Чтобы закончить подключение, нужно создать OAuth client в Google Cloud Console и повторно зарегистрировать нужный MCP server с `--oauth-client-id`, затем выполнить `codex mcp login <server> --scopes ...`.
+
 Для проекта Seasonvar Workspace MCP не обязателен. Включать его стоит только под конкретную задачу:
 
 - read-only анализ документации в Google Docs/Sheets;

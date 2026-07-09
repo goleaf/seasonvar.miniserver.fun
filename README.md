@@ -19,6 +19,7 @@ npm install
 php artisan seasonvar:import
 php artisan seasonvar:import "https://seasonvar.ru/serial-615--Bez_sleda_pssmtlk-1-season.html" --force
 php artisan seasonvar:import --forever
+php artisan integrations:doctor
 php artisan project:docs-refresh
 php artisan test --compact
 vendor/bin/pint --dirty --format agent

@@ -41,6 +41,7 @@ composer dev
 - `php artisan seasonvar:import` — единственная публичная команда импорта Seasonvar.
 - `php artisan seasonvar:import --forever --sleep=60` — непрерывный локальный цикл импорта.
 - `php artisan seasonvar:import "https://seasonvar.ru/..." --force` — принудительное обновление одной страницы.
+- `php artisan integrations:doctor` — read-only диагностика MCP, Google, CLI tools и проектных skills без вывода секретов.
 - `php artisan project:docs-refresh` — обновляет управляемые блоки документации.
 - `php artisan project:docs-refresh --check` — проверяет документацию без записи изменений.
 

@@ -36,6 +36,15 @@ GitHub MCP/app connector нужен только для issue, PR, commit или
 
 Если MCP не запускается, сначала проверьте, что зависимости установлены через `composer install`, а команда `php artisan boost:mcp --env=local` выполняется из корня проекта.
 
+## Диагностика
+
+```bash
+php artisan integrations:doctor
+php artisan integrations:doctor --json
+```
+
+Команда проверяет проектный Laravel Boost MCP, `.codex/mcp.example.toml`, список skills в `boost.json`, user-level OpenAI docs/Google Workspace MCP registration, Google Search Console/Analytics config и наличие CLI-инструментов `codex`, `gh`, `gcloud`, `pipx`. Команда не делает OAuth login, не вызывает Google API и не выводит секреты.
+
 ## Проектные skills
 
 `boost.json` перечисляет локальные skills, которые должны помогать Codex выбирать правильный workflow:
