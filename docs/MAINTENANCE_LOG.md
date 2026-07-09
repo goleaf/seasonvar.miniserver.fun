@@ -55,5 +55,6 @@
 - Added global quick-answer SEO expansion with visible page-specific answer cards and matching schema.org FAQPage data generated from each page title, description, topics, and search intent terms.
 - Added global page-structure SEO expansion with automatic visible table-of-contents links, section anchors, `toc-count` metadata, schema.org ItemList contents, and WebPageElement `hasPart` data for every SEO block.
 - Added global long-tail SEO expansion with automatic visible query-phrase links, `long-tail-keywords` metadata, `query-count` metadata, and schema.org ItemList data generated from page topics and search intent terms.
+- Added global related-collection SEO expansion with automatic visible thematic collection cards, `related-collection-count` metadata, and schema.org CollectionPage `hasPart` data generated from page topics and search intents.
 - Improved Seasonvar season URL parsing for `season`, `sezon`, `сезон`, and zero-padded season numbers like `00005-sezon`, so playlist media defaults to the correct current season.
 - Preserved canonical catalog title content hashes when importing additional season pages for the same series, preventing non-canonical season pages from overwriting title-level sync state.

@@ -56,6 +56,33 @@
         ->unique()
         ->take(40)
         ->values();
+    $relatedCollections = $topicTerms->take(8)
+        ->flatMap(fn ($term) => collect([
+            [
+                'name' => 'Сериалы по теме: '.$term,
+                'query' => $term.' сериалы',
+                'description' => 'Связанная подборка сериалов и страниц каталога по теме «'.$term.'».',
+            ],
+            [
+                'name' => $term.' смотреть онлайн',
+                'query' => $term.' смотреть онлайн',
+                'description' => 'Поиск страниц, сезонов, серий и описаний по запросу «'.$term.' смотреть онлайн».',
+            ],
+            [
+                'name' => $term.' актеры и описание',
+                'query' => $term.' актеры описание',
+                'description' => 'Подборка материалов с описанием, актерами, ролями и связанными сериалами по теме «'.$term.'».',
+            ],
+        ]))
+        ->merge($seoIntents->take(6)->map(fn ($intent) => [
+            'name' => $pageTitle.' - '.$intent,
+            'query' => $pageTitle.' '.$intent,
+            'description' => 'Связанная поисковая подборка по запросу «'.$pageTitle.' '.$intent.'».',
+        ]))
+        ->filter(fn ($item) => ! empty($item['name']) && ! empty($item['query']))
+        ->unique('name')
+        ->take(30)
+        ->values();
     $quickAnswers = collect([
         [
             'question' => 'Что есть на странице «'.$pageTitle.'»?',
@@ -79,6 +106,7 @@
         ['id' => 'key-topics', 'name' => 'Ключевые темы', 'enabled' => $topicTerms->isNotEmpty()],
         ['id' => 'query-navigation', 'name' => 'Навигация по запросам', 'enabled' => $seoIntents->isNotEmpty()],
         ['id' => 'long-tail-queries', 'name' => 'Поисковые формулировки', 'enabled' => $longTailQueries->isNotEmpty()],
+        ['id' => 'related-collections', 'name' => 'Связанные подборки', 'enabled' => $relatedCollections->isNotEmpty()],
         ['id' => 'quick-answers', 'name' => 'Быстрые ответы', 'enabled' => $quickAnswers->isNotEmpty()],
         ['id' => 'semantic-clusters', 'name' => 'Семантические подборки', 'enabled' => ! empty($seo['keyword_clusters'])],
         ['id' => 'popular-searches', 'name' => 'Популярные запросы', 'enabled' => ! empty($seo['search_phrases'])],
@@ -167,6 +195,23 @@
         ];
     }
 
+    if ($relatedCollections->isNotEmpty()) {
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'CollectionPage',
+            '@id' => $canonicalUrl.'#related-collections-schema',
+            'name' => $fullTitle.' - связанные подборки',
+            'url' => $canonicalUrl.'#related-collections',
+            'description' => 'Автоматические тематические подборки и внутренние ссылки по странице «'.$pageTitle.'».',
+            'hasPart' => $relatedCollections->take(24)->map(fn ($collection) => [
+                '@type' => 'CollectionPage',
+                'name' => $collection['name'],
+                'description' => $collection['description'] ?? $collection['name'],
+                'url' => route('titles.index', ['q' => $collection['query']]),
+            ])->values()->all(),
+        ];
+    }
+
     if ($seoSections->isNotEmpty()) {
         $jsonLdItems[] = [
             '@context' => 'https://schema.org',
@@ -212,6 +257,7 @@
         <meta name="answer-count" content="{{ $quickAnswers->count() }}">
         <meta name="toc-count" content="{{ $seoSections->count() }}">
         <meta name="query-count" content="{{ $longTailQueries->count() }}">
+        <meta name="related-collection-count" content="{{ $relatedCollections->count() }}">
         @if (! empty($seo['keywords']))
             <meta name="keywords" content="{{ $seo['keywords'] }}">
             <meta name="news_keywords" content="{{ $seo['news_keywords'] ?? $seo['keywords'] }}">
@@ -441,6 +487,26 @@
                             <a href="{{ route('titles.index', ['q' => $query]) }}" itemprop="url" class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700">
                                 <i class="fa-solid fa-magnifying-glass text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                 <span itemprop="name">{{ $query }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if ($relatedCollections->isNotEmpty())
+                <section id="related-collections" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Связанные подборки" itemscope itemtype="https://schema.org/CollectionPage">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-layer-group text-emerald-700" aria-hidden="true"></i>
+                        <span itemprop="name">Связанные подборки</span>
+                    </div>
+                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        @foreach ($relatedCollections->take(18) as $collection)
+                            <a href="{{ route('titles.index', ['q' => $collection['query']]) }}" class="block rounded-lg border border-slate-200 bg-slate-50 p-3 hover:border-emerald-100 hover:bg-emerald-50" itemprop="hasPart" itemscope itemtype="https://schema.org/CollectionPage">
+                                <span class="flex items-center gap-2 text-sm font-bold text-slate-800" itemprop="name">
+                                    <i class="fa-solid fa-folder-open text-[0.85em] text-emerald-700" aria-hidden="true"></i>
+                                    {{ $collection['name'] }}
+                                </span>
+                                <span class="mt-2 block text-xs leading-5 text-slate-600" itemprop="description">{{ $collection['description'] }}</span>
+                                <meta itemprop="url" content="{{ route('titles.index', ['q' => $collection['query']]) }}">
                             </a>
                         @endforeach
                     </div>
