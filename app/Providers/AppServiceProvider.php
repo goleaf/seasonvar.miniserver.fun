@@ -2,16 +2,16 @@
 
 namespace App\Providers;
 
-use App\Models\User;
 use App\View\ViewData\AppLayoutData;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View as ViewFacade;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\View\View;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -28,14 +28,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Gate::define('viewCatalogStats', fn (User $user): bool => true);
-
         RateLimiter::for('catalog-stats', function (Request $request): Limit {
             $userId = $request->user()?->getAuthIdentifier();
 
-            return Limit::perMinute(30)->by(
+            return Limit::perMinute(180)->by(
                 $userId === null ? 'ip:'.$request->ip() : 'user:'.$userId,
             );
+        });
+
+        Livewire::setUpdateRoute(function ($handle, string $path) {
+            return Route::post($path, $handle)
+                ->middleware(['web', 'throttle:catalog-stats']);
         });
 
         RateLimiter::for('catalog-api', fn (Request $request): Limit => Limit::perMinute(60)->by($request->ip()));

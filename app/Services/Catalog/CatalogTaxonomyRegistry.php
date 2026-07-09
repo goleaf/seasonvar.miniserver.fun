@@ -62,7 +62,15 @@ class CatalogTaxonomyRegistry
      */
     public function cardRelations(): array
     {
-        return ['genres', 'countries', 'ageRatings', 'translations', 'tags', 'seasons'];
+        return ['genres', 'countries', 'ageRatings', 'translations', 'tags'];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function listRowRelations(): array
+    {
+        return ['seasons'];
     }
 
     public function relationName(string $filterType): string

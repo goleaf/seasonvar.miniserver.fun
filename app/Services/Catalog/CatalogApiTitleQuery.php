@@ -36,7 +36,7 @@ class CatalogApiTitleQuery
     {
         return CatalogTitle::query()
             ->select(self::TITLE_COLUMNS)
-            ->where('is_published', true)
+            ->published()
             ->with($this->publicTaxonomyRelations())
             ->withCount(['seasons', 'episodes', 'publishedLicensedMedia'])
             ->orderByDesc('indexed_at')
@@ -50,7 +50,7 @@ class CatalogApiTitleQuery
         return CatalogTitle::query()
             ->select(self::TITLE_COLUMNS)
             ->whereKey($catalogTitle->getKey())
-            ->where('is_published', true)
+            ->published()
             ->with(array_merge(
                 $this->publicTaxonomyRelations(),
                 [

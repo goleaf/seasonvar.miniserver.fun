@@ -12,6 +12,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'argument',
     'force',
     'forever',
+    'process_id',
+    'process_host',
+    'process_command',
     'cycles',
     'discovered',
     'stored',
@@ -38,6 +41,22 @@ class SeasonvarImportRun extends Model
     }
 
     /**
+     * @return HasMany<SourcePageSnapshot, $this>
+     */
+    public function snapshots(): HasMany
+    {
+        return $this->hasMany(SourcePageSnapshot::class, 'seasonvar_import_run_id');
+    }
+
+    /**
+     * @return HasMany<SourcePage, $this>
+     */
+    public function lastImportedSourcePages(): HasMany
+    {
+        return $this->hasMany(SourcePage::class, 'last_import_run_id');
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -45,6 +64,17 @@ class SeasonvarImportRun extends Model
         return [
             'force' => 'boolean',
             'forever' => 'boolean',
+            'process_id' => 'integer',
+            'cycles' => 'integer',
+            'discovered' => 'integer',
+            'stored' => 'integer',
+            'selected' => 'integer',
+            'parsed' => 'integer',
+            'failed' => 'integer',
+            'media_attached' => 'integer',
+            'media_updated' => 'integer',
+            'media_skipped' => 'integer',
+            'media_failed' => 'integer',
             'summary' => 'array',
             'started_at' => 'datetime',
             'finished_at' => 'datetime',

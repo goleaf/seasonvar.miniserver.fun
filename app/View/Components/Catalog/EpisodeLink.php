@@ -6,6 +6,7 @@ use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\View\ViewModels\CatalogShowViewModel;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\View\Component;
 
 class EpisodeLink extends Component
@@ -24,6 +25,11 @@ class EpisodeLink extends Component
 
     public ?string $releasedAtLabel;
 
+    /**
+     * @var Collection<int, string>
+     */
+    public Collection $variantBadges;
+
     public function __construct(
         public CatalogTitle $title,
         public Episode $episode,
@@ -31,11 +37,12 @@ class EpisodeLink extends Component
     ) {
         $this->selected = $showView->isSelectedEpisode($episode);
         $this->hasMedia = $showView->episodeHasMedia($episode);
-        $this->url = route('titles.show', ['catalogTitle' => $title, 'episode' => $episode->id]).'#player';
+        $this->url = route('titles.show', $showView->episodeQuery($episode)).'#player';
         $this->statusIcon = $this->hasMedia ? 'fa-solid fa-play' : 'fa-solid fa-clock';
-        $this->statusLabel = $this->hasMedia ? 'видео' : 'готовится';
+        $this->statusLabel = $this->hasMedia ? 'видео' : '';
         $this->statusVariant = $this->hasMedia ? 'success' : 'muted';
         $this->releasedAtLabel = $episode->released_at?->format('d.m.Y');
+        $this->variantBadges = $showView->episodeVariantBadges($episode);
     }
 
     public function classes(): string
@@ -44,7 +51,7 @@ class EpisodeLink extends Component
             ? 'bg-emerald-50 ring-emerald-200'
             : 'bg-white ring-slate-200 hover:bg-emerald-50 hover:ring-emerald-200';
 
-        return 'block rounded-lg px-3 py-2 text-sm ring-1 transition '.$stateClasses;
+        return 'block min-h-16 rounded-lg px-3 py-3 text-sm ring-1 transition '.$stateClasses;
     }
 
     /**

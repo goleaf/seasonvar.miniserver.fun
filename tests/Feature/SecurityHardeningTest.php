@@ -30,7 +30,7 @@ class SecurityHardeningTest extends TestCase
         $user = User::factory()->create();
         $limiterKey = md5('catalog-statsuser:'.$user->id);
 
-        foreach (range(1, 30) as $attempt) {
+        foreach (range(1, 180) as $attempt) {
             RateLimiter::hit($limiterKey, 60);
         }
 

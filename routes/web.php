@@ -23,8 +23,10 @@ Route::get('/opensearch.xml', [CatalogSitemapController::class, 'openSearch'])->
 Route::get('/llms.txt', [CatalogSitemapController::class, 'llms'])->name('llms');
 Route::get('/stats', [CatalogController::class, 'stats'])
     ->middleware('throttle:catalog-stats')
-    ->can('viewCatalogStats')
     ->name('stats');
+Route::get('/stats/poster/{catalogTitle:slug}', [CatalogController::class, 'statsPoster'])
+    ->middleware('throttle:catalog-stats')
+    ->name('stats.poster');
 Route::get('/titles', [CatalogController::class, 'titles'])->name('titles.index');
 Route::get('/titles/year/{year}', [CatalogController::class, 'titlesByYear'])
     ->where('year', '(?:19|20)\d{2}')

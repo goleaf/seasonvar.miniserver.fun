@@ -117,11 +117,31 @@ class SeasonvarRefreshPlanner
     private function candidateQueries(Carbon $refreshAfter): array
     {
         return [
+            'seasons_without_episodes' => fn (Builder $query): Builder => $query
+                ->where('parse_status', 'parsed')
+                ->where(fn (Builder $query): Builder => $this->dueForMissingDataRetry($query))
+                ->whereHas('linkedSeasons', function (Builder $query): void {
+                    $query->whereDoesntHave('episodes');
+                }),
+
+            'seasons_without_video' => fn (Builder $query): Builder => $query
+                ->where('parse_status', 'parsed')
+                ->where(fn (Builder $query): Builder => $this->dueForMissingDataRetry($query))
+                ->whereHas('linkedSeasons', function (Builder $query): void {
+                    $query->whereDoesntHave('licensedMedia', fn (Builder $query): Builder => $query->published());
+                }),
+
             'episodes_without_video' => fn (Builder $query): Builder => $query
                 ->where('parse_status', 'parsed')
                 ->where(fn (Builder $query): Builder => $this->dueForMissingDataRetry($query))
-                ->whereHas('seasons.episodes', function (Builder $query): void {
-                    $query->whereDoesntHave('licensedMedia', fn (Builder $query): Builder => $query->published());
+                ->where(function (Builder $query): void {
+                    $query
+                        ->whereHas('linkedSeasons.episodes', function (Builder $query): void {
+                            $query->whereDoesntHave('licensedMedia', fn (Builder $query): Builder => $query->published());
+                        })
+                        ->orWhereHas('seasons.episodes', function (Builder $query): void {
+                            $query->whereDoesntHave('licensedMedia', fn (Builder $query): Builder => $query->published());
+                        });
                 }),
 
             'title_without_video' => fn (Builder $query): Builder => $query

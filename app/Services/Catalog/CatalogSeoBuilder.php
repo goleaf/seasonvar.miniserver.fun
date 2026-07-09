@@ -235,7 +235,6 @@ class CatalogSeoBuilder
             'description' => $description,
             'url' => route('titles.show', $catalogTitle),
             'mainEntityOfPage' => route('titles.show', $catalogTitle),
-            'sameAs' => $catalogTitle->source_url,
             'image' => $catalogTitle->poster_url,
             'inLanguage' => 'ru',
             'isAccessibleForFree' => true,
@@ -336,7 +335,7 @@ class CatalogSeoBuilder
         $text = strip_tags((string) $value);
         $text = preg_replace('/\s+/u', ' ', trim($text)) ?: '';
 
-        return Str::limit($text, $limit, '...');
+        return $text;
     }
 
     private function canonicalFromRequest(Request $request): string

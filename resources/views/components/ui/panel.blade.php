@@ -3,9 +3,16 @@
 <section {{ $attributes->merge(['class' => 'overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-200/60']) }}>
     @if ($title || $subtitle)
         <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
-            <div class="flex items-start gap-2">
+            <div @class([
+                'flex gap-2',
+                'items-start' => $subtitle,
+                'items-center' => ! $subtitle,
+            ])>
                 @if ($icon)
-                    <span class="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+                    <span @class([
+                        'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100',
+                        'mt-0.5' => $subtitle,
+                    ])>
                         <i class="{{ $icon }}" aria-hidden="true"></i>
                     </span>
                 @endif

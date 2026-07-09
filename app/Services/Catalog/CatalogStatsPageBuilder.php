@@ -9,13 +9,40 @@ use App\Models\SourcePage;
 use Closure;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Routing\Route as RouteDefinition;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Throwable;
 
 class CatalogStatsPageBuilder
 {
+    private const TITLE_SITEMAP_PAGE_SIZE = 10000;
+
+    private const VIDEO_SITEMAP_PAGE_SIZE = 5000;
+
+    /**
+     * @var array<string, array{table: string, pivot: string, related_key: string}>
+     */
+    private const FILTER_LINKS = [
+        'genre' => ['table' => 'genres', 'pivot' => 'catalog_title_genre', 'related_key' => 'genre_id'],
+        'country' => ['table' => 'countries', 'pivot' => 'catalog_title_country', 'related_key' => 'country_id'],
+        'actor' => ['table' => 'actors', 'pivot' => 'catalog_title_actor', 'related_key' => 'actor_id'],
+        'director' => ['table' => 'directors', 'pivot' => 'catalog_title_director', 'related_key' => 'director_id'],
+        'age_rating' => ['table' => 'age_ratings', 'pivot' => 'age_rating_catalog_title', 'related_key' => 'age_rating_id'],
+        'translation' => ['table' => 'translations', 'pivot' => 'catalog_title_translation', 'related_key' => 'translation_id'],
+        'status' => ['table' => 'catalog_statuses', 'pivot' => 'catalog_status_catalog_title', 'related_key' => 'catalog_status_id'],
+        'network' => ['table' => 'networks', 'pivot' => 'catalog_title_network', 'related_key' => 'network_id'],
+        'studio' => ['table' => 'studios', 'pivot' => 'catalog_title_studio', 'related_key' => 'studio_id'],
+        'tag' => ['table' => 'tags', 'pivot' => 'catalog_title_tag', 'related_key' => 'tag_id'],
+    ];
+
+    /**
+     * @var list<string>
+     */
+    private const LANDING_FILTER_TYPES = ['genre', 'country', 'actor', 'director', 'translation', 'age_rating'];
+
     /**
      * @var array<string, int>
      */
@@ -25,6 +52,21 @@ class CatalogStatsPageBuilder
      * @var array<string, int>
      */
     private array $presentCounts = [];
+
+    /**
+     * @var array<string, int>
+     */
+    private array $distinctPresentCounts = [];
+
+    /**
+     * @var array<string, int>
+     */
+    private array $absoluteUrlCounts = [];
+
+    /**
+     * @var Collection<int, array{table: string, name: string, unique: bool, origin: string, partial: bool, columns: string}>|null
+     */
+    private ?Collection $databaseIndexes = null;
 
     /**
      * @return array<string, mixed>
@@ -40,26 +82,38 @@ class CatalogStatsPageBuilder
         $publishedMedia = $this->whereCount('licensed_media', fn (QueryBuilder $query): QueryBuilder => $query->where('status', 'published'));
         $publishedTitles = $this->whereCount('catalog_titles', fn (QueryBuilder $query): QueryBuilder => $query->where('is_published', true));
         $totalDatabaseRows = $databaseTables->sum('total');
+        $pageStats = $this->pageStats();
+        $databaseOptimization = $this->databaseOptimizationStats($databaseTables);
+        $qualitySections = $this->qualitySections($catalogTitles, $seasons, $episodes, $media, $sourcePages);
+        $recentImportRuns = $this->recentImportRuns();
 
         return [
+            'statsHealthCards' => $this->statsHealthCards($catalogTitles, $media, $publishedMedia, $databaseOptimization, $recentImportRuns),
+            'statsPosterRows' => $this->statsPosterRows(),
+            'statsIssueRows' => $this->statsIssueRows(),
+            'qualityProgressRows' => $this->qualityProgressRows($qualitySections),
             'headlineStats' => [
                 ['label' => 'Записей в базе', 'value' => $totalDatabaseRows, 'icon' => 'fa-solid fa-database'],
-                ['label' => 'Карточек каталога', 'value' => $catalogTitles, 'icon' => 'fa-solid fa-clapperboard'],
+                ['label' => 'Сериалов каталога', 'value' => $catalogTitles, 'icon' => 'fa-solid fa-clapperboard'],
                 ['label' => 'Сезонов и серий', 'value' => $seasons + $episodes, 'icon' => 'fa-solid fa-layer-group'],
                 ['label' => 'Видео-ссылок', 'value' => $media, 'icon' => 'fa-solid fa-circle-play'],
+                ['label' => 'Публичных адресов', 'value' => $pageStats['totals']['public_urls'], 'icon' => 'fa-solid fa-link'],
+                ['label' => 'Полей со ссылками', 'value' => $pageStats['totals']['external_url_fields'], 'icon' => 'fa-solid fa-table-list'],
+                ['label' => 'Индексов базы', 'value' => $databaseOptimization['totals']['indexes'], 'icon' => 'fa-solid fa-gauge-high'],
+                ['label' => 'Проверок индексов', 'value' => $databaseOptimization['totals']['expected_indexes'], 'icon' => 'fa-solid fa-magnifying-glass-chart'],
             ],
             'summarySections' => [
                 [
                     'title' => 'Каталог',
                     'icon' => 'fa-solid fa-clapperboard',
                     'rows' => [
-                        $this->row('Карточек всего', $catalogTitles),
+                        $this->row('Сериалов всего', $catalogTitles),
                         $this->row('Опубликовано', $publishedTitles, $this->percent($publishedTitles, $catalogTitles)),
                         $this->row('С годом выхода', $this->presentCount('catalog_titles', 'year'), $this->percent($this->presentCount('catalog_titles', 'year'), $catalogTitles)),
                         $this->row('С описанием', $this->presentCount('catalog_titles', 'description'), $this->percent($this->presentCount('catalog_titles', 'description'), $catalogTitles)),
                         $this->row('С постером', $this->presentCount('catalog_titles', 'poster_url'), $this->percent($this->presentCount('catalog_titles', 'poster_url'), $catalogTitles)),
                         $this->row('С оригинальным названием', $this->presentCount('catalog_titles', 'original_title'), $this->percent($this->presentCount('catalog_titles', 'original_title'), $catalogTitles)),
-                        $this->row('С внешним ID', $this->presentCount('catalog_titles', 'external_id'), $this->percent($this->presentCount('catalog_titles', 'external_id'), $catalogTitles)),
+                        $this->row('С внешним номером', $this->presentCount('catalog_titles', 'external_id'), $this->percent($this->presentCount('catalog_titles', 'external_id'), $catalogTitles)),
                         $this->row('Без опубликованного видео', CatalogTitle::query()->whereDoesntHave('licensedMedia', fn (EloquentBuilder $query): EloquentBuilder => $query->where('status', 'published'))->count()),
                     ],
                 ],
@@ -69,9 +123,9 @@ class CatalogStatsPageBuilder
                     'rows' => [
                         $this->row('Сезонов', $seasons),
                         $this->row('Серий', $episodes),
-                        $this->row('Среднее сезонов на карточку', $this->average($seasons, $catalogTitles)),
+                        $this->row('Среднее сезонов на сериал', $this->average($seasons, $catalogTitles)),
                         $this->row('Среднее серий на сезон', $this->average($episodes, $seasons)),
-                        $this->row('Среднее серий на карточку', $this->average($episodes, $catalogTitles)),
+                        $this->row('Среднее серий на сериал', $this->average($episodes, $catalogTitles)),
                         $this->row('Сезонов с общим количеством серий', $this->presentCount('seasons', 'episodes_total'), $this->percent($this->presentCount('seasons', 'episodes_total'), $seasons)),
                         $this->row('Сезонов с количеством вышедших серий', $this->presentCount('seasons', 'episodes_released'), $this->percent($this->presentCount('seasons', 'episodes_released'), $seasons)),
                         $this->row('Серий с датой выхода', $this->presentCount('episodes', 'released_at'), $this->percent($this->presentCount('episodes', 'released_at'), $episodes)),
@@ -84,7 +138,7 @@ class CatalogStatsPageBuilder
                     'rows' => [
                         $this->row('Видео-ссылок всего', $media),
                         $this->row('Готово к просмотру', $publishedMedia, $this->percent($publishedMedia, $media)),
-                        $this->row('Связано с карточкой', $this->presentCount('licensed_media', 'catalog_title_id'), $this->percent($this->presentCount('licensed_media', 'catalog_title_id'), $media)),
+                        $this->row('Связано с сериалом', $this->presentCount('licensed_media', 'catalog_title_id'), $this->percent($this->presentCount('licensed_media', 'catalog_title_id'), $media)),
                         $this->row('Связано с сезоном', $this->presentCount('licensed_media', 'season_id'), $this->percent($this->presentCount('licensed_media', 'season_id'), $media)),
                         $this->row('Связано с серией', $this->presentCount('licensed_media', 'episode_id'), $this->percent($this->presentCount('licensed_media', 'episode_id'), $media)),
                         $this->row('С качеством', $this->presentCount('licensed_media', 'quality'), $this->percent($this->presentCount('licensed_media', 'quality'), $media)),
@@ -115,34 +169,319 @@ class CatalogStatsPageBuilder
                     'rows' => $this->freshnessRows(),
                 ],
             ],
-            'qualitySections' => $this->qualitySections($catalogTitles, $seasons, $episodes, $media, $sourcePages),
+            'qualitySections' => $qualitySections,
             'timeWindowRows' => $this->timeWindowRows(),
-            'recentImportRuns' => $this->recentImportRuns(),
+            'recentImportRuns' => $recentImportRuns,
+            'pageStatsSections' => $pageStats['summary_sections'],
+            'routeRows' => $pageStats['route_rows'],
+            'internalLinkRows' => $pageStats['internal_link_rows'],
+            'externalUrlFieldRows' => $pageStats['external_url_field_rows'],
+            'databaseOptimizationSections' => $databaseOptimization['summary_sections'],
+            'databaseExpectedIndexRows' => $databaseOptimization['expected_index_rows'],
+            'databaseIndexRows' => $databaseOptimization['index_rows'],
+            'databaseOptimizationIssueRows' => $databaseOptimization['issue_rows'],
             'groupSections' => $this->groupSections(),
             'taxonomyRows' => $this->taxonomyRows(),
             'databaseTables' => $databaseTables,
-            'seo' => [
-                'title' => 'Сводка каталога',
-                'description' => 'Сводка каталога: карточки, сезоны, серии, видео, отзывы, оценки, справочники и обновления.',
-                'canonical' => route('stats'),
-                'robots' => 'noindex,nofollow',
-                'extended_seo' => false,
-                'breadcrumbs' => [
-                    ['name' => 'Главная', 'url' => route('home')],
-                    ['name' => 'Сводка каталога', 'url' => route('stats')],
-                ],
+            'seo' => $this->seo(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function seo(): array
+    {
+        return [
+            'title' => 'Сводка каталога',
+            'description' => 'Сводка каталога: сериалы, сезоны, серии, видео, отзывы, оценки, справочники и обновления.',
+            'canonical' => route('stats'),
+            'robots' => 'noindex,nofollow',
+            'extended_seo' => false,
+            'breadcrumbs' => [
+                ['name' => 'Главная', 'url' => route('home')],
+                ['name' => 'Сводка каталога', 'url' => route('stats')],
             ],
         ];
     }
 
     /**
-     * @return list<array{title: string, icon: string, rows: list<array{label: string, value: int, display: string, meta: string, severity: string, severity_label: string, row_class: string, value_class: string}>}>
+     * @return array{
+     *     totals: array{public_urls: int, external_url_fields: int},
+     *     summary_sections: list<array{title: string, icon: string, rows: list<array{label: string, value: mixed, display: string, meta: string|null}>}>,
+     *     route_rows: Collection<int, array{label: string, address: string, kind: string, scope: string, generated_count: int, generated_display: string}>,
+     *     internal_link_rows: Collection<int, array{label: string, place: string, route: string, count: int, count_display: string, meta: string}>,
+     *     external_url_field_rows: Collection<int, array{label: string, field: string, total_display: string, filled_display: string, unique_display: string, absolute_display: string, empty_display: string, coverage: string}>
+     * }
+     */
+    private function pageStats(): array
+    {
+        $publishedTitleUrls = $this->publishedTitleUrlCount();
+        $yearUrls = $this->publishedYearUrlCount();
+        $taxonomyUrls = $this->publishedTaxonomyUrlCount();
+        $landingUrls = $this->landingUrlCount();
+        $videoPlayerLinks = $this->publishedVideoUrlCount();
+        $episodePlayerLinks = $this->episodePlayerLinkCount();
+        $titleSitemapPages = $this->paginatedPageCount($publishedTitleUrls, self::TITLE_SITEMAP_PAGE_SIZE);
+        $videoSitemapPages = $this->paginatedPageCount($videoPlayerLinks, self::VIDEO_SITEMAP_PAGE_SIZE);
+        $sitemapDocuments = 5 + $titleSitemapPages + $videoSitemapPages;
+        $machineReadableEndpoints = $sitemapDocuments + 3;
+        $htmlPages = 3 + $yearUrls + $taxonomyUrls + $publishedTitleUrls;
+        $queryAndFragmentLinks = $landingUrls + $videoPlayerLinks + $episodePlayerLinks + 1;
+        $publicUrls = $htmlPages + $queryAndFragmentLinks + $machineReadableEndpoints;
+        $namedGetRoutes = $this->namedGetRoutes();
+        $parameterizedRoutes = $namedGetRoutes->filter(fn (RouteDefinition $route): bool => str_contains($route->uri(), '{'))->count();
+        $externalUrlFieldRows = $this->externalUrlFieldRows();
+
+        $routeUrlCounts = [
+            'home' => 1,
+            'stats' => 1,
+            'stats.poster' => $this->presentCount('catalog_titles', 'poster_url'),
+            'titles.index' => 1,
+            'titles.year' => $yearUrls,
+            'titles.taxonomy' => $taxonomyUrls,
+            'titles.show' => $publishedTitleUrls,
+            'sitemap' => 1,
+            'sitemap.index' => 1,
+            'sitemap.static' => 1,
+            'sitemap.taxonomies' => 1,
+            'sitemap.landings' => 1,
+            'sitemap.titles' => $titleSitemapPages,
+            'sitemap.videos' => $videoSitemapPages,
+            'feed' => 1,
+            'opensearch' => 1,
+            'llms' => 1,
+        ];
+
+        return [
+            'totals' => [
+                'public_urls' => $publicUrls,
+                'external_url_fields' => $externalUrlFieldRows->count(),
+            ],
+            'summary_sections' => [
+                [
+                    'title' => 'Страницы и ссылки',
+                    'icon' => 'fa-solid fa-link',
+                    'rows' => [
+                        $this->row('Публичных адресов всего', $publicUrls),
+                        $this->row('Страниц каталога', $htmlPages),
+                        $this->row('Ссылок с выбором', $queryAndFragmentLinks),
+                        $this->row('Служебных файлов', $machineReadableEndpoints),
+                        $this->row('Разделы портала', $namedGetRoutes->count()),
+                        $this->row('Разделов с выбором', $parameterizedRoutes),
+                    ],
+                ],
+                [
+                    'title' => 'Покрытие карты сайта',
+                    'icon' => 'fa-solid fa-sitemap',
+                    'rows' => [
+                        $this->row('Файлов карты сайта', $sitemapDocuments),
+                        $this->row('Файлов карты с сериалами', $titleSitemapPages, self::TITLE_SITEMAP_PAGE_SIZE.' адресов в файле'),
+                        $this->row('Файлов карты с видео', $videoSitemapPages, self::VIDEO_SITEMAP_PAGE_SIZE.' адресов в файле'),
+                        $this->row('Сериалов в карте сайта', $publishedTitleUrls),
+                        $this->row('Видео в карте сайта', $videoPlayerLinks),
+                        $this->row('Страниц справочников по годам', $landingUrls),
+                    ],
+                ],
+            ],
+            'route_rows' => $this->routeRows($routeUrlCounts),
+            'internal_link_rows' => $this->internalLinkRows($publishedTitleUrls, $yearUrls, $taxonomyUrls, $landingUrls, $videoPlayerLinks, $episodePlayerLinks, $sitemapDocuments),
+            'external_url_field_rows' => $externalUrlFieldRows,
+        ];
+    }
+
+    /**
+     * @param  array{totals: array{indexes: int, expected_indexes: int, missing_expected_indexes: int}}  $databaseOptimization
+     * @param  Collection<int, array{id: string, mode: string, status: string, status_class: string, status_tone: string, options: list<string>, cycles: string, discovery: string, discovery_meta: string, pages: string, pages_meta: string, failed: string, media: string, media_meta: string, media_extra: string, maintenance: list<string>, started_at: string, finished_at: string, duration: string}>  $recentImportRuns
+     * @return list<array{label: string, value: string, meta: string, icon: string, tone: string}>
+     */
+    private function statsHealthCards(int $catalogTitles, int $media, int $publishedMedia, array $databaseOptimization, Collection $recentImportRuns): array
+    {
+        $latestRun = $recentImportRuns->first();
+        $posters = $this->presentCount('catalog_titles', 'poster_url');
+        $failedPages = $this->whereCount('source_pages', fn (QueryBuilder $query): QueryBuilder => $query
+            ->where('parse_status', 'failed')
+            ->orWhere('import_status', 'failed'));
+        $missingIndexes = $databaseOptimization['totals']['missing_expected_indexes'];
+        $expectedIndexes = $databaseOptimization['totals']['expected_indexes'];
+
+        return [
+            $this->healthCard(
+                'Последний запуск',
+                $latestRun['id'] ?? 'нет данных',
+                $latestRun === null ? 'обновление еще не запускалось' : $latestRun['mode'].' / '.$latestRun['status'],
+                'fa-solid fa-clock-rotate-left',
+                $latestRun['status_tone'] ?? 'muted',
+            ),
+            $this->healthCard(
+                'Готовность видео',
+                $this->percent($publishedMedia, $media),
+                $this->formatStat($publishedMedia).' / '.$this->formatStat($media).' готовы к просмотру',
+                'fa-solid fa-circle-play',
+                $publishedMedia === 0 && $media > 0 ? 'warning' : 'success',
+            ),
+            $this->healthCard(
+                'Постеры сериалов',
+                $this->percent($posters, $catalogTitles),
+                $this->formatStat($posters).' / '.$this->formatStat($catalogTitles).' с картинками',
+                'fa-regular fa-image',
+                $posters === 0 && $catalogTitles > 0 ? 'warning' : 'sky',
+            ),
+            $this->healthCard(
+                'Ошибки страниц',
+                $this->formatStat($failedPages),
+                'ошибки сбора или обновления',
+                'fa-solid fa-triangle-exclamation',
+                $failedPages > 0 ? 'danger' : 'success',
+            ),
+            $this->healthCard(
+                'Важные индексы',
+                $missingIndexes > 0 ? $this->formatStat($missingIndexes) : 'на месте',
+                $this->formatStat($expectedIndexes).' проверок индексов',
+                'fa-solid fa-magnifying-glass-chart',
+                $missingIndexes > 0 ? 'danger' : 'success',
+            ),
+            $this->healthCard(
+                'Новые за 24 часа',
+                $this->formatStat($this->sinceCount('catalog_titles', 'created_at', now()->subDay())),
+                'сериалы, добавленные недавно',
+                'fa-solid fa-calendar-day',
+                'slate',
+            ),
+        ];
+    }
+
+    /**
+     * @return array{label: string, value: string, meta: string, icon: string, tone: string}
+     */
+    private function healthCard(string $label, string $value, string $meta, string $icon, string $tone): array
+    {
+        return [
+            'label' => $label,
+            'value' => $value,
+            'meta' => $meta,
+            'icon' => $icon,
+            'tone' => $tone,
+        ];
+    }
+
+    /**
+     * @return Collection<int, array{id: int, title: string, year: string, label: string, meta: string, href: string, poster_src: string|null, icon: string, tone: string}>
+     */
+    private function statsPosterRows(): Collection
+    {
+        return CatalogTitle::query()
+            ->select(['id', 'slug', 'title', 'year', 'poster_url', 'indexed_at'])
+            ->whereNotNull('poster_url')
+            ->where('poster_url', '!=', '')
+            ->latest('indexed_at')
+            ->latest('id')
+            ->limit(8)
+            ->get()
+            ->map(fn (CatalogTitle $title): array => $this->titlePreviewRow(
+                $title,
+                'Обновлена',
+                $this->dateValue($title->indexed_at),
+                'fa-solid fa-clock',
+                'sky',
+            ));
+    }
+
+    /**
+     * @return Collection<int, array{id: int, title: string, year: string, label: string, meta: string, href: string, poster_src: string|null, icon: string, tone: string}>
+     */
+    private function statsIssueRows(): Collection
+    {
+        $withoutPublishedMedia = CatalogTitle::query()
+            ->select(['id', 'slug', 'title', 'year', 'poster_url', 'indexed_at'])
+            ->whereDoesntHave('licensedMedia', fn (EloquentBuilder $query): EloquentBuilder => $query->where('status', 'published'))
+            ->latest('indexed_at')
+            ->limit(4)
+            ->get()
+            ->map(fn (CatalogTitle $title): array => $this->titlePreviewRow($title, 'Без видео', 'нет опубликованного видео', 'fa-solid fa-circle-play', 'danger'));
+
+        $withoutPoster = CatalogTitle::query()
+            ->select(['id', 'slug', 'title', 'year', 'poster_url', 'indexed_at'])
+            ->where(function (EloquentBuilder $query): void {
+                $query->whereNull('poster_url')->orWhere('poster_url', '');
+            })
+            ->latest('indexed_at')
+            ->limit(4)
+            ->get()
+            ->map(fn (CatalogTitle $title): array => $this->titlePreviewRow($title, 'Без постера', 'картинка не найдена', 'fa-regular fa-image', 'warning'));
+
+        $withoutDescription = CatalogTitle::query()
+            ->select(['id', 'slug', 'title', 'year', 'poster_url', 'indexed_at'])
+            ->where(function (EloquentBuilder $query): void {
+                $query->whereNull('description')->orWhere('description', '');
+            })
+            ->latest('indexed_at')
+            ->limit(4)
+            ->get()
+            ->map(fn (CatalogTitle $title): array => $this->titlePreviewRow($title, 'Без описания', 'текст описания пустой', 'fa-solid fa-file-lines', 'warning'));
+
+        return $withoutPublishedMedia
+            ->merge($withoutPoster)
+            ->merge($withoutDescription)
+            ->unique('id')
+            ->take(8)
+            ->values();
+    }
+
+    /**
+     * @return array{id: int, title: string, year: string, label: string, meta: string, href: string, poster_src: string|null, icon: string, tone: string}
+     */
+    private function titlePreviewRow(CatalogTitle $title, string $label, string $meta, string $icon, string $tone): array
+    {
+        $hasPoster = is_string($title->poster_url) && trim($title->poster_url) !== '';
+
+        return [
+            'id' => (int) $title->id,
+            'title' => $title->title,
+            'year' => $title->year === null ? 'год не указан' : (string) $title->year,
+            'label' => $label,
+            'meta' => $meta,
+            'href' => route('titles.show', $title),
+            'poster_src' => $hasPoster ? route('stats.poster', $title) : null,
+            'icon' => $icon,
+            'tone' => $tone,
+        ];
+    }
+
+    /**
+     * @param  list<array{title: string, icon: string, rows: list<array{label: string, value: int, total: int, display: string, meta: string, percent_value: float, severity: string, severity_label: string, row_class: string, value_class: string}>}>  $qualitySections
+     * @return Collection<int, array{label: string, display: string, meta: string, percent_value: float, severity: string, severity_label: string}>
+     */
+    private function qualityProgressRows(array $qualitySections): Collection
+    {
+        return collect($qualitySections)
+            ->flatMap(fn (array $section): array => $section['rows'])
+            ->filter(fn (array $row): bool => $row['value'] > 0)
+            ->sortBy(fn (array $row): int => match ($row['severity']) {
+                'critical' => 0,
+                'warning' => 1,
+                default => 2,
+            })
+            ->take(8)
+            ->values()
+            ->map(fn (array $row): array => [
+                'label' => $row['label'],
+                'display' => $row['display'],
+                'meta' => $row['meta'],
+                'percent_value' => $row['percent_value'],
+                'severity' => $row['severity'],
+                'severity_label' => $row['severity_label'],
+            ]);
+    }
+
+    /**
+     * @return list<array{title: string, icon: string, rows: list<array{label: string, value: int, total: int, display: string, meta: string, percent_value: float, severity: string, severity_label: string, row_class: string, value_class: string}>}>
      */
     private function qualitySections(int $catalogTitles, int $seasons, int $episodes, int $media, int $sourcePages): array
     {
         return [
             [
-                'title' => 'Качество карточек',
+                'title' => 'Качество сериалов',
                 'icon' => 'fa-solid fa-clipboard-check',
                 'rows' => [
                     $this->qualityRow('Без опубликованного видео', CatalogTitle::query()->whereDoesntHave('licensedMedia', fn (EloquentBuilder $query): EloquentBuilder => $query->where('status', 'published'))->count(), $catalogTitles, 'critical'),
@@ -218,25 +557,646 @@ class CatalogStatsPageBuilder
     }
 
     /**
-     * @return Collection<int, array{id: string, mode: string, status: string, started_at: string, finished_at: string, selected: string, parsed: string, failed: string, media: string}>
+     * @return Collection<int, array{id: string, mode: string, status: string, status_class: string, status_tone: string, options: list<string>, cycles: string, discovery: string, discovery_meta: string, pages: string, pages_meta: string, failed: string, media: string, media_meta: string, media_extra: string, maintenance: list<string>, started_at: string, finished_at: string, duration: string}>
      */
     private function recentImportRuns(): Collection
     {
         return SeasonvarImportRun::query()
             ->latest('id')
             ->limit(10)
-            ->get(['id', 'mode', 'status', 'selected', 'parsed', 'failed', 'media_attached', 'media_updated', 'started_at', 'finished_at'])
+            ->get([
+                'id',
+                'mode',
+                'status',
+                'force',
+                'forever',
+                'cycles',
+                'discovered',
+                'stored',
+                'selected',
+                'parsed',
+                'failed',
+                'media_attached',
+                'media_updated',
+                'media_skipped',
+                'media_failed',
+                'summary',
+                'started_at',
+                'finished_at',
+                'updated_at',
+            ])
             ->map(fn (SeasonvarImportRun $run): array => [
                 'id' => '#'.$run->id,
                 'mode' => $this->displayValue('seasonvar_import_runs', 'mode', $run->mode),
                 'status' => $this->displayValue('seasonvar_import_runs', 'status', $run->status),
-                'started_at' => $this->dateValue($run->started_at),
-                'finished_at' => $this->dateValue($run->finished_at),
-                'selected' => $this->formatStat((int) $run->selected),
-                'parsed' => $this->formatStat((int) $run->parsed),
+                'status_class' => $this->runStatusClass((string) $run->status),
+                'status_tone' => $this->runStatusTone((string) $run->status),
+                'options' => $this->runOptionLabels($run),
+                'cycles' => $this->formatStat((int) $run->cycles),
+                'discovery' => $this->formatStat((int) $run->discovered).' / '.$this->formatStat((int) $run->stored),
+                'discovery_meta' => 'найдено / сохранено',
+                'pages' => $this->formatStat((int) $run->selected).' / '.$this->formatStat((int) $run->parsed),
+                'pages_meta' => 'выбрано / обновлено',
                 'failed' => $this->formatStat((int) $run->failed),
                 'media' => $this->formatStat((int) $run->media_attached).' / '.$this->formatStat((int) $run->media_updated),
+                'media_meta' => 'добавлено / обновлено',
+                'media_extra' => 'пропущено: '.$this->formatStat((int) $run->media_skipped).', ошибок: '.$this->formatStat((int) $run->media_failed),
+                'maintenance' => $this->runMaintenanceRows($run->summary),
+                'started_at' => $this->dateValue($run->started_at),
+                'finished_at' => $this->dateValue($run->finished_at),
+                'duration' => $this->durationValue($run->started_at, $run->finished_at),
             ]);
+    }
+
+    private function runStatusClass(string $status): string
+    {
+        return match ($status) {
+            'completed' => 'text-emerald-700',
+            'failed' => 'text-rose-700',
+            'running' => 'text-amber-700',
+            default => 'text-slate-700',
+        };
+    }
+
+    private function runStatusTone(string $status): string
+    {
+        return match ($status) {
+            'completed' => 'success',
+            'failed' => 'danger',
+            'running' => 'warning',
+            default => 'muted',
+        };
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function runOptionLabels(SeasonvarImportRun $run): array
+    {
+        $options = [];
+
+        if ((bool) $run->force) {
+            $options[] = 'Принудительно';
+        }
+
+        if ((bool) $run->forever) {
+            $options[] = 'Без остановки';
+        }
+
+        return $options;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function runMaintenanceRows(mixed $summary): array
+    {
+        if (! is_array($summary)) {
+            return ['нет дополнительных действий'];
+        }
+
+        $rows = [];
+        $sourceBackfill = $this->summarySection($summary, 'last_source_status_backfill');
+        $sourceBackfillSelected = $this->summaryInt($sourceBackfill, 'selected');
+        $sourceBackfilled = $this->summaryInt($sourceBackfill, 'backfilled');
+
+        if ($sourceBackfillSelected > 0 || $sourceBackfilled > 0) {
+            $rows[] = 'Статусы страниц: '.$this->formatStat($sourceBackfilled).' / '.$this->formatStat($sourceBackfillSelected);
+        }
+
+        $mediaMetadata = $this->summarySection($summary, 'last_media_metadata_backlog');
+        $mediaMetadataChecked = $this->summaryInt($mediaMetadata, 'media_checked');
+        $mediaMetadataUpdated = $this->summaryInt($mediaMetadata, 'media_updated');
+
+        if ($mediaMetadataChecked > 0 || $mediaMetadataUpdated > 0) {
+            $rows[] = 'Данные видео: '.$this->formatStat($mediaMetadataUpdated).' / '.$this->formatStat($mediaMetadataChecked);
+        }
+
+        $mediaSourceKeys = $this->summarySection($summary, 'last_media_source_key_backlog');
+        $mediaSourceKeysChecked = $this->summaryInt($mediaSourceKeys, 'media_checked');
+        $mediaSourceKeysUpdated = $this->summaryInt($mediaSourceKeys, 'media_updated');
+
+        if ($mediaSourceKeysChecked > 0 || $mediaSourceKeysUpdated > 0) {
+            $rows[] = 'Ключи видео: '.$this->formatStat($mediaSourceKeysUpdated).' / '.$this->formatStat($mediaSourceKeysChecked);
+        }
+
+        $mediaBacklog = $this->summarySection($summary, 'last_media_backlog');
+        $mediaChecked = $this->summaryInt($mediaBacklog, 'media_checked');
+        $mediaAvailable = $this->summaryInt($mediaBacklog, 'media_available');
+        $mediaUnavailable = $this->summaryInt($mediaBacklog, 'media_unavailable');
+
+        if ($mediaChecked > 0 || $mediaAvailable > 0 || $mediaUnavailable > 0) {
+            $rows[] = 'Проверка видео: '.$this->formatStat($mediaChecked).', доступно '.$this->formatStat($mediaAvailable).', недоступно '.$this->formatStat($mediaUnavailable);
+        }
+
+        $merge = $this->summarySection($summary, 'last_merge');
+        $mergedTitles = $this->summaryInt($merge, 'titles');
+        $mergedSeasons = $this->summaryInt($merge, 'seasons');
+        $mergedEpisodes = $this->summaryInt($merge, 'episodes');
+
+        if ($mergedTitles > 0 || $mergedSeasons > 0 || $mergedEpisodes > 0) {
+            $rows[] = 'Объединение: '.$this->formatStat($mergedTitles).' / '.$this->formatStat($mergedSeasons).' / '.$this->formatStat($mergedEpisodes);
+        }
+
+        $discovery = $this->summarySection($summary, 'last_discovery');
+        $cleaned = $this->summaryInt($discovery, 'cleaned');
+
+        if ($cleaned > 0) {
+            $rows[] = 'Некорректные ссылки: '.$this->formatStat($cleaned);
+        }
+
+        return $rows === [] ? ['нет дополнительных действий'] : $rows;
+    }
+
+    /**
+     * @param  array<string, mixed>  $summary
+     * @return array<string, mixed>
+     */
+    private function summarySection(array $summary, string $key): array
+    {
+        $section = $summary[$key] ?? [];
+
+        return is_array($section) ? $section : [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $summary
+     */
+    private function summaryInt(array $summary, string $key): int
+    {
+        return max(0, (int) ($summary[$key] ?? 0));
+    }
+
+    /**
+     * @param  array<string, int>  $generatedCounts
+     * @return Collection<int, array{label: string, address: string, kind: string, scope: string, generated_count: int, generated_display: string}>
+     */
+    private function routeRows(array $generatedCounts): Collection
+    {
+        return $this->namedGetRoutes()
+            ->map(function (RouteDefinition $route) use ($generatedCounts): array {
+                $name = (string) $route->getName();
+                $uri = $route->uri();
+
+                return [
+                    'name' => $name,
+                    'uri' => $uri === '/' ? '/' : '/'.ltrim($uri, '/'),
+                    'label' => $this->routeLabel($name),
+                    'address' => $this->routeAddressLabel($name),
+                    'kind' => $this->routeKind($name),
+                    'scope' => str_contains($uri, '{') ? 'Параметризованный' : 'Статический',
+                    'generated_count' => $generatedCounts[$name] ?? 0,
+                    'generated_display' => $this->formatStat($generatedCounts[$name] ?? 0),
+                ];
+            })
+            ->sortBy([['kind', 'asc'], ['name', 'asc']])
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, RouteDefinition>
+     */
+    private function namedGetRoutes(): Collection
+    {
+        return collect(Route::getRoutes())
+            ->filter(fn (RouteDefinition $route): bool => $route->getName() !== null && in_array('GET', $route->methods(), true))
+            ->values();
+    }
+
+    private function routeKind(string $routeName): string
+    {
+        return match (true) {
+            str_starts_with($routeName, 'sitemap') => 'Карта сайта',
+            in_array($routeName, ['feed', 'opensearch', 'llms'], true) => 'Служебные файлы',
+            str_starts_with($routeName, 'titles.') => 'Каталог',
+            str_starts_with($routeName, 'stats') => 'Служебный раздел',
+            default => 'Основные страницы',
+        };
+    }
+
+    private function routeLabel(string $routeName): string
+    {
+        return match ($routeName) {
+            'home' => 'Главная',
+            'stats' => 'Сводка каталога',
+            'stats.poster' => 'Постер статистики',
+            'titles.index' => 'Каталог',
+            'titles.year' => 'Страница года',
+            'titles.taxonomy' => 'Раздел справочника',
+            'titles.show' => 'Страница сериала',
+            'sitemap' => 'Карта сайта',
+            'sitemap.index' => 'Индекс карты сайта',
+            'sitemap.static' => 'Основные страницы карты',
+            'sitemap.taxonomies' => 'Справочники карты',
+            'sitemap.landings' => 'Страницы справочников по годам',
+            'sitemap.titles' => 'Сериалы карты',
+            'sitemap.videos' => 'Видео карты',
+            'feed' => 'Лента обновлений',
+            'opensearch' => 'Поиск браузера',
+            'llms' => 'Текстовый справочник',
+            default => 'Раздел портала',
+        };
+    }
+
+    private function routeAddressLabel(string $routeName): string
+    {
+        return match ($routeName) {
+            'home' => 'Главная страница',
+            'stats' => 'Сводка каталога',
+            'stats.poster' => 'Внутреннее изображение сериала',
+            'titles.index' => 'Список сериалов',
+            'titles.year' => 'Сериалы выбранного года',
+            'titles.taxonomy' => 'Сериалы выбранного справочника',
+            'titles.show' => 'Внутренняя страница сериала',
+            'sitemap' => 'Карта сайта',
+            'sitemap.index' => 'Индекс карты сайта',
+            'sitemap.static' => 'Основные страницы карты сайта',
+            'sitemap.taxonomies' => 'Справочники карты сайта',
+            'sitemap.landings' => 'Страницы справочников по годам',
+            'sitemap.titles' => 'Файлы карты с сериалами',
+            'sitemap.videos' => 'Файлы карты с видео',
+            'feed' => 'Лента последних обновлений',
+            'opensearch' => 'Подключение поиска в браузере',
+            'llms' => 'Текстовый справочник для чтения',
+            default => 'Служебная страница',
+        };
+    }
+
+    /**
+     * @return Collection<int, array{label: string, place: string, route: string, count: int, count_display: string, meta: string}>
+     */
+    private function internalLinkRows(
+        int $publishedTitleUrls,
+        int $yearUrls,
+        int $taxonomyUrls,
+        int $landingUrls,
+        int $videoPlayerLinks,
+        int $episodePlayerLinks,
+        int $sitemapDocuments,
+    ): Collection {
+        return collect([
+            $this->linkRow('Главная страница', 'Навигация и карта сайта', 'Главная', 1, 'основная страница'),
+            $this->linkRow('Каталог', 'Навигация, поиск, карта сайта', 'Каталог', 1, 'страница с поиском'),
+            $this->linkRow('Страницы годов', 'Каталог и карта сайта', 'Годы', $yearUrls, 'по опубликованным годам'),
+            $this->linkRow('Страницы справочников', 'Фильтры и карта сайта', 'Справочники', $taxonomyUrls, 'жанры, страны, актеры, переводы и другие справочники'),
+            $this->linkRow('Справочники по годам', 'Карта сайта и фильтры', 'Справочник с годом', $landingUrls, 'реальные пары справочника и года'),
+            $this->linkRow('Публичные сериалы', 'Сериалы, списки, карта сайта', 'Сериалы', $publishedTitleUrls, 'только опубликованные сериалы'),
+            $this->linkRow('Выбор серии на странице сериала', 'Плеер', 'Выбор серии', $episodePlayerLinks, 'серии с готовым видео'),
+            $this->linkRow('Выбор видео на странице сериала', 'Плеер и карта видео', 'Выбор видео', $videoPlayerLinks, 'готовые внешние видео'),
+            $this->linkRow('Файлы карты сайта', 'Поиск и индексация', 'Карта сайта', $sitemapDocuments, 'основные страницы, справочники, сериалы, видео'),
+            $this->linkRow('Служебные файлы', 'Поиск и чтение', 'Ленты и справочники', 3, 'для обновлений и поиска'),
+            $this->linkRow('Страница внутренней статистики', 'Служебная навигация', 'stats', 1, 'закрыто от индексации'),
+        ]);
+    }
+
+    /**
+     * @return array{label: string, place: string, route: string, count: int, count_display: string, meta: string}
+     */
+    private function linkRow(string $label, string $place, string $route, int $count, string $meta): array
+    {
+        return [
+            'label' => $label,
+            'place' => $place,
+            'route' => $route,
+            'count' => $count,
+            'count_display' => $this->formatStat($count),
+            'meta' => $meta,
+        ];
+    }
+
+    private function publishedTitleUrlCount(): int
+    {
+        return $this->whereCount('catalog_titles', fn (QueryBuilder $query): QueryBuilder => $query
+            ->where('is_published', true)
+            ->whereNotNull('slug')
+            ->where('slug', '!=', ''));
+    }
+
+    private function publishedYearUrlCount(): int
+    {
+        return (int) DB::table('catalog_titles')
+            ->where('is_published', true)
+            ->whereNotNull('year')
+            ->where('year', '>=', 1900)
+            ->where('year', '<=', (int) now()->format('Y') + 1)
+            ->distinct()
+            ->count('year');
+    }
+
+    private function publishedTaxonomyUrlCount(): int
+    {
+        return collect(self::FILTER_LINKS)
+            ->sum(fn (array $config): int => (int) DB::table($config['pivot'])
+                ->join('catalog_titles', 'catalog_titles.id', '=', $config['pivot'].'.catalog_title_id')
+                ->where('catalog_titles.is_published', true)
+                ->distinct()
+                ->count($config['pivot'].'.'.$config['related_key']));
+    }
+
+    private function landingUrlCount(): int
+    {
+        return collect(self::LANDING_FILTER_TYPES)
+            ->sum(function (string $filterType): int {
+                $config = self::FILTER_LINKS[$filterType];
+                $query = DB::table($config['pivot'])
+                    ->join('catalog_titles', 'catalog_titles.id', '=', $config['pivot'].'.catalog_title_id')
+                    ->where('catalog_titles.is_published', true)
+                    ->whereNotNull('catalog_titles.year')
+                    ->where('catalog_titles.year', '>=', 1900)
+                    ->where('catalog_titles.year', '<=', (int) now()->format('Y') + 1)
+                    ->select([
+                        $config['pivot'].'.'.$config['related_key'].' as taxonomy_id',
+                        'catalog_titles.year as year',
+                    ])
+                    ->groupBy($config['pivot'].'.'.$config['related_key'], 'catalog_titles.year');
+
+                return (int) DB::query()->fromSub($query, 'landing_links')->count();
+            });
+    }
+
+    private function publishedVideoUrlCount(): int
+    {
+        return (int) DB::table('licensed_media')
+            ->join('catalog_titles', 'catalog_titles.id', '=', 'licensed_media.catalog_title_id')
+            ->where('catalog_titles.is_published', true)
+            ->where('licensed_media.status', 'published')
+            ->where(function (QueryBuilder $query): void {
+                $query->where('licensed_media.playback_url', 'like', 'https://%')
+                    ->orWhere('licensed_media.playback_url', 'like', 'http://%')
+                    ->orWhere('licensed_media.path', 'like', 'https://%')
+                    ->orWhere('licensed_media.path', 'like', 'http://%');
+            })
+            ->count('licensed_media.id');
+    }
+
+    private function episodePlayerLinkCount(): int
+    {
+        return (int) DB::table('licensed_media')
+            ->join('catalog_titles', 'catalog_titles.id', '=', 'licensed_media.catalog_title_id')
+            ->where('catalog_titles.is_published', true)
+            ->where('licensed_media.status', 'published')
+            ->whereNotNull('licensed_media.episode_id')
+            ->distinct()
+            ->count('licensed_media.episode_id');
+    }
+
+    private function paginatedPageCount(int $items, int $pageSize): int
+    {
+        return max(1, (int) ceil($items / $pageSize));
+    }
+
+    /**
+     * @return Collection<int, array{label: string, field: string, total_display: string, filled_display: string, unique_display: string, absolute_display: string, empty_display: string, coverage: string}>
+     */
+    private function externalUrlFieldRows(): Collection
+    {
+        return collect($this->externalUrlFields())
+            ->map(function (array $field): array {
+                $total = $this->tableCount($field['table']);
+                $filled = $this->presentCount($field['table'], $field['column']);
+                $empty = max(0, $total - $filled);
+
+                return [
+                    'label' => $field['label'],
+                    'field' => $this->tableLabel($field['table']).' - '.$this->columnLabel($field['column']),
+                    'total_display' => $this->formatStat($total),
+                    'filled_display' => $this->formatStat($filled),
+                    'unique_display' => $this->formatStat($this->distinctPresentCount($field['table'], $field['column'])),
+                    'absolute_display' => $this->formatStat($this->absoluteUrlCount($field['table'], $field['column'])),
+                    'empty_display' => $this->formatStat($empty),
+                    'coverage' => $this->percent($filled, $total),
+                ];
+            })
+            ->sortBy('label')
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, array{label: string, table: string, total: int, total_display: string, group: string}>  $databaseTables
+     * @return array{
+     *     totals: array{indexes: int, expected_indexes: int, missing_expected_indexes: int},
+     *     summary_sections: list<array{title: string, icon: string, rows: list<array{label: string, value: mixed, display: string, meta: string|null}>}>,
+     *     expected_index_rows: Collection<int, array{label: string, table: string, columns: string, present: bool, status: string}>,
+     *     index_rows: Collection<int, array{label: string, records_display: string, indexes_display: string, secondary_display: string, unique_display: string, coverage: string}>,
+     *     issue_rows: Collection<int, array{label: string, table: string, columns: string, present: bool, status: string}>
+     * }
+     */
+    private function databaseOptimizationStats(Collection $databaseTables): array
+    {
+        $rawIndexRows = $this->databaseIndexRows();
+        $indexRows = $this->databaseIndexSummaryRows($databaseTables, $rawIndexRows);
+        $expectedIndexRows = $this->expectedIndexRows();
+        $missingRows = $expectedIndexRows
+            ->filter(fn (array $row): bool => $row['present'] === false)
+            ->values();
+        $indexedTables = $rawIndexRows->pluck('table')->unique()->count();
+
+        return [
+            'totals' => [
+                'indexes' => $rawIndexRows->count(),
+                'expected_indexes' => $expectedIndexRows->count(),
+                'missing_expected_indexes' => $missingRows->count(),
+            ],
+            'summary_sections' => [
+                [
+                    'title' => 'Индексы базы',
+                    'icon' => 'fa-solid fa-gauge-high',
+                    'rows' => [
+                        $this->row('Индексов всего', $rawIndexRows->count()),
+                        $this->row('Разделов с индексами', $indexedTables, $this->percent($indexedTables, $databaseTables->count())),
+                        $this->row('Проверено важных индексов', $expectedIndexRows->count()),
+                        $this->row('Не хватает важных индексов', $missingRows->count()),
+                    ],
+                ],
+            ],
+            'expected_index_rows' => $expectedIndexRows,
+            'index_rows' => $indexRows,
+            'issue_rows' => $missingRows,
+        ];
+    }
+
+    /**
+     * @param  Collection<int, array{label: string, table: string, total: int, total_display: string, group: string}>  $databaseTables
+     * @param  Collection<int, array{table: string, name: string, unique: bool, origin: string, partial: bool, columns: string}>  $rawIndexRows
+     * @return Collection<int, array{label: string, records_display: string, indexes_display: string, secondary_display: string, unique_display: string, coverage: string}>
+     */
+    private function databaseIndexSummaryRows(Collection $databaseTables, Collection $rawIndexRows): Collection
+    {
+        $indexesByTable = $rawIndexRows->groupBy('table');
+
+        return $databaseTables
+            ->map(function (array $table) use ($indexesByTable): array {
+                $indexes = $indexesByTable->get($table['table'], collect());
+                $fieldSets = $indexes
+                    ->pluck('columns')
+                    ->filter()
+                    ->unique()
+                    ->count();
+
+                return [
+                    'label' => $table['label'],
+                    'records_display' => $table['total_display'],
+                    'indexes_display' => $this->formatStat($indexes->count()),
+                    'secondary_display' => $this->formatStat($indexes->where('origin', 'c')->count()),
+                    'unique_display' => $this->formatStat($indexes->where('unique', true)->count()),
+                    'coverage' => $fieldSets === 0 ? 'нет индексов' : 'наборов полей: '.$this->formatStat($fieldSets),
+                ];
+            })
+            ->sortBy('label')
+            ->values();
+    }
+
+    /**
+     * @return Collection<int, array{label: string, table: string, columns: string, present: bool, status: string}>
+     */
+    private function expectedIndexRows(): Collection
+    {
+        return collect($this->expectedIndexChecks())
+            ->map(function (array $check): array {
+                $present = $this->hasIndexColumns($check['table'], $check['columns']);
+
+                return [
+                    'label' => $check['label'],
+                    'table' => $this->tableLabel($check['table']),
+                    'columns' => $this->columnListLabel($check['columns']),
+                    'present' => $present,
+                    'status' => $present ? 'Готово' : 'Нужно добавить',
+                ];
+            })
+            ->values();
+    }
+
+    /**
+     * @return list<array{label: string, table: string, columns: list<string>}>
+     */
+    private function expectedIndexChecks(): array
+    {
+        return [
+            ['label' => 'Сериалы по источнику', 'table' => 'catalog_titles', 'columns' => ['source_id', 'source_url_hash']],
+            ['label' => 'Сериалы по году и обновлению', 'table' => 'catalog_titles', 'columns' => ['year', 'indexed_at']],
+            ['label' => 'Жанры в фильтрах', 'table' => 'catalog_title_genre', 'columns' => ['genre_id', 'catalog_title_id']],
+            ['label' => 'Страны в фильтрах', 'table' => 'catalog_title_country', 'columns' => ['country_id', 'catalog_title_id']],
+            ['label' => 'Актеры в фильтрах', 'table' => 'catalog_title_actor', 'columns' => ['actor_id', 'catalog_title_id']],
+            ['label' => 'Режиссеры в фильтрах', 'table' => 'catalog_title_director', 'columns' => ['director_id', 'catalog_title_id']],
+            ['label' => 'Переводы в фильтрах', 'table' => 'catalog_title_translation', 'columns' => ['translation_id', 'catalog_title_id']],
+            ['label' => 'Возрастные рейтинги в фильтрах', 'table' => 'age_rating_catalog_title', 'columns' => ['age_rating_id', 'catalog_title_id']],
+            ['label' => 'Страницы для обновления', 'table' => 'source_pages', 'columns' => ['parse_status', 'page_type', 'id']],
+            ['label' => 'Свежесть страниц источника', 'table' => 'source_pages', 'columns' => ['page_type', 'parse_status', 'last_crawled_at', 'id']],
+            ['label' => 'Видео сериала по готовности', 'table' => 'licensed_media', 'columns' => ['catalog_title_id', 'status', 'published_at']],
+            ['label' => 'Видео серии по качеству', 'table' => 'licensed_media', 'columns' => ['episode_id', 'status', 'quality']],
+            ['label' => 'Постоянный ключ видео', 'table' => 'licensed_media', 'columns' => ['catalog_title_id', 'source_media_key']],
+        ];
+    }
+
+    /**
+     * @param  list<string>  $columns
+     */
+    private function hasIndexColumns(string $table, array $columns): bool
+    {
+        $columnSignature = implode(', ', $columns);
+
+        return $this->databaseIndexRows()
+            ->contains(fn (array $index): bool => $index['table'] === $table && $index['columns'] === $columnSignature);
+    }
+
+    /**
+     * @return Collection<int, array{table: string, name: string, unique: bool, origin: string, partial: bool, columns: string}>
+     */
+    private function databaseIndexRows(): Collection
+    {
+        if ($this->databaseIndexes !== null) {
+            return $this->databaseIndexes;
+        }
+
+        if (DB::connection()->getDriverName() !== 'sqlite') {
+            return $this->databaseIndexes = collect();
+        }
+
+        try {
+            $rows = $this->tableNames()
+                ->flatMap(function (string $table): Collection {
+                    return collect(DB::select("PRAGMA index_list('".$this->sqliteLiteral($table)."')"))
+                        ->map(function (object $index) use ($table): array {
+                            $name = (string) $index->name;
+
+                            return [
+                                'table' => $table,
+                                'name' => $name,
+                                'unique' => (bool) $index->unique,
+                                'origin' => (string) $index->origin,
+                                'partial' => (bool) $index->partial,
+                                'columns' => $this->sqliteIndexColumns($name),
+                            ];
+                        });
+                })
+                ->sortBy([['table', 'asc'], ['name', 'asc']])
+                ->values();
+
+            return $this->databaseIndexes = $rows;
+        } catch (Throwable) {
+            return $this->databaseIndexes = collect();
+        }
+    }
+
+    private function sqliteIndexColumns(string $indexName): string
+    {
+        return collect(DB::select("PRAGMA index_info('".$this->sqliteLiteral($indexName)."')"))
+            ->sortBy('seqno')
+            ->pluck('name')
+            ->map(fn (mixed $name): string => (string) $name)
+            ->implode(', ');
+    }
+
+    private function sqliteLiteral(string $value): string
+    {
+        return str_replace("'", "''", $value);
+    }
+
+    /**
+     * @param  list<string>  $columns
+     */
+    private function columnListLabel(array $columns): string
+    {
+        return collect($columns)
+            ->map(fn (string $column): string => $this->columnLabel($column))
+            ->implode(', ');
+    }
+
+    private function columnLabel(string $column): string
+    {
+        return match ($column) {
+            'source_id' => 'источник',
+            'source_url_hash' => 'адрес источника',
+            'is_published' => 'публикация',
+            'slug' => 'адрес сериала',
+            'created_at' => 'дата создания',
+            'year' => 'год',
+            'indexed_at' => 'дата добавления',
+            'genre_id' => 'жанр',
+            'country_id' => 'страна',
+            'actor_id' => 'актер',
+            'director_id' => 'режиссер',
+            'translation_id' => 'перевод',
+            'age_rating_id' => 'возрастной рейтинг',
+            'catalog_title_id' => 'сериал',
+            'parse_status' => 'состояние сбора',
+            'page_type' => 'тип страницы',
+            'id' => 'номер',
+            'last_crawled_at' => 'дата проверки',
+            'status' => 'состояние',
+            'level' => 'важность',
+            'published_at' => 'дата публикации',
+            'episode_id' => 'серия',
+            'quality' => 'качество',
+            'source_media_key' => 'ключ видео',
+            'source_url' => 'адрес источника',
+            'poster_url' => 'постер',
+            'path' => 'ссылка на файл',
+            'playback_url' => 'ссылка воспроизведения',
+            'url' => 'адрес страницы',
+            'discovered_from_url' => 'адрес обнаружения',
+            default => $column,
+        };
     }
 
     /**
@@ -245,8 +1205,8 @@ class CatalogStatsPageBuilder
     private function groupSections(): array
     {
         return [
-            ['title' => 'Карточки по типам', 'icon' => 'fa-solid fa-shapes', 'rows' => $this->groupedCounts('catalog_titles', 'type')],
-            ['title' => 'Карточки по годам', 'icon' => 'fa-solid fa-calendar-days', 'rows' => $this->groupedCounts('catalog_titles', 'year')],
+            ['title' => 'Сериалы по типам', 'icon' => 'fa-solid fa-shapes', 'rows' => $this->groupedCounts('catalog_titles', 'type')],
+            ['title' => 'Сериалы по годам', 'icon' => 'fa-solid fa-calendar-days', 'rows' => $this->groupedCounts('catalog_titles', 'year')],
             ['title' => 'Страницы источника по типам', 'icon' => 'fa-solid fa-file-lines', 'rows' => $this->groupedCounts('source_pages', 'page_type')],
             ['title' => 'Страницы источника по состоянию сбора', 'icon' => 'fa-solid fa-code-branch', 'rows' => $this->groupedCounts('source_pages', 'parse_status')],
             ['title' => 'Страницы источника по состоянию обновления', 'icon' => 'fa-solid fa-rotate', 'rows' => $this->groupedCounts('source_pages', 'import_status')],
@@ -308,8 +1268,8 @@ class CatalogStatsPageBuilder
     private function freshnessRows(): array
     {
         return [
-            $this->row('Первое добавление карточки', $this->dateValue(DB::table('catalog_titles')->min('indexed_at'))),
-            $this->row('Последнее добавление карточки', $this->dateValue(DB::table('catalog_titles')->max('indexed_at'))),
+            $this->row('Первое добавление сериала', $this->dateValue(DB::table('catalog_titles')->min('indexed_at'))),
+            $this->row('Последнее добавление сериала', $this->dateValue(DB::table('catalog_titles')->max('indexed_at'))),
             $this->row('Последняя проверка источника', $this->dateValue(DB::table('source_pages')->max('last_crawled_at'))),
             $this->row('Последнее обновление источника', $this->dateValue(DB::table('source_pages')->max('last_imported_at'))),
             $this->row('Последнее изменение страницы источника', $this->dateValue(DB::table('source_pages')->max('last_changed_at'))),
@@ -465,6 +1425,29 @@ class CatalogStatsPageBuilder
             ->where($column, '!=', ''));
     }
 
+    private function distinctPresentCount(string $table, string $column): int
+    {
+        $key = $table.'.'.$column;
+
+        return $this->distinctPresentCounts[$key] ??= (int) DB::table($table)
+            ->whereNotNull($column)
+            ->where($column, '!=', '')
+            ->distinct()
+            ->count($column);
+    }
+
+    private function absoluteUrlCount(string $table, string $column): int
+    {
+        $key = $table.'.'.$column;
+
+        return $this->absoluteUrlCounts[$key] ??= $this->whereCount($table, fn (QueryBuilder $query): QueryBuilder => $query
+            ->where(function (QueryBuilder $query) use ($column): void {
+                $query
+                    ->where($column, 'like', 'https://%')
+                    ->orWhere($column, 'like', 'http://%');
+            }));
+    }
+
     private function missingCount(string $table, string $column): int
     {
         return max(0, $this->tableCount($table) - $this->presentCount($table, $column));
@@ -506,7 +1489,7 @@ class CatalogStatsPageBuilder
     }
 
     /**
-     * @return array{label: string, value: int, display: string, meta: string, severity: string, severity_label: string, row_class: string, value_class: string}
+     * @return array{label: string, value: int, total: int, display: string, meta: string, percent_value: float, severity: string, severity_label: string, row_class: string, value_class: string}
      */
     private function qualityRow(string $label, int $value, int $total, string $severity): array
     {
@@ -515,8 +1498,10 @@ class CatalogStatsPageBuilder
         return [
             'label' => $label,
             'value' => $value,
+            'total' => $total,
             'display' => $this->formatStat($value),
             'meta' => $this->percent($value, $total),
+            'percent_value' => $this->percentValue($value, $total),
             'severity' => $severity,
             'severity_label' => $severityClasses['label'],
             'row_class' => $severityClasses['row_class'],
@@ -569,7 +1554,7 @@ class CatalogStatsPageBuilder
     private function tableLabels(): array
     {
         return [
-            'catalog_titles' => 'Карточки каталога',
+            'catalog_titles' => 'Сериалы каталога',
             'seasons' => 'Сезоны',
             'episodes' => 'Серии',
             'licensed_media' => 'Видео',
@@ -612,6 +1597,36 @@ class CatalogStatsPageBuilder
             'cache' => 'Кэш',
             'cache_locks' => 'Блокировки кэша',
             'password_reset_tokens' => 'Токены сброса пароля',
+        ];
+    }
+
+    /**
+     * @return list<array{table: string, column: string, label: string}>
+     */
+    private function externalUrlFields(): array
+    {
+        return [
+            ['table' => 'catalog_titles', 'column' => 'source_url', 'label' => 'Источник сериала'],
+            ['table' => 'catalog_titles', 'column' => 'poster_url', 'label' => 'Постер сериала'],
+            ['table' => 'seasons', 'column' => 'source_url', 'label' => 'Источник сезона'],
+            ['table' => 'episodes', 'column' => 'source_url', 'label' => 'Источник серии'],
+            ['table' => 'licensed_media', 'column' => 'path', 'label' => 'Ссылка на видео'],
+            ['table' => 'licensed_media', 'column' => 'playback_url', 'label' => 'Ссылка воспроизведения'],
+            ['table' => 'licensed_media', 'column' => 'source_url', 'label' => 'Источник видео'],
+            ['table' => 'source_pages', 'column' => 'url', 'label' => 'Страница источника'],
+            ['table' => 'source_pages', 'column' => 'discovered_from_url', 'label' => 'Откуда найдена страница'],
+            ['table' => 'source_page_snapshots', 'column' => 'url', 'label' => 'Ссылка сохраненной копии'],
+            ['table' => 'genres', 'column' => 'source_url', 'label' => 'Источник жанра'],
+            ['table' => 'countries', 'column' => 'source_url', 'label' => 'Источник страны'],
+            ['table' => 'actors', 'column' => 'source_url', 'label' => 'Источник актера'],
+            ['table' => 'directors', 'column' => 'source_url', 'label' => 'Источник режиссера'],
+            ['table' => 'age_ratings', 'column' => 'source_url', 'label' => 'Источник возрастного рейтинга'],
+            ['table' => 'translations', 'column' => 'source_url', 'label' => 'Источник перевода'],
+            ['table' => 'catalog_statuses', 'column' => 'source_url', 'label' => 'Источник статуса'],
+            ['table' => 'networks', 'column' => 'source_url', 'label' => 'Источник канала'],
+            ['table' => 'studios', 'column' => 'source_url', 'label' => 'Источник студии'],
+            ['table' => 'tags', 'column' => 'source_url', 'label' => 'Источник тега'],
+            ['table' => 'taxonomies', 'column' => 'source_url', 'label' => 'Источник архивного справочника'],
         ];
     }
 
@@ -678,6 +1693,15 @@ class CatalogStatsPageBuilder
         return number_format(($value / $total) * 100, 1, '.', ' ').'%';
     }
 
+    private function percentValue(int $value, int $total): float
+    {
+        if ($total === 0) {
+            return 0.0;
+        }
+
+        return round(min(100, max(0, ($value / $total) * 100)), 1);
+    }
+
     private function dateValue(mixed $value): string
     {
         if ($value === null || $value === '') {
@@ -689,6 +1713,47 @@ class CatalogStatsPageBuilder
         } catch (Throwable) {
             return (string) $value;
         }
+    }
+
+    private function durationValue(mixed $startedAt, mixed $finishedAt): string
+    {
+        if ($startedAt === null || $startedAt === '') {
+            return 'нет данных';
+        }
+
+        try {
+            $start = Carbon::parse($startedAt);
+            $finish = $finishedAt === null || $finishedAt === '' ? now() : Carbon::parse($finishedAt);
+        } catch (Throwable) {
+            return 'нет данных';
+        }
+
+        return $this->humanDuration((int) $start->diffInSeconds($finish));
+    }
+
+    private function humanDuration(int $seconds): string
+    {
+        if ($seconds < 60) {
+            return 'до минуты';
+        }
+
+        $minutes = intdiv($seconds, 60);
+
+        if ($minutes < 60) {
+            return $minutes.' мин';
+        }
+
+        $hours = intdiv($minutes, 60);
+        $remainingMinutes = $minutes % 60;
+
+        if ($hours < 24) {
+            return trim($hours.' ч '.$remainingMinutes.' мин');
+        }
+
+        $days = intdiv($hours, 24);
+        $remainingHours = $hours % 24;
+
+        return trim($days.' д '.$remainingHours.' ч');
     }
 
     private function displayValue(string $table, string $column, mixed $value): string
@@ -710,6 +1775,10 @@ class CatalogStatsPageBuilder
 
         if ($value === 1 || $value === '1') {
             return '1';
+        }
+
+        if (is_string($value) && preg_match('/seasonvar|сезонвар/iu', $value) === 1) {
+            return $column === 'event' ? 'Событие обновления' : 'Основной источник';
         }
 
         return (string) $value;
@@ -735,7 +1804,7 @@ class CatalogStatsPageBuilder
             'source_pages.page_type.country' => 'Страна',
             'source_pages.page_type.tag' => 'Тег',
             'source_pages.page_type.static' => 'Служебная страница',
-            'source_pages.page_type.rss' => 'Лента RSS',
+            'source_pages.page_type.rss' => 'Лента обновлений',
             'source_pages.page_type.search' => 'Поиск',
             'source_pages.page_type.unknown' => 'Не определено',
             'source_pages.parse_status.pending' => 'Ожидает сбора',
@@ -750,8 +1819,16 @@ class CatalogStatsPageBuilder
             'source_pages.missing_data_flags.poster' => 'Не хватает постера',
             'source_pages.missing_data_flags.poster_url' => 'Не хватает постера',
             'source_pages.missing_data_flags.episodes' => 'Не хватает серий',
+            'source_pages.missing_data_flags.seasons_without_episodes' => 'Есть сезоны без серий',
             'source_pages.missing_data_flags.video' => 'Не хватает видео',
             'source_pages.missing_data_flags.media' => 'Не хватает видео',
+            'source_pages.missing_data_flags.seasons_without_video' => 'Есть сезоны без видео',
+            'source_pages.missing_data_flags.episodes_without_video' => 'Есть серии без видео',
+            'source_pages.missing_data_flags.no_seasons' => 'Не хватает сезонов',
+            'source_pages.missing_data_flags.no_episodes' => 'Не хватает серий',
+            'source_pages.missing_data_flags.no_video' => 'Не хватает видео',
+            'source_pages.missing_data_flags.no_published_video' => 'Нет опубликованного видео',
+            'source_pages.missing_data_flags.unavailable_video' => 'Видео недоступно',
             'licensed_media.status.draft' => 'Готовится',
             'licensed_media.status.published' => 'Готово к просмотру',
             'licensed_media.status.unavailable' => 'Недоступно',
@@ -801,13 +1878,13 @@ class CatalogStatsPageBuilder
             'seasonvar_import_events.event.parse-batch-started' => 'Пакет обработки начался',
             'seasonvar_import_events.event.season-sync-complete' => 'Синхронизация сезонов завершена',
             'seasonvar_import_events.event.season-sync-started' => 'Синхронизация сезонов началась',
-            'seasonvar_import_events.event.seasonvar-import-complete' => 'Обновление Seasonvar завершено',
+            'seasonvar_import_events.event.seasonvar-import-complete' => 'Обновление каталога завершено',
             'seasonvar_import_events.event.seasonvar-import-cycle-complete' => 'Цикл обновления завершен',
             'seasonvar_import_events.event.seasonvar-import-cycle-started' => 'Цикл обновления начался',
-            'seasonvar_import_events.event.seasonvar-import-failed' => 'Обновление Seasonvar завершилось ошибкой',
+            'seasonvar_import_events.event.seasonvar-import-failed' => 'Обновление каталога завершилось ошибкой',
             'seasonvar_import_events.event.seasonvar-import-season-url-failed' => 'Страница сезона завершилась ошибкой',
             'seasonvar_import_events.event.seasonvar-import-season-urls-selected' => 'Страницы сезонов выбраны',
-            'seasonvar_import_events.event.seasonvar-import-started' => 'Обновление Seasonvar запущено',
+            'seasonvar_import_events.event.seasonvar-import-started' => 'Обновление каталога запущено',
             'seasonvar_import_events.event.seasonvar-import-url-failed' => 'Страница по ссылке завершилась ошибкой',
             'seasonvar_import_events.event.seasonvar-media-attached' => 'Видео из страницы подключено',
             'seasonvar_import_events.event.seasonvar-media-backlog-complete' => 'Допроверка старых видео завершена',
@@ -827,7 +1904,7 @@ class CatalogStatsPageBuilder
             'seasonvar_import_events.event.seasonvar-media-url-checked' => 'Видео-ссылка проверена',
             'seasonvar_import_events.event.seasonvar-media-url-check-failed' => 'Проверка видео-ссылки завершилась ошибкой',
             'seasonvar_import_events.event.seasonvar-refresh-candidates-selected' => 'Страницы для обновления выбраны',
-            'seasonvar_import_events.event.seasonvar-title-merge-complete' => 'Объединение карточек завершено',
+            'seasonvar_import_events.event.seasonvar-title-merge-complete' => 'Объединение сериалов завершено',
             'seasonvar_import_events.event.sitemap-fetch-failed' => 'Загрузка карты сайта завершилась ошибкой',
             'seasonvar_import_events.event.sitemap-mirror-archive-ready' => 'Архив карты сайта готов',
             'seasonvar_import_events.event.sitemap-mirror-complete' => 'Зеркало карты сайта готово',
@@ -848,7 +1925,7 @@ class CatalogStatsPageBuilder
             'seasonvar_import_events.event.url-normalized' => 'Ссылка нормализована',
             'catalog_title_aliases.type.original' => 'Оригинальное название',
             'catalog_title_aliases.type.alternative' => 'Дополнительное название',
-            'catalog_title_aliases.source.seasonvar' => 'Seasonvar',
+            'catalog_title_aliases.source.seasonvar' => 'Основной источник',
         ];
     }
 }

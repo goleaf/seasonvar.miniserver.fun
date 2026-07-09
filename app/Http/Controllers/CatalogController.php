@@ -7,9 +7,11 @@ use App\Http\Requests\CatalogTitlesRequest;
 use App\Models\CatalogTitle;
 use App\Services\Catalog\CatalogHomePageBuilder;
 use App\Services\Catalog\CatalogStatsPageBuilder;
+use App\Services\Catalog\CatalogStatsPosterResponder;
 use App\Services\Catalog\CatalogTitlePageBuilder;
 use App\Services\Catalog\CatalogTitlesPageBuilder;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 class CatalogController extends Controller
 {
@@ -44,6 +46,13 @@ class CatalogController extends Controller
 
     public function stats(): View
     {
-        return view('catalog.stats', $this->statsPage->data());
+        return view('catalog.stats', [
+            'seo' => $this->statsPage->seo(),
+        ]);
+    }
+
+    public function statsPoster(CatalogTitle $catalogTitle, CatalogStatsPosterResponder $posters): Response
+    {
+        return $posters->response($catalogTitle);
     }
 }

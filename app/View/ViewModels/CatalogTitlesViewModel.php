@@ -16,7 +16,7 @@ class CatalogTitlesViewModel
         'country' => 'Страны',
         'actor' => 'Актеры',
         'director' => 'Режиссеры',
-        'age_rating' => 'Возраст',
+        'age_rating' => 'Возрастной рейтинг',
         'translation' => 'Перевод',
         'status' => 'Статус',
         'network' => 'Каналы',
@@ -38,6 +38,30 @@ class CatalogTitlesViewModel
         'network' => 'fa-solid fa-tower-broadcast',
         'studio' => 'fa-solid fa-building',
         'tag' => 'fa-solid fa-tag',
+    ];
+
+    /**
+     * @var array<string, string>
+     */
+    public array $sortLabels = [
+        'updated' => 'Недавно обновленные',
+        'with_video' => 'Видео: больше сначала',
+        'episodes_desc' => 'Серий: больше сначала',
+        'year_desc' => 'Год: новые сначала',
+        'year_asc' => 'Год: старые сначала',
+        'title_asc' => 'Название: А-я',
+    ];
+
+    /**
+     * @var array<string, string>
+     */
+    public array $sortIcons = [
+        'updated' => 'fa-solid fa-clock-rotate-left',
+        'with_video' => 'fa-solid fa-file-video',
+        'episodes_desc' => 'fa-solid fa-list-ol',
+        'year_desc' => 'fa-solid fa-calendar-days',
+        'year_asc' => 'fa-regular fa-calendar',
+        'title_asc' => 'fa-solid fa-arrow-down-a-z',
     ];
 
     /**
@@ -67,6 +91,7 @@ class CatalogTitlesViewModel
      */
     public function __construct(
         public readonly string $search,
+        public readonly string $sort,
         public readonly ?int $year,
         public readonly string $requestedYear,
         public readonly bool $invalidYear,
@@ -89,6 +114,37 @@ class CatalogTitlesViewModel
     public function label(string $filterType): string
     {
         return $this->typeLabels[$filterType] ?? $filterType;
+    }
+
+    public function sortIcon(string $sort): string
+    {
+        return $this->sortIcons[$sort] ?? 'fa-solid fa-arrow-down-wide-short';
+    }
+
+    public function sortLabel(string $sort): string
+    {
+        return $this->sortLabels[$sort] ?? $this->sortLabels['updated'];
+    }
+
+    public function isActiveSort(string $sort): bool
+    {
+        return $this->sort === $sort;
+    }
+
+    /**
+     * @return array<string, string|int|null>
+     */
+    public function sortQuery(string $sort): array
+    {
+        $query = $this->appendSearchAndYear(array_merge($this->baseQuery, $this->allFilterSlugs));
+
+        if ($sort !== 'updated') {
+            $query['sort'] = $sort;
+        } else {
+            unset($query['sort']);
+        }
+
+        return $query;
     }
 
     /**
@@ -116,6 +172,10 @@ class CatalogTitlesViewModel
 
         if ($this->search !== '') {
             $query['q'] = $this->search;
+        }
+
+        if ($this->sort !== 'updated') {
+            $query['sort'] = $this->sort;
         }
 
         if ($selectedYear !== null) {
@@ -168,6 +228,10 @@ class CatalogTitlesViewModel
             $query['q'] = $this->search;
         }
 
+        if ($this->sort !== 'updated') {
+            $query['sort'] = $this->sort;
+        }
+
         if ($this->year !== null) {
             $query['year'] = $this->year;
         }
@@ -188,6 +252,10 @@ class CatalogTitlesViewModel
 
         if ($this->search !== '') {
             $query['q'] = $this->search;
+        }
+
+        if ($this->sort !== 'updated') {
+            $query['sort'] = $this->sort;
         }
 
         return $query;

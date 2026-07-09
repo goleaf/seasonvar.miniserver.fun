@@ -154,6 +154,9 @@
         @foreach ($jsonLdItems as $jsonLd)
             <script type="application/ld+json">{!! json_encode($jsonLd, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!}</script>
         @endforeach
+        @if (request()->routeIs('stats'))
+            @livewireStyles
+        @endif
         @stack('head')
         @vite('resources/js/app.js')
     </head>
@@ -195,17 +198,17 @@
 
         <main id="main-content" class="mx-auto max-w-[1760px] px-3 py-4 sm:px-6 sm:py-6 lg:px-8" itemscope itemtype="https://schema.org/WebPageElement" itemid="{{ $canonicalUrl }}#main-content">
             @if ($breadcrumbs->count() > 1)
-                <nav aria-label="Хлебные крошки" class="mb-4 overflow-x-auto rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm shadow-slate-200/60">
-                    <ol class="flex min-w-max items-center gap-2 text-slate-500">
+                <nav aria-label="Хлебные крошки" class="mb-4 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm shadow-slate-200/60">
+                    <ol class="flex flex-wrap items-center gap-2 text-slate-500">
                         @foreach ($breadcrumbs as $breadcrumb)
-                            <li class="inline-flex items-center gap-2">
+                            <li class="inline-flex min-w-0 items-center gap-2">
                                 @if (! $loop->first)
-                                    <i class="fa-solid fa-chevron-right text-[0.7em] text-slate-300" aria-hidden="true"></i>
+                                    <i class="fa-solid fa-chevron-right shrink-0 text-[0.7em] text-slate-300" aria-hidden="true"></i>
                                 @endif
                                 @if ($loop->last)
-                                    <span class="font-semibold text-slate-700" aria-current="page">{{ $breadcrumb['name'] }}</span>
+                                    <span class="break-words font-semibold text-slate-700" aria-current="page">{{ $breadcrumb['name'] }}</span>
                                 @else
-                                    <a href="{{ $breadcrumb['url'] }}" class="font-semibold text-emerald-700 hover:text-emerald-600">{{ $breadcrumb['name'] }}</a>
+                                    <a href="{{ $breadcrumb['url'] }}" class="break-words font-semibold text-emerald-700 hover:text-emerald-600">{{ $breadcrumb['name'] }}</a>
                                 @endif
                             </li>
                         @endforeach
@@ -221,6 +224,7 @@
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($seoSections as $section)
+                            @continue(($section['id'] ?? null) === 'discovery-signals' && ! request()->routeIs('stats'))
                             <a href="#{{ $section['id'] }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
                                 <i class="fa-solid fa-bookmark text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                 <span itemprop="name">{{ $section['name'] }}</span>
@@ -470,7 +474,7 @@
                     </div>
                 </section>
             @endif
-            @if ($discoverySignals->isNotEmpty())
+            @if ($discoverySignals->isNotEmpty() && request()->routeIs('stats'))
                 <section id="discovery-signals" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Индексация и обновления">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
                         <i class="fa-solid fa-satellite-dish text-emerald-700" aria-hidden="true"></i>
@@ -805,5 +809,8 @@
                 </section>
             @endif
         </main>
+        @if (request()->routeIs('stats'))
+            @livewireScripts
+        @endif
     </body>
 </html>

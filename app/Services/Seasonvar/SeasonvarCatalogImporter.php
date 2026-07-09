@@ -521,13 +521,13 @@ class SeasonvarCatalogImporter
                 'catalog_title' => $catalogTitle,
                 'media' => $mediaResult,
             ];
-        });
+        }, attempts: $this->importTransactionAttempts());
         $catalogTitle = $transactionResult['catalog_title'];
         $mediaResult = $this->mergeMediaResult(
             $transactionResult['media'],
             $this->importParsedPlaylists($catalogTitle, $data['media'], $progress),
         );
-        $missingDataFlags = $this->missingDataFlags($catalogTitle->fresh(['seasons.episodes', 'licensedMedia']) ?? $catalogTitle);
+        $missingDataFlags = $this->missingDataFlags($catalogTitle->fresh(['seasons.episodes', 'seasons.licensedMedia', 'licensedMedia']) ?? $catalogTitle);
 
         $page->update([
             'import_status' => $missingDataFlags === [] ? 'parsed' : 'missing_data',
@@ -1327,6 +1327,7 @@ class SeasonvarCatalogImporter
 
             $quality = $this->mediaQuality($item['title'], $playbackUrl);
             $format = $this->parsedMediaExtension($playbackUrl);
+            $variant = $this->mediaMetadata->playbackVariant($item['title'], $item['source_url'], $playbackUrl);
             $sourceMediaKey = $this->sourceMediaKey($catalogTitle, $season, $episode, $item, $playbackUrl, $quality, $format);
             $media = LicensedMedia::query()
                 ->where('catalog_title_id', $catalogTitle->id)
@@ -1352,7 +1353,11 @@ class SeasonvarCatalogImporter
                 'source_media_key' => $sourceMediaKey,
                 'source_url' => $item['source_url'],
                 'quality' => $quality,
-                'translation_name' => $this->mediaTranslationName($item['title']),
+                'translation_name' => $this->mediaTranslationName($item['title'], $item['source_url']),
+                'variant_type' => $variant['variant_type'],
+                'variant_name' => $variant['variant_name'],
+                'variant_key' => $variant['variant_key'],
+                'has_subtitles' => $variant['has_subtitles'],
                 'format' => $format,
                 'published_at' => $media->published_at ?? now(),
             ];
@@ -1757,9 +1762,9 @@ class SeasonvarCatalogImporter
         return $this->mediaMetadata->quality($title, $url);
     }
 
-    private function mediaTranslationName(?string $title): ?string
+    private function mediaTranslationName(?string $title, ?string $sourceUrl): ?string
     {
-        return $this->mediaMetadata->translationName($title);
+        return $this->mediaMetadata->translationName($title, $sourceUrl);
     }
 
     /**
@@ -1794,11 +1799,38 @@ class SeasonvarCatalogImporter
         return now()->addHours($hours);
     }
 
+    private function importTransactionAttempts(): int
+    {
+        return min(10, max(1, (int) config('seasonvar.import.transaction_attempts', 5)));
+    }
+
     private function catalogTitleNeedsMediaRefresh(CatalogTitle $catalogTitle): bool
     {
         return ! $catalogTitle->licensedMedia()->published()->exists()
+            || $this->seasonsWithoutEpisodes($catalogTitle)->exists()
+            || $this->seasonsWithoutPublishedMedia($catalogTitle)->exists()
             || $this->episodesWithoutPublishedMedia($catalogTitle)->exists()
             || $this->unavailableMedia($catalogTitle)->exists();
+    }
+
+    /**
+     * @return Builder<Season>
+     */
+    private function seasonsWithoutEpisodes(CatalogTitle $catalogTitle): Builder
+    {
+        return Season::query()
+            ->where('catalog_title_id', $catalogTitle->id)
+            ->whereDoesntHave('episodes');
+    }
+
+    /**
+     * @return Builder<Season>
+     */
+    private function seasonsWithoutPublishedMedia(CatalogTitle $catalogTitle): Builder
+    {
+        return Season::query()
+            ->where('catalog_title_id', $catalogTitle->id)
+            ->whereDoesntHave('licensedMedia', fn (Builder $query): Builder => $query->published());
     }
 
     /**
@@ -1863,12 +1895,20 @@ class SeasonvarCatalogImporter
             $flags[] = 'no_episodes';
         }
 
+        if ($seasons->contains(fn (Season $season): bool => $season->episodes->isEmpty())) {
+            $flags[] = 'seasons_without_episodes';
+        }
+
         if (! $media->isNotEmpty()) {
             $flags[] = 'no_video';
         }
 
         if ($media->isNotEmpty() && ! $publishedMedia->isNotEmpty()) {
             $flags[] = 'no_published_video';
+        }
+
+        if ($seasons->contains(fn (Season $season): bool => $season->licensedMedia->where('status', 'published')->isEmpty())) {
+            $flags[] = 'seasons_without_video';
         }
 
         if ($episodes->isNotEmpty()) {

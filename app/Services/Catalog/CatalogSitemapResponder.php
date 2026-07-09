@@ -296,8 +296,7 @@ class CatalogSitemapResponder
                 ->where('is_published', true)
                 ->whereNotNull('slug')
                 ->latest('indexed_at')
-                ->limit(100)
-                ->get()
+                ->cursor()
                 ->each(function (CatalogTitle $title): void {
                     $url = route('titles.show', $title);
                     echo "        <item>\n";
@@ -305,7 +304,7 @@ class CatalogSitemapResponder
                     echo '            <link>'.$this->xml($url)."</link>\n";
                     echo '            <guid isPermaLink="true">'.$this->xml($url)."</guid>\n";
                     echo '            <pubDate>'.$this->xml(Carbon::parse($title->indexed_at ?: $title->updated_at ?: now())->toRssString())."</pubDate>\n";
-                    echo '            <description>'.$this->xml($this->seoDescription($title->description ?: 'Сериал '.$title->title.' смотреть онлайн.'))."</description>\n";
+                    echo '            <description>'.$this->xml($this->plainText($title->description ?: 'Сериал '.$title->title.' смотреть онлайн.'))."</description>\n";
                     echo "        </item>\n";
                 });
 
@@ -337,7 +336,7 @@ class CatalogSitemapResponder
             $mediaCount = LicensedMedia::query()->published()->count();
 
             echo '# '.$this->siteName()."\n\n";
-            echo "Каталог сериалов онлайн на русском языке. Данные автоматически импортируются из Seasonvar и включают названия, оригинальные названия, алиасы, описания, постеры, жанры, страны, актеров, режиссеров, рейтинги, сезоны, серии и удаленные видео-файлы.\n\n";
+            echo "Каталог сериалов онлайн на русском языке. Данные автоматически обновляются и включают названия, оригинальные названия, алиасы, описания, постеры, жанры, страны, актеров, режиссеров, рейтинги, сезоны, серии и удаленные видео-файлы.\n\n";
             echo "## Статистика\n\n";
             echo '- Сериалов: '.$titleCount."\n";
             echo '- Серий: '.$episodeCount."\n";
@@ -487,10 +486,14 @@ class CatalogSitemapResponder
 
     private function seoDescription(?string $value, int $limit = 180): string
     {
-        $text = strip_tags((string) $value);
-        $text = preg_replace('/\s+/u', ' ', trim($text)) ?: '';
+        return Str::limit($this->plainText($value), $limit, '...');
+    }
 
-        return Str::limit($text, $limit, '...');
+    private function plainText(?string $value): string
+    {
+        $text = strip_tags((string) $value);
+
+        return preg_replace('/\s+/u', ' ', trim($text)) ?: '';
     }
 
     private function sitemapDate(mixed $value): string

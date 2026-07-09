@@ -37,6 +37,7 @@ class Source extends Model
     {
         return [
             'is_active' => 'boolean',
+            'crawl_delay_seconds' => 'integer',
             'settings' => 'array',
         ];
     }

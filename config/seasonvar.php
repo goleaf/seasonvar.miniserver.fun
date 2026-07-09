@@ -11,6 +11,7 @@ return [
         'missing_data_retry_hours' => (int) env('SEASONVAR_IMPORT_MISSING_DATA_RETRY_HOURS', 24),
         'lock_seconds' => (int) env('SEASONVAR_IMPORT_LOCK_SECONDS', 604800),
         'stale_after_minutes' => (int) env('SEASONVAR_IMPORT_STALE_AFTER_MINUTES', 15),
+        'transaction_attempts' => (int) env('SEASONVAR_IMPORT_TRANSACTION_ATTEMPTS', 5),
     ],
     'media_check' => [
         'enabled' => filter_var(env('SEASONVAR_MEDIA_CHECK_ENABLED', true), FILTER_VALIDATE_BOOL),
@@ -25,5 +26,9 @@ return [
     ],
     'media_identity' => [
         'chunk_size' => (int) env('SEASONVAR_MEDIA_SOURCE_KEY_CHUNK_SIZE', 250),
+    ],
+    'recommendations' => [
+        'chunk_size' => (int) env('SEASONVAR_RECOMMENDATION_CHUNK_SIZE', 100),
+        'min_score' => (int) env('SEASONVAR_RECOMMENDATION_MIN_SCORE', 600),
     ],
 ];

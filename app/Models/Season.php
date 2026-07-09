@@ -30,7 +30,10 @@ class Season extends Model
     protected function casts(): array
     {
         return [
+            'number' => 'integer',
             'latest_episode_released_at' => 'date',
+            'episodes_released' => 'integer',
+            'episodes_total' => 'integer',
         ];
     }
 

@@ -101,7 +101,7 @@ class ApiCatalogTitleTest extends TestCase
     {
         $catalogTitle = CatalogTitle::factory()->create([
             'slug' => 'api-show-title',
-            'title' => 'API карточка',
+            'title' => 'API сериал',
             'is_published' => true,
         ]);
         $season = Season::factory()->create([
@@ -173,7 +173,7 @@ class ApiCatalogTitleTest extends TestCase
     {
         CatalogTitle::factory()->create([
             'slug' => 'api-unpublished-title',
-            'title' => 'Невидимая API карточка',
+            'title' => 'Невидимый API сериал',
             'is_published' => false,
         ]);
 

@@ -12,6 +12,7 @@
 - `CatalogTitle hasMany CatalogTitleAlias`
 - `CatalogTitle hasMany CatalogTitleRating`
 - `CatalogTitle hasMany CatalogTitleReview`
+- `CatalogTitle hasMany SeasonvarImportEvent`
 - `CatalogTitle belongsToMany Genre`
 - `CatalogTitle belongsToMany Country`
 - `CatalogTitle belongsToMany Actor`
@@ -30,8 +31,17 @@
 - `LicensedMedia belongsTo CatalogTitle`
 - `LicensedMedia belongsTo Season`
 - `LicensedMedia belongsTo Episode`
+- `SourcePage belongsTo Source`
+- `SourcePage hasOne CatalogTitle`
+- `SourcePage hasMany Season`
+- `SourcePage hasMany Episode`
+- `SourcePage hasMany CatalogTitleReview`
 - `SourcePage hasMany SourcePageSnapshot`
+- `SourcePage hasMany SeasonvarImportEvent`
+- `SourcePage belongsTo SeasonvarImportRun` через `last_import_run_id`
 - `SeasonvarImportRun hasMany SeasonvarImportEvent`
+- `SeasonvarImportRun hasMany SourcePageSnapshot`
+- `SeasonvarImportRun hasMany SourcePage` через `last_import_run_id`
 - Каждая модель связи каталога относится ко многим `CatalogTitle` через явную pivot-таблицу.
 - Для метаданных каталога не используются morph- или polymorphic-связи.
 

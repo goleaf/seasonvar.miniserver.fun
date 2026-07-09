@@ -66,7 +66,7 @@ class ExternalPlaylistImportTest extends TestCase
         $this->get(route('titles.show', ['catalogTitle' => $catalogTitle, 'episode' => $episode->id]))
             ->assertOk()
             ->assertSeeText('Выбрана 2 серия')
-            ->assertSeeText('видео найдено')
+            ->assertDontSeeText('видео найдено')
             ->assertSee('https://media.example.com/files/6_kadrov_s01e02.mp4');
     }
 
@@ -203,7 +203,7 @@ class ExternalPlaylistImportTest extends TestCase
         $this->get(route('titles.show', ['catalogTitle' => $catalogTitle, 'episode' => $episode->id]))
             ->assertOk()
             ->assertSeeText('Выбрана 3 серия')
-            ->assertSeeText('Видео для выбранной серии готовится')
-            ->assertSeeText('готовится');
+            ->assertSeeText('Видео для этой серии пока нет')
+            ->assertDontSeeText('готовится');
     }
 }

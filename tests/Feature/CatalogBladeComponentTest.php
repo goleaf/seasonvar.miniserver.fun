@@ -35,7 +35,7 @@ class CatalogBladeComponentTest extends TestCase
             'number' => 2,
             'title' => 'Вторая серия',
         ]);
-        LicensedMedia::factory()->create([
+        $selectedMedia = LicensedMedia::factory()->create([
             'catalog_title_id' => $catalogTitle->id,
             'season_id' => $season->id,
             'episode_id' => $selectedEpisode->id,
@@ -57,11 +57,151 @@ class CatalogBladeComponentTest extends TestCase
             ->assertSee(e(route('titles.show', [
                 'catalogTitle' => $catalogTitle,
                 'episode' => $selectedEpisode->id,
+                'media' => $selectedMedia->id,
+                'variant' => 'voiceover-default',
+                'quality' => '1080p',
+                'format' => 'm3u8',
             ]).'#player'), false)
             ->assertSee('aria-current="true"', false)
             ->assertSeeText('2 серия')
             ->assertSeeText('видео')
-            ->assertSeeText('плеер готов')
-            ->assertSeeText('1 файлов');
+            ->assertSeeText('1 видео')
+            ->assertDontSeeText('плеер готов');
+    }
+
+    public function test_title_page_places_season_anchor_on_season_block_with_scroll_offset(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Якорный сериал',
+            'slug' => 'iakornyi-serial',
+        ]);
+        $firstSeason = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 1,
+            'title' => 'Сезон 1',
+        ]);
+        $secondSeason = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 2,
+            'title' => 'Сезон 2',
+        ]);
+        Episode::factory()->create([
+            'season_id' => $firstSeason->id,
+            'number' => 1,
+            'title' => 'Первая серия',
+        ]);
+        Episode::factory()->create([
+            'season_id' => $secondSeason->id,
+            'number' => 1,
+            'title' => 'Вторая серия',
+        ]);
+
+        $response = $this->get(route('titles.show', $catalogTitle));
+
+        $response
+            ->assertOk()
+            ->assertSee('href="#season-2"', false)
+            ->assertSee('id="season-2" class="group scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48"', false)
+            ->assertDontSee('id="season-2" class="grid', false);
+    }
+
+    public function test_title_page_groups_playback_options_and_preserves_selected_variant_between_episodes(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Теория большого взрыва',
+            'slug' => 'teoriia-bolshogo-vzryva',
+            'poster_url' => 'https://media.example.com/big-bang-poster.jpg',
+        ]);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 1,
+            'title' => 'Сезон 1',
+        ]);
+        $firstEpisode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 1,
+            'title' => 'Пилот',
+        ]);
+        $secondEpisode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 2,
+            'title' => 'Гипотеза',
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $firstEpisode->id,
+            'title' => '1 серия SD/FullHDКураж-Бамбей',
+            'path' => 'https://media.example.com/big-bang-s01e01-voice.mp4',
+            'playback_url' => 'https://media.example.com/big-bang-s01e01-voice.mp4',
+            'source_url' => 'https://seasonvar.ru/playls2/hash/trans/415/plist.txt',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        $firstSubtitleMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $firstEpisode->id,
+            'title' => '1 серия SDСубтитры',
+            'path' => 'https://media.example.com/big-bang-s01e01-sub.mp4',
+            'playback_url' => 'https://media.example.com/big-bang-s01e01-sub.mp4',
+            'source_url' => 'https://seasonvar.ru/playls2/hash/trans%D0%A1%D1%83%D0%B1%D1%82%D0%B8%D1%82%D1%80%D1%8B/415/plist.txt',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $secondEpisode->id,
+            'title' => '2 серия SD/FullHDКураж-Бамбей',
+            'path' => 'https://media.example.com/big-bang-s01e02-voice.mp4',
+            'playback_url' => 'https://media.example.com/big-bang-s01e02-voice.mp4',
+            'source_url' => 'https://seasonvar.ru/playls2/hash/trans/415/plist.txt',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        $secondSubtitleMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $secondEpisode->id,
+            'title' => '2 серия SDСубтитры',
+            'path' => 'https://media.example.com/big-bang-s01e02-sub.mp4',
+            'playback_url' => 'https://media.example.com/big-bang-s01e02-sub.mp4',
+            'source_url' => 'https://seasonvar.ru/playls2/hash/trans%D0%A1%D1%83%D0%B1%D1%82%D0%B8%D1%82%D1%80%D1%8B/415/plist.txt',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $response = $this->get(route('titles.show', [
+            'catalogTitle' => $catalogTitle,
+            'episode' => $firstEpisode->id,
+            'media' => $firstSubtitleMedia->id,
+        ]));
+
+        $response
+            ->assertOk()
+            ->assertSeeText('Настройки просмотра')
+            ->assertSeeText('Вариант')
+            ->assertSeeText('Субтитры')
+            ->assertSeeText('Кураж-Бамбей')
+            ->assertSee(e(route('titles.show', [
+                'catalogTitle' => $catalogTitle,
+                'episode' => $secondEpisode->id,
+                'media' => $secondSubtitleMedia->id,
+                'variant' => 'subtitles-subtitry',
+                'quality' => '480p',
+                'format' => 'mp4',
+            ]).'#player'), false);
+
+        $variantResponse = $this->get(route('titles.show', [
+            'catalogTitle' => $catalogTitle,
+            'episode' => $secondEpisode->id,
+            'variant' => 'subtitles-subtitry',
+        ]));
+
+        $variantResponse
+            ->assertOk()
+            ->assertSee('https://media.example.com/big-bang-s01e02-sub.mp4', false)
+            ->assertDontSee('https://media.example.com/big-bang-s01e02-voice.mp4', false);
     }
 }

@@ -28,6 +28,7 @@ class ExternalMediaMetadata
             preg_match('/\b(?:2k|qhd)\b/u', $value) === 1 => '1440p',
             preg_match('/\b(?:full\s*hd|fhd)\b/u', $value) === 1 => '1080p',
             preg_match('/\b(?:hd|hdtv|hdrip|web[\s.-]*dl|web[\s.-]*rip|bdrip)\b/u', $value) === 1 => '720p',
+            preg_match('/(?:^|[^\pL\pN])sd(?:$|[^\pL\pN]|\p{Cyrillic})/u', $value) === 1 => '480p',
             preg_match('/\b(?:sd|dvd|sat[\s.-]*rip|tv[\s.-]*rip|dvd[\s.-]*rip|dvdrip|vhs[\s.-]*rip|vhsrip)\b/u', $value) === 1 => '480p',
             default => null,
         };
@@ -40,9 +41,13 @@ class ExternalMediaMetadata
         return $format !== '' ? $format : 'stream';
     }
 
-    public function translationName(?string $title): ?string
+    public function translationName(?string $title, ?string $sourceUrl = null): ?string
     {
         if ($title === null) {
+            return $this->translationNameFromSourceUrl($sourceUrl);
+        }
+
+        if ($this->hasSubtitles($title, $sourceUrl)) {
             return null;
         }
 
@@ -54,7 +59,49 @@ class ExternalMediaMetadata
             return Str::substr(Str::squish($matches['name']), 0, 120);
         }
 
-        return null;
+        return $this->inferredTranslationName($title)
+            ?? $this->translationNameFromSourceUrl($sourceUrl);
+    }
+
+    public function hasSubtitles(?string $title, ?string $sourceUrl = null, ?string $url = null): bool
+    {
+        $value = $this->normalizedValue(implode(' ', array_filter([
+            $title,
+            $sourceUrl ? urldecode($sourceUrl) : null,
+            $url ? urldecode($url) : null,
+        ])));
+
+        return str_contains($value, 'субтитр')
+            || preg_match('/\b(?:subtitles?|subs?)\b/u', $value) === 1;
+    }
+
+    /**
+     * @return array{variant_type: string, variant_name: string|null, variant_key: string, has_subtitles: bool}
+     */
+    public function playbackVariant(?string $title, ?string $sourceUrl, string $url): array
+    {
+        $hasSubtitles = $this->hasSubtitles($title, $sourceUrl, $url);
+        $variantType = $this->playbackVariantType($title, $sourceUrl, $url, $hasSubtitles);
+        $variantName = match ($variantType) {
+            'subtitles' => 'Субтитры',
+            'original' => 'Оригинал',
+            'trailer' => 'Трейлер',
+            default => $this->translationName($title, $sourceUrl),
+        };
+
+        return [
+            'variant_type' => $variantType,
+            'variant_name' => $variantName,
+            'variant_key' => $this->playbackVariantKey($variantType, $variantName),
+            'has_subtitles' => $hasSubtitles,
+        ];
+    }
+
+    public function playbackVariantKey(string $variantType, ?string $variantName): string
+    {
+        $nameKey = Str::slug((string) ($variantName ?: 'default'));
+
+        return $variantType.'-'.($nameKey !== '' ? $nameKey : 'default');
     }
 
     public function isTrailer(?string $title, string $url): bool
@@ -98,5 +145,78 @@ class ExternalMediaMetadata
         $value = str_replace(['_', '.', '-'], ' ', $value);
 
         return Str::squish($value);
+    }
+
+    private function playbackVariantType(?string $title, ?string $sourceUrl, string $url, bool $hasSubtitles): string
+    {
+        if ($this->isTrailer($title, $url)) {
+            return 'trailer';
+        }
+
+        if ($hasSubtitles) {
+            return 'subtitles';
+        }
+
+        $value = $this->normalizedValue(implode(' ', array_filter([
+            $title,
+            $sourceUrl ? urldecode($sourceUrl) : null,
+            urldecode($url),
+        ])));
+
+        if (preg_match('/\b(?:original|originals?|оригинал|без\s+перевода)\b/u', $value) === 1) {
+            return 'original';
+        }
+
+        return 'voiceover';
+    }
+
+    private function translationNameFromSourceUrl(?string $sourceUrl): ?string
+    {
+        if ($sourceUrl === null) {
+            return null;
+        }
+
+        $path = urldecode((string) parse_url($sourceUrl, PHP_URL_PATH));
+
+        if (preg_match('~/trans(?<name>[^/]*)/~u', $path, $matches) !== 1) {
+            return null;
+        }
+
+        $name = Str::squish($matches['name'] ?? '');
+
+        if ($name === '' || preg_match('/^\d+$/', $name) === 1 || $this->hasSubtitles($name)) {
+            return null;
+        }
+
+        return Str::substr($name, 0, 120);
+    }
+
+    private function inferredTranslationName(string $title): ?string
+    {
+        if (preg_match('/\.(?:mp4|m4v|m3u8|webm|mov|mkv|avi)(?:$|[?#])/iu', $title) === 1) {
+            return null;
+        }
+
+        if (preg_match('/(?:4320p|2160p|1440p|1080p|720p|576p|540p|480p|360p|240p|full\s*hd|fhd|hd|sd|dvd|\[|\]|озвучка|перевод)/iu', $title) !== 1) {
+            return null;
+        }
+
+        $name = preg_replace('/^\s*\d{1,3}\s*(?:серия|серии|episode|ep)?\s*/iu', ' ', $title) ?? $title;
+        $name = preg_replace('/\bs\d{1,2}\s*e\d{1,3}\b/iu', ' ', $name) ?? $name;
+        $name = preg_replace('/(?:full\s*hd|fhd|hd|sd)(?=\p{Cyrillic})/iu', ' ', $name) ?? $name;
+        $name = preg_replace('/\b(?:4320p|2160p|1440p|1080p|720p|576p|540p|480p|360p|240p|full\s*hd|fhd|hd|sd|dvd|mp4|m3u8|webm|mov)\b/iu', ' ', $name) ?? $name;
+        $name = str_replace(['/', '|', '[', ']', '(', ')'], ' ', $name);
+        $name = Str::squish($name);
+
+        if ($name === ''
+            || Str::length($name) < 2
+            || Str::length($name) > 80
+            || preg_match('/^(?:видео|video|серия|episode|season|сезон|файл|file)$/iu', $name) === 1
+            || preg_match('/[\pL]/u', $name) !== 1
+        ) {
+            return null;
+        }
+
+        return Str::substr($name, 0, 120);
     }
 }

@@ -5,13 +5,25 @@
             <span>{{ $episode->number }} серия</span>
         </div>
 
-        <x-ui.status-pill :icon="$statusIcon" :variant="$statusVariant" size="xs" class="shrink-0">
-            {{ $statusLabel }}
-        </x-ui.status-pill>
+        @if ($hasMedia)
+            <x-ui.status-pill :icon="$statusIcon" :variant="$statusVariant" size="xs" class="shrink-0">
+                {{ $statusLabel }}
+            </x-ui.status-pill>
+        @endif
     </div>
 
     @if ($episode->title)
-        <div class="mt-0.5 line-clamp-2 text-xs text-slate-500">{{ $episode->title }}</div>
+        <div class="mt-0.5 text-xs text-slate-500">{{ $episode->title }}</div>
+    @endif
+
+    @if ($variantBadges->isNotEmpty())
+        <div class="mt-2 flex flex-wrap gap-1">
+            @foreach ($variantBadges as $badge)
+                <span class="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-500 ring-1 ring-slate-200">
+                    {{ $badge }}
+                </span>
+            @endforeach
+        </div>
     @endif
 
     @if ($releasedAtLabel)

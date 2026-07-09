@@ -8,6 +8,7 @@ use App\Models\Season;
 use App\Models\SeasonvarImportEvent;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
+use App\Services\Catalog\CatalogTitleRecommendationBuilder;
 use App\Services\Media\ExternalMediaMetadata;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -27,6 +28,7 @@ class SeasonvarImportPipeline
         private readonly SeasonvarMediaAvailabilityChecker $mediaAvailabilityChecker,
         private readonly ExternalMediaMetadata $mediaMetadata,
         private readonly SeasonvarRefreshPlanner $refreshPlanner,
+        private readonly CatalogTitleRecommendationBuilder $recommendations,
     ) {}
 
     /**
@@ -38,6 +40,9 @@ class SeasonvarImportPipeline
         bool $forever = false,
         ?int $sleepSeconds = null,
         bool $discover = true,
+        ?int $processId = null,
+        ?string $processHost = null,
+        ?string $processCommand = null,
         ?callable $progress = null,
     ): SeasonvarImportRun {
         $run = SeasonvarImportRun::query()->create([
@@ -46,6 +51,9 @@ class SeasonvarImportPipeline
             'argument' => $argument,
             'force' => $force,
             'forever' => $forever,
+            'process_id' => $processId,
+            'process_host' => $processHost,
+            'process_command' => $processCommand,
             'cycles' => 0,
             'started_at' => now(),
         ]);
@@ -136,18 +144,19 @@ class SeasonvarImportPipeline
         $mediaSourceKeyResult = $this->backfillMediaSourceKeys($progress);
         $mediaBacklogResult = $this->refreshMediaBacklog($progress);
         $mergeResult = $this->titleMerger->merge($progress);
+        $recommendationResult = $this->recommendations->rebuild($progress);
 
         $this->addRunCounters($run, [
             'cycles' => 1,
-            ...$cycleResult,
-            'media_updated' => $cycleResult['media_updated'] + $mediaBacklogResult['media_updated'],
-            'media_failed' => $cycleResult['media_failed'] + $mediaBacklogResult['media_failed'],
+            'media_updated' => $mediaBacklogResult['media_updated'],
+            'media_failed' => $mediaBacklogResult['media_failed'],
         ], [
             'last_merge' => $mergeResult,
             'last_source_status_backfill' => $sourceStatusBackfillResult,
             'last_media_metadata_backlog' => $mediaMetadataResult,
             'last_media_source_key_backlog' => $mediaSourceKeyResult,
             'last_media_backlog' => $mediaBacklogResult,
+            'last_recommendations' => $recommendationResult,
         ]);
 
         $progress('seasonvar-import-cycle-complete', [
@@ -164,6 +173,8 @@ class SeasonvarImportPipeline
             'merged_titles' => $mergeResult['titles'],
             'merged_seasons' => $mergeResult['seasons'],
             'merged_episodes' => $mergeResult['episodes'],
+            'recommendation_titles' => $recommendationResult['titles'],
+            'recommendations_stored' => $recommendationResult['stored'],
         ]);
     }
 
@@ -229,6 +240,20 @@ class SeasonvarImportPipeline
         }
 
         $cleaned = $this->cleanupMalformedSourcePages($progress);
+
+        if ($discover || $cleaned > 0) {
+            $this->addRunCounters($run, [
+                'discovered' => $discovered,
+                'stored' => $stored,
+            ], [
+                'last_discovery' => [
+                    'discovered' => $discovered,
+                    'stored' => $stored,
+                    'cleaned' => $cleaned,
+                ],
+            ]);
+        }
+
         $selected = 0;
         $parseResult = [
             'parsed' => 0,
@@ -242,6 +267,22 @@ class SeasonvarImportPipeline
         foreach ($this->pageChunksForImportCycle($force, $run->id, $progress) as $pages) {
             $selected += $pages->count();
             $chunkResult = $this->importer->parsePages($pages, $progress, $force, $run->id);
+            $chunkCounters = [
+                'selected' => $pages->count(),
+                'parsed' => $chunkResult['parsed'],
+                'failed' => $chunkResult['failed'],
+                'media_attached' => $chunkResult['media_attached'],
+                'media_updated' => $chunkResult['media_updated'],
+                'media_skipped' => $chunkResult['media_skipped'],
+                'media_failed' => $chunkResult['media_failed'],
+            ];
+
+            $this->addRunCounters($run, $chunkCounters, [
+                'last_page_chunk' => [
+                    ...$chunkCounters,
+                    'selected_total' => $selected,
+                ],
+            ]);
 
             $parseResult['parsed'] += $chunkResult['parsed'];
             $parseResult['failed'] += $chunkResult['failed'];
@@ -249,6 +290,13 @@ class SeasonvarImportPipeline
             $parseResult['media_updated'] += $chunkResult['media_updated'];
             $parseResult['media_skipped'] += $chunkResult['media_skipped'];
             $parseResult['media_failed'] += $chunkResult['media_failed'];
+
+            $progress('seasonvar-import-page-chunk-complete', [
+                ...$chunkCounters,
+                'selected_total' => $selected,
+                'parsed_total' => $parseResult['parsed'],
+                'failed_total' => $parseResult['failed'],
+            ]);
         }
 
         return [
@@ -293,6 +341,7 @@ class SeasonvarImportPipeline
                 'media_skipped' => 0,
                 'media_failed' => 0,
             ]);
+            $this->addParsedUrlCounters($run, $parsedUrls->last());
             $progress('seasonvar-import-url-failed', [
                 'url' => $argument,
                 'exception' => $exception::class,
@@ -508,7 +557,11 @@ class SeasonvarImportPipeline
                 $query->whereNull('quality')
                     ->orWhereNull('format')
                     ->orWhere('format', '')
-                    ->orWhereNull('translation_name');
+                    ->orWhereNull('translation_name')
+                    ->orWhereNull('variant_type')
+                    ->orWhere('variant_type', '')
+                    ->orWhereNull('variant_key')
+                    ->orWhere('variant_key', '');
             })
             ->where(function ($query): void {
                 $query->whereNotNull('playback_url')
@@ -539,7 +592,8 @@ class SeasonvarImportPipeline
                 $updates = [];
                 $quality = $this->mediaMetadata->quality($media->title, $url);
                 $format = $this->mediaMetadata->format($url);
-                $translationName = $this->mediaMetadata->translationName($media->title);
+                $translationName = $this->mediaMetadata->translationName($media->title, $media->source_url);
+                $variant = $this->mediaMetadata->playbackVariant($media->title, $media->source_url, $url);
 
                 if ($quality !== null && $quality !== $media->quality) {
                     $updates['quality'] = $quality;
@@ -549,8 +603,14 @@ class SeasonvarImportPipeline
                     $updates['format'] = $format;
                 }
 
-                if ($translationName !== null && $translationName !== $media->translation_name) {
+                if (($translationName !== null || $variant['has_subtitles']) && $translationName !== $media->translation_name) {
                     $updates['translation_name'] = $translationName;
+                }
+
+                foreach (['variant_type', 'variant_name', 'variant_key', 'has_subtitles'] as $attribute) {
+                    if ($variant[$attribute] !== $media->{$attribute}) {
+                        $updates[$attribute] = $variant[$attribute];
+                    }
                 }
 
                 $result['media_checked']++;
@@ -567,6 +627,10 @@ class SeasonvarImportPipeline
                     'quality' => $media->quality,
                     'format' => $media->format,
                     'translation_name' => $media->translation_name,
+                    'variant_type' => $media->variant_type,
+                    'variant_name' => $media->variant_name,
+                    'variant_key' => $media->variant_key,
+                    'has_subtitles' => $media->has_subtitles,
                     'url' => $url,
                 ]);
             }
@@ -739,6 +803,7 @@ class SeasonvarImportPipeline
             'media_skipped' => $result['media_skipped'],
             'media_failed' => $result['media_failed'],
         ]);
+        $this->addParsedUrlCounters($run, $parsedUrls->last());
 
         return $result['catalog_title'] ?? $this->catalogTitleForPage($page);
     }
@@ -775,6 +840,7 @@ class SeasonvarImportPipeline
                     'media_skipped' => 0,
                     'media_failed' => 0,
                 ]);
+                $this->addParsedUrlCounters($run, $parsedUrls->last());
                 $progress('seasonvar-import-season-url-failed', [
                     'catalog_title_id' => $catalogTitle->id,
                     'url' => (string) $seasonUrl,
@@ -817,7 +883,7 @@ class SeasonvarImportPipeline
         $path = $parts['path'] ?? '';
 
         return in_array($host, ['seasonvar.ru', 'www.seasonvar.ru'], true)
-            && preg_match('~^/serial-\d+-[^/]+-\d+-season\.html$~iu', $path) === 1;
+            && preg_match('~^/serial-\d+-[^/]+-0*\d{1,4}-+(?:season|sezon)\.html$~iu', $path) === 1;
     }
 
     private function catalogTitleForPage(SourcePage $page): ?CatalogTitle
@@ -834,6 +900,24 @@ class SeasonvarImportPipeline
                 ->where('source_url_hash', $page->url_hash)
                 ->first()
                 ?->catalogTitle;
+    }
+
+    /**
+     * @param  array{url: string, parsed: int, failed: int, media_attached: int, media_updated: int, media_skipped: int, media_failed: int}  $item
+     */
+    private function addParsedUrlCounters(SeasonvarImportRun $run, array $item): void
+    {
+        $this->addRunCounters($run, [
+            'selected' => 1,
+            'parsed' => $item['parsed'],
+            'failed' => $item['failed'],
+            'media_attached' => $item['media_attached'],
+            'media_updated' => $item['media_updated'],
+            'media_skipped' => $item['media_skipped'],
+            'media_failed' => $item['media_failed'],
+        ], [
+            'last_url' => $item,
+        ]);
     }
 
     /**

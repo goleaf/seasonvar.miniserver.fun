@@ -22,7 +22,7 @@ class AppLayoutData
             ? $pageTitle
             : $pageTitle.' - '.$siteName;
         $seoDescription = trim((string) ($seo['description'] ?? 'Каталог сериалов онлайн с фильтрами по жанрам, странам, актерам, годам, сезонам и сериям.'));
-        $seoDescription = Str::limit(preg_replace('/\s+/u', ' ', strip_tags($seoDescription)) ?: $seoDescription, 180, '...');
+        $seoDescription = preg_replace('/\s+/u', ' ', strip_tags($seoDescription)) ?: $seoDescription;
         $canonicalUrl = $seo['canonical'] ?? url()->current();
         $seoSearchContext = collect($seo['search_context'] ?? []);
         $seoSearchContextTitle = trim((string) $seoSearchContext->get('title', ''));
@@ -60,7 +60,7 @@ class AppLayoutData
             ->merge($seo['search_phrases'] ?? [])
             ->merge($seoClusterTerms)
             ->filter()
-            ->map(fn ($term) => trim((string) $term))
+            ->map(fn ($term) => $this->cleanGeneratedPhrase($term))
             ->filter()
             ->unique()
             ->take(40)
@@ -81,14 +81,14 @@ class AppLayoutData
         ])->values();
         $longTailQueries = $topicTerms->take(10)
             ->flatMap(fn ($term) => collect([
-                $term.' смотреть онлайн',
-                $term.' сериал онлайн',
-                $term.' все серии',
-                $term.' сезоны и серии',
-                $term.' описание и актеры',
+                $this->appendQuerySuffix($term, 'смотреть онлайн'),
+                $this->appendQuerySuffix($term, 'сериал онлайн'),
+                $this->appendQuerySuffix($term, 'все серии'),
+                $this->appendQuerySuffix($term, 'сезоны и серии'),
+                $this->appendQuerySuffix($term, 'описание и актеры'),
             ]))
-            ->merge($seoIntents->take(8)->map(fn ($intent) => trim($pageTitle.' '.$intent)))
-            ->map(fn ($query) => trim(preg_replace('/\s+/u', ' ', (string) $query)))
+            ->merge($seoIntents->take(8)->map(fn ($intent) => $this->appendQuerySuffix($pageTitle, $intent)))
+            ->map(fn ($query) => $this->cleanGeneratedPhrase($query))
             ->filter(fn ($query) => $query !== '' && mb_strlen($query) <= 100)
             ->unique()
             ->take(40)
@@ -101,9 +101,9 @@ class AppLayoutData
                     'description' => 'Связанная подборка сериалов и страниц каталога по теме «'.$term.'».',
                 ],
                 [
-                    'name' => $term.' смотреть онлайн',
-                    'query' => $term.' смотреть онлайн',
-                    'description' => 'Поиск страниц, сезонов, серий и описаний по запросу «'.$term.' смотреть онлайн».',
+                    'name' => $this->appendQuerySuffix($term, 'смотреть онлайн'),
+                    'query' => $this->appendQuerySuffix($term, 'смотреть онлайн'),
+                    'description' => 'Поиск страниц, сезонов, серий и описаний по запросу «'.$this->appendQuerySuffix($term, 'смотреть онлайн').'».',
                 ],
                 [
                     'name' => $term.' актеры и описание',
@@ -113,9 +113,10 @@ class AppLayoutData
             ]))
             ->merge($seoIntents->take(6)->map(fn ($intent) => [
                 'name' => $pageTitle.' - '.$intent,
-                'query' => $pageTitle.' '.$intent,
-                'description' => 'Связанная поисковая подборка по запросу «'.$pageTitle.' '.$intent.'».',
+                'query' => $this->appendQuerySuffix($pageTitle, $intent),
+                'description' => 'Связанная поисковая подборка по запросу «'.$this->appendQuerySuffix($pageTitle, $intent).'».',
             ]))
+            ->map(fn ($item) => $this->cleanGeneratedSeoItem($item))
             ->filter(fn ($item) => ! empty($item['name']) && ! empty($item['query']))
             ->unique('name')
             ->take(30)
@@ -125,9 +126,9 @@ class AppLayoutData
                 'title' => 'Смотреть онлайн',
                 'description' => 'Быстрые SEO-ссылки на страницы просмотра, сезонов и серий по темам этой страницы.',
                 'items' => $topicTerms->take(8)->map(fn ($term) => [
-                    'name' => $term.' смотреть онлайн',
-                    'query' => $term.' смотреть онлайн',
-                    'description' => 'Поиск страниц и серий по запросу «'.$term.' смотреть онлайн».',
+                    'name' => $this->appendQuerySuffix($term, 'смотреть онлайн'),
+                    'query' => $this->appendQuerySuffix($term, 'смотреть онлайн'),
+                    'description' => 'Поиск страниц и серий по запросу «'.$this->appendQuerySuffix($term, 'смотреть онлайн').'».',
                 ])->values(),
             ],
             [
@@ -161,6 +162,7 @@ class AppLayoutData
             'title' => $hub['title'],
             'description' => $hub['description'],
             'items' => collect($hub['items'] ?? [])
+                ->map(fn ($item) => $this->cleanGeneratedSeoItem($item))
                 ->filter(fn ($item) => ! empty($item['name']) && ! empty($item['query']))
                 ->unique('name')
                 ->take(10)
@@ -302,32 +304,32 @@ class AppLayoutData
             [
                 'name' => 'Для просмотра онлайн',
                 'description' => 'Путь для пользователей, которые хотят быстро найти серии, сезоны и доступное видео.',
-                'query' => $pageTitle.' смотреть онлайн',
-                'items' => $topicTerms->take(6)->map(fn ($term) => $term.' смотреть онлайн')->values(),
+                'query' => $this->appendQuerySuffix($pageTitle, 'смотреть онлайн'),
+                'items' => $topicTerms->take(6)->map(fn ($term) => $this->appendQuerySuffix($term, 'смотреть онлайн'))->values(),
             ],
             [
                 'name' => 'Для выбора сериала',
                 'description' => 'Путь для пользователей, которые сравнивают жанры, страны, описание, год выпуска и похожие подборки.',
-                'query' => $pageTitle.' описание жанры',
-                'items' => $topicTerms->take(6)->map(fn ($term) => $term.' описание жанры')->values(),
+                'query' => $this->appendQuerySuffix($pageTitle, 'описание жанры'),
+                'items' => $topicTerms->take(6)->map(fn ($term) => $this->appendQuerySuffix($term, 'описание жанры'))->values(),
             ],
             [
                 'name' => 'Для поиска актеров и ролей',
                 'description' => 'Путь для поиска актеров, режиссеров, ролей и связанных страниц каталога.',
-                'query' => $pageTitle.' актеры роли',
-                'items' => $topicTerms->take(6)->map(fn ($term) => $term.' актеры роли')->values(),
+                'query' => $this->appendQuerySuffix($pageTitle, 'актеры роли'),
+                'items' => $topicTerms->take(6)->map(fn ($term) => $this->appendQuerySuffix($term, 'актеры роли'))->values(),
             ],
             [
                 'name' => 'Для похожих подборок',
                 'description' => 'Путь для перехода к похожим темам, long-tail запросам и связанным коллекциям.',
-                'query' => $pageTitle.' похожие сериалы',
+                'query' => $this->appendQuerySuffix($pageTitle, 'похожие сериалы'),
                 'items' => $relatedCollections->pluck('name')->take(6)->values(),
             ],
         ])->map(fn ($path) => [
             'name' => $path['name'],
             'description' => $path['description'],
-            'query' => $path['query'],
-            'items' => collect($path['items'] ?? [])->filter()->unique()->take(8)->values(),
+            'query' => $this->cleanGeneratedPhrase($path['query']),
+            'items' => collect($path['items'] ?? [])->map(fn ($item) => $this->cleanGeneratedPhrase($item))->filter()->unique()->take(8)->values(),
         ])->filter(fn ($path) => $path['items']->isNotEmpty())->values();
         $alsoSearches = $topicTerms->take(10)
             ->flatMap(fn ($term) => collect([
@@ -341,7 +343,7 @@ class AppLayoutData
             ]))
             ->merge($audiencePaths->flatMap(fn ($path) => $path['items']))
             ->merge($longTailQueries->take(16))
-            ->map(fn ($query) => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $query))))
+            ->map(fn ($query) => $this->cleanGeneratedPhrase($query))
             ->filter(fn ($query) => $query !== '' && mb_strlen($query) <= 120)
             ->unique()
             ->take(60)
@@ -408,9 +410,9 @@ class AppLayoutData
             'name' => $group['name'],
             'description' => $group['description'],
             'items' => $topicTerms->take(7)
-                ->flatMap(fn ($term) => collect($group['suffixes'])->map(fn ($suffix) => trim($term.' '.$suffix)))
-                ->prepend(trim($pageTitle.' '.$group['name']))
-                ->map(fn ($query) => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $query))))
+                ->flatMap(fn ($term) => collect($group['suffixes'])->map(fn ($suffix) => $this->appendQuerySuffix($term, $suffix)))
+                ->prepend($this->appendQuerySuffix($pageTitle, $group['name']))
+                ->map(fn ($query) => $this->cleanGeneratedPhrase($query))
                 ->filter(fn ($query) => $query !== '' && mb_strlen($query) <= 120)
                 ->unique()
                 ->take(12)
@@ -530,14 +532,14 @@ class AppLayoutData
             'полное описание',
             'актеры и роли',
         ])->flatMap(fn ($suffix) => collect([
-            trim($pageTitle.' '.$suffix),
-        ])->merge($topicTerms->take(8)->map(fn ($term) => trim($term.' '.$suffix))))
+            $this->appendQuerySuffix($pageTitle, $suffix),
+        ])->merge($topicTerms->take(8)->map(fn ($term) => $this->appendQuerySuffix($term, $suffix))))
             ->merge($topicTerms->take(8)->flatMap(fn ($term) => collect([
-                'сериал '.$term.' смотреть онлайн',
-                $term.' сериал на русском',
-                $term.' сериал все серии',
+                $this->appendQuerySuffix('сериал '.$term, 'смотреть онлайн'),
+                $this->appendQuerySuffix($term, 'сериал на русском'),
+                $this->appendQuerySuffix($term, 'сериал все серии'),
             ])))
-            ->map(fn ($query) => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $query))))
+            ->map(fn ($query) => $this->cleanGeneratedPhrase($query))
             ->filter(fn ($query) => $query !== '' && mb_strlen($query) <= 120)
             ->unique()
             ->take(60)
@@ -626,11 +628,8 @@ class AppLayoutData
                 'query' => 'что посмотреть '.$term,
                 'description' => 'Поиск сериалов, страниц и подборок для пользователей, которым интересна тема «'.$term.'».',
             ],
-        ])))->map(fn ($item) => [
-            'name' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['name']))),
-            'query' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['query']))),
-            'description' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['description']))),
-        ])->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
+        ])))->map(fn ($item) => $this->cleanGeneratedSeoItem($item))
+            ->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
             ->unique('query')
             ->take(24)
             ->values();
@@ -671,11 +670,8 @@ class AppLayoutData
                 'query' => $term.' 1 сезон 1 серия',
                 'description' => 'Поиск стартовых сезонов, первых серий и связанных страниц по теме «'.$term.'».',
             ],
-        ])))->map(fn ($item) => [
-            'name' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['name']))),
-            'query' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['query']))),
-            'description' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['description']))),
-        ])->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
+        ])))->map(fn ($item) => $this->cleanGeneratedSeoItem($item))
+            ->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
             ->unique('query')
             ->take(28)
             ->values();
@@ -716,11 +712,8 @@ class AppLayoutData
                 'query' => $term.' смотреть на телефоне',
                 'description' => 'Поиск мобильных страниц просмотра, серий и сезонов по теме «'.$term.'».',
             ],
-        ])))->map(fn ($item) => [
-            'name' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['name']))),
-            'query' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['query']))),
-            'description' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['description']))),
-        ])->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
+        ])))->map(fn ($item) => $this->cleanGeneratedSeoItem($item))
+            ->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
             ->unique('query')
             ->take(28)
             ->values();
@@ -761,11 +754,8 @@ class AppLayoutData
                 'query' => $term.' перевод серий',
                 'description' => 'Поиск переводов серий, сезонов и обновлений по теме «'.$term.'».',
             ],
-        ])))->map(fn ($item) => [
-            'name' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['name']))),
-            'query' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['query']))),
-            'description' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['description']))),
-        ])->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
+        ])))->map(fn ($item) => $this->cleanGeneratedSeoItem($item))
+            ->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
             ->unique('query')
             ->take(28)
             ->values();
@@ -806,11 +796,8 @@ class AppLayoutData
                 'query' => 'какие сериалы похожи на '.$term,
                 'description' => 'Голосовой запрос для поиска похожих сериалов и тематических подборок.',
             ],
-        ])))->map(fn ($item) => [
-            'name' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['name']))),
-            'query' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['query']))),
-            'description' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['description']))),
-        ])->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
+        ])))->map(fn ($item) => $this->cleanGeneratedSeoItem($item))
+            ->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
             ->unique('query')
             ->take(28)
             ->values();
@@ -839,11 +826,8 @@ class AppLayoutData
             'name' => 'Тематический авторитет: '.$term,
             'query' => $term.' описание факты сериалы',
             'description' => 'Семантический переход по теме «'.$term.'» для описаний, фактов, похожих сериалов и связанных страниц.',
-        ]))->map(fn ($item) => [
-            'name' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['name']))),
-            'query' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['query']))),
-            'description' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['description']))),
-        ])->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
+        ]))->map(fn ($item) => $this->cleanGeneratedSeoItem($item))
+            ->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
             ->unique('query')
             ->take(24)
             ->values();
@@ -884,11 +868,8 @@ class AppLayoutData
                 'query' => $term.' расписание серий '.$currentSeoYear,
                 'description' => 'Поиск расписания, релизов и сезонных обновлений '.$currentSeoYear.' года.',
             ],
-        ])))->map(fn ($item) => [
-            'name' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['name']))),
-            'query' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['query']))),
-            'description' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['description']))),
-        ])->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
+        ])))->map(fn ($item) => $this->cleanGeneratedSeoItem($item))
+            ->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
             ->unique('query')
             ->take(28)
             ->values();
@@ -927,14 +908,14 @@ class AppLayoutData
             ->merge($topicAuthoritySignals->pluck('query'))
             ->merge($releaseCalendarQueries->pluck('name'))
             ->merge($releaseCalendarQueries->pluck('query'))
-            ->map(fn ($keyword) => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $keyword))))
+            ->map(fn ($keyword) => $this->cleanGeneratedPhrase($keyword))
             ->filter(fn ($keyword) => $keyword !== '' && mb_strlen($keyword) <= 120)
             ->unique()
             ->take(100)
             ->values();
         $newsKeywords = collect(explode(',', (string) ($seo['news_keywords'] ?? '')))
             ->merge($expandedKeywords)
-            ->map(fn ($keyword) => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $keyword))))
+            ->map(fn ($keyword) => $this->cleanGeneratedPhrase($keyword))
             ->filter()
             ->unique()
             ->take(70)
@@ -960,7 +941,7 @@ class AppLayoutData
             ->merge($voiceSearchQueries->pluck('query'))
             ->merge($topicAuthoritySignals->pluck('query'))
             ->merge($releaseCalendarQueries->pluck('query'))
-            ->map(fn ($keyword) => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $keyword))))
+            ->map(fn ($keyword) => $this->cleanGeneratedPhrase($keyword))
             ->filter(fn ($keyword) => $keyword !== '' && mb_strlen($keyword) <= 120)
             ->unique()
             ->take(70)
@@ -1013,7 +994,7 @@ class AppLayoutData
             ['id' => 'content-signals', 'name' => 'Сигналы страницы', 'enabled' => $contentSignals->isNotEmpty()],
             ['id' => 'audience-paths', 'name' => 'Пути поиска', 'enabled' => $audiencePaths->isNotEmpty()],
             ['id' => 'also-searches', 'name' => 'Также ищут', 'enabled' => $alsoSearches->isNotEmpty()],
-            ['id' => 'discovery-signals', 'name' => 'Индексация и обновления', 'enabled' => $discoverySignals->isNotEmpty()],
+            ['id' => 'discovery-signals', 'name' => 'Индексация и обновления', 'enabled' => $discoverySignals->isNotEmpty() && request()->routeIs('stats')],
             ['id' => 'query-matrix', 'name' => 'Матрица запросов', 'enabled' => $queryMatrix->isNotEmpty()],
             ['id' => 'media-signals', 'name' => 'Медиа и превью', 'enabled' => $mediaSignals->isNotEmpty()],
             ['id' => 'publisher-trust', 'name' => 'Доверие и индексация', 'enabled' => $publisherSignals->isNotEmpty()],
@@ -1565,5 +1546,59 @@ class AppLayoutData
         unset($data['viewData'], $data['data']);
 
         return $data;
+    }
+
+    private function appendQuerySuffix(mixed $query, mixed $suffix): string
+    {
+        $query = $this->cleanGeneratedPhrase($query);
+        $suffix = $this->cleanGeneratedPhrase($suffix);
+
+        if ($query === '') {
+            return $suffix;
+        }
+
+        if ($suffix === '') {
+            return $query;
+        }
+
+        if (str_contains(Str::lower($query), Str::lower($suffix))) {
+            return $query;
+        }
+
+        return $this->cleanGeneratedPhrase($query.' '.$suffix);
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @return array<string, mixed>
+     */
+    private function cleanGeneratedSeoItem(array $item): array
+    {
+        foreach (['name', 'query', 'description'] as $key) {
+            if (array_key_exists($key, $item)) {
+                $item[$key] = $this->cleanGeneratedPhrase($item[$key]);
+            }
+        }
+
+        return $item;
+    }
+
+    private function cleanGeneratedPhrase(mixed $phrase): string
+    {
+        $phrase = html_entity_decode(strip_tags((string) $phrase), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $phrase = preg_replace('/[\p{C}\s]+/u', ' ', $phrase) ?: '';
+        $phrase = trim($phrase, " \t\n\r\0\x0B.,;:|-");
+
+        if ($phrase === '') {
+            return '';
+        }
+
+        $phrase = preg_replace('/\b(смотреть онлайн)(?:\s+\1)+\b/iu', '$1', $phrase) ?: $phrase;
+        $phrase = preg_replace('/\b(смотреть в хорошем качестве)(?:\s+\1)+\b/iu', '$1', $phrase) ?: $phrase;
+        $phrase = preg_replace('/\b(в хорошем качестве)\s+хорошее качество\b/iu', '$1', $phrase) ?: $phrase;
+        $phrase = preg_replace('/\b(веб[- ]плеер)\s+веб[- ]плеер\b/iu', '$1', $phrase) ?: $phrase;
+        $phrase = preg_replace('/\b(мобильный просмотр)\s+мобильный просмотр\b/iu', '$1', $phrase) ?: $phrase;
+
+        return trim($phrase, " \t\n\r\0\x0B.,;:|-");
     }
 }

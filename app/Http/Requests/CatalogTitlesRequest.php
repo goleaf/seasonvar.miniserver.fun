@@ -25,6 +25,7 @@ class CatalogTitlesRequest extends FormRequest
             'q' => ['nullable', 'string', 'max:160'],
             'year' => ['nullable', 'string', 'max:16'],
             'title' => $this->slugRules(),
+            'sort' => ['nullable', 'string', Rule::in(['updated', 'year_desc', 'year_asc', 'episodes_desc', 'title_asc', 'with_video'])],
             'type' => ['nullable', Rule::enum(CatalogFilterType::class)],
             'taxonomy' => $this->slugRules(),
         ];
@@ -46,6 +47,7 @@ class CatalogTitlesRequest extends FormRequest
             'q.max' => 'Поисковый запрос слишком длинный.',
             'year.string' => 'Год должен быть строкой.',
             'year.max' => 'Год слишком длинный.',
+            'sort.in' => 'Выбрана неподдерживаемая сортировка.',
             'type.enum' => 'Выбран неподдерживаемый тип фильтра.',
         ];
     }
@@ -58,7 +60,8 @@ class CatalogTitlesRequest extends FormRequest
         $attributes = [
             'q' => 'поиск',
             'year' => 'год',
-            'title' => 'контекст карточки',
+            'title' => 'страница сериала',
+            'sort' => 'сортировка',
             'type' => 'тип фильтра',
             'taxonomy' => 'значение фильтра',
         ];
@@ -74,7 +77,7 @@ class CatalogTitlesRequest extends FormRequest
     {
         $normalized = [];
 
-        foreach (array_merge(['q', 'year', 'title', 'type', 'taxonomy'], CatalogFilterType::values()) as $key) {
+        foreach (array_merge(['q', 'year', 'title', 'sort', 'type', 'taxonomy'], CatalogFilterType::values()) as $key) {
             if (! $this->query->has($key) || ! is_scalar($this->query($key))) {
                 continue;
             }
@@ -123,6 +126,15 @@ class CatalogTitlesRequest extends FormRequest
     public function titleContextSlug(): ?string
     {
         return $this->filterSlug($this->query('title', ''));
+    }
+
+    public function sort(): string
+    {
+        $sort = $this->stringQuery('sort');
+
+        return in_array($sort, ['year_desc', 'year_asc', 'episodes_desc', 'title_asc', 'with_video'], true)
+            ? $sort
+            : 'updated';
     }
 
     /**

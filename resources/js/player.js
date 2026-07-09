@@ -47,8 +47,8 @@ const loadPlyr = async () => {
     return module.default;
 };
 
-export const initializeSeasonvarPlayers = async () => {
-    const videos = [...document.querySelectorAll('video.js-seasonvar-player:not([data-player-ready])')];
+export const initializeCatalogPlayers = async () => {
+    const videos = [...document.querySelectorAll('video.js-catalog-player:not([data-player-ready])')];
 
     if (videos.length === 0) {
         return;
@@ -73,7 +73,7 @@ export const initializeSeasonvarPlayers = async () => {
 
             hls.loadSource(hlsSource);
             hls.attachMedia(video);
-            video._seasonvarHls = hls;
+            video._catalogHls = hls;
         }
 
         new Plyr(video, {

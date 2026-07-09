@@ -4,25 +4,26 @@
     <section class="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_300px]">
         <main class="min-w-0 space-y-5">
             <x-ui.panel :pad="false">
-                <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                <div class="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <a href="{{ route('home') }}" class="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
                         <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
                         <span>Вернуться</span>
                     </a>
+                    <div class="flex flex-wrap gap-2 text-xs font-bold">
+                        <a href="#player" class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-100">
+                            <i class="fa-solid fa-circle-play" aria-hidden="true"></i>
+                            <span>Смотреть</span>
+                        </a>
+                        <a href="#seasons" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                            <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                            <span>Сезоны</span>
+                        </a>
+                    </div>
                 </div>
 
-                <article class="grid gap-4 p-3 sm:p-4 md:grid-cols-[minmax(150px,220px)_minmax(0,1fr)] md:gap-5">
+                <article class="grid gap-4 p-3 sm:p-4 md:grid-cols-[minmax(150px,230px)_minmax(0,1fr)] md:gap-5">
                     <div>
                         <x-title-poster :title="$title" class="mx-auto aspect-[2/3] w-44 max-w-full border border-slate-200 sm:w-52 md:w-full" empty-class="grid h-full place-items-center px-6 text-center text-sm text-slate-400" />
-
-                        <div class="mt-3 grid grid-cols-2 gap-2 text-center">
-                            <x-ui.status-pill icon="fa-solid fa-diagram-project" variant="success" size="tile" shape="lg">
-                                {{ $taxonomyCount > 0 ? $taxonomyCount.' связей' : 'нет связей' }}
-                            </x-ui.status-pill>
-                            <x-ui.status-pill :icon="$selectedMedia ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation'" :variant="$selectedMedia ? 'success' : 'warning'" size="tile" shape="lg">
-                                {{ $selectedMedia ? 'плеер готов' : 'видео готовится' }}
-                            </x-ui.status-pill>
-                        </div>
                     </div>
 
                     <div class="min-w-0">
@@ -30,6 +31,9 @@
                             <i class="fa-solid fa-clapperboard mt-1 text-emerald-700" aria-hidden="true"></i>
                             <span>Сериал {{ $title->title }} онлайн</span>
                         </h1>
+                        @if ($title->original_title)
+                            <div class="mt-1 text-sm font-semibold text-slate-500">{{ $title->original_title }}</div>
+                        @endif
                         <div class="mt-3 flex flex-wrap gap-2 text-xs font-bold">
                             @if ($title->year)
                                 <x-ui.taxonomy-chip :href="route('titles.year', ['year' => $title->year])" active icon="fa-solid fa-calendar-days">{{ $title->year }}</x-ui.taxonomy-chip>
@@ -40,6 +44,32 @@
                             @if ($seasons->isNotEmpty())
                                 <x-ui.taxonomy-chip icon="fa-solid fa-layer-group">{{ $seasons->count() }} сезонов</x-ui.taxonomy-chip>
                             @endif
+                            <x-ui.taxonomy-chip icon="fa-solid fa-list-ol">{{ $episodeCount }} серий</x-ui.taxonomy-chip>
+                            <x-ui.taxonomy-chip icon="fa-solid fa-file-video">{{ $mediaCount }} видео</x-ui.taxonomy-chip>
+                        </div>
+
+                        <div class="mt-4 grid gap-2 text-sm sm:grid-cols-3">
+                            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <div class="text-xs font-bold uppercase tracking-wide text-slate-400">Сезоны</div>
+                                <div class="mt-1 inline-flex items-center gap-2 font-black text-slate-700">
+                                    <i class="fa-solid fa-layer-group text-emerald-700" aria-hidden="true"></i>
+                                    <span>{{ $seasons->count() }}</span>
+                                </div>
+                            </div>
+                            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <div class="text-xs font-bold uppercase tracking-wide text-slate-400">Серии</div>
+                                <div class="mt-1 inline-flex items-center gap-2 font-black text-slate-700">
+                                    <i class="fa-solid fa-list-ol text-sky-700" aria-hidden="true"></i>
+                                    <span>{{ $episodeCount }}</span>
+                                </div>
+                            </div>
+                            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <div class="text-xs font-bold uppercase tracking-wide text-slate-400">Видео</div>
+                                <div class="mt-1 inline-flex items-center gap-2 font-black text-slate-700">
+                                    <i class="fa-solid fa-file-video text-amber-700" aria-hidden="true"></i>
+                                    <span>{{ $mediaCount }}</span>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50">
@@ -50,9 +80,30 @@
                             @if ($title->description)
                                 <p class="px-3 py-3 text-sm leading-6 text-slate-600">{{ $title->description }}</p>
                             @else
-                                <p class="px-3 py-3 text-sm leading-6 text-slate-500">Описание скоро появится. Мы уже дополняем страницу информацией.</p>
+                                <p class="px-3 py-3 text-sm leading-6 text-slate-500">Описание пока отсутствует.</p>
                             @endif
                         </div>
+
+                        @if ($seasons->isNotEmpty())
+                            <div class="mt-5">
+                                <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
+                                    <i class="fa-solid fa-layer-group text-slate-400" aria-hidden="true"></i>
+                                    <span>Быстрый выбор сезона</span>
+                                </div>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    @foreach ($seasons as $season)
+                                        <a href="#season-{{ $season->number }}" @class([
+                                            'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ring-1',
+                                            'bg-emerald-50 text-emerald-700 ring-emerald-100' => $showView->isSelectedSeason($season, $loop->first),
+                                            'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700' => ! $showView->isSelectedSeason($season, $loop->first),
+                                        ])>
+                                            <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                                            <span>{{ $season->number }} сезон</span>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
 
                         @if ($actors->isNotEmpty())
                             <div class="mt-5">
@@ -122,51 +173,7 @@
                 </article>
             </x-ui.panel>
 
-            <x-ui.panel title="Сезоны" icon="fa-solid fa-layer-group" :pad="false">
-                <div class="divide-y divide-slate-200">
-                    @forelse ($seasons as $season)
-                        <details class="group" @if ($showView->isSelectedSeason($season, $loop->first)) open @endif>
-                            <summary class="flex cursor-pointer list-none flex-col gap-2 px-4 py-3 hover:bg-emerald-50 sm:flex-row sm:items-center sm:justify-between">
-                                <span class="min-w-0">
-                                    <span class="inline-flex items-center gap-2 font-bold text-slate-700">
-                                        <i class="fa-solid fa-chevron-down text-xs text-slate-400 transition group-open:rotate-180" aria-hidden="true"></i>
-                                        <span>Сезон {{ $season->number }}</span>
-                                    </span>
-                                    @if ($season->title && $season->title !== 'Сезон '.$season->number)
-                                        <span class="mt-1 block text-xs font-semibold text-slate-500">{{ $season->title }}</span>
-                                    @endif
-                                </span>
-                                <span class="flex flex-wrap gap-1">
-                                    <x-ui.status-pill variant="muted">
-                                        {{ $showView->seasonEpisodeCount($season) > 0 ? $showView->seasonEpisodeCount($season).' серий' : 'серии скоро появятся' }}
-                                    </x-ui.status-pill>
-                                    @foreach ($showView->seasonStatusBadges($season) as $badge)
-                                        <x-ui.status-pill variant="success">{{ $badge }}</x-ui.status-pill>
-                                    @endforeach
-                                </span>
-                            </summary>
-
-                            <div class="px-4 pb-4">
-                                @if ($showView->seasonEpisodeCount($season) > 0)
-                                    <div id="season-{{ $season->number }}" class="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                                        @foreach ($season->episodes->sortBy('number')->values() as $episode)
-                                            <x-catalog.episode-link :title="$title" :episode="$episode" :show-view="$showView" />
-                                        @endforeach
-                                    </div>
-                                @else
-                                    <div class="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 ring-1 ring-slate-200">
-                                        Серии этого сезона скоро появятся на странице.
-                                    </div>
-                                @endif
-                            </div>
-                        </details>
-                    @empty
-                        <p class="p-4 text-sm text-slate-500">Сезоны скоро появятся на странице.</p>
-                    @endforelse
-                </div>
-            </x-ui.panel>
-
-            <x-ui.panel id="player" title="Просмотр" subtitle="Выберите серию выше. Плеер покажет доступное видео этой серии." icon="fa-solid fa-circle-play">
+            <x-ui.panel id="player" title="Просмотр" icon="fa-solid fa-circle-play" class="scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48">
                 <div class="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600">
                     @if ($selectedEpisode)
                         <x-ui.status-pill icon="fa-solid fa-circle-play" variant="success">
@@ -182,9 +189,6 @@
                             Серия не выбрана
                         </x-ui.status-pill>
                     @endif
-                    <x-ui.status-pill :icon="$selectedMedia ? 'fa-solid fa-circle-check' : 'fa-solid fa-clock'" :variant="$selectedMedia ? 'success' : 'warning'" size="md" class="sm:ml-auto">
-                        {{ $selectedMedia ? 'видео найдено' : 'видео готовится' }}
-                    </x-ui.status-pill>
                 </div>
 
                 <div @class([
@@ -192,13 +196,13 @@
                     'border-emerald-200 bg-emerald-50' => $selectedMedia,
                     'border-amber-200 bg-amber-50' => ! $selectedMedia,
                 ])>
-	                    @if ($selectedMedia && $selectedMediaUrl)
-	                        <video
+                    @if ($selectedMedia && $selectedMediaUrl)
+                        <video
                                 controls
                                 playsinline
                                 preload="metadata"
                                 poster="{{ $title->poster_url }}"
-                                class="js-seasonvar-player aspect-video w-full bg-black"
+                                class="js-catalog-player aspect-video w-full bg-black"
                                 @if ($selectedMediaFormat === 'm3u8') data-hls-src="{{ $selectedMediaUrl }}" @endif
                             >
                                 <source src="{{ $selectedMediaUrl }}" @if ($selectedMediaType) type="{{ $selectedMediaType }}" @endif>
@@ -211,46 +215,79 @@
                                     <i class="fa-solid fa-circle-play" aria-hidden="true"></i>
                                 </div>
                                 <div class="text-lg font-bold text-amber-800">
-	                                    {{ $selectedEpisode ? 'Видео для выбранной серии готовится' : 'Выберите серию для просмотра' }}
-	                                </div>
-	                                <p class="mt-1 text-sm">Как только видео будет доступно, оно появится в этом окне автоматически.</p>
-	                            </div>
-	                        </div>
-	                    @endif
-	                </div>
-
-	                @if ($selectedEpisodeMediaItems->isNotEmpty())
-                        <div class="mt-3">
-                            <div class="mb-2 flex items-center gap-2 text-sm font-bold text-slate-700">
-                                <i class="fa-solid fa-sliders text-slate-400" aria-hidden="true"></i>
-                                <span>Варианты видео</span>
+                                    {{ $selectedEpisode ? 'Видео для этой серии пока нет' : 'Выберите серию для просмотра' }}
+                                </div>
+                                <p class="mt-1 text-sm">Можно выбрать другую серию в списке ниже.</p>
                             </div>
-                            <div class="flex flex-wrap gap-2">
-                                @foreach ($selectedEpisodeMediaItems as $episodeMedia)
-                                    <a href="{{ route('titles.show', $showView->variantQuery($episodeMedia)) }}#player" @class([
-                                        'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ring-1 transition',
-                                        'bg-emerald-600 text-white ring-emerald-600' => $selectedMedia?->id === $episodeMedia->id,
-                                        'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:ring-emerald-200' => $selectedMedia?->id !== $episodeMedia->id,
-                                    ])>
-                                        <i class="fa-solid fa-file-video" aria-hidden="true"></i>
-                                        <span>{{ $showView->variantLabel($episodeMedia) }}</span>
-                                    </a>
-                                @endforeach
-                            </div>
-                        </div>
-                    @elseif ($selectedMedia)
-                        <div class="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-600">
-                            <x-ui.status-pill icon="fa-solid fa-file-video" variant="success" size="md">
-                                {{ $selectedMedia->title }}
-                            </x-ui.status-pill>
                         </div>
                     @endif
+                </div>
 
-	                @if ($mediaItems->isNotEmpty())
-	                    <div class="mt-3 rounded-lg border border-slate-200 bg-white">
-	                        <div class="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700">
-	                            <i class="fa-solid fa-folder-open text-slate-400" aria-hidden="true"></i>
-	                            <span>Все доступные варианты</span>
+                @if ($selectedEpisodeMediaItems->isNotEmpty())
+                    <div class="mt-4 rounded-lg border border-slate-200 bg-white">
+                        <div class="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
+                                <i class="fa-solid fa-sliders text-slate-400" aria-hidden="true"></i>
+                                <span>Настройки просмотра</span>
+                            </div>
+                            @if ($showView->selectedMediaBadges->isNotEmpty())
+                                <div class="flex flex-wrap gap-1">
+                                    @foreach ($showView->selectedMediaBadges as $badge)
+                                        <x-ui.status-pill size="xs" variant="success">{{ $badge }}</x-ui.status-pill>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+
+                        @if ($showView->playbackOptionGroups !== [])
+                            <div class="space-y-4 p-4">
+                                @foreach ($showView->playbackOptionGroups as $group)
+                                    <section class="space-y-2">
+                                        <div class="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500">
+                                            <i class="{{ $group['icon'] }} text-slate-400" aria-hidden="true"></i>
+                                            <span>{{ $group['label'] }}</span>
+                                        </div>
+                                        <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                                            @foreach ($group['options'] as $option)
+                                                <a href="{{ $option['url'] }}" @class([
+                                                    'min-h-14 rounded-lg px-3 py-2 text-sm ring-1 transition',
+                                                    'bg-emerald-50 text-emerald-800 ring-emerald-200' => $option['active'],
+                                                    'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:ring-emerald-200' => ! $option['active'],
+                                                ])>
+                                                    <span class="flex items-start gap-2 font-bold">
+                                                        <i class="{{ $option['icon'] }} mt-0.5 shrink-0" aria-hidden="true"></i>
+                                                        <span>{{ $option['label'] }}</span>
+                                                    </span>
+                                                    @if ($option['detail'])
+                                                        <span class="mt-1 block text-xs font-semibold text-slate-500">{{ $option['detail'] }}</span>
+                                                    @endif
+                                                </a>
+                                            @endforeach
+                                        </div>
+                                    </section>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="flex flex-wrap gap-2 p-4 text-xs font-bold text-slate-600">
+                                <x-ui.status-pill icon="fa-solid fa-file-video" variant="success" size="md">
+                                    {{ $showView->selectedPlaybackLabel }}
+                                </x-ui.status-pill>
+                            </div>
+                        @endif
+                    </div>
+                @elseif ($selectedMedia)
+                    <div class="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-600">
+                        <x-ui.status-pill icon="fa-solid fa-file-video" variant="success" size="md">
+                            {{ $selectedMedia->title }}
+                        </x-ui.status-pill>
+                    </div>
+                @endif
+
+                @if ($mediaItems->isNotEmpty())
+                    <div class="mt-3 rounded-lg border border-slate-200 bg-white">
+                        <div class="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700">
+                            <i class="fa-solid fa-folder-open text-slate-400" aria-hidden="true"></i>
+                            <span>Все доступные варианты</span>
                         </div>
                         <div class="max-h-80 divide-y divide-slate-200 overflow-y-auto">
                             @foreach ($mediaItems as $media)
@@ -265,8 +302,8 @@
                                         </span>
                                         <span class="inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
                                             <i class="fa-solid fa-circle-info text-slate-400" aria-hidden="true"></i>
-	                                            <span>{{ $showView->mediaDetailsLabel($media) }}</span>
-	                                        </span>
+                                            <span>{{ $showView->mediaDetailsLabel($media) }}</span>
+                                        </span>
                                     </div>
                                 </a>
                             @endforeach
@@ -275,31 +312,133 @@
                 @endif
             </x-ui.panel>
 
-            <x-ui.panel title="Советуем посмотреть" icon="fa-solid fa-thumbs-up" :pad="false">
+            <x-ui.panel id="seasons" title="Сезоны и серии" icon="fa-solid fa-layer-group" :pad="false" class="scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48">
                 <div class="divide-y divide-slate-200">
-                    @forelse ($recommendedTitles as $recommendedTitle)
-                        <a href="{{ route('titles.show', $recommendedTitle) }}" class="block p-4 hover:bg-emerald-50">
-                            <div class="flex gap-3">
-                                <x-title-poster :title="$recommendedTitle" class="h-20 w-14 shrink-0" empty-label="" />
-                                <div class="min-w-0">
-                                    <div class="font-bold text-slate-700">{{ $recommendedTitle->title }}</div>
-                                    @if (isset($recommendedTitle->shared_taxonomies_count) && $recommendedTitle->shared_taxonomies_count > 0)
-                                        <div class="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">
-                                            <i class="fa-solid fa-diagram-project" aria-hidden="true"></i>
-                                            <span>{{ $recommendedTitle->shared_taxonomies_count }} общих связей</span>
-                                        </div>
+                    @forelse ($seasons as $season)
+                        <details id="season-{{ $season->number }}" class="group scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48" @if ($showView->isSelectedSeason($season, $loop->first)) open @endif>
+                            <summary class="flex cursor-pointer list-none flex-col gap-2 px-4 py-3 hover:bg-emerald-50 sm:flex-row sm:items-center sm:justify-between">
+                                <span class="min-w-0">
+                                    <span class="inline-flex items-center gap-2 font-bold text-slate-700">
+                                        <i class="fa-solid fa-chevron-down text-xs text-slate-400 transition group-open:rotate-180" aria-hidden="true"></i>
+                                        <span>Сезон {{ $season->number }}</span>
+                                    </span>
+                                    @if ($season->title && $season->title !== 'Сезон '.$season->number)
+                                        <span class="mt-1 block text-xs font-semibold text-slate-500">{{ $season->title }}</span>
                                     @endif
-                                    @if ($recommendedTitle->description)
-                                        <p class="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">{{ $recommendedTitle->description }}</p>
-                                    @endif
-                                </div>
+                                </span>
+                                <span class="flex flex-wrap gap-1">
+                                    <x-ui.status-pill variant="muted">
+                                        {{ $showView->seasonEpisodeCount($season) }} серий
+                                    </x-ui.status-pill>
+                                    @foreach ($showView->seasonStatusBadges($season) as $badge)
+                                        <x-ui.status-pill variant="success">{{ $badge }}</x-ui.status-pill>
+                                    @endforeach
+                                </span>
+                            </summary>
+
+                            <div class="px-4 pb-4">
+                                @if ($showView->seasonEpisodeCount($season) > 0)
+                                    <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                                        @foreach ($season->episodes->sortBy('number')->values() as $episode)
+                                            <x-catalog.episode-link :title="$title" :episode="$episode" :show-view="$showView" />
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <div class="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 ring-1 ring-slate-200">
+                                        Для этого сезона пока нет серий.
+                                    </div>
+                                @endif
                             </div>
-                        </a>
+                        </details>
                     @empty
-	                        <p class="p-4 text-sm text-slate-500">Рекомендации появятся после обновления каталога.</p>
+                        <p class="p-4 text-sm text-slate-500">Сезоны не указаны.</p>
                     @endforelse
                 </div>
             </x-ui.panel>
+
+            <x-ui.panel title="Советуем посмотреть" icon="fa-solid fa-thumbs-up" :pad="false">
+                @if ($recommendedTitles->isNotEmpty() && $recommendedTitles->first())
+                    <div class="space-y-3 p-3">
+                        <div class="grid gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                            <div class="min-w-0">
+                                <x-title-card :title="$recommendedTitles->first()" />
+                            </div>
+
+                            @if ($recommendedTitles->skip(1)->take(4)->isNotEmpty())
+                                <div class="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
+                                    <div class="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">
+                                        <i class="fa-solid fa-ranking-star text-emerald-700" aria-hidden="true"></i>
+                                        <span>Ближайшие совпадения</span>
+                                    </div>
+                                    <div class="divide-y divide-slate-200">
+                                        @foreach ($recommendedTitles->skip(1)->take(4) as $recommendedTitle)
+                                            <x-title-list-row :title="$recommendedTitle" compact :show-description="false" />
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+
+                        @if ($recommendedTitles->skip(5)->isNotEmpty())
+                            <div class="grid auto-rows-fr gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                                @foreach ($recommendedTitles->skip(5) as $recommendedTitle)
+                                    <x-title-card :title="$recommendedTitle" />
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                @else
+                    <div class="p-3">
+                        <div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                            <div class="inline-flex items-center gap-2">
+                                <i class="fa-solid fa-circle-info text-slate-400" aria-hidden="true"></i>
+                                <span>Похожие сериалы пока не подобраны.</span>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+            </x-ui.panel>
+
+            @if ($genreRecommendations->isNotEmpty() || $yearRecommendations->isNotEmpty())
+                <x-ui.panel title="Похожие сериалы" icon="fa-solid fa-list" :pad="false">
+                    <div class="grid min-w-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                        @if ($genreRecommendations->isNotEmpty())
+                            <section @class([
+                                'min-w-0',
+                                'lg:border-r lg:border-slate-200' => $yearRecommendations->isNotEmpty(),
+                            ])>
+                                <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                                    <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
+                                        <i class="fa-solid fa-tags text-emerald-700" aria-hidden="true"></i>
+                                        <span>По жанрам</span>
+                                    </div>
+                                </div>
+                                <div class="divide-y divide-slate-200">
+                                    @foreach ($genreRecommendations->take(6) as $recommendedTitle)
+                                        <x-title-list-row :title="$recommendedTitle" readable :show-description="false" />
+                                    @endforeach
+                                </div>
+                            </section>
+                        @endif
+
+                        @if ($yearRecommendations->isNotEmpty())
+                            <section class="min-w-0">
+                                <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                                    <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
+                                        <i class="fa-solid fa-calendar-days text-emerald-700" aria-hidden="true"></i>
+                                        <span>За {{ $title->year }} год</span>
+                                    </div>
+                                </div>
+                                <div class="divide-y divide-slate-200">
+                                    @foreach ($yearRecommendations->take(6) as $recommendedTitle)
+                                        <x-title-list-row :title="$recommendedTitle" readable :show-description="false" />
+                                    @endforeach
+                                </div>
+                            </section>
+                        @endif
+                    </div>
+                </x-ui.panel>
+            @endif
 
             @if (! empty($seo['faq']))
                 <x-ui.panel title="Вопросы о сериале" icon="fa-solid fa-circle-question" :pad="false">
@@ -320,31 +459,6 @@
         </main>
 
         <aside class="space-y-4">
-            <x-ui.panel title="Данные страницы" icon="fa-solid fa-chart-simple" :pad="false">
-                <div class="grid grid-cols-2 gap-2 p-3 text-center text-xs font-bold">
-                    <x-catalog.page-stat icon="fa-solid fa-layer-group" :value="$seasons->count()" label="сезонов" />
-                    <x-catalog.page-stat icon="fa-solid fa-circle-play" :value="$episodeCount" label="серий" />
-                    <x-catalog.page-stat icon="fa-solid fa-diagram-project" :value="$taxonomyCount" label="связей" />
-                    <x-catalog.page-stat icon="fa-solid fa-file-video" :value="$mediaCount" label="файлов" />
-                </div>
-                <div class="border-t border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500">
-	                    Серии доступны в {{ $parsedSeasonCount }} из {{ $seasons->count() }} сезонов
-	                </div>
-	            </x-ui.panel>
-
-	            <x-ui.panel title="Обновление" icon="fa-solid fa-rotate" :pad="false">
-                    <dl class="divide-y divide-slate-200 text-sm">
-                        <div class="px-3 py-2">
-                            <dt class="text-slate-500">Номер</dt>
-                            <dd class="font-bold text-slate-700">{{ $title->external_id ?? 'Неизвестно' }}</dd>
-                        </div>
-                        <div class="px-3 py-2">
-                            <dt class="text-slate-500">Последнее обновление</dt>
-                            <dd class="font-bold text-slate-700">{{ $title->indexed_at?->format('d.m.Y H:i') ?? 'Скоро появится' }}</dd>
-                        </div>
-                    </dl>
-                </x-ui.panel>
-
             <x-ui.panel title="Связи каталога" icon="fa-solid fa-diagram-project">
                 <div class="space-y-3">
                     @forelse ($taxonomyGroups as $taxonomyType => $taxonomies)
@@ -363,10 +477,10 @@
                             </div>
                         </div>
                     @empty
-	                        <span class="text-sm text-slate-500">Связи появятся после обновления страницы.</span>
-	                    @endforelse
-	                </div>
-	            </x-ui.panel>
-	        </aside>
+                        <span class="text-sm text-slate-500">Связи не указаны.</span>
+                    @endforelse
+                </div>
+            </x-ui.panel>
+        </aside>
     </section>
 @endsection

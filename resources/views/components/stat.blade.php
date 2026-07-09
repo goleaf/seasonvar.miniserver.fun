@@ -1,6 +1,6 @@
 @props(['label', 'value', 'icon' => null])
 
-<div class="rounded-lg border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60">
+<div {{ $attributes->merge(['class' => 'rounded-lg border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60']) }}>
     <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
             <div class="text-3xl font-bold text-emerald-700">{{ number_format((int) $value) }}</div>

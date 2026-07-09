@@ -61,15 +61,65 @@ class SourcePage extends Model
     }
 
     /**
+     * @return HasMany<Season, $this>
+     */
+    public function linkedSeasons(): HasMany
+    {
+        return $this->hasMany(Season::class, 'source_url_hash', 'url_hash');
+    }
+
+    /**
+     * @return HasMany<Episode, $this>
+     */
+    public function episodes(): HasMany
+    {
+        return $this->hasMany(Episode::class);
+    }
+
+    /**
+     * @return HasMany<CatalogTitleReview, $this>
+     */
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(CatalogTitleReview::class);
+    }
+
+    /**
+     * @return HasMany<SourcePageSnapshot, $this>
+     */
+    public function snapshots(): HasMany
+    {
+        return $this->hasMany(SourcePageSnapshot::class);
+    }
+
+    /**
+     * @return HasMany<SeasonvarImportEvent, $this>
+     */
+    public function importEvents(): HasMany
+    {
+        return $this->hasMany(SeasonvarImportEvent::class);
+    }
+
+    /**
+     * @return BelongsTo<SeasonvarImportRun, $this>
+     */
+    public function lastImportRun(): BelongsTo
+    {
+        return $this->belongsTo(SeasonvarImportRun::class, 'last_import_run_id');
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
     {
         return [
+            'http_status' => 'integer',
             'last_crawled_at' => 'datetime',
             'last_changed_at' => 'datetime',
             'missing_data_flags' => 'array',
             'retry_after_at' => 'datetime',
+            'failure_count' => 'integer',
             'last_imported_at' => 'datetime',
         ];
     }

@@ -24,6 +24,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'source_url',
     'quality',
     'translation_name',
+    'variant_type',
+    'variant_name',
+    'variant_key',
+    'has_subtitles',
     'format',
     'check_status',
     'last_http_status',
@@ -33,6 +37,10 @@ class LicensedMedia extends Model
 {
     /** @use HasFactory<LicensedMediaFactory> */
     use HasFactory;
+
+    protected $attributes = [
+        'has_subtitles' => false,
+    ];
 
     /**
      * @param  Builder<LicensedMedia>  $query
@@ -73,6 +81,9 @@ class LicensedMedia extends Model
     protected function casts(): array
     {
         return [
+            'duration_seconds' => 'integer',
+            'has_subtitles' => 'boolean',
+            'last_http_status' => 'integer',
             'published_at' => 'datetime',
             'checked_at' => 'datetime',
         ];

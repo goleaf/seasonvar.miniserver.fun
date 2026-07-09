@@ -2,6 +2,7 @@
 
 ## 2026-07-09
 
+- Eloquent-модели дополнены обратными связями для `SourcePage`, `SeasonvarImportRun` и событий импорта, числовые поля приведены к явным casts, а правила моделей и query usage вынесены в `docs/models.md`.
 - Синхронизирована Markdown-документация с текущими маршрутами, командами, Laravel/Livewire архитектурой, MCP-настройкой, CI, setup/testing/deployment правилами и no-`@php` Blade-подходом.
 - Добавлен GitHub Actions CI workflow: backend проверяет Composer, Pint, PHP syntax lint, Laravel cache-команды и тесты; frontend выполняет `npm ci`, `npm audit` и `npm run build` через официальный npm registry.
 - `/stats` перенесена на Livewire 4: страница обновляет все видимые блоки через `wire:poll.1s`, использует `CatalogStatsSnapshotCache` с секундным fresh TTL и fallback на последний успешный снимок, а полный stats-массив не хранится в публичном состоянии Livewire.

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Database\Factories\CatalogTitleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -36,6 +37,15 @@ class CatalogTitle extends Model
     public function getRouteKeyName(): string
     {
         return 'slug';
+    }
+
+    /**
+     * @param  Builder<CatalogTitle>  $query
+     * @return Builder<CatalogTitle>
+     */
+    public function scopePublished(Builder $query): Builder
+    {
+        return $query->where('is_published', true);
     }
 
     /**
@@ -108,6 +118,22 @@ class CatalogTitle extends Model
     public function ratings(): HasMany
     {
         return $this->hasMany(CatalogTitleRating::class);
+    }
+
+    /**
+     * @return HasMany<SeasonvarImportEvent, $this>
+     */
+    public function importEvents(): HasMany
+    {
+        return $this->hasMany(SeasonvarImportEvent::class);
+    }
+
+    /**
+     * @return HasMany<CatalogTitleRecommendation, $this>
+     */
+    public function recommendations(): HasMany
+    {
+        return $this->hasMany(CatalogTitleRecommendation::class);
     }
 
     /**
@@ -204,6 +230,7 @@ class CatalogTitle extends Model
     protected function casts(): array
     {
         return [
+            'year' => 'integer',
             'is_published' => 'boolean',
             'indexed_at' => 'datetime',
         ];

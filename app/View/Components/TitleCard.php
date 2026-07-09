@@ -14,6 +14,8 @@ class TitleCard extends Component
 
     public int $episodesCount;
 
+    public int $mediaCount;
+
     /**
      * @var Collection<int, Model>
      */
@@ -23,6 +25,7 @@ class TitleCard extends Component
     {
         $this->seasonsCount = (int) ($title->seasons_count ?? ($title->relationLoaded('seasons') ? $title->seasons->count() : 0));
         $this->episodesCount = (int) ($title->episodes_count ?? 0);
+        $this->mediaCount = (int) ($title->published_media_count ?? $title->licensed_media_count ?? 0);
         $this->cardRelations = collect()
             ->merge($title->relationLoaded('genres') ? $title->genres : collect())
             ->merge($title->relationLoaded('countries') ? $title->countries : collect())

@@ -96,6 +96,36 @@ class SeasonvarCatalogParserTest extends TestCase
         $this->assertSame('seasonvar_playlist', $data['media'][0]['kind']);
     }
 
+    public function test_it_keeps_only_direct_season_links_and_sanitizes_suspicious_season_titles(): void
+    {
+        $parser = app(SeasonvarCatalogParser::class);
+
+        $data = $parser->parse(
+            <<<'HTML'
+            <html>
+                <head><title>Американский папаша 6 сезон смотреть онлайн</title></head>
+                <body>
+                    <h1>Американский папаша 6 сезон</h1>
+                    <div class="pgs-seaslist">
+                        <a href="/serial-1750--Amerikanskij_papasha-_pszhdcp-6-sezon.html">... главный герой пытается решить очень сложную проблему. Это длинное описание не является названием сезона.</a>
+                        <a href="/serial-50000-Sluchajnaya_stranica.html">... описание чужой страницы, которое нельзя сохранять как сезон</a>
+                    </div>
+                    <script>
+                        var arEpisodes = [{"1_seriya":{"n":"1"}}];
+                    </script>
+                </body>
+            </html>
+            HTML,
+            'https://seasonvar.ru/serial-1750--Amerikanskij_papasha-_pszhdcp-6-sezon.html',
+        );
+
+        $this->assertSame(6, $data['current_season_number']);
+        $this->assertCount(1, $data['seasons']);
+        $this->assertSame(6, $data['seasons'][0]['number']);
+        $this->assertSame('Сезон 6', $data['seasons'][0]['title']);
+        $this->assertSame('https://seasonvar.ru/serial-1750--Amerikanskij_papasha-_pszhdcp-6-sezon.html', $data['seasons'][0]['source_url']);
+    }
+
     public function test_it_normalizes_root_relative_urls_against_the_site_origin(): void
     {
         $url = app(SeasonvarUrl::class);

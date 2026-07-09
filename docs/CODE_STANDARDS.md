@@ -15,6 +15,7 @@
 - `docs/authorization.md` для gates, policies, middleware и правил доступа к служебным страницам.
 - `docs/validation.md` для Form Request-классов, правил ввода и reusable validation rules.
 - `docs/DATA_RELATIONS.md` для полей импортера, Eloquent-связей, фильтров и смысла данных.
+- `docs/models.md` для правил Eloquent-связей, casts, scopes и query usage.
 - `docs/performance.md` для query patterns, N+1-рисков, sitemap/feed и агрегированных счетчиков.
 - `docs/MAINTENANCE_LOG.md` для короткого датированного описания важных изменений.
 

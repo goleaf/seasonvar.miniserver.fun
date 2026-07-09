@@ -123,6 +123,39 @@ class SitemapAndRobotsTest extends TestCase
         $this->assertStringNotContainsString('licensed/local-video.mp4', $content);
     }
 
+    public function test_feed_contains_all_published_titles_without_limit(): void
+    {
+        $oldestTitle = null;
+
+        foreach (range(1, 101) as $number) {
+            $title = CatalogTitle::factory()->create([
+                'slug' => 'rss-card-'.$number,
+                'title' => 'RSS сериал '.$number,
+                'description' => $number === 101
+                    ? 'Описание RSS без сокращения '.str_repeat('длинный текст ', 30).'финальный фрагмент'
+                    : 'Описание RSS '.$number,
+                'is_published' => true,
+                'indexed_at' => now()->subMinutes($number),
+            ]);
+
+            if ($number === 101) {
+                $oldestTitle = $title;
+            }
+        }
+
+        $response = $this->get('/feed.xml');
+
+        $response->assertOk();
+        $response->assertStreamed();
+
+        $content = $response->streamedContent();
+
+        $this->assertNotNull($oldestTitle);
+        $this->assertSame(101, substr_count($content, '<item>'));
+        $this->assertStringContainsString(route('titles.show', $oldestTitle), $content);
+        $this->assertStringContainsString('финальный фрагмент', $content);
+    }
+
     public function test_landing_sitemap_uses_grouped_taxonomy_year_queries(): void
     {
         $genres = collect(range(1, 8))->map(fn (int $number): Genre => Genre::query()->create([
@@ -137,7 +170,7 @@ class SitemapAndRobotsTest extends TestCase
         $genres->each(function (Genre $genre, int $index) use ($countries): void {
             $title = CatalogTitle::factory()->create([
                 'slug' => 'landing-title-'.$index,
-                'title' => 'Посадочная карточка '.$index,
+                'title' => 'Посадочный сериал '.$index,
                 'year' => 2020 + ($index % 4),
                 'is_published' => true,
             ]);

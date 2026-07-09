@@ -45,6 +45,7 @@ class Episode extends Model
     protected function casts(): array
     {
         return [
+            'number' => 'integer',
             'released_at' => 'date',
         ];
     }

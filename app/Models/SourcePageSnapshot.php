@@ -40,6 +40,8 @@ class SourcePageSnapshot extends Model
     protected function casts(): array
     {
         return [
+            'http_status' => 'integer',
+            'body_bytes' => 'integer',
             'captured_at' => 'datetime',
         ];
     }

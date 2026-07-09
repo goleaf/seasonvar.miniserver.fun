@@ -120,6 +120,8 @@ class ExternalPlaylistImporter
                 ]);
             $wasRecentlyCreated = ! $media->exists;
 
+            $variant = $this->mediaMetadata->playbackVariant($entry['title'], $baseUrl, $entry['url']);
+
             $media->fill([
                 'catalog_title_id' => $match['catalogTitle']->id,
                 'season_id' => $match['season']?->id,
@@ -131,6 +133,11 @@ class ExternalPlaylistImporter
                 'source_media_key' => $sourceMediaKey,
                 'source_url' => $baseUrl,
                 'quality' => $this->mediaMetadata->quality($entry['title'], $entry['url']),
+                'translation_name' => $this->mediaMetadata->translationName($entry['title'], $baseUrl),
+                'variant_type' => $variant['variant_type'],
+                'variant_name' => $variant['variant_name'],
+                'variant_key' => $variant['variant_key'],
+                'has_subtitles' => $variant['has_subtitles'],
                 'format' => $this->mediaMetadata->format($entry['url']),
                 'check_status' => 'not_checked',
                 'status' => 'published',

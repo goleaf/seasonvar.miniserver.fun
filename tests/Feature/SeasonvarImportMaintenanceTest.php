@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleRecommendation;
 use App\Models\Episode;
+use App\Models\Genre;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\SeasonvarImportRun;
@@ -11,9 +13,12 @@ use App\Models\Source;
 use App\Models\SourcePage;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
+use App\Services\Seasonvar\SeasonvarImportPipeline;
+use App\Services\Seasonvar\SeasonvarImportProcessInspector;
 use App\Services\Seasonvar\SeasonvarRefreshPlanner;
 use App\Services\Seasonvar\SeasonvarSitemapMirror;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -34,27 +39,53 @@ class SeasonvarImportMaintenanceTest extends TestCase
         ]);
     }
 
-    public function test_it_refuses_to_start_when_import_lock_is_held(): void
+    public function test_it_skips_successfully_when_import_lock_is_held(): void
     {
+        $this->fakeImportProcessInspector(running: true, checks: ['fake-posix:alive', 'fake-ps:match']);
         $lock = Cache::lock('seasonvar-import', 60);
         $this->assertTrue($lock->get());
 
         try {
             $this->artisan('seasonvar:import', ['--no-discovery' => true])
+                ->expectsOutputToContain('Активный процесс обновления подтвержден')
                 ->expectsOutputToContain('Обновление уже запущено')
-                ->assertExitCode(1);
+                ->assertExitCode(0);
         } finally {
             $lock->release();
         }
     }
 
-    public function test_it_recovers_a_stale_import_lock_when_previous_run_stopped_without_finishing(): void
+    public function test_it_releases_orphaned_import_lock_when_no_process_is_confirmed(): void
     {
         Http::preventStrayRequests();
-        config(['seasonvar.import.stale_after_minutes' => 5]);
+        $this->fakeImportProcessInspector(running: false, checks: ['fake-posix:missing', 'fake-ps:no-match']);
         $lock = Cache::lock('seasonvar-import', 60);
         $this->assertTrue($lock->get());
-        $staleRun = SeasonvarImportRun::query()->create([
+
+        try {
+            $this->artisan('seasonvar:import', ['--no-discovery' => true])
+                ->expectsOutputToContain('Найдена блокировка импорта')
+                ->expectsOutputToContain('Проверки процесса')
+                ->assertExitCode(0);
+        } finally {
+            $lock->forceRelease();
+        }
+
+        $run = SeasonvarImportRun::query()->latest('id')->firstOrFail();
+
+        $this->assertSame('completed', $run->status);
+        $this->assertSame(99999, $run->process_id);
+        $this->assertSame('test-host', $run->process_host);
+        $this->assertSame('php artisan seasonvar:import --no-discovery', $run->process_command);
+    }
+
+    public function test_it_recovers_an_unconfirmed_import_lock_when_previous_run_stopped_without_finishing(): void
+    {
+        Http::preventStrayRequests();
+        $this->fakeImportProcessInspector(running: false, checks: ['fake-proc:missing', 'fake-pgrep:no-match']);
+        $lock = Cache::lock('seasonvar-import', 60);
+        $this->assertTrue($lock->get());
+        $unconfirmedRun = SeasonvarImportRun::query()->create([
             'mode' => 'sitemap',
             'status' => 'running',
             'force' => false,
@@ -62,21 +93,25 @@ class SeasonvarImportMaintenanceTest extends TestCase
             'started_at' => now()->subHour(),
         ]);
         SeasonvarImportRun::query()
-            ->whereKey($staleRun->id)
+            ->whereKey($unconfirmedRun->id)
             ->update([
                 'created_at' => now()->subHour(),
                 'updated_at' => now()->subMinutes(10),
             ]);
 
-        $this->artisan('seasonvar:import', ['--no-discovery' => true])
-            ->expectsOutputToContain('Найден зависший запуск импорта')
-            ->assertExitCode(0);
+        try {
+            $this->artisan('seasonvar:import', ['--no-discovery' => true])
+                ->expectsOutputToContain('Найден зависший запуск импорта')
+                ->assertExitCode(0);
+        } finally {
+            $lock->forceRelease();
+        }
 
-        $staleRun->refresh();
+        $unconfirmedRun->refresh();
 
-        $this->assertSame('failed', $staleRun->status);
-        $this->assertSame('Предыдущий запуск остановился без завершения и был закрыт автоматически.', $staleRun->last_error);
-        $this->assertNotNull($staleRun->finished_at);
+        $this->assertSame('failed', $unconfirmedRun->status);
+        $this->assertSame('Предыдущий запуск не имеет подтвержденного активного Linux-процесса и был закрыт автоматически.', $unconfirmedRun->last_error);
+        $this->assertNotNull($unconfirmedRun->finished_at);
     }
 
     public function test_it_marks_malformed_nested_source_urls_as_unavailable_without_requesting_them(): void
@@ -167,6 +202,51 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $this->assertNotNull($page->last_imported_at);
     }
 
+    public function test_it_rebuilds_catalog_title_recommendations_after_import_cycle(): void
+    {
+        Http::preventStrayRequests();
+        config([
+            'seasonvar.media_check.enabled' => false,
+            'seasonvar.recommendations.min_score' => 600,
+        ]);
+
+        $genre = Genre::query()->create([
+            'name' => 'Детектив',
+            'slug' => 'detektiv',
+        ]);
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Импортный главный сериал',
+            'slug' => 'importnyi-glavnyi-serial',
+            'year' => 2020,
+        ]);
+        $recommendedTitle = CatalogTitle::factory()->create([
+            'title' => 'Импортный похожий сериал',
+            'slug' => 'importnyi-poxozij-serial',
+            'year' => 2021,
+        ]);
+        $catalogTitle->genres()->attach($genre->id);
+        $recommendedTitle->genres()->attach($genre->id);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $recommendedTitle->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $this->artisan('seasonvar:import', ['--no-discovery' => true])
+            ->assertExitCode(0);
+
+        $recommendation = CatalogTitleRecommendation::query()
+            ->where('catalog_title_id', $catalogTitle->id)
+            ->where('recommended_title_id', $recommendedTitle->id)
+            ->first();
+        $run = SeasonvarImportRun::query()->latest('id')->firstOrFail();
+
+        $this->assertNotNull($recommendation);
+        $this->assertSame(1, $recommendation->rank);
+        $this->assertSame(2, $run->summary['last_recommendations']['titles']);
+        $this->assertGreaterThan(0, $run->summary['last_recommendations']['stored']);
+    }
+
     public function test_it_processes_all_pending_pages_across_import_chunks(): void
     {
         Http::preventStrayRequests();
@@ -209,6 +289,65 @@ class SeasonvarImportMaintenanceTest extends TestCase
 
         $this->assertSame(3, $run->selected);
         $this->assertSame(3, SourcePage::query()->whereIn('url', $urls)->where('parse_status', 'parsed')->count());
+    }
+
+    public function test_it_updates_import_run_counters_after_each_processed_page_chunk(): void
+    {
+        Http::preventStrayRequests();
+        config([
+            'seasonvar.import.chunk_size' => 1,
+            'seasonvar.media_check.enabled' => false,
+        ]);
+
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $urls = collect(range(47915, 47916))
+            ->map(fn (int $id): string => "https://seasonvar.ru/serial-{$id}-CHernyj_spisok_Na_kuhne-1-season.html");
+        $body = $this->refreshPlannerSeasonPageHtml([
+            1 => 'Начало',
+        ]);
+
+        foreach ($urls as $url) {
+            SourcePage::factory()->create([
+                'source_id' => $source->id,
+                'url' => $url,
+                'url_hash' => hash('sha256', $url),
+                'page_type' => 'serial',
+                'parse_status' => 'pending',
+                'import_status' => 'pending',
+                'last_imported_at' => null,
+            ]);
+        }
+
+        Http::fake([
+            'seasonvar.ru/*' => Http::response($body),
+        ]);
+
+        $observedCounters = [];
+        $run = app(SeasonvarImportPipeline::class)->run(
+            discover: false,
+            progress: function (string $event) use (&$observedCounters): void {
+                if ($event !== 'seasonvar-import-page-chunk-complete') {
+                    return;
+                }
+
+                $latestRun = SeasonvarImportRun::query()->latest('id')->firstOrFail();
+                $observedCounters[] = [
+                    'selected' => (int) $latestRun->selected,
+                    'parsed' => (int) $latestRun->parsed,
+                ];
+            },
+        );
+
+        $this->assertSame([
+            ['selected' => 1, 'parsed' => 1],
+            ['selected' => 2, 'parsed' => 2],
+        ], $observedCounters);
+        $this->assertSame(2, $run->selected);
+        $this->assertSame(2, $run->parsed);
     }
 
     public function test_it_backfills_all_legacy_source_page_statuses_across_chunks(): void
@@ -506,6 +645,10 @@ class SeasonvarImportMaintenanceTest extends TestCase
             'source_url' => $url,
             'quality' => '720p',
             'translation_name' => null,
+            'variant_type' => 'voiceover',
+            'variant_name' => null,
+            'variant_key' => 'voiceover-default',
+            'has_subtitles' => false,
             'format' => 'mp4',
             'status' => 'published',
             'check_status' => 'not_checked',
@@ -594,6 +737,80 @@ class SeasonvarImportMaintenanceTest extends TestCase
 
         $this->assertSame([$missingVideoPage->id, $pendingPage->id], $pages->take(2)->pluck('id')->all());
         $this->assertSame(['episodes_without_video', 'pending', 'stale'], $selectedReasons);
+    }
+
+    public function test_refresh_planner_selects_direct_season_page_when_linked_season_has_no_episodes(): void
+    {
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $canonicalPage = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'page_type' => 'serial',
+            'parse_status' => 'parsed',
+            'import_status' => 'parsed',
+            'last_imported_at' => now(),
+            'retry_after_at' => null,
+        ]);
+        $seasonUrl = 'https://seasonvar.ru/serial-1750--Amerikanskij_papasha-_pszhdcp-6-sezon.html';
+        $seasonPage = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $seasonUrl,
+            'url_hash' => hash('sha256', $seasonUrl),
+            'page_type' => 'serial',
+            'parse_status' => 'parsed',
+            'import_status' => 'parsed',
+            'last_imported_at' => now(),
+            'retry_after_at' => null,
+        ]);
+        $catalogTitle = CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $canonicalPage->id,
+        ]);
+        Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'source_page_id' => $canonicalPage->id,
+            'source_url' => $seasonUrl,
+            'source_url_hash' => hash('sha256', $seasonUrl),
+            'number' => 6,
+        ]);
+        $events = [];
+        $pages = collect();
+
+        foreach (app(SeasonvarRefreshPlanner::class)->pageChunksForImportCycle(
+            5,
+            now()->subHours(168),
+            null,
+            function (string $event, array $context) use (&$events): void {
+                $events[] = ['event' => $event, 'context' => $context];
+            },
+        ) as $chunk) {
+            $pages = $pages->merge($chunk);
+        }
+
+        $selectedReasons = collect($events)
+            ->filter(fn (array $event): bool => $event['context']['selected'] > 0)
+            ->pluck('context.reason')
+            ->all();
+
+        $this->assertSame($seasonPage->id, $pages->first()?->id);
+        $this->assertSame('seasons_without_episodes', $selectedReasons[0] ?? null);
+    }
+
+    public function test_importer_clamps_transaction_attempts_configuration(): void
+    {
+        $method = new \ReflectionMethod(SeasonvarCatalogImporter::class, 'importTransactionAttempts');
+
+        config(['seasonvar.import.transaction_attempts' => 0]);
+        $this->assertSame(1, $method->invoke(app(SeasonvarCatalogImporter::class)));
+
+        config(['seasonvar.import.transaction_attempts' => 5]);
+        $this->assertSame(5, $method->invoke(app(SeasonvarCatalogImporter::class)));
+
+        config(['seasonvar.import.transaction_attempts' => 99]);
+        $this->assertSame(10, $method->invoke(app(SeasonvarCatalogImporter::class)));
     }
 
     public function test_it_backfills_missing_media_quality_and_format_during_import_cycle(): void
@@ -729,6 +946,50 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $this->assertSame($expectedSourceMediaKey, $media->source_media_key);
         $this->assertSame('720p', $media->quality);
         $this->assertSame('mp4', $media->format);
+    }
+
+    /**
+     * @param  array<int, string>  $checks
+     */
+    private function fakeImportProcessInspector(bool $running, array $checks): void
+    {
+        $this->app->instance(SeasonvarImportProcessInspector::class, new class($running, $checks) extends SeasonvarImportProcessInspector
+        {
+            /**
+             * @param  array<int, string>  $checks
+             */
+            public function __construct(private readonly bool $running, private readonly array $checks) {}
+
+            /**
+             * @return array{pid: int|null, host: string|null, command: string|null, recorded_at: string}
+             */
+            public function currentProcess(): array
+            {
+                return [
+                    'pid' => 99999,
+                    'host' => 'test-host',
+                    'command' => 'php artisan seasonvar:import --no-discovery',
+                    'recorded_at' => now()->toIso8601String(),
+                ];
+            }
+
+            /**
+             * @param  array<string, mixed>|null  $lockProcess
+             * @param  Collection<int, SeasonvarImportRun>  $runningRuns
+             * @return array{running: bool, verified: bool, pid: int|null, run_id: int|null, source: string|null, checks: array<int, string>}
+             */
+            public function inspect(?array $lockProcess, Collection $runningRuns): array
+            {
+                return [
+                    'running' => $this->running,
+                    'verified' => true,
+                    'pid' => $this->running ? 12345 : null,
+                    'run_id' => $this->running && $runningRuns->isNotEmpty() ? (int) $runningRuns->first()->id : null,
+                    'source' => $this->running ? 'fake' : null,
+                    'checks' => $this->checks,
+                ];
+            }
+        });
     }
 
     /**

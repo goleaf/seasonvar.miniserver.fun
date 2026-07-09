@@ -580,10 +580,16 @@ class SeasonvarCatalogParser
 
         foreach ($xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " pgs-seaslist ")]//a[@href]') ?: [] as $node) {
             $href = $node->attributes?->getNamedItem('href')?->nodeValue;
+            $sourceUrl = $href ? $this->normalizeRelative($href, $baseUrl) : null;
+
+            if ($sourceUrl === null || ! $this->isDirectSeasonvarSeasonUrl($sourceUrl)) {
+                continue;
+            }
+
             $rawText = $this->stringValue($node->textContent) ?? '';
             $text = $this->cleanSeasonTitle($rawText);
             $releaseStatus = $this->seasonReleaseStatus($rawText);
-            $number = ($href !== null ? $this->seasonNumberFromUrl($href) : null) ?? $this->seasonNumber($text);
+            $number = $this->seasonNumberFromUrl($sourceUrl) ?? $this->seasonNumber($text);
 
             if ($number === null && $seasons === []) {
                 $number = 1;
@@ -593,10 +599,9 @@ class SeasonvarCatalogParser
                 continue;
             }
 
-            $sourceUrl = $href ? $this->normalizeRelative($href, $baseUrl) : null;
             $seasons[$number] = [
                 'number' => $number,
-                'title' => $text !== '' ? $text : "Сезон {$number}",
+                'title' => $this->safeSeasonTitle($text, $number),
                 'source_url' => $sourceUrl,
                 'latest_episode_released_at' => $releaseStatus['latest_episode_released_at'],
                 'episodes_released' => $releaseStatus['episodes_released'],
@@ -624,6 +629,37 @@ class SeasonvarCatalogParser
         ksort($seasons);
 
         return array_values($seasons);
+    }
+
+    private function safeSeasonTitle(string $title, int $number): string
+    {
+        if ($title === '' || $this->isSuspiciousSeasonTitle($title)) {
+            return "Сезон {$number}";
+        }
+
+        return $title;
+    }
+
+    private function isSuspiciousSeasonTitle(string $title): bool
+    {
+        return Str::startsWith($title, '...')
+            || Str::length($title) > 220
+            || (preg_match('/[.!?].+[.!?]/u', $title) === 1 && preg_match('/\b(?:сезон|season|sezon)\b/iu', $title) !== 1);
+    }
+
+    private function isDirectSeasonvarSeasonUrl(string $url): bool
+    {
+        $parts = parse_url($url);
+
+        if (! is_array($parts) || ! isset($parts['host'])) {
+            return false;
+        }
+
+        $host = Str::lower($parts['host']);
+        $path = $parts['path'] ?? '';
+
+        return in_array($host, ['seasonvar.ru', 'www.seasonvar.ru'], true)
+            && preg_match('~^/serial-\d+-[^/]+-0*\d{1,4}-+(?:season|sezon)\.html$~iu', $path) === 1;
     }
 
     private function seasonNumber(string $value): ?int
