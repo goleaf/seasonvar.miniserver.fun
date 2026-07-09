@@ -445,6 +445,10 @@ class SeasonvarCatalogParser
             $this->addMediaCandidate($items, $url, $baseUrl, null, $seasonNumber);
         }
 
+        foreach ($this->seasonvarPlaylistUrls($html) as $url) {
+            $this->addSeasonvarPlaylistCandidate($items, $url, $baseUrl, $seasonNumber);
+        }
+
         return array_values($items);
     }
 
@@ -485,6 +489,34 @@ class SeasonvarCatalogParser
         }
     }
 
+    /**
+     * @param  array<string, array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string}>  $items
+     */
+    private function addSeasonvarPlaylistCandidate(array &$items, string $rawUrl, string $baseUrl, int $seasonNumber): void
+    {
+        $url = $this->cleanMediaUrl($rawUrl);
+
+        if ($url === null || ! $this->looksLikeSeasonvarPlaylistUrl($url)) {
+            return;
+        }
+
+        $normalizedUrl = $this->normalizeRelative($url, $baseUrl);
+
+        if (! $this->looksLikeSeasonvarPlaylistUrl($normalizedUrl)) {
+            return;
+        }
+
+        $key = Str::lower($normalizedUrl);
+        $items[$key] ??= [
+            'url' => $normalizedUrl,
+            'title' => 'Плейлист Seasonvar',
+            'season_number' => $seasonNumber,
+            'episode_number' => null,
+            'source_url' => $baseUrl,
+            'kind' => 'seasonvar_playlist',
+        ];
+    }
+
     private function mediaTitleFromNode(DOMNode $node): ?string
     {
         foreach (['title', 'alt', 'data-title', 'aria-label'] as $attribute) {
@@ -523,6 +555,28 @@ class SeasonvarCatalogParser
             ->all();
     }
 
+    /**
+     * @return list<string>
+     */
+    private function seasonvarPlaylistUrls(string $html): array
+    {
+        $text = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = str_replace(['\\/', '\\u002F', '\\x2F'], '/', $text);
+
+        $matchesCount = preg_match_all('~[\'\"](?<url>(?:(?:https?:)?//[^\'\"]+)?/playls2/[^\'\"]*?/plist\.txt(?:\?[^\'\"]*)?)[\'\"]~iu', $text, $matches);
+
+        if ($matchesCount === false || $matchesCount === 0) {
+            return [];
+        }
+
+        return collect($matches['url'])
+            ->map(fn (string $url): string => trim($url))
+            ->filter(fn (string $url): bool => $url !== '')
+            ->unique(fn (string $url): string => Str::lower($url))
+            ->values()
+            ->all();
+    }
+
     private function cleanMediaUrl(string $url): ?string
     {
         $url = html_entity_decode($url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -538,6 +592,13 @@ class SeasonvarCatalogParser
         $extension = Str::lower(pathinfo($path, PATHINFO_EXTENSION));
 
         return in_array($extension, self::MEDIA_EXTENSIONS, true);
+    }
+
+    private function looksLikeSeasonvarPlaylistUrl(string $url): bool
+    {
+        $path = (string) parse_url($url, PHP_URL_PATH);
+
+        return preg_match('~/playls2/.+?/plist\.txt$~iu', $path) === 1;
     }
 
     /**

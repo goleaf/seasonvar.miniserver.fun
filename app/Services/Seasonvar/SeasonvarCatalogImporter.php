@@ -1078,10 +1078,6 @@ class SeasonvarCatalogImporter
             ->unique(fn (string $url): string => Str::lower($url))
             ->values();
 
-        if ($playlistUrls->isEmpty()) {
-            return $result;
-        }
-
         foreach ($playlistUrls as $playlistUrl) {
             try {
                 $playlistResult = $this->playlistImporter->importFromUrl(
@@ -1112,7 +1108,192 @@ class SeasonvarCatalogImporter
             }
         }
 
+        $seasonvarPlaylistItems = collect($mediaItems)
+            ->filter(fn (array $item): bool => $item['kind'] === 'seasonvar_playlist')
+            ->unique(fn (array $item): string => Str::lower($item['url']))
+            ->values();
+
+        foreach ($seasonvarPlaylistItems as $playlistItem) {
+            try {
+                $parsedMediaItems = $this->parseSeasonvarPlaylistItem($playlistItem, $progress);
+                $seasons = $catalogTitle
+                    ->loadMissing(['seasons.episodes'])
+                    ->seasons
+                    ->keyBy('number')
+                    ->all();
+                $playlistResult = $this->syncParsedMedia($catalogTitle, $seasons, $parsedMediaItems, $progress);
+                $result = $this->mergeMediaResult($result, $playlistResult);
+
+                $this->report($progress, 'seasonvar-media-playlist-import-complete', [
+                    'catalog_title_id' => $catalogTitle->id,
+                    'url' => $playlistItem['url'],
+                    'imported' => $playlistResult['attached'],
+                    'updated' => $playlistResult['updated'],
+                    'skipped' => $playlistResult['skipped'],
+                    'unmatched' => 0,
+                ]);
+            } catch (Throwable $exception) {
+                $result['failed']++;
+                $this->report($progress, 'seasonvar-media-playlist-import-failed', [
+                    'catalog_title_id' => $catalogTitle->id,
+                    'url' => $playlistItem['url'],
+                    'exception' => $exception::class,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+
         return $result;
+    }
+
+    /**
+     * @param  array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string}  $playlistItem
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @return list<array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string}>
+     */
+    private function parseSeasonvarPlaylistItem(array $playlistItem, ?callable $progress = null): array
+    {
+        $playlistUrl = $this->safeSeasonvarPlaylistUrl($playlistItem['url']);
+        $response = $this->httpClient->get($playlistUrl, 0, $progress);
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Плейлист Seasonvar вернул HTTP '.$response->status().'.');
+        }
+
+        $decoded = json_decode($response->body(), true);
+
+        if (json_last_error() !== JSON_ERROR_NONE || ! is_array($decoded)) {
+            throw new RuntimeException('Плейлист Seasonvar вернул некорректный JSON.');
+        }
+
+        $seasonNumber = $playlistItem['season_number'];
+        $items = [];
+
+        foreach ($decoded as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+
+            $file = $entry['file'] ?? null;
+
+            if (! is_string($file)) {
+                continue;
+            }
+
+            $url = $this->decodeSeasonvarPlaylistFile($file);
+
+            if ($url === null) {
+                continue;
+            }
+
+            $title = $this->cleanSeasonvarPlaylistTitle($entry['title'] ?? null);
+            $episodeNumber = $this->seasonvarPlaylistEpisodeNumber($entry, $title);
+
+            $items[] = [
+                'url' => $url,
+                'title' => $title,
+                'season_number' => $seasonNumber,
+                'episode_number' => $episodeNumber,
+                'source_url' => $playlistUrl,
+                'kind' => $this->parsedMediaExtension($url) === 'm3u8' ? 'playlist' : 'file',
+            ];
+        }
+
+        return $items;
+    }
+
+    private function safeSeasonvarPlaylistUrl(string $url): string
+    {
+        $normalizedUrl = $this->seasonvarUrl->normalize($url, $this->seasonvarUrl->baseUrl());
+        $host = Str::lower((string) parse_url($normalizedUrl, PHP_URL_HOST));
+        $path = (string) parse_url($normalizedUrl, PHP_URL_PATH);
+
+        if (! in_array($host, ['seasonvar.ru', 'www.seasonvar.ru'], true)) {
+            throw new RuntimeException('Плейлист Seasonvar должен быть на seasonvar.ru.');
+        }
+
+        if (preg_match('~/playls2/.+?/plist\.txt$~iu', $path) !== 1) {
+            throw new RuntimeException('Некорректная ссылка плейлиста Seasonvar.');
+        }
+
+        return $normalizedUrl;
+    }
+
+    private function decodeSeasonvarPlaylistFile(string $file): ?string
+    {
+        $value = html_entity_decode($file, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $value = str_replace(['\\/', '\\u002F', '\\x2F'], '/', $value);
+        $value = trim($value, " \t\n\r\0\x0B\"'()[]{};,");
+
+        if (Str::startsWith($value, ['http://', 'https://', '//'])) {
+            return $this->normalizeDecodedSeasonvarMediaUrl($value);
+        }
+
+        $value = ltrim($value, '#');
+        $value = str_replace('//b2xvbG8=', '', $value);
+        $candidates = array_filter([
+            $value,
+            mb_substr($value, 1),
+        ]);
+
+        foreach ($candidates as $candidate) {
+            $decoded = base64_decode($candidate, true);
+
+            if (! is_string($decoded) || $decoded === '') {
+                continue;
+            }
+
+            $url = $this->normalizeDecodedSeasonvarMediaUrl($decoded);
+
+            if ($url !== null) {
+                return $url;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizeDecodedSeasonvarMediaUrl(string $url): ?string
+    {
+        $url = trim($url);
+
+        if (Str::startsWith($url, '//')) {
+            $url = 'https:'.$url;
+        }
+
+        if (filter_var($url, FILTER_VALIDATE_URL) === false || ! $this->isDirectPlayerMediaUrl($url)) {
+            return null;
+        }
+
+        return $url;
+    }
+
+    private function cleanSeasonvarPlaylistTitle(mixed $value): ?string
+    {
+        if (! is_string($value) && ! is_numeric($value)) {
+            return null;
+        }
+
+        $title = strip_tags(html_entity_decode((string) $value, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $title = (string) Str::of($title)->replace("\xc2\xa0", ' ')->squish();
+
+        return $title !== '' ? $title : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $entry
+     */
+    private function seasonvarPlaylistEpisodeNumber(array $entry, ?string $title): ?int
+    {
+        if (isset($entry['id']) && is_numeric($entry['id']) && (int) $entry['id'] > 0) {
+            return (int) $entry['id'];
+        }
+
+        if ($title !== null && preg_match('/(?<episode>\d{1,3})\s*(?:серия|seriya|episode|ep)\b/iu', $title, $matches) === 1) {
+            return (int) $matches['episode'];
+        }
+
+        return null;
     }
 
     private function mediaTitle(CatalogTitle $catalogTitle, Season $season, Episode $episode): string

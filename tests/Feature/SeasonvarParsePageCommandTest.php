@@ -97,11 +97,42 @@ class SeasonvarParsePageCommandTest extends TestCase
         ]);
     }
 
+    public function test_it_imports_seasonvar_player_playlist_discovered_in_page_html(): void
+    {
+        config(['seasonvar.crawl_delay_seconds' => 0]);
+        Http::preventStrayRequests();
+        Http::fake([
+            'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html' => Http::response($this->seasonPageHtml(4, [
+                2 => 'Проверка',
+            ], seasonvarPlaylists: ['/playls2/hash/trans/47915/plist.txt?time=1783594881'])),
+            'seasonvar.ru/playls2/hash/trans/47915/plist.txt?time=1783594881' => Http::response(json_encode([
+                [
+                    'title' => '2 серия SD/HD<br>',
+                    'file' => $this->encodedSeasonvarPlayerFile('//media.example.com/kitchen/s04e02.mp4'),
+                    'id' => '2',
+                ],
+            ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES)),
+        ]);
+
+        $this->artisan('seasonvar:parse-page', [
+            'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
+            '--page-only' => true,
+        ])->assertExitCode(0);
+
+        $this->assertDatabaseHas('licensed_media', [
+            'title' => '2 серия SD/HD',
+            'storage_disk' => 'seasonvar_parsed',
+            'playback_url' => 'https://media.example.com/kitchen/s04e02.mp4',
+            'status' => 'published',
+        ]);
+    }
+
     /**
      * @param  array<int, string>  $episodes
      * @param  list<string>  $mediaUrls
+     * @param  list<string>  $seasonvarPlaylists
      */
-    private function seasonPageHtml(int $seasonNumber, array $episodes, array $mediaUrls = []): string
+    private function seasonPageHtml(int $seasonNumber, array $episodes, array $mediaUrls = [], array $seasonvarPlaylists = []): string
     {
         $episodeItems = collect($episodes)
             ->mapWithKeys(fn (string $title, int $number): array => [
@@ -110,6 +141,7 @@ class SeasonvarParsePageCommandTest extends TestCase
             ->all();
         $episodesJson = json_encode([$episodeItems], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
         $mediaJson = json_encode($mediaUrls, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $playlistsJson = json_encode($seasonvarPlaylists, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
 
         return <<<HTML
             <html>
@@ -134,9 +166,18 @@ class SeasonvarParsePageCommandTest extends TestCase
                     <script>
                         var arEpisodes = {$episodesJson};
                         var parsedMedia = {$mediaJson};
+                        var parsedSeasonvarPlaylists = {$playlistsJson};
+                        var pl = Object.fromEntries(parsedSeasonvarPlaylists.map((url, index) => [index, url]));
                     </script>
                 </body>
             </html>
             HTML;
+    }
+
+    private function encodedSeasonvarPlayerFile(string $url): string
+    {
+        $encoded = base64_encode($url);
+
+        return '#x'.substr($encoded, 0, 12).'//b2xvbG8='.substr($encoded, 12);
     }
 }

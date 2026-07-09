@@ -69,6 +69,33 @@ class SeasonvarCatalogParserTest extends TestCase
         $this->assertSame('file', $data['media'][0]['kind']);
     }
 
+    public function test_it_extracts_seasonvar_player_playlist_candidates_from_page_script(): void
+    {
+        $parser = app(SeasonvarCatalogParser::class);
+
+        $data = $parser->parse(
+            <<<'HTML'
+            <html>
+                <head><title>Черный список. На кухне 4 сезон смотреть онлайн</title></head>
+                <body>
+                    <h1>Черный список. На кухне 4 сезон</h1>
+                    <script>
+                        var arEpisodes = [{"1_seriya":{"n":"1"}}];
+                        var pl = {'0': "/playls2/4f13936c7df78ae9b28a2767bbea63a5/trans/47915/plist.txt?time=1783594881"};
+                    </script>
+                </body>
+            </html>
+            HTML,
+            'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
+        );
+
+        $this->assertCount(1, $data['media']);
+        $this->assertSame('https://seasonvar.ru/playls2/4f13936c7df78ae9b28a2767bbea63a5/trans/47915/plist.txt?time=1783594881', $data['media'][0]['url']);
+        $this->assertSame(4, $data['media'][0]['season_number']);
+        $this->assertNull($data['media'][0]['episode_number']);
+        $this->assertSame('seasonvar_playlist', $data['media'][0]['kind']);
+    }
+
     public function test_it_normalizes_root_relative_urls_against_the_site_origin(): void
     {
         $url = app(SeasonvarUrl::class);
