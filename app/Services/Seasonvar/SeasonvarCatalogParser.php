@@ -352,6 +352,33 @@ class SeasonvarCatalogParser
             $items[$key] = ['type' => 'country', 'name' => $name, 'source_url' => null];
         }
 
+        foreach ($this->valueList($this->infoField($xpath, 'Ограничение')) as $name) {
+            $key = 'age_rating|'.Str::lower($name);
+            $items[$key] = ['type' => 'age_rating', 'name' => $name, 'source_url' => null];
+        }
+
+        foreach (['Перевод', 'Озвучка'] as $label) {
+            foreach ($this->valueList($this->infoField($xpath, $label)) as $name) {
+                $key = 'translation|'.Str::lower($name);
+                $items[$key] = ['type' => 'translation', 'name' => $name, 'source_url' => null];
+            }
+        }
+
+        foreach ($this->valueList($this->infoField($xpath, 'Статус')) as $name) {
+            $key = 'status|'.Str::lower($name);
+            $items[$key] = ['type' => 'status', 'name' => $name, 'source_url' => null];
+        }
+
+        foreach ($this->valueList($this->infoField($xpath, 'Канал')) as $name) {
+            $key = 'network|'.Str::lower($name);
+            $items[$key] = ['type' => 'network', 'name' => $name, 'source_url' => null];
+        }
+
+        foreach ($this->valueList($this->infoField($xpath, 'Студия')) as $name) {
+            $key = 'studio|'.Str::lower($name);
+            $items[$key] = ['type' => 'studio', 'name' => $name, 'source_url' => null];
+        }
+
         foreach ($this->valueList($this->firstText($xpath, ['//*[@itemprop="directors"]//*[@itemprop="name"]'])) as $name) {
             $key = 'director|'.Str::lower($name);
             $items[$key] = ['type' => 'director', 'name' => $name, 'source_url' => null];
@@ -426,7 +453,7 @@ class SeasonvarCatalogParser
                 continue;
             }
 
-            $pattern = '/'.preg_quote($label, '/').'\s*:\s*(.*?)(?=\s*(?:Оригинал|Жанр|Ограничение|Страна|Вышел|Режиссер|IMDB|КиноПоиск)\s*:|$)/u';
+            $pattern = '/'.preg_quote($label, '/').'\s*:\s*(.*?)(?=\s*(?:Оригинал|Жанр|Ограничение|Страна|Вышел|Режиссер|Перевод|Озвучка|Статус|Канал|Студия|IMDB|КиноПоиск)\s*:|$)/u';
 
             if (preg_match($pattern, $text, $matches) === 1) {
                 return trim($matches[1]);

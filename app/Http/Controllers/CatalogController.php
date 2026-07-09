@@ -59,28 +59,40 @@ class CatalogController extends Controller
 
     public function titles(Request $request, ?string $type = null, ?string $taxonomy = null): View
     {
-        $search = trim((string) $request->query('q', ''));
+        $search = $this->normalizeSearch($request->query('q', ''));
         $requestedYear = $request->query('year');
         $requestedYear = is_scalar($requestedYear) ? trim((string) $requestedYear) : '';
-        $year = $requestedYear !== '' ? (int) $requestedYear : null;
-        $year = $year !== null && $year >= 1900 && $year <= ((int) now()->format('Y') + 1)
-            ? $year
+        $parsedYear = preg_match('/^\d{4}$/', $requestedYear) === 1 ? (int) $requestedYear : null;
+        $year = $parsedYear !== null && $parsedYear >= 1900 && $parsedYear <= ((int) now()->format('Y') + 1)
+            ? $parsedYear
             : null;
         $invalidYear = $requestedYear !== '' && $year === null;
-        $filterTypes = ['genre', 'country', 'actor', 'director', 'tag'];
-        $legacyType = trim((string) $request->query('type', ''));
-        $legacyTaxonomy = trim((string) $request->query('taxonomy', ''));
+        $filterTypes = ['genre', 'country', 'actor', 'director', 'age_rating', 'translation', 'status', 'network', 'studio', 'tag'];
+        $legacyType = $this->normalizeLegacyType($request->query('type', ''), $filterTypes);
+        $legacyTaxonomy = $this->normalizeFilterSlug($request->query('taxonomy', ''));
+        $invalidInputFilterSlugs = [];
+
+        if ($legacyType !== '' && $legacyTaxonomy === null) {
+            $invalidInputFilterSlugs[$legacyType] = 'invalid';
+        }
+
         $activeFilterSlugs = collect($filterTypes)
-            ->mapWithKeys(function (string $filterType) use ($request, $type, $taxonomy, $legacyType, $legacyTaxonomy): array {
+            ->mapWithKeys(function (string $filterType) use ($request, $type, $taxonomy, $legacyType, $legacyTaxonomy, &$invalidInputFilterSlugs): array {
                 $value = $type === $filterType
                     ? $taxonomy
                     : $request->query($filterType, '');
 
-                if ($value === '' && $legacyType === $filterType) {
+                if ($value === '' && $legacyType === $filterType && $legacyTaxonomy !== null) {
                     $value = $legacyTaxonomy;
                 }
 
-                $value = trim((string) $value);
+                $value = $this->normalizeFilterSlug($value);
+
+                if ($value === null) {
+                    $invalidInputFilterSlugs[$filterType] = 'invalid';
+
+                    return [];
+                }
 
                 return $value === '' ? [] : [$filterType => $value];
             })
@@ -95,9 +107,9 @@ class CatalogController extends Controller
                     ->first();
             })
             ->filter();
-        $invalidFilterSlugs = array_diff_key($activeFilterSlugs, $activeTaxonomies->all());
+        $invalidFilterSlugs = $invalidInputFilterSlugs + array_diff_key($activeFilterSlugs, $activeTaxonomies->all());
 
-        if ($taxonomy !== null && (! in_array($type, $filterTypes, true) || ! $activeTaxonomies->has($type))) {
+        if ($taxonomy !== null && ! in_array($type, $filterTypes, true)) {
             abort(404);
         }
 
@@ -186,6 +198,48 @@ class CatalogController extends Controller
         ]);
     }
 
+    private function normalizeSearch(mixed $value): string
+    {
+        $search = is_scalar($value) ? (string) $value : '';
+        $search = preg_replace('/\s+/u', ' ', trim($search)) ?: '';
+
+        if (mb_strlen($search) < 2) {
+            return '';
+        }
+
+        return mb_substr($search, 0, 80);
+    }
+
+    private function normalizeLegacyType(mixed $value, array $filterTypes): string
+    {
+        if (! is_scalar($value)) {
+            return '';
+        }
+
+        $value = trim((string) $value);
+
+        return in_array($value, $filterTypes, true) ? $value : '';
+    }
+
+    private function normalizeFilterSlug(mixed $value): ?string
+    {
+        if (! is_scalar($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return '';
+        }
+
+        if (mb_strlen($value) > 120 || preg_match('/^[a-z0-9][a-z0-9-]*$/', $value) !== 1) {
+            return null;
+        }
+
+        return $value;
+    }
+
     private function catalogTitleFilterQuery(
         Collection $activeTaxonomies,
         array $invalidFilterSlugs,
@@ -245,11 +299,19 @@ class CatalogController extends Controller
             'source',
             'taxonomies',
             'seasons.episodes',
-            'licensedMedia' => fn ($query) => $query->published()->latest('published_at')->latest(),
+            'licensedMedia' => fn ($query) => $query->published()->with(['season', 'episode'])->latest('published_at')->latest(),
         ]);
 
-        $selectedMedia = $catalogTitle->licensedMedia->firstWhere('id', $request->integer('media'))
-            ?? $catalogTitle->licensedMedia->first();
+        $mediaItems = $catalogTitle->licensedMedia
+            ->sortBy(fn (LicensedMedia $media): string => sprintf(
+                '%05d-%05d-%s',
+                $media->season?->number ?? 99999,
+                $media->episode?->number ?? 99999,
+                $media->title,
+            ))
+            ->values();
+        $selectedMedia = $mediaItems->firstWhere('id', $request->integer('media'))
+            ?? $mediaItems->first();
         $relatedTaxonomyIds = $catalogTitle->taxonomies
             ->whereIn('type', ['genre', 'country'])
             ->pluck('id');
@@ -257,6 +319,7 @@ class CatalogController extends Controller
         return view('catalog.show', [
             'title' => $catalogTitle,
             'selectedMedia' => $selectedMedia,
+            'mediaItems' => $mediaItems,
             'recommendedTitles' => CatalogTitle::query()
                 ->with(['taxonomies', 'seasons'])
                 ->withCount(['seasons', 'episodes'])

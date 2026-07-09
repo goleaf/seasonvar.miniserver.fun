@@ -1,0 +1,99 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\CatalogTitle;
+use App\Models\Episode;
+use App\Models\Season;
+use App\Models\Source;
+use App\Models\SourcePage;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Tests\TestCase;
+
+class ExternalPlaylistImportTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_it_imports_external_playlist_files_for_the_local_player(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake([
+            'playlist.example.com/*' => Http::response(<<<'M3U'
+                #EXTM3U
+                #EXTINF:-1,6 кадров S01E02
+                https://media.example.com/files/6_kadrov_s01e02.mp4
+                M3U),
+        ]);
+
+        $source = Source::factory()->create(['code' => 'seasonvar']);
+        $page = SourcePage::factory()->create(['source_id' => $source->id]);
+        $catalogTitle = CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $page->id,
+            'slug' => '6-kadrov',
+            'title' => '6 кадров',
+        ]);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 1,
+        ]);
+        $episode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 2,
+        ]);
+
+        $this->artisan('media:import-playlist', [
+            'url' => 'https://playlist.example.com/list.m3u',
+        ])->assertExitCode(0);
+
+        $this->assertDatabaseHas('licensed_media', [
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'title' => '6 кадров S01E02',
+            'storage_disk' => 'external_playlist',
+            'playback_url' => 'https://media.example.com/files/6_kadrov_s01e02.mp4',
+            'status' => 'published',
+        ]);
+
+        $this->get(route('titles.show', $catalogTitle))
+            ->assertOk()
+            ->assertSeeText('Файлы плейлиста')
+            ->assertSeeText('6 кадров S01E02')
+            ->assertSee('https://media.example.com/files/6_kadrov_s01e02.mp4');
+    }
+
+    public function test_it_can_force_all_playlist_files_to_one_catalog_title(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake([
+            'playlist.example.com/*' => Http::response(<<<'M3U'
+                #EXTM3U
+                #EXTINF:-1,2 серия
+                https://media.example.com/files/episode-2.mp4
+                M3U),
+        ]);
+
+        $source = Source::factory()->create(['code' => 'seasonvar']);
+        $page = SourcePage::factory()->create(['source_id' => $source->id]);
+        $catalogTitle = CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $page->id,
+            'slug' => '6-kadrov',
+            'title' => '6 кадров',
+        ]);
+
+        $this->artisan('media:import-playlist', [
+            'url' => 'https://playlist.example.com/list.m3u',
+            '--title' => '6-kadrov',
+        ])->assertExitCode(0);
+
+        $this->assertDatabaseHas('licensed_media', [
+            'catalog_title_id' => $catalogTitle->id,
+            'title' => '2 серия',
+            'playback_url' => 'https://media.example.com/files/episode-2.mp4',
+            'status' => 'published',
+        ]);
+    }
+}

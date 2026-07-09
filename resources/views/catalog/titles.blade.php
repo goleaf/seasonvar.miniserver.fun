@@ -6,6 +6,11 @@
         'country' => 'Страны',
         'actor' => 'Актеры',
         'director' => 'Режиссеры',
+        'age_rating' => 'Возраст',
+        'translation' => 'Перевод',
+        'status' => 'Статус',
+        'network' => 'Каналы',
+        'studio' => 'Студии',
         'tag' => 'Теги',
     ];
     $year = $year ?? null;
@@ -14,8 +19,9 @@
     $activeTaxonomies = $activeTaxonomies ?? collect();
     $activeFilterSlugs = $activeFilterSlugs ?? [];
     $invalidFilterSlugs = $invalidFilterSlugs ?? [];
-    $filterQuery = function (string $filterType, ?string $slug = null) use ($activeFilterSlugs, $search, $year): array {
-        $query = $activeFilterSlugs;
+    $allFilterSlugs = array_merge($activeFilterSlugs, $invalidFilterSlugs);
+    $filterQuery = function (string $filterType, ?string $slug = null) use ($allFilterSlugs, $search, $year, $invalidYear, $requestedYear): array {
+        $query = $allFilterSlugs;
 
         if ($slug === null) {
             unset($query[$filterType]);
@@ -31,15 +37,19 @@
             $query['year'] = $year;
         }
 
+        if ($invalidYear) {
+            $query['year'] = $requestedYear;
+        }
+
         return $query;
     };
-    $withoutYearQuery = $activeFilterSlugs;
+    $withoutYearQuery = $allFilterSlugs;
 
     if ($search !== '') {
         $withoutYearQuery['q'] = $search;
     }
-    $yearQuery = function (?int $selectedYear) use ($activeFilterSlugs, $search): array {
-        $query = $activeFilterSlugs;
+    $yearQuery = function (?int $selectedYear) use ($allFilterSlugs, $search): array {
+        $query = $allFilterSlugs;
 
         if ($search !== '') {
             $query['q'] = $search;
@@ -47,6 +57,24 @@
 
         if ($selectedYear !== null) {
             $query['year'] = $selectedYear;
+        }
+
+        return $query;
+    };
+    $invalidFilterQuery = function (string $filterType) use ($allFilterSlugs, $search, $year, $invalidYear, $requestedYear): array {
+        $query = $allFilterSlugs;
+        unset($query[$filterType]);
+
+        if ($search !== '') {
+            $query['q'] = $search;
+        }
+
+        if ($year !== null) {
+            $query['year'] = $year;
+        }
+
+        if ($invalidYear) {
+            $query['year'] = $requestedYear;
         }
 
         return $query;
@@ -134,9 +162,9 @@
                                     </a>
                                 @endif
                                 @if ($invalidYear)
-                                    <span class="rounded bg-red-400 px-3 py-1 font-semibold text-zinc-950">
+                                    <a href="{{ route('titles.index', $withoutYearQuery) }}" class="rounded bg-red-400 px-3 py-1 font-semibold text-zinc-950 hover:bg-red-300">
                                         Год: {{ $requestedYear }} не найден
-                                    </span>
+                                    </a>
                                 @endif
                                 @foreach ($activeTaxonomies as $filterType => $taxonomy)
                                     <a href="{{ route('titles.index', $filterQuery($filterType, null)) }}" class="rounded bg-emerald-400 px-3 py-1 font-semibold text-zinc-950 hover:bg-emerald-300">
@@ -144,9 +172,9 @@
                                     </a>
                                 @endforeach
                                 @foreach ($invalidFilterSlugs as $filterType => $slug)
-                                    <span class="rounded bg-red-400 px-3 py-1 font-semibold text-zinc-950">
+                                    <a href="{{ route('titles.index', $invalidFilterQuery($filterType)) }}" class="rounded bg-red-400 px-3 py-1 font-semibold text-zinc-950 hover:bg-red-300">
                                         {{ $typeLabels[$filterType] ?? $filterType }}: {{ $slug }} не найден
-                                    </span>
+                                    </a>
                                 @endforeach
                             </div>
                             <div class="flex flex-wrap gap-3 text-zinc-400">
@@ -173,8 +201,14 @@
                     @foreach ($activeFilterSlugs as $filterType => $slug)
                         <input type="hidden" name="{{ $filterType }}" value="{{ $slug }}">
                     @endforeach
+                    @foreach ($invalidFilterSlugs as $filterType => $slug)
+                        <input type="hidden" name="{{ $filterType }}" value="{{ $slug }}">
+                    @endforeach
                     @if ($year !== null)
                         <input type="hidden" name="year" value="{{ $year }}">
+                    @endif
+                    @if ($invalidYear)
+                        <input type="hidden" name="year" value="{{ $requestedYear }}">
                     @endif
                     <input
                         name="q"
