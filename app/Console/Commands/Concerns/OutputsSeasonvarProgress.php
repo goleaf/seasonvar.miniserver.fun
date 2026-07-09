@@ -5,12 +5,15 @@ namespace App\Console\Commands\Concerns;
 use BackedEnum;
 use DateTimeInterface;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
 
 /**
  * @mixin Command
  */
 trait OutputsSeasonvarProgress
 {
+    private const EUROPEAN_DATE_TIME_FORMAT = 'd.m.Y H:i';
+
     /**
      * @return callable(string, array<string, mixed>): void
      */
@@ -25,7 +28,7 @@ trait OutputsSeasonvarProgress
     private function writeSeasonvarProgress(string $event, array $context = []): void
     {
         $details = $this->formatSeasonvarContext($context);
-        $message = '['.now()->format('H:i:s').'] '.$this->formatSeasonvarEvent($event);
+        $message = '['.now()->format(self::EUROPEAN_DATE_TIME_FORMAT).'] '.$this->formatSeasonvarEvent($event);
 
         if ($details !== '') {
             $message .= ': '.$details;
@@ -84,11 +87,11 @@ trait OutputsSeasonvarProgress
         }
 
         if ($value instanceof DateTimeInterface) {
-            return $value->format(DATE_ATOM);
+            return $value->format(self::EUROPEAN_DATE_TIME_FORMAT);
         }
 
         if (is_string($value)) {
-            return self::valueLabels()[$value] ?? $value;
+            return self::valueLabels()[$value] ?? $this->formatSeasonvarString($value);
         }
 
         if (is_array($value)) {
@@ -100,6 +103,19 @@ trait OutputsSeasonvarProgress
         }
 
         return (string) $value;
+    }
+
+    private function formatSeasonvarString(string $value): string
+    {
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1) {
+            return Carbon::parse($value)->format('d.m.Y');
+        }
+
+        if (preg_match('/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?$/', $value) === 1) {
+            return Carbon::parse($value)->format(self::EUROPEAN_DATE_TIME_FORMAT);
+        }
+
+        return $value;
     }
 
     /**

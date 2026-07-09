@@ -13,6 +13,7 @@ class SeasonvarParsePageCommandTest extends TestCase
     public function test_it_parses_requested_page_and_all_detected_seasons_into_one_title(): void
     {
         config(['seasonvar.crawl_delay_seconds' => 0]);
+        $this->travelTo('2026-07-09 10:11:00');
         Http::preventStrayRequests();
         Http::fake([
             'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html' => Http::response($this->seasonPageHtml(4, [
@@ -26,7 +27,9 @@ class SeasonvarParsePageCommandTest extends TestCase
 
         $this->artisan('seasonvar:parse-page', [
             'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
-        ])->assertExitCode(0);
+        ])
+            ->expectsOutputToContain('[09.07.2026 10:11]')
+            ->assertExitCode(0);
 
         $this->assertDatabaseHas('catalog_titles', [
             'title' => 'Черный список: На кухне',
