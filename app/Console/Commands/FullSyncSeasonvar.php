@@ -5,11 +5,13 @@ namespace App\Console\Commands;
 use App\Console\Commands\Concerns\OutputsSeasonvarProgress;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
+use App\Models\SourcePage;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarSitemapMirror;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -88,7 +90,7 @@ class FullSyncSeasonvar extends Command
         $mirror = $sitemapMirror->mirror($progress);
         $urls = $discoverLimit > 0 ? array_slice($mirror['urls'], 0, $discoverLimit) : $mirror['urls'];
         $stored = $importer->storeDiscoveredUrls($urls);
-        $pages = $importer->pendingPages($parseLimit, $progress);
+        $pages = $this->pagesForParseCycle($importer, $parseLimit, $progress);
         $parseResult = $importer->parsePages($pages, $progress);
         $mediaAttached = (bool) $this->option('no-media') ? 0 : $this->attachLicensedMedia($parseLimit);
 
@@ -109,6 +111,41 @@ class FullSyncSeasonvar extends Command
             'failed' => $parseResult['failed'],
             'media_attached' => $mediaAttached,
         ]);
+    }
+
+    private function pagesForParseCycle(SeasonvarCatalogImporter $importer, int $parseLimit, callable $progress): Collection
+    {
+        $refreshReserve = $parseLimit > 1 ? max(1, intdiv($parseLimit, 5)) : 0;
+        $pendingLimit = max(1, $parseLimit - $refreshReserve);
+        $pages = $importer->pendingPages($pendingLimit, $progress);
+        $remaining = max(0, $parseLimit - $pages->count());
+
+        if ($remaining === 0) {
+            return $pages;
+        }
+
+        $refreshPages = SourcePage::query()
+            ->with('source')
+            ->where('page_type', 'serial')
+            ->where('parse_status', 'parsed')
+            ->whereNotIn('id', $pages->pluck('id'))
+            ->oldest('last_crawled_at')
+            ->oldest()
+            ->limit($remaining)
+            ->get();
+
+        foreach ($refreshPages as $page) {
+            $this->writeSeasonvarProgress('source-page-refresh-selected', [
+                'source_page_id' => $page->id,
+                'page_type' => $page->page_type,
+                'parse_status' => $page->parse_status,
+                'http_status' => $page->http_status,
+                'last_crawled_at' => $page->last_crawled_at,
+                'url' => $page->url,
+            ]);
+        }
+
+        return $pages->concat($refreshPages)->values();
     }
 
     private function attachLicensedMedia(int $limit): int
