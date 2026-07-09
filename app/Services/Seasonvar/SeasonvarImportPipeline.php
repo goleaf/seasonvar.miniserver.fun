@@ -3,11 +3,13 @@
 namespace App\Services\Seasonvar;
 
 use App\Models\CatalogTitle;
+use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\SeasonvarImportEvent;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 class SeasonvarImportPipeline
@@ -18,6 +20,7 @@ class SeasonvarImportPipeline
         private readonly SeasonvarCatalogImporter $importer,
         private readonly SeasonvarSitemapMirror $sitemapMirror,
         private readonly SeasonvarTitleMerger $titleMerger,
+        private readonly SeasonvarMediaAvailabilityChecker $mediaAvailabilityChecker,
     ) {}
 
     /**
@@ -122,18 +125,25 @@ class SeasonvarImportPipeline
         $cycleResult = $argument === null
             ? $this->runSitemapCycle($run, $force, $discover, $progress)
             : $this->runUrlCycle($run, $argument, $force, $progress);
+        $mediaBacklogResult = $this->refreshMediaBacklog($progress);
         $mergeResult = $this->titleMerger->merge($progress);
 
         $this->addRunCounters($run, [
             'cycles' => 1,
             ...$cycleResult,
+            'media_updated' => $cycleResult['media_updated'] + $mediaBacklogResult['media_updated'],
+            'media_failed' => $cycleResult['media_failed'] + $mediaBacklogResult['media_failed'],
         ], [
             'last_merge' => $mergeResult,
+            'last_media_backlog' => $mediaBacklogResult,
         ]);
 
         $progress('seasonvar-import-cycle-complete', [
             'cycle' => $cycle,
             ...$cycleResult,
+            'media_checked' => $mediaBacklogResult['media_checked'],
+            'media_check_available' => $mediaBacklogResult['media_available'],
+            'media_check_unavailable' => $mediaBacklogResult['media_unavailable'],
             'merged_titles' => $mergeResult['titles'],
             'merged_seasons' => $mergeResult['seasons'],
             'merged_episodes' => $mergeResult['episodes'],
@@ -142,7 +152,7 @@ class SeasonvarImportPipeline
 
     /**
      * @param  callable(string, array<string, mixed>): void  $progress
-     * @return array{discovered: int, stored: int, selected: int, parsed: int, failed: int, media_attached: int, media_updated: int, media_skipped: int, media_failed: int}
+     * @return array{discovered: int, stored: int, selected: int, parsed: int, failed: int, media_attached: int, media_updated: int, media_skipped: int, media_failed: int, cleaned: int}
      */
     private function runSitemapCycle(SeasonvarImportRun $run, bool $force, bool $discover, callable $progress): array
     {
@@ -156,6 +166,7 @@ class SeasonvarImportPipeline
             $stored = $this->importer->storeDiscoveredUrls($urls, $progress);
         }
 
+        $cleaned = $this->cleanupMalformedSourcePages($progress);
         $pages = $this->pagesForImportCycle($force, $progress);
         $parseResult = $this->importer->parsePages($pages, $progress, $force, $run->id);
 
@@ -169,12 +180,13 @@ class SeasonvarImportPipeline
             'media_updated' => $parseResult['media_updated'],
             'media_skipped' => $parseResult['media_skipped'],
             'media_failed' => $parseResult['media_failed'],
+            'cleaned' => $cleaned,
         ];
     }
 
     /**
      * @param  callable(string, array<string, mixed>): void  $progress
-     * @return array{discovered: int, stored: int, selected: int, parsed: int, failed: int, media_attached: int, media_updated: int, media_skipped: int, media_failed: int}
+     * @return array{discovered: int, stored: int, selected: int, parsed: int, failed: int, media_attached: int, media_updated: int, media_skipped: int, media_failed: int, cleaned: int}
      */
     private function runUrlCycle(SeasonvarImportRun $run, string $argument, bool $force, callable $progress): array
     {
@@ -231,6 +243,7 @@ class SeasonvarImportPipeline
             'media_updated' => $mediaUpdated,
             'media_skipped' => $mediaSkipped,
             'media_failed' => $mediaFailed,
+            'cleaned' => 0,
         ];
     }
 
@@ -285,6 +298,129 @@ class SeasonvarImportPipeline
         }
 
         return $pages;
+    }
+
+    /**
+     * @param  callable(string, array<string, mixed>): void  $progress
+     */
+    private function cleanupMalformedSourcePages(callable $progress): int
+    {
+        $malformedPages = SourcePage::query()
+            ->where('url', 'like', '%.html/%')
+            ->where(function ($query): void {
+                $query->where('parse_status', '!=', 'failed')
+                    ->orWhere('import_status', '!=', 'gone')
+                    ->orWhereNull('error_message');
+            });
+
+        $count = (clone $malformedPages)->count();
+
+        if ($count === 0) {
+            return 0;
+        }
+
+        $malformedPages->update([
+            'parse_status' => 'failed',
+            'import_status' => 'gone',
+            'error_message' => 'Некорректная склеенная ссылка',
+            'retry_after_at' => now()->addDays(30),
+            'failure_count' => DB::raw('failure_count + 1'),
+            'updated_at' => now(),
+        ]);
+
+        $progress('source-pages-malformed-cleaned', [
+            'total' => $count,
+        ]);
+
+        return $count;
+    }
+
+    /**
+     * @param  callable(string, array<string, mixed>): void  $progress
+     * @return array{media_checked: int, media_available: int, media_unavailable: int, media_updated: int, media_failed: int}
+     */
+    private function refreshMediaBacklog(callable $progress): array
+    {
+        $limit = max(0, (int) config('seasonvar.media_check.backfill_per_cycle', 25));
+
+        if ($limit === 0 || ! (bool) config('seasonvar.media_check.enabled', true)) {
+            return [
+                'media_checked' => 0,
+                'media_available' => 0,
+                'media_unavailable' => 0,
+                'media_updated' => 0,
+                'media_failed' => 0,
+            ];
+        }
+
+        $refreshAfter = now()->subHours(max(1, (int) config('seasonvar.media_check.refresh_after_hours', 168)));
+        $mediaItems = LicensedMedia::query()
+            ->where(function ($query) use ($refreshAfter): void {
+                $query->whereNull('check_status')
+                    ->orWhereNull('checked_at')
+                    ->orWhere('checked_at', '<=', $refreshAfter)
+                    ->orWhereIn('check_status', ['check_failed', 'unavailable']);
+            })
+            ->where(function ($query): void {
+                $query->whereNotNull('playback_url')
+                    ->orWhereNotNull('path');
+            })
+            ->oldest('checked_at')
+            ->oldest()
+            ->limit($limit)
+            ->get();
+
+        $progress('seasonvar-media-backlog-started', [
+            'selected' => $mediaItems->count(),
+            'limit' => $limit,
+        ]);
+
+        $result = [
+            'media_checked' => 0,
+            'media_available' => 0,
+            'media_unavailable' => 0,
+            'media_updated' => 0,
+            'media_failed' => 0,
+        ];
+
+        foreach ($mediaItems as $media) {
+            $url = $media->playback_url ?: $media->path;
+
+            if (! is_string($url) || trim($url) === '') {
+                $media->fill([
+                    'check_status' => 'invalid_url',
+                    'status' => 'unavailable',
+                    'checked_at' => now(),
+                ])->save();
+
+                $result['media_failed']++;
+
+                continue;
+            }
+
+            $availability = $this->mediaAvailabilityChecker->check($url, $progress);
+            $media->fill([
+                'status' => $availability['available'] ? 'published' : 'unavailable',
+                'check_status' => $availability['status'],
+                'last_http_status' => $availability['http_status'],
+                'checked_at' => $availability['checked_at'],
+                'published_at' => $availability['available'] ? ($media->published_at ?? now()) : $media->published_at,
+            ])->save();
+
+            $result['media_checked']++;
+            $result['media_updated']++;
+
+            if ($availability['available']) {
+                $result['media_available']++;
+            } else {
+                $result['media_unavailable']++;
+                $result['media_failed']++;
+            }
+        }
+
+        $progress('seasonvar-media-backlog-complete', $result);
+
+        return $result;
     }
 
     /**

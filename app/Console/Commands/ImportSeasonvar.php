@@ -7,6 +7,7 @@ use App\Services\Seasonvar\SeasonvarImportPipeline;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 #[Signature('seasonvar:import {url? : Ссылка страницы seasonvar.ru для обновления одного сериала} {--force : Обновить данные даже если страница не изменилась} {--forever : Работать циклами без остановки} {--sleep= : Пауза между циклами в секундах} {--no-discovery : Не обновлять карту сайта в этом запуске}')]
@@ -24,6 +25,13 @@ class ImportSeasonvar extends Command
     {
         $this->pipeline = $pipeline;
         $this->registerSignalHandlers();
+        $lock = Cache::lock('seasonvar-import', (int) config('seasonvar.import.lock_seconds', 604800));
+
+        if (! $lock->get()) {
+            $this->warn('Обновление уже запущено. Дождитесь завершения текущего запуска.');
+
+            return self::FAILURE;
+        }
 
         try {
             $run = $pipeline->run(
@@ -51,6 +59,8 @@ class ImportSeasonvar extends Command
             $this->error($exception->getMessage());
 
             return self::FAILURE;
+        } finally {
+            $lock->release();
         }
     }
 

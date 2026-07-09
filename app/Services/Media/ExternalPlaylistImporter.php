@@ -176,6 +176,12 @@ class ExternalPlaylistImporter
                 continue;
             }
 
+            if (Str::startsWith($line, '#EXT-X-STREAM-INF')) {
+                $pendingTitle = $this->titleFromStreamInf($line);
+
+                continue;
+            }
+
             if (Str::startsWith($line, '#')) {
                 continue;
             }
@@ -338,6 +344,26 @@ class ExternalPlaylistImporter
         }
 
         return trim($matches['title']);
+    }
+
+    private function titleFromStreamInf(string $line): ?string
+    {
+        $resolution = null;
+        $bandwidth = null;
+
+        if (preg_match('/RESOLUTION=(?<width>\d{3,5})x(?<height>\d{3,5})/iu', $line, $matches) === 1) {
+            $resolution = $matches['height'].'p';
+        }
+
+        if (preg_match('/BANDWIDTH=(?<bandwidth>\d+)/iu', $line, $matches) === 1) {
+            $bandwidth = ((int) $matches['bandwidth']) >= 1_000_000
+                ? round(((int) $matches['bandwidth']) / 1_000_000, 1).' Мбит/с'
+                : round(((int) $matches['bandwidth']) / 1000).' Кбит/с';
+        }
+
+        return collect([$resolution, $bandwidth])
+            ->filter()
+            ->implode(' ');
     }
 
     private function cleanDisplayTitle(string $rawTitle, string $fileName): string

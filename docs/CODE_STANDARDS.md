@@ -33,6 +33,7 @@ Update these files together when relevant:
 - Do not depend on external player pages for local navigation.
 - Store external video links only; never download video files into the application.
 - Store `source_media_key`, quality, translation, format, and availability check fields for media records.
+- Route all video URL availability checks through `SeasonvarMediaAvailabilityChecker`; do not duplicate Range-check HTTP logic in import services.
 - Preserve existing actors, episodes, and media records when Seasonvar no longer returns them.
 - Clean titles before storage: remove `>>>`, trailing online text, date noise, and Seasonvar suffixes.
 - Store season-list update text like `(09.07.2026 1 серия (AniDub) из ??)` as structured season fields plus the raw status text.
@@ -42,8 +43,11 @@ Update these files together when relevant:
 - Importer catalog writes after successful HTTP parsing must run in one database transaction: title, relation pivots, seasons, episodes, and final source-page parsed status.
 - Importer season and episode sync must use batch `upsert` for parsed page payloads instead of per-row `updateOrCreate()`.
 - Importer discovered URL storage must process URLs chunk by chunk, use batch `upsert`, and must not reset existing source pages to pending.
+- Importer must reject malformed Seasonvar catalog URLs such as nested `.html/...` links and mark already stored malformed source pages as unavailable instead of requesting them.
 - Importer title upsert must try exact `source_url_hash` lookup before wider title-based duplicate detection.
 - Importer must skip HTML parsing and catalog writes for unchanged pages that are already parsed and have an existing catalog title.
+- Importer must check a small backlog of older media records with missing or stale `check_status` during each cycle.
+- Importer must preserve season and episode context when expanding HLS master playlists into playable quality variants.
 - Age rating relation values must be strict short ratings like `18+`, `16+`, `12+`; long text must never be stored as an age rating.
 - Filter relation values for genre, country, status, network, studio, and tag must stay short and must not contain description-like sentences.
 - Store season/episode structure as `seasons` and `episodes`, not as tags.

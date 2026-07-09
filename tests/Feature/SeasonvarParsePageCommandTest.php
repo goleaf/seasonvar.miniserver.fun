@@ -135,6 +135,40 @@ class SeasonvarParsePageCommandTest extends TestCase
         ]);
     }
 
+    public function test_it_imports_hls_master_playlist_variants_for_detected_episode(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake([
+            'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html' => Http::response($this->seasonPageHtml(4, [
+                2 => 'Проверка',
+            ], ['https://media.example.com/kitchen/master.m3u8'])),
+            'media.example.com/kitchen/master.m3u8' => Http::response(<<<'M3U'
+                #EXTM3U
+                #EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=1920x1080
+                s04e02-1080.m3u8
+                #EXT-X-STREAM-INF:BANDWIDTH=2500000,RESOLUTION=1280x720
+                s04e02-720.m3u8
+                M3U),
+        ]);
+
+        $this->artisan('seasonvar:import', [
+            'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
+        ])->assertExitCode(0);
+
+        $this->assertDatabaseHas('licensed_media', [
+            'playback_url' => 'https://media.example.com/kitchen/s04e02-1080.m3u8',
+            'quality' => '1080p',
+            'format' => 'm3u8',
+            'status' => 'published',
+        ]);
+        $this->assertDatabaseHas('licensed_media', [
+            'playback_url' => 'https://media.example.com/kitchen/s04e02-720.m3u8',
+            'quality' => '720p',
+            'format' => 'm3u8',
+            'status' => 'published',
+        ]);
+    }
+
     public function test_it_skips_stale_nested_season_urls_when_parsing_detected_seasons(): void
     {
         Http::preventStrayRequests();

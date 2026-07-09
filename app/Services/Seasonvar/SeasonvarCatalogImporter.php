@@ -24,10 +24,8 @@ use App\Models\Translation;
 use App\Services\Crawler\PoliteHttpClient;
 use App\Services\Media\ExternalPlaylistImporter;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -54,6 +52,7 @@ class SeasonvarCatalogImporter
         private readonly PoliteHttpClient $httpClient,
         private readonly SeasonvarCatalogParser $parser,
         private readonly ExternalPlaylistImporter $playlistImporter,
+        private readonly SeasonvarMediaAvailabilityChecker $mediaAvailabilityChecker,
     ) {}
 
     /**
@@ -1304,6 +1303,41 @@ class SeasonvarCatalogImporter
             }
         }
 
+        $hlsPlaylistItems = collect($mediaItems)
+            ->filter(fn (array $item): bool => $item['kind'] === 'playlist' && $this->parsedMediaExtension($item['url']) === 'm3u8')
+            ->unique(fn (array $item): string => Str::lower($item['url']))
+            ->values();
+
+        foreach ($hlsPlaylistItems as $playlistItem) {
+            try {
+                $parsedMediaItems = $this->parseExternalPlaylistItem($playlistItem, $progress);
+                $seasons = $catalogTitle
+                    ->loadMissing(['seasons.episodes'])
+                    ->seasons
+                    ->keyBy('number')
+                    ->all();
+                $playlistResult = $this->syncParsedMedia($catalogTitle, $seasons, $parsedMediaItems, $progress);
+                $result = $this->mergeMediaResult($result, $playlistResult);
+
+                $this->report($progress, 'seasonvar-media-playlist-import-complete', [
+                    'catalog_title_id' => $catalogTitle->id,
+                    'url' => $playlistItem['url'],
+                    'imported' => $playlistResult['attached'],
+                    'updated' => $playlistResult['updated'],
+                    'skipped' => $playlistResult['skipped'],
+                    'unmatched' => 0,
+                ]);
+            } catch (Throwable $exception) {
+                $result['failed']++;
+                $this->report($progress, 'seasonvar-media-playlist-import-failed', [
+                    'catalog_title_id' => $catalogTitle->id,
+                    'url' => $playlistItem['url'],
+                    'exception' => $exception::class,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+
         $seasonvarPlaylistItems = collect($mediaItems)
             ->filter(fn (array $item): bool => $item['kind'] === 'seasonvar_playlist')
             ->unique(fn (array $item): string => Str::lower($item['url']))
@@ -1340,6 +1374,40 @@ class SeasonvarCatalogImporter
         }
 
         return $result;
+    }
+
+    /**
+     * @param  array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string}  $playlistItem
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @return list<array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string}>
+     */
+    private function parseExternalPlaylistItem(array $playlistItem, ?callable $progress = null): array
+    {
+        $playlistUrl = $this->playlistImporter->safeExternalUrl($playlistItem['url']);
+        $response = $this->httpClient->get($playlistUrl, 0, $progress);
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Плейлист вернул HTTP '.$response->status().'.');
+        }
+
+        return collect($this->playlistImporter->parse($response->body(), $playlistUrl))
+            ->map(function (array $entry) use ($playlistItem, $playlistUrl): array {
+                $title = collect([$playlistItem['title'], $entry['title'] ?? null])
+                    ->filter()
+                    ->unique()
+                    ->implode(' ');
+
+                return [
+                    'url' => $entry['url'],
+                    'title' => $title !== '' ? $title : null,
+                    'season_number' => $playlistItem['season_number'] ?? $entry['season_number'],
+                    'episode_number' => $playlistItem['episode_number'] ?? $entry['episode_number'],
+                    'source_url' => $playlistUrl,
+                    'kind' => $this->parsedMediaExtension($entry['url']) === 'm3u8' ? 'playlist' : 'file',
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**
@@ -1560,56 +1628,7 @@ class SeasonvarCatalogImporter
      */
     private function checkMediaUrl(string $url, ?callable $progress = null): array
     {
-        if (! (bool) config('seasonvar.media_check.enabled', true)) {
-            return [
-                'available' => true,
-                'status' => 'not_checked',
-                'http_status' => null,
-                'checked_at' => null,
-            ];
-        }
-
-        try {
-            $response = Http::withHeaders([
-                'Accept' => '*/*',
-                'Range' => 'bytes=0-0',
-                'Referer' => $this->seasonvarUrl->baseUrl().'/',
-                'User-Agent' => 'SeasonvarCatalog/0.1 (+https://seasonvar.miniserver.fun)',
-            ])
-                ->timeout((int) config('seasonvar.media_check.timeout_seconds', 10))
-                ->connectTimeout((int) config('seasonvar.media_check.connect_timeout_seconds', 5))
-                ->retry((int) config('seasonvar.media_check.retries', 3), 500, throw: false)
-                ->get($url);
-
-            $status = $response->status();
-            $available = ($status >= 200 && $status < 400) || $status === 206;
-
-            $this->report($progress, 'seasonvar-media-url-checked', [
-                'url' => $url,
-                'http_status' => $status,
-                'successful' => $available,
-            ]);
-
-            return [
-                'available' => $available,
-                'status' => $available ? 'available' : 'unavailable',
-                'http_status' => $status,
-                'checked_at' => now(),
-            ];
-        } catch (Throwable $exception) {
-            $this->report($progress, 'seasonvar-media-url-check-failed', [
-                'url' => $url,
-                'exception' => $exception::class,
-                'message' => $exception->getMessage(),
-            ]);
-
-            return [
-                'available' => false,
-                'status' => 'check_failed',
-                'http_status' => null,
-                'checked_at' => now(),
-            ];
-        }
+        return $this->mediaAvailabilityChecker->check($url, $progress);
     }
 
     private function isDirectPlayerMediaUrl(string $url): bool

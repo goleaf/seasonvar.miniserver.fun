@@ -103,7 +103,18 @@ class SeasonvarUrl
             }
         }
 
+        if ($this->isMalformedCatalogUrl($url)) {
+            return false;
+        }
+
         return true;
+    }
+
+    public function isMalformedCatalogUrl(string $url): bool
+    {
+        $path = strtolower(parse_url($url, PHP_URL_PATH) ?: '');
+
+        return str_contains($path, '.html/');
     }
 
     public function pageType(string $url): string

@@ -56,5 +56,20 @@
 - Added global page-structure SEO expansion with automatic visible table-of-contents links, section anchors, `toc-count` metadata, schema.org ItemList contents, and WebPageElement `hasPart` data for every SEO block.
 - Added global long-tail SEO expansion with automatic visible query-phrase links, `long-tail-keywords` metadata, `query-count` metadata, and schema.org ItemList data generated from page topics and search intent terms.
 - Added global related-collection SEO expansion with automatic visible thematic collection cards, `related-collection-count` metadata, and schema.org CollectionPage `hasPart` data generated from page topics and search intents.
+- Added global expanded-keyword SEO normalization that merges page keywords, topics, intents, long-tail phrases, and related collections into `keywords`, `news_keywords`, schema.org WebPage keywords, keyphrases, keyword aliases, and keyword-count metadata.
+- Added global action-intent SEO expansion with visible page actions, `action-count` metadata, schema.org WebPage `potentialAction`, SearchAction/ReadAction/ViewAction/WatchAction data, and ItemList action navigation.
+- Added global semantic-glossary SEO expansion with visible DefinedTerm cards, `defined-terms` metadata, `glossary-count` metadata, and schema.org DefinedTermSet data generated from page topics.
+- Added global semantic-hub SEO expansion with grouped visible topic hubs, `semantic-hub-count` metadata, expanded keyword integration, and schema.org ItemList data for watch, season, description, actor, genre, and related collection queries.
+- Added global snippet-block SEO expansion with visible page-specific thesis cards, `snippet-count` and `snippet-topics` metadata, expanded keyword integration, and schema.org WebPageElement ItemList data.
+- Added global content-signal SEO expansion with visible quality/scope metrics, `content-signal-count` and `content-signal-summary` metadata, main-content microdata, expanded keyword integration, and schema.org PropertyValue ItemList data.
+- Fixed SEO variable dependency order and added global audience-path SEO expansion with visible search paths, `audience-path-count` metadata, expanded keyword integration, keyword aliases, and schema.org ItemList data.
+- Added global also-search SEO expansion with visible related query chips, `also-search-count` metadata, expanded keyword and alias integration, table-of-contents integration, and schema.org ItemList data.
+- Added global discovery/freshness SEO expansion with visible indexing/update signals, sitemap/feed/opensearch/llms links, `discovery-signal-count` metadata, expanded keyword integration, and schema.org DataCatalog/Dataset data.
+- Added global query-matrix SEO expansion with grouped visible search-intent matrices, `query-matrix-count` metadata, expanded keyword and alias integration, table-of-contents integration, and schema.org ItemList data.
+- Added global media SEO expansion with normalized image/video signals, `media-signal-count` and `media-assets` metadata, expanded keyword integration, visible media preview links, and schema.org ImageObject/VideoObject ItemList data.
+- Added cache-lock protection for the single Seasonvar import command so overlapping CLI runs fail fast instead of processing the same queue in parallel.
+- Added automatic malformed nested Seasonvar URL cleanup for stored source pages and URL validation so `.html/...` catalog links are not requested again.
+- Added media availability backfill inside each import cycle to gradually check older `licensed_media` rows with missing or stale `check_status`.
+- Added HLS master playlist expansion so discovered `.m3u8` playlists can create separate quality variants while preserving the source season and episode.
 - Improved Seasonvar season URL parsing for `season`, `sezon`, `сезон`, and zero-padded season numbers like `00005-sezon`, so playlist media defaults to the correct current season.
 - Preserved canonical catalog title content hashes when importing additional season pages for the same series, preventing non-canonical season pages from overwriting title-level sync state.
