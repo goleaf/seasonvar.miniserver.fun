@@ -306,6 +306,104 @@ class SeasonvarImportMaintenanceTest extends TestCase
             ->assertExitCode(0);
     }
 
+    public function test_it_does_not_resave_unchanged_parsed_media_during_forced_refresh(): void
+    {
+        $this->travelTo('2026-07-09 11:00:00');
+        Http::preventStrayRequests();
+        config(['seasonvar.media_check.enabled' => false]);
+
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $url = 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-1-season.html';
+        $mediaUrl = 'https://media.example.com/kitchen/cernyi-spisok-na-kuxne-s01e01.720p.mp4';
+        $mediaTitle = 'cernyi-spisok-na-kuxne-s01e01.720p.mp4';
+        $body = $this->refreshPlannerSeasonPageHtml([
+            1 => 'Начало',
+        ], [$mediaUrl]);
+        $page = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+            'page_type' => 'serial',
+            'content_hash' => hash('sha256', $body),
+            'parse_status' => 'parsed',
+            'import_status' => 'parsed',
+            'last_imported_at' => now(),
+        ]);
+        $catalogTitle = CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $page->id,
+            'external_id' => '47915',
+            'slug' => 'chernyi-spisok-na-kuhne',
+            'title' => 'Черный список: На кухне',
+            'source_url' => $url,
+            'source_url_hash' => hash('sha256', $url),
+        ]);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'source_page_id' => $page->id,
+            'number' => 1,
+            'title' => 'Сериал Черный список: На кухне 1 сезон',
+            'source_url' => $url,
+            'source_url_hash' => hash('sha256', $url),
+        ]);
+        $episode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'source_page_id' => $page->id,
+            'number' => 1,
+            'title' => 'Начало',
+            'source_url' => $url.'#1_seriya',
+            'source_url_hash' => hash('sha256', $url.'#1_seriya'),
+        ]);
+        $sourceMediaKey = app(ExternalMediaMetadata::class)->sourceMediaKey(
+            'seasonvar',
+            $catalogTitle->source_url_hash,
+            $season->number,
+            $episode->number,
+            $url,
+            $mediaUrl,
+            $mediaTitle,
+            '720p',
+            'mp4',
+        );
+        $media = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'title' => $mediaTitle,
+            'storage_disk' => 'seasonvar_parsed',
+            'path' => $mediaUrl,
+            'playback_url' => $mediaUrl,
+            'source_media_key' => $sourceMediaKey,
+            'source_url' => $url,
+            'quality' => '720p',
+            'translation_name' => null,
+            'format' => 'mp4',
+            'status' => 'published',
+            'check_status' => 'not_checked',
+            'checked_at' => null,
+            'published_at' => now(),
+        ]);
+        $mediaUpdatedAt = $media->updated_at?->toDateTimeString();
+
+        $this->travelTo('2026-07-09 12:00:00');
+        Http::fake([
+            'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-1-season.html' => Http::response($body),
+        ]);
+
+        $this->artisan('seasonvar:import', [
+            'url' => $url,
+            '--force' => true,
+        ])->assertExitCode(0);
+
+        $media->refresh();
+
+        $this->assertSame($mediaUpdatedAt, $media->updated_at?->toDateTimeString());
+    }
+
     public function test_refresh_planner_prioritizes_pages_with_episodes_without_video(): void
     {
         $source = Source::factory()->create([

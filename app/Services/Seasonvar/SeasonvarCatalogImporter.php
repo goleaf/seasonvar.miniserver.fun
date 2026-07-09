@@ -1203,6 +1203,56 @@ class SeasonvarCatalogImporter
     }
 
     /**
+     * @param  array<string, mixed>  $updates
+     */
+    private function mediaAttributesChanged(LicensedMedia $media, array $updates): bool
+    {
+        foreach ($updates as $field => $value) {
+            if ($this->comparableMediaValue($field, $media->{$field}) !== $this->comparableMediaValue($field, $value)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function comparableMediaValue(string $field, mixed $value): mixed
+    {
+        if ($value instanceof Carbon) {
+            return $value->toDateTimeString();
+        }
+
+        if (in_array($field, ['catalog_title_id', 'season_id', 'episode_id', 'duration_seconds'], true)) {
+            return $value === null ? null : (int) $value;
+        }
+
+        return $value;
+    }
+
+    private function mediaAvailabilityCheckDue(LicensedMedia $media): bool
+    {
+        if (! (bool) config('seasonvar.media_check.enabled', true)) {
+            return false;
+        }
+
+        if (! $media->exists) {
+            return true;
+        }
+
+        if ($media->status === 'unavailable' || in_array($media->check_status, ['check_failed', 'unavailable'], true)) {
+            return true;
+        }
+
+        if ($media->checked_at === null || $media->check_status === null) {
+            return true;
+        }
+
+        $refreshAfter = now()->subHours(max(1, (int) config('seasonvar.media_check.refresh_after_hours', 168)));
+
+        return $media->checked_at->lessThanOrEqualTo($refreshAfter);
+    }
+
+    /**
      * @param  array<int, Season>  $seasons
      * @param  list<array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string}>  $mediaItems
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
@@ -1300,9 +1350,7 @@ class SeasonvarCatalogImporter
                     'source_media_key' => $sourceMediaKey,
                 ]);
             $wasExisting = $media->exists;
-            $availability = $this->checkMediaUrl($playbackUrl, $progress);
-
-            $media->fill([
+            $mediaUpdates = [
                 'catalog_title_id' => $catalogTitle->id,
                 'season_id' => $season?->id,
                 'episode_id' => $episode?->id,
@@ -1315,11 +1363,34 @@ class SeasonvarCatalogImporter
                 'quality' => $quality,
                 'translation_name' => $this->mediaTranslationName($item['title']),
                 'format' => $format,
+                'published_at' => $media->published_at ?? now(),
+            ];
+
+            if ($wasExisting
+                && ! $this->mediaAttributesChanged($media, $mediaUpdates)
+                && ! $this->mediaAvailabilityCheckDue($media)
+            ) {
+                $result['skipped']++;
+                $this->report($progress, 'seasonvar-media-skipped', [
+                    'catalog_title_id' => $catalogTitle->id,
+                    'licensed_media_id' => $media->id,
+                    'season_number' => $season?->number,
+                    'episode_number' => $episode?->number,
+                    'playback_url' => $playbackUrl,
+                    'reason' => 'медиа уже актуально',
+                ]);
+
+                continue;
+            }
+
+            $availability = $this->checkMediaUrl($playbackUrl, $progress);
+
+            $media->fill([
+                ...$mediaUpdates,
                 'status' => $availability['available'] ? 'published' : 'unavailable',
                 'check_status' => $availability['status'],
                 'last_http_status' => $availability['http_status'],
                 'checked_at' => $availability['checked_at'],
-                'published_at' => $media->published_at ?? now(),
             ])->save();
 
             $result[$wasExisting ? 'updated' : 'attached']++;
