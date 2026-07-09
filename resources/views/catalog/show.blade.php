@@ -48,6 +48,8 @@
     ];
     $seasons = $seasons ?? $title->seasons->sortBy('number')->values();
     $mediaItems = $mediaItems ?? collect();
+    $selectedEpisode = $selectedEpisode ?? null;
+    $mediaByEpisodeId = $mediaItems->whereNotNull('episode_id')->groupBy('episode_id');
     $selectedMediaUrl = $selectedMedia ? ($selectedMedia->playback_url ?: $selectedMedia->path) : null;
     $episodeCount = $episodeCount ?? $seasons->sum(fn ($season) => (int) $season->episodes->count());
     $taxonomyCount = $taxonomyCount ?? $taxonomiesByType->sum(fn ($items) => $items->count());
@@ -197,15 +199,31 @@
                             @if ($seasonEpisodeCount > 0)
                                 <div class="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                                     @foreach ($season->episodes->sortBy('number')->values() as $episode)
-                                        <div class="rounded-lg bg-slate-50 px-3 py-2 text-sm ring-1 ring-slate-200">
-                                            <div class="font-bold text-slate-700">{{ $episode->number }} серия</div>
+                                        @php
+                                            $episodeMediaItems = $mediaByEpisodeId->get($episode->id, collect());
+                                            $episodeHasMedia = $episodeMediaItems->isNotEmpty();
+                                            $isSelectedEpisode = $selectedEpisode?->id === $episode->id;
+                                        @endphp
+                                        <a href="{{ route('titles.show', ['catalogTitle' => $title, 'episode' => $episode->id]) }}#player" @class([
+                                            'block rounded-lg px-3 py-2 text-sm ring-1 transition',
+                                            'bg-emerald-50 ring-emerald-200' => $isSelectedEpisode,
+                                            'bg-slate-50 ring-slate-200 hover:bg-emerald-50 hover:ring-emerald-200' => ! $isSelectedEpisode,
+                                        ]) @if ($isSelectedEpisode) aria-current="true" @endif>
+                                            <div class="flex items-start justify-between gap-2">
+                                                <div class="font-bold text-slate-700">{{ $episode->number }} серия</div>
+                                                <span @class([
+                                                    'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ring-1',
+                                                    'bg-emerald-100 text-emerald-700 ring-emerald-200' => $episodeHasMedia,
+                                                    'bg-white text-slate-500 ring-slate-200' => ! $episodeHasMedia,
+                                                ])>{{ $episodeHasMedia ? 'видео' : 'без файла' }}</span>
+                                            </div>
                                             @if ($episode->title)
                                                 <div class="mt-0.5 line-clamp-2 text-xs text-slate-500">{{ $episode->title }}</div>
                                             @endif
                                             @if ($episode->released_at)
                                                 <div class="mt-1 text-xs font-semibold text-emerald-700">{{ $episode->released_at->format('d.m.Y') }}</div>
                                             @endif
-                                        </div>
+                                        </a>
                                     @endforeach
                                 </div>
                             @endif
@@ -216,12 +234,17 @@
                 </div>
             </x-ui.panel>
 
-            <x-ui.panel title="Просмотр" subtitle="Плеер использует локальную страницу, а файлы могут находиться удаленно.">
+            <x-ui.panel id="player" title="Просмотр" subtitle="Выберите серию выше. Плеер покажет подключенный файл этой серии.">
                 <div class="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600">
-                    <span class="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">Отметка на серии</span>
-                    <span class="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">Отметка на моменте</span>
-                    <span class="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">Хочу посмотреть</span>
-                    <span class="sm:ml-auto rounded-full bg-slate-50 px-2 py-1 ring-1 ring-slate-200">Меню сезона</span>
+                    @if ($selectedEpisode)
+                        <span class="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 ring-1 ring-emerald-100">Выбрана {{ $selectedEpisode->number }} серия</span>
+                        @if ($selectedEpisode->title)
+                            <span class="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">{{ $selectedEpisode->title }}</span>
+                        @endif
+                    @else
+                        <span class="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">Серия не выбрана</span>
+                    @endif
+                    <span class="sm:ml-auto rounded-full bg-slate-50 px-2 py-1 ring-1 ring-slate-200">{{ $selectedMedia ? 'файл подключен' : 'файл не подключен' }}</span>
                 </div>
 
                 <div class="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
@@ -233,8 +256,10 @@
                     @else
                         <div class="grid aspect-video place-items-center p-6 text-center text-slate-500">
                             <div>
-                                <div class="text-lg font-bold text-slate-700">Файлы для просмотра ещё не подключены</div>
-                                <p class="mt-1 text-sm">Когда медиа будет добавлено, оно появится в этом светлом блоке.</p>
+                                <div class="text-lg font-bold text-slate-700">
+                                    {{ $selectedEpisode ? 'Файл для выбранной серии еще не подключен' : 'Выберите серию для просмотра' }}
+                                </div>
+                                <p class="mt-1 text-sm">Когда внешний плейлист будет импортирован, видео появится в этом блоке.</p>
                             </div>
                         </div>
                     @endif
@@ -258,8 +283,13 @@
                                         $media->season ? 'Сезон '.$media->season->number : null,
                                         $media->episode ? 'Серия '.$media->episode->number : null,
                                     ])->filter()->implode(' / ');
+                                    $mediaQuery = ['catalogTitle' => $title, 'media' => $media->id];
+
+                                    if ($media->episode_id) {
+                                        $mediaQuery['episode'] = $media->episode_id;
+                                    }
                                 @endphp
-                                <a href="{{ route('titles.show', ['catalogTitle' => $title, 'media' => $media->id]) }}" @class([
+                                <a href="{{ route('titles.show', $mediaQuery) }}#player" @class([
                                     'block px-4 py-3 hover:bg-emerald-50',
                                     'bg-emerald-50' => $selectedMedia?->id === $media->id,
                                 ])>

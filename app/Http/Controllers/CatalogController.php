@@ -393,6 +393,9 @@ class CatalogController extends Controller
             ->mapWithKeys(fn (array $config, string $filterType): array => [$filterType => $catalogTitle->{$config['relation']}->values()]);
         $taxonomyGroups = $taxonomiesByType;
         $seasons = $catalogTitle->seasons->sortBy('number')->values();
+        $episodes = $seasons
+            ->flatMap(fn ($season): Collection => $season->episodes->sortBy('number')->values())
+            ->values();
 
         $mediaItems = $catalogTitle->licensedMedia
             ->sortBy(fn (LicensedMedia $media): string => sprintf(
@@ -402,8 +405,34 @@ class CatalogController extends Controller
                 $media->title,
             ))
             ->values();
-        $selectedMedia = $mediaItems->firstWhere('id', $request->integer('media'))
-            ?? $mediaItems->first();
+        $requestedEpisodeId = $request->integer('episode');
+        $requestedMediaId = $request->integer('media');
+        $selectedEpisode = $requestedEpisodeId > 0
+            ? $episodes->firstWhere('id', $requestedEpisodeId)
+            : null;
+        $selectedMedia = $requestedMediaId > 0
+            ? $mediaItems->firstWhere('id', $requestedMediaId)
+            : null;
+
+        if ($selectedMedia === null && $selectedEpisode !== null) {
+            $selectedMedia = $mediaItems->firstWhere('episode_id', $selectedEpisode->id);
+        }
+
+        if ($selectedEpisode === null && $selectedMedia?->episode_id !== null) {
+            $selectedEpisode = $episodes->firstWhere('id', $selectedMedia->episode_id)
+                ?? $selectedMedia->episode;
+        }
+
+        if ($selectedMedia === null && $selectedEpisode === null) {
+            $selectedMedia = $mediaItems->first();
+        }
+
+        if ($selectedEpisode === null && $selectedMedia?->episode_id !== null) {
+            $selectedEpisode = $episodes->firstWhere('id', $selectedMedia->episode_id)
+                ?? $selectedMedia->episode;
+        }
+
+        $selectedEpisode ??= $episodes->first();
         $relatedIdsByType = $taxonomiesByType
             ->map(fn (Collection $items): Collection => $items->pluck('id')->unique()->values())
             ->filter(fn (Collection $ids): bool => $ids->isNotEmpty());
@@ -430,6 +459,7 @@ class CatalogController extends Controller
             'episodeCount' => $seasons->sum(fn ($season): int => (int) $season->episodes->count()),
             'taxonomyCount' => $taxonomiesByType->sum(fn (Collection $items): int => $items->count()),
             'parsedSeasonCount' => $seasons->filter(fn ($season): bool => $season->episodes->isNotEmpty())->count(),
+            'selectedEpisode' => $selectedEpisode,
             'selectedMedia' => $selectedMedia,
             'mediaItems' => $mediaItems,
             'mediaCount' => $mediaItems->count(),

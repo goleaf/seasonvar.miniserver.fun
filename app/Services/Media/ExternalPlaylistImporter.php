@@ -204,9 +204,7 @@ class ExternalPlaylistImporter
             return null;
         }
 
-        $season = $entry['season_number'] === null
-            ? null
-            : $catalogTitle->seasons->firstWhere('number', $entry['season_number']);
+        $season = $this->matchSeason($catalogTitle, $entry);
         $episode = $season === null || $entry['episode_number'] === null
             ? null
             : $season->episodes->firstWhere('number', $entry['episode_number']);
@@ -254,6 +252,25 @@ class ExternalPlaylistImporter
         return $bestScore >= 80 ? $bestTitle : null;
     }
 
+    private function matchSeason(CatalogTitle $catalogTitle, array $entry): ?Season
+    {
+        if ($entry['season_number'] !== null) {
+            return $catalogTitle->seasons->firstWhere('number', $entry['season_number']);
+        }
+
+        if ($entry['episode_number'] === null) {
+            return null;
+        }
+
+        $matchingSeasons = $catalogTitle->seasons
+            ->filter(fn (Season $season): bool => $season->episodes->contains('number', $entry['episode_number']))
+            ->values();
+
+        return $matchingSeasons->count() === 1
+            ? $matchingSeasons->first()
+            : null;
+    }
+
     /**
      * @return array{title_key: string, season_number: int|null, episode_number: int|null}
      */
@@ -282,6 +299,11 @@ class ExternalPlaylistImporter
         if ($seasonNumber === null && preg_match('/(?<season>\d{1,2})\s*(?:сезон|sezon|season)\b/iu', $value, $matches) === 1) {
             $seasonNumber = (int) $matches['season'];
             $value = preg_replace('/(?<season>\d{1,2})\s*(?:сезон|sezon|season)\b/iu', ' ', $value) ?: $value;
+        }
+
+        if ($episodeNumber === null && preg_match('/(?<episode>\d{1,3})\s*(?:серия|seriya|episode|ep)\b/iu', $value, $matches) === 1) {
+            $episodeNumber = (int) $matches['episode'];
+            $value = preg_replace('/(?<episode>\d{1,3})\s*(?:серия|seriya|episode|ep)\b/iu', ' ', $value) ?: $value;
         }
 
         $value = preg_replace('/\b(?:1080p|720p|480p|2160p|web-dl|hdtv|x264|x265|hevc|aac|rus|ru|eng)\b/iu', ' ', $value) ?: $value;
