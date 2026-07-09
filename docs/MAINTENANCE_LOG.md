@@ -2,8 +2,16 @@
 
 ## 2026-07-09
 
+- Синхронизирована Markdown-документация с текущими маршрутами, командами, Laravel/Livewire архитектурой, MCP-настройкой, CI, setup/testing/deployment правилами и no-`@php` Blade-подходом.
 - Добавлен GitHub Actions CI workflow: backend проверяет Composer, Pint, PHP syntax lint, Laravel cache-команды и тесты; frontend выполняет `npm ci`, `npm audit` и `npm run build` через официальный npm registry.
-- Добавлена authorization-граница для служебной статистики: `/stats` защищен gate `viewCatalogStats` через route `can` middleware, публичные страницы каталога оставлены гостевыми, добавлены allowed/denied tests и документация `docs/authorization.md`.
+- `/stats` перенесена на Livewire 4: страница обновляет все видимые блоки через `wire:poll.1s`, использует `CatalogStatsSnapshotCache` с секундным fresh TTL и fallback на последний успешный снимок, а полный stats-массив не хранится в публичном состоянии Livewire.
+- Добавлены `CatalogStatsSnapshotBuilder` и `CatalogStatsSnapshotSanitizer`: stats-данные приводятся к массивам и очищаются от внешних source/media URL перед рендером, чтобы HTML и Livewire-ответы не раскрывали приватные адреса.
+- `seasonvar:import` после завершения запуска обновляет stats snapshot; отдельные публичные команды для обновления статистики не добавлялись.
+- Лимит `catalog-stats` увеличен до 180 запросов в минуту и применен к Livewire update endpoint, чтобы секундный polling `/stats` работал без ложных `429`.
+- Страница `/stats` открыта для гостевого read-only доступа: route `can('viewCatalogStats')` снят со статистики и proxy постеров, сохранен `catalog-stats` throttle и запрет на вывод raw source/private URLs.
+- Ранее для служебной статистики добавлялась authorization-граница; после решения открыть `/stats` публично соответствующие route `can` middleware и gate сняты, а тесты/документация обновлены под гостевой доступ.
+- `seasonvar:import` подготовлена для частого cron-запуска: если предыдущий импорт еще держит lock, новая копия пропускается с успешным кодом выхода, а все обновления остаются внутри единой команды импорта.
+- Стабилизированы проверки и отчетность импорта: базовый `Tests\TestCase` отключает Vite в тестах через `withoutVite()`, `/stats` снова скрывает технические имена таблиц и использует пользовательские русские подписи, а `seasonvar:import` обновляет счетчики запуска после каждого обработанного chunk/URL, чтобы длинный запуск не показывал нули до конца цикла.
 - Валидация публичных query-параметров каталога оформлена через Laravel Form Request-классы: `CatalogTitlesRequest` получил правила для фильтров, `CatalogShowRequest` проверяет выбранную серию/медиа, slug-фильтры вынесены в reusable Rule, а типы фильтров — в enum; добавлена документация `docs/validation.md`.
 - Оптимизирована карта посадочных страниц: пары справочник/год для `sitemap-landings.xml` считаются grouped join-запросами по pivot-таблицам вместо `exists()` в цикле; добавлена документация `docs/performance.md` и regression test на количество запросов.
 - `CatalogController` разделен на тонкий web-контроллер, `CatalogSitemapController`, Form Request для фильтров каталога, page-builder сервисы, query-сервис и SEO-builder; добавлена документация `docs/architecture.md`.

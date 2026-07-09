@@ -22,6 +22,21 @@ Production-значения должны задаваться сервером, 
 
 Проектные ключи Seasonvar описаны в `.env.example`. Значения по умолчанию консервативные: `SEASONVAR_BASE_URL=https://seasonvar.ru`, `SEASONVAR_IMPORT_CHUNK_SIZE=100`, `SEASONVAR_CRAWL_DELAY=3`, а проверки медиа включены с ограниченными тайм-аутами.
 
+## Переменные проекта
+
+Ключи, которые чаще всего меняются между окружениями:
+
+- `APP_URL` — публичный HTTPS URL приложения; от него зависят canonical, sitemap, OpenSearch и публичные ссылки.
+- `DB_BUSY_TIMEOUT`, `DB_JOURNAL_MODE`, `DB_SYNCHRONOUS` — настройки SQLite для устойчивой работы импорта.
+- `DB_QUEUE_RETRY_AFTER` и `REDIS_QUEUE_RETRY_AFTER` — должны оставаться больше максимального timeout job импорта.
+- `SEASONVAR_IMPORT_SLEEP_SECONDS` — пауза между циклами `--forever`.
+- `SEASONVAR_IMPORT_REFRESH_AFTER_HOURS` и `SEASONVAR_IMPORT_MISSING_DATA_RETRY_HOURS` — частота повторной проверки страниц источника.
+- `SEASONVAR_IMPORT_LOCK_SECONDS` и `SEASONVAR_IMPORT_STALE_AFTER_MINUTES` — защита от параллельного и зависшего импорта.
+- `SEASONVAR_MEDIA_CHECK_*` — включение, timeout, retries, размер пачки и возраст повторной проверки внешних media URL.
+- `SEASONVAR_MEDIA_METADATA_CHUNK_SIZE` и `SEASONVAR_MEDIA_SOURCE_KEY_CHUNK_SIZE` — размеры сервисных дозаполнений старых media rows.
+
+В коде приложения эти значения читаются через `config('seasonvar.*')`, `config('queue.*')`, `config('database.*')` и другие config-файлы, а не через прямой `env()`.
+
 ## Правила конфигурации
 
 - Код приложения читает значения окружения через `config()`.
@@ -47,4 +62,10 @@ npm run build
 php artisan config:cache
 php artisan config:clear
 php artisan test --filter=ConfigurationEnvironmentTest
+```
+
+Перед деплоем после изменения маршрутов или sitemap/robots-документации также проверять:
+
+```bash
+php artisan project:docs-refresh --check
 ```

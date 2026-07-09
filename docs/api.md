@@ -7,6 +7,8 @@
 - `GET /api/titles` возвращает опубликованные карточки каталога с пагинацией.
 - `GET /api/titles/{slug}` возвращает одну опубликованную карточку по slug.
 - API-маршруты подключены через `routes/api.php`, получают стандартный префикс `/api` и ограничены rate limiter `catalog-api` до 60 запросов в минуту на IP.
+- `GET /api/titles` принимает `page` и `per_page`; `per_page` ограничен диапазоном 1-50 и по умолчанию равен 15.
+- `/api/*` ошибки должны оставаться JSON-friendly благодаря `shouldRenderJsonWhen()` в `bootstrap/app.php`.
 
 ## Формат ответов
 

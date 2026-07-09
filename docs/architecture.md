@@ -11,6 +11,7 @@
   - `CatalogTitlePageBuilder` готовит страницу тайтла, выбранную серию, медиа, рекомендации и SEO.
 - Sitemap, feed, OpenSearch и `llms.txt` обслуживает отдельный `CatalogSitemapController`, который делегирует XML/text-ответы в `CatalogSitemapResponder`.
 - JSON API обслуживает `App\Http\Controllers\Api\CatalogTitleController`: контроллер только принимает Form Request/model binding и возвращает API Resources, а выбор публичных связей выполняет `CatalogApiTitleQuery`.
+- `/stats` обслуживается тонким controller-view слоем: `CatalogController::stats()` отдает SEO и Livewire-обертку, live-данные рендерит `App\Livewire\StatsDashboard`, а постеры статистики отдает `CatalogStatsPosterResponder` через внутренний proxy-маршрут.
 
 ## Actions и сервисы
 
@@ -18,6 +19,8 @@
 - Сервисы возвращают типизированный результат или готовые данные для вызывающего слоя, а вывод сообщений, HTTP-ответы и консольные коды остаются в контроллере или команде.
 - Не добавлять repository-классы для простых Eloquent-связей; reusable запросы остаются в query-сервисах, scopes или page-builder сервисах.
 - `project:docs-refresh` делегирует обновление управляемых блоков документации в `App\Services\ProjectDocumentation\ProjectDocumentationRefresher`, а команда только печатает результат и возвращает код выхода.
+- Статистика `/stats` собирается через `CatalogStatsSnapshotBuilder`, очищается `CatalogStatsSnapshotSanitizer` и кешируется `CatalogStatsSnapshotCache`; Livewire-компонент не хранит полный stats-массив в публичном состоянии.
+- `CatalogStatsPosterResponder` не передает исходные внешние URL постеров в Blade или Livewire payload и отвечает только за безопасную выдачу миниатюр для статистики.
 
 ## Запросы и валидация
 
@@ -30,7 +33,8 @@
 ## Авторизация
 
 - Основные страницы каталога остаются публичными read-only страницами.
-- Служебная страница `/stats` защищена gate `viewCatalogStats` через route `can` middleware.
+- Служебная страница `/stats` тоже доступна как публичная read-only сводка, но остается под rate limiter и не раскрывает raw source URLs, приватные media URLs или stack traces.
+- Livewire update endpoint дополнительно использует `throttle:catalog-stats`, а сам лимит рассчитан на нормальный `wire:poll.1s`.
 - Новые write/admin/import-control endpoints должны получать отдельный gate или policy до регистрации маршрута.
 
 ## Представление и SEO

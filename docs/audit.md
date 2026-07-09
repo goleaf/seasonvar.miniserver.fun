@@ -12,7 +12,7 @@
 - Основная база данных SQLite; тесты используют SQLite в памяти.
 - PHPUnit 12.5; Pest не установлен.
 - Tailwind CSS 4.3 с Vite 8, локальными FontAwesome, Plyr и HLS-ресурсами.
-- В проекте есть read-only JSON API в `routes/api.php` для опубликованных карточек каталога и Laravel API Resources для форматирования ответов. Политик приложения, событий, слушателей, писем и уведомлений сейчас нет. Публичные query-параметры каталога проверяются Form Request-классами, а служебная статистика защищена gate.
+- В проекте есть read-only JSON API в `routes/api.php` для опубликованных карточек каталога и Laravel API Resources для форматирования ответов. Политик приложения, событий, слушателей, писем и уведомлений сейчас нет. Публичные query-параметры каталога и API пагинация проверяются Form Request-классами, а служебная статистика доступна как read-only Livewire-страница под rate limit.
 - GitHub Actions workflow находится в `.github/workflows/ci.yml` и проверяет Composer, Pint, Laravel tests, PHP syntax lint, npm audit/build и dependency audits.
 
 ## MCP
@@ -35,17 +35,16 @@ args = ["artisan", "boost:mcp", "--env=local"]
 - Добавлен этот audit-документ и разрешено отслеживание существующей настройки Laravel Boost MCP.
 - Посадочные страницы sitemap больше не выполняют `exists()` для каждой пары справочник/год; реальные пары считаются grouped join-запросами по pivot-таблицам и покрыты query-count regression test.
 - Валидация публичных query-параметров вынесена в `CatalogTitlesRequest` и `CatalogShowRequest`; slug-фильтры используют reusable Rule, а типы фильтров перечислены enum.
-- Служебная страница `/stats` закрыта Laravel gate `viewCatalogStats` через route middleware; добавлены allowed/denied authorization tests.
+- Служебная страница `/stats` открыта для гостевого read-only доступа, остается под rate limiter и не выводит raw source URLs, приватные media URLs, stack traces или внутренние имена маршрутов.
+- Все Blade-шаблоны очищены от `@php`/`@endphp`; layout SEO готовит `AppLayoutData`, состояние страниц готовят ViewModel-классы, а `CatalogController` делегирует тяжелую работу page-builder и responder сервисам.
 
 ## Проверка
 
-- `./vendor/bin/pint --dirty --format agent` прошел.
-- `php artisan test --filter=CatalogPageTest` прошел: 5 tests, 17 assertions.
-- `php artisan test` прошел: 34 tests, 143 assertions.
-- `composer validate --strict` прошел.
-- `composer audit` не нашел advisories.
-- `npm run build` прошел. Vite вывел существующее предупреждение о крупном JavaScript-фрагменте.
-- `php artisan route:list` прошел. Опция `--compact` недоступна в этой установке Laravel, поэтому использован обычный route list.
+- `php artisan project:docs-refresh --check` прошел.
+- `php artisan route:list` прошел.
+- `php artisan list --raw` прошел.
+- `rg -n "@php|@endphp" resources/views -g '*.blade.php'` не нашел inline PHP.
+- `rg -n "env\(" app bootstrap config routes tests resources -g '*.php' -g '*.blade.php'` подтвердил `env()` только в config-файлах.
 
 ## Критично
 
@@ -53,15 +52,12 @@ args = ["artisan", "boost:mcp", "--env=local"]
 
 ## Высокий приоритет
 
-- [resources/views/layouts/app.blade.php](/www/wwwroot/seasonvar.miniserver.fun/resources/views/layouts/app.blade.php:1) содержит слишком большой `@php`-блок: там собираются SEO-метаданные, URL поиска, JSON-LD, навигационные блоки и производное состояние страницы. Это нужно вынести в отдельный SEO-сервис или view model перед дальнейшим расширением SEO.
-- [app/Http/Controllers/CatalogController.php](/www/wwwroot/seasonvar.miniserver.fun/app/Http/Controllers/CatalogController.php:1) остается слишком большим и смешивает нормализацию запроса, query building, SEO/JSON-LD, sitemap-делегирование, рекомендации и состояние страницы. Его нужно постепенно делить на query objects, SEO builders и меньшие контроллеры.
-- [resources/views/catalog/titles.blade.php](/www/wwwroot/seasonvar.miniserver.fun/resources/views/catalog/titles.blade.php:3) и [resources/views/catalog/show.blade.php](/www/wwwroot/seasonvar.miniserver.fun/resources/views/catalog/show.blade.php:3) все еще собирают URL фильтров, подписи таксономий, данные плеера, бейджи сезонов и состояние вариантов медиа внутри Blade. Перед новым UI-поведением это лучше перенести в подготовленные DTO, классы компонентов или view models.
-- В приложении появился gate для служебной статистики. Перед любыми write/admin/moderation/import-control эндпоинтами все еще нужно добавлять отдельную авторизацию.
+Высоких текущих проблем после рефакторинга Blade и контроллеров не найдено. Перед любыми будущими write/admin/moderation/import-control эндпоинтами все еще нужно добавлять отдельную авторизацию.
 
 ## Средний приоритет
 
 - [app/Services/Seasonvar/SeasonvarTitleMerger.php](/www/wwwroot/seasonvar.miniserver.fun/app/Services/Seasonvar/SeasonvarTitleMerger.php:82) загружает все тайтлы в память перед группировкой дублей. Для большого каталога лучше перейти на группировку кандидатных дублей в базе или chunk-обработку.
-- Поиск в `CatalogController::applySearchFilter()` использует несколько `LIKE` с ведущим `%` и повторные `orWhereHas()` по связям. Для маленькой базы это нормально, но при росте каталога стоит рассмотреть SQLite FTS или отдельную поисковую таблицу.
+- Поиск в `CatalogTitleQuery::applySearchFilter()` использует несколько `LIKE` с ведущим `%` и подзапросы по связям. Для маленькой базы это нормально, но при росте каталога стоит рассмотреть SQLite FTS или отдельную поисковую таблицу.
 - Снимки страниц источника хранят raw HTML. Они должны оставаться непубличными; нужна политика retention/cleanup и запрет на вывод таких данных через будущие API или диагностику.
 - JSON-LD выводится через `{!! !!}` в [resources/views/layouts/app.blade.php](/www/wwwroot/seasonvar.miniserver.fun/resources/views/layouts/app.blade.php:1667). Сейчас используются JSON_HEX-флаги, это правильная защита, но после рефакторинга SEO нужны regression tests на escaping.
 
@@ -69,7 +65,6 @@ args = ["artisan", "boost:mcp", "--env=local"]
 
 - CI workflow добавлен. При расширении набора инструментов стоит подключить PHPStan/Larastan или Rector отдельным шагом.
 - В `composer.json` нет команд статического анализа или Rector. PHPStan/Larastan или Rector стоит добавлять только когда будет готовность поддерживать базовый уровень проверок.
-- [resources/views/catalog/index.blade.php](/www/wwwroot/seasonvar.miniserver.fun/resources/views/catalog/index.blade.php:3) все еще группирует последние тайтлы внутри Blade. При следующей чистке главной каталога это стоит перенести в контроллер или небольшой view model.
 - API пока ограничен read-only карточками тайтлов. Перед write/admin/moderation/import-control JSON endpoints нужно добавить отдельную авторизацию, Form Requests и явные ресурсы ответа.
 
 ## Можно улучшить позже

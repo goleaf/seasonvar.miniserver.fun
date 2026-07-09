@@ -7,6 +7,7 @@
 - Тесты пишутся как PHPUnit-классы в `tests/Feature` и `tests/Unit`; Pest в проекте не установлен.
 - PHPUnit использует SQLite в памяти через `phpunit.xml`.
 - Для тестов, которые пишут в базу, использовать `RefreshDatabase`.
+- Базовый `Tests\TestCase` вызывает `withoutVite()`, поэтому feature-тесты не зависят от собранного Vite manifest.
 - Для данных каталога использовать существующие фабрики: `CatalogTitle`, `Season`, `Episode`, `LicensedMedia`, `Source`, `SourcePage`, `User`.
 - Production-данные не сидируются; seeders не являются частью обычного тестового сценария.
 
@@ -27,6 +28,7 @@ php artisan test
 ./vendor/bin/phpunit
 ./vendor/bin/pint path/to/ChangedFile.php --format agent
 composer test
+php artisan project:docs-refresh --check
 ```
 
 `npm run build` нужен только при изменениях Vite, JS/CSS, Blade-разметки с asset assumptions или frontend assets. `vendor/bin/pest`, `npm run lint`, PHPStan и Rector сейчас не установлены.
