@@ -23,6 +23,14 @@ Use instead:
 - Primary accent: `emerald-50`, `emerald-100`, `emerald-700`
 - Text: `text-slate-700`, `text-slate-600`, `text-slate-500`
 
+## Icons
+
+- Use FontAwesome from the local npm package `@fortawesome/fontawesome-free`.
+- Import icon CSS through Vite from `resources/js/app.js`; never use CDN links.
+- Prefer component icon props: `x-ui.panel icon="..."`, `x-ui.taxonomy-chip icon="..."`, and `x-stat icon="..."`.
+- Icons are decorative by default and should use `aria-hidden="true"` while visible text remains present.
+- Keep icons in the light palette: `text-emerald-700`, `text-slate-400`, `text-slate-500`, or semantic light-state colors.
+
 ## Shared components
 
 Use shared Blade components before writing repeated markup:

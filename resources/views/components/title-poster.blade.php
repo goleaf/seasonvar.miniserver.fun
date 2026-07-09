@@ -7,8 +7,15 @@
 
 <div {{ $attributes->merge(['class' => 'overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200']) }}>
     @if ($title->poster_url)
-        <img src="{{ $title->poster_url }}" alt="{{ $title->title }}" class="{{ $imageClass }}">
+        <img src="{{ $title->poster_url }}" alt="Постер {{ $title->title }}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="{{ $imageClass }}">
     @else
-        <div class="{{ $emptyClass }}">{{ $emptyLabel }}</div>
+        <div class="{{ $emptyClass }}">
+            <span class="inline-flex flex-col items-center gap-1">
+                <i class="fa-regular fa-image text-lg text-slate-300" aria-hidden="true"></i>
+                @if ($emptyLabel !== '')
+                    <span>{{ $emptyLabel }}</span>
+                @endif
+            </span>
+        </div>
     @endif
 </div>

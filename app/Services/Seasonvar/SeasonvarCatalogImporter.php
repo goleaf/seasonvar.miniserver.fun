@@ -6,6 +6,8 @@ use App\Models\Actor;
 use App\Models\AgeRating;
 use App\Models\CatalogStatus;
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleAlias;
+use App\Models\CatalogTitleRating;
 use App\Models\Country;
 use App\Models\Director;
 use App\Models\Episode;
@@ -476,11 +478,16 @@ class SeasonvarCatalogImporter
             'episodes' => count($data['episodes']),
             'media_candidates' => count($data['media']),
             'taxonomies' => count($data['taxonomies']),
+            'ratings' => count($data['ratings']),
+            'aliases' => count($data['aliases']),
+            'info_labels' => $data['parse_meta']['info_labels'] ?? [],
         ]);
 
         $transactionResult = DB::transaction(function () use ($page, $data, $contentHash, $progress): array {
             $catalogTitle = $this->upsertCatalogTitle($page, $data, $contentHash, $progress);
             $this->syncCatalogRelations($catalogTitle, $data['taxonomies'], $progress);
+            $this->syncCatalogAliases($catalogTitle, $data['aliases'], $progress);
+            $this->syncCatalogRatings($catalogTitle, $data['ratings'], $progress);
             $seasons = $this->syncSeasons($catalogTitle, $page, $data['seasons'], $progress);
             $this->syncEpisodes($seasons, $page, $data['episodes'], $progress);
             $mediaResult = $this->syncParsedMedia($catalogTitle, $seasons, $data['media'], $progress);
@@ -535,7 +542,10 @@ class SeasonvarCatalogImporter
      *     seasons: list<array{number: int, title: string|null, source_url: string|null, latest_episode_released_at: string|null, episodes_released: int|null, episodes_total: int|null, translation_name: string|null, release_status_text: string|null}>,
      *     episodes: list<array{season_number: int, number: int, title: string|null, source_url: string|null}>,
      *     media: list<array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string}>,
-     *     taxonomies: list<array{type: string, name: string, source_url: string|null}>
+     *     taxonomies: list<array{type: string, name: string, source_url: string|null}>,
+     *     ratings: list<array{provider: string, rating: float|null, votes: int|null, raw_value: string}>,
+     *     aliases: list<array{name: string, type: string, source: string}>,
+     *     parse_meta: array<string, mixed>
      * } $data
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      */
@@ -568,6 +578,10 @@ class SeasonvarCatalogImporter
             ]);
         }
 
+        $isCanonicalSourcePage = ! $catalogTitle->exists
+            || $catalogTitle->source_page_id === null
+            || (int) $catalogTitle->source_page_id === (int) $page->id;
+
         $catalogTitle->fill([
             'source_page_id' => $catalogTitle->source_page_id ?? $page->id,
             'external_id' => $catalogTitle->external_id ?? $data['external_id'],
@@ -581,7 +595,7 @@ class SeasonvarCatalogImporter
             'poster_url' => $catalogTitle->poster_url ?: $data['poster_url'],
             'source_url' => $catalogTitle->source_url ?: $page->url,
             'source_url_hash' => $catalogTitle->source_url_hash ?: $sourceUrlHash,
-            'content_hash' => $contentHash,
+            'content_hash' => $isCanonicalSourcePage ? $contentHash : $catalogTitle->content_hash,
             'is_published' => true,
             'indexed_at' => now(),
         ]);
@@ -805,6 +819,89 @@ class SeasonvarCatalogImporter
                 && preg_match('/[.!?]|(?:главн|добро пожаловать|типичная жизнь|сериал)/iu', $name) !== 1,
             default => true,
         };
+    }
+
+    /**
+     * @param  list<array{name: string, type: string, source: string}>  $aliases
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     */
+    private function syncCatalogAliases(CatalogTitle $catalogTitle, array $aliases, ?callable $progress = null): void
+    {
+        $now = now();
+        $rows = collect($aliases)
+            ->filter(fn (array $alias): bool => $this->isValidAliasName($alias['name']))
+            ->mapWithKeys(function (array $alias) use ($catalogTitle, $now): array {
+                $name = Str::squish($alias['name']);
+                $type = Str::substr(Str::slug($alias['type']) ?: 'alternative', 0, 32);
+                $nameHash = hash('sha256', Str::lower($name));
+
+                return [$type.'|'.$nameHash => [
+                    'catalog_title_id' => $catalogTitle->id,
+                    'name' => $name,
+                    'name_hash' => $nameHash,
+                    'type' => $type,
+                    'source' => Str::substr($alias['source'], 0, 64),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]];
+            });
+
+        if ($rows->isNotEmpty()) {
+            CatalogTitleAlias::query()->upsert(
+                $rows->values()->all(),
+                ['catalog_title_id', 'type', 'name_hash'],
+                ['name', 'source', 'updated_at'],
+            );
+        }
+
+        $this->report($progress, 'catalog-title-aliases-synced', [
+            'catalog_title_id' => $catalogTitle->id,
+            'aliases' => $rows->count(),
+        ]);
+    }
+
+    private function isValidAliasName(string $name): bool
+    {
+        $name = Str::squish($name);
+
+        return $name !== ''
+            && Str::length($name) <= 160
+            && preg_match('/(?:главн|добро пожаловать|смотреть онлайн|seasonvar)/iu', $name) !== 1;
+    }
+
+    /**
+     * @param  list<array{provider: string, rating: float|null, votes: int|null, raw_value: string}>  $ratings
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     */
+    private function syncCatalogRatings(CatalogTitle $catalogTitle, array $ratings, ?callable $progress = null): void
+    {
+        $now = now();
+        $rows = collect($ratings)
+            ->filter(fn (array $rating): bool => in_array($rating['provider'], ['imdb', 'kinopoisk'], true))
+            ->mapWithKeys(function (array $rating) use ($catalogTitle, $now): array {
+                return [$rating['provider'] => [
+                    'catalog_title_id' => $catalogTitle->id,
+                    'provider' => $rating['provider'],
+                    'rating' => $rating['rating'],
+                    'votes' => $rating['votes'],
+                    'raw_value' => Str::substr($rating['raw_value'], 0, 255),
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]];
+            });
+
+        if ($rows->isNotEmpty()) {
+            CatalogTitleRating::query()->upsert(
+                $rows->values()->all(),
+                ['catalog_title_id', 'provider'],
+                ['rating', 'votes', 'raw_value', 'updated_at'],
+            );
+        }
+
+        $this->report($progress, 'catalog-title-ratings-synced', [
+            'catalog_title_id' => $catalogTitle->id,
+            'ratings' => $rows->count(),
+        ]);
     }
 
     /**
@@ -1222,7 +1319,7 @@ class SeasonvarCatalogImporter
     private function decodeSeasonvarPlaylistFile(string $file): ?string
     {
         $value = html_entity_decode($file, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $value = str_replace(['\\/', '\\u002F', '\\x2F'], '/', $value);
+        $value = str_replace(['\/', '\u002F', '\x2F'], '/', $value);
         $value = trim($value, " \t\n\r\0\x0B\"'()[]{};,");
 
         if (Str::startsWith($value, ['http://', 'https://', '//'])) {

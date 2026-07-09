@@ -17,21 +17,34 @@
 
     <div class="flex flex-1 flex-col p-3 sm:p-4">
         <div class="flex items-center gap-2 text-xs text-slate-500">
-            <span>{{ $title->type === 'serial' ? 'сериал' : $title->type }}</span>
+            <span class="inline-flex items-center gap-1">
+                <i class="fa-solid fa-tv text-[0.85em] text-slate-400" aria-hidden="true"></i>
+                <span>{{ $title->type === 'serial' ? 'сериал' : $title->type }}</span>
+            </span>
             @if ($title->year)
-                <span>{{ $title->year }}</span>
+                <span class="inline-flex items-center gap-1">
+                    <i class="fa-solid fa-calendar-days text-[0.85em] text-slate-400" aria-hidden="true"></i>
+                    <span>{{ $title->year }}</span>
+                </span>
             @endif
         </div>
         <h3 class="mt-2 line-clamp-2 text-base font-bold text-slate-700">{{ $title->title }}</h3>
         <div class="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-            <span class="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 ring-1 ring-emerald-100">{{ $seasonsCount }} сезон(ов)</span>
-            <span class="rounded-full bg-sky-50 px-2 py-1 text-sky-700 ring-1 ring-sky-100">
-                {{ $episodesCount > 0 ? $episodesCount.' серий' : 'серии разбираются' }}
+            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 ring-1 ring-emerald-100">
+                <i class="fa-solid fa-layer-group text-[0.85em]" aria-hidden="true"></i>
+                <span>{{ $seasonsCount }} сезон(ов)</span>
+            </span>
+            <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700 ring-1 ring-sky-100">
+                <i class="fa-solid fa-circle-play text-[0.85em]" aria-hidden="true"></i>
+                <span>{{ $episodesCount > 0 ? $episodesCount.' серий' : 'серии разбираются' }}</span>
             </span>
         </div>
         <div class="mt-3 flex flex-wrap gap-1">
             @foreach ($cardRelations as $taxonomy)
-                <span class="rounded-full bg-slate-50 px-2 py-1 text-xs text-slate-500 ring-1 ring-slate-200">{{ $taxonomy->name }}</span>
+                <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-xs text-slate-500 ring-1 ring-slate-200">
+                    <i class="fa-solid fa-tag text-[0.8em] text-slate-400" aria-hidden="true"></i>
+                    <span>{{ $taxonomy->name }}</span>
+                </span>
             @endforeach
         </div>
     </div>

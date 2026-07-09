@@ -16,6 +16,41 @@ class SeasonvarCatalogParser
      */
     private const MEDIA_EXTENSIONS = ['m3u8', 'm3u', 'mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi'];
 
+    /**
+     * @var list<string>
+     */
+    private const INFO_LABELS = [
+        'Альтернативное название',
+        'Ориентировочная дата выхода',
+        'Продолжительность',
+        'Ограничение',
+        'КиноПоиск',
+        'Кинопоиск',
+        'Режиссёр',
+        'Режиссер',
+        'Оригинал',
+        'Актеры',
+        'Актёры',
+        'В ролях',
+        'Перевод',
+        'Озвучка',
+        'Страна',
+        'Вышел',
+        'Статус',
+        'Канал',
+        'Студия',
+        'Жанр',
+        'IMDb',
+        'IMDB',
+        'Качество',
+        'Сценарист',
+        'Продюсер',
+        'Композитор',
+        'Оператор',
+        'Премьера',
+        'Слоган',
+    ];
+
     public function __construct(private readonly SeasonvarUrl $seasonvarUrl) {}
 
     /**
@@ -31,7 +66,10 @@ class SeasonvarCatalogParser
      *     seasons: list<array{number: int, title: string|null, source_url: string|null, latest_episode_released_at: string|null, episodes_released: int|null, episodes_total: int|null, translation_name: string|null, release_status_text: string|null}>,
      *     episodes: list<array{season_number: int, number: int, title: string|null, source_url: string|null}>,
      *     media: list<array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string}>,
-     *     taxonomies: list<array{type: string, name: string, source_url: string|null}>
+     *     taxonomies: list<array{type: string, name: string, source_url: string|null}>,
+     *     ratings: list<array{provider: string, rating: float|null, votes: int|null, raw_value: string}>,
+     *     aliases: list<array{name: string, type: string, source: string}>,
+     *     parse_meta: array{info_labels: list<string>, has_info_list: bool, has_season_list: bool, has_episode_script: bool}
      * }
      */
     public function parse(string $html, string $url): array
@@ -39,6 +77,7 @@ class SeasonvarCatalogParser
         $dom = $this->loadHtml($html);
         $xpath = new DOMXPath($dom);
         $structuredData = $this->structuredData($xpath);
+        $infoFields = $this->infoFields($xpath);
 
         $title = $this->cleanTitle($this->firstNonEmpty([
             Arr::get($structuredData, 'name'),
@@ -55,10 +94,8 @@ class SeasonvarCatalogParser
 
         $originalTitle = $this->firstNonEmpty([
             Arr::get($structuredData, 'alternateName'),
-            $this->firstText($xpath, [
-                '//*[contains(concat(" ", normalize-space(@class), " "), " pgs-sinfo_list ")][contains(., "Оригинал:")]/span[1]',
-                '//*[contains(@class, "original") or contains(@class, "altname")]',
-            ]),
+            $this->firstInfoField($infoFields, ['Оригинал']),
+            $this->firstText($xpath, ['//*[contains(@class, "original") or contains(@class, "altname")]']),
         ]);
 
         if ($originalTitle === $title) {
@@ -94,7 +131,7 @@ class SeasonvarCatalogParser
         ]);
 
         $year = $this->extractYear($this->firstNonEmpty([
-            $this->infoField($xpath, 'Вышел'),
+            $this->firstInfoField($infoFields, ['Вышел', 'Ориентировочная дата выхода']),
             Arr::get($structuredData, 'datePublished'),
             Arr::get($structuredData, 'releasedEvent.startDate'),
         ]).' '.$title.' '.$description);
@@ -114,7 +151,10 @@ class SeasonvarCatalogParser
             'seasons' => $seasons,
             'episodes' => $this->episodes($html, $url, $currentSeasonNumber),
             'media' => $this->mediaCandidates($html, $xpath, $url, $currentSeasonNumber),
-            'taxonomies' => $this->taxonomies($xpath, $url, $structuredData),
+            'taxonomies' => $this->taxonomies($xpath, $url, $structuredData, $infoFields),
+            'ratings' => $this->ratings($infoFields),
+            'aliases' => $this->aliases($infoFields, $title, $originalTitle),
+            'parse_meta' => $this->parseMeta($xpath, $html, $infoFields),
         ];
     }
 
@@ -287,6 +327,249 @@ class SeasonvarCatalogParser
     }
 
     /**
+     * @param  array<string, list<string>>  $infoFields
+     * @return array{info_labels: list<string>, has_info_list: bool, has_season_list: bool, has_episode_script: bool}
+     */
+    private function parseMeta(DOMXPath $xpath, string $html, array $infoFields): array
+    {
+        return [
+            'info_labels' => array_keys($infoFields),
+            'has_info_list' => ($xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " pgs-sinfo_list ")]')?->length ?? 0) > 0,
+            'has_season_list' => ($xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " pgs-seaslist ")]')?->length ?? 0) > 0,
+            'has_episode_script' => Str::contains($html, 'arEpisodes'),
+        ];
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    private function infoFields(DOMXPath $xpath): array
+    {
+        $fields = [];
+
+        foreach ($xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " pgs-sinfo_list ")]') ?: [] as $node) {
+            $text = $this->stringValue($node->textContent);
+
+            if ($text === null) {
+                continue;
+            }
+
+            foreach ($this->infoFieldsFromText($text) as $label => $values) {
+                foreach ($values as $value) {
+                    if ($value === '') {
+                        continue;
+                    }
+
+                    $fields[$label] ??= [];
+                    $fields[$label][Str::lower($value)] = $value;
+                }
+            }
+        }
+
+        return collect($fields)
+            ->map(fn (array $values): array => array_values($values))
+            ->all();
+    }
+
+    /**
+     * @param  array<string, list<string>>  $infoFields
+     * @param  list<string>  $labels
+     */
+    private function firstInfoField(array $infoFields, array $labels): ?string
+    {
+        foreach ($labels as $label) {
+            foreach ($this->infoFieldValues($infoFields, $label) as $value) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, list<string>>  $infoFields
+     * @return list<string>
+     */
+    private function infoFieldValues(array $infoFields, string $label): array
+    {
+        $canonical = $this->canonicalInfoLabel($label);
+
+        return $canonical !== null ? ($infoFields[$canonical] ?? []) : [];
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    private function infoFieldsFromText(string $text): array
+    {
+        $labels = collect(self::INFO_LABELS)
+            ->sortByDesc(fn (string $label): int => Str::length($label))
+            ->map(fn (string $label): string => preg_quote($label, '/'))
+            ->implode('|');
+
+        $matchesCount = preg_match_all('/('.$labels.')\s*:/iu', $text, $matches, PREG_OFFSET_CAPTURE);
+
+        if ($matchesCount === false || $matchesCount === 0) {
+            return [];
+        }
+
+        $fields = [];
+        $count = count($matches[0]);
+
+        for ($index = 0; $index < $count; $index++) {
+            $rawLabel = $matches[1][$index][0];
+            $label = $this->canonicalInfoLabel($rawLabel);
+
+            if ($label === null) {
+                continue;
+            }
+
+            $valueStart = $matches[0][$index][1] + strlen($matches[0][$index][0]);
+            $valueEnd = $index + 1 < $count ? $matches[0][$index + 1][1] : strlen($text);
+            $value = $this->stringValue(substr($text, $valueStart, max(0, $valueEnd - $valueStart)));
+
+            if ($value === null) {
+                continue;
+            }
+
+            $fields[$label] ??= [];
+            $fields[$label][] = $value;
+        }
+
+        return $fields;
+    }
+
+    private function canonicalInfoLabel(string $label): ?string
+    {
+        $normalized = Str::lower(Str::squish($label));
+
+        foreach (self::INFO_LABELS as $knownLabel) {
+            if (Str::lower($knownLabel) === $normalized) {
+                return match ($knownLabel) {
+                    'Режиссёр' => 'Режиссер',
+                    'Актёры' => 'Актеры',
+                    'IMDb' => 'IMDB',
+                    'Кинопоиск' => 'КиноПоиск',
+                    default => $knownLabel,
+                };
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, list<string>>  $infoFields
+     * @return list<array{provider: string, rating: float|null, votes: int|null, raw_value: string}>
+     */
+    private function ratings(array $infoFields): array
+    {
+        $ratings = [];
+
+        foreach ([
+            'imdb' => ['IMDB', 'IMDb'],
+            'kinopoisk' => ['КиноПоиск', 'Кинопоиск'],
+        ] as $provider => $labels) {
+            $rawValue = $this->firstInfoField($infoFields, $labels);
+
+            if ($rawValue === null) {
+                continue;
+            }
+
+            $ratings[] = [
+                'provider' => $provider,
+                'rating' => $this->ratingValue($rawValue),
+                'votes' => $this->ratingVotes($rawValue),
+                'raw_value' => $rawValue,
+            ];
+        }
+
+        return $ratings;
+    }
+
+    private function ratingValue(string $value): ?float
+    {
+        if (preg_match('/(\d{1,2}(?:[,.]\d{1,2})?)/u', $value, $matches) !== 1) {
+            return null;
+        }
+
+        $rating = (float) str_replace(',', '.', $matches[1]);
+
+        return $rating >= 0 && $rating <= 10 ? $rating : null;
+    }
+
+    private function ratingVotes(string $value): ?int
+    {
+        if (preg_match('/(?:\(|\s)(\d[\d\s]{1,12})\s*(?:голос|оцен|votes?|users?)?/iu', $value, $matches) !== 1) {
+            return null;
+        }
+
+        $votes = (int) preg_replace('/\D/u', '', $matches[1]);
+
+        return $votes > 0 ? $votes : null;
+    }
+
+    /**
+     * @param  array<string, list<string>>  $infoFields
+     * @return list<array{name: string, type: string, source: string}>
+     */
+    private function aliases(array $infoFields, string $title, ?string $originalTitle): array
+    {
+        $aliases = [];
+
+        if ($originalTitle !== null) {
+            $this->addAlias($aliases, $originalTitle, 'original', 'info');
+        }
+
+        foreach ($this->valueList($this->firstInfoField($infoFields, ['Альтернативное название'])) as $name) {
+            $this->addAlias($aliases, $name, 'alternative', 'info');
+        }
+
+        foreach (explode('/', $title) as $name) {
+            $this->addAlias($aliases, $name, 'source_title', 'title');
+        }
+
+        return array_values($aliases);
+    }
+
+    /**
+     * @param  array<string, array{name: string, type: string, source: string}>  $aliases
+     */
+    private function addAlias(array &$aliases, ?string $name, string $type, string $source): void
+    {
+        $name = $this->stringValue($name);
+
+        if ($name === null || Str::length($name) > 160) {
+            return;
+        }
+
+        $key = $type.'|'.Str::lower($name);
+        $aliases[$key] = [
+            'name' => $name,
+            'type' => $type,
+            'source' => $source,
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function ageRatingNames(?string $value): array
+    {
+        $ratings = [];
+
+        foreach ($this->valueList($value) as $name) {
+            if (preg_match('/\b(\d{1,2})\s*\+?\b/u', $name, $matches) !== 1) {
+                continue;
+            }
+
+            $ratings[$matches[1].'+'] = $matches[1].'+';
+        }
+
+        return array_values($ratings);
+    }
+
+    /**
      * @return list<array{number: int, title: string|null, source_url: string|null, latest_episode_released_at: string|null, episodes_released: int|null, episodes_total: int|null, translation_name: string|null, release_status_text: string|null}>
      */
     private function seasons(DOMXPath $xpath, string $baseUrl): array
@@ -357,12 +640,17 @@ class SeasonvarCatalogParser
 
     private function seasonNumberFromUrl(string $value): ?int
     {
+        $value = urldecode($value);
+
         foreach ([
-            '/-(\d+)-season/i',
-            '/_s(\d+)\b/i',
+            '/(?:^|[-_\/])0*(\d{1,3})(?:[-_]*(?:season|sezon|сезон))\b/iu',
+            '/(?:season|sezon|сезон)[-_]*0*(\d{1,3})\b/iu',
+            '/[_-]s0*(\d{1,3})\b/iu',
         ] as $pattern) {
             if (preg_match($pattern, $value, $matches) === 1) {
-                return (int) $matches[1];
+                $number = (int) $matches[1];
+
+                return $number > 0 ? $number : null;
             }
         }
 
@@ -374,45 +662,21 @@ class SeasonvarCatalogParser
      */
     private function episodes(string $html, string $baseUrl, int $seasonNumber): array
     {
-        if (preg_match('/var\s+arEpisodes\s*=\s*(\[.*?\]);/s', $html, $matches) !== 1) {
-            return [];
-        }
-
-        $decoded = json_decode($matches[1], true);
-
-        if (json_last_error() !== JSON_ERROR_NONE || ! is_array($decoded)) {
-            return [];
-        }
-
         $episodes = [];
+        $payload = $this->episodePayload($html);
+        $decoded = $payload !== null ? json_decode($payload, true) : null;
 
-        foreach ($decoded as $group) {
-            if (! is_array($group)) {
-                continue;
-            }
+        if (is_array($decoded)) {
+            $this->collectEpisodesFromValue($decoded, $baseUrl, $seasonNumber, $episodes);
+        }
 
-            foreach ($group as $slug => $episode) {
-                if (! is_array($episode) || ! isset($episode['n']) || ! is_numeric($episode['n'])) {
-                    continue;
-                }
-
-                $number = (int) $episode['n'];
-
-                if ($number <= 0) {
-                    continue;
-                }
-
-                $episodeSlug = is_string($slug) && $slug !== '' ? $slug : $number.'_seriya';
-                $episodeTitle = $this->firstNonEmpty([
-                    $episode['title'] ?? null,
-                    $episode['name'] ?? null,
-                    $episode['t'] ?? null,
-                ]);
+        if ($episodes === []) {
+            foreach ($this->fallbackEpisodeNumbers($html) as $number) {
                 $episodes[$number] = [
                     'season_number' => $seasonNumber,
                     'number' => $number,
-                    'title' => $episodeTitle ?? $number.' серия',
-                    'source_url' => $baseUrl.'#'.$episodeSlug,
+                    'title' => $number.' серия',
+                    'source_url' => $baseUrl.'#'.$number.'_seriya',
                 ];
             }
         }
@@ -420,6 +684,141 @@ class SeasonvarCatalogParser
         ksort($episodes);
 
         return array_values($episodes);
+    }
+
+    private function episodePayload(string $html): ?string
+    {
+        if (preg_match('/var\s+arEpisodes\s*=\s*/u', $html, $matches, PREG_OFFSET_CAPTURE) !== 1) {
+            return null;
+        }
+
+        $start = $matches[0][1] + strlen($matches[0][0]);
+
+        return $this->balancedJavascriptValue($html, $start);
+    }
+
+    private function balancedJavascriptValue(string $text, int $start): ?string
+    {
+        $length = strlen($text);
+
+        while ($start < $length && ctype_space($text[$start])) {
+            $start++;
+        }
+
+        if ($start >= $length || ! in_array($text[$start], ['[', '{'], true)) {
+            return null;
+        }
+
+        $stack = [];
+        $stringQuote = null;
+        $escaped = false;
+
+        for ($position = $start; $position < $length; $position++) {
+            $char = $text[$position];
+
+            if ($stringQuote !== null) {
+                if ($escaped) {
+                    $escaped = false;
+
+                    continue;
+                }
+
+                if ($char === '\\') {
+                    $escaped = true;
+
+                    continue;
+                }
+
+                if ($char === $stringQuote) {
+                    $stringQuote = null;
+                }
+
+                continue;
+            }
+
+            if (in_array($char, ['"', "'"], true)) {
+                $stringQuote = $char;
+
+                continue;
+            }
+
+            if ($char === '[' || $char === '{') {
+                $stack[] = $char;
+
+                continue;
+            }
+
+            if ($char !== ']' && $char !== '}') {
+                continue;
+            }
+
+            $open = array_pop($stack);
+
+            if (($char === ']' && $open !== '[') || ($char === '}' && $open !== '{')) {
+                return null;
+            }
+
+            if ($stack === []) {
+                return substr($text, $start, $position - $start + 1);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<int, array{season_number: int, number: int, title: string|null, source_url: string|null}>  $episodes
+     */
+    private function collectEpisodesFromValue(mixed $value, string $baseUrl, int $seasonNumber, array &$episodes, string|int|null $key = null): void
+    {
+        if (! is_array($value)) {
+            return;
+        }
+
+        if (isset($value['n']) && is_numeric($value['n'])) {
+            $number = (int) $value['n'];
+
+            if ($number <= 0) {
+                return;
+            }
+
+            $episodeSlug = is_string($key) && $key !== '' ? $key : $number.'_seriya';
+            $episodeTitle = $this->firstNonEmpty([
+                $value['title'] ?? null,
+                $value['name'] ?? null,
+                $value['t'] ?? null,
+            ]);
+            $episodes[$number] = [
+                'season_number' => $seasonNumber,
+                'number' => $number,
+                'title' => $episodeTitle ?? $number.' серия',
+                'source_url' => $baseUrl.'#'.$episodeSlug,
+            ];
+
+            return;
+        }
+
+        foreach ($value as $childKey => $childValue) {
+            $this->collectEpisodesFromValue($childValue, $baseUrl, $seasonNumber, $episodes, $childKey);
+        }
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function fallbackEpisodeNumbers(string $html): array
+    {
+        if (preg_match_all('/["\']?n["\']?\s*:\s*["\']?(\d{1,3})["\']?/iu', $html, $matches) !== 1) {
+            return [];
+        }
+
+        return collect($matches[1])
+            ->map(fn (string $number): int => (int) $number)
+            ->filter(fn (int $number): bool => $number > 0)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
     }
 
     /**
@@ -561,9 +960,9 @@ class SeasonvarCatalogParser
     private function seasonvarPlaylistUrls(string $html): array
     {
         $text = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $text = str_replace(['\\/', '\\u002F', '\\x2F'], '/', $text);
+        $text = str_replace(['\/', '\u002F', '\x2F'], '/', $text);
 
-        $matchesCount = preg_match_all('~[\'\"](?<url>(?:(?:https?:)?//[^\'\"]+)?/playls2/[^\'\"]*?/plist\.txt(?:\?[^\'\"]*)?)[\'\"]~iu', $text, $matches);
+        $matchesCount = preg_match_all('~[\'"](?<url>(?:(?:https?:)?//[^\'"]+)?/playls2/[^\'"]*?/plist\.txt(?:\?[^\'"]*)?)[\'"]~iu', $text, $matches);
 
         if ($matchesCount === false || $matchesCount === 0) {
             return [];
@@ -675,7 +1074,7 @@ class SeasonvarCatalogParser
     /**
      * @return list<array{type: string, name: string, source_url: string|null}>
      */
-    private function taxonomies(DOMXPath $xpath, string $baseUrl, array $structuredData): array
+    private function taxonomies(DOMXPath $xpath, string $baseUrl, array $structuredData, array $infoFields): array
     {
         $items = [];
 
@@ -689,43 +1088,39 @@ class SeasonvarCatalogParser
             $items[$key] = ['type' => 'genre', 'name' => $name, 'source_url' => null];
         }
 
-        foreach ($this->valueList($this->infoField($xpath, 'Жанр')) as $name) {
+        foreach ($this->valueList($this->firstInfoField($infoFields, ['Жанр'])) as $name) {
             $key = 'genre|'.Str::lower($name);
             $items[$key] = ['type' => 'genre', 'name' => $name, 'source_url' => null];
         }
 
-        foreach ($this->valueList($this->infoField($xpath, 'Страна')) as $name) {
+        foreach ($this->valueList($this->firstInfoField($infoFields, ['Страна'])) as $name) {
             $key = 'country|'.Str::lower($name);
             $items[$key] = ['type' => 'country', 'name' => $name, 'source_url' => null];
         }
 
-        foreach ($this->valueList($this->infoField($xpath, 'Ограничение')) as $name) {
-            if (preg_match('/^\d{1,2}\+?$/u', $name) !== 1) {
-                continue;
-            }
-
+        foreach ($this->ageRatingNames($this->firstInfoField($infoFields, ['Ограничение'])) as $name) {
             $key = 'age_rating|'.Str::lower($name);
             $items[$key] = ['type' => 'age_rating', 'name' => $name, 'source_url' => null];
         }
 
         foreach (['Перевод', 'Озвучка'] as $label) {
-            foreach ($this->valueList($this->infoField($xpath, $label)) as $name) {
+            foreach ($this->valueList($this->firstInfoField($infoFields, [$label])) as $name) {
                 $key = 'translation|'.Str::lower($name);
                 $items[$key] = ['type' => 'translation', 'name' => $name, 'source_url' => null];
             }
         }
 
-        foreach ($this->valueList($this->infoField($xpath, 'Статус')) as $name) {
+        foreach ($this->valueList($this->firstInfoField($infoFields, ['Статус'])) as $name) {
             $key = 'status|'.Str::lower($name);
             $items[$key] = ['type' => 'status', 'name' => $name, 'source_url' => null];
         }
 
-        foreach ($this->valueList($this->infoField($xpath, 'Канал')) as $name) {
+        foreach ($this->valueList($this->firstInfoField($infoFields, ['Канал'])) as $name) {
             $key = 'network|'.Str::lower($name);
             $items[$key] = ['type' => 'network', 'name' => $name, 'source_url' => null];
         }
 
-        foreach ($this->valueList($this->infoField($xpath, 'Студия')) as $name) {
+        foreach ($this->valueList($this->firstInfoField($infoFields, ['Студия'])) as $name) {
             $key = 'studio|'.Str::lower($name);
             $items[$key] = ['type' => 'studio', 'name' => $name, 'source_url' => null];
         }
@@ -738,6 +1133,18 @@ class SeasonvarCatalogParser
         foreach ($this->valueList($this->firstText($xpath, ['//*[@itemprop="directors"]//*[@itemprop="name"]'])) as $name) {
             $key = 'director|'.Str::lower($name);
             $items[$key] = ['type' => 'director', 'name' => $name, 'source_url' => null];
+        }
+
+        foreach ($this->valueList($this->firstInfoField($infoFields, ['Режиссер', 'Режиссёр'])) as $name) {
+            $key = 'director|'.Str::lower($name);
+            $items[$key] = ['type' => 'director', 'name' => $name, 'source_url' => null];
+        }
+
+        foreach (['В ролях', 'Актеры', 'Актёры'] as $label) {
+            foreach ($this->valueList($this->firstInfoField($infoFields, [$label])) as $name) {
+                $key = 'actor|'.Str::lower($name);
+                $items[$key] = ['type' => 'actor', 'name' => $name, 'source_url' => null];
+            }
         }
 
         foreach ([
@@ -888,21 +1295,7 @@ class SeasonvarCatalogParser
 
     private function infoField(DOMXPath $xpath, string $label): ?string
     {
-        foreach ($xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " pgs-sinfo_list ")]') ?: [] as $node) {
-            $text = $this->stringValue($node->textContent);
-
-            if ($text === null || ! Str::contains($text, $label.':')) {
-                continue;
-            }
-
-            $pattern = '/'.preg_quote($label, '/').'\s*:\s*(.*?)(?=\s*(?:Оригинал|Жанр|Ограничение|Страна|Вышел|Режиссер|Перевод|Озвучка|Статус|Канал|Студия|IMDB|КиноПоиск)\s*:|$)/u';
-
-            if (preg_match($pattern, $text, $matches) === 1) {
-                return trim($matches[1]);
-            }
-        }
-
-        return null;
+        return $this->firstInfoField($this->infoFields($xpath), [$label]);
     }
 
     /**

@@ -79,6 +79,22 @@ class CatalogTitle extends Model
     }
 
     /**
+     * @return HasMany<CatalogTitleAlias, $this>
+     */
+    public function aliases(): HasMany
+    {
+        return $this->hasMany(CatalogTitleAlias::class);
+    }
+
+    /**
+     * @return HasMany<CatalogTitleRating, $this>
+     */
+    public function ratings(): HasMany
+    {
+        return $this->hasMany(CatalogTitleRating::class);
+    }
+
+    /**
      * @return BelongsToMany<Taxonomy, $this>
      */
     public function taxonomies(): BelongsToMany

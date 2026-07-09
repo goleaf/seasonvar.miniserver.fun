@@ -26,21 +26,34 @@
                         ])>{{ $title->original_title }}</span>
                     @endif
                     @if ($latestSeason)
-                        <span class="text-sm text-slate-500">Сезон {{ $latestSeason->number }}</span>
+                        <span class="inline-flex items-center gap-1 text-sm text-slate-500">
+                            <i class="fa-solid fa-layer-group text-[0.85em] text-slate-400" aria-hidden="true"></i>
+                            <span>Сезон {{ $latestSeason->number }}</span>
+                        </span>
                     @else
-                        <span class="text-sm text-slate-500">Сезон разбирается</span>
+                        <span class="inline-flex items-center gap-1 text-sm text-slate-500">
+                            <i class="fa-solid fa-layer-group text-[0.85em] text-slate-400" aria-hidden="true"></i>
+                            <span>Сезон разбирается</span>
+                        </span>
                     @endif
                 </div>
 
                 <div class="flex shrink-0 flex-wrap gap-2 text-xs font-semibold">
                     @if ($title->year)
-                        <span class="rounded-full bg-slate-50 px-2 py-1 text-slate-500 ring-1 ring-slate-200">{{ $title->year }}</span>
+                        <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-500 ring-1 ring-slate-200">
+                            <i class="fa-solid fa-calendar-days text-[0.85em]" aria-hidden="true"></i>
+                            <span>{{ $title->year }}</span>
+                        </span>
                     @endif
                     @unless ($compact)
-                        <span class="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 ring-1 ring-emerald-100">{{ $seasonsCount }} сезон(ов)</span>
+                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 ring-1 ring-emerald-100">
+                            <i class="fa-solid fa-layer-group text-[0.85em]" aria-hidden="true"></i>
+                            <span>{{ $seasonsCount }} сезон(ов)</span>
+                        </span>
                     @endunless
-                    <span class="rounded-full bg-sky-50 px-2 py-1 text-sky-700 ring-1 ring-sky-100">
-                        {{ $episodesCount > 0 ? $episodesCount.' серий' : 'серии разбираются' }}
+                    <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700 ring-1 ring-sky-100">
+                        <i class="fa-solid fa-circle-play text-[0.85em]" aria-hidden="true"></i>
+                        <span>{{ $episodesCount > 0 ? $episodesCount.' серий' : 'серии разбираются' }}</span>
                     </span>
                 </div>
             </div>

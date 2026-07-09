@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => $title->title])
+@extends('layouts.app', ['title' => $seo['title'] ?? $title->title, 'seo' => $seo ?? []])
 
 @php
     $taxonomiesByType = $taxonomiesByType ?? collect([
@@ -36,15 +36,27 @@
         'studio' => 'Студии',
         'tag' => 'Теги',
     ];
+    $taxonomyIcons = [
+        'genre' => 'fa-solid fa-masks-theater',
+        'country' => 'fa-solid fa-earth-europe',
+        'actor' => 'fa-solid fa-user-group',
+        'director' => 'fa-solid fa-video',
+        'age_rating' => 'fa-solid fa-shield-halved',
+        'translation' => 'fa-solid fa-language',
+        'status' => 'fa-solid fa-signal',
+        'network' => 'fa-solid fa-tower-broadcast',
+        'studio' => 'fa-solid fa-building',
+        'tag' => 'fa-solid fa-tag',
+    ];
     $taxonomyRows = [
-        ['label' => 'Жанр', 'items' => $genres],
-        ['label' => 'Ограничение', 'items' => $ageRatings],
-        ['label' => 'Страна', 'items' => $countries],
-        ['label' => 'Режиссер', 'items' => $directors],
-        ['label' => 'Перевод', 'items' => $translations],
-        ['label' => 'Статус', 'items' => $statuses],
-        ['label' => 'Канал', 'items' => $networks],
-        ['label' => 'Студия', 'items' => $studios],
+        ['label' => 'Жанр', 'items' => $genres, 'icon' => $taxonomyIcons['genre']],
+        ['label' => 'Ограничение', 'items' => $ageRatings, 'icon' => $taxonomyIcons['age_rating']],
+        ['label' => 'Страна', 'items' => $countries, 'icon' => $taxonomyIcons['country']],
+        ['label' => 'Режиссер', 'items' => $directors, 'icon' => $taxonomyIcons['director']],
+        ['label' => 'Перевод', 'items' => $translations, 'icon' => $taxonomyIcons['translation']],
+        ['label' => 'Статус', 'items' => $statuses, 'icon' => $taxonomyIcons['status']],
+        ['label' => 'Канал', 'items' => $networks, 'icon' => $taxonomyIcons['network']],
+        ['label' => 'Студия', 'items' => $studios, 'icon' => $taxonomyIcons['studio']],
     ];
     $seasons = $seasons ?? $title->seasons->sortBy('number')->values();
     $mediaItems = $mediaItems ?? collect();
@@ -63,7 +75,10 @@
         <main class="min-w-0 space-y-5">
             <x-ui.panel :pad="false">
                 <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
-                    <a href="{{ route('home') }}" class="inline-flex items-center rounded-lg bg-white px-3 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">Вернуться</a>
+                    <a href="{{ route('home') }}" class="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                        <span>Вернуться</span>
+                    </a>
                 </div>
 
                 <article class="grid gap-4 p-3 sm:p-4 md:grid-cols-[minmax(150px,220px)_minmax(0,1fr)] md:gap-5">
@@ -71,31 +86,43 @@
                         <x-title-poster :title="$title" class="mx-auto aspect-[2/3] w-44 max-w-full border border-slate-200 sm:w-52 md:w-full" empty-class="grid h-full place-items-center px-6 text-center text-sm text-slate-400" />
 
                         <div class="mt-3 grid grid-cols-2 gap-2 text-center text-xs font-bold">
-                            <span class="rounded-lg bg-emerald-50 px-2 py-2 text-emerald-700 ring-1 ring-emerald-100">{{ $taxonomyCount > 0 ? $taxonomyCount.' связей' : 'нет связей' }}</span>
+                            <span class="inline-flex items-center justify-center gap-1 rounded-lg bg-emerald-50 px-2 py-2 text-emerald-700 ring-1 ring-emerald-100">
+                                <i class="fa-solid fa-diagram-project" aria-hidden="true"></i>
+                                <span>{{ $taxonomyCount > 0 ? $taxonomyCount.' связей' : 'нет связей' }}</span>
+                            </span>
                             <span @class([
-                                'rounded-lg px-2 py-2 ring-1',
+                                'inline-flex items-center justify-center gap-1 rounded-lg px-2 py-2 ring-1',
                                 'bg-emerald-50 text-emerald-700 ring-emerald-100' => $selectedMedia,
                                 'bg-amber-50 text-amber-700 ring-amber-100' => ! $selectedMedia,
-                            ])>{{ $selectedMedia ? 'плеер готов' : 'нет медиа' }}</span>
+                            ])>
+                                <i class="{{ $selectedMedia ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation' }}" aria-hidden="true"></i>
+                                <span>{{ $selectedMedia ? 'плеер готов' : 'нет медиа' }}</span>
+                            </span>
                         </div>
                     </div>
 
                     <div class="min-w-0">
-                        <h1 class="text-xl font-black leading-tight text-slate-700 sm:text-2xl">Сериал {{ $title->title }} онлайн</h1>
+                        <h1 class="inline-flex items-start gap-2 text-xl font-black leading-tight text-slate-700 sm:text-2xl">
+                            <i class="fa-solid fa-clapperboard mt-1 text-emerald-700" aria-hidden="true"></i>
+                            <span>Сериал {{ $title->title }} онлайн</span>
+                        </h1>
                         <div class="mt-3 flex flex-wrap gap-2 text-xs font-bold">
                             @if ($title->year)
-                                <x-ui.taxonomy-chip :href="route('titles.index', ['year' => $title->year])" active>{{ $title->year }}</x-ui.taxonomy-chip>
+                                <x-ui.taxonomy-chip :href="route('titles.index', ['year' => $title->year])" active icon="fa-solid fa-calendar-days">{{ $title->year }}</x-ui.taxonomy-chip>
                             @endif
                             @foreach ($ageRatings as $ageRating)
                                 <x-ui.taxonomy-chip :taxonomy="$ageRating" active />
                             @endforeach
                             @if ($seasons->isNotEmpty())
-                                <x-ui.taxonomy-chip>{{ $seasons->count() }} сезон(ов)</x-ui.taxonomy-chip>
+                                <x-ui.taxonomy-chip icon="fa-solid fa-layer-group">{{ $seasons->count() }} сезон(ов)</x-ui.taxonomy-chip>
                             @endif
                         </div>
 
                         <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50">
-                            <div class="border-b border-slate-200 px-3 py-2 text-sm font-bold text-slate-700">Описание</div>
+                            <div class="flex items-center gap-2 border-b border-slate-200 px-3 py-2 text-sm font-bold text-slate-700">
+                                <i class="fa-solid fa-book-open text-slate-400" aria-hidden="true"></i>
+                                <span>Описание</span>
+                            </div>
                             @if ($title->description)
                                 <p class="px-3 py-3 text-sm leading-6 text-slate-600">{{ $title->description }}</p>
                             @else
@@ -105,7 +132,10 @@
 
                         @if ($actors->isNotEmpty())
                             <div class="mt-5">
-                                <div class="text-sm font-bold text-slate-700">В ролях</div>
+                                <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
+                                    <i class="fa-solid fa-user-group text-slate-400" aria-hidden="true"></i>
+                                    <span>В ролях</span>
+                                </div>
                                 <div class="mt-2 flex flex-wrap gap-2">
                                     @foreach ($actors->take(12) as $actor)
                                         <x-ui.taxonomy-chip :taxonomy="$actor" />
@@ -117,7 +147,10 @@
                         <dl class="mt-5 divide-y divide-slate-200 text-sm">
                             @if ($title->original_title)
                                 <div class="grid gap-2 py-2 sm:grid-cols-[120px_1fr]">
-                                    <dt class="font-bold text-slate-500">Оригинал</dt>
+                                    <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
+                                        <i class="fa-solid fa-language text-slate-400" aria-hidden="true"></i>
+                                        <span>Оригинал</span>
+                                    </dt>
                                     <dd class="text-slate-700">{{ $title->original_title }}</dd>
                                 </div>
                             @endif
@@ -125,7 +158,10 @@
                             @foreach ($taxonomyRows as $row)
                                 @if ($row['items']->isNotEmpty())
                                     <div class="grid gap-2 py-2 sm:grid-cols-[120px_1fr]">
-                                        <dt class="font-bold text-slate-500">{{ $row['label'] }}</dt>
+                                        <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
+                                            <i class="{{ $row['icon'] ?? 'fa-solid fa-tag' }} text-slate-400" aria-hidden="true"></i>
+                                            <span>{{ $row['label'] }}</span>
+                                        </dt>
                                         <dd class="flex flex-wrap gap-1">
                                             @foreach ($row['items'] as $taxonomy)
                                                 <x-ui.taxonomy-chip :taxonomy="$taxonomy" />
@@ -137,8 +173,16 @@
 
                             @if ($title->year)
                                 <div class="grid gap-2 py-2 sm:grid-cols-[120px_1fr]">
-                                    <dt class="font-bold text-slate-500">Вышел</dt>
-                                    <dd><a href="{{ route('titles.index', ['year' => $title->year]) }}" class="font-semibold text-emerald-700 hover:text-emerald-600">{{ $title->year }}</a></dd>
+                                    <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
+                                        <i class="fa-solid fa-calendar-days text-slate-400" aria-hidden="true"></i>
+                                        <span>Вышел</span>
+                                    </dt>
+                                    <dd>
+                                        <a href="{{ route('titles.index', ['year' => $title->year]) }}" class="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-600">
+                                            <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
+                                            <span>{{ $title->year }}</span>
+                                        </a>
+                                    </dd>
                                 </div>
                             @endif
                         </dl>
@@ -154,7 +198,7 @@
                 </article>
             </x-ui.panel>
 
-            <x-ui.panel title="Сезоны" :pad="false">
+            <x-ui.panel title="Сезоны" icon="fa-solid fa-layer-group" :pad="false">
                 <div class="divide-y divide-slate-200">
                     @forelse ($seasons as $season)
                         @php
@@ -182,7 +226,10 @@
                         <div class="px-4 py-3">
                             <div class="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
                                 <div>
-                                    <h2 class="font-bold text-slate-700">Сезон {{ $season->number }}</h2>
+                                    <h2 class="inline-flex items-center gap-2 font-bold text-slate-700">
+                                        <i class="fa-solid fa-layer-group text-slate-400" aria-hidden="true"></i>
+                                        <span>Сезон {{ $season->number }}</span>
+                                    </h2>
                                     @if ($season->title && $season->title !== 'Сезон '.$season->number)
                                         <p class="mt-1 text-xs font-semibold text-slate-500">{{ $season->title }}</p>
                                     @endif
@@ -201,7 +248,7 @@
                             </div>
 
                             @if ($seasonEpisodeCount > 0)
-                                <div class="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                        <div id="season-{{ $season->number }}" class="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                                     @foreach ($season->episodes->sortBy('number')->values() as $episode)
                                         @php
                                             $episodeMediaItems = $mediaByEpisodeId->get($episode->id, collect());
@@ -214,12 +261,18 @@
                                             'bg-slate-50 ring-slate-200 hover:bg-emerald-50 hover:ring-emerald-200' => ! $isSelectedEpisode,
                                         ]) @if ($isSelectedEpisode) aria-current="true" @endif>
                                             <div class="flex items-start justify-between gap-2">
-                                                <div class="font-bold text-slate-700">{{ $episode->number }} серия</div>
+                                                <div class="inline-flex items-center gap-2 font-bold text-slate-700">
+                                                    <i class="fa-solid fa-circle-play text-emerald-700" aria-hidden="true"></i>
+                                                    <span>{{ $episode->number }} серия</span>
+                                                </div>
                                                 <span @class([
-                                                    'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ring-1',
+                                                    'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold ring-1',
                                                     'bg-emerald-100 text-emerald-700 ring-emerald-200' => $episodeHasMedia,
                                                     'bg-white text-slate-500 ring-slate-200' => ! $episodeHasMedia,
-                                                ])>{{ $episodeHasMedia ? 'видео' : 'без файла' }}</span>
+                                                ])>
+                                                    <i class="{{ $episodeHasMedia ? 'fa-solid fa-play' : 'fa-solid fa-circle' }}" aria-hidden="true"></i>
+                                                    <span>{{ $episodeHasMedia ? 'видео' : 'без файла' }}</span>
+                                                </span>
                                             </div>
                                             @if ($episode->title)
                                                 <div class="mt-0.5 line-clamp-2 text-xs text-slate-500">{{ $episode->title }}</div>
@@ -238,21 +291,33 @@
                 </div>
             </x-ui.panel>
 
-            <x-ui.panel id="player" title="Просмотр" subtitle="Выберите серию выше. Плеер покажет подключенный файл этой серии.">
+            <x-ui.panel id="player" title="Просмотр" subtitle="Выберите серию выше. Плеер покажет подключенный файл этой серии." icon="fa-solid fa-circle-play">
                 <div class="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600">
                     @if ($selectedEpisode)
-                        <span class="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 ring-1 ring-emerald-100">Выбрана {{ $selectedEpisode->number }} серия</span>
+                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 ring-1 ring-emerald-100">
+                            <i class="fa-solid fa-circle-play" aria-hidden="true"></i>
+                            <span>Выбрана {{ $selectedEpisode->number }} серия</span>
+                        </span>
                         @if ($selectedEpisode->title)
-                            <span class="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">{{ $selectedEpisode->title }}</span>
+                            <span class="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
+                                <i class="fa-solid fa-file-lines text-slate-400" aria-hidden="true"></i>
+                                <span>{{ $selectedEpisode->title }}</span>
+                            </span>
                         @endif
                     @else
-                        <span class="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">Серия не выбрана</span>
+                        <span class="inline-flex items-center gap-1 rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">
+                            <i class="fa-solid fa-circle-info text-slate-400" aria-hidden="true"></i>
+                            <span>Серия не выбрана</span>
+                        </span>
                     @endif
                     <span @class([
-                        'sm:ml-auto rounded-full px-3 py-1 ring-1',
+                        'inline-flex items-center gap-1 sm:ml-auto rounded-full px-3 py-1 ring-1',
                         'bg-emerald-50 text-emerald-700 ring-emerald-100' => $selectedMedia,
                         'bg-amber-50 text-amber-700 ring-amber-100' => ! $selectedMedia,
-                    ])>{{ $selectedMedia ? 'видео найдено' : 'файл ожидается' }}</span>
+                    ])>
+                        <i class="{{ $selectedMedia ? 'fa-solid fa-circle-check' : 'fa-solid fa-clock' }}" aria-hidden="true"></i>
+                        <span>{{ $selectedMedia ? 'видео найдено' : 'файл ожидается' }}</span>
+                    </span>
                 </div>
 
                 <div @class([
@@ -261,13 +326,16 @@
                     'border-amber-200 bg-amber-50' => ! $selectedMedia,
                 ])>
                     @if ($selectedMedia && $selectedMediaUrl)
-                        <video controls playsinline preload="metadata" poster="{{ $title->poster_url }}" class="aspect-video w-full bg-black">
+                        <video controls playsinline preload="metadata" poster="{{ $title->poster_url }}" class="aspect-video w-full bg-slate-100">
                             <source src="{{ $selectedMediaUrl }}">
                             Ваш браузер не поддерживает воспроизведение видео.
                         </video>
                     @else
                         <div class="grid aspect-video place-items-center p-6 text-center text-amber-700">
                             <div>
+                                <div class="mb-3 text-3xl text-amber-600">
+                                    <i class="fa-solid fa-circle-play" aria-hidden="true"></i>
+                                </div>
                                 <div class="text-lg font-bold text-amber-800">
                                     {{ $selectedEpisode ? 'Файл для выбранной серии еще не подключен' : 'Выберите серию для просмотра' }}
                                 </div>
@@ -277,17 +345,21 @@
                     @endif
                 </div>
 
-                <div class="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-600">
-                    <span class="rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">Локальный плеер</span>
-                    @if ($selectedMedia)
-                        <span class="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 ring-1 ring-emerald-100">{{ $selectedMedia->title }}</span>
-                    @endif
-                    <span class="sm:ml-auto text-slate-500">Выберите файл</span>
-                </div>
+                @if ($selectedMedia)
+                    <div class="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-600">
+                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 ring-1 ring-emerald-100">
+                            <i class="fa-solid fa-file-video" aria-hidden="true"></i>
+                            <span>{{ $selectedMedia->title }}</span>
+                        </span>
+                    </div>
+                @endif
 
                 @if ($mediaItems->isNotEmpty())
                     <div class="mt-3 rounded-lg border border-slate-200 bg-white">
-                        <div class="border-b border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700">Файлы плейлиста</div>
+                        <div class="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700">
+                            <i class="fa-solid fa-folder-open text-slate-400" aria-hidden="true"></i>
+                            <span>Файлы плейлиста</span>
+                        </div>
                         <div class="max-h-80 divide-y divide-slate-200 overflow-y-auto">
                             @foreach ($mediaItems as $media)
                                 @php
@@ -306,8 +378,14 @@
                                     'bg-emerald-50' => $selectedMedia?->id === $media->id,
                                 ])>
                                     <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                        <span class="font-semibold text-slate-700">{{ $media->title }}</span>
-                                        <span class="text-xs font-semibold text-slate-500">{{ $mediaDetails !== '' ? $mediaDetails : 'Файл сериала' }}</span>
+                                        <span class="inline-flex items-center gap-2 font-semibold text-slate-700">
+                                            <i class="fa-solid fa-file-video text-emerald-700" aria-hidden="true"></i>
+                                            <span>{{ $media->title }}</span>
+                                        </span>
+                                        <span class="inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
+                                            <i class="fa-solid fa-circle-info text-slate-400" aria-hidden="true"></i>
+                                            <span>{{ $mediaDetails !== '' ? $mediaDetails : 'Файл сериала' }}</span>
+                                        </span>
                                     </div>
                                 </a>
                             @endforeach
@@ -316,7 +394,7 @@
                 @endif
             </x-ui.panel>
 
-            <x-ui.panel title="Советуем посмотреть" :pad="false">
+            <x-ui.panel title="Советуем посмотреть" icon="fa-solid fa-thumbs-up" :pad="false">
                 <div class="divide-y divide-slate-200">
                     @forelse ($recommendedTitles as $recommendedTitle)
                         <a href="{{ route('titles.show', $recommendedTitle) }}" class="block p-4 hover:bg-emerald-50">
@@ -325,7 +403,10 @@
                                 <div class="min-w-0">
                                     <div class="font-bold text-slate-700">{{ $recommendedTitle->title }}</div>
                                     @if (isset($recommendedTitle->shared_taxonomies_count) && $recommendedTitle->shared_taxonomies_count > 0)
-                                        <div class="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">{{ $recommendedTitle->shared_taxonomies_count }} общих связей</div>
+                                        <div class="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">
+                                            <i class="fa-solid fa-diagram-project" aria-hidden="true"></i>
+                                            <span>{{ $recommendedTitle->shared_taxonomies_count }} общих связей</span>
+                                        </div>
                                     @endif
                                     @if ($recommendedTitle->description)
                                         <p class="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">{{ $recommendedTitle->description }}</p>
@@ -339,28 +420,53 @@
                 </div>
             </x-ui.panel>
 
-            <x-ui.panel title="Комментарии">
-                <p class="text-sm leading-6 text-slate-500">Комментарии не импортируются. Здесь остается локальный блок страницы, чтобы макет соответствовал структуре страницы сериала.</p>
-            </x-ui.panel>
+            @if (! empty($seo['faq']))
+                <x-ui.panel title="Вопросы о сериале" icon="fa-solid fa-circle-question" :pad="false">
+                    <div class="divide-y divide-slate-200">
+                        @foreach ($seo['faq'] as $faqItem)
+                            <details class="group px-4 py-3">
+                                <summary class="flex cursor-pointer list-none items-center justify-between gap-3 font-bold text-slate-700">
+                                    <span>{{ $faqItem['question'] }}</span>
+                                    <i class="fa-solid fa-chevron-down text-slate-400 transition group-open:rotate-180" aria-hidden="true"></i>
+                                </summary>
+                                <p class="mt-2 text-sm leading-6 text-slate-600">{{ $faqItem['answer'] }}</p>
+                            </details>
+                        @endforeach
+                    </div>
+                </x-ui.panel>
+            @endif
+
         </main>
 
         <aside class="space-y-4">
-            <x-ui.panel title="Данные страницы" :pad="false">
+            <x-ui.panel title="Данные страницы" icon="fa-solid fa-chart-simple" :pad="false">
                 <div class="grid grid-cols-2 gap-2 p-3 text-center text-xs font-bold">
                     <div class="rounded-lg bg-slate-50 px-2 py-3 text-slate-600 ring-1 ring-slate-200">
-                        <div class="text-lg text-emerald-700">{{ $seasons->count() }}</div>
+                        <div class="flex items-center justify-center gap-2 text-lg text-emerald-700">
+                            <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                            <span>{{ $seasons->count() }}</span>
+                        </div>
                         <div>сезонов</div>
                     </div>
                     <div class="rounded-lg bg-slate-50 px-2 py-3 text-slate-600 ring-1 ring-slate-200">
-                        <div class="text-lg text-emerald-700">{{ $episodeCount }}</div>
+                        <div class="flex items-center justify-center gap-2 text-lg text-emerald-700">
+                            <i class="fa-solid fa-circle-play" aria-hidden="true"></i>
+                            <span>{{ $episodeCount }}</span>
+                        </div>
                         <div>серий</div>
                     </div>
                     <div class="rounded-lg bg-slate-50 px-2 py-3 text-slate-600 ring-1 ring-slate-200">
-                        <div class="text-lg text-emerald-700">{{ $taxonomyCount }}</div>
+                        <div class="flex items-center justify-center gap-2 text-lg text-emerald-700">
+                            <i class="fa-solid fa-diagram-project" aria-hidden="true"></i>
+                            <span>{{ $taxonomyCount }}</span>
+                        </div>
                         <div>связей</div>
                     </div>
                     <div class="rounded-lg bg-slate-50 px-2 py-3 text-slate-600 ring-1 ring-slate-200">
-                        <div class="text-lg text-emerald-700">{{ $mediaCount }}</div>
+                        <div class="flex items-center justify-center gap-2 text-lg text-emerald-700">
+                            <i class="fa-solid fa-file-video" aria-hidden="true"></i>
+                            <span>{{ $mediaCount }}</span>
+                        </div>
                         <div>файлов</div>
                     </div>
                 </div>
@@ -369,7 +475,7 @@
                 </div>
             </x-ui.panel>
 
-            <x-ui.panel title="Источник" :pad="false">
+            <x-ui.panel title="Источник" icon="fa-solid fa-link" :pad="false">
                 <dl class="divide-y divide-slate-200 text-sm">
                     <div class="px-3 py-2">
                         <dt class="text-slate-500">Внешний номер</dt>
@@ -381,7 +487,12 @@
                     </div>
                     <div class="px-3 py-2">
                         <dt class="text-slate-500">Источник</dt>
-                        <dd><a href="{{ $title->source_url }}" rel="nofollow noopener" class="break-all font-semibold text-emerald-700 hover:text-emerald-600">{{ $title->source_url }}</a></dd>
+                        <dd>
+                            <a href="{{ $title->source_url }}" rel="nofollow noopener" class="inline-flex min-w-0 items-start gap-1 break-all font-semibold text-emerald-700 hover:text-emerald-600">
+                                <i class="fa-solid fa-arrow-up-right-from-square mt-1 shrink-0" aria-hidden="true"></i>
+                                <span>{{ $title->source_url }}</span>
+                            </a>
+                        </dd>
                     </div>
                     @if ($title->sourcePage)
                         <div class="px-3 py-2">
@@ -396,12 +507,15 @@
                 </dl>
             </x-ui.panel>
 
-            <x-ui.panel title="Связи каталога">
+            <x-ui.panel title="Связи каталога" icon="fa-solid fa-diagram-project">
                 <div class="space-y-3">
                     @forelse ($taxonomyGroups as $taxonomyType => $taxonomies)
                         <div>
                             <div class="mb-2 flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                                <span>{{ $taxonomyLabels[$taxonomyType] ?? $taxonomyType }}</span>
+                                <span class="inline-flex items-center gap-2">
+                                    <i class="{{ $taxonomyIcons[$taxonomyType] ?? 'fa-solid fa-tag' }} text-slate-400" aria-hidden="true"></i>
+                                    <span>{{ $taxonomyLabels[$taxonomyType] ?? $taxonomyType }}</span>
+                                </span>
                                 <span class="rounded-full bg-slate-50 px-2 py-0.5 text-slate-500 ring-1 ring-slate-200">{{ $taxonomies->count() }}</span>
                             </div>
                             <div class="flex flex-wrap gap-2">
@@ -416,9 +530,12 @@
                 </div>
             </x-ui.panel>
 
-            <x-ui.panel title="Синхронизация">
+            <x-ui.panel title="Синхронизация" icon="fa-solid fa-rotate">
                 <div class="space-y-3 text-sm text-slate-500">
-                    <code class="block rounded-lg bg-slate-50 p-3 text-xs font-semibold text-emerald-700 ring-1 ring-slate-200">php artisan seasonvar:full-sync</code>
+                    <div class="flex items-center gap-2 rounded-lg bg-slate-50 p-3 text-xs font-semibold text-emerald-700 ring-1 ring-slate-200">
+                        <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+                        <code>php artisan seasonvar:full-sync</code>
+                    </div>
                     <p>Обновляет зеркало карты сайта, страницы, метаданные, постеры, сезоны и серии.</p>
                 </div>
             </x-ui.panel>
