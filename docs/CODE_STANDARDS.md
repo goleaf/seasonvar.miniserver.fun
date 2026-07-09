@@ -14,6 +14,7 @@
 - `docs/views.md` для правил Blade-шаблонов и view-model/view-data слоя.
 - `docs/forms.md` для Form Request, old input, ошибок и компонентных правил форм.
 - `docs/storage.md` для upload-дисков, file validation, visibility и cleanup-правил.
+- `docs/notifications.md` для email/notification каналов, queue-правил и operational alerts.
 - `docs/authorization.md` для gates, policies, middleware и правил доступа к служебным страницам.
 - `docs/validation.md` для Form Request-классов, правил ввода и reusable validation rules.
 - `docs/DATA_RELATIONS.md` для полей импортера, Eloquent-связей, фильтров и смысла данных.
@@ -37,6 +38,7 @@
 - Размещать request validation в Form Request-классах; reusable/сложные проверки оформлять Rule-классами.
 - Размещать authorization decisions в gates, policies или middleware; Blade может использовать только простые `@can`, `@cannot`, `@auth`, `@guest` для отображения.
 - Пользовательские uploads хранить только через приватный disk `uploads` или явно авторизованный private-диск; публичную выдачу делать отдельным signed/authorized endpoint.
+- Notifications и emails должны быть queueable, содержать только безопасный operational context и тестироваться отдельно на dispatch и content.
 
 ## Правила импортера
 

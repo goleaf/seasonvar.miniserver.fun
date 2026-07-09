@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Jobs\RunSeasonvarImport;
 use App\Models\SeasonvarImportRun;
+use App\Notifications\SeasonvarImportFailed;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Mockery;
 use RuntimeException;
@@ -120,5 +122,30 @@ class RunSeasonvarImportJobTest extends TestCase
 
         (new RunSeasonvarImport(argument: 'https://seasonvar.ru/serial-1-Test-1-season.html', force: true, discover: false))
             ->failed(new RuntimeException('network failed'));
+    }
+
+    public function test_job_sends_on_demand_import_failure_notification_when_recipient_is_configured(): void
+    {
+        Notification::fake();
+        Log::spy();
+        config([
+            'notifications.seasonvar_import_failed.mail_to' => 'ops@example.com',
+            'notifications.seasonvar_import_failed.mail_to_name' => 'Ops',
+        ]);
+
+        (new RunSeasonvarImport(argument: 'https://seasonvar.ru/serial-1-Test-1-season.html', force: true, discover: false))
+            ->failed(new RuntimeException('network failed'));
+
+        Notification::assertSentOnDemand(
+            SeasonvarImportFailed::class,
+            function (SeasonvarImportFailed $notification, array $channels, object $notifiable): bool {
+                return $channels === ['mail']
+                    && $notifiable->routes['mail'] === ['ops@example.com' => 'Ops']
+                    && $notification->argument === 'https://seasonvar.ru/serial-1-Test-1-season.html'
+                    && $notification->force === true
+                    && $notification->discover === false
+                    && $notification->exceptionClass === RuntimeException::class;
+            },
+        );
     }
 }

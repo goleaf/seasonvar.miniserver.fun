@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\Notifications\SeasonvarImportFailureNotifier;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -88,5 +89,12 @@ class RunSeasonvarImport implements ShouldBeUnique, ShouldQueue
             'exception' => $exception ? get_class($exception) : null,
             'message' => $exception?->getMessage(),
         ]);
+
+        app(SeasonvarImportFailureNotifier::class)->notify(
+            argument: $this->argument,
+            force: $this->force,
+            discover: $this->discover,
+            exception: $exception,
+        );
     }
 }

@@ -47,6 +47,23 @@ class ConfigurationEnvironmentTest extends TestCase
         $this->assertFalse(config('filesystems.disks.uploads.serve'));
     }
 
+    public function test_notification_configuration_is_documented(): void
+    {
+        $envExample = File::get(base_path('.env.example'));
+
+        foreach ([
+            'NOTIFICATIONS_MAIL_QUEUE=default',
+            'SEASONVAR_IMPORT_FAILURE_MAIL_TO=',
+            'SEASONVAR_IMPORT_FAILURE_MAIL_TO_NAME=',
+        ] as $placeholder) {
+            $this->assertStringContainsString($placeholder, $envExample);
+        }
+
+        $this->assertSame('default', config('notifications.mail_queue'));
+        $this->assertNull(config('notifications.seasonvar_import_failed.mail_to'));
+        $this->assertNull(config('notifications.seasonvar_import_failed.mail_to_name'));
+    }
+
     public function test_env_helper_is_only_used_in_configuration_files(): void
     {
         $directories = [

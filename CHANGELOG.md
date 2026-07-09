@@ -2,6 +2,7 @@
 
 ## 2026-07-09
 
+- Added an optional queued email notification for failed queued Seasonvar imports, with safe env configuration, dispatch/content tests, and notification documentation.
 - Added a private upload storage foundation with explicit image validation rules, generated filenames, fake-storage tests, and storage documentation.
 - Improved catalog search form UX with reusable Blade form components, visible validation errors, and preserved old input after validation redirects.
 - Cleaned up Eloquent relationship inverses for catalog source pages and Seasonvar import runs, added schema-aligned casts, and documented model query rules in `docs/models.md`.

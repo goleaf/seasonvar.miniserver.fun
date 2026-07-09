@@ -18,3 +18,4 @@
 - Job реализует `ShouldBeUnique`, использует уникальный ключ `seasonvar-import` и дополнительно берет тот же cache lock, что CLI-команда. Если импорт уже идет, job освобождает себя обратно в очередь через 300 секунд.
 - Политика выполнения job: `tries=3`, `timeout=900`, backoff `[60, 300, 900]`, `uniqueFor=3600`.
 - Ошибки job логируются через `failed()` с URL-аргументом и флагами запуска; сама pipeline уже помечает созданный `SeasonvarImportRun` как failed.
+- Если задан `SEASONVAR_IMPORT_FAILURE_MAIL_TO`, `RunSeasonvarImport::failed()` отправляет queued on-demand notification `SeasonvarImportFailed` на email получателя. Notification использует queue из `NOTIFICATIONS_MAIL_QUEUE`.
