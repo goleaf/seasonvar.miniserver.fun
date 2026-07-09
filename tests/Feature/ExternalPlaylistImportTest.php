@@ -137,6 +137,49 @@ class ExternalPlaylistImportTest extends TestCase
         $this->assertSame(501, LicensedMedia::query()->where('catalog_title_id', $catalogTitle->id)->count());
     }
 
+    public function test_it_updates_existing_playlist_media_without_creating_duplicates(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create([
+            'slug' => 'idempotentnyi-pleilist',
+            'title' => 'Идемпотентный плейлист',
+        ]);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 1,
+        ]);
+        $episode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 2,
+        ]);
+        $firstPlaylist = <<<'M3U'
+            #EXTM3U
+            #EXTINF:-1,2 серия
+            https://media.example.com/files/episode-2.mp4
+            M3U;
+        $updatedPlaylist = <<<'M3U'
+            #EXTM3U
+            #EXTINF:-1,2 серия HD
+            https://media.example.com/files/episode-2.mp4
+            M3U;
+
+        $importer = app(ExternalPlaylistImporter::class);
+        $firstResult = $importer->importFromContent($firstPlaylist, 'https://playlist.example.com/list.m3u', $catalogTitle);
+        $secondResult = $importer->importFromContent($updatedPlaylist, 'https://playlist.example.com/list.m3u', $catalogTitle);
+
+        $this->assertSame(1, $firstResult['imported']);
+        $this->assertSame(0, $secondResult['imported']);
+        $this->assertSame(1, $secondResult['updated']);
+        $this->assertSame(1, LicensedMedia::query()->where('catalog_title_id', $catalogTitle->id)->count());
+
+        $media = LicensedMedia::query()->where('catalog_title_id', $catalogTitle->id)->sole();
+
+        $this->assertSame($season->id, $media->season_id);
+        $this->assertSame($episode->id, $media->episode_id);
+        $this->assertSame('2 серия HD', $media->title);
+        $this->assertSame('https://media.example.com/files/episode-2.mp4', $media->playback_url);
+        $this->assertSame('published', $media->status);
+    }
+
     public function test_it_shows_selected_episode_without_media_as_not_connected(): void
     {
         $source = Source::factory()->create(['code' => 'seasonvar']);

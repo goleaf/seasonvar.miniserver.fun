@@ -37,4 +37,18 @@ class CatalogValidationTest extends TestCase
             ->assertRedirect($showUrl)
             ->assertSessionHasErrors(['episode', 'media']);
     }
+
+    public function test_valid_but_unknown_taxonomy_filter_does_not_fall_back_to_full_catalog(): void
+    {
+        CatalogTitle::factory()->create([
+            'slug' => 'vidimyi-serial',
+            'title' => 'Видимый сериал',
+        ]);
+
+        $this
+            ->get(route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => 'neizvestnyi-zhanr']))
+            ->assertOk()
+            ->assertSeeText('Ничего не найдено.')
+            ->assertDontSeeText('Видимый сериал');
+    }
 }
