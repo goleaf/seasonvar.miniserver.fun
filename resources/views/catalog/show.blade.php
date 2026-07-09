@@ -214,6 +214,21 @@
 	                                            <span class="text-xs font-semibold text-zinc-500">серии разбираются</span>
 	                                        @endif
                                     </div>
+                                    @if ($seasonEpisodeCount > 0)
+                                        <div class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                                            @foreach ($season->episodes->sortBy('number')->values() as $episode)
+                                                <div class="rounded bg-[#f8fafb] px-3 py-2 text-sm ring-1 ring-[#e5eaed]">
+                                                    <div class="font-bold text-[#26333b]">{{ $episode->number }} серия</div>
+                                                    @if ($episode->title)
+                                                        <div class="mt-0.5 line-clamp-2 text-xs text-zinc-500">{{ $episode->title }}</div>
+                                                    @endif
+                                                    @if ($episode->released_at)
+                                                        <div class="mt-1 text-xs font-semibold text-emerald-700">{{ $episode->released_at->format('d.m.Y') }}</div>
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
                                 </div>
                             @empty
                                 <p class="p-4 text-sm text-zinc-500">Сезоны еще не распарсены.</p>
@@ -335,12 +350,19 @@
                 </div>
 
                 <div class="mt-4 rounded border border-[#d4dce0] bg-white">
-                    <div class="bg-[#31424c] px-3 py-2 text-sm font-bold text-white">Теги</div>
-                    <div class="flex flex-wrap gap-2 p-3">
-                        @forelse ($title->taxonomies as $taxonomy)
-                            <a href="{{ route('titles.taxonomy', ['type' => $taxonomy->type, 'taxonomy' => $taxonomy->slug]) }}" class="rounded bg-[#eef3f5] px-2 py-1 text-xs font-semibold text-[#31424c] hover:bg-emerald-100">{{ $taxonomy->name }}</a>
+                    <div class="bg-[#31424c] px-3 py-2 text-sm font-bold text-white">Связи каталога</div>
+                    <div class="space-y-3 p-3">
+                        @forelse ($title->taxonomies->groupBy('type') as $taxonomyType => $taxonomies)
+                            <div>
+                                <div class="mb-2 text-xs font-bold uppercase tracking-wide text-zinc-500">{{ $taxonomyLabels[$taxonomyType] ?? $taxonomyType }}</div>
+                                <div class="flex flex-wrap gap-2">
+                                    @foreach ($taxonomies as $taxonomy)
+                                        <a href="{{ route('titles.taxonomy', ['type' => $taxonomy->type, 'taxonomy' => $taxonomy->slug]) }}" class="rounded bg-[#eef3f5] px-2 py-1 text-xs font-semibold text-[#31424c] hover:bg-emerald-100">{{ $taxonomy->name }}</a>
+                                    @endforeach
+                                </div>
+                            </div>
                         @empty
-                            <span class="text-sm text-zinc-500">Нет тегов.</span>
+                            <span class="text-sm text-zinc-500">Связи появятся после синхронизации.</span>
                         @endforelse
                     </div>
                 </div>
