@@ -433,10 +433,11 @@ class SeasonvarCatalogImporter
     private function upsertCatalogTitle(SourcePage $page, array $data, string $contentHash, ?callable $progress = null): CatalogTitle
     {
         $sourceUrlHash = $this->seasonvarUrl->hash($page->url);
-        $catalogTitle = CatalogTitle::query()->firstOrNew([
-            'source_id' => $page->source_id,
-            'source_url_hash' => $sourceUrlHash,
-        ]);
+        $catalogTitle = $this->findExistingCatalogTitle($page, $data['type'], $data['title'])
+            ?? CatalogTitle::query()->firstOrNew([
+                'source_id' => $page->source_id,
+                'source_url_hash' => $sourceUrlHash,
+            ]);
         $wasExisting = $catalogTitle->exists;
 
         $this->report($progress, 'catalog-title-upsert-started', [
@@ -458,15 +459,18 @@ class SeasonvarCatalogImporter
         }
 
         $catalogTitle->fill([
-            'source_page_id' => $page->id,
-            'external_id' => $data['external_id'],
-            'title' => $data['title'],
-            'original_title' => $data['original_title'],
+            'source_page_id' => $catalogTitle->source_page_id ?? $page->id,
+            'external_id' => $catalogTitle->external_id ?? $data['external_id'],
+            'title' => $catalogTitle->exists
+                ? $this->preferredTitle($catalogTitle->title, $data['title'])
+                : $data['title'],
+            'original_title' => $catalogTitle->original_title ?? $this->normalizedOriginalTitle($data['original_title']),
             'type' => $data['type'],
-            'year' => $data['year'],
-            'description' => $data['description'],
-            'poster_url' => $data['poster_url'],
-            'source_url' => $page->url,
+            'year' => $this->earliestYear($catalogTitle->year, $data['year']),
+            'description' => $catalogTitle->description ?: $data['description'],
+            'poster_url' => $catalogTitle->poster_url ?: $data['poster_url'],
+            'source_url' => $catalogTitle->source_url ?: $page->url,
+            'source_url_hash' => $catalogTitle->source_url_hash ?: $sourceUrlHash,
             'content_hash' => $contentHash,
             'is_published' => true,
             'indexed_at' => now(),
@@ -484,6 +488,73 @@ class SeasonvarCatalogImporter
         ]);
 
         return $catalogTitle;
+    }
+
+    private function findExistingCatalogTitle(SourcePage $page, string $type, string $title): ?CatalogTitle
+    {
+        $titleKey = $this->normalizedSeriesTitleKey($title);
+        $seriesTitle = $this->seriesTitleKey($title);
+
+        return CatalogTitle::query()
+            ->where('source_id', $page->source_id)
+            ->where('type', $type)
+            ->where(function ($query) use ($title, $seriesTitle): void {
+                $query->where('title', $title)
+                    ->orWhere('title', $seriesTitle)
+                    ->orWhere('title', 'like', $seriesTitle.'/%');
+            })
+            ->orderBy('id')
+            ->get()
+            ->first(fn (CatalogTitle $catalogTitle): bool => $this->normalizedSeriesTitleKey($catalogTitle->title) === $titleKey);
+    }
+
+    private function earliestYear(?int $currentYear, ?int $incomingYear): ?int
+    {
+        return collect([$currentYear, $incomingYear])
+            ->filter()
+            ->min();
+    }
+
+    private function preferredTitle(string $currentTitle, string $incomingTitle): string
+    {
+        if ($this->normalizedSeriesTitleKey($currentTitle) !== $this->normalizedSeriesTitleKey($incomingTitle)) {
+            return $incomingTitle;
+        }
+
+        return Str::length($currentTitle) <= Str::length($incomingTitle)
+            ? $currentTitle
+            : $incomingTitle;
+    }
+
+    private function normalizedOriginalTitle(?string $originalTitle): ?string
+    {
+        if ($originalTitle === null || $this->containsCyrillic($originalTitle)) {
+            return null;
+        }
+
+        return $originalTitle;
+    }
+
+    private function normalizedSeriesTitleKey(string $title): string
+    {
+        return Str::lower($this->seriesTitleKey($title));
+    }
+
+    private function seriesTitleKey(string $title): string
+    {
+        $title = Str::squish($title);
+        $parts = explode('/', $title, 2);
+
+        if (count($parts) === 2 && $this->containsCyrillic($parts[0]) && $this->containsCyrillic($parts[1])) {
+            return Str::squish($parts[0]);
+        }
+
+        return $title;
+    }
+
+    private function containsCyrillic(string $value): bool
+    {
+        return preg_match('/\p{Cyrillic}/u', $value) === 1;
     }
 
     private function uniqueSlug(string $title, ?string $externalId, string $sourceUrlHash, ?int $ignoreId = null): string

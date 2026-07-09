@@ -10,7 +10,6 @@
         <div class="border-b border-[#26333b] bg-[#17242c] text-zinc-100 shadow-lg shadow-zinc-900/20">
             <div class="mx-auto max-w-7xl px-4 py-2 text-xs text-zinc-300 sm:px-6 lg:px-8">
                 <span class="font-semibold text-emerald-300">Каталог сериалов</span>
-                <span class="ml-2">сезоны, постеры и публичные метаданные из карты сайта</span>
             </div>
 
             <div class="mx-auto flex max-w-7xl flex-col gap-3 px-4 pb-4 sm:px-6 lg:flex-row lg:items-center lg:px-8">

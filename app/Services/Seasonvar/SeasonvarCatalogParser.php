@@ -58,6 +58,10 @@ class SeasonvarCatalogParser
             $originalTitle = null;
         }
 
+        if ($originalTitle !== null && $this->containsCyrillic($originalTitle)) {
+            $originalTitle = null;
+        }
+
         $description = $this->firstNonEmpty([
             Arr::get($structuredData, 'description'),
             $this->firstText($xpath, [
@@ -393,7 +397,24 @@ class SeasonvarCatalogParser
             ];
         }
 
+        if ($this->hasSubtitles($xpath)) {
+            $items['tag|субтитры'] = ['type' => 'tag', 'name' => 'субтитры', 'source_url' => null];
+        }
+
         return array_values($items);
+    }
+
+    private function hasSubtitles(DOMXPath $xpath): bool
+    {
+        foreach ($xpath->query('//body//*[not(self::script) and not(self::style)]') ?: [] as $node) {
+            $text = $this->stringValue($node->textContent);
+
+            if ($text !== null && preg_match('/(?:субтитр|subtitles?|subs?)/iu', $text) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function infoField(DOMXPath $xpath, string $label): ?string
@@ -527,5 +548,10 @@ class SeasonvarCatalogParser
         } catch (InvalidArgumentException) {
             return $url;
         }
+    }
+
+    private function containsCyrillic(string $value): bool
+    {
+        return preg_match('/\p{Cyrillic}/u', $value) === 1;
     }
 }

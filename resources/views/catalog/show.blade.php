@@ -46,7 +46,7 @@
                                         <div class="text-sm font-bold text-[#31424c]">В ролях</div>
                                         <div class="mt-2 flex flex-wrap gap-2">
                                             @foreach ($actors->take(12) as $actor)
-                                                <a href="{{ route('titles.index', ['taxonomy' => $actor->slug, 'type' => $actor->type]) }}" class="rounded border border-[#d4dce0] bg-[#f8fafb] px-3 py-1 text-xs font-semibold text-[#31424c] hover:bg-emerald-50">{{ $actor->name }}</a>
+                                                <a href="{{ route('titles.taxonomy', ['type' => $actor->type, 'taxonomy' => $actor->slug]) }}" class="rounded border border-[#d4dce0] bg-[#f8fafb] px-3 py-1 text-xs font-semibold text-[#31424c] hover:bg-emerald-50">{{ $actor->name }}</a>
                                             @endforeach
                                         </div>
                                     </div>
@@ -96,7 +96,7 @@
 
                                 <div class="mt-5 flex flex-wrap gap-2">
                                     @foreach ($title->taxonomies->take(16) as $taxonomy)
-                                        <a href="{{ route('titles.index', ['taxonomy' => $taxonomy->slug, 'type' => $taxonomy->type]) }}" class="rounded bg-[#eef3f5] px-2 py-1 text-xs font-semibold text-[#31424c] hover:bg-emerald-100">{{ $taxonomy->name }}</a>
+                                        <a href="{{ route('titles.taxonomy', ['type' => $taxonomy->type, 'taxonomy' => $taxonomy->slug]) }}" class="rounded bg-[#eef3f5] px-2 py-1 text-xs font-semibold text-[#31424c] hover:bg-emerald-100">{{ $taxonomy->name }}</a>
                                     @endforeach
                                 </div>
                             </div>
@@ -108,12 +108,12 @@
                         <div class="divide-y divide-[#e5eaed]">
 	                            @forelse ($seasons as $season)
 	                                @php
-	                                    $seasonEpisodeCount = (int) ($episodeCountsBySeasonUrl[$season->source_url] ?? $season->episodes->count());
+	                                    $seasonEpisodeCount = (int) $season->episodes->count();
 	                                @endphp
 	                                <div class="px-4 py-3">
 	                                    <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
 	                                        <h2 class="font-bold text-[#26333b]">
-	                                            {{ $season->number === 1 ? '>>>' : '' }} {{ $season->title ?? 'Сезон '.$season->number }}
+	                                            Сезон {{ $season->number }}
 	                                        </h2>
 	                                        @if ($seasonEpisodeCount > 0)
 	                                            <span class="text-xs font-semibold text-zinc-500">{{ $seasonEpisodeCount }} серий</span>
@@ -224,7 +224,7 @@
                     <div class="bg-[#31424c] px-3 py-2 text-sm font-bold text-white">Теги</div>
                     <div class="flex flex-wrap gap-2 p-3">
                         @forelse ($title->taxonomies as $taxonomy)
-                            <a href="{{ route('titles.index', ['taxonomy' => $taxonomy->slug, 'type' => $taxonomy->type]) }}" class="rounded bg-[#eef3f5] px-2 py-1 text-xs font-semibold text-[#31424c] hover:bg-emerald-100">{{ $taxonomy->name }}</a>
+                            <a href="{{ route('titles.taxonomy', ['type' => $taxonomy->type, 'taxonomy' => $taxonomy->slug]) }}" class="rounded bg-[#eef3f5] px-2 py-1 text-xs font-semibold text-[#31424c] hover:bg-emerald-100">{{ $taxonomy->name }}</a>
                         @empty
                             <span class="text-sm text-zinc-500">Нет тегов.</span>
                         @endforelse

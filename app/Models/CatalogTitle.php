@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 #[Fillable([
     'source_id',
@@ -59,6 +60,14 @@ class CatalogTitle extends Model
     public function seasons(): HasMany
     {
         return $this->hasMany(Season::class);
+    }
+
+    /**
+     * @return HasManyThrough<Episode, Season, $this>
+     */
+    public function episodes(): HasManyThrough
+    {
+        return $this->hasManyThrough(Episode::class, Season::class);
     }
 
     /**
