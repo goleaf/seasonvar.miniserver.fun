@@ -402,6 +402,201 @@
             'description' => 'Доступное видео или удаленный медиапоток, связанный со страницей «'.$pageTitle.'».',
         ] : null,
     ])->filter()->values();
+    $publisherSignals = collect([
+        [
+            'name' => 'Издатель портала',
+            'value' => $siteName,
+            'url' => route('home'),
+            'description' => 'Единый каталог сериалов с автоматической индексацией страниц, фильтров, подборок и медиа.',
+        ],
+        [
+            'name' => 'Раздел каталога',
+            'value' => 'Сериалы онлайн',
+            'url' => route('titles.index'),
+            'description' => 'Основной раздел портала для поиска сериалов, сезонов, серий, жанров, стран, актеров и режиссеров.',
+        ],
+        [
+            'name' => 'Правила индексации',
+            'value' => $robots,
+            'url' => $canonicalUrl,
+            'description' => 'Страница открыта для индексации с расширенным просмотром изображений, сниппетов и видео.',
+        ],
+        [
+            'name' => 'Поисковая карта',
+            'value' => 'XML sitemap',
+            'url' => route('sitemap.index'),
+            'description' => 'XML-карта помогает поисковым системам находить все важные страницы портала.',
+        ],
+        [
+            'name' => 'Лента обновлений',
+            'value' => 'RSS feed',
+            'url' => route('feed'),
+            'description' => 'RSS-лента помогает отслеживать новые и обновленные страницы каталога.',
+        ],
+        [
+            'name' => 'Встроенный поиск',
+            'value' => 'OpenSearch',
+            'url' => route('opensearch'),
+            'description' => 'OpenSearch-описание позволяет быстро искать по сериалам и страницам каталога.',
+        ],
+    ])->filter(fn ($signal) => ! empty($signal['name']) && ! empty($signal['url']))->values();
+    $currentSeoYear = (int) now()->year;
+    $freshnessQueries = collect([
+        [
+            'name' => 'Новинки сериалов '.$currentSeoYear,
+            'query' => 'сериалы '.$currentSeoYear.' смотреть онлайн',
+            'url' => route('titles.year', ['year' => $currentSeoYear]),
+            'description' => 'Актуальная посадочная страница для сериалов, выпусков и обновлений '.$currentSeoYear.' года.',
+        ],
+        [
+            'name' => 'Новые серии онлайн',
+            'query' => 'новые серии смотреть онлайн',
+            'url' => route('titles.index', ['q' => 'новые серии смотреть онлайн']),
+            'description' => 'Поиск свежих серий, последних выпусков, переводов и обновленных страниц каталога.',
+        ],
+        [
+            'name' => 'Дата выхода серий',
+            'query' => 'дата выхода серий',
+            'url' => route('titles.index', ['q' => 'дата выхода серий']),
+            'description' => 'Запросы для поиска дат выхода, новых эпизодов, сезонов и информации об обновлениях.',
+        ],
+        [
+            'name' => 'Обновления каталога',
+            'query' => 'обновления сериалов онлайн',
+            'url' => route('feed'),
+            'description' => 'Лента и страницы каталога помогают находить недавно обновленную информацию.',
+        ],
+    ])->merge($topicTerms->take(8)->flatMap(fn ($term) => collect([
+        [
+            'name' => $term.' '.$currentSeoYear,
+            'query' => $term.' '.$currentSeoYear.' смотреть онлайн',
+            'url' => route('titles.index', ['q' => $term.' '.$currentSeoYear.' смотреть онлайн']),
+            'description' => 'Актуальный поиск по теме «'.$term.'» для '.$currentSeoYear.' года.',
+        ],
+        [
+            'name' => $term.' новые серии',
+            'query' => $term.' новые серии',
+            'url' => route('titles.index', ['q' => $term.' новые серии']),
+            'description' => 'Поиск новых серий, переводов и обновлений по теме «'.$term.'».',
+        ],
+    ])))->filter(fn ($item) => ! empty($item['name']) && ! empty($item['query']) && ! empty($item['url']))
+        ->unique('query')
+        ->take(24)
+        ->values();
+    $russianQueryVariants = collect([
+        'на русском',
+        'с русской озвучкой',
+        'с субтитрами',
+        'в хорошем качестве',
+        'все серии подряд',
+        'без регистрации',
+        'полное описание',
+        'актеры и роли',
+    ])->flatMap(fn ($suffix) => collect([
+        trim($pageTitle.' '.$suffix),
+    ])->merge($topicTerms->take(8)->map(fn ($term) => trim($term.' '.$suffix))))
+        ->merge($topicTerms->take(8)->flatMap(fn ($term) => collect([
+            'сериал '.$term.' смотреть онлайн',
+            $term.' сериал на русском',
+            $term.' сериал все серии',
+        ])))
+        ->map(fn ($query) => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $query))))
+        ->filter(fn ($query) => $query !== '' && mb_strlen($query) <= 120)
+        ->unique()
+        ->take(60)
+        ->values();
+    $catalogDirections = collect([
+        [
+            'name' => 'Сериалы по жанрам',
+            'query' => $pageTitle.' жанры сериалов',
+            'url' => route('titles.index', ['q' => $pageTitle.' жанры сериалов']),
+            'description' => 'Переход к жанрам, тематическим страницам и похожим сериалам каталога.',
+        ],
+        [
+            'name' => 'Сериалы по странам',
+            'query' => $pageTitle.' страны сериалы',
+            'url' => route('titles.index', ['q' => $pageTitle.' страны сериалы']),
+            'description' => 'Поиск сериалов по странам, регионам, языкам, производству и связанным темам.',
+        ],
+        [
+            'name' => 'Сериалы '.$currentSeoYear.' года',
+            'query' => 'сериалы '.$currentSeoYear.' года',
+            'url' => route('titles.year', ['year' => $currentSeoYear]),
+            'description' => 'Чистая годовая посадочная страница для новых и актуальных сериалов.',
+        ],
+        [
+            'name' => 'Актеры и роли',
+            'query' => $pageTitle.' актеры роли',
+            'url' => route('titles.index', ['q' => $pageTitle.' актеры роли']),
+            'description' => 'Поиск страниц по актерам, ролям, персонажам и связанным сериалам.',
+        ],
+        [
+            'name' => 'Режиссеры и студии',
+            'query' => $pageTitle.' режиссер студия',
+            'url' => route('titles.index', ['q' => $pageTitle.' режиссер студия']),
+            'description' => 'Поиск информации по режиссерам, студиям, каналам и производству.',
+        ],
+        [
+            'name' => 'Переводы и озвучка',
+            'query' => $pageTitle.' перевод озвучка',
+            'url' => route('titles.index', ['q' => $pageTitle.' перевод озвучка']),
+            'description' => 'Переход к страницам по переводам, озвучке, субтитрам и версиям просмотра.',
+        ],
+        [
+            'name' => 'Возрастные ограничения',
+            'query' => $pageTitle.' возрастное ограничение',
+            'url' => route('titles.index', ['q' => $pageTitle.' возрастное ограничение']),
+            'description' => 'Поиск страниц с возрастными отметками, рейтингами и описанием ограничений.',
+        ],
+    ])->merge($topicTerms->take(8)->map(fn ($term) => [
+        'name' => 'Каталог по теме: '.$term,
+        'query' => $term.' каталог сериалов',
+        'url' => route('titles.index', ['q' => $term.' каталог сериалов']),
+        'description' => 'Внутреннее направление каталога по теме «'.$term.'» с сериалами, описаниями и подборками.',
+    ]))->filter(fn ($item) => ! empty($item['name']) && ! empty($item['query']) && ! empty($item['url']))
+        ->unique('query')
+        ->take(24)
+        ->values();
+    $comparisonQueries = collect([
+        [
+            'name' => 'Похожие на '.$pageTitle,
+            'query' => 'похожие на '.$pageTitle,
+            'description' => 'Поиск похожих сериалов, тематических подборок и связанных страниц каталога.',
+        ],
+        [
+            'name' => 'Что посмотреть после '.$pageTitle,
+            'query' => 'что посмотреть после '.$pageTitle,
+            'description' => 'Запрос для пользователей, которые ищут похожие сериалы после этой страницы.',
+        ],
+        [
+            'name' => 'Лучшие сериалы по теме '.$pageTitle,
+            'query' => 'лучшие сериалы '.$pageTitle,
+            'description' => 'Поиск лучших и похожих сериалов по темам, жанрам, странам и описанию страницы.',
+        ],
+        [
+            'name' => 'Альтернативы '.$pageTitle,
+            'query' => 'альтернативы '.$pageTitle,
+            'description' => 'Поиск альтернативных сериалов, похожих подборок и связанных страниц.',
+        ],
+    ])->merge($topicTerms->take(8)->flatMap(fn ($term) => collect([
+        [
+            'name' => 'Похожие сериалы: '.$term,
+            'query' => 'похожие сериалы '.$term,
+            'description' => 'Сравнительный поиск похожих сериалов и подборок по теме «'.$term.'».',
+        ],
+        [
+            'name' => 'Что посмотреть про '.$term,
+            'query' => 'что посмотреть '.$term,
+            'description' => 'Поиск сериалов, страниц и подборок для пользователей, которым интересна тема «'.$term.'».',
+        ],
+    ])))->map(fn ($item) => [
+        'name' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['name']))),
+        'query' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['query']))),
+        'description' => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $item['description']))),
+    ])->filter(fn ($item) => $item['name'] !== '' && $item['query'] !== '')
+        ->unique('query')
+        ->take(24)
+        ->values();
     $expandedKeywords = collect(explode(',', (string) ($seo['keywords'] ?? '')))
         ->merge($topicTerms)
         ->merge($seoIntents)
@@ -417,6 +612,14 @@
         ->merge($queryMatrix->pluck('name'))
         ->merge($queryMatrix->flatMap(fn ($group) => $group['items']))
         ->merge($mediaSignals->pluck('name'))
+        ->merge($publisherSignals->pluck('name'))
+        ->merge($freshnessQueries->pluck('name'))
+        ->merge($freshnessQueries->pluck('query'))
+        ->merge($russianQueryVariants)
+        ->merge($catalogDirections->pluck('name'))
+        ->merge($catalogDirections->pluck('query'))
+        ->merge($comparisonQueries->pluck('name'))
+        ->merge($comparisonQueries->pluck('query'))
         ->map(fn ($keyword) => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $keyword))))
         ->filter(fn ($keyword) => $keyword !== '' && mb_strlen($keyword) <= 120)
         ->unique()
@@ -440,6 +643,10 @@
         ->merge($audiencePaths->flatMap(fn ($path) => $path['items']))
         ->merge($alsoSearches)
         ->merge($queryMatrix->flatMap(fn ($group) => $group['items']))
+        ->merge($freshnessQueries->pluck('query'))
+        ->merge($russianQueryVariants)
+        ->merge($catalogDirections->pluck('query'))
+        ->merge($comparisonQueries->pluck('query'))
         ->map(fn ($keyword) => trim(preg_replace('/\s+/u', ' ', strip_tags((string) $keyword))))
         ->filter(fn ($keyword) => $keyword !== '' && mb_strlen($keyword) <= 120)
         ->unique()
@@ -461,6 +668,11 @@
         ['id' => 'discovery-signals', 'name' => 'Индексация и обновления', 'enabled' => $discoverySignals->isNotEmpty()],
         ['id' => 'query-matrix', 'name' => 'Матрица запросов', 'enabled' => $queryMatrix->isNotEmpty()],
         ['id' => 'media-signals', 'name' => 'Медиа и превью', 'enabled' => $mediaSignals->isNotEmpty()],
+        ['id' => 'publisher-trust', 'name' => 'Доверие и индексация', 'enabled' => $publisherSignals->isNotEmpty()],
+        ['id' => 'freshness-seo', 'name' => 'Актуальные запросы', 'enabled' => $freshnessQueries->isNotEmpty()],
+        ['id' => 'russian-query-variants', 'name' => 'Русские варианты поиска', 'enabled' => $russianQueryVariants->isNotEmpty()],
+        ['id' => 'catalog-directions', 'name' => 'Направления каталога', 'enabled' => $catalogDirections->isNotEmpty()],
+        ['id' => 'comparison-seo', 'name' => 'Похожие и сравнения', 'enabled' => $comparisonQueries->isNotEmpty()],
         ['id' => 'quick-answers', 'name' => 'Быстрые ответы', 'enabled' => $quickAnswers->isNotEmpty()],
         ['id' => 'semantic-clusters', 'name' => 'Семантические подборки', 'enabled' => ! empty($seo['keyword_clusters'])],
         ['id' => 'popular-searches', 'name' => 'Популярные запросы', 'enabled' => ! empty($seo['search_phrases'])],
@@ -777,6 +989,101 @@
         ];
     }
 
+    if ($publisherSignals->isNotEmpty()) {
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'CreativeWork',
+            '@id' => $canonicalUrl.'#publisher-trust-schema',
+            'name' => $fullTitle.' - доверие и индексация',
+            'url' => $canonicalUrl.'#publisher-trust',
+            'description' => 'Сигналы издателя, индексации, поиска, карты сайта и обновлений для страницы «'.$pageTitle.'».',
+            'publisher' => [
+                '@type' => 'Organization',
+                'name' => $siteName,
+                'url' => route('home'),
+            ],
+            'isPartOf' => [
+                '@type' => 'WebSite',
+                'name' => $siteName,
+                'url' => route('home'),
+                'potentialAction' => [
+                    '@type' => 'SearchAction',
+                    'target' => route('titles.index', ['q' => '{search_term_string}']),
+                    'query-input' => 'required name=search_term_string',
+                ],
+            ],
+            'about' => $publisherSignals->map(fn ($signal) => [
+                '@type' => 'Thing',
+                'name' => $signal['name'],
+                'description' => $signal['description'],
+                'url' => $signal['url'],
+            ])->values()->all(),
+        ];
+    }
+
+    if ($freshnessQueries->isNotEmpty()) {
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            '@id' => $canonicalUrl.'#freshness-seo-schema',
+            'name' => $fullTitle.' - актуальные запросы',
+            'itemListElement' => $freshnessQueries->map(fn ($item, $index) => [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $item['name'],
+                'description' => $item['description'],
+                'url' => $item['url'],
+            ])->values()->all(),
+        ];
+    }
+
+    if ($russianQueryVariants->isNotEmpty()) {
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            '@id' => $canonicalUrl.'#russian-query-variants-schema',
+            'name' => $fullTitle.' - русские варианты поиска',
+            'itemListElement' => $russianQueryVariants->take(40)->values()->map(fn ($query, $index) => [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $query,
+                'url' => route('titles.index', ['q' => $query]),
+            ])->values()->all(),
+        ];
+    }
+
+    if ($catalogDirections->isNotEmpty()) {
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            '@id' => $canonicalUrl.'#catalog-directions-schema',
+            'name' => $fullTitle.' - направления каталога',
+            'itemListElement' => $catalogDirections->map(fn ($item, $index) => [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $item['name'],
+                'description' => $item['description'],
+                'url' => $item['url'],
+            ])->values()->all(),
+        ];
+    }
+
+    if ($comparisonQueries->isNotEmpty()) {
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            '@id' => $canonicalUrl.'#comparison-seo-schema',
+            'name' => $fullTitle.' - похожие и сравнения',
+            'itemListElement' => $comparisonQueries->map(fn ($item, $index) => [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $item['name'],
+                'description' => $item['description'],
+                'url' => route('titles.index', ['q' => $item['query']]),
+            ])->values()->all(),
+        ];
+    }
+
     if ($seoSections->isNotEmpty()) {
         $jsonLdItems[] = [
             '@context' => 'https://schema.org',
@@ -835,6 +1142,12 @@
         <meta name="discovery-signal-count" content="{{ $discoverySignals->count() }}">
         <meta name="query-matrix-count" content="{{ $queryMatrix->sum(fn ($group) => $group['items']->count()) }}">
         <meta name="media-signal-count" content="{{ $mediaSignals->count() }}">
+        <meta name="publisher-signal-count" content="{{ $publisherSignals->count() }}">
+        <meta name="freshness-query-count" content="{{ $freshnessQueries->count() }}">
+        <meta name="freshness-year" content="{{ $currentSeoYear }}">
+        <meta name="russian-query-variant-count" content="{{ $russianQueryVariants->count() }}">
+        <meta name="catalog-direction-count" content="{{ $catalogDirections->count() }}">
+        <meta name="comparison-query-count" content="{{ $comparisonQueries->count() }}">
         @if ($expandedKeywords->isNotEmpty())
             <meta name="keywords" content="{{ $expandedKeywords->take(60)->implode(', ') }}">
             <meta name="news_keywords" content="{{ $newsKeywords->implode(', ') }}">
@@ -867,6 +1180,12 @@
             <meta name="query-matrix" content="{{ $queryMatrix->pluck('name')->implode(', ') }}">
             <meta name="query-matrix-keywords" content="{{ $queryMatrix->flatMap(fn ($group) => $group['items'])->take(30)->implode(', ') }}">
             <meta name="media-assets" content="{{ $mediaSignals->pluck('name')->implode(', ') }}">
+            <meta name="publisher-signals" content="{{ $publisherSignals->pluck('name')->implode(', ') }}">
+            <meta name="freshness-keywords" content="{{ $freshnessQueries->pluck('query')->take(30)->implode(', ') }}">
+            <meta name="russian-query-variants" content="{{ $russianQueryVariants->take(35)->implode(', ') }}">
+            <meta name="catalog-directions" content="{{ $catalogDirections->pluck('name')->implode(', ') }}">
+            <meta name="catalog-direction-keywords" content="{{ $catalogDirections->pluck('query')->take(30)->implode(', ') }}">
+            <meta name="comparison-keywords" content="{{ $comparisonQueries->pluck('query')->take(30)->implode(', ') }}">
             <meta name="resource-type" content="document">
             <meta name="language" content="Russian">
         @endif
@@ -1310,6 +1629,103 @@
                                 <a href="{{ $signal['url'] }}" class="mt-3 inline-flex items-center gap-1 break-all text-xs font-bold text-emerald-700 hover:text-emerald-600">
                                     <i class="fa-solid fa-arrow-up-right-from-square text-[0.8em]" aria-hidden="true"></i>
                                     <span>{{ $signal['type'] === 'video' ? 'Открыть видео' : 'Открыть изображение' }}</span>
+                                </a>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if ($publisherSignals->isNotEmpty())
+                <section id="publisher-trust" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Доверие и индексация">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-shield-halved text-emerald-700" aria-hidden="true"></i>
+                        <span>Доверие и индексация</span>
+                    </div>
+                    <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        @foreach ($publisherSignals as $signal)
+                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <h2 class="text-sm font-bold text-slate-800">{{ $signal['name'] }}</h2>
+                                <p class="mt-1 break-words text-xs font-semibold text-emerald-700">{{ $signal['value'] }}</p>
+                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $signal['description'] }}</p>
+                                <a href="{{ $signal['url'] }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                    <i class="fa-solid fa-arrow-up-right-from-square text-[0.8em]" aria-hidden="true"></i>
+                                    <span>Открыть</span>
+                                </a>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if ($freshnessQueries->isNotEmpty())
+                <section id="freshness-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Актуальные запросы">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-clock-rotate-left text-emerald-700" aria-hidden="true"></i>
+                        <span>Актуальные запросы {{ $currentSeoYear }}</span>
+                    </div>
+                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        @foreach ($freshnessQueries as $item)
+                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
+                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
+                                <a href="{{ $item['url'] }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                    <i class="fa-solid fa-arrow-up-right-from-square text-[0.8em]" aria-hidden="true"></i>
+                                    <span>{{ $item['query'] }}</span>
+                                </a>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if ($russianQueryVariants->isNotEmpty())
+                <section id="russian-query-variants" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Русские варианты поиска" itemscope itemtype="https://schema.org/SiteNavigationElement">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-language text-emerald-700" aria-hidden="true"></i>
+                        <span itemprop="name">Русские варианты поиска</span>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        @foreach ($russianQueryVariants->take(42) as $query)
+                            <a href="{{ route('titles.index', ['q' => $query]) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                                <i class="fa-solid fa-spell-check text-[0.8em] text-slate-400" aria-hidden="true"></i>
+                                <span itemprop="name">{{ $query }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if ($catalogDirections->isNotEmpty())
+                <section id="catalog-directions" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Направления каталога">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-compass-drafting text-emerald-700" aria-hidden="true"></i>
+                        <span>Направления каталога</span>
+                    </div>
+                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        @foreach ($catalogDirections as $item)
+                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
+                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
+                                <a href="{{ $item['url'] }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                    <i class="fa-solid fa-arrow-up-right-from-square text-[0.8em]" aria-hidden="true"></i>
+                                    <span>{{ $item['query'] }}</span>
+                                </a>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if ($comparisonQueries->isNotEmpty())
+                <section id="comparison-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Похожие и сравнения">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-code-compare text-emerald-700" aria-hidden="true"></i>
+                        <span>Похожие и сравнения</span>
+                    </div>
+                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        @foreach ($comparisonQueries as $item)
+                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
+                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
+                                <a href="{{ route('titles.index', ['q' => $item['query']]) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                    <i class="fa-solid fa-magnifying-glass text-[0.8em]" aria-hidden="true"></i>
+                                    <span>{{ $item['query'] }}</span>
                                 </a>
                             </article>
                         @endforeach

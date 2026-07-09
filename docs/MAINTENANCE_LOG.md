@@ -67,6 +67,11 @@
 - Added global discovery/freshness SEO expansion with visible indexing/update signals, sitemap/feed/opensearch/llms links, `discovery-signal-count` metadata, expanded keyword integration, and schema.org DataCatalog/Dataset data.
 - Added global query-matrix SEO expansion with grouped visible search-intent matrices, `query-matrix-count` metadata, expanded keyword and alias integration, table-of-contents integration, and schema.org ItemList data.
 - Added global media SEO expansion with normalized image/video signals, `media-signal-count` and `media-assets` metadata, expanded keyword integration, visible media preview links, and schema.org ImageObject/VideoObject ItemList data.
+- Added global publisher-trust SEO expansion with visible publisher/indexing/search signals, `publisher-signal-count` metadata, expanded keyword integration, and schema.org CreativeWork/WebSite/Organization data.
+- Added global freshness SEO expansion with current-year/new-episode/update queries, `freshness-query-count` and `freshness-year` metadata, expanded keyword and alias integration, visible freshness cards, and schema.org ItemList data.
+- Added global Russian query variant SEO expansion with visible language/quality/subtitle/voiceover/internal-search chips, `russian-query-variant-count` metadata, expanded keyword and alias integration, and schema.org ItemList data.
+- Added global catalog-direction SEO expansion with visible genre/country/year/actor/director/translation/age/topic direction cards, `catalog-direction-count` metadata, expanded keyword and alias integration, and schema.org ItemList data.
+- Added global comparison SEO expansion with visible similar/alternative/what-to-watch cards, `comparison-query-count` metadata, expanded keyword and alias integration, and schema.org ItemList data.
 - Added cache-lock protection for the single Seasonvar import command so overlapping CLI runs fail fast instead of processing the same queue in parallel.
 - Added automatic malformed nested Seasonvar URL cleanup for stored source pages and URL validation so `.html/...` catalog links are not requested again.
 - Added media availability backfill inside each import cycle to gradually check older `licensed_media` rows with missing or stale `check_status`.
