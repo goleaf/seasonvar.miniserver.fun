@@ -13,7 +13,7 @@
 @endphp
 
 <a href="{{ route('titles.show', $title) }}" class="group flex h-full flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-200/60 transition hover:border-emerald-300 hover:shadow-md hover:shadow-emerald-100">
-    <x-title-poster :title="$title" class="aspect-[3/2] rounded-none sm:aspect-[16/10]" image-class="h-full w-full object-cover transition group-hover:scale-[1.02]" empty-class="flex h-full items-center justify-center text-sm text-slate-400" />
+    <x-title-poster :title="$title" class="aspect-[2/3] rounded-none bg-white" image-class="h-full w-full object-contain" empty-class="flex h-full items-center justify-center text-sm text-slate-400" />
 
     <div class="flex flex-1 flex-col p-3 sm:p-4">
         <div class="flex items-center gap-2 text-xs text-slate-500">
