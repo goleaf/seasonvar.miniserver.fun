@@ -3,16 +3,14 @@
 namespace App\Console\Commands;
 
 use App\Console\Commands\Concerns\OutputsSeasonvarProgress;
-use App\Models\CatalogTitle;
-use App\Models\LicensedMedia;
 use App\Models\SourcePage;
+use App\Services\Media\LicensedMediaAutoAttacher;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarSitemapMirror;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use Throwable;
 
 #[Signature('seasonvar:full-sync {--discover= : Сколько ссылок из карты сайта добавлять за цикл} {--parse= : Сколько страниц из очереди разбирать за цикл} {--sleep= : Пауза между циклами в секундах} {--once : Выполнить один цикл и остановиться} {--no-media : Не подключать медиа автоматически из настроенного хранилища}')]
@@ -26,8 +24,11 @@ class FullSyncSeasonvar extends Command
     /**
      * Execute the console command.
      */
-    public function handle(SeasonvarCatalogImporter $importer, SeasonvarSitemapMirror $sitemapMirror): int
-    {
+    public function handle(
+        SeasonvarCatalogImporter $importer,
+        SeasonvarSitemapMirror $sitemapMirror,
+        LicensedMediaAutoAttacher $mediaAttacher,
+    ): int {
         $this->registerSignalHandlers();
 
         $discoverLimit = $this->positiveOption('discover', (int) config('seasonvar.full_sync.discover_limit', 500));
@@ -47,7 +48,7 @@ class FullSyncSeasonvar extends Command
             $cycle++;
 
             try {
-                $this->runCycle($importer, $sitemapMirror, $cycle, $discoverLimit, $parseLimit);
+                $this->runCycle($importer, $sitemapMirror, $mediaAttacher, $cycle, $discoverLimit, $parseLimit);
             } catch (Throwable $exception) {
                 $this->writeSeasonvarProgress('full-sync-cycle-failed', [
                     'cycle' => $cycle,
@@ -77,6 +78,7 @@ class FullSyncSeasonvar extends Command
     private function runCycle(
         SeasonvarCatalogImporter $importer,
         SeasonvarSitemapMirror $sitemapMirror,
+        LicensedMediaAutoAttacher $mediaAttacher,
         int $cycle,
         int $discoverLimit,
         int $parseLimit,
@@ -92,7 +94,9 @@ class FullSyncSeasonvar extends Command
         $stored = $importer->storeDiscoveredUrls($urls);
         $pages = $this->pagesForParseCycle($importer, $parseLimit, $progress);
         $parseResult = $importer->parsePages($pages, $progress);
-        $mediaAttached = (bool) $this->option('no-media') ? 0 : $this->attachLicensedMedia($parseLimit);
+        $mediaResult = (bool) $this->option('no-media')
+            ? ['attached' => 0, 'updated' => 0, 'skipped' => 0, 'failed' => 0]
+            : $mediaAttacher->attachRecent($parseLimit, $progress);
 
         foreach ($parseResult['failures'] as $failure) {
             $this->warn("Ошибка: {$failure}");
@@ -109,7 +113,7 @@ class FullSyncSeasonvar extends Command
             'selected_for_parse' => $pages->count(),
             'parsed' => $parseResult['parsed'],
             'failed' => $parseResult['failed'],
-            'media_attached' => $mediaAttached,
+            'media_attached' => $mediaResult['attached'] + $mediaResult['updated'],
         ]);
     }
 
@@ -148,70 +152,6 @@ class FullSyncSeasonvar extends Command
         return $pages->concat($refreshPages)->values();
     }
 
-    private function attachLicensedMedia(int $limit): int
-    {
-        $baseUrl = trim((string) config('licensed_media.remote_base_url'));
-
-        if ($baseUrl === '') {
-            $this->writeSeasonvarProgress('licensed-media-auto-attach-skipped', [
-                'reason' => 'базовая ссылка медиа не настроена',
-            ]);
-
-            return 0;
-        }
-
-        if (! $this->isSafeRemoteMediaBaseUrl($baseUrl)) {
-            $this->writeSeasonvarProgress('licensed-media-auto-attach-skipped', [
-                'reason' => 'базовая ссылка медиа заблокирована',
-                'base_url' => $baseUrl,
-            ]);
-
-            return 0;
-        }
-
-        $extension = trim((string) config('licensed_media.default_extension', 'mp4'), '. ');
-
-        if ($extension === '') {
-            $extension = 'mp4';
-        }
-
-        $titles = CatalogTitle::query()
-            ->whereDoesntHave('licensedMedia')
-            ->latest('indexed_at')
-            ->limit(max(1, $limit))
-            ->get();
-
-        $attached = 0;
-
-        foreach ($titles as $catalogTitle) {
-            $playbackUrl = Str::finish($baseUrl, '/').$catalogTitle->slug.'.'.$extension;
-
-            LicensedMedia::query()->updateOrCreate(
-                [
-                    'catalog_title_id' => $catalogTitle->id,
-                    'playback_url' => $playbackUrl,
-                ],
-                [
-                    'title' => $catalogTitle->title,
-                    'storage_disk' => 'remote',
-                    'path' => $playbackUrl,
-                    'status' => 'published',
-                    'published_at' => now(),
-                ],
-            );
-
-            $attached++;
-
-            $this->writeSeasonvarProgress('licensed-media-attached', [
-                'catalog_title_id' => $catalogTitle->id,
-                'slug' => $catalogTitle->slug,
-                'playback_url' => $playbackUrl,
-            ]);
-        }
-
-        return $attached;
-    }
-
     private function positiveOption(string $name, int $default): int
     {
         $value = $this->option($name);
@@ -221,29 +161,6 @@ class FullSyncSeasonvar extends Command
         }
 
         return max(1, (int) $value);
-    }
-
-    private function isSafeRemoteMediaBaseUrl(string $url): bool
-    {
-        if (filter_var($url, FILTER_VALIDATE_URL) === false) {
-            return false;
-        }
-
-        $scheme = Str::lower((string) parse_url($url, PHP_URL_SCHEME));
-        $host = Str::lower((string) parse_url($url, PHP_URL_HOST));
-
-        if (! in_array($scheme, ['http', 'https'], true)) {
-            return false;
-        }
-
-        return ! Str::is([
-            'seasonvar.ru',
-            '*.seasonvar.ru',
-            'angrycdn.net',
-            '*.angrycdn.net',
-            'bigsv.ru',
-            '*.bigsv.ru',
-        ], $host);
     }
 
     private function registerSignalHandlers(): void

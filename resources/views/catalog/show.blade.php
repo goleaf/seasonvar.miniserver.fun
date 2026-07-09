@@ -72,7 +72,11 @@
 
                         <div class="mt-3 grid grid-cols-2 gap-2 text-center text-xs font-bold">
                             <span class="rounded-lg bg-emerald-50 px-2 py-2 text-emerald-700 ring-1 ring-emerald-100">{{ $taxonomyCount > 0 ? $taxonomyCount.' связей' : 'нет связей' }}</span>
-                            <span class="rounded-lg bg-orange-50 px-2 py-2 text-orange-700 ring-1 ring-orange-100">{{ $selectedMedia ? 'плеер' : 'нет медиа' }}</span>
+                            <span @class([
+                                'rounded-lg px-2 py-2 ring-1',
+                                'bg-emerald-50 text-emerald-700 ring-emerald-100' => $selectedMedia,
+                                'bg-amber-50 text-amber-700 ring-amber-100' => ! $selectedMedia,
+                            ])>{{ $selectedMedia ? 'плеер готов' : 'нет медиа' }}</span>
                         </div>
                     </div>
 
@@ -244,29 +248,37 @@
                     @else
                         <span class="rounded-full bg-white px-2 py-1 ring-1 ring-slate-200">Серия не выбрана</span>
                     @endif
-                    <span class="sm:ml-auto rounded-full bg-slate-50 px-2 py-1 ring-1 ring-slate-200">{{ $selectedMedia ? 'файл подключен' : 'файл не подключен' }}</span>
+                    <span @class([
+                        'sm:ml-auto rounded-full px-3 py-1 ring-1',
+                        'bg-emerald-50 text-emerald-700 ring-emerald-100' => $selectedMedia,
+                        'bg-amber-50 text-amber-700 ring-amber-100' => ! $selectedMedia,
+                    ])>{{ $selectedMedia ? 'видео найдено' : 'файл ожидается' }}</span>
                 </div>
 
-                <div class="mt-3 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+                <div @class([
+                    'mt-3 overflow-hidden rounded-lg border',
+                    'border-emerald-200 bg-emerald-50' => $selectedMedia,
+                    'border-amber-200 bg-amber-50' => ! $selectedMedia,
+                ])>
                     @if ($selectedMedia && $selectedMediaUrl)
-                        <video controls playsinline preload="metadata" poster="{{ $title->poster_url }}" class="aspect-video w-full bg-slate-100">
+                        <video controls playsinline preload="metadata" poster="{{ $title->poster_url }}" class="aspect-video w-full bg-black">
                             <source src="{{ $selectedMediaUrl }}">
                             Ваш браузер не поддерживает воспроизведение видео.
                         </video>
                     @else
-                        <div class="grid aspect-video place-items-center p-6 text-center text-slate-500">
+                        <div class="grid aspect-video place-items-center p-6 text-center text-amber-700">
                             <div>
-                                <div class="text-lg font-bold text-slate-700">
+                                <div class="text-lg font-bold text-amber-800">
                                     {{ $selectedEpisode ? 'Файл для выбранной серии еще не подключен' : 'Выберите серию для просмотра' }}
                                 </div>
-                                <p class="mt-1 text-sm">Когда внешний плейлист будет импортирован, видео появится в этом блоке.</p>
+                                <p class="mt-1 text-sm">После парсинга портал сам проверит настроенные внешние источники и покажет видео здесь.</p>
                             </div>
                         </div>
                     @endif
                 </div>
 
                 <div class="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-600">
-                    <span class="rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">Стандартный</span>
+                    <span class="rounded-full bg-white px-3 py-1 ring-1 ring-slate-200">Локальный плеер</span>
                     @if ($selectedMedia)
                         <span class="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 ring-1 ring-emerald-100">{{ $selectedMedia->title }}</span>
                     @endif

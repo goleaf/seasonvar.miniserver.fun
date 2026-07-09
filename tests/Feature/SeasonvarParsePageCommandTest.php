@@ -13,6 +13,7 @@ class SeasonvarParsePageCommandTest extends TestCase
     public function test_it_parses_requested_page_and_all_detected_seasons_into_one_title(): void
     {
         config(['seasonvar.crawl_delay_seconds' => 0]);
+        config(['licensed_media.playlist_urls' => ['https://playlist.example.com/kitchen.m3u']]);
         Http::preventStrayRequests();
         Http::fake([
             'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html' => Http::response($this->seasonPageHtml(4, [
@@ -22,6 +23,11 @@ class SeasonvarParsePageCommandTest extends TestCase
             'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-1-season.html' => Http::response($this->seasonPageHtml(1, [
                 1 => 'Начало',
             ])),
+            'playlist.example.com/*' => Http::response(<<<'M3U'
+                #EXTM3U
+                #EXTINF:-1,Черный список: На кухне S04E02
+                https://media.example.com/kitchen/s04e02.mp4
+                M3U),
         ]);
 
         $this->artisan('seasonvar:parse-page', [
@@ -50,6 +56,12 @@ class SeasonvarParsePageCommandTest extends TestCase
         $this->assertDatabaseHas('episodes', [
             'number' => 2,
             'title' => 'Проверка',
+        ]);
+        $this->assertDatabaseHas('licensed_media', [
+            'title' => 'Черный список: На кухне S04E02',
+            'storage_disk' => 'external_playlist',
+            'playback_url' => 'https://media.example.com/kitchen/s04e02.mp4',
+            'status' => 'published',
         ]);
         $this->assertDatabaseHas('source_pages', [
             'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',

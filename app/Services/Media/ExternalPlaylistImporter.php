@@ -390,7 +390,7 @@ class ExternalPlaylistImporter
         return $origin.$directory.'/'.$url;
     }
 
-    private function safeExternalUrl(string $url): string
+    public function safeExternalUrl(string $url): string
     {
         if (filter_var($url, FILTER_VALIDATE_URL) === false) {
             throw new InvalidArgumentException('Неверная ссылка.');
