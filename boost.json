@@ -6,6 +6,10 @@
     "sail": false,
     "skills": [
         "laravel-best-practices",
-        "tailwindcss-development"
+        "tailwindcss-development",
+        "seasonvar-importer",
+        "seasonvar-ui",
+        "seasonvar-seo",
+        "seasonvar-mcp-ops"
     ]
 }

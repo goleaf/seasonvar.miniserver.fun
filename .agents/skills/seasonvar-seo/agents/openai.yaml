@@ -1,0 +1,4 @@
+interface:
+  display_name: "Seasonvar SEO"
+  short_description: "Sitemap, robots, Search Console и SEO"
+  default_prompt: "Use $seasonvar-seo to update sitemap, robots, metadata, indexing, Search Console, or Analytics workflows."

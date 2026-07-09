@@ -22,6 +22,8 @@ Production-значения должны задаваться сервером, 
 
 Проектные ключи Seasonvar описаны в `.env.example`. Значения по умолчанию консервативные: `SEASONVAR_BASE_URL=https://seasonvar.ru`, `SEASONVAR_IMPORT_CHUNK_SIZE=100`, `SEASONVAR_CRAWL_DELAY=3`, а проверки медиа включены с ограниченными тайм-аутами.
 
+Google-интеграции по умолчанию выключены. Если включаются Search Console или Google Analytics, реальные credential-файлы и OAuth-секреты должны задаваться сервером или secret store, а в Git остаются только имена переменных из `.env.example`.
+
 ## Переменные проекта
 
 Ключи, которые чаще всего меняются между окружениями:
@@ -34,6 +36,9 @@ Production-значения должны задаваться сервером, 
 - `SEASONVAR_IMPORT_LOCK_SECONDS` и `SEASONVAR_IMPORT_STALE_AFTER_MINUTES` — защита от параллельного и зависшего импорта.
 - `SEASONVAR_MEDIA_CHECK_*` — включение, timeout, retries, размер пачки и возраст повторной проверки внешних media URL.
 - `SEASONVAR_MEDIA_METADATA_CHUNK_SIZE` и `SEASONVAR_MEDIA_SOURCE_KEY_CHUNK_SIZE` — размеры сервисных дозаполнений старых media rows.
+- `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_PROJECT_ID` — runtime credential/project значения для Google API или локальных MCP, если они включены.
+- `GOOGLE_SEARCH_CONSOLE_*` — read-only настройки Search Console.
+- `GOOGLE_ANALYTICS_*` — read-only настройки GA4 reporting.
 
 В коде приложения эти значения читаются через `config('seasonvar.*')`, `config('queue.*')`, `config('database.*')` и другие config-файлы, а не через прямой `env()`.
 

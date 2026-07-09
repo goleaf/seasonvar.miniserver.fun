@@ -17,7 +17,7 @@
 
 ## MCP
 
-Laravel Boost сейчас единственный полезный MCP-сервер для этого проекта. В проекте есть `boost.json` с включенным MCP и `.codex/config.toml` для запуска:
+Laravel Boost остается единственным активным проектным MCP-сервером, который хранится в Git. В проекте есть `boost.json` с включенным MCP и `.codex/config.toml` для запуска:
 
 ```toml
 [mcp_servers.laravel-boost]
@@ -26,6 +26,8 @@ args = ["artisan", "boost:mcp", "--env=local"]
 ```
 
 Файл конфигурации разрешен в `.gitignore`, чтобы проектная настройка Laravel Boost MCP попадала в Git без отслеживания остальных файлов `.codex`.
+
+Дополнительные MCP и app connectors для GitHub, Google, Cloudflare, Notion, Sentry, Figma и других внешних сервисов должны подключаться через user/global config или авторизованный connector. Проектные правила и шаблоны находятся в `docs/integrations/mcp-catalog.md`, `docs/integrations/google.md` и `.codex/mcp.example.toml`.
 
 ## Исправлено
 

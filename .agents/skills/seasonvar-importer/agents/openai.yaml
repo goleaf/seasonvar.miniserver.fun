@@ -1,0 +1,4 @@
+interface:
+  display_name: "Seasonvar Importer"
+  short_description: "Импорт, парсинг и media-данные Seasonvar"
+  default_prompt: "Use $seasonvar-importer to update Seasonvar import, parsing, media metadata, or refresh behavior safely."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Seasonvar UI"
+  short_description: "Каталог, Blade и Tailwind-интерфейс"
+  default_prompt: "Use $seasonvar-ui to change the Russian catalog interface, Blade views, playback controls, or responsive UI."

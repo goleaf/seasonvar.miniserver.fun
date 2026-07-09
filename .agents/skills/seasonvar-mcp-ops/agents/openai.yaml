@@ -1,0 +1,4 @@
+interface:
+  display_name: "Seasonvar MCP Ops"
+  short_description: "MCP, коннекторы и внешние сервисы"
+  default_prompt: "Use $seasonvar-mcp-ops to configure or audit MCP servers, Codex skills, Google, GitHub, Cloudflare, Notion, or Sentry integrations."

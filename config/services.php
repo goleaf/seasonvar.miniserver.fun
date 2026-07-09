@@ -28,6 +28,22 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'google' => [
+        'application_credentials' => env('GOOGLE_APPLICATION_CREDENTIALS'),
+        'project_id' => env('GOOGLE_CLOUD_PROJECT', env('GOOGLE_PROJECT_ID')),
+
+        'search_console' => [
+            'enabled' => (bool) env('GOOGLE_SEARCH_CONSOLE_ENABLED', false),
+            'site_url' => env('GOOGLE_SEARCH_CONSOLE_SITE_URL'),
+            'readonly' => (bool) env('GOOGLE_SEARCH_CONSOLE_READONLY', true),
+        ],
+
+        'analytics' => [
+            'enabled' => (bool) env('GOOGLE_ANALYTICS_ENABLED', false),
+            'property_id' => env('GOOGLE_ANALYTICS_PROPERTY_ID'),
+        ],
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

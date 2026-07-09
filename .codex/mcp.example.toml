@@ -1,0 +1,56 @@
+# Seasonvar MCP examples.
+#
+# Do not copy this whole file into project config. Enable only the server that is
+# required for the current workflow. Keep personal credentials in user/global
+# Codex config or the operating system secret store, not in this repository.
+#
+# Active project-local MCP remains in `.codex/config.toml`:
+# [mcp_servers.laravel-boost]
+# command = "php"
+# args = ["artisan", "boost:mcp", "--env=local"]
+
+# Google Workspace remote MCP examples.
+# Requires a Google Cloud project, enabled Workspace MCP services, OAuth consent,
+# and an MCP client OAuth flow. Prefer user/global config because these servers
+# expose private account data.
+#
+# [mcp_servers.google-drive]
+# url = "https://drivemcp.googleapis.com/mcp/v1"
+# default_tools_approval_mode = "prompt"
+# required = false
+#
+# [mcp_servers.google-calendar]
+# url = "https://calendarmcp.googleapis.com/mcp/v1"
+# default_tools_approval_mode = "prompt"
+# required = false
+#
+# [mcp_servers.google-gmail]
+# url = "https://gmailmcp.googleapis.com/mcp/v1"
+# default_tools_approval_mode = "prompt"
+# required = false
+#
+# [mcp_servers.google-people]
+# url = "https://people.googleapis.com/mcp/v1"
+# default_tools_approval_mode = "prompt"
+# required = false
+
+# Google Analytics local MCP example.
+# Requires `pipx`, Google Analytics Admin/Data APIs, and ADC credentials with the
+# analytics read-only scope. Put real credential paths in user/global config.
+#
+# [mcp_servers.analytics-mcp]
+# command = "pipx"
+# args = ["run", "analytics-mcp"]
+# env = { GOOGLE_APPLICATION_CREDENTIALS = "/absolute/private/path/application_default_credentials.json", GOOGLE_PROJECT_ID = "google-cloud-project-id" }
+# default_tools_approval_mode = "prompt"
+# required = false
+
+# Generic remote HTTP MCP with bearer token from the user's environment.
+# Use this shape only for trusted official/internal MCP endpoints.
+#
+# [mcp_servers.example-readonly]
+# url = "https://example.com/mcp"
+# env_http_headers = { Authorization = "EXAMPLE_MCP_BEARER_TOKEN" }
+# default_tools_approval_mode = "prompt"
+# enabled_tools = ["read_status", "search"]
+# required = false

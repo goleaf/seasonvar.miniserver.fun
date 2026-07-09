@@ -8,6 +8,28 @@ use Tests\TestCase;
 
 class ConfigurationEnvironmentTest extends TestCase
 {
+    public function test_google_integration_placeholders_are_documented(): void
+    {
+        $envExample = File::get(base_path('.env.example'));
+
+        foreach ([
+            'GOOGLE_APPLICATION_CREDENTIALS=',
+            'GOOGLE_CLOUD_PROJECT=',
+            'GOOGLE_PROJECT_ID=',
+            'GOOGLE_SEARCH_CONSOLE_ENABLED=false',
+            'GOOGLE_SEARCH_CONSOLE_SITE_URL=https://seasonvar.miniserver.fun/',
+            'GOOGLE_SEARCH_CONSOLE_READONLY=true',
+            'GOOGLE_ANALYTICS_ENABLED=false',
+            'GOOGLE_ANALYTICS_PROPERTY_ID=',
+        ] as $placeholder) {
+            $this->assertStringContainsString($placeholder, $envExample);
+        }
+
+        $this->assertIsArray(config('services.google'));
+        $this->assertIsArray(config('services.google.search_console'));
+        $this->assertIsArray(config('services.google.analytics'));
+    }
+
     public function test_env_helper_is_only_used_in_configuration_files(): void
     {
         $directories = [
