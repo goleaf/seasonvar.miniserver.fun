@@ -10,7 +10,7 @@
                         <span>Сводка каталога</span>
                     </h1>
                     <p class="mt-2 max-w-4xl text-sm leading-6 text-slate-500">
-                        Карточки, сезоны, серии, видео, отзывы, оценки, справочники и обновления в одном месте.
+                        Карточки, сезоны, серии, видео, источники, обновления, качество данных и разделы базы.
                     </p>
                 </div>
                 <div class="inline-flex w-fit items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500 ring-1 ring-slate-200">
@@ -45,6 +45,105 @@
                 </x-ui.panel>
             @endforeach
         </section>
+
+        <section class="grid gap-5 xl:grid-cols-2">
+            @foreach ($qualitySections as $section)
+                <x-ui.panel :title="$section['title']" :icon="$section['icon']" :pad="false">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-slate-200 text-sm">
+                            <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                                <tr>
+                                    <th scope="col" class="px-4 py-3 text-left">Проверка</th>
+                                    <th scope="col" class="px-4 py-3 text-right">Найдено</th>
+                                    <th scope="col" class="px-4 py-3 text-right">Доля</th>
+                                    <th scope="col" class="px-4 py-3 text-right">Важность</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                @foreach ($section['rows'] as $row)
+                                    <tr class="{{ $row['row_class'] }}">
+                                        <th scope="row" class="px-4 py-3 text-left font-semibold text-slate-700">{{ $row['label'] }}</th>
+                                        <td class="px-4 py-3 text-right font-bold {{ $row['value_class'] }}">{{ $row['display'] }}</td>
+                                        <td class="px-4 py-3 text-right text-xs font-semibold text-slate-500">{{ $row['meta'] }}</td>
+                                        <td class="px-4 py-3 text-right text-xs font-semibold text-slate-500">{{ $row['severity_label'] }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </x-ui.panel>
+            @endforeach
+        </section>
+
+        <x-ui.panel title="Временные срезы" icon="fa-solid fa-chart-line" :pad="false">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 text-left">Период</th>
+                            <th scope="col" class="px-4 py-3 text-right">Карточки</th>
+                            <th scope="col" class="px-4 py-3 text-right">Серии</th>
+                            <th scope="col" class="px-4 py-3 text-right">Видео</th>
+                            <th scope="col" class="px-4 py-3 text-right">Сбор</th>
+                            <th scope="col" class="px-4 py-3 text-right">Обновление</th>
+                            <th scope="col" class="px-4 py-3 text-right">Ошибки</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach ($timeWindowRows as $row)
+                            <tr>
+                                <th scope="row" class="px-4 py-3 text-left font-semibold text-slate-700">{{ $row['label'] }}</th>
+                                <td class="px-4 py-3 text-right font-bold text-slate-800">{{ $row['catalog_titles'] }}</td>
+                                <td class="px-4 py-3 text-right font-bold text-slate-800">{{ $row['episodes'] }}</td>
+                                <td class="px-4 py-3 text-right font-bold text-slate-800">{{ $row['media'] }}</td>
+                                <td class="px-4 py-3 text-right font-bold text-slate-800">{{ $row['crawled'] }}</td>
+                                <td class="px-4 py-3 text-right font-bold text-slate-800">{{ $row['imported'] }}</td>
+                                <td class="px-4 py-3 text-right font-bold text-rose-700">{{ $row['import_errors'] }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </x-ui.panel>
+
+        <x-ui.panel title="Последние запуски обновления" icon="fa-solid fa-clock-rotate-left" :pad="false">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200 text-sm">
+                    <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 text-left">ID</th>
+                            <th scope="col" class="px-4 py-3 text-left">Режим</th>
+                            <th scope="col" class="px-4 py-3 text-left">Состояние</th>
+                            <th scope="col" class="px-4 py-3 text-right">Страниц</th>
+                            <th scope="col" class="px-4 py-3 text-right">Обновлено</th>
+                            <th scope="col" class="px-4 py-3 text-right">Ошибок</th>
+                            <th scope="col" class="px-4 py-3 text-right">Видео +/-</th>
+                            <th scope="col" class="px-4 py-3 text-right">Старт</th>
+                            <th scope="col" class="px-4 py-3 text-right">Финиш</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @forelse ($recentImportRuns as $run)
+                            <tr>
+                                <th scope="row" class="px-4 py-3 text-left font-semibold text-slate-700">{{ $run['id'] }}</th>
+                                <td class="px-4 py-3 text-slate-600">{{ $run['mode'] }}</td>
+                                <td class="px-4 py-3 text-slate-600">{{ $run['status'] }}</td>
+                                <td class="px-4 py-3 text-right font-bold text-slate-800">{{ $run['selected'] }}</td>
+                                <td class="px-4 py-3 text-right font-bold text-slate-800">{{ $run['parsed'] }}</td>
+                                <td class="px-4 py-3 text-right font-bold text-rose-700">{{ $run['failed'] }}</td>
+                                <td class="px-4 py-3 text-right font-bold text-slate-800">{{ $run['media'] }}</td>
+                                <td class="px-4 py-3 text-right text-xs font-semibold text-slate-500">{{ $run['started_at'] }}</td>
+                                <td class="px-4 py-3 text-right text-xs font-semibold text-slate-500">{{ $run['finished_at'] }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td class="px-4 py-4 text-sm text-slate-500" colspan="9">Нет данных.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </x-ui.panel>
 
         <x-ui.panel title="Справочники и связи" icon="fa-solid fa-diagram-project" :pad="false">
             <div class="overflow-x-auto">

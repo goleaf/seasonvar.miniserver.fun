@@ -6,6 +6,9 @@ use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
+use App\Models\SeasonvarImportEvent;
+use App\Models\SeasonvarImportRun;
+use App\Models\SourcePage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -24,6 +27,9 @@ class CatalogPageTest extends TestCase
     public function test_stats_page_shows_database_statistics_without_raw_source_urls(): void
     {
         $sourceUrl = 'https://seasonvar.ru/serial-777-Skrytyj_url-1-season.html';
+        $sourcePageUrl = 'https://seasonvar.ru/serial-778-Skrytyj_source_page-1-season.html';
+        $runArgumentUrl = 'https://seasonvar.ru/serial-779-Skrytyj_argument-1-season.html';
+        $eventContextUrl = 'https://seasonvar.ru/serial-780-Skrytyj_context-1-season.html';
         $catalogTitle = CatalogTitle::factory()->create([
             'title' => 'Статистический сериал',
             'slug' => 'statisticheskii-serial',
@@ -54,6 +60,36 @@ class CatalogPageTest extends TestCase
             'checked_at' => now(),
             'published_at' => now(),
         ]);
+        $sourcePage = SourcePage::factory()->create([
+            'url' => $sourcePageUrl,
+            'url_hash' => hash('sha256', $sourcePageUrl),
+            'parse_status' => 'failed',
+            'import_status' => 'failed',
+            'missing_data_flags' => ['video'],
+            'retry_after_at' => now()->addHour(),
+            'last_crawled_at' => now()->subDays(45),
+        ]);
+        $run = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'status' => 'failed',
+            'argument' => $runArgumentUrl,
+            'selected' => 7,
+            'parsed' => 4,
+            'failed' => 1,
+            'media_attached' => 2,
+            'media_updated' => 3,
+            'last_error' => 'raw stack trace secret',
+            'started_at' => now()->subMinutes(10),
+            'finished_at' => now(),
+        ]);
+        SeasonvarImportEvent::query()->create([
+            'seasonvar_import_run_id' => $run->id,
+            'source_page_id' => $sourcePage->id,
+            'catalog_title_id' => $catalogTitle->id,
+            'event' => 'parse_failed',
+            'level' => 'error',
+            'context' => ['url' => $eventContextUrl, 'secret' => 'private context secret'],
+        ]);
 
         $response = $this->get(route('stats'));
 
@@ -63,10 +99,21 @@ class CatalogPageTest extends TestCase
             ->assertSeeText('Карточек каталога')
             ->assertSeeText('Сезоны и серии')
             ->assertSeeText('Видео')
+            ->assertSeeText('Качество карточек')
+            ->assertSeeText('Без опубликованного видео')
+            ->assertSeeText('Временные срезы')
+            ->assertSeeText('Последние запуски обновления')
             ->assertSeeText('Разделы базы')
             ->assertDontSee('catalog_titles', false)
+            ->assertSeeText('#'.$run->id)
             ->assertDontSeeText('Сводка каталога смотреть онлайн')
-            ->assertDontSee($sourceUrl, false);
+            ->assertDontSee('parse_failed', false)
+            ->assertDontSee($sourceUrl, false)
+            ->assertDontSee($sourcePageUrl, false)
+            ->assertDontSee($runArgumentUrl, false)
+            ->assertDontSee($eventContextUrl, false)
+            ->assertDontSee('raw stack trace secret', false)
+            ->assertDontSee('private context secret', false);
     }
 
     public function test_titles_page_shows_posters_without_cropping_in_equal_size_area(): void
