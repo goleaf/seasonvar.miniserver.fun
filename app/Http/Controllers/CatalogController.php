@@ -7,7 +7,9 @@ use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\SourcePage;
 use App\Models\Taxonomy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class CatalogController extends Controller
@@ -116,39 +118,22 @@ class CatalogController extends Controller
             ->groupBy('type')
             ->map(fn ($items) => $items->take(12)->values());
 
-        $filterTaxonomies->each(function ($items) use ($activeTaxonomies, $invalidFilterSlugs, $search, $year): void {
-            foreach ($items as $candidateTaxonomy) {
-                $candidateTaxonomy->context_titles_count = $invalidFilterSlugs !== []
-                    ? 0
-                    : CatalogTitle::query()
-                        ->when($year !== null, function ($query) use ($year): void {
-                            $query->where('year', $year);
-                        })
-                        ->when($search !== '', function ($query) use ($search): void {
-                            $query->where(function ($query) use ($search): void {
-                                $query->where('title', 'like', "%{$search}%")
-                                    ->orWhere('original_title', 'like', "%{$search}%")
-                                    ->orWhere('description', 'like', "%{$search}%")
-                                    ->orWhereHas('taxonomies', function ($query) use ($search): void {
-                                        $query->where('name', 'like', "%{$search}%");
-                                    });
-                            });
-                        })
-                        ->whereHas('taxonomies', function ($query) use ($candidateTaxonomy): void {
-                            $query->whereKey($candidateTaxonomy->id);
-                        })
-                        ->when($activeTaxonomies->isNotEmpty(), function ($query) use ($activeTaxonomies, $candidateTaxonomy): void {
-                            foreach ($activeTaxonomies as $filterType => $activeTaxonomy) {
-                                if ($filterType === $candidateTaxonomy->type) {
-                                    continue;
-                                }
+        $activeTaxonomies->each(function (Taxonomy $activeTaxonomy, string $filterType) use ($filterTaxonomies): void {
+            $items = $filterTaxonomies->get($filterType, collect());
 
-                                $query->whereHas('taxonomies', function ($query) use ($activeTaxonomy): void {
-                                    $query->whereKey($activeTaxonomy->id);
-                                });
-                            }
-                        })
-                        ->count();
+            if (! $items->contains(fn (Taxonomy $taxonomy): bool => $taxonomy->id === $activeTaxonomy->id)) {
+                $filterTaxonomies->put($filterType, $items->prepend($activeTaxonomy)->values());
+            }
+        });
+
+        $filterTaxonomies->each(function (Collection $items) use ($activeTaxonomies, $invalidFilterSlugs, $search, $year): void {
+            foreach ($items as $candidateTaxonomy) {
+                $candidateTaxonomy->context_titles_count = $this
+                    ->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, $year, $candidateTaxonomy->type)
+                    ->whereHas('taxonomies', function (Builder $query) use ($candidateTaxonomy): void {
+                        $query->whereKey($candidateTaxonomy->id);
+                    })
+                    ->count();
             }
         });
         $yearBuckets = CatalogTitle::query()
@@ -162,29 +147,10 @@ class CatalogController extends Controller
             ->limit(20)
             ->get();
 
-        $yearBuckets->each(function ($bucket) use ($activeTaxonomies, $invalidFilterSlugs, $search): void {
-            $bucket->context_titles_count = $invalidFilterSlugs !== []
-                ? 0
-                : CatalogTitle::query()
-                    ->where('year', (int) $bucket->year)
-                    ->when($search !== '', function ($query) use ($search): void {
-                        $query->where(function ($query) use ($search): void {
-                            $query->where('title', 'like', "%{$search}%")
-                                ->orWhere('original_title', 'like', "%{$search}%")
-                                ->orWhere('description', 'like', "%{$search}%")
-                                ->orWhereHas('taxonomies', function ($query) use ($search): void {
-                                    $query->where('name', 'like', "%{$search}%");
-                                });
-                        });
-                    })
-                    ->when($activeTaxonomies->isNotEmpty(), function ($query) use ($activeTaxonomies): void {
-                        foreach ($activeTaxonomies as $activeTaxonomy) {
-                            $query->whereHas('taxonomies', function ($query) use ($activeTaxonomy): void {
-                                $query->whereKey($activeTaxonomy->id);
-                            });
-                        }
-                    })
-                    ->count();
+        $yearBuckets->each(function (CatalogTitle $bucket) use ($activeTaxonomies, $invalidFilterSlugs, $search): void {
+            $bucket->context_titles_count = $this
+                ->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, (int) $bucket->year)
+                ->count();
         });
 
         return view('catalog.titles', [
@@ -199,6 +165,58 @@ class CatalogController extends Controller
             'filterTypes' => $filterTypes,
             'yearBuckets' => $yearBuckets,
         ]);
+    }
+
+    private function catalogTitleFilterQuery(
+        Collection $activeTaxonomies,
+        array $invalidFilterSlugs,
+        string $search,
+        ?int $year = null,
+        ?string $exceptTaxonomyType = null,
+    ): Builder {
+        $query = CatalogTitle::query();
+
+        if ($invalidFilterSlugs !== []) {
+            $query->whereRaw('1 = 0');
+        }
+
+        if ($year !== null) {
+            $query->where('year', $year);
+        }
+
+        $this->applySearchFilter($query, $search);
+        $this->applyTaxonomyFilters($query, $activeTaxonomies, $exceptTaxonomyType);
+
+        return $query;
+    }
+
+    private function applySearchFilter(Builder $query, string $search): void
+    {
+        if ($search === '') {
+            return;
+        }
+
+        $query->where(function (Builder $query) use ($search): void {
+            $query->where('title', 'like', "%{$search}%")
+                ->orWhere('original_title', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%")
+                ->orWhereHas('taxonomies', function (Builder $query) use ($search): void {
+                    $query->where('name', 'like', "%{$search}%");
+                });
+        });
+    }
+
+    private function applyTaxonomyFilters(Builder $query, Collection $activeTaxonomies, ?string $exceptTaxonomyType = null): void
+    {
+        foreach ($activeTaxonomies as $filterType => $activeTaxonomy) {
+            if ($filterType === $exceptTaxonomyType) {
+                continue;
+            }
+
+            $query->whereHas('taxonomies', function (Builder $query) use ($activeTaxonomy): void {
+                $query->whereKey($activeTaxonomy->id);
+            });
+        }
     }
 
     public function show(Request $request, CatalogTitle $catalogTitle): View
