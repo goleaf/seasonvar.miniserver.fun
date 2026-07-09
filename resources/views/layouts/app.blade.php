@@ -1,3 +1,4 @@
+@use('Illuminate\Support\Facades\Vite')
 <!DOCTYPE html>
 <html lang="{{ $htmlLang }}">
     <head>
@@ -149,11 +150,12 @@
         <meta name="twitter:title" content="{{ $fullTitle }}">
         <meta name="twitter:description" content="{{ $seoDescription }}">
         <title>{{ $fullTitle }}</title>
+        {{ Vite::fonts('instrument-sans') }}
         @foreach ($jsonLdItems as $jsonLd)
             <script type="application/ld+json">{!! json_encode($jsonLd, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!}</script>
         @endforeach
         @stack('head')
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @vite('resources/js/app.js')
     </head>
     <body class="min-h-screen bg-slate-50 text-slate-700 antialiased">
         <header class="border-b border-slate-200 bg-white shadow-sm shadow-slate-200/70">

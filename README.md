@@ -12,12 +12,14 @@ Laravel-приложение для локального каталога сер
 
 ```bash
 composer install
+npm install
 php artisan seasonvar:import
 php artisan seasonvar:import "https://seasonvar.ru/serial-615--Bez_sleda_pssmtlk-1-season.html" --force
 php artisan seasonvar:import --forever
 php artisan project:docs-refresh
 php artisan test --compact
 vendor/bin/pint --dirty --format agent
+npm run dev
 npm run build
 ```
 
@@ -30,6 +32,8 @@ npm run build
 ## Интерфейс
 
 Интерфейс каталога ведется на русском языке. Нельзя добавлять на страницы рекламные или заглушечные описания проекта.
+
+Frontend собирается через Vite 8 и Tailwind CSS 4. Основная точка входа — `resources/js/app.js`; подробности по командам и asset rules описаны в `docs/frontend.md`.
 
 ## Медиа
 
