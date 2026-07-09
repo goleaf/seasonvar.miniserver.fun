@@ -16,6 +16,73 @@
     $seoLocale = $seo['locale'] ?? 'ru_RU';
     $htmlLang = $seo['htmlLang'] ?? 'ru';
     $seoTags = collect($seo['tags'] ?? [])->filter()->unique()->take(25)->values();
+    $seoClusterTerms = collect($seo['keyword_clusters'] ?? [])
+        ->flatMap(fn ($cluster) => collect($cluster['items'] ?? []));
+    $topicTerms = collect($seo['topic_terms'] ?? [])
+        ->merge($seoTags)
+        ->merge($seo['search_phrases'] ?? [])
+        ->merge($seoClusterTerms)
+        ->filter()
+        ->map(fn ($term) => trim((string) $term))
+        ->filter()
+        ->unique()
+        ->take(40)
+        ->values();
+    $seoIntents = collect([
+        'смотреть онлайн',
+        'сериал онлайн',
+        'все серии',
+        'сезоны и серии',
+        'описание сериала',
+        'актеры и роли',
+        'жанры и страны',
+    ])->merge($topicTerms->take(12))->unique()->values();
+    $semanticEntities = $topicTerms->take(24)->map(fn ($term) => [
+        '@type' => 'Thing',
+        'name' => $term,
+        'url' => route('titles.index', ['q' => $term]),
+    ])->values();
+    $longTailQueries = $topicTerms->take(10)
+        ->flatMap(fn ($term) => collect([
+            $term.' смотреть онлайн',
+            $term.' сериал онлайн',
+            $term.' все серии',
+            $term.' сезоны и серии',
+            $term.' описание и актеры',
+        ]))
+        ->merge($seoIntents->take(8)->map(fn ($intent) => trim($pageTitle.' '.$intent)))
+        ->map(fn ($query) => trim(preg_replace('/\s+/u', ' ', (string) $query)))
+        ->filter(fn ($query) => $query !== '' && mb_strlen($query) <= 100)
+        ->unique()
+        ->take(40)
+        ->values();
+    $quickAnswers = collect([
+        [
+            'question' => 'Что есть на странице «'.$pageTitle.'»?',
+            'answer' => $seoDescription,
+        ],
+        [
+            'question' => 'Как найти похожие сериалы и подборки?',
+            'answer' => $topicTerms->isNotEmpty()
+                ? 'Используйте связанные темы: '.$topicTerms->take(8)->implode(', ').'.'
+                : 'Используйте поиск, жанры, страны, годы выпуска, актеров и режиссеров в каталоге.',
+        ],
+        [
+            'question' => 'Какие запросы связаны с этой страницей?',
+            'answer' => $seoIntents->isNotEmpty()
+                ? $seoIntents->take(10)->implode(', ').'.'
+                : 'Сериалы онлайн, все серии, сезоны, описание, актеры и жанры.',
+        ],
+    ])->filter(fn ($item) => ! empty($item['question']) && ! empty($item['answer']))->values();
+    $seoSections = collect([
+        ['id' => 'seo-summary', 'name' => 'Описание страницы', 'enabled' => ! empty($seo['seo_text']) || ! empty($seo['related_links'])],
+        ['id' => 'key-topics', 'name' => 'Ключевые темы', 'enabled' => $topicTerms->isNotEmpty()],
+        ['id' => 'query-navigation', 'name' => 'Навигация по запросам', 'enabled' => $seoIntents->isNotEmpty()],
+        ['id' => 'long-tail-queries', 'name' => 'Поисковые формулировки', 'enabled' => $longTailQueries->isNotEmpty()],
+        ['id' => 'quick-answers', 'name' => 'Быстрые ответы', 'enabled' => $quickAnswers->isNotEmpty()],
+        ['id' => 'semantic-clusters', 'name' => 'Семантические подборки', 'enabled' => ! empty($seo['keyword_clusters'])],
+        ['id' => 'popular-searches', 'name' => 'Популярные запросы', 'enabled' => ! empty($seo['search_phrases'])],
+    ])->filter(fn ($section) => $section['enabled'])->values();
     $breadcrumbs = collect($seo['breadcrumbs'] ?? [])->filter(fn ($item) => is_array($item) && ! empty($item['name']) && ! empty($item['url']))->values();
 
     if ($seoImage && ! \Illuminate\Support\Str::startsWith($seoImage, ['http://', 'https://'])) {
@@ -26,6 +93,105 @@
 
     if ($jsonLdItems !== [] && ! array_is_list($jsonLdItems)) {
         $jsonLdItems = [$jsonLdItems];
+    }
+
+    if ($topicTerms->isNotEmpty()) {
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'DefinedTermSet',
+            'name' => $fullTitle.' - ключевые темы',
+            'hasDefinedTerm' => $topicTerms->take(35)->map(fn ($term) => [
+                '@type' => 'DefinedTerm',
+                'name' => $term,
+                'url' => route('titles.index', ['q' => $term]),
+            ])->values()->all(),
+        ];
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            'name' => $fullTitle.' - тематическая навигация',
+            'itemListElement' => $topicTerms->take(30)->values()->map(fn ($term, $index) => [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $term,
+                'url' => route('titles.index', ['q' => $term]),
+            ])->values()->all(),
+        ];
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'WebPage',
+            '@id' => $canonicalUrl.'#semantic-page',
+            'url' => $canonicalUrl,
+            'name' => $fullTitle,
+            'description' => $seoDescription,
+            'inLanguage' => 'ru',
+            'keywords' => $topicTerms->take(30)->implode(', '),
+            'about' => $semanticEntities->take(8)->values()->all(),
+            'mentions' => $semanticEntities->slice(8)->values()->all(),
+            'isPartOf' => [
+                '@type' => 'WebSite',
+                'name' => $siteName,
+                'url' => route('home'),
+            ],
+        ];
+    }
+
+    if ($quickAnswers->isNotEmpty()) {
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'FAQPage',
+            '@id' => $canonicalUrl.'#quick-answers',
+            'mainEntity' => $quickAnswers->map(fn ($item) => [
+                '@type' => 'Question',
+                'name' => $item['question'],
+                'acceptedAnswer' => [
+                    '@type' => 'Answer',
+                    'text' => $item['answer'],
+                ],
+            ])->values()->all(),
+        ];
+    }
+
+    if ($longTailQueries->isNotEmpty()) {
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            '@id' => $canonicalUrl.'#long-tail-queries-list',
+            'name' => $fullTitle.' - поисковые формулировки',
+            'itemListElement' => $longTailQueries->take(35)->values()->map(fn ($query, $index) => [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $query,
+                'url' => route('titles.index', ['q' => $query]),
+            ])->values()->all(),
+        ];
+    }
+
+    if ($seoSections->isNotEmpty()) {
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            '@id' => $canonicalUrl.'#table-of-contents',
+            'name' => $fullTitle.' - содержание страницы',
+            'itemListElement' => $seoSections->map(fn ($section, $index) => [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $section['name'],
+                'url' => $canonicalUrl.'#'.$section['id'],
+            ])->values()->all(),
+        ];
+        $jsonLdItems[] = [
+            '@context' => 'https://schema.org',
+            '@type' => 'WebPage',
+            '@id' => $canonicalUrl.'#page-sections',
+            'name' => $fullTitle.' - структура страницы',
+            'hasPart' => $seoSections->map(fn ($section) => [
+                '@type' => 'WebPageElement',
+                '@id' => $canonicalUrl.'#'.$section['id'],
+                'name' => $section['name'],
+                'url' => $canonicalUrl.'#'.$section['id'],
+            ])->values()->all(),
+        ];
     }
 @endphp
 
@@ -39,16 +205,57 @@
         <meta name="author" content="{{ $siteName }}">
         <meta name="application-name" content="{{ $siteName }}">
         <meta name="generator" content="Laravel">
+        <meta name="url" content="{{ $canonicalUrl }}">
+        <meta name="identifier-URL" content="{{ $canonicalUrl }}">
+        <meta name="summary" content="{{ $seoDescription }}">
+        <meta name="owner" content="{{ $siteName }}">
+        <meta name="answer-count" content="{{ $quickAnswers->count() }}">
+        <meta name="toc-count" content="{{ $seoSections->count() }}">
+        <meta name="query-count" content="{{ $longTailQueries->count() }}">
         @if (! empty($seo['keywords']))
             <meta name="keywords" content="{{ $seo['keywords'] }}">
+            <meta name="news_keywords" content="{{ $seo['news_keywords'] ?? $seo['keywords'] }}">
         @endif
+        @if ($topicTerms->isNotEmpty())
+            <meta name="subject" content="{{ $topicTerms->take(12)->implode(', ') }}">
+            <meta name="classification" content="{{ $topicTerms->take(16)->implode(', ') }}">
+            <meta name="category" content="{{ $seo['section'] ?? $topicTerms->first() }}">
+            <meta name="page-topic" content="{{ $topicTerms->take(10)->implode(', ') }}">
+            <meta name="audience" content="зрители сериалов онлайн">
+            <meta name="coverage" content="Worldwide">
+            <meta name="distribution" content="Global">
+            <meta name="revisit-after" content="1 days">
+            <meta name="abstract" content="{{ $seoDescription }}">
+            <meta name="topic" content="{{ $topicTerms->take(14)->implode(', ') }}">
+            <meta name="target" content="{{ $seoIntents->take(18)->implode(', ') }}">
+            <meta name="search-intent" content="{{ $seoIntents->take(18)->implode(', ') }}">
+            <meta name="long-tail-keywords" content="{{ $longTailQueries->take(20)->implode(', ') }}">
+            <meta name="resource-type" content="document">
+            <meta name="language" content="Russian">
+        @endif
+        @foreach ($topicTerms->take(10) as $term)
+            <meta name="entity" content="{{ $term }}">
+        @endforeach
+        @if (! empty($seo['section']))
+            <meta property="article:section" content="{{ $seo['section'] }}">
+        @endif
+        @foreach ($topicTerms->take(12) as $term)
+            <meta property="article:tag" content="{{ $term }}">
+        @endforeach
         <meta name="theme-color" content="#ecfdf5">
         <link rel="canonical" href="{{ $canonicalUrl }}">
         <link rel="alternate" hreflang="ru" href="{{ $canonicalUrl }}">
         <link rel="alternate" hreflang="x-default" href="{{ $canonicalUrl }}">
         <link rel="sitemap" type="application/xml" href="{{ route('sitemap.index') }}">
+        <link rel="sitemap" type="application/xml" href="{{ route('sitemap.landings') }}">
         <link rel="alternate" type="application/rss+xml" title="{{ $siteName }}" href="{{ route('feed') }}">
         <link rel="search" type="application/opensearchdescription+xml" title="{{ $siteName }}" href="{{ route('opensearch') }}">
+        <link rel="alternate" type="text/plain" title="LLMs" href="{{ route('llms') }}">
+        <meta name="rating" content="general">
+        <meta name="referrer" content="strict-origin-when-cross-origin">
+        <meta name="DC.title" content="{{ $fullTitle }}">
+        <meta name="DC.description" content="{{ $seoDescription }}">
+        <meta name="DC.language" content="ru">
         @if (! empty($seo['prev']))
             <link rel="prev" href="{{ $seo['prev'] }}">
         @endif
@@ -150,6 +357,147 @@
                 </nav>
             @endif
             @yield('content')
+            @if ($seoSections->isNotEmpty())
+                <nav id="table-of-contents" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Содержание страницы" itemscope itemtype="https://schema.org/SiteNavigationElement">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-table-list text-emerald-700" aria-hidden="true"></i>
+                        <span itemprop="name">Содержание страницы</span>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        @foreach ($seoSections as $section)
+                            <a href="#{{ $section['id'] }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                                <i class="fa-solid fa-bookmark text-[0.8em] text-slate-400" aria-hidden="true"></i>
+                                <span itemprop="name">{{ $section['name'] }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                </nav>
+            @endif
+            @if (! empty($seo['seo_text']) || ! empty($seo['related_links']))
+                <section id="seo-summary" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="SEO описание страницы" data-seo-summary>
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-file-lines text-emerald-700" aria-hidden="true"></i>
+                        <span>Описание страницы</span>
+                    </div>
+                    @if (! empty($seo['seo_text']))
+                        <div class="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                            @foreach (collect($seo['seo_text'])->filter()->take(4) as $paragraph)
+                                <p>{{ $paragraph }}</p>
+                            @endforeach
+                        </div>
+                    @endif
+                    @if (! empty($seo['related_links']))
+                        <div class="mt-4 flex flex-wrap gap-2">
+                            @foreach (collect($seo['related_links'])->filter()->take(14) as $link)
+                                <a href="{{ $link['url'] }}" class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-100">
+                                    <i class="fa-solid fa-link text-[0.8em]" aria-hidden="true"></i>
+                                    <span>{{ $link['name'] }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    @endif
+                </section>
+            @endif
+            @if ($topicTerms->isNotEmpty())
+                <section id="key-topics" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Ключевые темы" itemscope itemtype="https://schema.org/SiteNavigationElement">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-tags text-emerald-700" aria-hidden="true"></i>
+                        <span itemprop="name">Ключевые темы</span>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        @foreach ($topicTerms as $term)
+                            <a href="{{ route('titles.index', ['q' => $term]) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-100 hover:bg-emerald-50 hover:text-emerald-700 hover:ring-emerald-100">
+                                <i class="fa-solid fa-hashtag text-[0.8em] text-amber-500" aria-hidden="true"></i>
+                                <span itemprop="name">{{ $term }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if ($seoIntents->isNotEmpty())
+                <section id="query-navigation" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Навигация по запросам" itemscope itemtype="https://schema.org/SiteNavigationElement">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-route text-emerald-700" aria-hidden="true"></i>
+                        <span itemprop="name">Навигация по запросам</span>
+                    </div>
+                    <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        @foreach ($seoIntents->take(16) as $intent)
+                            <a href="{{ route('titles.index', ['q' => $intent]) }}" itemprop="url" class="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700">
+                                <i class="fa-solid fa-arrow-up-right-from-square text-[0.8em] text-slate-400" aria-hidden="true"></i>
+                                <span itemprop="name">{{ $intent }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if ($longTailQueries->isNotEmpty())
+                <section id="long-tail-queries" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Поисковые формулировки" itemscope itemtype="https://schema.org/SiteNavigationElement">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-keyboard text-emerald-700" aria-hidden="true"></i>
+                        <span itemprop="name">Поисковые формулировки</span>
+                    </div>
+                    <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        @foreach ($longTailQueries->take(24) as $query)
+                            <a href="{{ route('titles.index', ['q' => $query]) }}" itemprop="url" class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700">
+                                <i class="fa-solid fa-magnifying-glass text-[0.8em] text-slate-400" aria-hidden="true"></i>
+                                <span itemprop="name">{{ $query }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if ($quickAnswers->isNotEmpty())
+                <section class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Быстрые ответы" id="quick-answers">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-circle-question text-emerald-700" aria-hidden="true"></i>
+                        <span>Быстрые ответы</span>
+                    </div>
+                    <div class="mt-3 grid gap-3 lg:grid-cols-3">
+                        @foreach ($quickAnswers as $item)
+                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <h2 class="text-sm font-bold text-slate-800">{{ $item['question'] }}</h2>
+                                <p class="mt-2 text-sm leading-6 text-slate-600">{{ $item['answer'] }}</p>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if (! empty($seo['keyword_clusters']))
+                <section id="semantic-clusters" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Семантические кластеры">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-diagram-project text-emerald-700" aria-hidden="true"></i>
+                        <span>Семантические подборки</span>
+                    </div>
+                    <div class="mt-3 grid gap-3 md:grid-cols-3">
+                        @foreach (collect($seo['keyword_clusters'])->filter()->take(6) as $cluster)
+                            <div class="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
+                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ $cluster['title'] }}</div>
+                                <div class="mt-2 flex flex-wrap gap-1.5">
+                                    @foreach (collect($cluster['items'] ?? [])->filter()->unique()->take(8) as $item)
+                                        <a href="{{ route('titles.index', ['q' => $item]) }}" class="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">{{ $item }}</a>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+            @if (! empty($seo['search_phrases']))
+                <section id="popular-searches" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Популярные поисковые запросы">
+                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                        <i class="fa-solid fa-magnifying-glass-chart text-emerald-700" aria-hidden="true"></i>
+                        <span>Популярные запросы</span>
+                    </div>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        @foreach (collect($seo['search_phrases'])->filter()->unique()->take(18) as $phrase)
+                            <a href="{{ route('titles.index', ['q' => $phrase]) }}" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                                <i class="fa-solid fa-key text-[0.8em] text-slate-400" aria-hidden="true"></i>
+                                <span>{{ $phrase }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
         </main>
     </body>
 </html>

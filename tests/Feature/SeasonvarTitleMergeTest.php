@@ -10,6 +10,7 @@ use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\Source;
 use App\Models\SourcePage;
+use App\Services\Seasonvar\SeasonvarTitleMerger;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -99,8 +100,7 @@ class SeasonvarTitleMergeTest extends TestCase
             'episode_id' => $secondEpisode->id,
         ]);
 
-        $this->artisan('seasonvar:merge-titles')
-            ->assertExitCode(0);
+        app(SeasonvarTitleMerger::class)->merge();
 
         $this->assertDatabaseMissing('catalog_titles', ['id' => $duplicate->id]);
         $this->assertDatabaseHas('catalog_title_country', [
@@ -187,8 +187,7 @@ class SeasonvarTitleMergeTest extends TestCase
             'source_url_hash' => hash('sha256', $secondUrl),
         ]);
 
-        $this->artisan('seasonvar:merge-titles')
-            ->assertExitCode(0);
+        app(SeasonvarTitleMerger::class)->merge();
 
         $this->assertDatabaseMissing('catalog_titles', ['id' => $variant->id]);
 

@@ -13,7 +13,15 @@ return new class extends Migration
     {
         Schema::create('seasonvar_import_events', function (Blueprint $table) {
             $table->id();
+            $table->unsignedBigInteger('seasonvar_import_run_id')->nullable()->index();
+            $table->foreignId('source_page_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('catalog_title_id')->nullable()->constrained()->nullOnDelete();
+            $table->string('event')->index();
+            $table->string('level', 16)->default('info')->index();
+            $table->json('context')->nullable();
             $table->timestamps();
+
+            $table->index(['event', 'created_at']);
         });
     }
 

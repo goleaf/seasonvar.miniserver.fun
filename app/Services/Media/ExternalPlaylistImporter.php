@@ -103,25 +103,41 @@ class ExternalPlaylistImporter
                 continue;
             }
 
-            $media = LicensedMedia::query()->updateOrCreate(
-                [
+            $sourceMediaKey = $this->sourceMediaKey($match['catalogTitle'], $entry, $baseUrl);
+            $media = LicensedMedia::query()
+                ->where('catalog_title_id', $match['catalogTitle']->id)
+                ->where('source_media_key', $sourceMediaKey)
+                ->first()
+                ?? LicensedMedia::query()
+                    ->where('catalog_title_id', $match['catalogTitle']->id)
+                    ->where('playback_url', $entry['url'])
+                    ->first()
+                ?? new LicensedMedia([
                     'catalog_title_id' => $match['catalogTitle']->id,
-                    'playback_url' => $entry['url'],
-                ],
-                [
-                    'season_id' => $match['season']?->id,
-                    'episode_id' => $match['episode']?->id,
-                    'title' => $entry['title'],
-                    'storage_disk' => 'external_playlist',
-                    'path' => $entry['url'],
-                    'status' => 'published',
-                    'published_at' => now(),
-                ],
-            );
+                    'source_media_key' => $sourceMediaKey,
+                ]);
+            $wasRecentlyCreated = ! $media->exists;
 
-            $result[$media->wasRecentlyCreated ? 'imported' : 'updated']++;
+            $media->fill([
+                'catalog_title_id' => $match['catalogTitle']->id,
+                'season_id' => $match['season']?->id,
+                'episode_id' => $match['episode']?->id,
+                'title' => $entry['title'],
+                'storage_disk' => 'external_playlist',
+                'path' => $entry['url'],
+                'playback_url' => $entry['url'],
+                'source_media_key' => $sourceMediaKey,
+                'source_url' => $baseUrl,
+                'quality' => $this->mediaQuality($entry['title'], $entry['url']),
+                'format' => $this->mediaFormat($entry['url']),
+                'check_status' => 'not_checked',
+                'status' => 'published',
+                'published_at' => $media->published_at ?? now(),
+            ])->save();
+
+            $result[$wasRecentlyCreated ? 'imported' : 'updated']++;
             $result['items'][] = $entry + [
-                'status' => $media->wasRecentlyCreated ? 'imported' : 'updated',
+                'status' => $wasRecentlyCreated ? 'imported' : 'updated',
                 'licensed_media_id' => $media->id,
                 'catalog_title' => $match['catalogTitle']->title,
                 'season' => $match['season']?->number,
@@ -357,6 +373,36 @@ class ExternalPlaylistImporter
         return preg_replace('/\.(?:'.implode('|', $this->mediaExtensions).')$/iu', '', $value) ?: $value;
     }
 
+    private function sourceMediaKey(CatalogTitle $catalogTitle, array $entry, string $baseUrl): string
+    {
+        return hash('sha256', implode('|', [
+            'external_playlist',
+            $catalogTitle->source_url_hash ?: $catalogTitle->id,
+            $baseUrl,
+            $entry['season_number'] ?? '',
+            $entry['episode_number'] ?? '',
+            Str::slug($entry['title']),
+            $this->mediaQuality($entry['title'], $entry['url']) ?? '',
+            $this->mediaFormat($entry['url']),
+        ]));
+    }
+
+    private function mediaQuality(string $title, string $url): ?string
+    {
+        $value = Str::lower($title.' '.$url);
+
+        if (preg_match('/(?<quality>2160p|1440p|1080p|720p|480p|360p|240p)/iu', $value, $matches) === 1) {
+            return Str::lower($matches['quality']);
+        }
+
+        return null;
+    }
+
+    private function mediaFormat(string $url): string
+    {
+        return Str::lower(pathinfo((string) parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION));
+    }
+
     private function isMediaFileUrl(string $url): bool
     {
         $path = (string) parse_url($url, PHP_URL_PATH);
@@ -413,17 +459,6 @@ class ExternalPlaylistImporter
     private function isBlockedHost(string $host): bool
     {
         if ($host === 'localhost' || Str::endsWith($host, '.local')) {
-            return true;
-        }
-
-        if (Str::is([
-            'seasonvar.ru',
-            '*.seasonvar.ru',
-            'angrycdn.net',
-            '*.angrycdn.net',
-            'bigsv.ru',
-            '*.bigsv.ru',
-        ], $host)) {
             return true;
         }
 

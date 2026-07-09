@@ -20,6 +20,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'duration_seconds',
     'status',
     'published_at',
+    'source_media_key',
+    'source_url',
+    'quality',
+    'translation_name',
+    'format',
+    'check_status',
+    'last_http_status',
+    'checked_at',
 ])]
 class LicensedMedia extends Model
 {
@@ -66,6 +74,7 @@ class LicensedMedia extends Model
     {
         return [
             'published_at' => 'datetime',
+            'checked_at' => 'datetime',
         ];
     }
 }

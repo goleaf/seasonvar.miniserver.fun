@@ -12,7 +12,6 @@ use App\Models\Episode;
 use App\Models\Genre;
 use App\Models\LicensedMedia;
 use App\Models\Network;
-use App\Models\SourcePage;
 use App\Models\Studio;
 use App\Models\Tag;
 use App\Models\Translation;
@@ -43,13 +42,15 @@ class CatalogController extends Controller
 
     private const SITEMAP_PAGE_SIZE = 10000;
 
+    private const VIDEO_SITEMAP_PAGE_SIZE = 5000;
+
     public function index(): View
     {
         $stats = [
             'titles' => CatalogTitle::query()->count(),
-            'sourcePages' => SourcePage::query()->count(),
-            'pendingPages' => SourcePage::query()->where('parse_status', 'pending')->count(),
             'episodes' => Episode::query()->count(),
+            'genres' => Genre::query()->count(),
+            'countries' => Country::query()->count(),
         ];
         $latestTitles = CatalogTitle::query()
             ->with($this->cardRelations())
@@ -249,6 +250,13 @@ class CatalogController extends Controller
         ]);
     }
 
+    public function titlesByYear(Request $request, int $year): View
+    {
+        $request->query->set('year', (string) $year);
+
+        return $this->titles($request);
+    }
+
     private function normalizeSearch(mixed $value): string
     {
         $search = is_scalar($value) ? (string) $value : '';
@@ -417,9 +425,10 @@ class CatalogController extends Controller
 
         $mediaItems = $catalogTitle->licensedMedia
             ->sortBy(fn (LicensedMedia $media): string => sprintf(
-                '%05d-%05d-%s',
+                '%05d-%05d-%02d-%s',
                 $media->season?->number ?? 99999,
                 $media->episode?->number ?? 99999,
+                $this->mediaQualityRank($media->quality),
                 $media->title,
             ))
             ->values();
@@ -494,6 +503,20 @@ class CatalogController extends Controller
         ]);
     }
 
+    private function mediaQualityRank(?string $quality): int
+    {
+        return match (Str::lower((string) $quality)) {
+            '2160p' => 0,
+            '1440p' => 1,
+            '1080p' => 2,
+            '720p' => 3,
+            '480p' => 4,
+            '360p' => 5,
+            '240p' => 6,
+            default => 9,
+        };
+    }
+
     public function sitemap(): StreamedResponse
     {
         return response()->stream(function (): void {
@@ -533,7 +556,7 @@ class CatalogController extends Controller
     }
 
     /**
-     * @param  array{titles: int, sourcePages: int, pendingPages: int, episodes: int}  $stats
+     * @param  array{titles: int, episodes: int, genres: int, countries: int}  $stats
      * @return array<string, mixed>
      */
     private function homeSeo(array $stats, Collection $latestTitles): array
@@ -545,10 +568,45 @@ class CatalogController extends Controller
             'title' => $title,
             'description' => $description,
             'keywords' => 'сериалы онлайн, смотреть сериалы, каталог сериалов, новые серии, сезоны сериалов',
+            'news_keywords' => 'сериалы онлайн, смотреть сериалы онлайн, новые серии сериалов, каталог сериалов',
             'canonical' => route('home'),
             'type' => 'website',
             'updated_time' => now()->toAtomString(),
+            'section' => 'Каталог сериалов',
             'tags' => ['сериалы онлайн', 'каталог сериалов', 'новые серии', 'сезоны сериалов'],
+            'seo_text' => [
+                'Каталог автоматически собирает сериалы, сезоны, серии, постеры, жанры, страны, актеров, режиссеров и доступные видео для просмотра во встроенном плеере.',
+                'На главной странице появляются последние обновления, поэтому поисковые страницы получают актуальную информацию после каждого обновления каталога.',
+            ],
+            'search_phrases' => [
+                'смотреть сериалы онлайн',
+                'новые серии сериалов',
+                'каталог сериалов по жанрам',
+                'сериалы по странам',
+                'сериалы по актерам',
+                'сериалы с сезонами и сериями',
+                'сериалы во встроенном плеере',
+                'обновления сериалов онлайн',
+            ],
+            'keyword_clusters' => [
+                [
+                    'title' => 'Смотреть онлайн',
+                    'items' => ['смотреть сериалы онлайн', 'сериалы онлайн бесплатно', 'сериалы в плеере', 'новые серии онлайн'],
+                ],
+                [
+                    'title' => 'Каталог и фильтры',
+                    'items' => ['сериалы по жанрам', 'сериалы по странам', 'сериалы по актерам', 'сериалы по годам'],
+                ],
+                [
+                    'title' => 'Сезоны и серии',
+                    'items' => ['все сезоны сериалов', 'все серии сериалов', 'обновления сезонов', 'новые эпизоды'],
+                ],
+            ],
+            'related_links' => [
+                ['name' => 'Все сериалы онлайн', 'url' => route('titles.index')],
+                ['name' => 'Сериалы '.now()->year.' года', 'url' => route('titles.year', ['year' => now()->year])],
+                ['name' => 'RSS обновлений', 'url' => route('feed')],
+            ],
             'breadcrumbs' => [
                 ['name' => 'Главная', 'url' => route('home')],
             ],
@@ -619,15 +677,23 @@ class CatalogController extends Controller
 
         return [
             'title' => $title,
+            'h1' => $this->catalogSeoHeading($search, $year, $activeTaxonomies),
+            'lead' => $this->catalogSeoLead($total, $search, $year, $activeTaxonomies),
             'description' => $this->seoDescription($descriptionParts),
             'keywords' => $keywords->implode(', '),
+            'news_keywords' => $keywords->take(10)->implode(', '),
             'canonical' => $canonical,
             'robots' => $robots,
             'prev' => $previousPageUrl,
             'next' => $nextPageUrl,
             'type' => 'website',
             'updated_time' => now()->toAtomString(),
+            'section' => 'Сериалы',
             'tags' => $tags,
+            'seo_text' => $this->catalogSeoText($total, $search, $year, $activeTaxonomies),
+            'search_phrases' => $this->catalogSearchPhrases($search, $year, $activeTaxonomies),
+            'keyword_clusters' => $this->catalogKeywordClusters($search, $year, $activeTaxonomies),
+            'related_links' => $this->catalogRelatedLinks($search, $year, $activeTaxonomies),
             'breadcrumbs' => [
                 ['name' => 'Главная', 'url' => route('home')],
                 ['name' => 'Сериалы', 'url' => route('titles.index')],
@@ -671,7 +737,7 @@ class CatalogController extends Controller
             $countries->isNotEmpty() ? 'Страна: '.$countries->take(3)->implode(', ').'.' : null,
             $seasons->count() > 0 ? 'Сезонов: '.$seasons->count().'.' : null,
             $episodeCount > 0 ? 'Серий: '.$episodeCount.'.' : null,
-            $mediaCount > 0 ? 'Видео доступно во встроенном web player.' : null,
+            $mediaCount > 0 ? 'Видео доступно во встроенном плеере.' : null,
         ])->filter()->implode(' ');
         $description = $this->seoDescription($catalogTitle->description ?: $fallbackDescription, 190);
         $pageTitle = 'Сериал '.$catalogTitle->title.' смотреть онлайн';
@@ -719,21 +785,13 @@ class CatalogController extends Controller
             ]) : null,
         ]);
         $faqItems = $this->titleFaqItems($catalogTitle, $genres, $countries, $seasons->count(), $episodeCount, $mediaCount);
+        $keywordCollection = $this->titleKeywordCollection($catalogTitle, $alternateNames, $genres, $countries, $actors, $directors, $seasons->count(), $episodeCount, $mediaCount);
+        $searchPhrases = $this->titleSearchPhrases($catalogTitle, $keywordCollection, $genres, $countries, $seasons->count(), $episodeCount, $mediaCount);
         $jsonLd = [
             $this->organizationJsonLd(),
             $this->websiteJsonLd(),
             $this->siteNavigationJsonLd(),
-            $this->webPageJsonLd($pageTitle, $description, route('titles.show', $catalogTitle), 'VideoObject', collect([$catalogTitle->title])
-                ->merge($alternateNames)
-                ->merge($genres)
-                ->merge($countries)
-                ->merge($actors)
-                ->merge($directors)
-                ->filter()
-                ->unique()
-                ->take(25)
-                ->values()
-                ->all()),
+            $this->webPageJsonLd($pageTitle, $description, route('titles.show', $catalogTitle), 'VideoObject', $keywordCollection->take(25)->all()),
             $seriesSchema,
             $this->faqJsonLd($faqItems),
             $this->episodeItemListJsonLd($catalogTitle, $seasons),
@@ -760,38 +818,20 @@ class CatalogController extends Controller
         return [
             'title' => $pageTitle,
             'description' => $description,
-            'keywords' => collect([
-                $catalogTitle->title,
-                $catalogTitle->original_title,
-                'сериал '.$catalogTitle->title.' смотреть онлайн',
-                $catalogTitle->year ? $catalogTitle->title.' '.$catalogTitle->year : null,
-            ])
-                ->merge($alternateNames)
-                ->merge($genres)
-                ->merge($countries)
-                ->merge($actors)
-                ->merge($directors)
-                ->filter()
-                ->unique()
-                ->take(30)
-                ->implode(', '),
+            'keywords' => $keywordCollection->take(45)->implode(', '),
+            'news_keywords' => $keywordCollection->take(15)->implode(', '),
             'canonical' => route('titles.show', $catalogTitle),
             'image' => $catalogTitle->poster_url,
             'image_alt' => 'Постер '.$catalogTitle->title,
             'video' => $selectedMediaUrl,
             'published_time' => $this->sitemapDate($catalogTitle->created_at),
             'updated_time' => $this->sitemapDate($catalogTitle->indexed_at ?: $catalogTitle->updated_at),
-            'tags' => collect([$catalogTitle->title])
-                ->merge($alternateNames)
-                ->merge($genres)
-                ->merge($countries)
-                ->merge($actors)
-                ->merge($directors)
-                ->filter()
-                ->unique()
-                ->take(25)
-                ->values()
-                ->all(),
+            'section' => 'Сериал онлайн',
+            'tags' => $keywordCollection->take(25)->values()->all(),
+            'seo_text' => $this->titleSeoText($catalogTitle, $genres, $countries, $actors, $directors, $seasons->count(), $episodeCount, $mediaCount),
+            'search_phrases' => $searchPhrases,
+            'keyword_clusters' => $this->titleKeywordClusters($catalogTitle, $genres, $countries, $actors, $directors, $seasons->count(), $episodeCount, $mediaCount),
+            'related_links' => $this->titleRelatedLinks($catalogTitle, $taxonomiesByType),
             'breadcrumbs' => [
                 ['name' => 'Главная', 'url' => route('home')],
                 ['name' => 'Сериалы', 'url' => route('titles.index')],
@@ -863,6 +903,10 @@ class CatalogController extends Controller
                 $query['q'] = trim((string) $search);
             }
 
+            if ($year !== null && ! isset($query['q']) && $currentPage === 1) {
+                return route('titles.year', ['year' => $year]);
+            }
+
             return $query === []
                 ? route('titles.index')
                 : route('titles.index').'?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986);
@@ -919,6 +963,7 @@ class CatalogController extends Controller
                 route('sitemap.index'),
                 route('feed'),
             ],
+            'keywords' => 'сериалы онлайн, каталог сериалов, смотреть сериалы онлайн',
         ];
     }
 
@@ -993,6 +1038,11 @@ class CatalogController extends Controller
                 'url' => route('home'),
             ],
             'publisher' => $this->organizationJsonLd(false),
+            'mainEntity' => $url,
+            'speakable' => [
+                '@type' => 'SpeakableSpecification',
+                'cssSelector' => ['[data-seo-summary]', 'h1'],
+            ],
             'about' => collect($about)
                 ->filter()
                 ->unique()
@@ -1000,6 +1050,7 @@ class CatalogController extends Controller
                 ->map(fn (string $name): array => ['@type' => 'Thing', 'name' => $name])
                 ->values()
                 ->all(),
+            'keywords' => collect($about)->filter()->unique()->take(30)->implode(', '),
         ]);
     }
 
@@ -1046,6 +1097,304 @@ class CatalogController extends Controller
     }
 
     /**
+     * @return list<string>
+     */
+    private function catalogSeoText(int $total, string $search, ?int $year, Collection $activeTaxonomies): array
+    {
+        $parts = collect([
+            $total.' сериалов найдено в текущей подборке каталога.',
+            $year !== null ? 'Подборка сфокусирована на сериалах '.$year.' года.' : null,
+            $search !== '' ? 'Поиск учитывает название, оригинальное название, описание, актеров, режиссеров, жанры, страны и другие связи каталога.' : null,
+            $activeTaxonomies->isNotEmpty() ? 'Активные фильтры: '.$activeTaxonomies->pluck('name')->implode(', ').'.' : null,
+        ])->filter()->implode(' ');
+
+        return [
+            $parts !== '' ? $parts : 'Каталог сериалов поддерживает фильтрацию по жанрам, странам, актерам, режиссерам, годам, переводам, статусам, каналам, студиям и тегам.',
+            'Все страницы формируются автоматически из актуальной базы: после обновления появляются постеры, описания, сезоны, серии, видео и SEO-данные.',
+        ];
+    }
+
+    /**
+     * @return list<array{name: string, url: string}>
+     */
+    private function catalogRelatedLinks(string $search, ?int $year, Collection $activeTaxonomies): array
+    {
+        $links = collect([
+            ['name' => 'Все сериалы', 'url' => route('titles.index')],
+            ['name' => 'Сериалы '.now()->year.' года', 'url' => route('titles.year', ['year' => now()->year])],
+        ]);
+
+        if ($year !== null) {
+            $links->push(['name' => 'Сериалы '.($year - 1).' года', 'url' => route('titles.year', ['year' => $year - 1])]);
+            $links->push(['name' => 'Сериалы '.($year + 1).' года', 'url' => route('titles.year', ['year' => $year + 1])]);
+        }
+
+        foreach ($activeTaxonomies as $filterType => $taxonomy) {
+            $links->push([
+                'name' => $this->filterTypeLabel($filterType).': '.$taxonomy->name,
+                'url' => route('titles.taxonomy', ['type' => $filterType, 'taxonomy' => $taxonomy->slug]),
+            ]);
+        }
+
+        if ($search !== '') {
+            $links->push(['name' => 'Поиск: '.$search, 'url' => route('titles.index', ['q' => $search])]);
+        }
+
+        return $links
+            ->unique('url')
+            ->take(10)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function titleSeoText(
+        CatalogTitle $catalogTitle,
+        Collection $genres,
+        Collection $countries,
+        Collection $actors,
+        Collection $directors,
+        int $seasonCount,
+        int $episodeCount,
+        int $mediaCount,
+    ): array {
+        $facts = collect([
+            $catalogTitle->year ? 'год выхода '.$catalogTitle->year : null,
+            $genres->isNotEmpty() ? 'жанры: '.$genres->take(5)->implode(', ') : null,
+            $countries->isNotEmpty() ? 'страна: '.$countries->take(3)->implode(', ') : null,
+            $directors->isNotEmpty() ? 'режиссеры: '.$directors->take(4)->implode(', ') : null,
+            $actors->isNotEmpty() ? 'в ролях: '.$actors->take(8)->implode(', ') : null,
+        ])->filter()->implode('; ');
+
+        return [
+            'Страница сериала '.$catalogTitle->title.' автоматически собирает описание, постер, сезоны, серии, связи каталога и доступные видео для просмотра онлайн.',
+            ($facts !== '' ? 'Основная информация: '.$facts.'. ' : '').'Сейчас в базе указано сезонов: '.$seasonCount.', серий: '.$episodeCount.', видео-файлов: '.$mediaCount.'.',
+            'SEO-данные этой страницы обновляются из импортированной информации: алиасы, оригинальное название, рейтинги, актеры, жанры, страны, сезоны и серии используются для формирования поисковых фраз.',
+        ];
+    }
+
+    /**
+     * @return list<array{name: string, url: string}>
+     */
+    private function titleRelatedLinks(CatalogTitle $catalogTitle, Collection $taxonomiesByType): array
+    {
+        $links = collect([
+            ['name' => 'Все сериалы', 'url' => route('titles.index')],
+        ]);
+
+        if ($catalogTitle->year) {
+            $links->push(['name' => 'Сериалы '.$catalogTitle->year.' года', 'url' => route('titles.year', ['year' => $catalogTitle->year])]);
+        }
+
+        foreach (['genre', 'country', 'actor', 'director', 'age_rating', 'translation'] as $type) {
+            foreach ($taxonomiesByType->get($type, collect())->take(3) as $taxonomy) {
+                $links->push([
+                    'name' => $this->filterTypeLabel($type).': '.$taxonomy->name,
+                    'url' => route('titles.taxonomy', ['type' => $type, 'taxonomy' => $taxonomy->slug]),
+                ]);
+            }
+        }
+
+        return $links
+            ->unique('url')
+            ->take(14)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function catalogSearchPhrases(string $search, ?int $year, Collection $activeTaxonomies): array
+    {
+        $base = collect([
+            'смотреть сериалы онлайн',
+            'каталог сериалов онлайн',
+            'сериалы по жанрам',
+            'сериалы по странам',
+            'сериалы по актерам',
+        ]);
+
+        if ($search !== '') {
+            $base = $base->merge([
+                $search.' смотреть онлайн',
+                'сериалы похожие на '.$search,
+                $search.' все серии',
+            ]);
+        }
+
+        if ($year !== null) {
+            $base = $base->merge([
+                'сериалы '.$year.' года',
+                'смотреть сериалы '.$year.' онлайн',
+                'новые сериалы '.$year,
+            ]);
+        }
+
+        foreach ($activeTaxonomies as $taxonomy) {
+            $base = $base->merge([
+                'сериалы '.$taxonomy->name.' онлайн',
+                'смотреть сериалы '.$taxonomy->name,
+                'лучшие сериалы '.$taxonomy->name,
+            ]);
+        }
+
+        return $base
+            ->filter()
+            ->map(fn (string $phrase): string => Str::lower($phrase))
+            ->unique()
+            ->take(16)
+            ->values()
+            ->all();
+    }
+
+    private function catalogSeoHeading(string $search, ?int $year, Collection $activeTaxonomies): string
+    {
+        if ($search !== '') {
+            return 'Сериалы по запросу '.$search;
+        }
+
+        if ($activeTaxonomies->isNotEmpty() && $year !== null) {
+            return 'Сериалы '.$year.' года: '.$activeTaxonomies->pluck('name')->implode(', ');
+        }
+
+        if ($activeTaxonomies->isNotEmpty()) {
+            return 'Сериалы: '.$activeTaxonomies->pluck('name')->implode(', ');
+        }
+
+        if ($year !== null) {
+            return 'Сериалы '.$year.' года смотреть онлайн';
+        }
+
+        return 'Все сериалы онлайн';
+    }
+
+    private function catalogSeoLead(int $total, string $search, ?int $year, Collection $activeTaxonomies): string
+    {
+        $parts = collect([
+            $total.' сериалов в подборке',
+            $year !== null ? 'год '.$year : null,
+            $search !== '' ? 'поиск: '.$search : null,
+            $activeTaxonomies->isNotEmpty() ? 'фильтры: '.$activeTaxonomies->pluck('name')->implode(', ') : null,
+        ])->filter()->implode(', ');
+
+        return ucfirst($parts).'. Автоматическая выдача учитывает названия, описания, жанры, страны, актеров, режиссеров, сезоны, серии и доступное видео.';
+    }
+
+    private function titleKeywordCollection(
+        CatalogTitle $catalogTitle,
+        Collection $alternateNames,
+        Collection $genres,
+        Collection $countries,
+        Collection $actors,
+        Collection $directors,
+        int $seasonCount,
+        int $episodeCount,
+        int $mediaCount,
+    ): Collection {
+        $baseNames = collect([$catalogTitle->title, $catalogTitle->original_title])
+            ->merge($alternateNames)
+            ->filter()
+            ->unique()
+            ->values();
+        $keywords = collect([
+            $catalogTitle->title,
+            $catalogTitle->original_title,
+            'сериал '.$catalogTitle->title,
+            'сериал '.$catalogTitle->title.' смотреть онлайн',
+            $catalogTitle->title.' онлайн',
+            $catalogTitle->title.' все серии',
+            $catalogTitle->title.' все сезоны',
+            $catalogTitle->title.' в хорошем качестве',
+            $catalogTitle->title.' плеер',
+            $catalogTitle->year ? $catalogTitle->title.' '.$catalogTitle->year : null,
+            $catalogTitle->year ? 'сериал '.$catalogTitle->title.' '.$catalogTitle->year.' смотреть онлайн' : null,
+            $seasonCount > 0 ? $catalogTitle->title.' '.$seasonCount.' сезон' : null,
+            $episodeCount > 0 ? $catalogTitle->title.' '.$episodeCount.' серий' : null,
+            $mediaCount > 0 ? $catalogTitle->title.' смотреть в плеере' : null,
+        ])
+            ->merge($baseNames)
+            ->merge($genres)
+            ->merge($countries)
+            ->merge($actors)
+            ->merge($directors);
+
+        foreach ($baseNames->take(5) as $name) {
+            $keywords = $keywords->merge([
+                $name.' смотреть онлайн',
+                $name.' все серии онлайн',
+                $name.' сезоны и серии',
+            ]);
+        }
+
+        foreach ($genres->take(5) as $genre) {
+            $keywords = $keywords->merge([
+                $catalogTitle->title.' '.$genre,
+                'сериалы '.$genre.' онлайн',
+            ]);
+        }
+
+        foreach ($countries->take(3) as $country) {
+            $keywords = $keywords->merge([
+                $catalogTitle->title.' '.$country,
+                'сериалы '.$country.' смотреть онлайн',
+            ]);
+        }
+
+        foreach ($actors->take(5) as $actor) {
+            $keywords = $keywords->push($catalogTitle->title.' '.$actor);
+        }
+
+        return $keywords
+            ->filter()
+            ->map(fn (string $keyword): string => trim(preg_replace('/\s+/u', ' ', $keyword) ?: $keyword))
+            ->filter(fn (string $keyword): bool => $keyword !== '' && mb_strlen($keyword) <= 120)
+            ->unique(fn (string $keyword): string => Str::lower($keyword))
+            ->values();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function titleSearchPhrases(
+        CatalogTitle $catalogTitle,
+        Collection $keywords,
+        Collection $genres,
+        Collection $countries,
+        int $seasonCount,
+        int $episodeCount,
+        int $mediaCount,
+    ): array {
+        $phrases = collect([
+            'смотреть '.$catalogTitle->title.' онлайн',
+            $catalogTitle->title.' все серии подряд',
+            $catalogTitle->title.' все сезоны онлайн',
+            $catalogTitle->title.' бесплатно в плеере',
+            $catalogTitle->title.' описание сериала',
+            $catalogTitle->title.' актеры и роли',
+            $catalogTitle->title.' жанр и страна',
+            $catalogTitle->year ? $catalogTitle->title.' '.$catalogTitle->year.' онлайн' : null,
+            $seasonCount > 0 ? $catalogTitle->title.' '.$seasonCount.' сезон смотреть' : null,
+            $episodeCount > 0 ? $catalogTitle->title.' '.$episodeCount.' серий смотреть' : null,
+            $mediaCount > 0 ? $catalogTitle->title.' видео онлайн' : null,
+        ])
+            ->merge($genres->take(3)->map(fn (string $genre): string => $catalogTitle->title.' '.$genre.' сериал'))
+            ->merge($countries->take(2)->map(fn (string $country): string => $catalogTitle->title.' '.$country.' сериал'))
+            ->merge($keywords->take(8));
+
+        return $phrases
+            ->filter()
+            ->map(fn (string $phrase): string => trim(preg_replace('/\s+/u', ' ', $phrase) ?: $phrase))
+            ->filter(fn (string $phrase): bool => $phrase !== '' && mb_strlen($phrase) <= 140)
+            ->unique(fn (string $phrase): string => Str::lower($phrase))
+            ->take(18)
+            ->values()
+            ->all();
+    }
+
+    /**
      * @return list<array{question: string, answer: string}>
      */
     private function titleFaqItems(
@@ -1063,8 +1412,8 @@ class CatalogController extends Controller
             [
                 'question' => 'Где смотреть сериал '.$catalogTitle->title.' онлайн?',
                 'answer' => $mediaCount > 0
-                    ? 'Сериал '.$catalogTitle->title.' доступен на этой странице во встроенном web player. Видео-файлы подключаются удаленно и открываются через выбранную серию.'
-                    : 'Страница сериала '.$catalogTitle->title.' уже создана, а видео-файлы будут показаны здесь после очередной автоматической синхронизации.',
+                    ? 'Сериал '.$catalogTitle->title.' доступен на этой странице во встроенном плеере. Видео открывается через выбранную серию.'
+                    : 'Страница сериала '.$catalogTitle->title.' уже создана, а видео появится здесь после ближайшего обновления.',
             ],
             [
                 'question' => 'Сколько сезонов и серий в сериале '.$catalogTitle->title.'?',
@@ -1080,7 +1429,7 @@ class CatalogController extends Controller
             ],
             [
                 'question' => 'Обновляется ли информация по сериалу '.$catalogTitle->title.'?',
-                'answer' => 'Да, портал автоматически обновляет метаданные, сезоны, серии, постер, связи каталога и доступные видео через синхронизацию Seasonvar.',
+                'answer' => 'Да, портал автоматически обновляет описание, сезоны, серии, постер, связи каталога и доступные видео.',
             ],
         ])
             ->filter(fn (array $item): bool => trim($item['answer'], " .\t\n\r\0\x0B") !== '')
@@ -1220,14 +1569,26 @@ class CatalogController extends Controller
                 ->where('is_published', true)
                 ->whereNotNull('slug')
                 ->count() / self::SITEMAP_PAGE_SIZE));
+            $videoSitemapPages = max(1, (int) ceil(LicensedMedia::query()
+                ->published()
+                ->where(function (Builder $query): void {
+                    $query->whereNotNull('playback_url')
+                        ->orWhereNotNull('path');
+                })
+                ->count() / self::VIDEO_SITEMAP_PAGE_SIZE));
 
             echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
             echo '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
             $this->writeSitemapIndexUrl(route('sitemap.static'), now());
             $this->writeSitemapIndexUrl(route('sitemap.taxonomies'), now());
+            $this->writeSitemapIndexUrl(route('sitemap.landings'), now());
 
             for ($page = 1; $page <= $titleSitemapPages; $page++) {
                 $this->writeSitemapIndexUrl(route('sitemap.titles', ['page' => $page]), now());
+            }
+
+            for ($page = 1; $page <= $videoSitemapPages; $page++) {
+                $this->writeSitemapIndexUrl(route('sitemap.videos', ['page' => $page]), now());
             }
 
             echo '</sitemapindex>'."\n";
@@ -1251,7 +1612,7 @@ class CatalogController extends Controller
                 ->orderByDesc('year')
                 ->cursor()
                 ->each(function (CatalogTitle $bucket): void {
-                    $this->writeSitemapUrl(route('titles.index', ['year' => (int) $bucket->year]), now(), 'weekly', '0.7');
+                    $this->writeSitemapUrl(route('titles.year', ['year' => (int) $bucket->year]), now(), 'weekly', '0.7');
                 });
 
             echo '</urlset>'."\n";
@@ -1274,6 +1635,45 @@ class CatalogController extends Controller
                     ->chunkById(1000, function (Collection $taxonomies) use ($filterType): void {
                         foreach ($taxonomies as $taxonomy) {
                             $this->writeSitemapUrl(route('titles.taxonomy', ['type' => $filterType, 'taxonomy' => $taxonomy->slug]), now(), 'weekly', '0.7');
+                        }
+                    });
+            }
+
+            echo '</urlset>'."\n";
+        }, 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
+    }
+
+    public function sitemapLandings(): StreamedResponse
+    {
+        return response()->stream(function (): void {
+            $years = $this->landingYears();
+
+            echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
+            echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
+
+            foreach ($this->landingFilterTypes() as $filterType) {
+                $modelClass = self::FILTER_RELATIONS[$filterType]['model'];
+
+                $modelClass::query()
+                    ->select(['id', 'slug'])
+                    ->withCount('catalogTitles')
+                    ->whereHas('catalogTitles')
+                    ->orderByDesc('catalog_titles_count')
+                    ->limit(80)
+                    ->get()
+                    ->each(function (Model $taxonomy) use ($filterType, $years): void {
+                        foreach ($years as $year) {
+                            $hasTitlesForYear = $taxonomy
+                                ->catalogTitles()
+                                ->where('year', $year)
+                                ->exists();
+
+                            if (! $hasTitlesForYear) {
+                                continue;
+                            }
+
+                            $url = route('titles.taxonomy', ['type' => $filterType, 'taxonomy' => $taxonomy->slug]).'?year='.$year;
+                            $this->writeSitemapUrl($url, now(), 'weekly', '0.65');
                         }
                     });
             }
@@ -1305,6 +1705,56 @@ class CatalogController extends Controller
                         '0.8',
                         $title->poster_url,
                         'Постер '.$title->title,
+                    );
+                });
+
+            echo '</urlset>'."\n";
+        }, 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
+    }
+
+    public function sitemapVideos(int $page): StreamedResponse
+    {
+        $page = max(1, $page);
+
+        return response()->stream(function () use ($page): void {
+            echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
+            echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">'."\n";
+
+            LicensedMedia::query()
+                ->with([
+                    'catalogTitle:id,slug,title,description,poster_url,updated_at,indexed_at',
+                    'season:id,number',
+                    'episode:id,number,title',
+                ])
+                ->published()
+                ->where(function (Builder $query): void {
+                    $query->whereNotNull('playback_url')
+                        ->orWhereNotNull('path');
+                })
+                ->orderBy('id')
+                ->forPage($page, self::VIDEO_SITEMAP_PAGE_SIZE)
+                ->get()
+                ->each(function (LicensedMedia $media): void {
+                    $title = $media->catalogTitle;
+                    $contentUrl = $media->playback_url ?: $media->path;
+
+                    if ($title === null || $contentUrl === null || trim($contentUrl) === '') {
+                        return;
+                    }
+
+                    $query = ['catalogTitle' => $title, 'media' => $media->id];
+
+                    if ($media->episode_id) {
+                        $query['episode'] = $media->episode_id;
+                    }
+
+                    $this->writeVideoSitemapUrl(
+                        route('titles.show', $query),
+                        $title->indexed_at ?: $title->updated_at,
+                        $title->poster_url,
+                        $media->title ?: $title->title,
+                        $this->seoDescription($title->description ?: 'Сериал '.$title->title.' смотреть онлайн во встроенном плеере.'),
+                        $contentUrl,
                     );
                 });
 
@@ -1362,6 +1812,32 @@ class CatalogController extends Controller
         }, 200, ['Content-Type' => 'application/opensearchdescription+xml; charset=UTF-8']);
     }
 
+    public function llms(): StreamedResponse
+    {
+        return response()->stream(function (): void {
+            $titleCount = CatalogTitle::query()->where('is_published', true)->count();
+            $episodeCount = Episode::query()->count();
+            $mediaCount = LicensedMedia::query()->published()->count();
+
+            echo '# '.$this->siteName()."\n\n";
+            echo "Каталог сериалов онлайн на русском языке. Данные автоматически импортируются из Seasonvar и включают названия, оригинальные названия, алиасы, описания, постеры, жанры, страны, актеров, режиссеров, рейтинги, сезоны, серии и удаленные видео-файлы.\n\n";
+            echo "## Статистика\n\n";
+            echo '- Сериалов: '.$titleCount."\n";
+            echo '- Серий: '.$episodeCount."\n";
+            echo '- Видео-файлов: '.$mediaCount."\n\n";
+            echo "## Основные URL\n\n";
+            echo '- Главная: '.route('home')."\n";
+            echo '- Каталог: '.route('titles.index')."\n";
+            echo '- Сериалы текущего года: '.route('titles.year', ['year' => now()->year])."\n";
+            echo '- Programmatic SEO sitemap: '.route('sitemap.landings')."\n";
+            echo '- Sitemap index: '.route('sitemap.index')."\n";
+            echo '- RSS: '.route('feed')."\n";
+            echo '- OpenSearch: '.route('opensearch')."\n\n";
+            echo "## Поиск\n\n";
+            echo 'Используйте '.route('titles.index')."?q={query} для поиска по названиям, описаниям, актерам, режиссерам, жанрам, странам и другим связям каталога.\n";
+        }, 200, ['Content-Type' => 'text/plain; charset=UTF-8']);
+    }
+
     private function writeSitemapIndexUrl(string $loc, mixed $lastmod): void
     {
         echo "    <sitemap>\n";
@@ -1396,6 +1872,136 @@ class CatalogController extends Controller
         }
 
         echo "    </url>\n";
+    }
+
+    private function writeVideoSitemapUrl(
+        string $loc,
+        mixed $lastmod,
+        ?string $thumbnailUrl,
+        string $title,
+        string $description,
+        string $contentUrl,
+    ): void {
+        echo "    <url>\n";
+        echo '        <loc>'.$this->xml($loc)."</loc>\n";
+        echo '        <lastmod>'.$this->xml($this->sitemapDate($lastmod))."</lastmod>\n";
+        echo "        <video:video>\n";
+
+        if ($thumbnailUrl !== null && trim($thumbnailUrl) !== '') {
+            echo '            <video:thumbnail_loc>'.$this->xml($thumbnailUrl)."</video:thumbnail_loc>\n";
+        }
+
+        echo '            <video:title>'.$this->xml(Str::limit($title, 100, ''))."</video:title>\n";
+        echo '            <video:description>'.$this->xml(Str::limit($description, 2000, ''))."</video:description>\n";
+        echo '            <video:content_loc>'.$this->xml($contentUrl)."</video:content_loc>\n";
+        echo '            <video:player_loc>'.$this->xml($loc.'#player')."</video:player_loc>\n";
+        echo '            <video:publication_date>'.$this->xml($this->sitemapDate($lastmod))."</video:publication_date>\n";
+        echo "            <video:family_friendly>yes</video:family_friendly>\n";
+        echo "            <video:live>no</video:live>\n";
+        echo "        </video:video>\n";
+        echo "    </url>\n";
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function landingFilterTypes(): array
+    {
+        return ['genre', 'country', 'actor', 'director', 'translation', 'age_rating'];
+    }
+
+    /**
+     * @return Collection<int, int>
+     */
+    private function landingYears(): Collection
+    {
+        return CatalogTitle::query()
+            ->select('year')
+            ->whereNotNull('year')
+            ->where('year', '>=', 1900)
+            ->where('year', '<=', (int) now()->format('Y') + 1)
+            ->groupBy('year')
+            ->orderByDesc('year')
+            ->limit(12)
+            ->pluck('year')
+            ->map(fn (mixed $year): int => (int) $year)
+            ->values();
+    }
+
+    /**
+     * @return list<array{title: string, items: list<string>}>
+     */
+    private function catalogKeywordClusters(string $search, ?int $year, Collection $activeTaxonomies): array
+    {
+        $taxonomyNames = $activeTaxonomies->pluck('name')->filter()->values();
+
+        return [
+            [
+                'title' => 'Смотреть онлайн',
+                'items' => collect(['смотреть сериалы онлайн', 'сериалы онлайн в хорошем качестве', 'все серии сериалов онлайн', 'все сезоны сериалов'])
+                    ->when($search !== '', fn (Collection $items): Collection => $items->push($search.' смотреть онлайн'))
+                    ->values()
+                    ->all(),
+            ],
+            [
+                'title' => 'Подборки',
+                'items' => collect(['сериалы по жанрам', 'сериалы по странам', 'сериалы по актерам', 'сериалы по режиссерам'])
+                    ->merge($taxonomyNames->map(fn (string $name): string => 'сериалы '.$name.' онлайн'))
+                    ->values()
+                    ->all(),
+            ],
+            [
+                'title' => 'Годы и обновления',
+                'items' => collect(['новые сериалы', 'обновления сериалов', 'новые серии'])
+                    ->when($year !== null, fn (Collection $items): Collection => $items->push('сериалы '.$year.' года')->push('смотреть сериалы '.$year.' онлайн'))
+                    ->values()
+                    ->all(),
+            ],
+        ];
+    }
+
+    /**
+     * @return list<array{title: string, items: list<string>}>
+     */
+    private function titleKeywordClusters(
+        CatalogTitle $catalogTitle,
+        Collection $genres,
+        Collection $countries,
+        Collection $actors,
+        Collection $directors,
+        int $seasonCount,
+        int $episodeCount,
+        int $mediaCount,
+    ): array {
+        return [
+            [
+                'title' => 'Смотреть онлайн',
+                'items' => collect([
+                    $catalogTitle->title.' смотреть онлайн',
+                    $catalogTitle->title.' все серии',
+                    $catalogTitle->title.' все сезоны',
+                    $mediaCount > 0 ? $catalogTitle->title.' смотреть в плеере' : $catalogTitle->title.' видео скоро появится',
+                ])->filter()->values()->all(),
+            ],
+            [
+                'title' => 'Информация о сериале',
+                'items' => collect([
+                    $catalogTitle->year ? $catalogTitle->title.' '.$catalogTitle->year : null,
+                    $seasonCount > 0 ? $catalogTitle->title.' '.$seasonCount.' сезон' : null,
+                    $episodeCount > 0 ? $catalogTitle->title.' '.$episodeCount.' серий' : null,
+                    $genres->isNotEmpty() ? $catalogTitle->title.' '.$genres->first() : null,
+                    $countries->isNotEmpty() ? $catalogTitle->title.' '.$countries->first() : null,
+                ])->filter()->values()->all(),
+            ],
+            [
+                'title' => 'Люди и связи',
+                'items' => collect()
+                    ->merge($actors->take(5)->map(fn (string $actor): string => $catalogTitle->title.' '.$actor))
+                    ->merge($directors->take(3)->map(fn (string $director): string => $catalogTitle->title.' режиссер '.$director))
+                    ->values()
+                    ->all(),
+            ],
+        ];
     }
 
     private function sitemapDate(mixed $value): string

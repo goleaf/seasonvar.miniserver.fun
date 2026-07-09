@@ -9,8 +9,8 @@
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <x-stat label="Сериалов" :value="$stats['titles']" icon="fa-solid fa-clapperboard" />
             <x-stat label="Серий" :value="$stats['episodes']" icon="fa-solid fa-circle-play" />
-            <x-stat label="Страниц источника" :value="$stats['sourcePages']" icon="fa-solid fa-file-lines" />
-            <x-stat label="В очереди" :value="$stats['pendingPages']" icon="fa-solid fa-clock" />
+            <x-stat label="Жанров" :value="$stats['genres']" icon="fa-solid fa-masks-theater" />
+            <x-stat label="Стран" :value="$stats['countries']" icon="fa-solid fa-earth-europe" />
         </div>
 
         <section class="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)]">
@@ -21,7 +21,7 @@
                             <i class="fa-solid fa-list" aria-hidden="true"></i>
                             <span>Все сериалы</span>
                         </a>
-                        <a href="{{ route('titles.index', ['year' => now()->year]) }}" class="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                        <a href="{{ route('titles.year', ['year' => now()->year]) }}" class="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
                             <i class="fa-solid fa-star" aria-hidden="true"></i>
                             <span>Новинки</span>
                         </a>
@@ -66,7 +66,7 @@
                         @forelse ($genres->take(14) as $genre)
                             <x-ui.taxonomy-chip :taxonomy="$genre" :count="$genre->catalog_titles_count" />
                         @empty
-                            <span class="text-sm text-slate-500">Жанры появятся после синхронизации.</span>
+                            <span class="text-sm text-slate-500">Жанры появятся после обновления каталога.</span>
                         @endforelse
                     </div>
                 </x-ui.panel>
@@ -92,7 +92,7 @@
                         @endforeach
                     @empty
                         <div class="p-6 text-sm text-slate-500">
-                            Нет сериалов. Запусти <code class="rounded bg-slate-50 px-2 py-1 font-semibold text-emerald-700"><i class="fa-solid fa-terminal" aria-hidden="true"></i> php artisan seasonvar:full-sync</code>.
+                            Сериалы скоро появятся.
                         </div>
                     @endforelse
                 </div>

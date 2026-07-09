@@ -79,6 +79,14 @@ class CatalogTitle extends Model
     }
 
     /**
+     * @return HasMany<CatalogTitleReview, $this>
+     */
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(CatalogTitleReview::class);
+    }
+
+    /**
      * @return HasMany<CatalogTitleAlias, $this>
      */
     public function aliases(): HasMany

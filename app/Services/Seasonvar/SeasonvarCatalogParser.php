@@ -69,6 +69,7 @@ class SeasonvarCatalogParser
      *     taxonomies: list<array{type: string, name: string, source_url: string|null}>,
      *     ratings: list<array{provider: string, rating: float|null, votes: int|null, raw_value: string}>,
      *     aliases: list<array{name: string, type: string, source: string}>,
+     *     reviews: list<array{author: string|null, body: string, published_at: string|null}>,
      *     parse_meta: array{info_labels: list<string>, has_info_list: bool, has_season_list: bool, has_episode_script: bool}
      * }
      */
@@ -154,6 +155,7 @@ class SeasonvarCatalogParser
             'taxonomies' => $this->taxonomies($xpath, $url, $structuredData, $infoFields),
             'ratings' => $this->ratings($infoFields),
             'aliases' => $this->aliases($infoFields, $title, $originalTitle),
+            'reviews' => $this->reviews($xpath),
             'parse_meta' => $this->parseMeta($xpath, $html, $infoFields),
         ];
     }
@@ -1291,6 +1293,56 @@ class SeasonvarCatalogParser
         }
 
         return false;
+    }
+
+    /**
+     * @return list<array{author: string|null, body: string, published_at: string|null}>
+     */
+    private function reviews(DOMXPath $xpath): array
+    {
+        $reviews = [];
+
+        foreach ($xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " pgs-review-post ")]') ?: [] as $node) {
+            $body = $this->stringValue($node->textContent);
+
+            if ($body === null) {
+                continue;
+            }
+
+            $date = $this->reviewDate($body);
+
+            if ($date !== null) {
+                $body = Str::squish(str_replace($date['raw'], '', $body));
+            }
+
+            if ($body === '' || Str::length($body) < 40) {
+                continue;
+            }
+
+            $key = hash('sha256', Str::lower($body));
+            $reviews[$key] = [
+                'author' => null,
+                'body' => $body,
+                'published_at' => $date['date'] ?? null,
+            ];
+        }
+
+        return array_values($reviews);
+    }
+
+    /**
+     * @return array{raw: string, date: string}|null
+     */
+    private function reviewDate(string $body): ?array
+    {
+        if (preg_match('/(?<raw>\b(?<day>\d{1,2})\.(?<month>\d{1,2})\.(?<year>\d{4})(?:\s+\d{1,2}:\d{2})?\b)/u', $body, $matches) !== 1) {
+            return null;
+        }
+
+        return [
+            'raw' => $matches['raw'],
+            'date' => sprintf('%04d-%02d-%02d', (int) $matches['year'], (int) $matches['month'], (int) $matches['day']),
+        ];
     }
 
     private function infoField(DOMXPath $xpath, string $label): ?string

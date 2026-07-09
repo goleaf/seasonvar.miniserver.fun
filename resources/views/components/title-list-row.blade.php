@@ -33,7 +33,7 @@
                     @else
                         <span class="inline-flex items-center gap-1 text-sm text-slate-500">
                             <i class="fa-solid fa-layer-group text-[0.85em] text-slate-400" aria-hidden="true"></i>
-                            <span>Сезон разбирается</span>
+                            <span>Сезон скоро появится</span>
                         </span>
                     @endif
                 </div>
@@ -53,7 +53,7 @@
                     @endunless
                     <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700 ring-1 ring-sky-100">
                         <i class="fa-solid fa-circle-play text-[0.85em]" aria-hidden="true"></i>
-                        <span>{{ $episodesCount > 0 ? $episodesCount.' серий' : 'серии разбираются' }}</span>
+                        <span>{{ $episodesCount > 0 ? $episodesCount.' серий' : 'серии скоро появятся' }}</span>
                     </span>
                 </div>
             </div>

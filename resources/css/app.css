@@ -7,3 +7,13 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+.plyr {
+    --plyr-color-main: #059669;
+    --plyr-video-background: #020617;
+    min-width: 0;
+}
+
+.plyr__video-wrapper {
+    aspect-ratio: 16 / 9;
+}

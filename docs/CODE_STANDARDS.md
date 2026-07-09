@@ -17,7 +17,7 @@ Update these files together when relevant:
 
 - Keep server configuration unchanged from application work.
 - Do not use seeders for production catalog data.
-- Keep `php artisan seasonvar:full-sync` as the single operational sync entry point.
+- Keep `php artisan seasonvar:import` as the single public Seasonvar import entry point.
 - Prefer Eloquent relationships over raw queries.
 - Eager-load all relationships used by Blade views.
 - Do not run database queries in Blade views.
@@ -29,14 +29,16 @@ Update these files together when relevant:
 ## Parser standards
 
 - Use only `https://seasonvar.ru/` as the Seasonvar source domain.
-- Parse metadata, relations, seasons, episodes, poster URLs, and source page state.
+- Parse metadata, relations, ratings, aliases, reviews, seasons, episodes, poster URLs, source page state, HTML snapshots, and video candidates.
 - Do not depend on external player pages for local navigation.
-- Do not store or expose scraped video playlist internals as application requirements.
+- Store external video links only; never download video files into the application.
+- Store `source_media_key`, quality, translation, format, and availability check fields for media records.
+- Preserve existing actors, episodes, and media records when Seasonvar no longer returns them.
 - Clean titles before storage: remove `>>>`, trailing online text, date noise, and Seasonvar suffixes.
 - Store season-list update text like `(09.07.2026 1 серия (AniDub) из ??)` as structured season fields plus the raw status text.
 - Store relation-like values in concrete relation tables when they are filterable: genre, country, actor, director, age rating, translation, status, network, studio, tag.
 - Do not introduce morph or polymorphic relations for catalog metadata; use explicit `belongsToMany` relations and pivot tables.
-- Importer relation sync must group parsed relation values by type, batch `upsert` lookup rows, fetch IDs in one query per type, and `sync()` each pivot relation once.
+- Importer relation sync must group parsed relation values by type, batch `upsert` lookup rows, fetch IDs in one query per type, and attach new pivot records without removing older missing relations.
 - Importer catalog writes after successful HTTP parsing must run in one database transaction: title, relation pivots, seasons, episodes, and final source-page parsed status.
 - Importer season and episode sync must use batch `upsert` for parsed page payloads instead of per-row `updateOrCreate()`.
 - Importer discovered URL storage must process URLs chunk by chunk, use batch `upsert`, and must not reset existing source pages to pending.
@@ -45,6 +47,7 @@ Update these files together when relevant:
 - Age rating relation values must be strict short ratings like `18+`, `16+`, `12+`; long text must never be stored as an age rating.
 - Filter relation values for genre, country, status, network, studio, and tag must stay short and must not contain description-like sentences.
 - Store season/episode structure as `seasons` and `episodes`, not as tags.
+- Merge duplicated season pages into one `CatalogTitle`; seasons must stay internal to that title.
 
 ## Query standards
 

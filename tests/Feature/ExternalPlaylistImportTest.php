@@ -7,6 +7,7 @@ use App\Models\Episode;
 use App\Models\Season;
 use App\Models\Source;
 use App\Models\SourcePage;
+use App\Services\Media\ExternalPlaylistImporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -43,9 +44,7 @@ class ExternalPlaylistImportTest extends TestCase
             'number' => 2,
         ]);
 
-        $this->artisan('media:import-playlist', [
-            'url' => 'https://playlist.example.com/list.m3u',
-        ])->assertExitCode(0);
+        app(ExternalPlaylistImporter::class)->importFromUrl('https://playlist.example.com/list.m3u');
 
         $this->assertDatabaseHas('licensed_media', [
             'catalog_title_id' => $catalogTitle->id,
@@ -59,7 +58,7 @@ class ExternalPlaylistImportTest extends TestCase
 
         $this->get(route('titles.show', $catalogTitle))
             ->assertOk()
-            ->assertSeeText('Файлы плейлиста')
+            ->assertSeeText('Все доступные варианты')
             ->assertSeeText('6 кадров S01E02')
             ->assertSee('https://media.example.com/files/6_kadrov_s01e02.mp4');
 
@@ -98,10 +97,10 @@ class ExternalPlaylistImportTest extends TestCase
             'number' => 2,
         ]);
 
-        $this->artisan('media:import-playlist', [
-            'url' => 'https://playlist.example.com/list.m3u',
-            '--title' => '6-kadrov',
-        ])->assertExitCode(0);
+        app(ExternalPlaylistImporter::class)->importFromUrl(
+            'https://playlist.example.com/list.m3u',
+            $catalogTitle,
+        );
 
         $this->assertDatabaseHas('licensed_media', [
             'catalog_title_id' => $catalogTitle->id,
@@ -136,7 +135,7 @@ class ExternalPlaylistImportTest extends TestCase
         $this->get(route('titles.show', ['catalogTitle' => $catalogTitle, 'episode' => $episode->id]))
             ->assertOk()
             ->assertSeeText('Выбрана 3 серия')
-            ->assertSeeText('Файл для выбранной серии еще не подключен')
-            ->assertSeeText('без файла');
+            ->assertSeeText('Видео для выбранной серии готовится')
+            ->assertSeeText('готовится');
     }
 }

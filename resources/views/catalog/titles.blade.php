@@ -124,7 +124,7 @@
                                     </span>
                                 </a>
                             @empty
-                                <p class="text-sm text-slate-500">Годы появятся после синхронизации.</p>
+                                <p class="text-sm text-slate-500">Годы появятся после обновления каталога.</p>
                             @endforelse
                         </div>
                     </div>
@@ -173,9 +173,9 @@
                     <div>
                         <h1 class="inline-flex items-center gap-2 text-3xl font-bold text-slate-700">
                             <i class="fa-solid fa-clapperboard text-emerald-700" aria-hidden="true"></i>
-                            <span>Сериалы</span>
+                            <span>{{ $seo['h1'] ?? 'Сериалы' }}</span>
                         </h1>
-                        <p class="mt-2 text-sm text-slate-500">Поиск по названиям, описаниям, актерам, жанрам и связям каталога.</p>
+                        <p class="mt-2 text-sm text-slate-500">{{ $seo['lead'] ?? 'Поиск по названиям, описаниям, актерам, жанрам и связям каталога.' }}</p>
                         @if ($activeTaxonomies->isNotEmpty() || $year !== null || $invalidYear || $invalidFilterSlugs !== [])
                             <div class="mt-3 space-y-3 text-sm">
                                 <div class="flex flex-wrap items-center gap-2">

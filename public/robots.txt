@@ -3,3 +3,5 @@ Disallow:
 Host: seasonvar.miniserver.fun
 Sitemap: https://seasonvar.miniserver.fun/sitemap-index.xml
 Sitemap: https://seasonvar.miniserver.fun/sitemap.xml
+Sitemap: https://seasonvar.miniserver.fun/sitemap-landings.xml
+Sitemap: https://seasonvar.miniserver.fun/sitemap-videos-1.xml

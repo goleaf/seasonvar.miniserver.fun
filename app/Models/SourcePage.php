@@ -22,6 +22,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'parse_status',
     'error_message',
     'discovered_from_url',
+    'import_status',
+    'missing_data_flags',
+    'retry_after_at',
+    'failure_count',
+    'last_import_run_id',
+    'last_imported_at',
 ])]
 class SourcePage extends Model
 {
@@ -44,6 +50,9 @@ class SourcePage extends Model
         return [
             'last_crawled_at' => 'datetime',
             'last_changed_at' => 'datetime',
+            'missing_data_flags' => 'array',
+            'retry_after_at' => 'datetime',
+            'last_imported_at' => 'datetime',
         ];
     }
 }

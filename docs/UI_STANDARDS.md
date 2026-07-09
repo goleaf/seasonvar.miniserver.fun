@@ -42,6 +42,8 @@ Use shared Blade components before writing repeated markup:
 - `x-title-card` for title grid cards.
 - `x-title-list-row` for responsive list rows with poster thumbnail, title metadata, and counters.
 - `x-stat` for dashboard counters.
+- Title pages use season accordions and keep every season inside one title page.
+- Video playback uses the local Plyr/HLS bundle initialized from `resources/js/app.js`.
 
 ## Readability rules
 
@@ -50,6 +52,7 @@ Use shared Blade components before writing repeated markup:
 - Long descriptions use normal line height and slate text, not small low-contrast text.
 - Dense metadata should use label/value layout or chips, not raw comma strings.
 - Player placeholder must remain light even when no media is connected.
+- Visitor-facing empty states must be written in plain Russian and avoid implementation words like parser, import, command, or sync.
 
 ## Layout rules
 
@@ -60,3 +63,4 @@ Use shared Blade components before writing repeated markup:
 - Main catalog lists should show a compact poster thumbnail beside each title when a poster is available.
 - Use `minmax(0, 1fr)` in multi-column page grids to avoid horizontal overflow.
 - Tablet layouts should avoid forcing three dense columns before `xl`.
+- Episode lists must remain readable on mobile and may use two or three columns only from medium desktop widths upward.
