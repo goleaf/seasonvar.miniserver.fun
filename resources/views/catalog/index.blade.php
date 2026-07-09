@@ -79,16 +79,6 @@
             </x-ui.panel>
 
             <aside class="space-y-4 lg:order-3 lg:col-span-2 xl:col-span-1">
-                <x-ui.panel title="Новые серии" subtitle="Последние страницы с постерами" :pad="false">
-                    <div class="divide-y divide-slate-200">
-                        @forelse ($posterTitles as $posterTitle)
-                            <x-title-list-row :title="$posterTitle" readable />
-                        @empty
-                            <p class="p-3 text-sm text-slate-500">Постеры появятся после синхронизации.</p>
-                        @endforelse
-                    </div>
-                </x-ui.panel>
-
                 <x-ui.panel title="Состояние базы">
                     <dl class="space-y-2 text-sm">
                         <div class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">

@@ -54,13 +54,6 @@ class CatalogController extends Controller
                 ->latest('indexed_at')
                 ->limit(64)
                 ->get(),
-            'posterTitles' => CatalogTitle::query()
-                ->with($this->cardRelations())
-                ->withCount(['seasons', 'episodes'])
-                ->whereNotNull('poster_url')
-                ->latest('indexed_at')
-                ->limit(18)
-                ->get(),
             'genres' => Genre::query()
                 ->withCount('catalogTitles')
                 ->orderByDesc('catalog_titles_count')
