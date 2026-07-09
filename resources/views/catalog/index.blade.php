@@ -13,7 +13,7 @@
             <x-stat label="В очереди" :value="$stats['pendingPages']" />
         </div>
 
-        <section class="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_minmax(420px,520px)] 2xl:grid-cols-[280px_minmax(0,1fr)_minmax(520px,620px)]">
+        <section class="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)]">
             <aside class="space-y-4 lg:order-1">
                 <x-ui.panel title="Навигация">
                     <nav class="space-y-2">
@@ -77,25 +77,6 @@
                     @endforelse
                 </div>
             </x-ui.panel>
-
-            <aside class="space-y-4 lg:order-3 lg:col-span-2 xl:col-span-1">
-                <x-ui.panel title="Состояние базы">
-                    <dl class="space-y-2 text-sm">
-                        <div class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                            <dt class="text-slate-500">Сериалы</dt>
-                            <dd class="font-bold text-slate-700">{{ number_format($stats['titles']) }}</dd>
-                        </div>
-                        <div class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                            <dt class="text-slate-500">Серии</dt>
-                            <dd class="font-bold text-slate-700">{{ number_format($stats['episodes']) }}</dd>
-                        </div>
-                        <div class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                            <dt class="text-slate-500">Медиа</dt>
-                            <dd class="font-bold text-slate-700">{{ number_format($stats['licensedMedia']) }}</dd>
-                        </div>
-                    </dl>
-                </x-ui.panel>
-            </aside>
         </section>
     </div>
 @endsection

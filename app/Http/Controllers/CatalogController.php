@@ -45,7 +45,6 @@ class CatalogController extends Controller
                 'titles' => CatalogTitle::query()->count(),
                 'sourcePages' => SourcePage::query()->count(),
                 'pendingPages' => SourcePage::query()->where('parse_status', 'pending')->count(),
-                'licensedMedia' => LicensedMedia::query()->count(),
                 'episodes' => Episode::query()->count(),
             ],
             'latestTitles' => CatalogTitle::query()
