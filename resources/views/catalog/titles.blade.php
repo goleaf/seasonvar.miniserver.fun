@@ -9,6 +9,8 @@
         'tag' => 'Теги',
     ];
     $year = $year ?? null;
+    $requestedYear = $requestedYear ?? null;
+    $invalidYear = $invalidYear ?? false;
     $activeTaxonomies = $activeTaxonomies ?? collect();
     $activeFilterSlugs = $activeFilterSlugs ?? [];
     $invalidFilterSlugs = $invalidFilterSlugs ?? [];
@@ -123,13 +125,18 @@
                 <div>
                     <h1 class="text-3xl font-semibold text-white">Сериалы</h1>
                     <p class="mt-2 text-sm text-zinc-400">Поиск по названиям, описаниям, актерам, жанрам и связям каталога.</p>
-                    @if ($activeTaxonomies->isNotEmpty() || $year !== null || $invalidFilterSlugs !== [])
+                    @if ($activeTaxonomies->isNotEmpty() || $year !== null || $invalidYear || $invalidFilterSlugs !== [])
                         <div class="mt-3 space-y-3 text-sm">
                             <div class="flex flex-wrap items-center gap-2">
                                 @if ($year !== null)
                                     <a href="{{ route('titles.index', $withoutYearQuery) }}" class="rounded bg-sky-300 px-3 py-1 font-semibold text-zinc-950 hover:bg-sky-200">
                                         Год: {{ $year }} x
                                     </a>
+                                @endif
+                                @if ($invalidYear)
+                                    <span class="rounded bg-red-400 px-3 py-1 font-semibold text-zinc-950">
+                                        Год: {{ $requestedYear }} не найден
+                                    </span>
                                 @endif
                                 @foreach ($activeTaxonomies as $filterType => $taxonomy)
                                     <a href="{{ route('titles.index', $filterQuery($filterType, null)) }}" class="rounded bg-emerald-400 px-3 py-1 font-semibold text-zinc-950 hover:bg-emerald-300">
@@ -146,6 +153,9 @@
                                 <span>Активных связей: {{ $activeTaxonomies->count() }}</span>
                                 @if ($invalidFilterSlugs !== [])
                                     <span>Ошибочных фильтров: {{ count($invalidFilterSlugs) }}</span>
+                                @endif
+                                @if ($invalidYear)
+                                    <span>Ошибочный год: {{ $requestedYear }}</span>
                                 @endif
                                 @if ($year !== null)
                                     <span>Год: {{ $year }}</span>

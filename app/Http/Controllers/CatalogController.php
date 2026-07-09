@@ -60,10 +60,13 @@ class CatalogController extends Controller
     public function titles(Request $request, ?string $type = null, ?string $taxonomy = null): View
     {
         $search = trim((string) $request->query('q', ''));
-        $year = $request->integer('year') ?: null;
+        $requestedYear = $request->query('year');
+        $requestedYear = is_scalar($requestedYear) ? trim((string) $requestedYear) : '';
+        $year = $requestedYear !== '' ? (int) $requestedYear : null;
         $year = $year !== null && $year >= 1900 && $year <= ((int) now()->format('Y') + 1)
             ? $year
             : null;
+        $invalidYear = $requestedYear !== '' && $year === null;
         $filterTypes = ['genre', 'country', 'actor', 'director', 'tag'];
         $legacyType = trim((string) $request->query('type', ''));
         $legacyTaxonomy = trim((string) $request->query('taxonomy', ''));
@@ -102,7 +105,7 @@ class CatalogController extends Controller
             ->mapWithKeys(fn (Taxonomy $taxonomy, string $filterType): array => [$filterType => $taxonomy->slug])
             ->all();
 
-        $titles = $this->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, $year)
+        $titles = $this->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, $year, null, $invalidYear)
             ->with(['taxonomies', 'seasons'])
             ->withCount(['seasons', 'episodes'])
             ->latest('indexed_at')
@@ -126,10 +129,10 @@ class CatalogController extends Controller
             }
         });
 
-        $filterTaxonomies->each(function (Collection $items) use ($activeTaxonomies, $invalidFilterSlugs, $search, $year): void {
+        $filterTaxonomies->each(function (Collection $items) use ($activeTaxonomies, $invalidFilterSlugs, $search, $year, $invalidYear): void {
             foreach ($items as $candidateTaxonomy) {
                 $candidateTaxonomy->context_titles_count = $this
-                    ->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, $year, $candidateTaxonomy->type)
+                    ->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, $year, $candidateTaxonomy->type, $invalidYear)
                     ->whereHas('taxonomies', function (Builder $query) use ($candidateTaxonomy): void {
                         $query->whereKey($candidateTaxonomy->id);
                     })
@@ -147,9 +150,23 @@ class CatalogController extends Controller
             ->limit(20)
             ->get();
 
-        $yearBuckets->each(function (CatalogTitle $bucket) use ($activeTaxonomies, $invalidFilterSlugs, $search): void {
+        if ($year !== null && ! $yearBuckets->contains(fn (CatalogTitle $bucket): bool => (int) $bucket->year === $year)) {
+            $selectedYearBucket = CatalogTitle::query()
+                ->select('year')
+                ->selectRaw('count(*) as titles_count')
+                ->where('year', $year)
+                ->groupBy('year')
+                ->first();
+
+            $yearBuckets->prepend($selectedYearBucket ?? new CatalogTitle([
+                'year' => $year,
+                'titles_count' => 0,
+            ]));
+        }
+
+        $yearBuckets->each(function (CatalogTitle $bucket) use ($activeTaxonomies, $invalidFilterSlugs, $search, $invalidYear): void {
             $bucket->context_titles_count = $this
-                ->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, (int) $bucket->year)
+                ->catalogTitleFilterQuery($activeTaxonomies, $invalidFilterSlugs, $search, (int) $bucket->year, null, $invalidYear)
                 ->count();
         });
 
@@ -157,6 +174,8 @@ class CatalogController extends Controller
             'titles' => $titles,
             'search' => $search,
             'year' => $year,
+            'requestedYear' => $requestedYear,
+            'invalidYear' => $invalidYear,
             'selectedTaxonomy' => $activeTaxonomies->first(),
             'activeTaxonomies' => $activeTaxonomies,
             'activeFilterSlugs' => $activeFilterSlugs,
@@ -173,10 +192,11 @@ class CatalogController extends Controller
         string $search,
         ?int $year = null,
         ?string $exceptTaxonomyType = null,
+        bool $invalidYear = false,
     ): Builder {
         $query = CatalogTitle::query();
 
-        if ($invalidFilterSlugs !== []) {
+        if ($invalidFilterSlugs !== [] || $invalidYear) {
             $query->whereRaw('1 = 0');
         }
 
