@@ -120,3 +120,19 @@
 - Один запуск импорта держит cache lock, чтобы две копии `seasonvar:import` не обновляли одну очередь одновременно.
 - Каждый цикл импорта помечает неправильные вложенные ссылки Seasonvar как недоступные и проверяет ограниченный backlog старых медиа с пустым или устаревшим статусом доступности.
 - Каждый цикл импорта нормализует старые состояния разобранных страниц источника и дозаполняет отсутствующие ключи медиа, качество, формат и перевод.
+
+<!-- project-docs:start -->
+## Публичная индексация
+
+- Индекс карты сайта собирает статические страницы, годы, активные справочники, программные посадочные страницы, карточки тайтлов и карту видео.
+- Карточки тайтлов попадают в `sitemap-titles-{page}.xml` только при `is_published=true` и заполненном `slug`.
+- Карта видео строится по `licensed_media` со статусом `published` и абсолютной внешней ссылкой в `playback_url` или `path`.
+- `robots.txt` объявляет только индекс карты сайта, потому что количество страниц `sitemap-titles-*` и `sitemap-videos-*` зависит от базы.
+- `/sitemap.xml` (`sitemap`)
+- `/sitemap-index.xml` (`sitemap.index`)
+- `/sitemap-static.xml` (`sitemap.static`)
+- `/sitemap-taxonomies.xml` (`sitemap.taxonomies`)
+- `/sitemap-landings.xml` (`sitemap.landings`)
+- `/sitemap-titles-{page}.xml` (`sitemap.titles`)
+- `/sitemap-videos-{page}.xml` (`sitemap.videos`)
+<!-- project-docs:end -->

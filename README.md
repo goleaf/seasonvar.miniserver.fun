@@ -8,6 +8,7 @@ Laravel-приложение для локального каталога сер
 php artisan seasonvar:import
 php artisan seasonvar:import "https://seasonvar.ru/serial-615--Bez_sleda_pssmtlk-1-season.html" --force
 php artisan seasonvar:import --forever
+php artisan project:docs-refresh
 php artisan test --compact
 vendor/bin/pint --dirty --format agent
 ```
@@ -31,3 +32,13 @@ vendor/bin/pint --dirty --format agent
 Если на странице найден HLS master playlist, импорт пробует сохранить отдельные варианты качества для той же серии.
 
 Трейлеры и анонсы сохраняются как медиа карточки или сезона даже тогда, когда у них нет номера серии.
+
+<!-- project-docs:start -->
+## Автоматически обновляемое состояние
+
+- Обновлено командой `php artisan project:docs-refresh`: 09.07.2026.
+- Основная карта сайта портала: `https://seasonvar.miniserver.fun/sitemap-index.xml`.
+- Совместимый адрес `/sitemap.xml` отдает индекс карты сайта, чтобы поисковые системы получали все разделы карты.
+- `public/robots.txt` объявляет стабильный индекс карты сайта без ручного перечисления страниц `sitemap-titles-*` и `sitemap-videos-*`.
+- Git-хук `.githooks/post-commit` запускает обновление файлов документации и при изменениях делает отдельный коммит документации; автоматическая отправка в Git включается только через `SEASONVAR_DOCS_AUTO_PUSH=1`.
+<!-- project-docs:end -->

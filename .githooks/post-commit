@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${SEASONVAR_DOCS_HOOK:-}" == "1" || "${SEASONVAR_SKIP_DOCS_HOOK:-}" == "1" ]]; then
+    exit 0
+fi
+
+cd "$(git rev-parse --show-toplevel)"
+
+scripts/docs-autocommit-push.sh

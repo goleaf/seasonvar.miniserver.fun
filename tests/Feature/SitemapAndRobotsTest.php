@@ -1,0 +1,133 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\CatalogTitle;
+use App\Models\LicensedMedia;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class SitemapAndRobotsTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_legacy_sitemap_url_returns_sitemap_index(): void
+    {
+        CatalogTitle::factory()->create([
+            'slug' => 'testovyi-serial',
+            'title' => 'Тестовый сериал',
+            'is_published' => true,
+            'indexed_at' => now(),
+        ]);
+
+        $response = $this->get('/sitemap.xml');
+
+        $response->assertOk();
+        $response->assertStreamed();
+
+        $content = $response->streamedContent();
+
+        $this->assertStringContainsString('<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">', $content);
+        $this->assertStringContainsString('/sitemap-static.xml', $content);
+        $this->assertStringContainsString('/sitemap-taxonomies.xml', $content);
+        $this->assertStringContainsString('/sitemap-landings.xml', $content);
+        $this->assertStringContainsString('/sitemap-titles-1.xml', $content);
+        $this->assertStringContainsString('/sitemap-videos-1.xml', $content);
+    }
+
+    public function test_static_sitemap_uses_only_published_title_years(): void
+    {
+        CatalogTitle::factory()->create([
+            'year' => 2026,
+            'is_published' => true,
+        ]);
+        CatalogTitle::factory()->create([
+            'year' => 1999,
+            'is_published' => false,
+        ]);
+
+        $response = $this->get('/sitemap-static.xml');
+
+        $response->assertOk();
+        $response->assertStreamed();
+
+        $content = $response->streamedContent();
+
+        $this->assertStringContainsString('/titles/year/2026', $content);
+        $this->assertStringNotContainsString('/titles/year/1999', $content);
+    }
+
+    public function test_title_sitemap_contains_published_titles_and_poster_images(): void
+    {
+        $title = CatalogTitle::factory()->create([
+            'slug' => 'serial-s-posterom',
+            'title' => 'Сериал с постером',
+            'poster_url' => 'https://cdn.example.com/posters/serial.jpg',
+            'is_published' => true,
+            'indexed_at' => now(),
+        ]);
+
+        $response = $this->get('/sitemap-titles-1.xml');
+
+        $response->assertOk();
+        $response->assertStreamed();
+
+        $content = $response->streamedContent();
+
+        $this->assertStringContainsString(route('titles.show', $title), $content);
+        $this->assertStringContainsString('<image:image>', $content);
+        $this->assertStringContainsString('https://cdn.example.com/posters/serial.jpg', $content);
+        $this->assertStringContainsString('Постер Сериал с постером', $content);
+    }
+
+    public function test_video_sitemap_contains_only_published_media_with_absolute_urls(): void
+    {
+        $title = CatalogTitle::factory()->create([
+            'slug' => 'serial-s-video',
+            'title' => 'Сериал с видео',
+            'poster_url' => 'https://cdn.example.com/posters/video.jpg',
+            'is_published' => true,
+            'indexed_at' => now(),
+        ]);
+
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $title->id,
+            'title' => 'Серия 1',
+            'path' => 'licensed/local-video.mp4',
+            'playback_url' => null,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $title->id,
+            'title' => 'Серия 2',
+            'path' => 'licensed/ignored-when-playback-exists.mp4',
+            'playback_url' => 'https://media.example.com/serial/s01e02.mp4',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $response = $this->get('/sitemap-videos-1.xml');
+
+        $response->assertOk();
+        $response->assertStreamed();
+
+        $content = $response->streamedContent();
+
+        $this->assertStringContainsString('<video:video>', $content);
+        $this->assertStringContainsString('https://media.example.com/serial/s01e02.mp4', $content);
+        $this->assertStringNotContainsString('licensed/local-video.mp4', $content);
+    }
+
+    public function test_public_robots_declares_only_stable_sitemap_index(): void
+    {
+        $robots = file_get_contents(public_path('robots.txt'));
+
+        $this->assertIsString($robots);
+        $this->assertStringContainsString('User-agent: *', $robots);
+        $this->assertStringContainsString('Host: seasonvar.miniserver.fun', $robots);
+        $this->assertStringContainsString('Sitemap: https://seasonvar.miniserver.fun/sitemap-index.xml', $robots);
+        $this->assertStringNotContainsString('sitemap-videos-1.xml', $robots);
+        $this->assertStringNotContainsString('sitemap-landings.xml', $robots);
+    }
+}

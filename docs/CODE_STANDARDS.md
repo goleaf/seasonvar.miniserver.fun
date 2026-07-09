@@ -75,3 +75,19 @@
 - Коллекции используют описательные имена во множественном числе: `$recommendedTitles`, `$taxonomiesByType`.
 - Имена данных для view должны описывать подготовленные данные, а не детали реализации.
 - Blade-компоненты лежат в `resources/views/components`, переиспользуемый интерфейс лежит в `resources/views/components/ui`.
+
+<!-- project-docs:start -->
+## Автоматизация документации, карты сайта и robots
+
+- После изменений маршрутов, карты сайта, robots или команд нужно запускать `php artisan project:docs-refresh`.
+- После PHP-правок по-прежнему обязателен `vendor/bin/pint --dirty --format agent`.
+- Совместимый `/sitemap.xml` должен оставаться адресом индекса карты сайта, а не монолитной картой всех URL.
+- Карта видео должна включать только опубликованные медиа с абсолютной внешней ссылкой `http://` или `https://`.
+- `/sitemap.xml` (`sitemap`)
+- `/sitemap-index.xml` (`sitemap.index`)
+- `/sitemap-static.xml` (`sitemap.static`)
+- `/sitemap-taxonomies.xml` (`sitemap.taxonomies`)
+- `/sitemap-landings.xml` (`sitemap.landings`)
+- `/sitemap-titles-{page}.xml` (`sitemap.titles`)
+- `/sitemap-videos-{page}.xml` (`sitemap.videos`)
+<!-- project-docs:end -->
