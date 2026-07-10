@@ -3,15 +3,48 @@
 namespace Tests\Feature;
 
 use App\Models\CatalogTitle;
+use App\Models\Country;
 use App\Models\Episode;
+use App\Models\Genre;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Blade;
 use Tests\TestCase;
 
 class CatalogBladeComponentTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_title_card_and_list_row_render_relation_chips_as_links(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Навигационный сериал',
+            'slug' => 'navigacionnyi-serial',
+        ]);
+        $genre = Genre::query()->create([
+            'name' => 'Детектив',
+            'slug' => 'detektiv',
+        ]);
+        $country = Country::query()->create([
+            'name' => 'Испания',
+            'slug' => 'ispaniia',
+        ]);
+
+        $catalogTitle->genres()->attach($genre->id);
+        $catalogTitle->countries()->attach($country->id);
+        $catalogTitle->load(['genres', 'countries', 'seasons']);
+
+        $cardHtml = Blade::render('<x-title-card :title="$title" />', ['title' => $catalogTitle]);
+        $rowHtml = Blade::render('<x-title-list-row :title="$title" />', ['title' => $catalogTitle]);
+
+        foreach ([$cardHtml, $rowHtml] as $html) {
+            $this->assertStringContainsString('<article', $html);
+            $this->assertStringContainsString('href="'.route('titles.show', $catalogTitle).'"', $html);
+            $this->assertStringContainsString('href="'.route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => $genre->slug]).'"', $html);
+            $this->assertStringContainsString('href="'.route('titles.taxonomy', ['type' => 'country', 'taxonomy' => $country->slug]).'"', $html);
+        }
+    }
 
     public function test_title_page_renders_componentized_episode_links_and_status_badges(): void
     {
@@ -101,6 +134,8 @@ class CatalogBladeComponentTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('href="#season-2"', false)
+            ->assertSeeText('Сезоны сериала')
+            ->assertDontSeeText('Быстрый выбор сезона')
             ->assertSee('id="season-2" class="group scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48"', false)
             ->assertDontSee('id="season-2" class="grid', false);
     }

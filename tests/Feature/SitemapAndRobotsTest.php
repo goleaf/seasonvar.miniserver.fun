@@ -143,6 +143,13 @@ class SitemapAndRobotsTest extends TestCase
             }
         }
 
+        $queries = [];
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            if (str_contains($query->sql, 'catalog_titles')) {
+                $queries[] = strtolower($query->sql);
+            }
+        });
+
         $response = $this->get('/feed.xml');
 
         $response->assertOk();
@@ -154,6 +161,11 @@ class SitemapAndRobotsTest extends TestCase
         $this->assertSame(101, substr_count($content, '<item>'));
         $this->assertStringContainsString(route('titles.show', $oldestTitle), $content);
         $this->assertStringContainsString('финальный фрагмент', $content);
+        $this->assertNotEmpty($queries);
+        $this->assertFalse(
+            collect($queries)->contains(fn (string $sql): bool => preg_match('/\blimit\b/', $sql) === 1),
+            'Feed catalog query should not use SQL LIMIT.',
+        );
     }
 
     public function test_landing_sitemap_uses_grouped_taxonomy_year_queries(): void

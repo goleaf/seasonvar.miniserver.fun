@@ -30,5 +30,6 @@ return [
     'recommendations' => [
         'chunk_size' => (int) env('SEASONVAR_RECOMMENDATION_CHUNK_SIZE', 100),
         'min_score' => (int) env('SEASONVAR_RECOMMENDATION_MIN_SCORE', 600),
+        'max_per_title' => (int) env('SEASONVAR_RECOMMENDATION_MAX_PER_TITLE', 12),
     ],
 ];

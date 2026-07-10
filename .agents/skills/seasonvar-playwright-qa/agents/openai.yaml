@@ -1,0 +1,4 @@
+interface:
+  display_name: "Seasonvar Playwright QA"
+  short_description: "Browser QA for Seasonvar UI"
+  default_prompt: "Use $seasonvar-playwright-qa to audit Seasonvar pages in desktop and mobile browsers."

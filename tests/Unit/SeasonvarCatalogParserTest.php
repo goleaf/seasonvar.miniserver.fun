@@ -126,6 +126,87 @@ class SeasonvarCatalogParserTest extends TestCase
         $this->assertSame('https://seasonvar.ru/serial-1750--Amerikanskij_papasha-_pszhdcp-6-sezon.html', $data['seasons'][0]['source_url']);
     }
 
+    public function test_it_collects_all_country_values_and_rejects_invalid_translation_values(): void
+    {
+        $parser = app(SeasonvarCatalogParser::class);
+
+        $data = $parser->parse(
+            <<<'HTML'
+            <html>
+                <head><title>Тестовый сериал смотреть онлайн</title></head>
+                <body>
+                    <h1>Тестовый сериал</h1>
+                    <div class="pgs-sinfo_list">
+                        Жанр: Драма
+                        Страна: США, Канада
+                        Перевод: LostFilm, 2020, США, версия США, рус., финал сезона
+                    </div>
+                    <div class="pgs-sinfo_list">
+                        Страна: Россия
+                        Озвучка: NewStudio
+                    </div>
+                    <div class="pgs-seaslist">
+                        <a href="/serial-50000-Test-1-season.html">1 сезон (NewStudio)</a>
+                        <a href="/serial-50000-Test-2-season.html">2 сезон (2020)</a>
+                    </div>
+                    <script>
+                        var arEpisodes = [{"1_seriya":{"n":"1"}}];
+                    </script>
+                </body>
+            </html>
+            HTML,
+            'https://seasonvar.ru/serial-50000-Test-1-season.html',
+        );
+
+        $taxonomies = collect($data['taxonomies'])->groupBy('type');
+
+        $this->assertSame(['США', 'Канада', 'Россия'], $taxonomies->get('country')->pluck('name')->values()->all());
+        $this->assertSame(['LostFilm', 'NewStudio'], $taxonomies->get('translation')->pluck('name')->values()->all());
+    }
+
+    public function test_it_builds_recommendation_signals_from_source_metadata(): void
+    {
+        $parser = app(SeasonvarCatalogParser::class);
+
+        $data = $parser->parse(
+            <<<'HTML'
+            <html>
+                <head><title>Точный детектив смотреть онлайн</title></head>
+                <body>
+                    <h1>Точный детектив</h1>
+                    <div class="pgs-sinfo_list">
+                        Вышел: 2021
+                        Жанр: Детектив
+                        Страна: Испания
+                        КиноПоиск: 8.2 (123 голоса)
+                    </div>
+                    <div class="pgs-seaslist">
+                        <a href="/serial-51000-Tochnyj_detektiv-1-season.html">1 сезон</a>
+                    </div>
+                    <script>
+                        var arEpisodes = [{"1_seriya":{"n":"1"}}];
+                    </script>
+                </body>
+            </html>
+            HTML,
+            'https://seasonvar.ru/serial-51000-Tochnyj_detektiv-1-season.html',
+        );
+
+        $signals = collect($data['recommendation_signals']);
+
+        $this->assertNotNull($signals->first(fn (array $signal): bool => $signal['source'] === 'seasonvar_info'
+            && $signal['signal_type'] === 'taxonomy_genre'
+            && $signal['signal_value'] === 'Детектив'
+            && $signal['weight'] === 120));
+        $this->assertNotNull($signals->first(fn (array $signal): bool => $signal['signal_type'] === 'rating'
+            && $signal['signal_key'] === 'kinopoisk'
+            && $signal['weight'] > 180));
+        $this->assertNotNull($signals->first(fn (array $signal): bool => $signal['signal_type'] === 'release_year'
+            && $signal['signal_key'] === '2021'
+            && $signal['weight'] === 25));
+        $this->assertCount(3, $signals->where('signal_type', 'page_quality'));
+    }
+
     public function test_it_normalizes_root_relative_urls_against_the_site_origin(): void
     {
         $url = app(SeasonvarUrl::class);

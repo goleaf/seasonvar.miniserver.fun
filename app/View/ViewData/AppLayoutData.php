@@ -14,8 +14,9 @@ class AppLayoutData
     {
         extract($viewData, EXTR_SKIP);
         $siteName = config('app.name', 'Каталог сериалов');
-        $seo = $seo ?? [];
-        $extendedSeo = ($seo['extended_seo'] ?? true) !== false;
+        $seo = is_array($seo ?? null) ? $this->cleanGeneratedSeoPayload($seo) : [];
+        $extendedSeo = ($seo['extended_seo'] ?? false) === true;
+        $showPublicSeoBlocks = ($seo['show_public_seo_blocks'] ?? false) === true;
         $pageTitle = trim((string) ($seo['title'] ?? $title ?? $siteName));
         $pageTitle = $pageTitle !== '' ? $pageTitle : $siteName;
         $fullTitle = Str::contains(Str::lower($pageTitle), Str::lower($siteName))
@@ -985,37 +986,39 @@ class AppLayoutData
             $keywordAliases = collect();
         }
 
-        $seoSections = collect([
-            ['id' => 'seo-summary', 'name' => 'Описание страницы', 'enabled' => ! empty($seo['seo_text']) || ! empty($seo['related_links'])],
-            ['id' => 'key-topics', 'name' => 'Ключевые темы', 'enabled' => $topicTerms->isNotEmpty()],
-            ['id' => 'semantic-glossary', 'name' => 'Глоссарий страницы', 'enabled' => $semanticGlossary->isNotEmpty()],
-            ['id' => 'query-navigation', 'name' => 'Навигация по запросам', 'enabled' => $seoIntents->isNotEmpty()],
-            ['id' => 'long-tail-queries', 'name' => 'Поисковые формулировки', 'enabled' => $longTailQueries->isNotEmpty()],
-            ['id' => 'related-collections', 'name' => 'Связанные подборки', 'enabled' => $relatedCollections->isNotEmpty()],
-            ['id' => 'semantic-hubs', 'name' => 'Тематические хабы', 'enabled' => $semanticHubs->isNotEmpty()],
-            ['id' => 'page-actions', 'name' => 'Действия на странице', 'enabled' => $seoActions->isNotEmpty()],
-            ['id' => 'snippet-blocks', 'name' => 'Короткие тезисы', 'enabled' => $snippetBlocks->isNotEmpty()],
-            ['id' => 'content-signals', 'name' => 'Сигналы страницы', 'enabled' => $contentSignals->isNotEmpty()],
-            ['id' => 'audience-paths', 'name' => 'Пути поиска', 'enabled' => $audiencePaths->isNotEmpty()],
-            ['id' => 'also-searches', 'name' => 'Также ищут', 'enabled' => $alsoSearches->isNotEmpty()],
-            ['id' => 'discovery-signals', 'name' => 'Индексация и обновления', 'enabled' => $discoverySignals->isNotEmpty() && request()->routeIs('stats')],
-            ['id' => 'query-matrix', 'name' => 'Матрица запросов', 'enabled' => $queryMatrix->isNotEmpty()],
-            ['id' => 'media-signals', 'name' => 'Медиа и превью', 'enabled' => $mediaSignals->isNotEmpty()],
-            ['id' => 'publisher-trust', 'name' => 'Доверие и индексация', 'enabled' => $publisherSignals->isNotEmpty()],
-            ['id' => 'freshness-seo', 'name' => 'Актуальные запросы', 'enabled' => $freshnessQueries->isNotEmpty()],
-            ['id' => 'russian-query-variants', 'name' => 'Русские варианты поиска', 'enabled' => $russianQueryVariants->isNotEmpty()],
-            ['id' => 'catalog-directions', 'name' => 'Направления каталога', 'enabled' => $catalogDirections->isNotEmpty()],
-            ['id' => 'comparison-seo', 'name' => 'Похожие и сравнения', 'enabled' => $comparisonQueries->isNotEmpty()],
-            ['id' => 'episode-intents', 'name' => 'Серии и сезоны', 'enabled' => $episodeIntentQueries->isNotEmpty()],
-            ['id' => 'watch-mode-seo', 'name' => 'Способы просмотра', 'enabled' => $watchModeQueries->isNotEmpty()],
-            ['id' => 'translation-seo', 'name' => 'Переводы и озвучки', 'enabled' => $translationQueries->isNotEmpty()],
-            ['id' => 'voice-search-seo', 'name' => 'Голосовые запросы', 'enabled' => $voiceSearchQueries->isNotEmpty()],
-            ['id' => 'topic-authority-seo', 'name' => 'Тематический авторитет', 'enabled' => $topicAuthoritySignals->isNotEmpty()],
-            ['id' => 'release-calendar-seo', 'name' => 'Календарь релизов', 'enabled' => $releaseCalendarQueries->isNotEmpty()],
-            ['id' => 'quick-answers', 'name' => 'Быстрые ответы', 'enabled' => $quickAnswers->isNotEmpty()],
-            ['id' => 'semantic-clusters', 'name' => 'Семантические подборки', 'enabled' => ! empty($seo['keyword_clusters'])],
-            ['id' => 'popular-searches', 'name' => 'Популярные запросы', 'enabled' => ! empty($seo['search_phrases'])],
-        ])->filter(fn ($section) => $section['enabled'])->values();
+        $seoSections = $showPublicSeoBlocks
+            ? collect([
+                ['id' => 'seo-summary', 'name' => 'Описание страницы', 'enabled' => ! empty($seo['seo_text']) || ! empty($seo['related_links'])],
+                ['id' => 'key-topics', 'name' => 'Ключевые темы', 'enabled' => $topicTerms->isNotEmpty()],
+                ['id' => 'semantic-glossary', 'name' => 'Глоссарий страницы', 'enabled' => $semanticGlossary->isNotEmpty()],
+                ['id' => 'query-navigation', 'name' => 'Навигация по запросам', 'enabled' => $seoIntents->isNotEmpty()],
+                ['id' => 'long-tail-queries', 'name' => 'Поисковые формулировки', 'enabled' => $longTailQueries->isNotEmpty()],
+                ['id' => 'related-collections', 'name' => 'Связанные подборки', 'enabled' => $relatedCollections->isNotEmpty()],
+                ['id' => 'semantic-hubs', 'name' => 'Тематические хабы', 'enabled' => $semanticHubs->isNotEmpty()],
+                ['id' => 'page-actions', 'name' => 'Действия на странице', 'enabled' => $seoActions->isNotEmpty()],
+                ['id' => 'snippet-blocks', 'name' => 'Короткие тезисы', 'enabled' => $snippetBlocks->isNotEmpty()],
+                ['id' => 'content-signals', 'name' => 'Сигналы страницы', 'enabled' => $contentSignals->isNotEmpty()],
+                ['id' => 'audience-paths', 'name' => 'Пути поиска', 'enabled' => $audiencePaths->isNotEmpty()],
+                ['id' => 'also-searches', 'name' => 'Также ищут', 'enabled' => $alsoSearches->isNotEmpty()],
+                ['id' => 'discovery-signals', 'name' => 'Индексация и обновления', 'enabled' => $discoverySignals->isNotEmpty() && request()->routeIs('stats')],
+                ['id' => 'query-matrix', 'name' => 'Матрица запросов', 'enabled' => $queryMatrix->isNotEmpty()],
+                ['id' => 'media-signals', 'name' => 'Медиа и превью', 'enabled' => $mediaSignals->isNotEmpty()],
+                ['id' => 'publisher-trust', 'name' => 'Доверие и индексация', 'enabled' => $publisherSignals->isNotEmpty()],
+                ['id' => 'freshness-seo', 'name' => 'Актуальные запросы', 'enabled' => $freshnessQueries->isNotEmpty()],
+                ['id' => 'russian-query-variants', 'name' => 'Русские варианты поиска', 'enabled' => $russianQueryVariants->isNotEmpty()],
+                ['id' => 'catalog-directions', 'name' => 'Направления каталога', 'enabled' => $catalogDirections->isNotEmpty()],
+                ['id' => 'comparison-seo', 'name' => 'Похожие и сравнения', 'enabled' => $comparisonQueries->isNotEmpty()],
+                ['id' => 'episode-intents', 'name' => 'Серии и сезоны', 'enabled' => $episodeIntentQueries->isNotEmpty()],
+                ['id' => 'watch-mode-seo', 'name' => 'Способы просмотра', 'enabled' => $watchModeQueries->isNotEmpty()],
+                ['id' => 'translation-seo', 'name' => 'Переводы и озвучки', 'enabled' => $translationQueries->isNotEmpty()],
+                ['id' => 'voice-search-seo', 'name' => 'Голосовые запросы', 'enabled' => $voiceSearchQueries->isNotEmpty()],
+                ['id' => 'topic-authority-seo', 'name' => 'Тематический авторитет', 'enabled' => $topicAuthoritySignals->isNotEmpty()],
+                ['id' => 'release-calendar-seo', 'name' => 'Календарь релизов', 'enabled' => $releaseCalendarQueries->isNotEmpty()],
+                ['id' => 'quick-answers', 'name' => 'Быстрые ответы', 'enabled' => $quickAnswers->isNotEmpty()],
+                ['id' => 'semantic-clusters', 'name' => 'Семантические подборки', 'enabled' => ! empty($seo['keyword_clusters'])],
+                ['id' => 'popular-searches', 'name' => 'Популярные запросы', 'enabled' => ! empty($seo['search_phrases'])],
+            ])->filter(fn ($section) => $section['enabled'])->values()
+            : collect();
         $breadcrumbs = collect($seo['breadcrumbs'] ?? [])->filter(fn ($item) => is_array($item) && ! empty($item['name']) && ! empty($item['url']))->values();
 
         if ($seoImage && ! Str::startsWith($seoImage, ['http://', 'https://'])) {
@@ -1587,6 +1590,107 @@ class AppLayoutData
         return $item;
     }
 
+    /**
+     * @param  array<string, mixed>  $seo
+     * @return array<string, mixed>
+     */
+    private function cleanGeneratedSeoPayload(array $seo): array
+    {
+        foreach (['title', 'image_alt', 'section'] as $key) {
+            if (array_key_exists($key, $seo)) {
+                $seo[$key] = $this->cleanGeneratedPhrase($seo[$key]);
+            }
+        }
+
+        foreach (['keywords', 'news_keywords'] as $key) {
+            if (array_key_exists($key, $seo)) {
+                $seo[$key] = implode(', ', $this->cleanGeneratedSeoStringList($seo[$key]));
+            }
+        }
+
+        foreach (['tags', 'search_phrases', 'topic_terms'] as $key) {
+            if (array_key_exists($key, $seo)) {
+                $seo[$key] = $this->cleanGeneratedSeoStringList($seo[$key]);
+            }
+        }
+
+        if (isset($seo['keyword_clusters']) && is_iterable($seo['keyword_clusters'])) {
+            $seo['keyword_clusters'] = collect($seo['keyword_clusters'])
+                ->filter(fn ($cluster) => is_array($cluster))
+                ->map(function (array $cluster): array {
+                    if (array_key_exists('title', $cluster)) {
+                        $cluster['title'] = $this->cleanGeneratedPhrase($cluster['title']);
+                    }
+
+                    $cluster['items'] = $this->cleanGeneratedSeoStringList($cluster['items'] ?? []);
+
+                    return $cluster;
+                })
+                ->values()
+                ->all();
+        }
+
+        if (isset($seo['related_links']) && is_iterable($seo['related_links'])) {
+            $seo['related_links'] = collect($seo['related_links'])
+                ->filter(fn ($item) => is_array($item))
+                ->map(fn (array $item): array => $this->cleanGeneratedSeoItem($item))
+                ->values()
+                ->all();
+        }
+
+        if (array_key_exists('jsonLd', $seo)) {
+            $seo['jsonLd'] = $this->cleanGeneratedJsonLd($seo['jsonLd']);
+        }
+
+        return $seo;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function cleanGeneratedSeoStringList(mixed $items): array
+    {
+        if (is_string($items)) {
+            $items = explode(',', $items);
+        }
+
+        return collect(is_iterable($items) ? $items : [$items])
+            ->filter(fn ($item) => is_scalar($item))
+            ->map(fn ($item) => $this->cleanGeneratedPhrase($item))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function cleanGeneratedJsonLd(mixed $value, ?string $key = null): mixed
+    {
+        if (is_array($value)) {
+            foreach ($value as $itemKey => $itemValue) {
+                $value[$itemKey] = $this->cleanGeneratedJsonLd(
+                    $itemValue,
+                    is_string($itemKey) ? $itemKey : $key,
+                );
+            }
+
+            return $value;
+        }
+
+        if (! is_string($value)) {
+            return $value;
+        }
+
+        if ($key === 'keywords') {
+            return implode(', ', $this->cleanGeneratedSeoStringList($value));
+        }
+
+        if (in_array($key, ['name', 'alternateName', 'headline', 'description', 'text', 'articleSection', 'genre', 'caption', 'label', 'title'], true)) {
+            return $this->cleanGeneratedPhrase($value);
+        }
+
+        return $value;
+    }
+
     private function cleanGeneratedPhrase(mixed $phrase): string
     {
         $phrase = html_entity_decode(strip_tags((string) $phrase), ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -1597,11 +1701,25 @@ class AppLayoutData
             return '';
         }
 
-        $phrase = preg_replace('/\b(смотреть онлайн)(?:\s+\1)+\b/iu', '$1', $phrase) ?: $phrase;
-        $phrase = preg_replace('/\b(смотреть в хорошем качестве)(?:\s+\1)+\b/iu', '$1', $phrase) ?: $phrase;
-        $phrase = preg_replace('/\b(в хорошем качестве)\s+хорошее качество\b/iu', '$1', $phrase) ?: $phrase;
-        $phrase = preg_replace('/\b(веб[- ]плеер)\s+веб[- ]плеер\b/iu', '$1', $phrase) ?: $phrase;
-        $phrase = preg_replace('/\b(мобильный просмотр)\s+мобильный просмотр\b/iu', '$1', $phrase) ?: $phrase;
+        for ($i = 0; $i < 4; $i++) {
+            $previous = $phrase;
+            $phrase = preg_replace('/\b(смотреть онлайн)(?:\s+\1)+\b/iu', '$1', $phrase) ?: $phrase;
+            $phrase = preg_replace('/\bонлайн\s+онлайн\b/iu', 'онлайн', $phrase) ?: $phrase;
+            $phrase = preg_replace('/\bонлайн\s+смотреть онлайн\b/iu', 'смотреть онлайн', $phrase) ?: $phrase;
+            $phrase = preg_replace('/\bонлайн\s+сериал онлайн\b/iu', 'сериал онлайн', $phrase) ?: $phrase;
+            $phrase = preg_replace('/\bсмотреть онлайн\s+сериал онлайн\b/iu', 'смотреть онлайн', $phrase) ?: $phrase;
+            $phrase = preg_replace('/\b(смотреть в хорошем качестве)(?:\s+\1)+\b/iu', '$1', $phrase) ?: $phrase;
+            $phrase = preg_replace('/\b(в хорошем качестве)\s+хорошее качество\b/iu', '$1', $phrase) ?: $phrase;
+            $phrase = preg_replace('/\b(все сезоны|все серии)\s+сезоны и серии\b/iu', '$1', $phrase) ?: $phrase;
+            $phrase = preg_replace('/\bвсе сезоны\s+все серии\b/iu', 'все сезоны и серии', $phrase) ?: $phrase;
+            $phrase = preg_replace('/\b(сезоны и серии)(?:\s+\1)+\b/iu', '$1', $phrase) ?: $phrase;
+            $phrase = preg_replace('/\b(веб[- ]плеер)\s+веб[- ]плеер\b/iu', '$1', $phrase) ?: $phrase;
+            $phrase = preg_replace('/\b(мобильный просмотр)\s+мобильный просмотр\b/iu', '$1', $phrase) ?: $phrase;
+
+            if ($phrase === $previous) {
+                break;
+            }
+        }
 
         return trim($phrase, " \t\n\r\0\x0B.,;:|-");
     }

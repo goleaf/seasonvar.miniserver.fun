@@ -50,6 +50,7 @@ class TitleListRow extends Component
         };
         $this->cardRelations = collect()
             ->merge($title->relationLoaded('genres') ? $title->genres : collect())
+            ->merge($title->relationLoaded('countries') ? $title->countries : collect())
             ->merge($title->relationLoaded('ageRatings') ? $title->ageRatings : collect())
             ->merge($title->relationLoaded('translations') ? $title->translations : collect())
             ->merge($title->relationLoaded('tags') ? $title->tags : collect())

@@ -223,6 +223,7 @@
                 </nav>
             @endif
             @yield('content')
+            @if (($seo['show_public_seo_blocks'] ?? false) === true)
             @if ($seoSections->isNotEmpty())
                 <nav id="table-of-contents" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Содержание страницы" itemscope itemtype="https://schema.org/SiteNavigationElement">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
@@ -814,6 +815,7 @@
                         @endforeach
                     </div>
                 </section>
+            @endif
             @endif
         </main>
         @if (request()->routeIs('stats'))

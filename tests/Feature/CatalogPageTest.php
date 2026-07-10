@@ -34,6 +34,32 @@ class CatalogPageTest extends TestCase
 
         $response->assertStatus(200);
         $response->assertDontSeeText('Состояние базы');
+        $response->assertSeeText('Сейчас можно смотреть');
+        $response->assertDontSeeText('Быстрый выбор');
+    }
+
+    public function test_home_page_lists_country_filters_without_four_item_cap(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create();
+
+        collect(range(1, 6))->each(function (int $number) use ($catalogTitle): void {
+            $country = Country::query()->create([
+                'name' => 'Страна '.$number,
+                'slug' => 'strana-'.$number,
+            ]);
+
+            $catalogTitle->countries()->attach($country->id);
+        });
+
+        $response = $this->get(route('home'));
+
+        $response
+            ->assertOk()
+            ->assertSeeText('Страны')
+            ->assertDontSeeText('Фильтр сериалов')
+            ->assertSeeText('Страна 1')
+            ->assertSeeText('Страна 5')
+            ->assertSeeText('Страна 6');
     }
 
     public function test_stats_page_shows_database_statistics_without_raw_source_urls(): void
@@ -137,6 +163,12 @@ class CatalogPageTest extends TestCase
                     'media_available' => 4,
                     'media_unavailable' => 1,
                 ],
+                'last_relation_cleanup' => [
+                    'records_removed' => 2,
+                    'links_removed' => 3,
+                    'legacy_records_removed' => 1,
+                    'legacy_links_removed' => 1,
+                ],
                 'last_merge' => [
                     'titles' => 1,
                     'seasons' => 2,
@@ -169,6 +201,7 @@ class CatalogPageTest extends TestCase
             ->assertOk()
             ->assertSeeLivewire('stats-dashboard')
             ->assertSee('wire:poll.1s="refreshStats"', false)
+            ->assertSee('/vendor/livewire/livewire.js?id=', false)
             ->assertSeeText('Сводка каталога')
             ->assertSeeText('Данные обновляются каждую секунду')
             ->assertSeeText('Показано:')
@@ -178,6 +211,7 @@ class CatalogPageTest extends TestCase
             ->assertSeeText('Страницы и ссылки')
             ->assertSeeText('Индексов базы')
             ->assertSeeText('Проверка важных индексов')
+            ->assertSeeText('Лента по опубликованным сериалам')
             ->assertSeeText('Индексы разделов')
             ->assertDontSeeText('Оптимизация БД')
             ->assertDontSeeText('Аудит ожидаемых индексов')
@@ -200,6 +234,7 @@ class CatalogPageTest extends TestCase
             ->assertSeeText('Данные видео: 2 / 3')
             ->assertSeeText('Ключи видео: 1 / 4')
             ->assertSeeText('Проверка видео: 5, доступно 4, недоступно 1')
+            ->assertSeeText('Справочники: удалено записей 3, связей 4')
             ->assertSeeText('Объединение: 1 / 2 / 3')
             ->assertSeeText('Некорректные ссылки: 1')
             ->assertSeeText('Разделы базы')
@@ -304,10 +339,22 @@ class CatalogPageTest extends TestCase
             foreach ($hiddenPhrases as $phrase) {
                 $response->assertDontSeeText($phrase);
             }
+
+            foreach ([
+                'id="table-of-contents"',
+                'id="seo-summary"',
+                'id="key-topics"',
+                'id="semantic-glossary"',
+                'id="long-tail-queries"',
+                'id="popular-searches"',
+                'id="quick-answers"',
+            ] as $hiddenBlock) {
+                $response->assertDontSee($hiddenBlock, false);
+            }
         }
     }
 
-    public function test_generated_title_search_links_keep_the_current_title_context(): void
+    public function test_generated_title_search_blocks_are_hidden_on_public_title_page(): void
     {
         $catalogTitle = CatalogTitle::factory()->create([
             'title' => 'Знахарь',
@@ -318,10 +365,10 @@ class CatalogPageTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertSee(e(route('titles.index', [
-                'q' => 'Знахарь смотреть онлайн',
-                'title' => 'znaxar',
-            ])), false);
+            ->assertSeeText('Знахарь')
+            ->assertDontSee('id="popular-searches"', false)
+            ->assertDontSee('id="semantic-clusters"', false)
+            ->assertDontSee('id="long-tail-queries"', false);
     }
 
     public function test_title_scoped_catalog_search_stays_on_one_title(): void
@@ -501,12 +548,13 @@ class CatalogPageTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertSeeText('Похожие сериалы')
-            ->assertSeeText('По жанрам')
+            ->assertSeeText('Советуем посмотреть')
+            ->assertSeeText('По похожим жанрам')
             ->assertSeeText('За 2007 год')
             ->assertSeeText('Очень длинное название похожего сериала с переносом текста')
             ->assertSeeText('Long Original Related Series Title')
             ->assertSee('break-words', false)
+            ->assertDontSeeText('Похожие сериалы пока не подобраны')
             ->assertDontSeeText('Еще из жанра')
             ->assertDontSeeText('Еще из страны')
             ->assertDontSeeText('Еще за 2007 год');
@@ -518,6 +566,10 @@ class CatalogPageTest extends TestCase
             'title' => 'Главный рекомендательный сериал',
             'slug' => 'glavnyi-rekomendatelnyi-serial',
         ]);
+        $genre = Genre::query()->create([
+            'name' => 'Детектив',
+            'slug' => 'detektiv-rekomendacij',
+        ]);
         $firstRecommendation = CatalogTitle::factory()->create([
             'title' => 'Первый точный совет',
             'slug' => 'pervyi-tocnyi-sovet',
@@ -526,6 +578,9 @@ class CatalogPageTest extends TestCase
             'title' => 'Второй точный совет',
             'slug' => 'vtoroi-tocnyi-sovet',
         ]);
+        $catalogTitle->genres()->attach($genre->id);
+        $firstRecommendation->genres()->attach($genre->id);
+        $secondRecommendation->genres()->attach($genre->id);
         LicensedMedia::factory()->create([
             'catalog_title_id' => $firstRecommendation->id,
             'status' => 'published',
@@ -559,10 +614,54 @@ class CatalogPageTest extends TestCase
             ->assertOk()
             ->assertSeeText('Советуем посмотреть')
             ->assertSeeText('Ближайшие совпадения')
+            ->assertSeeText('Жанр')
+            ->assertDontSeeText('По жанрам')
             ->assertSeeTextInOrder([
                 'Первый точный совет',
                 'Второй точный совет',
             ]);
+    }
+
+    public function test_title_page_limits_stale_precomputed_recommendations(): void
+    {
+        config(['seasonvar.recommendations.max_per_title' => 3]);
+
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Главный сериал с лишними советами',
+            'slug' => 'glavnyi-serial-s-lishnimi-sovetami',
+        ]);
+
+        collect(range(1, 5))->each(function (int $rank) use ($catalogTitle): void {
+            $recommendedTitle = CatalogTitle::factory()->create([
+                'title' => 'Лишний совет '.$rank,
+                'slug' => 'lishnii-sovet-'.$rank,
+            ]);
+
+            LicensedMedia::factory()->create([
+                'catalog_title_id' => $recommendedTitle->id,
+                'status' => 'published',
+                'published_at' => now(),
+            ]);
+
+            CatalogTitleRecommendation::query()->create([
+                'catalog_title_id' => $catalogTitle->id,
+                'recommended_title_id' => $recommendedTitle->id,
+                'score' => 1000 - $rank,
+                'rank' => $rank,
+                'reasons' => ['genre' => ['count' => 1, 'score' => 500]],
+                'computed_at' => now(),
+            ]);
+        });
+
+        $response = $this->get(route('titles.show', $catalogTitle));
+
+        $response
+            ->assertOk()
+            ->assertSeeText('Лишний совет 1')
+            ->assertSeeText('Лишний совет 2')
+            ->assertSeeText('Лишний совет 3')
+            ->assertDontSeeText('Лишний совет 4')
+            ->assertDontSeeText('Лишний совет 5');
     }
 
     public function test_title_page_renders_when_recommendation_table_is_missing(): void

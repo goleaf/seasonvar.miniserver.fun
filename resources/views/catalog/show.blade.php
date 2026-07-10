@@ -29,7 +29,7 @@
                     <div class="min-w-0">
                         <h1 class="inline-flex items-start gap-2 text-xl font-black leading-tight text-slate-700 sm:text-2xl">
                             <i class="fa-solid fa-clapperboard mt-1 text-emerald-700" aria-hidden="true"></i>
-                            <span>Сериал {{ $title->title }} онлайн</span>
+                            <span>{{ $title->title }}</span>
                         </h1>
                         @if ($title->original_title)
                             <div class="mt-1 text-sm font-semibold text-slate-500">{{ $title->original_title }}</div>
@@ -88,7 +88,7 @@
                             <div class="mt-5">
                                 <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
                                     <i class="fa-solid fa-layer-group text-slate-400" aria-hidden="true"></i>
-                                    <span>Быстрый выбор сезона</span>
+                                    <span>Сезоны сериала</span>
                                 </div>
                                 <div class="mt-2 flex flex-wrap gap-2">
                                     @foreach ($seasons as $season)
@@ -357,88 +357,123 @@
             </x-ui.panel>
 
             <x-ui.panel title="Советуем посмотреть" icon="fa-solid fa-thumbs-up" :pad="false">
-                @if ($recommendedTitles->isNotEmpty() && $recommendedTitles->first())
+                @if ($recommendedTitleRecommendations->first()?->recommendedTitle)
                     <div class="space-y-3 p-3">
                         <div class="grid gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
                             <div class="min-w-0">
-                                <x-title-card :title="$recommendedTitles->first()" />
+                                <x-title-card :title="$recommendedTitleRecommendations->first()->recommendedTitle" />
+
+                                @if ($recommendedTitleRecommendations->first()->reasonLabels() !== [])
+                                    <div class="mt-2 flex flex-wrap gap-1 text-xs font-bold">
+                                        @foreach ($recommendedTitleRecommendations->first()->reasonLabels() as $reasonLabel)
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 ring-1 ring-emerald-100">
+                                                <i class="fa-solid fa-check text-[0.8em]" aria-hidden="true"></i>
+                                                <span>{{ $reasonLabel }}</span>
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                @endif
                             </div>
 
-                            @if ($recommendedTitles->skip(1)->take(4)->isNotEmpty())
+                            @if ($recommendedTitleRecommendations->skip(1)->take(4)->isNotEmpty())
                                 <div class="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
                                     <div class="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">
                                         <i class="fa-solid fa-ranking-star text-emerald-700" aria-hidden="true"></i>
                                         <span>Ближайшие совпадения</span>
                                     </div>
                                     <div class="divide-y divide-slate-200">
-                                        @foreach ($recommendedTitles->skip(1)->take(4) as $recommendedTitle)
-                                            <x-title-list-row :title="$recommendedTitle" compact :show-description="false" />
+                                        @foreach ($recommendedTitleRecommendations->skip(1)->take(4) as $recommendation)
+                                            <div>
+                                                <x-title-list-row :title="$recommendation->recommendedTitle" compact :show-description="false" />
+
+                                                @if ($recommendation->reasonLabels() !== [])
+                                                    <div class="flex flex-wrap gap-1 px-3 pb-3 text-xs font-bold">
+                                                        @foreach ($recommendation->reasonLabels() as $reasonLabel)
+                                                            <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-600 ring-1 ring-slate-200">
+                                                                <i class="fa-solid fa-check text-[0.8em] text-emerald-700" aria-hidden="true"></i>
+                                                                <span>{{ $reasonLabel }}</span>
+                                                            </span>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
+                                            </div>
                                         @endforeach
                                     </div>
                                 </div>
                             @endif
                         </div>
 
-                        @if ($recommendedTitles->skip(5)->isNotEmpty())
+                        @if ($recommendedTitleRecommendations->skip(5)->isNotEmpty())
                             <div class="grid auto-rows-fr gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                                @foreach ($recommendedTitles->skip(5) as $recommendedTitle)
-                                    <x-title-card :title="$recommendedTitle" />
+                                @foreach ($recommendedTitleRecommendations->skip(5) as $recommendation)
+                                    <div class="min-w-0">
+                                        <x-title-card :title="$recommendation->recommendedTitle" />
+
+                                        @if ($recommendation->reasonLabels() !== [])
+                                            <div class="mt-2 flex flex-wrap gap-1 text-xs font-bold">
+                                                @foreach ($recommendation->reasonLabels() as $reasonLabel)
+                                                    <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-600 ring-1 ring-slate-200">
+                                                        <i class="fa-solid fa-check text-[0.8em] text-emerald-700" aria-hidden="true"></i>
+                                                        <span>{{ $reasonLabel }}</span>
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
                                 @endforeach
                             </div>
                         @endif
                     </div>
                 @else
-                    <div class="p-3">
-                        <div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                            <div class="inline-flex items-center gap-2">
-                                <i class="fa-solid fa-circle-info text-slate-400" aria-hidden="true"></i>
-                                <span>Похожие сериалы пока не подобраны.</span>
+                    @if ($genreRecommendations->isNotEmpty() || $yearRecommendations->isNotEmpty())
+                        <div class="grid min-w-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                            @if ($genreRecommendations->isNotEmpty())
+                                <section @class([
+                                    'min-w-0',
+                                    'lg:border-r lg:border-slate-200' => $yearRecommendations->isNotEmpty(),
+                                ])>
+                                    <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                                        <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
+                                            <i class="fa-solid fa-tags text-emerald-700" aria-hidden="true"></i>
+                                            <span>По похожим жанрам</span>
+                                        </div>
+                                    </div>
+                                    <div class="divide-y divide-slate-200">
+                                        @foreach ($genreRecommendations->take(6) as $recommendedTitle)
+                                            <x-title-list-row :title="$recommendedTitle" readable :show-description="false" />
+                                        @endforeach
+                                    </div>
+                                </section>
+                            @endif
+
+                            @if ($yearRecommendations->isNotEmpty())
+                                <section class="min-w-0">
+                                    <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                                        <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
+                                            <i class="fa-solid fa-calendar-days text-emerald-700" aria-hidden="true"></i>
+                                            <span>За {{ $title->year }} год</span>
+                                        </div>
+                                    </div>
+                                    <div class="divide-y divide-slate-200">
+                                        @foreach ($yearRecommendations->take(6) as $recommendedTitle)
+                                            <x-title-list-row :title="$recommendedTitle" readable :show-description="false" />
+                                        @endforeach
+                                    </div>
+                                </section>
+                            @endif
+                        </div>
+                    @else
+                        <div class="p-3">
+                            <div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                                <div class="inline-flex items-center gap-2">
+                                    <i class="fa-solid fa-circle-info text-slate-400" aria-hidden="true"></i>
+                                    <span>Похожие сериалы пока не подобраны.</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    @endif
                 @endif
             </x-ui.panel>
-
-            @if ($genreRecommendations->isNotEmpty() || $yearRecommendations->isNotEmpty())
-                <x-ui.panel title="Похожие сериалы" icon="fa-solid fa-list" :pad="false">
-                    <div class="grid min-w-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                        @if ($genreRecommendations->isNotEmpty())
-                            <section @class([
-                                'min-w-0',
-                                'lg:border-r lg:border-slate-200' => $yearRecommendations->isNotEmpty(),
-                            ])>
-                                <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
-                                    <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
-                                        <i class="fa-solid fa-tags text-emerald-700" aria-hidden="true"></i>
-                                        <span>По жанрам</span>
-                                    </div>
-                                </div>
-                                <div class="divide-y divide-slate-200">
-                                    @foreach ($genreRecommendations->take(6) as $recommendedTitle)
-                                        <x-title-list-row :title="$recommendedTitle" readable :show-description="false" />
-                                    @endforeach
-                                </div>
-                            </section>
-                        @endif
-
-                        @if ($yearRecommendations->isNotEmpty())
-                            <section class="min-w-0">
-                                <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
-                                    <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
-                                        <i class="fa-solid fa-calendar-days text-emerald-700" aria-hidden="true"></i>
-                                        <span>За {{ $title->year }} год</span>
-                                    </div>
-                                </div>
-                                <div class="divide-y divide-slate-200">
-                                    @foreach ($yearRecommendations->take(6) as $recommendedTitle)
-                                        <x-title-list-row :title="$recommendedTitle" readable :show-description="false" />
-                                    @endforeach
-                                </div>
-                            </section>
-                        @endif
-                    </div>
-                </x-ui.panel>
-            @endif
 
             @if (! empty($seo['faq']))
                 <x-ui.panel title="Вопросы о сериале" icon="fa-solid fa-circle-question" :pad="false">

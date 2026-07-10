@@ -10,6 +10,9 @@
         "seasonvar-importer",
         "seasonvar-ui",
         "seasonvar-seo",
-        "seasonvar-mcp-ops"
+        "seasonvar-mcp-ops",
+        "seasonvar-playwright-qa",
+        "seasonvar-recommendations",
+        "seasonvar-skill-authoring"
     ]
 }

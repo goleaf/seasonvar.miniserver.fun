@@ -61,20 +61,6 @@ class CatalogHomePageBuilder
             ->latest()
             ->limit(12)
             ->get();
-        $longRunningTitles = $this->titleSummaryQuery()
-            ->with($this->taxonomies->cardRelations())
-            ->whereHas('episodes')
-            ->orderByDesc('episodes_count')
-            ->latest('indexed_at')
-            ->limit(8)
-            ->get();
-        $shortTitles = $this->titleSummaryQuery()
-            ->with($this->taxonomies->cardRelations())
-            ->whereHas('episodes')
-            ->orderBy('episodes_count')
-            ->latest('indexed_at')
-            ->limit(8)
-            ->get();
         $yearBuckets = CatalogTitle::query()
             ->select('year')
             ->selectRaw('count(*) as titles_count')
@@ -93,8 +79,6 @@ class CatalogHomePageBuilder
             'featuredTitles' => $featuredTitles,
             'videoTitles' => $videoTitles,
             'latestMedia' => $latestMedia,
-            'longRunningTitles' => $longRunningTitles,
-            'shortTitles' => $shortTitles,
             'yearBuckets' => $yearBuckets,
             'genres' => Genre::query()
                 ->withCount('catalogTitles')
@@ -104,7 +88,6 @@ class CatalogHomePageBuilder
             'countries' => Country::query()
                 ->withCount('catalogTitles')
                 ->orderByDesc('catalog_titles_count')
-                ->limit(10)
                 ->get(),
             'subtitleTag' => Tag::query()
                 ->where('slug', 'subtitry')

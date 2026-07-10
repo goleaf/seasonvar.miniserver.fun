@@ -4,6 +4,7 @@ namespace App\Services\Catalog;
 
 use App\Http\Requests\CatalogShowRequest;
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleRecommendation;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Services\Media\ExternalMediaMetadata;
@@ -130,6 +131,7 @@ class CatalogTitlePageBuilder
             parsedSeasonCount: $parsedSeasonCount,
             mediaCount: $mediaCount,
         );
+        $recommendedTitleRecommendations = $this->recommendedTitleRecommendations($catalogTitle);
 
         return [
             'title' => $catalogTitle,
@@ -162,7 +164,7 @@ class CatalogTitlePageBuilder
             'mediaCount' => $mediaCount,
             'topTaxonomies' => $showView->topTaxonomies,
             'showView' => $showView,
-            'recommendedTitles' => $this->recommendedTitles($catalogTitle),
+            'recommendedTitleRecommendations' => $recommendedTitleRecommendations,
             'genreRecommendations' => $genreRecommendations,
             'yearRecommendations' => $yearRecommendations,
             'seo' => $this->seo->title($catalogTitle, $taxonomiesByType, $seasons, $episodeCount, $mediaCount, $selectedMedia, $selectedMediaUrl),
@@ -179,9 +181,9 @@ class CatalogTitlePageBuilder
     }
 
     /**
-     * @return Collection<int, CatalogTitle>
+     * @return Collection<int, CatalogTitleRecommendation>
      */
-    private function recommendedTitles(CatalogTitle $catalogTitle): Collection
+    private function recommendedTitleRecommendations(CatalogTitle $catalogTitle): Collection
     {
         if (! $this->hasRecommendationsTable()) {
             return collect();
@@ -190,6 +192,7 @@ class CatalogTitlePageBuilder
         return $catalogTitle->recommendations()
             ->orderBy('rank')
             ->orderByDesc('score')
+            ->limit($this->recommendationDisplayLimit())
             ->with([
                 'recommendedTitle' => function ($query): void {
                     $this->titleSummaryQuery($query->getQuery())
@@ -197,9 +200,13 @@ class CatalogTitlePageBuilder
                 },
             ])
             ->get()
-            ->pluck('recommendedTitle')
-            ->filter()
+            ->filter(fn ($recommendation): bool => $recommendation->recommendedTitle !== null)
             ->values();
+    }
+
+    private function recommendationDisplayLimit(): int
+    {
+        return max(1, (int) config('seasonvar.recommendations.max_per_title', 12));
     }
 
     private function hasRecommendationsTable(): bool

@@ -2,12 +2,24 @@
 
 namespace App\Services\Seasonvar;
 
+use App\Models\Actor;
+use App\Models\AgeRating;
+use App\Models\CatalogStatus;
 use App\Models\CatalogTitle;
+use App\Models\Country;
+use App\Models\Director;
+use App\Models\Genre;
 use App\Models\LicensedMedia;
+use App\Models\Network;
 use App\Models\Season;
 use App\Models\SeasonvarImportEvent;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
+use App\Models\Studio;
+use App\Models\Tag;
+use App\Models\Taxonomy;
+use App\Models\Translation;
+use App\Services\Catalog\CatalogRelationNameSanitizer;
 use App\Services\Catalog\CatalogTitleRecommendationBuilder;
 use App\Services\Media\ExternalMediaMetadata;
 use Illuminate\Support\Carbon;
@@ -29,6 +41,7 @@ class SeasonvarImportPipeline
         private readonly ExternalMediaMetadata $mediaMetadata,
         private readonly SeasonvarRefreshPlanner $refreshPlanner,
         private readonly CatalogTitleRecommendationBuilder $recommendations,
+        private readonly CatalogRelationNameSanitizer $relationNames,
     ) {}
 
     /**
@@ -136,6 +149,7 @@ class SeasonvarImportPipeline
             'cycle' => $cycle,
         ]);
 
+        $earlyRelationCleanupResult = $this->cleanupInvalidCatalogRelations($progress);
         $sourceStatusBackfillResult = $this->backfillParsedSourcePageStatuses($progress);
         $cycleResult = $argument === null
             ? $this->runSitemapCycle($run, $force, $discover, $progress)
@@ -143,6 +157,8 @@ class SeasonvarImportPipeline
         $mediaMetadataResult = $this->refreshMediaMetadataBacklog($progress);
         $mediaSourceKeyResult = $this->backfillMediaSourceKeys($progress);
         $mediaBacklogResult = $this->refreshMediaBacklog($progress);
+        $lateRelationCleanupResult = $this->cleanupInvalidCatalogRelations($progress);
+        $relationCleanupResult = $this->mergeRelationCleanupResults($earlyRelationCleanupResult, $lateRelationCleanupResult);
         $mergeResult = $this->titleMerger->merge($progress);
         $recommendationResult = $this->recommendations->rebuild($progress);
 
@@ -156,6 +172,7 @@ class SeasonvarImportPipeline
             'last_media_metadata_backlog' => $mediaMetadataResult,
             'last_media_source_key_backlog' => $mediaSourceKeyResult,
             'last_media_backlog' => $mediaBacklogResult,
+            'last_relation_cleanup' => $relationCleanupResult,
             'last_recommendations' => $recommendationResult,
         ]);
 
@@ -170,12 +187,40 @@ class SeasonvarImportPipeline
             'media_checked' => $mediaBacklogResult['media_checked'],
             'media_check_available' => $mediaBacklogResult['media_available'],
             'media_check_unavailable' => $mediaBacklogResult['media_unavailable'],
+            'relations_checked' => $relationCleanupResult['checked'],
+            'relation_records_removed' => $relationCleanupResult['records_removed'],
+            'relation_links_removed' => $relationCleanupResult['links_removed'],
             'merged_titles' => $mergeResult['titles'],
             'merged_seasons' => $mergeResult['seasons'],
             'merged_episodes' => $mergeResult['episodes'],
             'recommendation_titles' => $recommendationResult['titles'],
+            'recommendation_titles_without_recommendations' => $recommendationResult['titles_without_recommendations'],
             'recommendations_stored' => $recommendationResult['stored'],
+            'recommendations_duration_ms' => $recommendationResult['duration_ms'],
         ]);
+    }
+
+    /**
+     * @param  array{checked: int, records_removed: int, links_removed: int, legacy_records_removed: int, legacy_links_removed: int}  ...$results
+     * @return array{checked: int, records_removed: int, links_removed: int, legacy_records_removed: int, legacy_links_removed: int}
+     */
+    private function mergeRelationCleanupResults(array ...$results): array
+    {
+        $merged = [
+            'checked' => 0,
+            'records_removed' => 0,
+            'links_removed' => 0,
+            'legacy_records_removed' => 0,
+            'legacy_links_removed' => 0,
+        ];
+
+        foreach ($results as $result) {
+            foreach ($merged as $key => $value) {
+                $merged[$key] = $value + (int) ($result[$key] ?? 0);
+            }
+        }
+
+        return $merged;
     }
 
     /**
@@ -440,6 +485,137 @@ class SeasonvarImportPipeline
         ]);
 
         return $count;
+    }
+
+    /**
+     * @param  callable(string, array<string, mixed>): void  $progress
+     * @return array{checked: int, records_removed: int, links_removed: int, legacy_records_removed: int, legacy_links_removed: int}
+     */
+    private function cleanupInvalidCatalogRelations(callable $progress): array
+    {
+        $chunkSize = $this->importChunkSize();
+        $result = [
+            'checked' => 0,
+            'records_removed' => 0,
+            'links_removed' => 0,
+            'legacy_records_removed' => 0,
+            'legacy_links_removed' => 0,
+        ];
+
+        $progress('catalog-relations-cleanup-started', [
+            'chunk_size' => $chunkSize,
+        ]);
+
+        foreach ($this->relationCleanupTables() as $type => $config) {
+            $typeResult = [
+                'checked' => 0,
+                'records_removed' => 0,
+                'links_removed' => 0,
+            ];
+            /** @var class-string $modelClass */
+            $modelClass = $config['model'];
+
+            foreach ($modelClass::query()->select(['id', 'name'])->lazyById($chunkSize)->chunk($chunkSize) as $records) {
+                $records = $records instanceof Collection ? $records : $records->collect();
+                $typeResult['checked'] += $records->count();
+                $invalidIds = $records
+                    ->filter(fn ($record): bool => ! $this->relationNames->isValid($type, (string) $record->name))
+                    ->pluck('id')
+                    ->map(fn (mixed $id): int => (int) $id)
+                    ->all();
+
+                if ($invalidIds === []) {
+                    continue;
+                }
+
+                $typeResult['links_removed'] += DB::table($config['pivot'])
+                    ->whereIn($config['related_key'], $invalidIds)
+                    ->delete();
+                $typeResult['records_removed'] += $modelClass::query()
+                    ->whereKey($invalidIds)
+                    ->delete();
+            }
+
+            $result['checked'] += $typeResult['checked'];
+            $result['records_removed'] += $typeResult['records_removed'];
+            $result['links_removed'] += $typeResult['links_removed'];
+
+            if ($typeResult['records_removed'] > 0 || $typeResult['links_removed'] > 0) {
+                $progress('catalog-relations-cleanup-type-complete', [
+                    'type' => $type,
+                    ...$typeResult,
+                ]);
+            }
+        }
+
+        $legacyResult = $this->cleanupLegacyTaxonomies($chunkSize, $progress);
+        $result['checked'] += $legacyResult['checked'];
+        $result['legacy_records_removed'] = $legacyResult['records_removed'];
+        $result['legacy_links_removed'] = $legacyResult['links_removed'];
+
+        $progress('catalog-relations-cleanup-complete', $result);
+
+        return $result;
+    }
+
+    /**
+     * @param  callable(string, array<string, mixed>): void  $progress
+     * @return array{checked: int, records_removed: int, links_removed: int}
+     */
+    private function cleanupLegacyTaxonomies(int $chunkSize, callable $progress): array
+    {
+        $result = [
+            'checked' => 0,
+            'records_removed' => 0,
+            'links_removed' => 0,
+        ];
+        $types = array_keys($this->relationCleanupTables());
+
+        foreach (Taxonomy::query()->select(['id', 'type', 'name'])->whereIn('type', $types)->lazyById($chunkSize)->chunk($chunkSize) as $records) {
+            $records = $records instanceof Collection ? $records : $records->collect();
+            $result['checked'] += $records->count();
+            $invalidIds = $records
+                ->filter(fn (Taxonomy $taxonomy): bool => ! $this->relationNames->isValid($taxonomy->type, $taxonomy->name))
+                ->pluck('id')
+                ->map(fn (mixed $id): int => (int) $id)
+                ->all();
+
+            if ($invalidIds === []) {
+                continue;
+            }
+
+            $result['links_removed'] += DB::table('catalog_title_taxonomy')
+                ->whereIn('taxonomy_id', $invalidIds)
+                ->delete();
+            $result['records_removed'] += Taxonomy::query()
+                ->whereKey($invalidIds)
+                ->delete();
+        }
+
+        if ($result['records_removed'] > 0 || $result['links_removed'] > 0) {
+            $progress('catalog-relations-legacy-cleanup-complete', $result);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return array<string, array{model: class-string, pivot: string, related_key: string}>
+     */
+    private function relationCleanupTables(): array
+    {
+        return [
+            'genre' => ['model' => Genre::class, 'pivot' => 'catalog_title_genre', 'related_key' => 'genre_id'],
+            'country' => ['model' => Country::class, 'pivot' => 'catalog_title_country', 'related_key' => 'country_id'],
+            'actor' => ['model' => Actor::class, 'pivot' => 'catalog_title_actor', 'related_key' => 'actor_id'],
+            'director' => ['model' => Director::class, 'pivot' => 'catalog_title_director', 'related_key' => 'director_id'],
+            'age_rating' => ['model' => AgeRating::class, 'pivot' => 'age_rating_catalog_title', 'related_key' => 'age_rating_id'],
+            'translation' => ['model' => Translation::class, 'pivot' => 'catalog_title_translation', 'related_key' => 'translation_id'],
+            'status' => ['model' => CatalogStatus::class, 'pivot' => 'catalog_status_catalog_title', 'related_key' => 'catalog_status_id'],
+            'network' => ['model' => Network::class, 'pivot' => 'catalog_title_network', 'related_key' => 'network_id'],
+            'studio' => ['model' => Studio::class, 'pivot' => 'catalog_title_studio', 'related_key' => 'studio_id'],
+            'tag' => ['model' => Tag::class, 'pivot' => 'catalog_title_tag', 'related_key' => 'tag_id'],
+        ];
     }
 
     /**

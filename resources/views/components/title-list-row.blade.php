@@ -1,12 +1,14 @@
-<a href="{{ route('titles.show', $title) }}" {{ $attributes->merge(['class' => $baseClass]) }}>
+<article {{ $attributes->merge(['class' => $baseClass]) }}>
     @if ($readable)
         <div class="flex min-w-0 gap-3 sm:gap-4">
-            <x-title-poster :title="$title" class="{{ $posterClass }} shrink-0" image-class="h-full w-full object-contain" empty-class="grid h-full place-items-center px-2 text-center text-[10px] font-semibold text-slate-400" />
+            <a href="{{ route('titles.show', $title) }}" class="shrink-0">
+                <x-title-poster :title="$title" class="{{ $posterClass }}" image-class="h-full w-full object-contain" empty-class="grid h-full place-items-center px-2 text-center text-[10px] font-semibold text-slate-400" />
+            </a>
 
             <div class="min-w-0 flex-1">
                 <div class="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                     <div class="min-w-0">
-                        <span class="block break-words text-base font-bold leading-6 text-slate-700">{{ $title->title }}</span>
+                        <a href="{{ route('titles.show', $title) }}" class="block break-words text-base font-bold leading-6 text-slate-700 hover:text-emerald-700">{{ $title->title }}</a>
                         @if ($title->original_title)
                             <span class="mt-1 block break-words text-sm leading-5 text-slate-500">{{ $title->original_title }}</span>
                         @endif
@@ -45,10 +47,7 @@
                 @if ($cardRelations->isNotEmpty())
                     <div class="mt-3 flex flex-wrap gap-1.5">
                         @foreach ($cardRelations as $taxonomy)
-                            <span class="inline-flex min-w-0 items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-500 ring-1 ring-slate-200">
-                                <i class="fa-solid fa-tag shrink-0 text-[0.8em] text-slate-400" aria-hidden="true"></i>
-                                <span class="break-words">{{ $taxonomy->name }}</span>
-                            </span>
+                            <x-ui.taxonomy-chip :taxonomy="$taxonomy" />
                         @endforeach
                     </div>
                 @endif
@@ -56,12 +55,14 @@
         </div>
     @else
         <div class="flex min-w-0 gap-3">
-            <x-title-poster :title="$title" class="{{ $posterClass }} shrink-0" empty-class="grid h-full place-items-center px-2 text-center text-[10px] font-semibold text-slate-400" />
+            <a href="{{ route('titles.show', $title) }}" class="shrink-0">
+                <x-title-poster :title="$title" class="{{ $posterClass }}" empty-class="grid h-full place-items-center px-2 text-center text-[10px] font-semibold text-slate-400" />
+            </a>
 
             <div class="min-w-0 flex-1">
                 <div class="flex min-w-0 flex-col gap-1 lg:flex-row lg:items-start lg:justify-between">
                     <div class="min-w-0">
-                        <span class="block break-words font-bold leading-5 text-slate-700">{{ $title->title }}</span>
+                        <a href="{{ route('titles.show', $title) }}" class="block break-words font-bold leading-5 text-slate-700 hover:text-emerald-700">{{ $title->title }}</a>
                         @if ($title->original_title)
                             <span class="block break-words text-sm leading-5 text-slate-500">{{ $title->original_title }}</span>
                         @endif
@@ -107,7 +108,15 @@
                 @if ($showDescription && $title->description)
                     <p class="mt-2 text-sm leading-5 text-slate-500">{{ $title->description }}</p>
                 @endif
+
+                @if ($cardRelations->isNotEmpty())
+                    <div class="mt-3 flex flex-wrap gap-1.5">
+                        @foreach ($cardRelations as $taxonomy)
+                            <x-ui.taxonomy-chip :taxonomy="$taxonomy" />
+                        @endforeach
+                    </div>
+                @endif
             </div>
         </div>
     @endif
-</a>
+</article>

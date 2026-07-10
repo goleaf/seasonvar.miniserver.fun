@@ -97,51 +97,17 @@
                     </div>
                 </x-ui.panel>
 
-                <div class="grid gap-5 2xl:grid-cols-2">
-                    <x-ui.panel title="Доступно к просмотру" icon="fa-solid fa-file-video" :pad="false">
-                        <div class="grid auto-rows-fr gap-3 p-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-2">
-                            @forelse ($videoTitles as $catalogTitle)
-                                <x-title-card :title="$catalogTitle" />
-                            @empty
-                                <div class="col-span-full rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">
-                                    Видео пока нет.
-                                </div>
-                            @endforelse
-                        </div>
-                    </x-ui.panel>
-
-                    <x-ui.panel title="Быстрый выбор" icon="fa-solid fa-bolt" :pad="false">
-                        <div class="grid gap-3 p-3 sm:grid-cols-2">
-                            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <div class="mb-2 inline-flex items-center gap-2 text-sm font-bold text-slate-700">
-                                    <i class="fa-solid fa-list-ol text-emerald-700" aria-hidden="true"></i>
-                                    <span>Многосерийные</span>
-                                </div>
-                                <div class="space-y-2">
-                                    @forelse ($longRunningTitles->take(5) as $catalogTitle)
-                                        <x-title-list-row :title="$catalogTitle" compact :show-description="false" />
-                                    @empty
-                                        <p class="text-sm text-slate-500">Подборка пока пуста.</p>
-                                    @endforelse
-                                </div>
+                <x-ui.panel title="Сейчас можно смотреть" icon="fa-solid fa-file-video" :pad="false">
+                    <div class="grid auto-rows-fr gap-3 p-3 sm:grid-cols-2 xl:grid-cols-4">
+                        @forelse ($videoTitles as $catalogTitle)
+                            <x-title-card :title="$catalogTitle" />
+                        @empty
+                            <div class="col-span-full rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+                                Видео пока нет.
                             </div>
-
-                            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <div class="mb-2 inline-flex items-center gap-2 text-sm font-bold text-slate-700">
-                                    <i class="fa-solid fa-stopwatch text-emerald-700" aria-hidden="true"></i>
-                                    <span>Короткие сериалы</span>
-                                </div>
-                                <div class="space-y-2">
-                                    @forelse ($shortTitles->take(5) as $catalogTitle)
-                                        <x-title-list-row :title="$catalogTitle" compact :show-description="false" />
-                                    @empty
-                                        <p class="text-sm text-slate-500">Подборка пока пуста.</p>
-                                    @endforelse
-                                </div>
-                            </div>
-                        </div>
-                    </x-ui.panel>
-                </div>
+                        @endforelse
+                    </div>
+                </x-ui.panel>
 
                 <x-ui.panel title="Лента обновлений по датам" icon="fa-solid fa-calendar-days" :pad="false">
                     <div class="divide-y divide-slate-200">
@@ -192,21 +158,19 @@
                     </nav>
                 </x-ui.panel>
 
-                <x-ui.panel title="Фильтр сериалов" icon="fa-solid fa-filter">
-                    <div class="space-y-2">
-                        <a href="{{ route('titles.index') }}" class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
-                            <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
-                            <span>Любой год</span>
-                        </a>
-                        @foreach ($countries->take(4) as $country)
-                            <a href="{{ route('titles.taxonomy', ['type' => $country->filterType(), 'taxonomy' => $country->slug]) }}" class="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                <x-ui.panel title="Страны" icon="fa-solid fa-earth-europe">
+                    <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                        @forelse ($countries as $country)
+                            <a href="{{ route('titles.taxonomy', ['type' => $country->filterType(), 'taxonomy' => $country->slug]) }}" class="flex min-w-0 items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-sm text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
                                 <span class="inline-flex items-center gap-2">
                                     <i class="fa-solid fa-earth-europe text-slate-400" aria-hidden="true"></i>
-                                    <span>{{ $country->name }}</span>
+                                    <span class="min-w-0 break-words">{{ $country->name }}</span>
                                 </span>
-                                <span class="text-xs text-slate-400">{{ $country->catalog_titles_count }}</span>
+                                <span class="shrink-0 text-xs text-slate-400">{{ $country->catalog_titles_count }}</span>
                             </a>
-                        @endforeach
+                        @empty
+                            <span class="text-sm text-slate-500">Страны не указаны.</span>
+                        @endforelse
                     </div>
                 </x-ui.panel>
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Seasonvar Skill Authoring"
+  short_description: "Create safe project skills"
+  default_prompt: "Use $seasonvar-skill-authoring to create or update project skills and MCP documentation safely."

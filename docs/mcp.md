@@ -55,5 +55,8 @@ php artisan integrations:doctor --json
 - `seasonvar-ui`
 - `seasonvar-seo`
 - `seasonvar-mcp-ops`
+- `seasonvar-playwright-qa`
+- `seasonvar-recommendations`
+- `seasonvar-skill-authoring`
 
 Новые Seasonvar skills лежат в `.agents/skills` и не содержат секретов или исполняемых интеграций. Они задают правила для импорта, интерфейса, SEO и MCP-операций.

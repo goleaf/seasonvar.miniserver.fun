@@ -8,6 +8,7 @@ use App\Models\CatalogStatus;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
 use App\Models\CatalogTitleRating;
+use App\Models\CatalogTitleRecommendationSignal;
 use App\Models\CatalogTitleReview;
 use App\Models\Country;
 use App\Models\Director;
@@ -21,6 +22,7 @@ use App\Models\SourcePageSnapshot;
 use App\Models\Studio;
 use App\Models\Tag;
 use App\Models\Translation;
+use App\Services\Catalog\CatalogRelationNameSanitizer;
 use App\Services\Crawler\PoliteHttpClient;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\ExternalPlaylistImporter;
@@ -57,6 +59,7 @@ class SeasonvarCatalogImporter
         private readonly ExternalPlaylistImporter $playlistImporter,
         private readonly SeasonvarMediaAvailabilityChecker $mediaAvailabilityChecker,
         private readonly ExternalMediaMetadata $mediaMetadata,
+        private readonly CatalogRelationNameSanitizer $relationNames,
     ) {}
 
     /**
@@ -507,6 +510,7 @@ class SeasonvarCatalogImporter
             $this->syncCatalogRelations($catalogTitle, $data['taxonomies'], $progress);
             $this->syncCatalogAliases($catalogTitle, $data['aliases'], $progress);
             $this->syncCatalogRatings($catalogTitle, $data['ratings'], $progress);
+            $this->syncCatalogRecommendationSignals($catalogTitle, $data['recommendation_signals'], $progress);
             $this->syncCatalogReviews($catalogTitle, $page, $data['reviews'], $progress);
             $seasons = $this->syncSeasons($catalogTitle, $page, $data['seasons'], $progress);
             $this->syncEpisodes($seasons, $page, $data['episodes'], $progress);
@@ -574,6 +578,7 @@ class SeasonvarCatalogImporter
      *     media: list<array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string}>,
      *     taxonomies: list<array{type: string, name: string, source_url: string|null}>,
      *     ratings: list<array{provider: string, rating: float|null, votes: int|null, raw_value: string}>,
+     *     recommendation_signals: list<array{source: string, signal_type: string, signal_key: string, signal_value: string|null, weight: int}>,
      *     aliases: list<array{name: string, type: string, source: string}>,
      *     reviews: list<array{author: string|null, body: string, published_at: string|null}>,
      *     parse_meta: array<string, mixed>
@@ -795,10 +800,11 @@ class SeasonvarCatalogImporter
         $rowsBySlug = $items
             ->filter(fn (array $item): bool => trim($item['name']) !== '')
             ->mapWithKeys(function (array $item) use ($type, $now): array {
-                $slug = $this->relationSlug($type, $item['name']);
+                $name = $this->relationNames->normalize($item['name']);
+                $slug = $this->relationSlug($type, $name);
 
                 return [$slug => [
-                    'name' => $item['name'],
+                    'name' => $name,
                     'slug' => $slug,
                     'source_url' => $item['source_url'],
                     'created_at' => $now,
@@ -835,23 +841,14 @@ class SeasonvarCatalogImporter
 
     private function relationSlug(string $type, string $name): string
     {
+        $name = $this->relationNames->normalize($name);
+
         return Str::slug($name) ?: Str::substr(hash('sha256', $type.'|'.$name), 0, 16);
     }
 
     private function isValidRelationName(string $type, string $name): bool
     {
-        $name = Str::squish($name);
-
-        if ($name === '' || Str::length($name) > 120) {
-            return false;
-        }
-
-        return match ($type) {
-            'age_rating' => preg_match('/^\d{1,2}\+?$/u', $name) === 1,
-            'genre', 'country', 'status', 'network', 'studio', 'tag' => Str::length($name) <= 80
-                && preg_match('/[.!?]|(?:главн|добро пожаловать|типичная жизнь|сериал)/iu', $name) !== 1,
-            default => true,
-        };
+        return $this->relationNames->isValid($type, $name);
     }
 
     /**
@@ -934,6 +931,66 @@ class SeasonvarCatalogImporter
         $this->report($progress, 'catalog-title-ratings-synced', [
             'catalog_title_id' => $catalogTitle->id,
             'ratings' => $rows->count(),
+        ]);
+    }
+
+    /**
+     * @param  list<array{source: string, signal_type: string, signal_key: string, signal_value: string|null, weight: int}>  $signals
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     */
+    private function syncCatalogRecommendationSignals(CatalogTitle $catalogTitle, array $signals, ?callable $progress = null): void
+    {
+        $now = now();
+        $managedSources = ['seasonvar_info'];
+        $rows = collect($signals)
+            ->filter(fn (array $signal): bool => in_array($signal['source'], $managedSources, true))
+            ->filter(fn (array $signal): bool => trim($signal['signal_type']) !== '' && trim($signal['signal_key']) !== '' && (int) $signal['weight'] > 0)
+            ->mapWithKeys(function (array $signal) use ($catalogTitle, $now): array {
+                $source = Str::substr($signal['source'], 0, 64);
+                $signalType = Str::substr(Str::slug($signal['signal_type'], '_') ?: 'source', 0, 64);
+                $signalKey = Str::substr(Str::slug($signal['signal_key']) ?: Str::substr(hash('sha256', $signalType.'|'.$signal['signal_key']), 0, 24), 0, 128);
+
+                return [$source.'|'.$signalType.'|'.$signalKey => [
+                    'catalog_title_id' => $catalogTitle->id,
+                    'source' => $source,
+                    'signal_type' => $signalType,
+                    'signal_key' => $signalKey,
+                    'signal_value' => $signal['signal_value'] !== null ? Str::substr(Str::squish($signal['signal_value']), 0, 255) : null,
+                    'weight' => min(1000, max(0, (int) $signal['weight'])),
+                    'observed_at' => $now,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]];
+            });
+
+        CatalogTitleRecommendationSignal::query()
+            ->where('catalog_title_id', $catalogTitle->id)
+            ->whereIn('source', $managedSources)
+            ->when($rows->isNotEmpty(), function (Builder $query) use ($rows): void {
+                $query->whereNot(function (Builder $query) use ($rows): void {
+                    foreach ($rows as $row) {
+                        $query->orWhere(function (Builder $query) use ($row): void {
+                            $query
+                                ->where('source', $row['source'])
+                                ->where('signal_type', $row['signal_type'])
+                                ->where('signal_key', $row['signal_key']);
+                        });
+                    }
+                });
+            })
+            ->delete();
+
+        if ($rows->isNotEmpty()) {
+            CatalogTitleRecommendationSignal::query()->upsert(
+                $rows->values()->all(),
+                ['catalog_title_id', 'source', 'signal_type', 'signal_key'],
+                ['signal_value', 'weight', 'observed_at', 'updated_at'],
+            );
+        }
+
+        $this->report($progress, 'catalog-title-recommendation-signals-synced', [
+            'catalog_title_id' => $catalogTitle->id,
+            'signals' => $rows->count(),
         ]);
     }
 

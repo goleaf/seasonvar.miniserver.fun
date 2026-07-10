@@ -1,0 +1,4 @@
+interface:
+  display_name: "Seasonvar Recommendations"
+  short_description: "Plan and verify recommendations"
+  default_prompt: "Use $seasonvar-recommendations to improve Seasonvar recommendation scoring, import refresh, and title-page output."

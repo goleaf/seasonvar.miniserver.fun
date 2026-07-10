@@ -11,6 +11,22 @@ use Illuminate\Support\Collection;
 
 class CatalogTitlesPageBuilder
 {
+    /**
+     * @var array<string, int>
+     */
+    private const FILTER_LIMITS = [
+        'genre' => 80,
+        'country' => 80,
+        'actor' => 24,
+        'director' => 24,
+        'age_rating' => 40,
+        'translation' => 80,
+        'status' => 40,
+        'network' => 80,
+        'studio' => 80,
+        'tag' => 80,
+    ];
+
     public function __construct(
         private readonly CatalogSeoBuilder $seo,
         private readonly CatalogTitleQuery $query,
@@ -110,7 +126,7 @@ class CatalogTitlesPageBuilder
             $items = $modelClass::query()
                 ->withCount('catalogTitles')
                 ->orderByDesc('catalog_titles_count')
-                ->limit(12)
+                ->limit($this->filterLimit($filterType))
                 ->get()
                 ->filter(fn (Model $record): bool => $record->catalog_titles_count > 0)
                 ->values();
@@ -231,6 +247,11 @@ class CatalogTitlesPageBuilder
             'episodes',
             'licensedMedia as published_media_count' => fn (Builder $query): Builder => $query->published(),
         ];
+    }
+
+    private function filterLimit(string $filterType): int
+    {
+        return self::FILTER_LIMITS[$filterType] ?? 24;
     }
 
     /**

@@ -137,6 +137,14 @@ class CatalogTitle extends Model
     }
 
     /**
+     * @return HasMany<CatalogTitleRecommendationSignal, $this>
+     */
+    public function recommendationSignals(): HasMany
+    {
+        return $this->hasMany(CatalogTitleRecommendationSignal::class);
+    }
+
+    /**
      * @return BelongsToMany<Taxonomy, $this>
      */
     public function taxonomies(): BelongsToMany

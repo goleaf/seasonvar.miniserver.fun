@@ -45,6 +45,16 @@
 # default_tools_approval_mode = "prompt"
 # required = false
 
+# Playwright MCP example for browser QA.
+# Prefer user/global config unless the team has a shared browser/runtime setup.
+# On servers without Chrome, verify managed Chromium works before enabling it.
+#
+# [mcp_servers.playwright]
+# command = "npx"
+# args = ["@playwright/mcp@latest"]
+# default_tools_approval_mode = "prompt"
+# required = false
+
 # Generic remote HTTP MCP with bearer token from the user's environment.
 # Use this shape only for trusted official/internal MCP endpoints.
 #

@@ -689,6 +689,14 @@ class CatalogStatsPageBuilder
             $rows[] = 'Проверка видео: '.$this->formatStat($mediaChecked).', доступно '.$this->formatStat($mediaAvailable).', недоступно '.$this->formatStat($mediaUnavailable);
         }
 
+        $relationCleanup = $this->summarySection($summary, 'last_relation_cleanup');
+        $relationRecordsRemoved = $this->summaryInt($relationCleanup, 'records_removed') + $this->summaryInt($relationCleanup, 'legacy_records_removed');
+        $relationLinksRemoved = $this->summaryInt($relationCleanup, 'links_removed') + $this->summaryInt($relationCleanup, 'legacy_links_removed');
+
+        if ($relationRecordsRemoved > 0 || $relationLinksRemoved > 0) {
+            $rows[] = 'Справочники: удалено записей '.$this->formatStat($relationRecordsRemoved).', связей '.$this->formatStat($relationLinksRemoved);
+        }
+
         $merge = $this->summarySection($summary, 'last_merge');
         $mergedTitles = $this->summaryInt($merge, 'titles');
         $mergedSeasons = $this->summaryInt($merge, 'seasons');
@@ -1074,6 +1082,7 @@ class CatalogStatsPageBuilder
         return [
             ['label' => 'Сериалы по источнику', 'table' => 'catalog_titles', 'columns' => ['source_id', 'source_url_hash']],
             ['label' => 'Сериалы по году и обновлению', 'table' => 'catalog_titles', 'columns' => ['year', 'indexed_at']],
+            ['label' => 'Лента по опубликованным сериалам', 'table' => 'catalog_titles', 'columns' => ['is_published', 'indexed_at', 'id']],
             ['label' => 'Жанры в фильтрах', 'table' => 'catalog_title_genre', 'columns' => ['genre_id', 'catalog_title_id']],
             ['label' => 'Страны в фильтрах', 'table' => 'catalog_title_country', 'columns' => ['country_id', 'catalog_title_id']],
             ['label' => 'Актеры в фильтрах', 'table' => 'catalog_title_actor', 'columns' => ['actor_id', 'catalog_title_id']],
@@ -1856,6 +1865,10 @@ class CatalogStatsPageBuilder
             'seasonvar_import_events.event.catalog-title-slug-prepared' => 'Адрес записи подготовлен',
             'seasonvar_import_events.event.catalog-title-updated' => 'Запись каталога обновлена',
             'seasonvar_import_events.event.catalog-title-upsert-started' => 'Сохранение записи каталога началось',
+            'seasonvar_import_events.event.catalog-relations-cleanup-complete' => 'Очистка справочников завершена',
+            'seasonvar_import_events.event.catalog-relations-cleanup-started' => 'Очистка справочников началась',
+            'seasonvar_import_events.event.catalog-relations-cleanup-type-complete' => 'Тип справочника очищен',
+            'seasonvar_import_events.event.catalog-relations-legacy-cleanup-complete' => 'Старые справочники очищены',
             'seasonvar_import_events.event.crawl-delay-not-needed' => 'Пауза обхода не нужна',
             'seasonvar_import_events.event.crawl-delay-skipped' => 'Пауза обхода пропущена',
             'seasonvar_import_events.event.crawl-delay-wait-complete' => 'Пауза обхода завершена',
@@ -1905,6 +1918,7 @@ class CatalogStatsPageBuilder
             'seasonvar_import_events.event.seasonvar-media-url-check-failed' => 'Проверка видео-ссылки завершилась ошибкой',
             'seasonvar_import_events.event.seasonvar-refresh-candidates-selected' => 'Страницы для обновления выбраны',
             'seasonvar_import_events.event.seasonvar-title-merge-complete' => 'Объединение сериалов завершено',
+            'seasonvar_import_events.event.seasonvar-title-merged' => 'Страницы сезонов объединены',
             'seasonvar_import_events.event.sitemap-fetch-failed' => 'Загрузка карты сайта завершилась ошибкой',
             'seasonvar_import_events.event.sitemap-mirror-archive-ready' => 'Архив карты сайта готов',
             'seasonvar_import_events.event.sitemap-mirror-complete' => 'Зеркало карты сайта готово',

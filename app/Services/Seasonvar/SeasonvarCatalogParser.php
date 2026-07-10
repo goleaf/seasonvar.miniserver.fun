@@ -2,6 +2,7 @@
 
 namespace App\Services\Seasonvar;
 
+use App\Services\Catalog\CatalogRelationNameSanitizer;
 use DOMDocument;
 use DOMNode;
 use DOMXPath;
@@ -51,7 +52,10 @@ class SeasonvarCatalogParser
         'Слоган',
     ];
 
-    public function __construct(private readonly SeasonvarUrl $seasonvarUrl) {}
+    public function __construct(
+        private readonly SeasonvarUrl $seasonvarUrl,
+        private readonly CatalogRelationNameSanitizer $relationNames,
+    ) {}
 
     /**
      * @return array{
@@ -68,6 +72,7 @@ class SeasonvarCatalogParser
      *     media: list<array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string}>,
      *     taxonomies: list<array{type: string, name: string, source_url: string|null}>,
      *     ratings: list<array{provider: string, rating: float|null, votes: int|null, raw_value: string}>,
+     *     recommendation_signals: list<array{source: string, signal_type: string, signal_key: string, signal_value: string|null, weight: int}>,
      *     aliases: list<array{name: string, type: string, source: string}>,
      *     reviews: list<array{author: string|null, body: string, published_at: string|null}>,
      *     parse_meta: array{info_labels: list<string>, has_info_list: bool, has_season_list: bool, has_episode_script: bool}
@@ -139,6 +144,9 @@ class SeasonvarCatalogParser
 
         $seasons = $this->seasons($xpath, $url);
         $currentSeasonNumber = $this->seasonNumberFromUrl($url) ?? $this->seasonNumber($title) ?? 1;
+        $taxonomies = $this->taxonomies($xpath, $url, $structuredData, $infoFields);
+        $ratings = $this->ratings($infoFields);
+        $parseMeta = $this->parseMeta($xpath, $html, $infoFields);
 
         return [
             'title' => $title,
@@ -152,11 +160,12 @@ class SeasonvarCatalogParser
             'seasons' => $seasons,
             'episodes' => $this->episodes($html, $url, $currentSeasonNumber),
             'media' => $this->mediaCandidates($html, $xpath, $url, $currentSeasonNumber),
-            'taxonomies' => $this->taxonomies($xpath, $url, $structuredData, $infoFields),
-            'ratings' => $this->ratings($infoFields),
+            'taxonomies' => $taxonomies,
+            'ratings' => $ratings,
+            'recommendation_signals' => $this->recommendationSignals($taxonomies, $ratings, $year, $parseMeta),
             'aliases' => $this->aliases($infoFields, $title, $originalTitle),
             'reviews' => $this->reviews($xpath),
-            'parse_meta' => $this->parseMeta($xpath, $html, $infoFields),
+            'parse_meta' => $parseMeta,
         ];
     }
 
@@ -400,6 +409,26 @@ class SeasonvarCatalogParser
     }
 
     /**
+     * @param  array<string, list<string>>  $infoFields
+     * @param  list<string>  $labels
+     * @return list<string>
+     */
+    private function infoValueList(array $infoFields, array $labels): array
+    {
+        $items = [];
+
+        foreach ($labels as $label) {
+            foreach ($this->infoFieldValues($infoFields, $label) as $value) {
+                foreach ($this->valueList($value) as $name) {
+                    $items[Str::lower($name)] = $name;
+                }
+            }
+        }
+
+        return array_values($items);
+    }
+
+    /**
      * @return array<string, list<string>>
      */
     private function infoFieldsFromText(string $text): array
@@ -509,6 +538,104 @@ class SeasonvarCatalogParser
         $votes = (int) preg_replace('/\D/u', '', $matches[1]);
 
         return $votes > 0 ? $votes : null;
+    }
+
+    /**
+     * @param  list<array{type: string, name: string, source_url: string|null}>  $taxonomies
+     * @param  list<array{provider: string, rating: float|null, votes: int|null, raw_value: string}>  $ratings
+     * @param  array{info_labels: list<string>, has_info_list: bool, has_season_list: bool, has_episode_script: bool}  $parseMeta
+     * @return list<array{source: string, signal_type: string, signal_key: string, signal_value: string|null, weight: int}>
+     */
+    private function recommendationSignals(array $taxonomies, array $ratings, ?int $year, array $parseMeta): array
+    {
+        $signals = [];
+
+        foreach ($taxonomies as $taxonomy) {
+            $weight = $this->taxonomySignalWeight($taxonomy['type']);
+
+            if ($weight <= 0) {
+                continue;
+            }
+
+            $this->addRecommendationSignal(
+                $signals,
+                'seasonvar_info',
+                'taxonomy_'.$taxonomy['type'],
+                $taxonomy['name'],
+                $taxonomy['name'],
+                $weight,
+            );
+        }
+
+        foreach ($ratings as $rating) {
+            if ($rating['rating'] === null) {
+                continue;
+            }
+
+            $votesWeight = $rating['votes'] !== null
+                ? min(80, (int) floor(log($rating['votes'] + 1) * 12))
+                : 0;
+            $this->addRecommendationSignal(
+                $signals,
+                'seasonvar_info',
+                'rating',
+                $rating['provider'],
+                $rating['raw_value'],
+                (int) round($rating['rating'] * 18) + $votesWeight,
+            );
+        }
+
+        if ($year !== null) {
+            $this->addRecommendationSignal($signals, 'seasonvar_info', 'release_year', (string) $year, (string) $year, 25);
+        }
+
+        foreach ([
+            'has_info_list' => 20,
+            'has_season_list' => 20,
+            'has_episode_script' => 20,
+        ] as $key => $weight) {
+            if (($parseMeta[$key] ?? false) === true) {
+                $this->addRecommendationSignal($signals, 'seasonvar_info', 'page_quality', $key, '1', $weight);
+            }
+        }
+
+        return array_values($signals);
+    }
+
+    private function taxonomySignalWeight(string $type): int
+    {
+        return match ($type) {
+            'genre' => 120,
+            'tag' => 90,
+            'director' => 80,
+            'actor' => 60,
+            'network', 'studio' => 55,
+            'translation', 'status' => 35,
+            'country' => 20,
+            'age_rating' => 10,
+            default => 0,
+        };
+    }
+
+    /**
+     * @param  array<string, array{source: string, signal_type: string, signal_key: string, signal_value: string|null, weight: int}>  $signals
+     */
+    private function addRecommendationSignal(array &$signals, string $source, string $type, string $key, ?string $value, int $weight): void
+    {
+        $key = Str::slug(Str::lower($key)) ?: Str::substr(hash('sha256', $type.'|'.$key), 0, 24);
+
+        if ($weight <= 0 || $type === '' || $key === '') {
+            return;
+        }
+
+        $compoundKey = $source.'|'.$type.'|'.$key;
+        $signals[$compoundKey] = [
+            'source' => $source,
+            'signal_type' => Str::substr($type, 0, 64),
+            'signal_key' => Str::substr($key, 0, 128),
+            'signal_value' => $value !== null ? Str::substr(Str::squish($value), 0, 255) : null,
+            'weight' => $weight,
+        ];
     }
 
     /**
@@ -1117,71 +1244,58 @@ class SeasonvarCatalogParser
         $items = [];
 
         foreach ($this->structuredTaxonomies($structuredData) as $item) {
-            $key = $item['type'].'|'.Str::lower($item['name']);
-            $items[$key] = $item;
+            $this->addTaxonomyItem($items, $item['type'], $item['name'], $item['source_url']);
         }
 
         foreach ($this->valueList($this->firstText($xpath, ['//*[@itemprop="genre"]'])) as $name) {
-            $key = 'genre|'.Str::lower($name);
-            $items[$key] = ['type' => 'genre', 'name' => $name, 'source_url' => null];
+            $this->addTaxonomyItem($items, 'genre', $name, null);
         }
 
-        foreach ($this->valueList($this->firstInfoField($infoFields, ['Жанр'])) as $name) {
-            $key = 'genre|'.Str::lower($name);
-            $items[$key] = ['type' => 'genre', 'name' => $name, 'source_url' => null];
+        foreach ($this->infoValueList($infoFields, ['Жанр']) as $name) {
+            $this->addTaxonomyItem($items, 'genre', $name, null);
         }
 
-        foreach ($this->valueList($this->firstInfoField($infoFields, ['Страна'])) as $name) {
-            $key = 'country|'.Str::lower($name);
-            $items[$key] = ['type' => 'country', 'name' => $name, 'source_url' => null];
+        foreach ($this->infoValueList($infoFields, ['Страна']) as $name) {
+            $this->addTaxonomyItem($items, 'country', $name, null);
         }
 
         foreach ($this->ageRatingNames($this->firstInfoField($infoFields, ['Ограничение'])) as $name) {
-            $key = 'age_rating|'.Str::lower($name);
-            $items[$key] = ['type' => 'age_rating', 'name' => $name, 'source_url' => null];
+            $this->addTaxonomyItem($items, 'age_rating', $name, null);
         }
 
         foreach (['Перевод', 'Озвучка'] as $label) {
-            foreach ($this->valueList($this->firstInfoField($infoFields, [$label])) as $name) {
-                $key = 'translation|'.Str::lower($name);
-                $items[$key] = ['type' => 'translation', 'name' => $name, 'source_url' => null];
+            foreach ($this->infoValueList($infoFields, [$label]) as $name) {
+                $this->addTaxonomyItem($items, 'translation', $name, null);
             }
         }
 
-        foreach ($this->valueList($this->firstInfoField($infoFields, ['Статус'])) as $name) {
-            $key = 'status|'.Str::lower($name);
-            $items[$key] = ['type' => 'status', 'name' => $name, 'source_url' => null];
+        foreach ($this->infoValueList($infoFields, ['Статус']) as $name) {
+            $this->addTaxonomyItem($items, 'status', $name, null);
         }
 
-        foreach ($this->valueList($this->firstInfoField($infoFields, ['Канал'])) as $name) {
-            $key = 'network|'.Str::lower($name);
-            $items[$key] = ['type' => 'network', 'name' => $name, 'source_url' => null];
+        foreach ($this->infoValueList($infoFields, ['Канал']) as $name) {
+            $this->addTaxonomyItem($items, 'network', $name, null);
         }
 
-        foreach ($this->valueList($this->firstInfoField($infoFields, ['Студия'])) as $name) {
-            $key = 'studio|'.Str::lower($name);
-            $items[$key] = ['type' => 'studio', 'name' => $name, 'source_url' => null];
+        foreach ($this->infoValueList($infoFields, ['Студия']) as $name) {
+            $this->addTaxonomyItem($items, 'studio', $name, null);
         }
 
         foreach ($this->seasonListTranslations($xpath) as $name) {
-            $key = 'translation|'.Str::lower($name);
-            $items[$key] = ['type' => 'translation', 'name' => $name, 'source_url' => null];
+            $this->addTaxonomyItem($items, 'translation', $name, null);
         }
 
         foreach ($this->valueList($this->firstText($xpath, ['//*[@itemprop="directors"]//*[@itemprop="name"]'])) as $name) {
-            $key = 'director|'.Str::lower($name);
-            $items[$key] = ['type' => 'director', 'name' => $name, 'source_url' => null];
+            $this->addTaxonomyItem($items, 'director', $name, null);
         }
 
-        foreach ($this->valueList($this->firstInfoField($infoFields, ['Режиссер', 'Режиссёр'])) as $name) {
-            $key = 'director|'.Str::lower($name);
-            $items[$key] = ['type' => 'director', 'name' => $name, 'source_url' => null];
+        foreach ($this->infoValueList($infoFields, ['Режиссер', 'Режиссёр']) as $name) {
+            $this->addTaxonomyItem($items, 'director', $name, null);
         }
 
         foreach (['В ролях', 'Актеры', 'Актёры'] as $label) {
-            foreach ($this->valueList($this->firstInfoField($infoFields, [$label])) as $name) {
-                $key = 'actor|'.Str::lower($name);
-                $items[$key] = ['type' => 'actor', 'name' => $name, 'source_url' => null];
+            foreach ($this->infoValueList($infoFields, [$label]) as $name) {
+                $this->addTaxonomyItem($items, 'actor', $name, null);
             }
         }
 
@@ -1197,8 +1311,7 @@ class SeasonvarCatalogParser
                     continue;
                 }
 
-                $key = 'actor|'.Str::lower($name);
-                $items[$key] = ['type' => 'actor', 'name' => $name, 'source_url' => null];
+                $this->addTaxonomyItem($items, 'actor', $name, null);
             }
         }
 
@@ -1223,24 +1336,37 @@ class SeasonvarCatalogParser
                 continue;
             }
 
-            $key = $type.'|'.Str::lower($name);
-            $items[$key] = [
-                'type' => $type,
-                'name' => $name,
-                'source_url' => $this->normalizeRelative($href, $baseUrl),
-            ];
+            $this->addTaxonomyItem($items, $type, $name, $this->normalizeRelative($href, $baseUrl));
         }
 
         foreach ($this->tagListTaxonomies($xpath, $baseUrl) as $item) {
-            $key = 'tag|'.Str::lower($item['name']);
-            $items[$key] = $item;
+            $this->addTaxonomyItem($items, 'tag', $item['name'], $item['source_url']);
         }
 
         if ($this->hasSubtitles($xpath)) {
-            $items['tag|субтитры'] = ['type' => 'tag', 'name' => 'субтитры', 'source_url' => null];
+            $this->addTaxonomyItem($items, 'tag', 'субтитры', null);
         }
 
         return array_values($items);
+    }
+
+    /**
+     * @param  array<string, array{type: string, name: string, source_url: string|null}>  $items
+     */
+    private function addTaxonomyItem(array &$items, string $type, string $name, ?string $sourceUrl): void
+    {
+        $name = $this->relationNames->normalize($name);
+
+        if (! $this->relationNames->isValid($type, $name)) {
+            return;
+        }
+
+        $key = $type.'|'.Str::lower($name);
+        $items[$key] = [
+            'type' => $type,
+            'name' => $name,
+            'source_url' => $sourceUrl,
+        ];
     }
 
     /**
@@ -1284,6 +1410,10 @@ class SeasonvarCatalogParser
             }
 
             if (preg_match('/(?:сер(?:ия|ии|ий)|из|\?\?)/iu', $name) === 1) {
+                continue;
+            }
+
+            if (! $this->relationNames->isValid('translation', $name)) {
                 continue;
             }
 

@@ -4,13 +4,17 @@ namespace Tests\Feature;
 
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
+use App\Models\Country;
 use App\Models\Episode;
 use App\Models\Genre;
 use App\Models\LicensedMedia;
 use App\Models\Season;
+use App\Models\SeasonvarImportEvent;
 use App\Models\SeasonvarImportRun;
 use App\Models\Source;
 use App\Models\SourcePage;
+use App\Models\Taxonomy;
+use App\Models\Translation;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
@@ -243,8 +247,94 @@ class SeasonvarImportMaintenanceTest extends TestCase
 
         $this->assertNotNull($recommendation);
         $this->assertSame(1, $recommendation->rank);
+        $this->assertSame('v2', $recommendation->algorithm_version);
+        $this->assertSame('full', $run->summary['last_recommendations']['mode']);
+        $this->assertSame('v2', $run->summary['last_recommendations']['algorithm_version']);
         $this->assertSame(2, $run->summary['last_recommendations']['titles']);
+        $this->assertSame(1, $run->summary['last_recommendations']['titles_with_recommendations']);
+        $this->assertSame(1, $run->summary['last_recommendations']['titles_without_recommendations']);
+        $this->assertSame(12, $run->summary['last_recommendations']['max_per_title']);
         $this->assertGreaterThan(0, $run->summary['last_recommendations']['stored']);
+        $this->assertGreaterThanOrEqual(0, $run->summary['last_recommendations']['duration_ms']);
+    }
+
+    public function test_it_cleans_invalid_catalog_relation_names_during_import_cycle(): void
+    {
+        Http::preventStrayRequests();
+        config([
+            'seasonvar.media_check.enabled' => false,
+        ]);
+
+        $catalogTitle = CatalogTitle::factory()->create();
+        $validCountry = Country::query()->create([
+            'name' => 'Россия',
+            'slug' => 'rossiia',
+        ]);
+        $invalidCountry = Country::query()->create([
+            'name' => 'Добро пожаловать в Англию. Типичная жизнь в деревушке здесь не отличается от нашей.',
+            'slug' => 'opisanie-vmesto-strany',
+        ]);
+        $cityCountry = Country::query()->create([
+            'name' => 'Москва',
+            'slug' => 'moskva',
+        ]);
+        $validTranslation = Translation::query()->create([
+            'name' => 'LostFilm',
+            'slug' => 'lostfilm',
+        ]);
+        $invalidTranslation = Translation::query()->create([
+            'name' => 'США',
+            'slug' => 'ssa',
+        ]);
+        $legacyInvalidCountry = Taxonomy::query()->create([
+            'type' => 'country',
+            'name' => 'Главные герои этого сериала - брат и сестра. Это описание не является страной.',
+            'slug' => 'legacy-opisanie-vmesto-strany',
+        ]);
+
+        $catalogTitle->countries()->attach([$validCountry->id, $invalidCountry->id, $cityCountry->id]);
+        $catalogTitle->translations()->attach([$validTranslation->id, $invalidTranslation->id]);
+        $catalogTitle->taxonomies()->attach($legacyInvalidCountry->id);
+
+        $this->artisan('seasonvar:import', ['--no-discovery' => true])
+            ->assertExitCode(0);
+
+        $run = SeasonvarImportRun::query()->latest('id')->firstOrFail();
+        $cleanupEvents = SeasonvarImportEvent::query()
+            ->where('seasonvar_import_run_id', $run->id)
+            ->where('event', 'catalog-relations-cleanup-complete')
+            ->orderBy('id')
+            ->get();
+
+        $this->assertDatabaseHas('countries', ['id' => $validCountry->id]);
+        $this->assertDatabaseHas('translations', ['id' => $validTranslation->id]);
+        $this->assertDatabaseMissing('countries', ['id' => $invalidCountry->id]);
+        $this->assertDatabaseMissing('countries', ['id' => $cityCountry->id]);
+        $this->assertDatabaseMissing('translations', ['id' => $invalidTranslation->id]);
+        $this->assertDatabaseMissing('taxonomies', ['id' => $legacyInvalidCountry->id]);
+        $this->assertDatabaseMissing('catalog_title_country', [
+            'catalog_title_id' => $catalogTitle->id,
+            'country_id' => $invalidCountry->id,
+        ]);
+        $this->assertDatabaseMissing('catalog_title_country', [
+            'catalog_title_id' => $catalogTitle->id,
+            'country_id' => $cityCountry->id,
+        ]);
+        $this->assertDatabaseMissing('catalog_title_translation', [
+            'catalog_title_id' => $catalogTitle->id,
+            'translation_id' => $invalidTranslation->id,
+        ]);
+        $this->assertDatabaseMissing('catalog_title_taxonomy', [
+            'catalog_title_id' => $catalogTitle->id,
+            'taxonomy_id' => $legacyInvalidCountry->id,
+        ]);
+        $this->assertGreaterThanOrEqual(3, $run->summary['last_relation_cleanup']['records_removed']);
+        $this->assertGreaterThanOrEqual(3, $run->summary['last_relation_cleanup']['links_removed']);
+        $this->assertSame(1, $run->summary['last_relation_cleanup']['legacy_records_removed']);
+        $this->assertSame(1, $run->summary['last_relation_cleanup']['legacy_links_removed']);
+        $this->assertCount(2, $cleanupEvents);
+        $this->assertGreaterThanOrEqual(3, (int) $cleanupEvents->first()->context['records_removed']);
+        $this->assertSame(0, (int) $cleanupEvents->last()->context['records_removed']);
     }
 
     public function test_it_processes_all_pending_pages_across_import_chunks(): void

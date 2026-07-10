@@ -70,7 +70,10 @@ class CatalogTaxonomyRegistry
      */
     public function listRowRelations(): array
     {
-        return ['seasons'];
+        return array_values(array_unique([
+            'seasons',
+            ...$this->cardRelations(),
+        ]));
     }
 
     public function relationName(string $filterType): string

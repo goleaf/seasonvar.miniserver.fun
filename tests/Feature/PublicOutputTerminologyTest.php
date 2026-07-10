@@ -79,10 +79,37 @@ class PublicOutputTerminologyTest extends TestCase
             $this->assertStringNotContainsString('видео готовится', $visibleContent, $name);
             $this->assertStringNotContainsString('готовится', $visibleContent, $name);
             $this->assertStringNotContainsString('после обновления каталога', $visibleContent, $name);
+            $this->assertStringNotContainsString('после ближайшего обновления', $visibleContent, $name);
+            $this->assertStringNotContainsString('после обработки источника', $visibleContent, $name);
             $this->assertStringNotContainsString('Данные страницы', $visibleContent, $name);
             $this->assertStringNotContainsString('Последнее обновление', $visibleContent, $name);
             $this->assertStringNotContainsString('Индексация и обновления', $visibleContent, $name);
         }
+    }
+
+    public function test_public_title_page_deduplicates_generated_search_phrases(): void
+    {
+        $title = CatalogTitle::factory()->create([
+            'slug' => 'public-generated-phrases-test',
+            'title' => 'Публичный онлайн',
+            'description' => 'Описание публичного сериала для проверки поисковых фраз.',
+            'is_published' => true,
+            'indexed_at' => now(),
+        ]);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $title->id,
+            'number' => 1,
+        ]);
+        Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 1,
+        ]);
+
+        $content = $this->get(route('titles.show', $title))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertPublicOutputIsNeutral($content, 'titles.show.generated_phrases');
     }
 
     private function assertPublicOutputIsNeutral(string $content, string $name): void
@@ -93,8 +120,13 @@ class PublicOutputTerminologyTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/тайтл/iu', $content, $name);
         $this->assertDoesNotMatchRegularExpression('/seasonvar|сезонвар/iu', $content, $name);
         $this->assertDoesNotMatchRegularExpression('/смотреть онлайн\s+смотреть онлайн/iu', $content, $name);
+        $this->assertDoesNotMatchRegularExpression('/онлайн\s+онлайн/iu', $content, $name);
+        $this->assertDoesNotMatchRegularExpression('/онлайн\s+(?:смотреть|сериал)\s+онлайн/iu', $content, $name);
+        $this->assertDoesNotMatchRegularExpression('/смотреть онлайн\s+сериал онлайн/iu', $content, $name);
         $this->assertDoesNotMatchRegularExpression('/смотреть в хорошем качестве\s+смотреть в хорошем качестве/iu', $content, $name);
         $this->assertDoesNotMatchRegularExpression('/в хорошем качестве\s+хорошее качество/iu', $content, $name);
+        $this->assertDoesNotMatchRegularExpression('/(?:все сезоны|все серии)\s+сезоны и серии/iu', $content, $name);
+        $this->assertDoesNotMatchRegularExpression('/все сезоны\s+все серии/iu', $content, $name);
         $this->assertDoesNotMatchRegularExpression('/веб[- ]плеер\s+веб[- ]плеер/iu', $content, $name);
         $this->assertStringNotContainsString('js-seasonvar-player', $content, $name);
         $this->assertStringNotContainsString('source_url', $content, $name);

@@ -522,7 +522,7 @@ class CatalogSeoBuilder
             'mainEntity' => $url,
             'speakable' => [
                 '@type' => 'SpeakableSpecification',
-                'cssSelector' => ['[data-seo-summary]', 'h1'],
+                'cssSelector' => ['h1'],
             ],
             'about' => collect($about)
                 ->filter()
@@ -888,17 +888,20 @@ class CatalogSeoBuilder
     ): array {
         $genreText = $genres->take(5)->implode(', ');
         $countryText = $countries->take(3)->implode(', ');
+        $watchQuestion = Str::endsWith(Str::lower($catalogTitle->title), 'онлайн')
+            ? 'Где смотреть сериал '.$catalogTitle->title.'?'
+            : 'Где смотреть сериал '.$catalogTitle->title.' онлайн?';
 
         return collect([
             [
-                'question' => 'Где смотреть сериал '.$catalogTitle->title.' онлайн?',
+                'question' => $watchQuestion,
                 'answer' => $mediaCount > 0
                     ? 'Сериал '.$catalogTitle->title.' доступен на этой странице во встроенном плеере. Видео открывается через выбранную серию.'
-                    : 'Страница сериала '.$catalogTitle->title.' уже создана, а видео появится здесь после ближайшего обновления.',
+                    : 'Для сериала '.$catalogTitle->title.' сейчас нет доступного видео.',
             ],
             [
                 'question' => 'Сколько сезонов и серий в сериале '.$catalogTitle->title.'?',
-                'answer' => 'В каталоге сейчас указано сезонов: '.$seasonCount.', серий: '.$episodeCount.'. Эти данные обновляются автоматически после обработки источника.',
+                'answer' => 'В каталоге сейчас указано сезонов: '.$seasonCount.', серий: '.$episodeCount.'.',
             ],
             [
                 'question' => 'Какой год, жанр и страна у сериала '.$catalogTitle->title.'?',
@@ -909,8 +912,8 @@ class CatalogSeoBuilder
                 ])->filter()->implode('; ').'.',
             ],
             [
-                'question' => 'Обновляется ли информация по сериалу '.$catalogTitle->title.'?',
-                'answer' => 'Да, портал автоматически обновляет описание, сезоны, серии, постер, связи каталога и доступные видео.',
+                'question' => 'Какая информация есть на странице сериала '.$catalogTitle->title.'?',
+                'answer' => 'На странице показаны описание, сезоны, серии, постер, связи каталога и доступные видео, если они есть.',
             ],
         ])
             ->filter(fn (array $item): bool => trim($item['answer'], " .\t\n\r\0\x0B") !== '')

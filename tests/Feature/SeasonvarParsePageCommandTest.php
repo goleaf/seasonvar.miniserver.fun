@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleRecommendationSignal;
 use App\Models\Season;
 use App\Models\Source;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -44,6 +45,8 @@ class SeasonvarParsePageCommandTest extends TestCase
             ->expectsOutputToContain('[09.07.2026 10:11]')
             ->assertExitCode(0);
 
+        $catalogTitle = CatalogTitle::query()->where('external_id', '47915')->firstOrFail();
+
         $this->assertDatabaseHas('catalog_titles', [
             'title' => 'Черный список: На кухне',
             'external_id' => '47915',
@@ -80,6 +83,24 @@ class SeasonvarParsePageCommandTest extends TestCase
             'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-1-season.html',
             'parse_status' => 'parsed',
         ]);
+        $this->assertDatabaseHas('catalog_title_recommendation_signals', [
+            'catalog_title_id' => $catalogTitle->id,
+            'source' => 'seasonvar_info',
+            'signal_type' => 'taxonomy_genre',
+            'signal_value' => 'Кулинария',
+            'weight' => 120,
+        ]);
+        $this->assertDatabaseHas('catalog_title_recommendation_signals', [
+            'catalog_title_id' => $catalogTitle->id,
+            'source' => 'seasonvar_info',
+            'signal_type' => 'release_year',
+            'signal_key' => '2024',
+            'weight' => 25,
+        ]);
+        $this->assertSame(3, CatalogTitleRecommendationSignal::query()
+            ->where('catalog_title_id', $catalogTitle->id)
+            ->where('signal_type', 'page_quality')
+            ->count());
     }
 
     public function test_it_imports_m3u_playlist_discovered_in_page_html(): void
