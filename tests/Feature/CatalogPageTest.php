@@ -16,6 +16,7 @@ use App\Models\SeasonvarImportEvent;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use App\Models\User;
+use App\Services\Catalog\CatalogStatsPageBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -298,6 +299,40 @@ class CatalogPageTest extends TestCase
             ->assertOk()
             ->assertHeader('Content-Type', 'image/jpeg')
             ->assertSee('fake-image-body', false);
+    }
+
+    public function test_stats_issue_rows_merge_multiple_issue_categories(): void
+    {
+        $withoutPoster = CatalogTitle::factory()->create([
+            'title' => 'Статистика без постера',
+            'slug' => 'statistika-bez-postera',
+            'poster_url' => null,
+            'description' => 'Описание есть.',
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $withoutPoster->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $withoutDescription = CatalogTitle::factory()->create([
+            'title' => 'Статистика без описания',
+            'slug' => 'statistika-bez-opisaniya',
+            'poster_url' => 'https://media.example.com/without-description.jpg',
+            'description' => null,
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $withoutDescription->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $data = app(CatalogStatsPageBuilder::class)->data();
+
+        $issueTitles = collect($data['statsIssueRows'])->pluck('title');
+
+        $this->assertContains('Статистика без постера', $issueTitles);
+        $this->assertContains('Статистика без описания', $issueTitles);
     }
 
     public function test_titles_page_shows_posters_without_cropping_in_equal_size_area(): void

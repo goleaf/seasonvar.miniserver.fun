@@ -420,7 +420,8 @@ class CatalogStatsPageBuilder
             ->get()
             ->map(fn (CatalogTitle $title): array => $this->titlePreviewRow($title, 'Без описания', 'текст описания пустой', 'fa-solid fa-file-lines', 'warning'));
 
-        return $withoutPublishedMedia
+        return collect()
+            ->merge($withoutPublishedMedia)
             ->merge($withoutPoster)
             ->merge($withoutDescription)
             ->unique('id')
