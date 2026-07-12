@@ -56,7 +56,7 @@ class CatalogTitlesPageBuilder
             $request,
             $searchQuery,
             $titleContext?->id,
-            $titleContextSlug !== null && $titleContext === null,
+            false,
         );
         $years = $criteria->years;
         $sortOption = $criteria->sort;
@@ -67,10 +67,6 @@ class CatalogTitlesPageBuilder
         $legacyType = $request->legacyType($filterTypes);
         $legacyTaxonomy = $request->legacyTaxonomy();
         $invalidInputFilterSlugs = [];
-
-        if ($criteria->invalidTitleContext && $titleContextSlug !== null) {
-            $invalidInputFilterSlugs['title'] = $titleContextSlug;
-        }
 
         $requestedFilterSlugs = $request->filterSlugs();
 
