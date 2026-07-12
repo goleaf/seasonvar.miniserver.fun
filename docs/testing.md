@@ -24,6 +24,8 @@
 - `CatalogSearchPageTest` фиксирует hard-year, short-token, AND-person, exact external ID, duplicate-free totals, unpublished, true-zero и insufficient состояния поиска.
 - `CatalogVisualSystemTest` фиксирует shell, 650 ms search debounce, порядок страниц, один title tab-stop, non-cropping poster и русскую светлую pagination.
 - `CatalogPageTest` фиксирует Livewire URL hydration, malformed и out-of-range page recovery, сохранение search/filter state при сортировке, reverse-pivot facet aggregation, единый запрет public binding неопубликованных тайтлов, отсутствие HTTP-запроса для их poster proxy и поддержку image-ответов без `Content-Length`.
+- `CatalogPageTest` также фиксирует карточку тайтла: один active-season episode set, exact playable counts, guest/authenticated audience boundary, continue/next/replay action, watchlist/rating/progress writes, unavailable/empty media и фильтрацию недоступных рекомендаций.
+- `CatalogBladeComponentTest` проверяет shareable season/episode/media profile links, active markers, active-season anchor и сохранение playback variant между сериями без загрузки остальных сезонов.
 - `CatalogAdvancedFilterTest` сравнивает paginator total с фактическими ID, проверяет OR-внутри/AND-между группами, own-group-excluded счетчики relation/year/publication/subtitle фасетов, bounded top-N после контекста, выбранные нулевые значения, постоянный query budget и свежесть после publish/unpublish, soft delete/restore, pivot/media и episode lifecycle изменений.
 
 ## Команды

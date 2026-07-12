@@ -118,26 +118,54 @@ class CatalogBladeComponentTest extends TestCase
             'number' => 2,
             'title' => 'Сезон 2',
         ]);
-        Episode::factory()->create([
+        $firstEpisode = Episode::factory()->create([
             'season_id' => $firstSeason->id,
             'number' => 1,
             'title' => 'Первая серия',
         ]);
-        Episode::factory()->create([
+        $secondEpisode = Episode::factory()->create([
             'season_id' => $secondSeason->id,
             'number' => 1,
             'title' => 'Вторая серия',
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $firstSeason->id,
+            'episode_id' => $firstEpisode->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $secondSeason->id,
+            'episode_id' => $secondEpisode->id,
+            'status' => 'published',
+            'published_at' => now(),
         ]);
 
         $response = $this->get(route('titles.show', $catalogTitle));
 
         $response
             ->assertOk()
-            ->assertSee('href="#season-2"', false)
-            ->assertSee('aria-label="Сезоны сериала"', false)
+            ->assertSee('href="'.route('titles.show', [
+                'catalogTitle' => $catalogTitle,
+                'season' => $secondSeason->id,
+            ]).'#seasons"', false)
+            ->assertSee('aria-label="Доступные сезоны"', false)
             ->assertDontSeeText('Быстрый выбор сезона')
-            ->assertSee('id="season-2" class="group scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48"', false)
-            ->assertDontSee('id="season-2" class="grid', false);
+            ->assertSee('id="season-'.$firstSeason->id.'"', false)
+            ->assertSee('class="scroll-mt-40 p-4 sm:scroll-mt-44 lg:scroll-mt-48"', false)
+            ->assertDontSeeText('Вторая серия');
+
+        $this->get(route('titles.show', [
+            'catalogTitle' => $catalogTitle,
+            'season' => $secondSeason->id,
+        ]))
+            ->assertOk()
+            ->assertSee('id="season-'.$secondSeason->id.'"', false)
+            ->assertSee('class="scroll-mt-40 p-4 sm:scroll-mt-44 lg:scroll-mt-48"', false)
+            ->assertSeeText('Вторая серия')
+            ->assertDontSeeText('Первая серия');
     }
 
     public function test_title_page_groups_playback_options_and_preserves_selected_variant_between_episodes(): void

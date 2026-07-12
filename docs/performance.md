@@ -25,7 +25,9 @@
 - Подзапросы алиасов и каждой связи группируют все legacy-варианты одного терма, чтобы не размножать одинаковые подзапросы на каждый вариант регистра, `е/ё` или транслитерации.
 - Выдача, API, фасеты, публичные счетчики, sitemap/feed и рекомендации начинают title-запросы с `CatalogTitleQuery::visibleTo()`. Распознанный год добавляется до текстовых условий. Все сортировки сопоставлены в `CatalogSort` и завершаются `catalog_titles.id DESC` как детерминированным tie-breaker.
 - Карточки списка выбирают только отображаемые поля, загружают только relations из `CatalogTaxonomyRegistry::cardRelations()` и считают видимые сезоны, серии и media через общие count-ограничения `CatalogTitleQuery`.
-- Страница тайтла загружает только связи, которые нужны карточке: справочники, сезоны с сериями, опубликованные медиа с сезоном и серией, алиасы и рейтинги.
+- Статическая часть страницы тайтла загружает справочники, aliases/ratings и summaries сезонов с агрегированными playable episode/media counts. Все серии всех сезонов больше не eager-load-ятся.
+- Вложенный `CatalogTitlePlayer` загружает только серии активного сезона и их playable media; выбор first/next episode остаётся SQL query с детерминированным tuple-order, а не полной PHP-коллекцией выпусков.
+- Публичный Livewire snapshot карточки содержит только locked `catalogTitleId` и URL-скаляры `season`, `episode`, `media`, `variant`, `quality`, `format`; Eloquent models, watchlist/rating и progress остаются server/render-local.
 - Блок рекомендаций на странице тайтла не загружает тяжелые связи, потому что он показывает только базовые поля карточек.
 - `/stats` обновляется через Livewire `wire:poll.15s.visible`, но читает серверный snapshot из `CatalogStatsSnapshotCache`; тяжелые агрегаты собираются не чаще одного раза в 15 секунд и имеют fallback на последний успешный снимок.
 - `/stats` не рендерит `poster_src` для poster URL, которые `CatalogStatsPosterUrlGuard` не сможет безопасно проксировать; блок последних постеров берет расширенный набор кандидатов и оставляет только реально proxyable изображения, чтобы убрать лишние браузерные 404-запросы к `stats.poster`.
@@ -43,6 +45,9 @@
 - `seasonvar:import` обновляет счетчики активного запуска после каждого обработанного chunk страницы или отдельного URL.
 - Queued-режим пишет задания в Redis-очередь `seasonvar-import`; десять workers не резервируют jobs в SQLite и выполняют внешние HTTP-запросы вне catalog transactions.
 - Диспетчер может запускаться десять раз в сутки, но живые lease и 24-часовой freshness interval не позволяют повторно ставить или скачивать свежую страницу при каждом cron tick.
+- Исключение сделано для ограниченного recovery-пакета: каждый запуск берёт не более `SEASONVAR_IMPORT_CHUNK_SIZE` старейших страниц `missing_data`. После попытки обновлённые timestamps перемещают их в конец ротации, поэтому тысячи проблемных страниц не скачиваются одновременно.
+- Страницы сезонов одного сериала используют общий Redis lock по canonical slug. Ключ вычисляется worker во время обработки, поэтому старые jobs с numeric key в сериализованном payload также не создают параллельные записи одного тайтла.
+- SQLite работает в WAL с `busy_timeout=10000` и `IMMEDIATE` transaction mode: catalog transaction получает writer lock до первых reads, а десять workers продолжают параллельно выполнять внешние HTTP-запросы вне transaction.
 - Connection failures, HTTP 408/425/429/5xx и исчерпанная SQLite lock transaction повторяются Laravel worker с экспоненциальным backoff в ограниченном retry window. HTTP 404 и ошибки содержимого записываются как permanent result и не создают бессмысленный немедленный повтор.
 - Queue jobs отправляются только after commit. Worker имеет явные `--memory=256`, `--max-time=3600` и `--max-jobs=1000`, поэтому долгоживущий PHP-процесс регулярно освобождает накопленные ресурсы.
 - `seasonvar:import --status` использует Laravel 13 queue inspection methods и одним чтением показывает pending, delayed, reserved, oldest pending job, живые claims и последний queued run.

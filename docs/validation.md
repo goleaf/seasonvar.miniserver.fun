@@ -5,7 +5,7 @@
 ## Form Request
 
 - Публичные фильтры каталога проверяет `App\Http\Requests\CatalogTitlesRequest`.
-- Страница карточки проверяет параметры выбранной серии и видео через `App\Http\Requests\CatalogShowRequest`.
+- Страница карточки проверяет `season`, выбранную серию, video ID и bounded media profile через `App\Http\Requests\CatalogShowRequest`; Livewire повторно нормализует положительные ID и не доверяет URL/browser identifiers.
 - Контроллеры принимают типизированные Form Request-классы и не вызывают inline `$request->validate()`; full-page `CatalogSeries` переиспользует тот же `CatalogTitlesRequest::validateResolved()` для URL и Livewire update state.
 - Для read-only фильтров каталога синтаксис query-параметров валидируется строго. Пустые значения и дубли удаляются, неподдерживаемые значения отклоняются правилами, а существующие slug резолвятся в уникальные положительные ID с лимитом 20 значений на тип перед построением SQL.
 - `publication_type[]` проверяется через `CatalogPublicationType`, `subtitles[]` принимает только `available|missing`, `quality[]` — только явно перечисленные разрешения. Фиксированные группы имеют собственные меньшие лимиты; отсутствующие записи справочников игнорируются без ошибки.

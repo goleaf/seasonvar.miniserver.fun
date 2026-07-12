@@ -12,7 +12,7 @@
 - Основная база данных SQLite; тесты используют SQLite в памяти.
 - PHPUnit 12.5; Pest не установлен.
 - Tailwind CSS 4.3 с Vite 8, локальными FontAwesome, Plyr и HLS-ресурсами.
-- В проекте есть read-only JSON API в `routes/api.php` для опубликованных карточек каталога и Laravel API Resources для форматирования ответов. Политик приложения, событий, слушателей, писем и уведомлений сейчас нет. Публичные query-параметры каталога и API пагинация проверяются Form Request-классами, а служебная статистика доступна как read-only Livewire-страница под rate limit.
+- В проекте есть read-only JSON API в `routes/api.php` для опубликованных карточек каталога и Laravel API Resources для форматирования ответов. Для authenticated watchlist/rating/progress карточки добавлена `CatalogTitlePolicy`; project-specific events/listeners по-прежнему отсутствуют. Публичные query-параметры каталога и API пагинация проверяются Form Request-классами, а служебная статистика доступна как read-only Livewire-страница под rate limit.
 - GitHub Actions workflow находится в `.github/workflows/ci.yml` и проверяет Composer, Pint, Laravel tests, PHP syntax lint, npm audit/build и dependency audits.
 
 ## MCP

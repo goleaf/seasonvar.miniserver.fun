@@ -60,6 +60,7 @@ class SeasonvarParallelImportTest extends TestCase
         $this->assertSame('redis', config('seasonvar.queue.lock_store'));
         $this->assertSame(86400, config('seasonvar.queue.claim_seconds'));
         $this->assertSame(24, config('seasonvar.import.refresh_after_hours'));
+        $this->assertSame('IMMEDIATE', config('database.connections.sqlite.transaction_mode'));
     }
 
     public function test_page_claim_is_atomic_owned_and_recoverable_after_expiry(): void
@@ -82,17 +83,39 @@ class SeasonvarParallelImportTest extends TestCase
         $this->assertNotNull($claims->claim($page->fresh(), $run->id, 60));
     }
 
-    public function test_import_group_key_uses_external_id_and_hash_fallback(): void
+    public function test_import_group_key_groups_seasons_by_canonical_title_slug(): void
     {
         $keys = app(SeasonvarImportGroupKey::class);
 
         $this->assertSame(
-            'seasonvar-title:47915',
-            $keys->forUrl('https://seasonvar.ru/serial-47915-Test-4-season.html', 'hash-a'),
+            $keys->forUrl('https://seasonvar.ru/serial-14979-Sinij_ekzortcist_psftqae-2-season.html', 'hash-a'),
+            $keys->forUrl('https://seasonvar.ru/serial-42722-Sinij_ekzortcist_pslwzbv-5-season.html', 'hash-b'),
         );
         $this->assertSame(
-            'seasonvar-page:hash-b',
-            $keys->forUrl('https://seasonvar.ru/catalog/test.html', 'hash-b'),
+            $keys->forUrl('https://seasonvar.ru/serial-3177--Sinij_ekzortcist_psbdtjm.html', 'hash-first'),
+            $keys->forUrl('https://seasonvar.ru/serial-42722-Sinij_ekzortcist_pslwzbv-5-season.html', 'hash-b'),
+        );
+        $this->assertNotSame(
+            $keys->forUrl('https://seasonvar.ru/serial-42722-Sinij_ekzortcist_pslwzbv-5-season.html', 'hash-b'),
+            $keys->forUrl('https://seasonvar.ru/serial-10532-Po_dolgu_sluzhby_pssxanb-2-season.html', 'hash-c'),
+        );
+        $this->assertSame(
+            'seasonvar-page:hash-d',
+            $keys->forUrl('https://seasonvar.ru/catalog/test.html', 'hash-d'),
+        );
+    }
+
+    public function test_import_group_key_groups_legacy_season_urls_without_ps_suffix(): void
+    {
+        $keys = app(SeasonvarImportGroupKey::class);
+
+        $this->assertSame(
+            $keys->forUrl('https://seasonvar.ru/serial-608--25_cheloveka-006-sezon.html', 'hash-a'),
+            $keys->forUrl('https://seasonvar.ru/serial-726--25_cheloveka-007-sezon.html', 'hash-b'),
+        );
+        $this->assertSame(
+            $keys->forUrl('https://seasonvar.ru/serial-12776-Igra_s_ognyem_1-season.html', 'hash-c'),
+            $keys->forUrl('https://seasonvar.ru/serial-99999-Igra_s_ognyem_2-season.html', 'hash-d'),
         );
     }
 
@@ -115,6 +138,7 @@ class SeasonvarParallelImportTest extends TestCase
             app(SeasonvarPageClaimManager::class),
             $importer,
             app(SeasonvarImportRunRecorder::class),
+            app(SeasonvarImportGroupKey::class),
         );
 
         Http::assertNothingSent();
@@ -159,6 +183,7 @@ class SeasonvarParallelImportTest extends TestCase
             $claims,
             $importer,
             app(SeasonvarImportRunRecorder::class),
+            app(SeasonvarImportGroupKey::class),
         );
 
         $freshRun = $run->fresh();
@@ -200,7 +225,8 @@ class SeasonvarParallelImportTest extends TestCase
         $page = SourcePage::factory()->create();
         $claims = app(SeasonvarPageClaimManager::class);
         $token = $claims->claim($page, $run->id, 3600);
-        $lock = Cache::store('array')->lock('seasonvar-title:1', 1200);
+        $groupKey = app(SeasonvarImportGroupKey::class)->forUrl($page->url, $page->url_hash);
+        $lock = Cache::store('array')->lock($groupKey, 1200);
         $this->assertTrue($lock->get());
         $importer = Mockery::mock(SeasonvarCatalogImporter::class);
         $importer->shouldNotReceive('parsePages');
@@ -210,10 +236,48 @@ class SeasonvarParallelImportTest extends TestCase
                 sourcePageId: $page->id,
                 importRunId: $run->id,
                 claimToken: (string) $token,
-                groupKey: 'seasonvar-title:1',
+                groupKey: $groupKey,
             ))->withFakeQueueInteractions();
 
-            $job->handle($claims, $importer, app(SeasonvarImportRunRecorder::class));
+            $job->handle(
+                $claims,
+                $importer,
+                app(SeasonvarImportRunRecorder::class),
+                app(SeasonvarImportGroupKey::class),
+            );
+
+            $job->assertReleased(delay: 30);
+            $this->assertTrue($claims->owns($page->id, $run->id, (string) $token));
+        } finally {
+            $lock->release();
+        }
+    }
+
+    public function test_worker_recomputes_group_key_from_source_page_for_queued_payloads(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        $run = $this->queuedRun();
+        $page = SourcePage::factory()->create([
+            'url' => 'https://seasonvar.ru/serial-42722-Sinij_ekzortcist_pslwzbv-5-season.html',
+        ]);
+        $claims = app(SeasonvarPageClaimManager::class);
+        $token = $claims->claim($page, $run->id, 3600);
+        $canonicalKey = app(SeasonvarImportGroupKey::class)->forUrl($page->url, $page->url_hash);
+        $lock = Cache::store('array')->lock($canonicalKey, 1200);
+        $this->assertTrue($lock->get());
+        $importer = Mockery::mock(SeasonvarCatalogImporter::class);
+        $importer->shouldNotReceive('parsePages');
+        $this->app->instance(SeasonvarCatalogImporter::class, $importer);
+
+        try {
+            $job = (new ImportSeasonvarSourcePage(
+                sourcePageId: $page->id,
+                importRunId: $run->id,
+                claimToken: (string) $token,
+                groupKey: 'seasonvar-title:42722',
+            ))->withFakeQueueInteractions();
+
+            $this->app->call([$job, 'handle']);
 
             $job->assertReleased(delay: 30);
             $this->assertTrue($claims->owns($page->id, $run->id, (string) $token));

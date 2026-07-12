@@ -102,11 +102,12 @@ class CatalogValidationTest extends TestCase
             ->from($showUrl)
             ->get(route('titles.show', [
                 'catalogTitle' => $catalogTitle,
+                'season' => ['bad'],
                 'episode' => 'bad',
                 'media' => 0,
             ]))
             ->assertRedirect($showUrl)
-            ->assertSessionHasErrors(['episode', 'media']);
+            ->assertSessionHasErrors(['season', 'episode', 'media']);
     }
 
     public function test_unknown_taxonomy_route_returns_not_found_instead_of_full_catalog(): void

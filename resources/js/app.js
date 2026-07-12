@@ -13,6 +13,21 @@ const loadCatalogPlayers = async () => {
     await initializeCatalogPlayers();
 };
 
+const destroyCatalogPlayersWithin = (element) => {
+    if (!(element instanceof Element)) {
+        return;
+    }
+
+    const videos = element.matches('video.js-catalog-player')
+        ? [element]
+        : [...element.querySelectorAll('video.js-catalog-player')];
+
+    videos.forEach((video) => {
+        video._catalogHls?.destroy();
+        video._catalogPlyr?.destroy();
+    });
+};
+
 const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
 const smoothScrollDuration = {
     min: 260,
@@ -204,3 +219,12 @@ if (document.readyState === 'loading') {
     loadCatalogSeasonAnchors();
     loadCatalogFilterSearch();
 }
+
+document.addEventListener('livewire:init', () => {
+    window.Livewire.hook('morphed', () => {
+        void loadCatalogPlayers();
+    });
+    window.Livewire.hook('morph.removing', ({ el }) => {
+        destroyCatalogPlayersWithin(el);
+    });
+});

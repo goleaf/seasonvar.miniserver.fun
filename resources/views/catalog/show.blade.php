@@ -24,13 +24,6 @@
                             <span>Сезоны</span>
                         </a>
 
-                        @if ($showView->selectedSeason)
-                            <a href="#season-{{ $showView->selectedSeason->number }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
-                                <i class="fa-solid fa-flag-checkered" aria-hidden="true"></i>
-                                <span>Сезон {{ $showView->selectedSeason->number }}</span>
-                            </a>
-                        @endif
-
                         <a href="#data-title-reference" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                             <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
                             <span>О сериале</span>
@@ -63,49 +56,6 @@
                         </div>
                     </div>
 
-                    <div class="rounded-lg bg-slate-50 p-3">
-                        <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                            <i class="fa-solid fa-bolt text-emerald-700" aria-hidden="true"></i>
-                            <span>Сейчас открыто</span>
-                        </div>
-
-                        <div class="mt-3 space-y-2">
-                            @if ($selectedEpisode)
-                                <div class="text-sm font-semibold text-slate-700">
-                                    <span class="text-slate-500">Серия:</span>
-                                    <span>{{ $selectedEpisode->number }}</span>
-                                    @if ($selectedEpisode->title)
-                                        <span class="block text-xs font-medium text-slate-500">{{ $selectedEpisode->title }}</span>
-                                    @endif
-                                </div>
-                            @else
-                                <div class="text-sm text-slate-500">Серия не выбрана.</div>
-                            @endif
-
-                            @if ($showView->selectedSeason)
-                                <div class="text-sm font-semibold text-slate-700">
-                                    <span class="text-slate-500">Сезон:</span>
-                                    <span>{{ $showView->selectedSeason->number }}</span>
-                                </div>
-                            @endif
-
-                            @if ($showView->selectedMedia)
-                                <div class="flex flex-wrap gap-1.5 pt-1">
-                                    <x-ui.status-pill icon="fa-solid fa-file-video" variant="success" size="xs">
-                                        {{ $showView->selectedPlaybackLabel }}
-                                    </x-ui.status-pill>
-
-                                    @foreach ($showView->selectedMediaBadges as $badge)
-                                        <x-ui.status-pill variant="muted" size="xs">
-                                            {{ $badge }}
-                                        </x-ui.status-pill>
-                                    @endforeach
-                                </div>
-                            @elseif ($selectedEpisode)
-                                <div class="text-xs text-slate-500">Видео для этой серии пока не выбрано.</div>
-                            @endif
-                        </div>
-                    </div>
                 </div>
             </section>
         </aside>
@@ -151,162 +101,11 @@
                             <p class="mt-2 text-sm leading-6 text-slate-600">{{ $title->description ?: 'Описание пока отсутствует.' }}</p>
                         </section>
 
-                        @if ($seasons->isNotEmpty())
-                            <nav aria-label="Сезоны сериала" class="mt-5 flex flex-wrap gap-2">
-                                @foreach ($seasons as $season)
-                                    <a href="#season-{{ $season->number }}" @class([
-                                        'inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-bold',
-                                        'bg-emerald-50 text-emerald-700' => $showView->isSelectedSeason($season, $loop->first),
-                                        'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $showView->isSelectedSeason($season, $loop->first),
-                                    ])>
-                                        <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
-                                        <span>{{ $season->number }} сезон</span>
-                                    </a>
-                                @endforeach
-                            </nav>
-                        @endif
                     </div>
                 </article>
             </x-ui.panel>
 
-            <x-ui.panel id="player" title="Просмотр" icon="fa-solid fa-circle-play" class="scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48">
-                <div class="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600">
-                    @if ($selectedEpisode)
-                        <x-ui.status-pill icon="fa-solid fa-circle-play" variant="success">
-                            Выбрана {{ $selectedEpisode->number }} серия
-                        </x-ui.status-pill>
-                        @if ($selectedEpisode->title)
-                            <x-ui.status-pill icon="fa-solid fa-file-lines">
-                                {{ $selectedEpisode->title }}
-                            </x-ui.status-pill>
-                        @endif
-                    @else
-                        <x-ui.status-pill icon="fa-solid fa-circle-info">
-                            Серия не выбрана
-                        </x-ui.status-pill>
-                    @endif
-                </div>
-
-                <div @class([
-                    'mt-3 overflow-hidden rounded-lg border',
-                    'border-emerald-200 bg-emerald-50' => $selectedMedia,
-                    'border-amber-200 bg-amber-50' => ! $selectedMedia,
-                ])>
-                    @if ($selectedMedia && $selectedMediaUrl)
-                        <video
-                                controls
-                                playsinline
-                                preload="metadata"
-                                poster="{{ $title->poster_url }}"
-                                class="js-catalog-player aspect-video w-full bg-black"
-                                @if ($selectedMediaFormat === 'm3u8') data-hls-src="{{ $selectedMediaUrl }}" @endif
-                            >
-                                <source src="{{ $selectedMediaUrl }}" @if ($selectedMediaType) type="{{ $selectedMediaType }}" @endif>
-                                Ваш браузер не поддерживает воспроизведение видео.
-                            </video>
-                    @else
-                        <div class="grid aspect-video place-items-center p-6 text-center text-amber-700">
-                            <div>
-                                <div class="mb-3 text-3xl text-amber-600">
-                                    <i class="fa-solid fa-circle-play" aria-hidden="true"></i>
-                                </div>
-                                <div class="text-lg font-bold text-amber-800">
-                                    {{ $selectedEpisode ? 'Видео для этой серии пока нет' : 'Выберите серию для просмотра' }}
-                                </div>
-                                <p class="mt-1 text-sm">Можно выбрать другую серию в списке ниже.</p>
-                            </div>
-                        </div>
-                    @endif
-                </div>
-
-                @if ($selectedEpisodeMediaItems->isNotEmpty())
-                    <div class="mt-4 rounded-lg border border-slate-200 bg-white">
-                        <div class="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
-                                <i class="fa-solid fa-sliders text-slate-400" aria-hidden="true"></i>
-                                <span>Настройки просмотра</span>
-                            </div>
-                            @if ($showView->selectedMediaBadges->isNotEmpty())
-                                <div class="flex flex-wrap gap-1">
-                                    @foreach ($showView->selectedMediaBadges as $badge)
-                                        <x-ui.status-pill size="xs" variant="success">{{ $badge }}</x-ui.status-pill>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
-
-                        @if ($showView->playbackOptionGroups !== [])
-                            <div class="space-y-4 p-4">
-                                @foreach ($showView->playbackOptionGroups as $group)
-                                    <section class="space-y-2">
-                                        <div class="inline-flex items-center gap-2 text-xs font-black uppercase tracking-wide text-slate-500">
-                                            <i class="{{ $group['icon'] }} text-slate-400" aria-hidden="true"></i>
-                                            <span>{{ $group['label'] }}</span>
-                                        </div>
-                                        <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                                            @foreach ($group['options'] as $option)
-                                                <a href="{{ $option['url'] }}" @class([
-                                                    'min-h-14 rounded-lg px-3 py-2 text-sm transition',
-                                                    'bg-emerald-50 text-emerald-800' => $option['active'],
-                                                    'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $option['active'],
-                                                ])>
-                                                    <span class="flex items-start gap-2 font-bold">
-                                                        <i class="{{ $option['icon'] }} mt-0.5 shrink-0" aria-hidden="true"></i>
-                                                        <span>{{ $option['label'] }}</span>
-                                                    </span>
-                                                    @if ($option['detail'])
-                                                        <span class="mt-1 block text-xs font-semibold text-slate-500">{{ $option['detail'] }}</span>
-                                                    @endif
-                                                </a>
-                                            @endforeach
-                                        </div>
-                                    </section>
-                                @endforeach
-                            </div>
-                        @else
-                            <div class="flex flex-wrap gap-2 p-4 text-xs font-bold text-slate-600">
-                                <x-ui.status-pill icon="fa-solid fa-file-video" variant="success" size="md">
-                                    {{ $showView->selectedPlaybackLabel }}
-                                </x-ui.status-pill>
-                            </div>
-                        @endif
-                    </div>
-                @elseif ($selectedMedia)
-                    <div class="mt-3 flex flex-wrap gap-2 text-xs font-bold text-slate-600">
-                        <x-ui.status-pill icon="fa-solid fa-file-video" variant="success" size="md">
-                            {{ $selectedMedia->title }}
-                        </x-ui.status-pill>
-                    </div>
-                @endif
-
-                @if ($mediaItems->isNotEmpty())
-                    <div class="mt-3 rounded-lg border border-slate-200 bg-white">
-                        <div class="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700">
-                            <i class="fa-solid fa-folder-open text-slate-400" aria-hidden="true"></i>
-                            <span>Все доступные варианты</span>
-                        </div>
-                        <div class="max-h-80 divide-y divide-slate-200 overflow-y-auto">
-                            @foreach ($mediaItems as $media)
-                                <a href="{{ route('titles.show', $showView->mediaQuery($media)) }}#player" @class([
-                                    'block px-4 py-3 hover:bg-emerald-50',
-                                    'bg-emerald-50' => $selectedMedia?->id === $media->id,
-                                ])>
-                                    <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                                        <span class="inline-flex items-center gap-2 font-semibold text-slate-700">
-                                            <i class="fa-solid fa-file-video text-emerald-700" aria-hidden="true"></i>
-                                            <span>{{ $media->title }}</span>
-                                        </span>
-                                        <span class="inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
-                                            <i class="fa-solid fa-circle-info text-slate-400" aria-hidden="true"></i>
-                                            <span>{{ $showView->mediaDetailsLabel($media) }}</span>
-                                        </span>
-                                    </div>
-                                </a>
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
-            </x-ui.panel>
+            <livewire:catalog-title-player :catalog-title-id="$title->id" />
 
             <x-ui.panel data-title-reference title="О сериале" icon="fa-solid fa-circle-info">
                 @if ($actors->isNotEmpty())
@@ -339,6 +138,34 @@
                             </div>
                         @endif
                     @endforeach
+                    @if ($aliases->isNotEmpty())
+                        <div class="grid gap-2 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
+                            <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
+                                <i class="fa-solid fa-signature text-slate-400" aria-hidden="true"></i>
+                                <span>Другие названия</span>
+                            </dt>
+                            <dd class="flex flex-wrap gap-1.5">
+                                @foreach ($aliases as $alias)
+                                    <x-ui.status-pill variant="muted">{{ $alias->name }}</x-ui.status-pill>
+                                @endforeach
+                            </dd>
+                        </div>
+                    @endif
+                    @if ($ratings->isNotEmpty())
+                        <div class="grid gap-2 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
+                            <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
+                                <i class="fa-solid fa-star text-slate-400" aria-hidden="true"></i>
+                                <span>Рейтинги</span>
+                            </dt>
+                            <dd class="flex flex-wrap gap-1.5">
+                                @foreach ($ratings as $rating)
+                                    <x-ui.status-pill variant="success">
+                                        {{ mb_strtoupper($rating->provider) }}: {{ $rating->rating }}@if ($rating->votes) · {{ $rating->votes }} голосов @endif
+                                    </x-ui.status-pill>
+                                @endforeach
+                            </dd>
+                        </div>
+                    @endif
                     @if ($title->year)
                         <div class="grid gap-2 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
                             <dt class="font-bold text-slate-500">Вышел</dt>
@@ -354,50 +181,6 @@
                         @endforeach
                     </div>
                 @endif
-            </x-ui.panel>
-
-            <x-ui.panel id="seasons" title="Сезоны и серии" icon="fa-solid fa-layer-group" :pad="false" class="scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48">
-                <div class="divide-y divide-slate-200">
-                    @forelse ($seasons as $season)
-                        <details id="season-{{ $season->number }}" class="group scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48" @if ($showView->isSelectedSeason($season, $loop->first)) open @endif>
-                            <summary class="flex cursor-pointer list-none flex-col gap-2 px-4 py-3 hover:bg-emerald-50 sm:flex-row sm:items-center sm:justify-between">
-                                <span class="min-w-0">
-                                    <span class="inline-flex items-center gap-2 font-bold text-slate-700">
-                                        <i class="fa-solid fa-chevron-down text-xs text-slate-400 transition group-open:rotate-180" aria-hidden="true"></i>
-                                        <span>Сезон {{ $season->number }}</span>
-                                    </span>
-                                    @if ($season->title && $season->title !== 'Сезон '.$season->number)
-                                        <span class="mt-1 block text-xs font-semibold text-slate-500">{{ $season->title }}</span>
-                                    @endif
-                                </span>
-                                <span class="flex flex-wrap gap-1">
-                                    <x-ui.status-pill variant="muted">
-                                        {{ $showView->seasonEpisodeCount($season) }} серий
-                                    </x-ui.status-pill>
-                                    @foreach ($showView->seasonStatusBadges($season) as $badge)
-                                        <x-ui.status-pill variant="success">{{ $badge }}</x-ui.status-pill>
-                                    @endforeach
-                                </span>
-                            </summary>
-
-                            <div class="px-4 pb-4">
-                                @if ($showView->seasonEpisodeCount($season) > 0)
-                                    <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                                        @foreach ($season->episodes as $episode)
-                                            <x-catalog.episode-link :title="$title" :episode="$episode" :show-view="$showView" />
-                                        @endforeach
-                                    </div>
-                                @else
-                                    <div class="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
-                                        Для этого сезона пока нет серий.
-                                    </div>
-                                @endif
-                            </div>
-                        </details>
-                    @empty
-                        <p class="p-4 text-sm text-slate-500">Сезоны не указаны.</p>
-                    @endforelse
-                </div>
             </x-ui.panel>
 
             <x-ui.panel title="Советуем посмотреть" icon="fa-solid fa-thumbs-up" :pad="false">

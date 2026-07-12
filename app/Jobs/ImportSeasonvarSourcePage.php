@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\SourcePage;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
+use App\Services\Seasonvar\SeasonvarImportGroupKey;
 use App\Services\Seasonvar\SeasonvarImportRunRecorder;
 use App\Services\Seasonvar\SeasonvarPageClaimManager;
 use DateTimeInterface;
@@ -49,6 +50,7 @@ class ImportSeasonvarSourcePage implements ShouldQueue
         SeasonvarPageClaimManager $claims,
         SeasonvarCatalogImporter $importer,
         SeasonvarImportRunRecorder $runs,
+        SeasonvarImportGroupKey $groupKeys,
     ): void {
         if (! $claims->owns($this->sourcePageId, $this->importRunId, $this->claimToken)) {
             return;
@@ -63,8 +65,18 @@ class ImportSeasonvarSourcePage implements ShouldQueue
             return;
         }
 
+        $page = SourcePage::query()->with('source')->find($this->sourcePageId);
+
+        if ($page === null) {
+            $runs->addCounters($this->importRunId, ['failed' => 1]);
+            $claims->release($this->sourcePageId, $this->importRunId, $this->claimToken);
+
+            return;
+        }
+
+        $groupKey = $groupKeys->forUrl($page->url, $page->url_hash);
         $lock = Cache::store((string) config('seasonvar.queue.lock_store', 'redis'))
-            ->lock($this->groupKey, $this->timeout + 300);
+            ->lock($groupKey, $this->timeout + 300);
 
         if (! $lock->get()) {
             $claims->extend($this->sourcePageId, $this->importRunId, $this->claimToken, 3600);
@@ -76,15 +88,6 @@ class ImportSeasonvarSourcePage implements ShouldQueue
         $releaseClaim = false;
 
         try {
-            $page = SourcePage::query()->with('source')->find($this->sourcePageId);
-
-            if ($page === null) {
-                $runs->addCounters($this->importRunId, ['failed' => 1]);
-                $releaseClaim = true;
-
-                return;
-            }
-
             $result = $importer->parsePages(
                 collect([$page]),
                 null,

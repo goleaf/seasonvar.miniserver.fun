@@ -152,6 +152,18 @@ class CatalogTitle extends Model
         return $this->hasMany(CatalogTitleRating::class);
     }
 
+    /** @return HasMany<CatalogTitleUserState, $this> */
+    public function userStates(): HasMany
+    {
+        return $this->hasMany(CatalogTitleUserState::class);
+    }
+
+    /** @return HasMany<EpisodeViewProgress, $this> */
+    public function viewProgress(): HasMany
+    {
+        return $this->hasMany(EpisodeViewProgress::class);
+    }
+
     /**
      * @return HasMany<SeasonvarImportEvent, $this>
      */

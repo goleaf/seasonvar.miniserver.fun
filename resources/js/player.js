@@ -48,6 +48,64 @@ const loadPlyr = async () => {
     return module.default;
 };
 
+const initializeProgressTracking = (video) => {
+    const episodeId = Number.parseInt(video.dataset.progressEpisode || '', 10);
+    const resumePosition = Number.parseInt(video.dataset.progressPosition || '', 10);
+
+    if (!Number.isInteger(episodeId) || episodeId < 1) {
+        return;
+    }
+
+    video.addEventListener('loadedmetadata', () => {
+        if (
+            Number.isInteger(resumePosition)
+            && resumePosition > 0
+            && Number.isFinite(video.duration)
+            && resumePosition < video.duration - 5
+            && video.currentTime < 1
+        ) {
+            video.currentTime = resumePosition;
+        }
+    }, { once: true });
+
+    if (video.dataset.progressEnabled !== '1') {
+        return;
+    }
+
+    let lastSavedPosition = resumePosition > 0 ? resumePosition : 0;
+
+    const dispatchProgress = (completed = false) => {
+        if (!Number.isFinite(video.duration) || video.duration < 1) {
+            return;
+        }
+
+        const positionSeconds = Math.max(0, Math.floor(completed ? video.duration : video.currentTime));
+
+        lastSavedPosition = positionSeconds;
+        video.dispatchEvent(new CustomEvent('catalog-progress', {
+            bubbles: true,
+            detail: {
+                episodeId,
+                positionSeconds,
+                durationSeconds: Math.floor(video.duration),
+                completed,
+            },
+        }));
+    };
+
+    video.addEventListener('timeupdate', () => {
+        if (Math.abs(Math.floor(video.currentTime) - lastSavedPosition) >= 30) {
+            dispatchProgress();
+        }
+    });
+    video.addEventListener('pause', () => {
+        if (!video.ended && Math.abs(Math.floor(video.currentTime) - lastSavedPosition) > 1) {
+            dispatchProgress();
+        }
+    });
+    video.addEventListener('ended', () => dispatchProgress(true));
+};
+
 export const initializeCatalogPlayers = async () => {
     const videos = [...document.querySelectorAll('video.js-catalog-player:not([data-player-ready])')];
 
@@ -81,7 +139,8 @@ export const initializeCatalogPlayers = async () => {
             video._catalogHls = hls;
         }
 
-        new Plyr(video, {
+        initializeProgressTracking(video);
+        video._catalogPlyr = new Plyr(video, {
             controls: playerControls,
             i18n: playerTranslations,
             iconUrl: plyrIconUrl,

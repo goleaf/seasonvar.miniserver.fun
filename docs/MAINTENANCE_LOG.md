@@ -2,6 +2,9 @@
 
 ## 2026-07-12
 
+- Карточка сериала переведена на вложенный Livewire 4 playback-компонент: статическая оболочка загружает metadata и summaries сезонов, серии/media загружаются только для активного сезона, а shareable URL сохраняет season/episode/media profile.
+- Добавлены additive таблицы watchlist/rating и episode progress, server-side `CatalogTitlePolicy`, deterministic continue/next/replay/start action и throttled сохранение позиции из локального Plyr/HLS player.
+- Общая playback boundary исключает hidden/window/audience releases и published media без фактического playback location из counts, выбора серии, primary action и прогресса; рекомендации повторно проходят доступность текущего пользователя.
 - Добавлен Redis queued-режим `seasonvar:import --queued`, атомарные lease страниц, Redis-блокировка сезонов одного тайтла, десять systemd workers и cron на 10 запусков диспетчера в сутки; успешные страницы повторно проверяются через 24 часа и обновляют изменившийся постер по новому HTML.
 - Multi-select каталог использует единый контракт OR внутри группы и AND между группами для годов, справочников, типов публикации, качеств и субтитров; grouped pivot-подзапросы сохраняют точный paginator total без `distinct` основной выборки.
 - Добавлены URL-синхронизированные группы `publication_type[]` и `subtitles[]`, точечное удаление выбранных значений и debounced серверный поиск актеров/режиссеров с лимитом 24 результата. Языки дорожек не симулируются: используется существующая озвучка/перевод и признак наличия субтитров.

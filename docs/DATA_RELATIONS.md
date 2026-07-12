@@ -13,6 +13,8 @@
 - `CatalogTitle hasMany CatalogTitleRating`
 - `CatalogTitle hasMany CatalogTitleReview`
 - `CatalogTitle hasMany SeasonvarImportEvent`
+- `CatalogTitle hasMany CatalogTitleUserState`
+- `CatalogTitle hasMany EpisodeViewProgress`
 - `CatalogTitle belongsToMany Genre`
 - `CatalogTitle belongsToMany Country`
 - `CatalogTitle belongsToMany Actor`
@@ -28,6 +30,7 @@
 - `Season hasMany Episode`
 - `Episode belongsTo Season`
 - `Episode belongsTo SourcePage`
+- `Episode hasMany EpisodeViewProgress`
 - `LicensedMedia belongsTo CatalogTitle`
 - `LicensedMedia belongsTo Season`
 - `LicensedMedia belongsTo Episode`
@@ -43,6 +46,7 @@
 - `SeasonvarImportRun hasMany SourcePageSnapshot`
 - `SeasonvarImportRun hasMany SourcePage` через `last_import_run_id`
 - Каждая модель связи каталога относится ко многим `CatalogTitle` через явную pivot-таблицу.
+- `User hasMany CatalogTitleUserState` и `User hasMany EpisodeViewProgress`; unique `(user_id, catalog_title_id)` хранит одну watchlist/rating запись, unique `(user_id, episode_id)` — одну позицию выпуска.
 - Для метаданных каталога не используются morph- или polymorphic-связи.
 
 ## Целостность выпуска и публикации
@@ -55,6 +59,7 @@
 - Порядок сезонов и серий детерминирован: `kind`, `sort_order`, `number`, `id`; обычные выпуски идут до специальных и не перенумеровываются из-за specials.
 - `CatalogTitle`, `Season`, `Episode` и `LicensedMedia` используют soft delete; merge импортёра применяет физическое удаление только к уже объединённым дублям, чтобы не оставлять конфликтующие provider keys.
 - Публичные медиа проверяют собственный status/window/audience и доступность связанных сезона и серии.
+- Playback дополнительно требует непустой `playback_url` или `path`; пустая опубликованная media row не делает серию доступной и не попадает в counts/primary action.
 
 ## Типы фильтров справочников
 
@@ -147,10 +152,12 @@
 - Существующие связи, серии и медиа сохраняются, если они исчезли со страницы источника.
 - Импортируемые сезоны и серии всегда записываются как `regular`, получают `sort_order=number`, публичное состояние и восстанавливаются после soft delete по стабильному составному ключу.
 - Измененные название, описание, постер, рейтинг и поля видео-ссылок обновляются.
+- JSON-плейлисты Seasonvar разворачиваются рекурсивно: листовые записи с `file` импортируются и из вложенных `folder`, при этом URL по-прежнему проходит allowlist прямых видео-форматов.
 - Дубли страниц сезонов объединяются в одну `CatalogTitle`; сезоны остаются внутренними записями.
 - Один запуск импорта держит cache lock, чтобы две копии `seasonvar:import` не обновляли одну очередь одновременно.
 - Если частый cron стартует новую копию во время активного импорта, команда пропускает этот запуск с успешным кодом выхода.
 - Каждый цикл импорта помечает неправильные вложенные ссылки Seasonvar как недоступные и проверяет ограниченный backlog старых медиа с пустым или устаревшим статусом доступности.
+- При старте каждого обычного или queued цикла один ограниченный chunk страниц `missing_data` повторяется раньше общего `retry_after_at`; выборка ротируется по времени попытки и не отменяет backoff для HTTP/connection failures.
 - Каждый цикл импорта нормализует старые состояния разобранных страниц источника и дозаполняет отсутствующие ключи медиа, качество, формат и перевод.
 
 ## Счетчики публичного каталога

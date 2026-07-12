@@ -10,6 +10,7 @@
 - Multi-value свойства используют `#[Url(history: true)]`, поэтому выбранные значения сохраняются при сортировке, пагинации, обновлении страницы и browser back/forward. Удаление одного chip меняет только одно значение, групповой сброс очищает только указанную группу.
 - Empty-state свойства формы допускают `null` на границе Livewire hydration, потому что Laravel преобразует пустые JSON-строки до lifecycle hooks; `CatalogSeriesFilters::toRequestInput()` отбрасывает `null`, а успешная нормализация возвращает UI-default `''`.
 - `optionSearch.actor` и `optionSearch.director` — временные строки серверного поиска вариантов: они не попадают в URL и не заменяют выбранные actor/director slug.
+- Карточка тайтла использует Livewire actions для watchlist/rating; rating принимает только 1–10 и показывает русскую ошибку в component error bag. Season/episode/media controls остаются ссылками с GET fallback и одновременно используют `wire:click.prevent` для обновления без полной перезагрузки.
 
 ## Компоненты
 

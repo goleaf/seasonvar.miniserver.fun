@@ -3,13 +3,16 @@
 namespace Tests\Feature;
 
 use App\Livewire\CatalogSeries;
+use App\Livewire\CatalogTitlePlayer;
 use App\Livewire\StatsDashboard;
 use App\Models\Actor;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
 use App\Models\CatalogTitleRecommendation;
+use App\Models\CatalogTitleUserState;
 use App\Models\Country;
 use App\Models\Episode;
+use App\Models\EpisodeViewProgress;
 use App\Models\Genre;
 use App\Models\LicensedMedia;
 use App\Models\Season;
@@ -521,6 +524,23 @@ class CatalogPageTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_authenticated_title_binding_is_enforced_on_the_server(): void
+    {
+        $user = User::factory()->create();
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Сериал после входа',
+            'slug' => 'serial-posle-vhoda',
+            'audience' => 'authenticated',
+        ]);
+
+        $this->get(route('titles.show', $catalogTitle))->assertNotFound();
+
+        $this->actingAs($user)
+            ->get(route('titles.show', $catalogTitle))
+            ->assertOk()
+            ->assertSeeText('Сериал после входа');
+    }
+
     public function test_stats_issue_rows_merge_multiple_issue_categories(): void
     {
         $withoutPoster = CatalogTitle::factory()->create([
@@ -902,6 +922,59 @@ class CatalogPageTest extends TestCase
             ]);
     }
 
+    public function test_title_page_recommendations_respect_the_current_viewers_publication_boundary(): void
+    {
+        $user = User::factory()->create();
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Главный сериал с ограниченными советами',
+            'slug' => 'glavnyi-serial-s-ogranichennymi-sovetami',
+        ]);
+        $publicRecommendation = CatalogTitle::factory()->create([
+            'title' => 'Публичный совет',
+            'slug' => 'publichnyi-sovet',
+        ]);
+        $authenticatedRecommendation = CatalogTitle::factory()->create([
+            'title' => 'Совет после входа',
+            'slug' => 'sovet-posle-vhoda',
+            'audience' => 'authenticated',
+        ]);
+        $hiddenRecommendation = CatalogTitle::factory()->create([
+            'title' => 'Скрытый совет',
+            'slug' => 'skrytyi-sovet',
+            'publication_status' => 'hidden',
+        ]);
+
+        collect([$publicRecommendation, $authenticatedRecommendation, $hiddenRecommendation])
+            ->each(function (CatalogTitle $recommendedTitle) use ($catalogTitle): void {
+                LicensedMedia::factory()->create([
+                    'catalog_title_id' => $recommendedTitle->id,
+                    'status' => 'published',
+                    'published_at' => now(),
+                ]);
+                CatalogTitleRecommendation::query()->create([
+                    'catalog_title_id' => $catalogTitle->id,
+                    'recommended_title_id' => $recommendedTitle->id,
+                    'score' => 900 - $recommendedTitle->id,
+                    'rank' => $recommendedTitle->id,
+                    'reasons' => ['genre' => ['count' => 1, 'score' => 500]],
+                    'computed_at' => now(),
+                ]);
+            });
+
+        $this->get(route('titles.show', $catalogTitle))
+            ->assertOk()
+            ->assertSeeText('Публичный совет')
+            ->assertDontSeeText('Совет после входа')
+            ->assertDontSeeText('Скрытый совет');
+
+        $this->actingAs($user)
+            ->get(route('titles.show', $catalogTitle))
+            ->assertOk()
+            ->assertSeeText('Публичный совет')
+            ->assertSeeText('Совет после входа')
+            ->assertDontSeeText('Скрытый совет');
+    }
+
     public function test_title_page_limits_stale_precomputed_recommendations(): void
     {
         config(['seasonvar.recommendations.max_per_title' => 3]);
@@ -961,6 +1034,269 @@ class CatalogPageTest extends TestCase
         $this->get(route('titles.show', $catalogTitle))
             ->assertOk()
             ->assertSeeText('Сериал без таблицы рекомендаций');
+    }
+
+    public function test_title_page_loads_only_the_active_season_episodes_and_keeps_exact_visible_counts(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Большой сериал',
+            'slug' => 'bolshoi-serial',
+        ]);
+        $firstSeason = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 1,
+        ]);
+        $secondSeason = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 2,
+        ]);
+        $firstEpisode = Episode::factory()->create([
+            'season_id' => $firstSeason->id,
+            'number' => 1,
+            'title' => 'Серия активного сезона',
+        ]);
+        $secondEpisode = Episode::factory()->create([
+            'season_id' => $secondSeason->id,
+            'number' => 1,
+            'title' => 'Серия неактивного сезона',
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $firstSeason->id,
+            'episode_id' => $firstEpisode->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $secondSeason->id,
+            'episode_id' => $secondEpisode->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $this->get(route('titles.show', $catalogTitle))
+            ->assertOk()
+            ->assertSeeText('2 серий')
+            ->assertSeeText('Начать с 1 серии')
+            ->assertSeeText('Серия активного сезона')
+            ->assertDontSeeText('Серия неактивного сезона');
+
+        $this->get(route('titles.show', [
+            'catalogTitle' => $catalogTitle,
+            'season' => $secondSeason->id,
+        ]))
+            ->assertOk()
+            ->assertSeeText('Серия неактивного сезона')
+            ->assertDontSeeText('Серия активного сезона');
+    }
+
+    public function test_catalog_title_player_resolves_continue_next_and_replay_actions_from_progress(): void
+    {
+        $user = User::factory()->create();
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Сериал с прогрессом',
+            'slug' => 'serial-s-progressom',
+        ]);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 1,
+        ]);
+        $episodes = collect(range(1, 3))->map(function (int $number) use ($catalogTitle, $season): Episode {
+            $episode = Episode::factory()->create([
+                'season_id' => $season->id,
+                'number' => $number,
+                'title' => 'Серия '.$number,
+            ]);
+            LicensedMedia::factory()->create([
+                'catalog_title_id' => $catalogTitle->id,
+                'season_id' => $season->id,
+                'episode_id' => $episode->id,
+                'status' => 'published',
+                'published_at' => now(),
+            ]);
+
+            return $episode;
+        });
+        EpisodeViewProgress::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $catalogTitle->id,
+            'episode_id' => $episodes[1]->id,
+            'position_seconds' => 120,
+            'duration_seconds' => 600,
+            'last_watched_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->assertSeeText('Продолжить 2 серию');
+
+        EpisodeViewProgress::query()->where('episode_id', $episodes[1]->id)->update([
+            'position_seconds' => 600,
+            'completed_at' => now(),
+            'last_watched_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->assertSeeText('Следующая: 3 серия');
+
+        EpisodeViewProgress::query()->where('episode_id', $episodes[1]->id)->delete();
+        EpisodeViewProgress::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $catalogTitle->id,
+            'episode_id' => $episodes[2]->id,
+            'position_seconds' => 600,
+            'duration_seconds' => 600,
+            'completed_at' => now(),
+            'last_watched_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->assertSeeText('Смотреть сначала');
+    }
+
+    public function test_catalog_title_player_persists_only_the_authenticated_users_private_state(): void
+    {
+        $user = User::factory()->create();
+        $catalogTitle = CatalogTitle::factory()->create();
+        $season = Season::factory()->create(['catalog_title_id' => $catalogTitle->id]);
+        $episode = Episode::factory()->create(['season_id' => $season->id]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->call('toggleWatchlist')
+            ->call('setRating', 8)
+            ->call('recordProgress', $episode->id, 125, 600, false)
+            ->assertSeeText('В списке просмотра')
+            ->assertSeeText('Ваша оценка: 8 из 10');
+
+        $state = CatalogTitleUserState::query()
+            ->whereBelongsTo($user)
+            ->whereBelongsTo($catalogTitle)
+            ->sole();
+        $progress = EpisodeViewProgress::query()
+            ->whereBelongsTo($user)
+            ->whereBelongsTo($episode)
+            ->sole();
+
+        $this->assertTrue($state->in_watchlist);
+        $this->assertSame(8, $state->rating);
+        $this->assertSame(125, $progress->position_seconds);
+        $this->assertNull($progress->completed_at);
+
+        Livewire::actingAs($user)
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->call('recordProgress', $episode->id, 1, 10, false);
+
+        $this->assertNull($progress->fresh()->completed_at);
+
+        Livewire::actingAs($user)
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->call('setRating', '')
+            ->assertSeeText('Ваша оценка');
+
+        $this->assertNull($state->fresh()->rating);
+
+        auth()->logout();
+
+        Livewire::test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->call('toggleWatchlist')
+            ->assertForbidden();
+    }
+
+    public function test_catalog_title_player_excludes_unavailable_releases_from_counts_actions_and_selections(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Сериал с ограничениями',
+            'slug' => 'serial-s-ogranicheniiami',
+        ]);
+        $season = Season::factory()->create(['catalog_title_id' => $catalogTitle->id, 'number' => 1]);
+        $availableEpisode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 1,
+            'title' => 'Доступная серия',
+        ]);
+        $hiddenEpisode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 2,
+            'title' => 'Скрытая серия',
+            'publication_status' => 'hidden',
+        ]);
+        $missingSourceEpisode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 3,
+            'title' => 'Серия без источника',
+        ]);
+        $authenticatedEpisode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 4,
+            'title' => 'Серия после входа',
+            'audience' => 'authenticated',
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $availableEpisode->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $authenticatedEpisode->id,
+            'status' => 'published',
+            'audience' => 'authenticated',
+            'published_at' => now(),
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $missingSourceEpisode->id,
+            'path' => '',
+            'playback_url' => null,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $hiddenEpisode->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        Livewire::test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->assertSeeText('1 серия доступна')
+            ->assertSeeText('Начать с 1 серии')
+            ->assertSeeText('Доступная серия')
+            ->assertDontSeeText('Скрытая серия')
+            ->assertDontSeeText('Серия без источника')
+            ->assertDontSeeText('Серия после входа')
+            ->call('selectEpisode', $missingSourceEpisode->id)
+            ->assertSet('episode', '');
+
+        Livewire::actingAs(User::factory()->create())
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->assertSeeText('2 серии доступны')
+            ->assertSeeText('Серия после входа');
+
+        Livewire::withQueryParams([
+            'season' => 999999,
+            'episode' => $missingSourceEpisode->id,
+            'media' => 999999,
+        ])->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->assertSet('season', '')
+            ->assertSet('episode', '')
+            ->assertSet('media', '');
     }
 
     public function test_title_page_renders_selected_episode_media_state(): void

@@ -5,16 +5,12 @@ namespace App\Services\Catalog;
 use App\Http\Requests\CatalogShowRequest;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
-use App\Models\Episode;
-use App\Models\LicensedMedia;
 use App\Models\User;
 use App\Services\Media\ExternalMediaMetadata;
 use App\View\ViewModels\CatalogShowViewModel;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 
 class CatalogTitlePageBuilder
 {
@@ -23,6 +19,7 @@ class CatalogTitlePageBuilder
     public function __construct(
         private readonly CatalogSeoBuilder $seo,
         private readonly CatalogTitleQuery $query,
+        private readonly CatalogTitlePlaybackQuery $playback,
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly ExternalMediaMetadata $mediaMetadata,
     ) {}
@@ -32,88 +29,14 @@ class CatalogTitlePageBuilder
      */
     public function data(CatalogShowRequest $request, CatalogTitle $catalogTitle): array
     {
-        $catalogTitle->load(array_merge([
-            'sourcePage',
-            'aliases',
-            'ratings',
-            'seasons' => fn (HasMany $query): HasMany => $query
-                ->availableTo($request->user())
-                ->with([
-                    'episodes' => fn (HasMany $query): HasMany => $query->availableTo($request->user()),
-                ]),
-            'licensedMedia' => fn (HasMany $query): HasMany => $query
-                ->availableTo($request->user())
-                ->forAvailableReleases($request->user())
-                ->with(['season', 'episode'])
-                ->latest('published_at')
-                ->latest(),
-        ], $this->taxonomies->relationNames()));
+        $catalogTitle->load(array_merge(['aliases', 'ratings'], $this->taxonomies->relationNames()));
         $taxonomiesByType = collect($this->taxonomies->relations())
             ->mapWithKeys(fn (array $config, string $filterType): array => [$filterType => $catalogTitle->{$config['relation']}->values()]);
-        $seasons = $catalogTitle->seasons->values();
-        $episodes = $seasons
-            ->flatMap(fn ($season): Collection => $season->episodes->values())
-            ->values();
-
-        $mediaItems = $catalogTitle->licensedMedia
-            ->sortBy(fn (LicensedMedia $media): string => sprintf(
-                '%05d-%05d-%02d-%s',
-                $media->season?->number ?? 99999,
-                $media->episode?->number ?? 99999,
-                $this->query->mediaQualityRank($media->quality),
-                $media->title,
-            ))
-            ->values();
-        $requestedEpisodeId = $request->episodeId();
-        $requestedMediaId = $request->mediaId();
-        $requestedVariantKey = $request->variantKey();
-        $requestedQuality = $request->quality();
-        $requestedFormat = $request->mediaFormat();
-        $selectedEpisode = $requestedEpisodeId > 0
-            ? $episodes->firstWhere('id', $requestedEpisodeId)
-            : null;
-        $selectedMedia = $requestedMediaId > 0
-            ? $mediaItems->firstWhere('id', $requestedMediaId)
-            : null;
-
-        if ($selectedMedia !== null
-            && $selectedEpisode !== null
-            && $selectedMedia->episode_id !== null
-            && (int) $selectedMedia->episode_id !== (int) $selectedEpisode->id
-        ) {
-            $selectedMedia = null;
-        }
-
-        if ($selectedMedia === null && $selectedEpisode !== null) {
-            $selectedMedia = $this->bestMediaForEpisode(
-                $mediaItems,
-                $selectedEpisode,
-                $requestedVariantKey,
-                $requestedQuality,
-                $requestedFormat,
-            );
-        }
-
-        if ($selectedEpisode === null && $selectedMedia?->episode_id !== null) {
-            $selectedEpisode = $episodes->firstWhere('id', $selectedMedia->episode_id)
-                ?? $selectedMedia->episode;
-        }
-
-        if ($selectedMedia === null && $selectedEpisode === null) {
-            $selectedMedia = $mediaItems->first();
-        }
-
-        if ($selectedEpisode === null && $selectedMedia?->episode_id !== null) {
-            $selectedEpisode = $episodes->firstWhere('id', $selectedMedia->episode_id)
-                ?? $selectedMedia->episode;
-        }
-
-        $selectedEpisode ??= $episodes->first();
-        $selectedMediaUrl = $selectedMedia ? ($selectedMedia->playback_url ?: $selectedMedia->path) : null;
-        $episodeCount = $seasons->sum(fn ($season): int => (int) $season->episodes->count());
+        $seasons = $this->playback->seasonSummaries($catalogTitle, $request->user());
+        $episodeCount = (int) $seasons->sum('available_episodes_count');
         $taxonomyCount = $taxonomiesByType->sum(fn (Collection $items): int => $items->count());
-        $parsedSeasonCount = $seasons->filter(fn ($season): bool => $season->episodes->isNotEmpty())->count();
-        $mediaCount = $mediaItems->count();
+        $parsedSeasonCount = $seasons->filter(fn ($season): bool => (int) $season->available_episodes_count > 0)->count();
+        $mediaCount = $this->playback->availableMedia($catalogTitle, $request->user())->count();
         $genreIds = $taxonomiesByType->get('genre', collect())->pluck('id')->unique()->values();
         $genreRecommendations = $this->relatedTitleSummaryQuery($catalogTitle, $request->user())
             ->when($genreIds->isNotEmpty(), fn (Builder $query): Builder => $query->whereHas('genres', fn (Builder $query): Builder => $query->whereKey($genreIds)))
@@ -133,9 +56,9 @@ class CatalogTitlePageBuilder
             title: $catalogTitle,
             taxonomiesByType: $taxonomiesByType,
             seasons: $seasons,
-            mediaItems: $mediaItems,
-            selectedEpisode: $selectedEpisode,
-            selectedMedia: $selectedMedia,
+            mediaItems: collect(),
+            selectedEpisode: null,
+            selectedMedia: null,
             mediaMetadata: $this->mediaMetadata,
             episodeCount: $episodeCount,
             taxonomyCount: $taxonomyCount,
@@ -165,20 +88,15 @@ class CatalogTitlePageBuilder
             'episodeCount' => $episodeCount,
             'taxonomyCount' => $taxonomyCount,
             'parsedSeasonCount' => $parsedSeasonCount,
-            'selectedEpisode' => $selectedEpisode,
-            'selectedMedia' => $selectedMedia,
-            'selectedMediaUrl' => $showView->selectedMediaUrl,
-            'selectedMediaFormat' => $showView->selectedMediaFormat,
-            'selectedMediaType' => $showView->selectedMediaType,
-            'selectedEpisodeMediaItems' => $showView->selectedEpisodeMediaItems,
-            'mediaItems' => $mediaItems,
             'mediaCount' => $mediaCount,
+            'aliases' => $catalogTitle->aliases,
+            'ratings' => $catalogTitle->ratings,
             'topTaxonomies' => $showView->topTaxonomies,
             'showView' => $showView,
             'recommendedTitleRecommendations' => $recommendedTitleRecommendations,
             'genreRecommendations' => $genreRecommendations,
             'yearRecommendations' => $yearRecommendations,
-            'seo' => $this->seo->title($catalogTitle, $taxonomiesByType, $seasons, $episodeCount, $mediaCount, $selectedMedia, $selectedMediaUrl),
+            'seo' => $this->seo->title($catalogTitle, $taxonomiesByType, $seasons, $episodeCount, $mediaCount, null, null),
         ];
     }
 
@@ -201,6 +119,7 @@ class CatalogTitlePageBuilder
         }
 
         return $catalogTitle->recommendations()
+            ->whereHas('recommendedTitle', fn (Builder $query): Builder => $this->query->constrainVisible($query, $user))
             ->orderBy('rank')
             ->orderByDesc('score')
             ->limit($this->recommendationDisplayLimit())
@@ -235,100 +154,5 @@ class CatalogTitlePageBuilder
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url', 'indexed_at'])
             ->with($this->taxonomies->cardRelations())
             ->withCount($this->query->publicCardCounts($user));
-    }
-
-    /**
-     * @param  Collection<int, LicensedMedia>  $mediaItems
-     */
-    private function bestMediaForEpisode(
-        Collection $mediaItems,
-        Episode $episode,
-        ?string $variantKey,
-        ?string $quality,
-        ?string $format,
-    ): ?LicensedMedia {
-        $episodeMediaItems = $mediaItems
-            ->filter(fn (LicensedMedia $media): bool => (int) $media->episode_id === (int) $episode->id)
-            ->values();
-
-        if ($episodeMediaItems->isEmpty()) {
-            return null;
-        }
-
-        $candidates = $episodeMediaItems;
-        $variantMatches = $variantKey !== null
-            ? $candidates->filter(fn (LicensedMedia $media): bool => $this->mediaVariantKey($media) === $variantKey)->values()
-            : collect();
-
-        if ($variantMatches->isNotEmpty()) {
-            $candidates = $variantMatches;
-        }
-
-        $qualityMatches = $quality !== null
-            ? $candidates->filter(fn (LicensedMedia $media): bool => $this->sameNormalizedValue($this->mediaQuality($media), $quality))->values()
-            : collect();
-
-        if ($qualityMatches->isNotEmpty()) {
-            $candidates = $qualityMatches;
-        }
-
-        $formatMatches = $format !== null
-            ? $candidates->filter(fn (LicensedMedia $media): bool => $this->sameNormalizedValue($this->mediaFormat($media), $format))->values()
-            : collect();
-
-        if ($formatMatches->isNotEmpty()) {
-            $candidates = $formatMatches;
-        }
-
-        return $candidates->first();
-    }
-
-    private function mediaVariantKey(LicensedMedia $media): ?string
-    {
-        if (is_string($media->variant_key) && $media->variant_key !== '') {
-            return $media->variant_key;
-        }
-
-        $url = $this->mediaUrl($media);
-
-        if ($url === null) {
-            return null;
-        }
-
-        return $this->mediaMetadata->playbackVariant($media->title, $media->source_url, $url)['variant_key'];
-    }
-
-    private function mediaQuality(LicensedMedia $media): ?string
-    {
-        if (is_string($media->quality) && $media->quality !== '') {
-            return $media->quality;
-        }
-
-        $url = $this->mediaUrl($media);
-
-        return $url !== null ? $this->mediaMetadata->quality($media->title, $url) : null;
-    }
-
-    private function mediaFormat(LicensedMedia $media): ?string
-    {
-        if (is_string($media->format) && $media->format !== '') {
-            return $media->format;
-        }
-
-        $url = $this->mediaUrl($media);
-
-        return $url !== null ? $this->mediaMetadata->format($url) : null;
-    }
-
-    private function mediaUrl(LicensedMedia $media): ?string
-    {
-        $url = $media->playback_url ?: $media->path;
-
-        return is_string($url) && trim($url) !== '' ? $url : null;
-    }
-
-    private function sameNormalizedValue(?string $actual, string $expected): bool
-    {
-        return $actual !== null && Str::lower($actual) === Str::lower($expected);
     }
 }

@@ -837,6 +837,43 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $this->assertSame(['episodes_without_video', 'pending', 'stale'], $selectedReasons);
     }
 
+    public function test_refresh_planner_retries_a_bounded_attention_batch_on_every_start(): void
+    {
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $attentionPages = collect(range(1, 3))->map(function (int $index) use ($source): SourcePage {
+            return SourcePage::factory()->create([
+                'source_id' => $source->id,
+                'page_type' => 'serial',
+                'parse_status' => 'parsed',
+                'import_status' => 'missing_data',
+                'missing_data_flags' => ['episodes_without_video'],
+                'last_imported_at' => now()->subHours(4 - $index),
+                'retry_after_at' => now()->addHours(23 + $index),
+            ]);
+        });
+        $events = [];
+        $pages = collect();
+
+        foreach (app(SeasonvarRefreshPlanner::class)->pageChunksForImportCycle(
+            2,
+            now()->subHours(168),
+            null,
+            function (string $event, array $context) use (&$events): void {
+                $events[] = ['event' => $event, 'context' => $context];
+            },
+        ) as $chunk) {
+            $pages = $pages->merge($chunk);
+        }
+
+        $this->assertSame($attentionPages->take(2)->pluck('id')->all(), $pages->pluck('id')->all());
+        $this->assertSame('needs_attention', $events[0]['context']['reason'] ?? null);
+        $this->assertSame(2, $events[0]['context']['selected'] ?? null);
+    }
+
     public function test_refresh_planner_selects_direct_season_page_when_linked_season_has_no_episodes(): void
     {
         $source = Source::factory()->create([

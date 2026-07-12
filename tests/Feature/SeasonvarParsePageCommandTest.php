@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendationSignal;
+use App\Models\Episode;
 use App\Models\Genre;
 use App\Models\Season;
 use App\Models\Source;
@@ -176,6 +177,61 @@ class SeasonvarParsePageCommandTest extends TestCase
             'storage_disk' => 'seasonvar_parsed',
             'playback_url' => 'https://media.example.com/kitchen/s04e02.mp4',
             'quality' => '720p',
+            'status' => 'published',
+        ]);
+    }
+
+    public function test_it_imports_nested_seasonvar_player_playlist_folders(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake([
+            'seasonvar.ru/serial-7762-Poka_prohodit_zhizn_psfhncj.html' => Http::response($this->seasonPageHtml(1, [
+                1 => '1 серия',
+                101 => '101 серия',
+            ], seasonvarPlaylists: ['/playls2/hash/trans/7762/plist.txt?time=1783891671'])),
+            'seasonvar.ru/playls2/hash/trans/7762/plist.txt?time=1783891671' => Http::response(json_encode([
+                [
+                    'title' => '1-100 серия',
+                    'folder' => [
+                        [
+                            'title' => '1 серия SD<br>',
+                            'file' => $this->encodedSeasonvarPlayerFile('//media.example.com/mientras-haya-vida/s01e01.mp4'),
+                            'id' => '1',
+                        ],
+                    ],
+                ],
+                [
+                    'title' => '101-187 серия',
+                    'folder' => [
+                        [
+                            'title' => '101 серия SD<br>',
+                            'file' => $this->encodedSeasonvarPlayerFile('//media.example.com/mientras-haya-vida/s01e101.mp4'),
+                            'id' => '101',
+                        ],
+                    ],
+                ],
+            ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)),
+        ]);
+
+        $this->artisan('seasonvar:import', [
+            'url' => 'https://seasonvar.ru/serial-7762-Poka_prohodit_zhizn_psfhncj.html',
+        ])->assertExitCode(0);
+
+        $catalogTitle = CatalogTitle::query()->where('external_id', '7762')->firstOrFail();
+        $episodeIds = Episode::query()
+            ->whereHas('season', fn ($query) => $query->where('catalog_title_id', $catalogTitle->id))
+            ->pluck('id', 'number');
+
+        $this->assertDatabaseHas('licensed_media', [
+            'catalog_title_id' => $catalogTitle->id,
+            'episode_id' => $episodeIds->get(1),
+            'playback_url' => 'https://media.example.com/mientras-haya-vida/s01e01.mp4',
+            'status' => 'published',
+        ]);
+        $this->assertDatabaseHas('licensed_media', [
+            'catalog_title_id' => $catalogTitle->id,
+            'episode_id' => $episodeIds->get(101),
+            'playback_url' => 'https://media.example.com/mientras-haya-vida/s01e101.mp4',
             'status' => 'published',
         ]);
     }

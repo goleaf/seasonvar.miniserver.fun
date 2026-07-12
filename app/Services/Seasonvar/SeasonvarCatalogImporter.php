@@ -1586,7 +1586,7 @@ class SeasonvarCatalogImporter
         $seasonNumber = $playlistItem['season_number'];
         $items = [];
 
-        foreach ($decoded as $entry) {
+        foreach ($this->flattenSeasonvarPlaylistEntries($decoded) as $entry) {
             if (! is_array($entry)) {
                 continue;
             }
@@ -1614,6 +1614,35 @@ class SeasonvarCatalogImporter
                 'source_url' => $playlistUrl,
                 'kind' => $this->parsedMediaExtension($url) === 'm3u8' ? 'playlist' : 'file',
             ];
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $entries
+     * @return list<array<string, mixed>>
+     */
+    private function flattenSeasonvarPlaylistEntries(array $entries, int $depth = 0): array
+    {
+        if ($depth > 16) {
+            return [];
+        }
+
+        $items = [];
+
+        foreach ($entries as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+
+            if (isset($entry['file']) && is_string($entry['file'])) {
+                $items[] = $entry;
+            }
+
+            if (isset($entry['folder']) && is_array($entry['folder'])) {
+                array_push($items, ...$this->flattenSeasonvarPlaylistEntries($entry['folder'], $depth + 1));
+            }
         }
 
         return $items;

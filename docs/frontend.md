@@ -7,7 +7,7 @@
 - Vite 8 и `laravel-vite-plugin` 3 собирают фронтенд.
 - Tailwind CSS 4 подключается через `@tailwindcss/vite` и `resources/css/app.css`.
 - FontAwesome, Plyr и HLS подключаются из локальных npm-пакетов, без CDN.
-- Livewire 4 используется для интерактивного каталога `/titles` и live-страницы `/stats`; ассеты Livewire подключаются явно через layout.
+- Livewire 4 используется для интерактивного каталога `/titles`, playback-island карточки `/titles/{slug}` и live-страницы `/stats`; ассеты Livewire подключаются явно через layout.
 
 ## Команды
 
@@ -28,6 +28,7 @@ composer dev
 - Основная точка входа Vite одна: `resources/js/app.js`.
 - `resources/js/app.js` импортирует `resources/css/app.css` и глобальные стили FontAwesome.
 - Player-код для Plyr/HLS находится в `resources/js/player.js` и загружается dynamic import только на страницах с `video.js-catalog-player`.
+- Player восстанавливает сохранённую позицию после metadata load, раз в 30 секунд и при pause/ended отправляет bounded progress event только для authenticated markup. После Livewire morph локальные Plyr/HLS instances уничтожаются и инициализируются заново без второго глобального bundle.
 - Поиск актеров и режиссеров выполняется Livewire на сервере с debounce 350 мс и лимитом 24 результата, поэтому полный справочник не попадает в браузер. Локальный поиск для остальных длинных групп остается progressive enhancement из `resources/js/app.js`; GET-форма работает без JavaScript.
 - Серверное состояние `/titles` ведёт `CatalogSeries`: строка поиска обновляется с debounce 650 мс, checkbox/расширенные поля применяются по submit, а сортировка, вид, размер страницы, алфавит и пагинация обновляются отдельными Livewire actions. Для всех форм сохранён обычный GET fallback; malformed и out-of-range `page` канонизируется redirect-ом, чтобы адресная строка не сохраняла stale границу.
 - Для HLS используется `hls.js/light`: он сохраняет воспроизведение HLS-плейлистов и не тянет модули субтитров, DRM и расширенной аналитики, которые сейчас не используются интерфейсом.

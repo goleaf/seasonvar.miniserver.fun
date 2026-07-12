@@ -253,7 +253,7 @@ class CatalogSeoBuilder
         $faqItems = $this->titleFaqItems($catalogTitle, $genres, $countries, $seasons->count(), $episodeCount, $mediaCount);
         $keywordCollection = $this->titleKeywordCollection($catalogTitle, $alternateNames, $genres, $countries, $actors, $directors, $seasons->count(), $episodeCount, $mediaCount);
         $searchPhrases = $this->titleSearchPhrases($catalogTitle, $keywordCollection, $genres, $countries, $seasons->count(), $episodeCount, $mediaCount);
-        $jsonLd = [
+        $jsonLd = array_values(array_filter([
             $this->organizationJsonLd(),
             $this->websiteJsonLd(),
             $this->siteNavigationJsonLd(),
@@ -266,7 +266,7 @@ class CatalogSeoBuilder
                 ['name' => 'Сериалы', 'url' => route('titles.index')],
                 ['name' => $catalogTitle->title, 'url' => route('titles.show', $catalogTitle)],
             ]),
-        ];
+        ], fn (array $item): bool => $item !== []));
 
         if ($selectedMediaUrl !== null) {
             $jsonLd[] = $this->withoutEmpty([
@@ -1010,8 +1010,10 @@ class CatalogSeoBuilder
                 '@type' => 'CreativeWorkSeason',
                 'name' => 'Сезон '.$season->number,
                 'seasonNumber' => (int) $season->number,
-                'numberOfEpisodes' => $season->episodes->count(),
-                'url' => route('titles.show', $catalogTitle).'#season-'.$season->number,
+                'numberOfEpisodes' => $season->relationLoaded('episodes')
+                    ? $season->episodes->count()
+                    : (int) ($season->available_episodes_count ?? 0),
+                'url' => route('titles.show', $catalogTitle).'#season-'.$season->id,
             ]))
             ->all();
     }
@@ -1022,6 +1024,7 @@ class CatalogSeoBuilder
     private function episodeItemListJsonLd(CatalogTitle $catalogTitle, Collection $seasons): array
     {
         $episodes = $seasons
+            ->filter(fn ($season): bool => $season->relationLoaded('episodes'))
             ->flatMap(fn ($season): Collection => $season->episodes
                 ->sortBy('number')
                 ->values()
@@ -1031,6 +1034,10 @@ class CatalogSeoBuilder
                 ]))
             ->values()
             ->take(100);
+
+        if ($episodes->isEmpty()) {
+            return [];
+        }
 
         return [
             '@context' => 'https://schema.org',

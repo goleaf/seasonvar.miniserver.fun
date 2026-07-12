@@ -14,6 +14,12 @@
 
 Rollback третьей миграции остановится, если special и regular записи уже используют одинаковый номер: старый unique key не способен представить такие данные. Сначала экспортируйте или безопасно перенумеруйте conflicts, затем повторите rollback.
 
+## Пользовательское состояние карточки от 12.07.2026
+
+Additive migration `2026_07_12_235500_create_catalog_user_state_tables` создаёт только новые таблицы `catalog_title_user_states` и `episode_view_progress`. Backfill не требуется: отсутствие строки означает пустой watchlist/rating/progress. Foreign keys удаляют приватное состояние вместе с user/title/episode, а unique keys запрещают дубли одного user/title и user/episode.
+
+Порядок rollout: штатно дождаться завершения текущих database writes, сделать backup SQLite, развернуть код, выполнить `php artisan migrate --force`, затем проверить гостевую и authenticated карточку. Код не требует остановки импортера из-за изменения catalog tables, но backup и короткое согласованное окно исключают конкуренцию schema lock SQLite. Rollback сначала удаляет `episode_view_progress`, затем `catalog_title_user_states`; catalog data при этом не меняется.
+
 ## Окружение
 
 Production-значения должны задаваться сервером, process manager или зашифрованным environment-файлом. Нельзя коммитить `.env` и настоящие секреты.

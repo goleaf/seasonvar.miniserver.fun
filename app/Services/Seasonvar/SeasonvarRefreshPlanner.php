@@ -20,6 +20,32 @@ class SeasonvarRefreshPlanner
         $totalSelected = 0;
         $selectedIds = [];
 
+        $attentionPages = $this->rejectAlreadySelectedPages(
+            $this->baseQuery($importRunId)
+                ->where('parse_status', 'parsed')
+                ->where('import_status', 'missing_data')
+                ->orderBy('retry_after_at')
+                ->orderBy('last_imported_at')
+                ->orderBy('id')
+                ->limit($chunkSize)
+                ->get(),
+            $selectedIds,
+        );
+
+        if ($attentionPages->isNotEmpty()) {
+            $totalSelected += $attentionPages->count();
+
+            $this->report($progress, 'seasonvar-refresh-candidates-selected', [
+                'reason' => 'needs_attention',
+                'selected' => $attentionPages->count(),
+                'reason_selected' => $attentionPages->count(),
+                'total_selected' => $totalSelected,
+                'chunk_size' => $chunkSize,
+            ]);
+
+            yield $attentionPages;
+        }
+
         foreach ($this->candidateQueries($refreshAfter) as $reason => $callback) {
             $reasonSelected = 0;
             $query = $this->baseQuery($importRunId)->tap($callback);

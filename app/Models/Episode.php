@@ -59,6 +59,12 @@ class Episode extends Model
         return $this->hasMany(LicensedMedia::class);
     }
 
+    /** @return HasMany<EpisodeViewProgress, $this> */
+    public function viewProgress(): HasMany
+    {
+        return $this->hasMany(EpisodeViewProgress::class);
+    }
+
     /**
      * @return array<string, string>
      */

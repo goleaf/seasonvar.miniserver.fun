@@ -70,8 +70,8 @@ class ExternalPlaylistImportTest extends TestCase
 
         $this->get(route('titles.show', $catalogTitle))
             ->assertOk()
-            ->assertSeeText('Все доступные варианты')
-            ->assertSeeText('6 кадров S01E02')
+            ->assertSeeText('Начать с 2 серии')
+            ->assertSeeText('Выбрана 2 серия')
             ->assertSee('https://media.example.com/files/6_kadrov_s01e02.mp4');
 
         $this->get(route('titles.show', ['catalogTitle' => $catalogTitle, 'episode' => $episode->id]))
@@ -191,7 +191,7 @@ class ExternalPlaylistImportTest extends TestCase
         $this->assertSame('published', $media->status);
     }
 
-    public function test_it_shows_selected_episode_without_media_as_not_connected(): void
+    public function test_it_excludes_selected_episode_without_media_from_public_playback(): void
     {
         $source = Source::factory()->create(['code' => 'seasonvar']);
         $page = SourcePage::factory()->create(['source_id' => $source->id]);
@@ -213,8 +213,8 @@ class ExternalPlaylistImportTest extends TestCase
 
         $this->get(route('titles.show', ['catalogTitle' => $catalogTitle, 'episode' => $episode->id]))
             ->assertOk()
-            ->assertSeeText('Выбрана 3 серия')
-            ->assertSeeText('Видео для этой серии пока нет')
+            ->assertDontSeeText('Выбрана 3 серия')
+            ->assertSeeText('Видео пока недоступно')
             ->assertDontSeeText('готовится');
     }
 }

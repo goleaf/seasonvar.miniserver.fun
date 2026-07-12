@@ -18,6 +18,7 @@ class CatalogShowRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'season' => ['nullable', 'integer', 'min:1'],
             'episode' => ['nullable', 'integer', 'min:1'],
             'media' => ['nullable', 'integer', 'min:1'],
             'variant' => ['nullable', 'string', 'max:160'],
@@ -32,6 +33,8 @@ class CatalogShowRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'season.integer' => 'Номер выбранного сезона должен быть числом.',
+            'season.min' => 'Номер выбранного сезона должен быть больше нуля.',
             'episode.integer' => 'Номер выбранной серии должен быть числом.',
             'episode.min' => 'Номер выбранной серии должен быть больше нуля.',
             'media.integer' => 'Номер выбранного видео должен быть числом.',
@@ -51,6 +54,7 @@ class CatalogShowRequest extends FormRequest
     public function attributes(): array
     {
         return [
+            'season' => 'сезон',
             'episode' => 'серия',
             'media' => 'видео',
             'variant' => 'вариант просмотра',

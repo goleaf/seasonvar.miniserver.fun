@@ -94,6 +94,21 @@ class LicensedMedia extends Model
     }
 
     /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeWithPlaybackLocation(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query): void {
+            $query
+                ->where(function (Builder $query): void {
+                    $query->whereNotNull('playback_url')->where('playback_url', '!=', '');
+                })
+                ->orWhere('path', '!=', '');
+        });
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
