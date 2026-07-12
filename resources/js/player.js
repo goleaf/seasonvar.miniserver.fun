@@ -1,4 +1,5 @@
 import 'plyr/dist/plyr.css';
+import plyrIconUrl from '../images/plyr.svg?url';
 
 const playerControls = [
     'play-large',
@@ -54,10 +55,14 @@ export const initializeCatalogPlayers = async () => {
         return;
     }
 
-    const needsHls = videos.some((video) => video.dataset.hlsSrc);
+    const needsHlsLibrary = videos.some((video) => (
+        video.dataset.hlsSrc
+        && video.canPlayType('application/vnd.apple.mpegurl') === ''
+        && video.canPlayType('application/x-mpegURL') === ''
+    ));
     const [Plyr, Hls] = await Promise.all([
         loadPlyr(),
-        needsHls ? loadHls() : Promise.resolve(null),
+        needsHlsLibrary ? loadHls() : Promise.resolve(null),
     ]);
 
     videos.forEach((video) => {
@@ -79,6 +84,7 @@ export const initializeCatalogPlayers = async () => {
         new Plyr(video, {
             controls: playerControls,
             i18n: playerTranslations,
+            iconUrl: plyrIconUrl,
         });
     });
 };

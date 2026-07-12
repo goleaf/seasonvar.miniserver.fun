@@ -11,7 +11,7 @@ class CatalogRelationNameSanitizerTest extends TestCase
     {
         $sanitizer = app(CatalogRelationNameSanitizer::class);
 
-        foreach (['Россия', 'США', 'Великобритания', 'Корея Южная', 'Южная Корея', 'Нидерланды'] as $name) {
+        foreach (['Россия', 'США', 'Великобритания', 'Корея Южная', 'Южная Корея', 'Нидерланды', 'Тайвань', 'Армения', 'Исландия', 'Чехословакия', 'Филиппины'] as $name) {
             $this->assertTrue($sanitizer->isValid('country', $name), $name);
         }
     }
@@ -40,6 +40,21 @@ class CatalogRelationNameSanitizerTest extends TestCase
 
         foreach (['2007', '2020', 'США', 'версия США', 'финал сезона', 'рус.', '1 серия из 10'] as $name) {
             $this->assertFalse($sanitizer->isValid('translation', $name), $name);
+        }
+    }
+
+    public function test_it_accepts_real_organization_names_and_rejects_metadata_placeholders(): void
+    {
+        $sanitizer = app(CatalogRelationNameSanitizer::class);
+
+        foreach (['A-1 Pictures', 'J.C.Staff', 'TV Tokyo', 'Пятница'] as $name) {
+            $this->assertTrue($sanitizer->isValid('studio', $name), $name);
+        }
+
+        foreach (['ничего не найдено', 'не указано', 'отсутствует', 'Рекомендовано!'] as $name) {
+            $this->assertFalse($sanitizer->isValid('network', $name), $name);
+            $this->assertFalse($sanitizer->isValid('studio', $name), $name);
+            $this->assertFalse($sanitizer->isValid('status', $name), $name);
         }
     }
 }

@@ -164,6 +164,86 @@ class SeasonvarCatalogParserTest extends TestCase
         $this->assertSame(['LostFilm', 'NewStudio'], $taxonomies->get('translation')->pluck('name')->values()->all());
     }
 
+    public function test_it_extracts_extended_metadata_only_from_trusted_official_nodes(): void
+    {
+        $parser = app(SeasonvarCatalogParser::class);
+
+        $data = $parser->parse(
+            <<<'HTML'
+            <html>
+                <head>
+                    <title>Доверенный сериал смотреть онлайн</title>
+                    <script type="application/ld+json">
+                        {"@context":"https://schema.org","@type":"TVSeries","name":"Доверенный сериал","productionCompany":{"@type":"Organization","name":"Bones"}}
+                    </script>
+                </head>
+                <body>
+                    <h1>Доверенный сериал</h1>
+                    <div class="pgs-sinfo_list">
+                        Страна: Тайвань, Армения, Исландия, Чехословакия, Филиппины
+                        Статус: идет
+                        Телеканал: Пятница
+                        Студии: A-1 Pictures
+                    </div>
+                    <div class="pgs-sinfo_list">Статус: Рекомендовано!</div>
+                    <ul class="pgs-trans">
+                        <li data-click="translate">HDRuDub</li>
+                        <li data-click="translate">NewStudio</li>
+                        <li data-click="translate">LostFilm</li>
+                    </ul>
+                    <p itemprop="description">Официальное описание.
+                    Студия: J.C.Staff</p>
+                    <div class="b-taglist"><a href="/tag/netflix">Netflix</a></div>
+                    <div class="svc_comment">Канал: TV Tokyo</div>
+                    <div class="pgs-review-post">Статус: завершен. Этот отзыв достаточно длинный, но не является метаданными.</div>
+                </body>
+            </html>
+            HTML,
+            'https://seasonvar.ru/serial-52000-Trusted-1-season.html',
+        );
+
+        $taxonomies = collect($data['taxonomies'])->groupBy('type');
+
+        $this->assertSame(['Тайвань', 'Армения', 'Исландия', 'Чехословакия', 'Филиппины'], $taxonomies->get('country')->pluck('name')->values()->all());
+        $this->assertSame(['RuDub', 'NewStudio', 'LostFilm'], $taxonomies->get('translation')->pluck('name')->values()->all());
+        $this->assertSame(['Выходит'], $taxonomies->get('status')->pluck('name')->values()->all());
+        $this->assertSame(['Пятница', 'Netflix'], $taxonomies->get('network')->pluck('name')->values()->all());
+        $this->assertSame(['Bones', 'A-1 Pictures', 'J.C.Staff'], $taxonomies->get('studio')->pluck('name')->values()->all());
+        $this->assertFalse($taxonomies->get('network')->contains('name', 'TV Tokyo'));
+        $this->assertFalse($taxonomies->get('status')->contains('name', 'Завершён'));
+    }
+
+    public function test_it_processes_multiple_translation_markers_episode_numbers_and_media_urls(): void
+    {
+        $parser = app(SeasonvarCatalogParser::class);
+
+        $data = $parser->parse(
+            <<<'HTML'
+            <html>
+                <head><title>Много данных смотреть онлайн</title></head>
+                <body>
+                    <h1>Много данных</h1>
+                    <div class="pgs-seaslist">
+                        <a href="/serial-53000-Multiple-1-season.html">1 сезон (NewStudio) (LostFilm)</a>
+                    </div>
+                    <script>
+                        window.fallbackEpisodes = [{"n":"1"},{"n":"2"}];
+                        window.visibleFiles = ["https://media.example.com/multiple/s01e01.mp4", "https://media.example.com/multiple/s01e02.mp4"];
+                    </script>
+                </body>
+            </html>
+            HTML,
+            'https://seasonvar.ru/serial-53000-Multiple-1-season.html',
+        );
+
+        $this->assertSame(['NewStudio', 'LostFilm'], collect($data['taxonomies'])->where('type', 'translation')->pluck('name')->values()->all());
+        $this->assertSame([1, 2], collect($data['episodes'])->pluck('number')->values()->all());
+        $this->assertSame([
+            'https://media.example.com/multiple/s01e01.mp4',
+            'https://media.example.com/multiple/s01e02.mp4',
+        ], collect($data['media'])->pluck('url')->values()->all());
+    }
+
     public function test_it_builds_recommendation_signals_from_source_metadata(): void
     {
         $parser = app(SeasonvarCatalogParser::class);

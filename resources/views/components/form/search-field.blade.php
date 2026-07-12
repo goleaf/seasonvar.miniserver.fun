@@ -6,9 +6,9 @@
     'placeholder' => '',
     'icon' => 'fa-solid fa-magnifying-glass',
     'containerClass' => 'relative min-w-0 flex-1',
-    'frameClass' => 'flex min-w-0 items-center overflow-hidden rounded-lg border bg-white',
+    'frameClass' => 'flex min-w-0 items-center overflow-hidden rounded-control border bg-white',
     'iconClass' => 'flex shrink-0 items-center pl-3 text-slate-400',
-    'inputClass' => 'min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-sm text-slate-700 outline-none placeholder:text-slate-400',
+    'inputClass' => 'min-h-11 min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-sm text-slate-700 outline-none placeholder:text-slate-500',
 ])
 
 <div class="{{ $containerClass }}">

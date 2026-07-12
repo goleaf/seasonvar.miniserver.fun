@@ -2,32 +2,20 @@
 
 namespace App\Services\Seasonvar;
 
-use App\Models\Actor;
-use App\Models\AgeRating;
-use App\Models\CatalogStatus;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
 use App\Models\CatalogTitleRating;
 use App\Models\CatalogTitleRecommendationSignal;
 use App\Models\CatalogTitleReview;
-use App\Models\Country;
-use App\Models\Director;
 use App\Models\Episode;
-use App\Models\Genre;
 use App\Models\LicensedMedia;
-use App\Models\Network;
 use App\Models\Season;
 use App\Models\SourcePage;
 use App\Models\SourcePageSnapshot;
-use App\Models\Studio;
-use App\Models\Tag;
-use App\Models\Translation;
-use App\Services\Catalog\CatalogRelationNameSanitizer;
 use App\Services\Crawler\PoliteHttpClient;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\ExternalPlaylistImporter;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -37,19 +25,6 @@ use Throwable;
 
 class SeasonvarCatalogImporter
 {
-    private const RELATION_TYPES = [
-        'genre' => ['model' => Genre::class, 'relation' => 'genres'],
-        'country' => ['model' => Country::class, 'relation' => 'countries'],
-        'actor' => ['model' => Actor::class, 'relation' => 'actors'],
-        'director' => ['model' => Director::class, 'relation' => 'directors'],
-        'age_rating' => ['model' => AgeRating::class, 'relation' => 'ageRatings'],
-        'translation' => ['model' => Translation::class, 'relation' => 'translations'],
-        'status' => ['model' => CatalogStatus::class, 'relation' => 'statuses'],
-        'network' => ['model' => Network::class, 'relation' => 'networks'],
-        'studio' => ['model' => Studio::class, 'relation' => 'studios'],
-        'tag' => ['model' => Tag::class, 'relation' => 'tags'],
-    ];
-
     public function __construct(
         private readonly SeasonvarSource $seasonvarSource,
         private readonly SeasonvarDiscovery $discovery,
@@ -59,7 +34,8 @@ class SeasonvarCatalogImporter
         private readonly ExternalPlaylistImporter $playlistImporter,
         private readonly SeasonvarMediaAvailabilityChecker $mediaAvailabilityChecker,
         private readonly ExternalMediaMetadata $mediaMetadata,
-        private readonly CatalogRelationNameSanitizer $relationNames,
+        private readonly SeasonvarCatalogRelationSyncer $relationSyncer,
+        private readonly SeasonvarRelationMetadataNormalizer $relationMetadata,
     ) {}
 
     /**
@@ -507,14 +483,13 @@ class SeasonvarCatalogImporter
 
         $transactionResult = DB::transaction(function () use ($page, $data, $contentHash, $progress): array {
             $catalogTitle = $this->upsertCatalogTitle($page, $data, $contentHash, $progress);
-            $this->syncCatalogRelations($catalogTitle, $data['taxonomies'], $progress);
+            $this->relationSyncer->sync($catalogTitle, $data['taxonomies'], $progress);
             $this->syncCatalogAliases($catalogTitle, $data['aliases'], $progress);
             $this->syncCatalogRatings($catalogTitle, $data['ratings'], $progress);
             $this->syncCatalogRecommendationSignals($catalogTitle, $data['recommendation_signals'], $progress);
             $this->syncCatalogReviews($catalogTitle, $page, $data['reviews'], $progress);
             $seasons = $this->syncSeasons($catalogTitle, $page, $data['seasons'], $progress);
             $this->syncEpisodes($seasons, $page, $data['episodes'], $progress);
-            $mediaResult = $this->syncParsedMedia($catalogTitle, $seasons, $data['media'], $progress);
 
             $page->update([
                 'parse_status' => 'parsed',
@@ -523,14 +498,15 @@ class SeasonvarCatalogImporter
 
             return [
                 'catalog_title' => $catalogTitle,
-                'media' => $mediaResult,
+                'seasons' => $seasons,
             ];
         }, attempts: $this->importTransactionAttempts());
         $catalogTitle = $transactionResult['catalog_title'];
         $mediaResult = $this->mergeMediaResult(
-            $transactionResult['media'],
+            $this->syncParsedMedia($catalogTitle, $transactionResult['seasons'], $data['media'], $progress),
             $this->importParsedPlaylists($catalogTitle, $data['media'], $progress),
         );
+        $this->syncMediaTranslations($catalogTitle, $progress);
         $missingDataFlags = $this->missingDataFlags($catalogTitle->fresh(['seasons.episodes', 'seasons.licensedMedia', 'licensedMedia']) ?? $catalogTitle);
 
         $page->update([
@@ -746,109 +722,6 @@ class SeasonvarCatalogImporter
         }
 
         return $slug;
-    }
-
-    /**
-     * @param  list<array{type: string, name: string, source_url: string|null}>  $taxonomies
-     * @param  (callable(string, array<string, mixed>): void)|null  $progress
-     */
-    private function syncCatalogRelations(CatalogTitle $catalogTitle, array $taxonomies, ?callable $progress = null): void
-    {
-        $this->report($progress, 'taxonomy-sync-started', [
-            'catalog_title_id' => $catalogTitle->id,
-            'total' => count($taxonomies),
-        ]);
-
-        $idsByRelation = collect(self::RELATION_TYPES)
-            ->mapWithKeys(fn (array $config): array => [$config['relation'] => []])
-            ->all();
-        $relationsByType = collect($taxonomies)
-            ->filter(fn (array $item): bool => isset(self::RELATION_TYPES[$item['type']]))
-            ->filter(fn (array $item): bool => $this->isValidRelationName($item['type'], $item['name']))
-            ->groupBy('type');
-
-        foreach ($relationsByType as $type => $items) {
-            $config = self::RELATION_TYPES[$type];
-            $idsByRelation[$config['relation']] = $this->syncCatalogRelationType($catalogTitle, $type, $items, $progress);
-        }
-
-        foreach ($idsByRelation as $relation => $ids) {
-            if ($ids !== []) {
-                $catalogTitle->{$relation}()->syncWithoutDetaching($ids);
-            }
-        }
-
-        $syncedIds = collect($idsByRelation)->flatten()->values();
-
-        $this->report($progress, 'taxonomy-sync-complete', [
-            'catalog_title_id' => $catalogTitle->id,
-            'synced' => $syncedIds->count(),
-            'taxonomy_ids' => $syncedIds->all(),
-        ]);
-    }
-
-    /**
-     * @param  Collection<int, array{type: string, name: string, source_url: string|null}>  $items
-     * @return list<int>
-     */
-    private function syncCatalogRelationType(CatalogTitle $catalogTitle, string $type, Collection $items, ?callable $progress = null): array
-    {
-        $config = self::RELATION_TYPES[$type];
-        /** @var class-string<Model> $modelClass */
-        $modelClass = $config['model'];
-        $now = now();
-        $rowsBySlug = $items
-            ->filter(fn (array $item): bool => trim($item['name']) !== '')
-            ->mapWithKeys(function (array $item) use ($type, $now): array {
-                $name = $this->relationNames->normalize($item['name']);
-                $slug = $this->relationSlug($type, $name);
-
-                return [$slug => [
-                    'name' => $name,
-                    'slug' => $slug,
-                    'source_url' => $item['source_url'],
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]];
-            });
-
-        if ($rowsBySlug->isEmpty()) {
-            return [];
-        }
-
-        $modelClass::query()->upsert(
-            $rowsBySlug->values()->all(),
-            ['slug'],
-            ['name', 'source_url', 'updated_at'],
-        );
-
-        $relationIds = $modelClass::query()
-            ->whereIn('slug', $rowsBySlug->keys())
-            ->pluck('id')
-            ->map(fn (mixed $id): int => (int) $id)
-            ->all();
-
-        $this->report($progress, 'taxonomy-type-synced', [
-            'catalog_title_id' => $catalogTitle->id,
-            'type' => $type,
-            'relation' => $config['relation'],
-            'records' => $rowsBySlug->count(),
-            'synced' => count($relationIds),
-        ]);
-
-        return array_values(array_unique($relationIds));
-    }
-
-    private function relationSlug(string $type, string $name): string
-    {
-        $name = $this->relationNames->normalize($name);
-
-        return Str::slug($name) ?: Str::substr(hash('sha256', $type.'|'.$name), 0, 16);
-    }
-
-    private function isValidRelationName(string $type, string $name): bool
-    {
-        return $this->relationNames->isValid($type, $name);
     }
 
     /**
@@ -1469,6 +1342,31 @@ class SeasonvarCatalogImporter
         ]);
 
         return $result;
+    }
+
+    /**
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     */
+    private function syncMediaTranslations(CatalogTitle $catalogTitle, ?callable $progress = null): void
+    {
+        $taxonomies = $catalogTitle->licensedMedia()
+            ->whereIn('variant_type', ['voiceover', 'original'])
+            ->get(['variant_name', 'translation_name'])
+            ->flatMap(fn (LicensedMedia $media): array => [$media->variant_name, $media->translation_name])
+            ->map(fn (mixed $name): ?string => is_string($name) ? $this->relationMetadata->translation($name) : null)
+            ->filter()
+            ->unique(fn (string $name): string => Str::lower($name))
+            ->map(fn (string $name): array => [
+                'type' => 'translation',
+                'name' => $name,
+                'source_url' => null,
+            ])
+            ->values()
+            ->all();
+
+        if ($taxonomies !== []) {
+            $this->relationSyncer->sync($catalogTitle, $taxonomies, $progress);
+        }
     }
 
     /**

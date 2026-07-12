@@ -38,7 +38,9 @@ class SeasonvarCatalogParser
         'Страна',
         'Вышел',
         'Статус',
+        'Телеканал',
         'Канал',
+        'Студии',
         'Студия',
         'Жанр',
         'IMDb',
@@ -55,6 +57,7 @@ class SeasonvarCatalogParser
     public function __construct(
         private readonly SeasonvarUrl $seasonvarUrl,
         private readonly CatalogRelationNameSanitizer $relationNames,
+        private readonly SeasonvarRelationMetadataNormalizer $relationMetadata,
     ) {}
 
     /**
@@ -973,7 +976,9 @@ class SeasonvarCatalogParser
      */
     private function fallbackEpisodeNumbers(string $html): array
     {
-        if (preg_match_all('/["\']?n["\']?\s*:\s*["\']?(\d{1,3})["\']?/iu', $html, $matches) !== 1) {
+        $matchesCount = preg_match_all('/["\']?n["\']?\s*:\s*["\']?(\d{1,3})["\']?/iu', $html, $matches);
+
+        if ($matchesCount === false || $matchesCount === 0) {
             return [];
         }
 
@@ -1107,7 +1112,9 @@ class SeasonvarCatalogParser
         $extensions = implode('|', array_map(fn (string $extension): string => preg_quote($extension, '~'), self::MEDIA_EXTENSIONS));
         $pattern = '~(?:(?:https?:)?//|/|[A-Za-z0-9._-]+/)?[A-Za-z0-9._\~:/?#\[\]@!$&()*+,;=%-]+\.(?:'.$extensions.')(?:\?[A-Za-z0-9._\~:/?#\[\]@!$&()*+,;=%-]*)?~iu';
 
-        if (preg_match_all($pattern, $text, $matches) !== 1) {
+        $matchesCount = preg_match_all($pattern, $text, $matches);
+
+        if ($matchesCount === false || $matchesCount === 0) {
             return [];
         }
 
@@ -1269,16 +1276,24 @@ class SeasonvarCatalogParser
             }
         }
 
+        foreach ($this->officialTranslationNames($xpath) as $name) {
+            $this->addTaxonomyItem($items, 'translation', $name, null);
+        }
+
         foreach ($this->infoValueList($infoFields, ['Статус']) as $name) {
             $this->addTaxonomyItem($items, 'status', $name, null);
         }
 
-        foreach ($this->infoValueList($infoFields, ['Канал']) as $name) {
+        foreach ($this->infoValueList($infoFields, ['Телеканал', 'Канал']) as $name) {
             $this->addTaxonomyItem($items, 'network', $name, null);
         }
 
-        foreach ($this->infoValueList($infoFields, ['Студия']) as $name) {
+        foreach ($this->infoValueList($infoFields, ['Студии', 'Студия']) as $name) {
             $this->addTaxonomyItem($items, 'studio', $name, null);
+        }
+
+        foreach ($this->officialDescriptionTaxonomies($xpath) as $item) {
+            $this->addTaxonomyItem($items, $item['type'], $item['name'], null);
         }
 
         foreach ($this->seasonListTranslations($xpath) as $name) {
@@ -1341,6 +1356,12 @@ class SeasonvarCatalogParser
 
         foreach ($this->tagListTaxonomies($xpath, $baseUrl) as $item) {
             $this->addTaxonomyItem($items, 'tag', $item['name'], $item['source_url']);
+
+            $network = $this->relationMetadata->curatedNetwork($item['name']);
+
+            if ($network !== null) {
+                $this->addTaxonomyItem($items, 'network', $network, $item['source_url']);
+            }
         }
 
         if ($this->hasSubtitles($xpath)) {
@@ -1355,6 +1376,17 @@ class SeasonvarCatalogParser
      */
     private function addTaxonomyItem(array &$items, string $type, string $name, ?string $sourceUrl): void
     {
+        $name = match ($type) {
+            'country' => $this->relationMetadata->country($name),
+            'status' => $this->relationMetadata->status($name),
+            'translation' => $this->relationMetadata->translation($name),
+            default => $name,
+        };
+
+        if ($name === null) {
+            return;
+        }
+
         $name = $this->relationNames->normalize($name);
 
         if (! $this->relationNames->isValid($type, $name)) {
@@ -1367,6 +1399,74 @@ class SeasonvarCatalogParser
             'name' => $name,
             'source_url' => $sourceUrl,
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function officialTranslationNames(DOMXPath $xpath): array
+    {
+        $translations = [];
+        $query = '//*[contains(concat(" ", normalize-space(@class), " "), " pgs-trans ")]//*[@data-click="translate"]';
+
+        foreach ($xpath->query($query) ?: [] as $node) {
+            $values = [$node->textContent];
+
+            foreach (['data-translate', 'data-value', 'title'] as $attribute) {
+                $values[] = $node->attributes?->getNamedItem($attribute)?->nodeValue;
+            }
+
+            foreach ($values as $value) {
+                $name = $this->relationMetadata->translation(is_string($value) ? $value : null);
+
+                if ($name !== null && $this->relationNames->isValid('translation', $name)) {
+                    $translations[Str::lower($name)] = $name;
+                }
+            }
+        }
+
+        return array_values($translations);
+    }
+
+    /**
+     * @return list<array{type: string, name: string}>
+     */
+    private function officialDescriptionTaxonomies(DOMXPath $xpath): array
+    {
+        $items = [];
+        $query = '//*[(
+            @itemprop="description"
+            or contains(concat(" ", normalize-space(@class), " "), " pgs-sinfo_text ")
+        ) and not(ancestor-or-self::*[
+            contains(concat(" ", normalize-space(@class), " "), " svc_comment ")
+            or contains(concat(" ", normalize-space(@class), " "), " pgs-review-post ")
+            or contains(concat(" ", normalize-space(@class), " "), " comment ")
+        ])]';
+
+        foreach ($xpath->query($query) ?: [] as $node) {
+            $text = html_entity_decode($node->textContent, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $text = str_replace("\xc2\xa0", ' ', $text);
+
+            foreach (preg_split('/\R/u', $text) ?: [] as $line) {
+                $line = Str::squish($line);
+
+                if (preg_match('/^(?<label>Студи(?:я|и)|Телеканал|Канал|Статус)\s*:\s*(?<value>[^\r\n]{1,120})$/iu', $line, $matches) !== 1) {
+                    continue;
+                }
+
+                $type = match (Str::lower($matches['label'])) {
+                    'студия', 'студии' => 'studio',
+                    'телеканал', 'канал' => 'network',
+                    'статус' => 'status',
+                };
+                $items[] = [
+                    'type' => $type,
+                    'name' => $matches['value'],
+                ];
+            }
+        }
+
+        return $items;
     }
 
     /**
@@ -1396,7 +1496,9 @@ class SeasonvarCatalogParser
      */
     private function translationNamesFromText(string $text): array
     {
-        if (preg_match_all('/\(([^()]{2,80})\)/u', $text, $matches) !== 1) {
+        $matchesCount = preg_match_all('/\(([^()]{2,80})\)/u', $text, $matches);
+
+        if ($matchesCount === false || $matchesCount === 0) {
             return [];
         }
 
@@ -1450,7 +1552,12 @@ class SeasonvarCatalogParser
 
     private function hasSubtitles(DOMXPath $xpath): bool
     {
-        foreach ($xpath->query('//body//*[not(self::script) and not(self::style)]') ?: [] as $node) {
+        $query = '//*[contains(concat(" ", normalize-space(@class), " "), " pgs-sinfo_list ")]
+            | //*[contains(concat(" ", normalize-space(@class), " "), " pgs-seaslist ")]
+            | //*[contains(concat(" ", normalize-space(@class), " "), " pgs-trans ")]
+            | //*[contains(concat(" ", normalize-space(@class), " "), " b-taglist ")]';
+
+        foreach ($xpath->query($query) ?: [] as $node) {
             $text = $this->stringValue($node->textContent);
 
             if ($text !== null && preg_match('/(?:субтитр|subtitles?|subs?)/iu', $text) === 1) {
@@ -1539,7 +1646,32 @@ class SeasonvarCatalogParser
             $items[] = ['type' => 'country', 'name' => $name, 'source_url' => null];
         }
 
+        foreach ($this->structuredEntityNames(Arr::get($structuredData, 'productionCompany')) as $name) {
+            $items[] = ['type' => 'studio', 'name' => $name, 'source_url' => null];
+        }
+
         return $items;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function structuredEntityNames(mixed $value): array
+    {
+        $items = [];
+        $entities = is_array($value) && ! array_is_list($value) ? [$value] : Arr::wrap($value);
+
+        foreach ($entities as $item) {
+            $name = is_array($item)
+                ? $this->stringValue(Arr::get($item, 'name'))
+                : $this->stringValue($item);
+
+            if ($name !== null) {
+                $items[Str::lower($name)] = $name;
+            }
+        }
+
+        return array_values($items);
     }
 
     /**

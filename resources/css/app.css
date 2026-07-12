@@ -4,8 +4,44 @@
 @source '../../storage/framework/views/*.php';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
+    --color-aurora-50: oklch(0.98 0.02 183);
+    --color-aurora-100: oklch(0.95 0.045 183);
+    --color-aurora-600: oklch(0.55 0.13 183);
+    --radius-control: 0.875rem;
+    --radius-panel: 1.25rem;
+    --shadow-panel: 0 18px 45px -34px oklch(0.42 0.08 183 / 0.45), 0 1px 2px oklch(0.2 0.02 250 / 0.06);
+    --shadow-panel-hover: 0 24px 55px -34px oklch(0.5 0.13 183 / 0.55), 0 8px 20px -16px oklch(0.2 0.02 250 / 0.18);
+}
+
+@layer base {
+    :root {
+        color-scheme: light;
+    }
+
+    body {
+        background-color: var(--color-slate-50);
+        background-image: radial-gradient(circle at top left, var(--color-emerald-50), transparent 34rem),
+            radial-gradient(circle at top right, var(--color-cyan-50), transparent 30rem);
+    }
+
+    ::selection {
+        background: var(--color-emerald-100);
+        color: var(--color-slate-800);
+    }
+}
+
+@layer components {
+    .catalog-card {
+        content-visibility: auto;
+        contain-intrinsic-size: 24rem;
+    }
+}
+
+:where(a, button, input, select, summary, [tabindex]):focus-visible {
+    outline: 3px solid var(--color-emerald-500);
+    outline-offset: 3px;
 }
 
 .plyr {
@@ -16,4 +52,15 @@
 
 .plyr__video-wrapper {
     aspect-ratio: 16 / 9;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
 }

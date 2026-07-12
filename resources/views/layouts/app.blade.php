@@ -1,4 +1,3 @@
-@use('Illuminate\Support\Facades\Vite')
 <!DOCTYPE html>
 <html lang="{{ $htmlLang }}">
     <head>
@@ -150,7 +149,6 @@
         <meta name="twitter:title" content="{{ $fullTitle }}">
         <meta name="twitter:description" content="{{ $seoDescription }}">
         <title>{{ $fullTitle }}</title>
-        {{ Vite::fonts('instrument-sans') }}
         @foreach ($jsonLdItems as $jsonLd)
             <script type="application/ld+json">{!! json_encode($jsonLd, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!}</script>
         @endforeach
@@ -161,51 +159,15 @@
         @vite('resources/js/app.js')
     </head>
     <body class="min-h-screen bg-slate-50 text-slate-700 antialiased">
-        <header class="border-b border-slate-200 bg-white shadow-sm shadow-slate-200/70">
-            <div class="mx-auto flex max-w-[1760px] flex-col gap-3 px-3 py-4 sm:px-6 lg:flex-row lg:items-center lg:px-8">
-                <a href="{{ route('home') }}" class="flex min-w-0 items-center gap-3">
-                    <span class="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-emerald-50 text-xl font-black text-emerald-700 ring-1 ring-emerald-100 sm:h-12 sm:w-12">
-                        <i class="fa-solid fa-film" aria-hidden="true"></i>
-                    </span>
-                    <span>
-                        <span class="block text-xl font-black tracking-tight text-slate-700 sm:text-2xl">Каталог сериалов</span>
-                    </span>
-                </a>
+        <a href="#main-content" class="fixed left-3 top-3 z-[100] -translate-y-24 rounded-control bg-emerald-700 px-4 py-3 font-bold text-white shadow-lg transition focus:translate-y-0">
+            Перейти к содержанию
+        </a>
 
-                <form action="{{ route('titles.index') }}" method="GET" class="flex min-w-0 w-full flex-1 items-start gap-2 lg:mx-6">
-                    <x-form.search-field
-                        id="site-search"
-                        name="q"
-                        :value="$layoutSearchQuery"
-                        label="Поиск сериала"
-                        placeholder="Поиск сериала..."
-                        container-class="min-w-0 flex-1"
-                        frame-class="flex min-w-0 items-center overflow-hidden rounded-lg border bg-white shadow-sm shadow-slate-200/40"
-                        icon-class="flex shrink-0 items-center pl-4 text-slate-400"
-                        input-class="min-w-0 flex-1 border-0 bg-transparent px-3 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400"
-                    />
-                    <button type="submit" class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-100 sm:px-5">
-                        <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
-                        <span>Найти</span>
-                    </button>
-                </form>
-
-                <nav class="flex w-full flex-wrap items-center gap-2 text-sm font-semibold lg:w-auto">
-                    <a href="{{ route('home') }}" class="inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
-                        <i class="fa-solid fa-house" aria-hidden="true"></i>
-                        <span>Главная</span>
-                    </a>
-                    <a href="{{ route('titles.index') }}" class="inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
-                        <i class="fa-solid fa-list" aria-hidden="true"></i>
-                        <span>Все сериалы</span>
-                    </a>
-                </nav>
-            </div>
-        </header>
+        <x-layout.site-header :site-name="$siteName" :search-query="$layoutSearchQuery" />
 
         <main id="main-content" class="mx-auto max-w-[1760px] px-3 py-4 sm:px-6 sm:py-6 lg:px-8" itemscope itemtype="https://schema.org/WebPageElement" itemid="{{ $canonicalUrl }}#main-content">
             @if ($breadcrumbs->count() > 1)
-                <nav aria-label="Хлебные крошки" class="mb-4 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm shadow-slate-200/60">
+                <nav aria-label="Хлебные крошки" class="mb-4 rounded-panel border border-slate-200 bg-white px-3 py-2 text-sm shadow-panel">
                     <ol class="flex flex-wrap items-center gap-2 text-slate-500">
                         @foreach ($breadcrumbs as $breadcrumb)
                             <li class="inline-flex min-w-0 items-center gap-2">
@@ -818,6 +780,7 @@
             @endif
             @endif
         </main>
+        <x-layout.site-footer :site-name="$siteName" />
         @if (request()->routeIs('stats'))
             @livewireScripts
         @endif

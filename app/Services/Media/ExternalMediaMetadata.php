@@ -2,10 +2,18 @@
 
 namespace App\Services\Media;
 
+use App\Services\Seasonvar\SeasonvarRelationMetadataNormalizer;
 use Illuminate\Support\Str;
 
 class ExternalMediaMetadata
 {
+    private readonly SeasonvarRelationMetadataNormalizer $relationMetadata;
+
+    public function __construct(?SeasonvarRelationMetadataNormalizer $relationMetadata = null)
+    {
+        $this->relationMetadata = $relationMetadata ?? new SeasonvarRelationMetadataNormalizer;
+    }
+
     public function quality(?string $title, string $url): ?string
     {
         $value = $this->normalizedValue(($title ?? '').' '.urldecode($url));
@@ -44,7 +52,7 @@ class ExternalMediaMetadata
     public function translationName(?string $title, ?string $sourceUrl = null): ?string
     {
         if ($title === null) {
-            return $this->translationNameFromSourceUrl($sourceUrl);
+            return $this->relationMetadata->translation($this->translationNameFromSourceUrl($sourceUrl));
         }
 
         if ($this->hasSubtitles($title, $sourceUrl)) {
@@ -52,15 +60,17 @@ class ExternalMediaMetadata
         }
 
         if (preg_match('/(?:озвучка|перевод)\s*[:\-]\s*(?<name>[^,;|]{2,80})/iu', $title, $matches) === 1) {
-            return Str::substr(Str::squish($matches['name']), 0, 120);
+            return $this->relationMetadata->translation(Str::substr(Str::squish($matches['name']), 0, 120));
         }
 
         if (preg_match('/\[(?<name>[^\]]{2,80})\]/u', $title, $matches) === 1) {
-            return Str::substr(Str::squish($matches['name']), 0, 120);
+            return $this->relationMetadata->translation(Str::substr(Str::squish($matches['name']), 0, 120));
         }
 
-        return $this->inferredTranslationName($title)
-            ?? $this->translationNameFromSourceUrl($sourceUrl);
+        return $this->relationMetadata->translation(
+            $this->inferredTranslationName($title)
+                ?? $this->translationNameFromSourceUrl($sourceUrl),
+        );
     }
 
     public function hasSubtitles(?string $title, ?string $sourceUrl = null, ?string $url = null): bool

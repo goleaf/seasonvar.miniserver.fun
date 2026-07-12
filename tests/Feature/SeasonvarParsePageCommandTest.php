@@ -4,9 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendationSignal;
+use App\Models\Genre;
 use App\Models\Season;
 use App\Models\Source;
+use App\Services\Seasonvar\SeasonvarCatalogParser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -156,6 +160,94 @@ class SeasonvarParsePageCommandTest extends TestCase
             'quality' => '720p',
             'status' => 'published',
         ]);
+    }
+
+    public function test_it_attaches_normalized_media_translations_and_preserves_an_existing_relation_source_url(): void
+    {
+        Http::preventStrayRequests();
+        $sourceUrl = 'https://seasonvar.ru/genre/kulinarija';
+        Genre::query()->create([
+            'name' => 'Кулинария',
+            'slug' => 'kulinarija',
+            'source_url' => $sourceUrl,
+        ]);
+
+        Http::fake([
+            'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html' => Http::response($this->seasonPageHtml(4, [
+                1 => 'Пробуждение',
+                2 => 'Проверка',
+            ], seasonvarPlaylists: ['/playls2/hash/trans/47915/plist.txt'])),
+            'seasonvar.ru/playls2/hash/trans/47915/plist.txt' => Http::response(json_encode([
+                [
+                    'title' => '1 серия HDRuDub',
+                    'file' => $this->encodedSeasonvarPlayerFile('//media.example.com/kitchen/s04e01.mp4'),
+                    'id' => '1',
+                ],
+                [
+                    'title' => '2 серия HDLostFilm',
+                    'file' => $this->encodedSeasonvarPlayerFile('//media.example.com/kitchen/s04e02.mp4'),
+                    'id' => '2',
+                ],
+            ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)),
+        ]);
+
+        $this->artisan('seasonvar:import', [
+            'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
+        ])->assertExitCode(0);
+
+        $catalogTitle = CatalogTitle::query()->where('external_id', '47915')->firstOrFail();
+
+        $this->assertSame($sourceUrl, Genre::query()->where('slug', 'kulinarija')->value('source_url'));
+        $this->assertEqualsCanonicalizing(
+            ['Оригинал', 'RuDub', 'LostFilm'],
+            $catalogTitle->translations()->pluck('name')->all(),
+        );
+    }
+
+    public function test_it_checks_media_availability_outside_the_catalog_database_transaction(): void
+    {
+        Http::preventStrayRequests();
+        config([
+            'seasonvar.media_check.enabled' => true,
+            'seasonvar.media_check.retries' => 1,
+        ]);
+        $transactionLevelBeforeImport = DB::transactionLevel();
+        $mediaRequestTransactionLevels = [];
+        $observedRequestUrls = [];
+        $pageHtml = $this->seasonPageHtml(4, [
+            2 => 'Проверка',
+        ], ['https://media.example.com/kitchen/s04e02.mp4']);
+        $parsed = app(SeasonvarCatalogParser::class)->parse(
+            $pageHtml,
+            'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
+        );
+        $this->assertSame(['https://media.example.com/kitchen/s04e02.mp4'], collect($parsed['media'])->pluck('url')->all());
+
+        Http::fake(function (Request $request) use (&$mediaRequestTransactionLevels, &$observedRequestUrls, $pageHtml): \Illuminate\Http\Client\Response {
+            $observedRequestUrls[] = $request->url();
+
+            if ($request->url() === 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html') {
+                return Http::response($pageHtml);
+            }
+
+            if ($request->url() === 'https://media.example.com/kitchen/s04e02.mp4') {
+                $mediaRequestTransactionLevels[] = DB::transactionLevel();
+
+                return Http::response('', 206);
+            }
+
+            return Http::response('', 404);
+        });
+
+        $this->artisan('seasonvar:import', [
+            'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
+        ])->assertExitCode(0);
+
+        $this->assertDatabaseHas('licensed_media', [
+            'playback_url' => 'https://media.example.com/kitchen/s04e02.mp4',
+        ]);
+        $this->assertSame(['https://media.example.com/kitchen/s04e02.mp4'], $observedRequestUrls);
+        $this->assertSame([$transactionLevelBeforeImport], $mediaRequestTransactionLevels);
     }
 
     public function test_it_saves_trailer_media_without_episode_number(): void

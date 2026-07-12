@@ -1,6 +1,6 @@
 @props(['title' => null, 'subtitle' => null, 'pad' => true, 'icon' => null])
 
-<section {{ $attributes->merge(['class' => 'overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-200/60']) }}>
+<section {{ $attributes->merge(['class' => 'overflow-hidden rounded-panel border border-slate-200 bg-white shadow-panel']) }}>
     @if ($title || $subtitle)
         <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
             <div @class([
@@ -10,7 +10,7 @@
             ])>
                 @if ($icon)
                     <span @class([
-                        'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100',
+                        'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100',
                         'mt-0.5' => $subtitle,
                     ])>
                         <i class="{{ $icon }}" aria-hidden="true"></i>

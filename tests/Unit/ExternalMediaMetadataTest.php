@@ -37,4 +37,25 @@ class ExternalMediaMetadataTest extends TestCase
         $this->assertSame('Кураж-Бамбей', $variant['variant_name']);
         $this->assertSame('voiceover-kuraz-bambei', $variant['variant_key']);
     }
+
+    public function test_it_normalizes_seasonvar_quality_prefixes_and_rejects_non_translation_variants(): void
+    {
+        $metadata = app(ExternalMediaMetadata::class);
+
+        foreach ([
+            'HDRuDub' => 'RuDub',
+            'SDRuDub' => 'RuDub',
+            'FullHDRuDub' => 'RuDub',
+            'HDLostFilm' => 'LostFilm',
+            'HDHDRezka' => 'HDRezka',
+            'HDOriginal' => 'Оригинал',
+            'SDБез перевода' => 'Оригинал',
+        ] as $rawName => $expectedName) {
+            $this->assertSame($expectedName, $metadata->translationName($rawName), $rawName);
+        }
+
+        foreach (['Трейлеры', 'HDТрейлер', 'SDСубтитры', 'FullHD subtitles'] as $rawName) {
+            $this->assertNull($metadata->translationName($rawName), $rawName);
+        }
+    }
 }

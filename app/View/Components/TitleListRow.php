@@ -44,9 +44,9 @@ class TitleListRow extends Component
             default => 'h-20 w-14 sm:h-24 sm:w-16',
         };
         $this->baseClass = match (true) {
-            $readable => 'block p-3 transition hover:bg-emerald-50 sm:p-4',
-            $compact => 'block p-3 hover:bg-emerald-50',
-            default => 'block px-4 py-3 hover:bg-emerald-50',
+            $readable => 'group relative block overflow-hidden rounded-control p-3 transition hover:bg-emerald-50 sm:p-4',
+            $compact => 'group relative block overflow-hidden rounded-control p-3 transition hover:bg-emerald-50',
+            default => 'group relative block overflow-hidden rounded-control px-4 py-3 transition hover:bg-emerald-50',
         };
         $this->cardRelations = collect()
             ->merge($title->relationLoaded('genres') ? $title->genres : collect())

@@ -32,7 +32,7 @@ class StatusPill extends Component
      */
     private const SHAPE_CLASSES = [
         'pill' => 'rounded-full',
-        'lg' => 'rounded-lg',
+        'lg' => 'rounded-control',
     ];
 
     public function __construct(

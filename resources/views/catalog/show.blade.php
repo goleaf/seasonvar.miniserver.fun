@@ -2,172 +2,70 @@
 
 @section('content')
     <section class="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_300px]">
-        <main class="min-w-0 space-y-5">
-            <x-ui.panel :pad="false">
-                <div class="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <a href="{{ route('home') }}" class="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+        <div class="min-w-0 space-y-5">
+            <x-ui.panel data-title-hero :pad="false" class="overflow-hidden border-emerald-100">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
+                    <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
                         <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
-                        <span>Вернуться</span>
+                        <span>К каталогу</span>
                     </a>
-                    <div class="flex flex-wrap gap-2 text-xs font-bold">
-                        <a href="#player" class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-100">
+                    <nav aria-label="Навигация по сериалу" class="flex flex-wrap gap-2">
+                        <a href="#player" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600">
                             <i class="fa-solid fa-circle-play" aria-hidden="true"></i>
                             <span>Смотреть</span>
                         </a>
-                        <a href="#seasons" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                        <a href="#seasons" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
                             <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
                             <span>Сезоны</span>
                         </a>
-                    </div>
+                    </nav>
                 </div>
 
-                <article class="grid gap-4 p-3 sm:p-4 md:grid-cols-[minmax(150px,230px)_minmax(0,1fr)] md:gap-5">
-                    <div>
-                        <x-title-poster :title="$title" class="mx-auto aspect-[2/3] w-44 max-w-full border border-slate-200 sm:w-52 md:w-full" empty-class="grid h-full place-items-center px-6 text-center text-sm text-slate-400" />
-                    </div>
+                <article class="grid gap-5 bg-gradient-to-br from-white via-white to-emerald-50 p-4 md:grid-cols-[minmax(150px,220px)_minmax(0,1fr)] md:p-5">
+                    <x-title-poster :title="$title" class="mx-auto aspect-[2/3] w-44 max-w-full border border-slate-200 shadow-panel sm:w-52 md:w-full" empty-class="grid h-full place-items-center px-6 text-center text-sm text-slate-500" />
 
                     <div class="min-w-0">
-                        <h1 class="inline-flex items-start gap-2 text-xl font-black leading-tight text-slate-700 sm:text-2xl">
+                        <h1 class="flex items-start gap-3 text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">
                             <i class="fa-solid fa-clapperboard mt-1 text-emerald-700" aria-hidden="true"></i>
                             <span>{{ $title->title }}</span>
                         </h1>
                         @if ($title->original_title)
-                            <div class="mt-1 text-sm font-semibold text-slate-500">{{ $title->original_title }}</div>
+                            <div class="mt-2 break-words text-sm font-semibold text-slate-500">{{ $title->original_title }}</div>
                         @endif
-                        <div class="mt-3 flex flex-wrap gap-2 text-xs font-bold">
+
+                        <div class="mt-4 flex flex-wrap gap-2 text-xs font-bold">
                             @if ($title->year)
                                 <x-ui.taxonomy-chip :href="route('titles.year', ['year' => $title->year])" active icon="fa-solid fa-calendar-days">{{ $title->year }}</x-ui.taxonomy-chip>
                             @endif
                             @foreach ($ageRatings as $ageRating)
                                 <x-ui.taxonomy-chip :taxonomy="$ageRating" active />
                             @endforeach
-                            @if ($seasons->isNotEmpty())
-                                <x-ui.taxonomy-chip icon="fa-solid fa-layer-group">{{ $seasons->count() }} сезонов</x-ui.taxonomy-chip>
-                            @endif
+                            <x-ui.taxonomy-chip icon="fa-solid fa-layer-group">{{ $seasons->count() }} сезонов</x-ui.taxonomy-chip>
                             <x-ui.taxonomy-chip icon="fa-solid fa-list-ol">{{ $episodeCount }} серий</x-ui.taxonomy-chip>
                             <x-ui.taxonomy-chip icon="fa-solid fa-file-video">{{ $mediaCount }} видео</x-ui.taxonomy-chip>
                         </div>
 
-                        <div class="mt-4 grid gap-2 text-sm sm:grid-cols-3">
-                            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <div class="text-xs font-bold uppercase tracking-wide text-slate-400">Сезоны</div>
-                                <div class="mt-1 inline-flex items-center gap-2 font-black text-slate-700">
-                                    <i class="fa-solid fa-layer-group text-emerald-700" aria-hidden="true"></i>
-                                    <span>{{ $seasons->count() }}</span>
-                                </div>
-                            </div>
-                            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <div class="text-xs font-bold uppercase tracking-wide text-slate-400">Серии</div>
-                                <div class="mt-1 inline-flex items-center gap-2 font-black text-slate-700">
-                                    <i class="fa-solid fa-list-ol text-sky-700" aria-hidden="true"></i>
-                                    <span>{{ $episodeCount }}</span>
-                                </div>
-                            </div>
-                            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <div class="text-xs font-bold uppercase tracking-wide text-slate-400">Видео</div>
-                                <div class="mt-1 inline-flex items-center gap-2 font-black text-slate-700">
-                                    <i class="fa-solid fa-file-video text-amber-700" aria-hidden="true"></i>
-                                    <span>{{ $mediaCount }}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="mt-4 rounded-lg border border-slate-200 bg-slate-50">
-                            <div class="flex items-center gap-2 border-b border-slate-200 px-3 py-2 text-sm font-bold text-slate-700">
+                        <section class="mt-5 rounded-control border border-slate-200 bg-white p-4">
+                            <h2 class="flex items-center gap-2 text-sm font-bold text-slate-700">
                                 <i class="fa-solid fa-book-open text-slate-400" aria-hidden="true"></i>
                                 <span>Описание</span>
-                            </div>
-                            @if ($title->description)
-                                <p class="px-3 py-3 text-sm leading-6 text-slate-600">{{ $title->description }}</p>
-                            @else
-                                <p class="px-3 py-3 text-sm leading-6 text-slate-500">Описание пока отсутствует.</p>
-                            @endif
-                        </div>
+                            </h2>
+                            <p class="mt-2 text-sm leading-6 text-slate-600">{{ $title->description ?: 'Описание пока отсутствует.' }}</p>
+                        </section>
 
                         @if ($seasons->isNotEmpty())
-                            <div class="mt-5">
-                                <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
-                                    <i class="fa-solid fa-layer-group text-slate-400" aria-hidden="true"></i>
-                                    <span>Сезоны сериала</span>
-                                </div>
-                                <div class="mt-2 flex flex-wrap gap-2">
-                                    @foreach ($seasons as $season)
-                                        <a href="#season-{{ $season->number }}" @class([
-                                            'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ring-1',
-                                            'bg-emerald-50 text-emerald-700 ring-emerald-100' => $showView->isSelectedSeason($season, $loop->first),
-                                            'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700' => ! $showView->isSelectedSeason($season, $loop->first),
-                                        ])>
-                                            <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
-                                            <span>{{ $season->number }} сезон</span>
-                                        </a>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endif
-
-                        @if ($actors->isNotEmpty())
-                            <div class="mt-5">
-                                <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
-                                    <i class="fa-solid fa-user-group text-slate-400" aria-hidden="true"></i>
-                                    <span>В ролях</span>
-                                </div>
-                                <div class="mt-2 flex flex-wrap gap-2">
-                                    @foreach ($actors->take(12) as $actor)
-                                        <x-ui.taxonomy-chip :taxonomy="$actor" />
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endif
-
-                        <dl class="mt-5 divide-y divide-slate-200 text-sm">
-                            @if ($title->original_title)
-                                <div class="grid gap-2 py-2 sm:grid-cols-[120px_1fr]">
-                                    <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
-                                        <i class="fa-solid fa-language text-slate-400" aria-hidden="true"></i>
-                                        <span>Оригинал</span>
-                                    </dt>
-                                    <dd class="text-slate-700">{{ $title->original_title }}</dd>
-                                </div>
-                            @endif
-
-                            @foreach ($taxonomyRows as $row)
-                                @if ($row['items']->isNotEmpty())
-                                    <div class="grid gap-2 py-2 sm:grid-cols-[120px_1fr]">
-                                        <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
-                                            <i class="{{ $row['icon'] ?? 'fa-solid fa-tag' }} text-slate-400" aria-hidden="true"></i>
-                                            <span>{{ $row['label'] }}</span>
-                                        </dt>
-                                        <dd class="flex flex-wrap gap-1">
-                                            @foreach ($row['items'] as $taxonomy)
-                                                <x-ui.taxonomy-chip :taxonomy="$taxonomy" />
-                                            @endforeach
-                                        </dd>
-                                    </div>
-                                @endif
-                            @endforeach
-
-                            @if ($title->year)
-                                <div class="grid gap-2 py-2 sm:grid-cols-[120px_1fr]">
-                                    <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
-                                        <i class="fa-solid fa-calendar-days text-slate-400" aria-hidden="true"></i>
-                                        <span>Вышел</span>
-                                    </dt>
-                                    <dd>
-                                        <a href="{{ route('titles.year', ['year' => $title->year]) }}" class="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-600">
-                                            <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
-                                            <span>{{ $title->year }}</span>
-                                        </a>
-                                    </dd>
-                                </div>
-                            @endif
-                        </dl>
-
-                        @if ($topTaxonomies->isNotEmpty())
-                            <div class="mt-5 flex flex-wrap gap-2">
-                                @foreach ($topTaxonomies as $taxonomy)
-                                    <x-ui.taxonomy-chip :taxonomy="$taxonomy" />
+                            <nav aria-label="Сезоны сериала" class="mt-5 flex flex-wrap gap-2">
+                                @foreach ($seasons as $season)
+                                    <a href="#season-{{ $season->number }}" @class([
+                                        'inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-bold ring-1',
+                                        'bg-emerald-50 text-emerald-700 ring-emerald-100' => $showView->isSelectedSeason($season, $loop->first),
+                                        'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700' => ! $showView->isSelectedSeason($season, $loop->first),
+                                    ])>
+                                        <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                                        <span>{{ $season->number }} сезон</span>
+                                    </a>
                                 @endforeach
-                            </div>
+                            </nav>
                         @endif
                     </div>
                 </article>
@@ -308,6 +206,54 @@
                                 </a>
                             @endforeach
                         </div>
+                    </div>
+                @endif
+            </x-ui.panel>
+
+            <x-ui.panel data-title-reference title="О сериале" icon="fa-solid fa-circle-info">
+                @if ($actors->isNotEmpty())
+                    <div>
+                        <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
+                            <i class="fa-solid fa-user-group text-slate-400" aria-hidden="true"></i>
+                            <span>В ролях</span>
+                        </div>
+                        <div class="mt-2 flex flex-wrap gap-2">
+                            @foreach ($actors->take(12) as $actor)
+                                <x-ui.taxonomy-chip :taxonomy="$actor" />
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                <dl class="mt-4 divide-y divide-slate-200 text-sm">
+                    @foreach ($taxonomyRows as $row)
+                        @if ($row['items']->isNotEmpty())
+                            <div class="grid gap-2 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
+                                <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
+                                    <i class="{{ $row['icon'] ?? 'fa-solid fa-tag' }} text-slate-400" aria-hidden="true"></i>
+                                    <span>{{ $row['label'] }}</span>
+                                </dt>
+                                <dd class="flex flex-wrap gap-1.5">
+                                    @foreach ($row['items'] as $taxonomy)
+                                        <x-ui.taxonomy-chip :taxonomy="$taxonomy" />
+                                    @endforeach
+                                </dd>
+                            </div>
+                        @endif
+                    @endforeach
+                    @if ($title->year)
+                        <div class="grid gap-2 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
+                            <dt class="font-bold text-slate-500">Вышел</dt>
+                            <dd><a href="{{ route('titles.year', ['year' => $title->year]) }}" class="font-bold text-emerald-700">{{ $title->year }}</a></dd>
+                        </div>
+                    @endif
+                </dl>
+
+                @if ($topTaxonomies->isNotEmpty())
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        @foreach ($topTaxonomies as $taxonomy)
+                            <x-ui.taxonomy-chip :taxonomy="$taxonomy" />
+                        @endforeach
                     </div>
                 @endif
             </x-ui.panel>
@@ -491,7 +437,7 @@
                 </x-ui.panel>
             @endif
 
-        </main>
+        </div>
 
         <aside class="space-y-4">
             <x-ui.panel title="Связи каталога" icon="fa-solid fa-diagram-project">

@@ -13,6 +13,7 @@ class CatalogRelationNameSanitizer
         'австралия' => true,
         'австрия' => true,
         'аргентина' => true,
+        'армения' => true,
         'беларусь' => true,
         'бельгия' => true,
         'болгария' => true,
@@ -20,13 +21,17 @@ class CatalogRelationNameSanitizer
         'великобритания' => true,
         'венгрия' => true,
         'венесуэла' => true,
+        'вьетнам' => true,
         'германия' => true,
         'гонконг' => true,
+        'грузия' => true,
         'греция' => true,
         'дания' => true,
         'израиль' => true,
         'индия' => true,
+        'индонезия' => true,
         'ирландия' => true,
+        'исландия' => true,
         'испания' => true,
         'италия' => true,
         'казахстан' => true,
@@ -37,12 +42,16 @@ class CatalogRelationNameSanitizer
         'корея северная' => true,
         'корея южная' => true,
         'латвия' => true,
+        'ливан' => true,
         'литва' => true,
         'люксембург' => true,
+        'малайзия' => true,
         'мексика' => true,
         'нидерланды' => true,
         'норвегия' => true,
         'новая зеландия' => true,
+        'оаэ' => true,
+        'пакистан' => true,
         'перу' => true,
         'польша' => true,
         'португалия' => true,
@@ -54,12 +63,15 @@ class CatalogRelationNameSanitizer
         'ссср' => true,
         'сша' => true,
         'таиланд' => true,
+        'тайвань' => true,
         'турция' => true,
         'украина' => true,
         'финляндия' => true,
         'франция' => true,
+        'филиппины' => true,
         'хорватия' => true,
         'чехия' => true,
+        'чехословакия' => true,
         'чили' => true,
         'швейцария' => true,
         'швеция' => true,
@@ -78,14 +90,16 @@ class CatalogRelationNameSanitizer
     {
         $name = $this->normalize($name);
 
-        if ($name === '' || Str::length($name) > 120) {
+        if ($name === '' || Str::length($name) > 120 || $this->isPlaceholder($name)) {
             return false;
         }
 
         return match ($type) {
             'age_rating' => preg_match('/^\d{1,2}\+?$/u', $name) === 1,
             'country' => $this->isCountryName($name),
-            'genre', 'status', 'network', 'studio', 'tag' => $this->isShortCatalogLabel($name),
+            'status' => in_array($name, ['Выходит', 'Завершён', 'Анонсирован', 'Приостановлен', 'Отменён'], true),
+            'network', 'studio' => $this->isValidOrganizationName($name),
+            'genre', 'tag' => $this->isShortCatalogLabel($name),
             'translation' => $this->isValidTranslationName($name),
             default => true,
         };
@@ -95,6 +109,13 @@ class CatalogRelationNameSanitizer
     {
         return Str::length($name) <= 80
             && preg_match('/[.!?]|(?:главн|добро пожаловать|типичная жизнь|сериал)/iu', $name) !== 1;
+    }
+
+    private function isValidOrganizationName(string $name): bool
+    {
+        return Str::length($name) <= 80
+            && preg_match('/[\pL]/u', $name) === 1
+            && preg_match('/[!?]|(?:главн|добро пожаловать|типичная жизнь|финал сезона|\bсер(?:ия|ии|ий)\b)/iu', $name) !== 1;
     }
 
     private function isValidTranslationName(string $name): bool
@@ -133,5 +154,19 @@ class CatalogRelationNameSanitizer
         $normalized = Str::lower($this->normalize($name));
 
         return isset(self::COUNTRY_NAMES[$normalized]);
+    }
+
+    private function isPlaceholder(string $name): bool
+    {
+        return in_array(Str::lower($this->normalize($name)), [
+            '-',
+            'нет',
+            'не указано',
+            'неизвестно',
+            'ничего не найдено',
+            'отсутствует',
+            'рекомендовано',
+            'рекомендовано!',
+        ], true);
     }
 }
