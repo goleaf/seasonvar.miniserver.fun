@@ -105,7 +105,7 @@ In `docs/performance.md`, directly after the existing connection-failure/backoff
 - Абсолютный `retryUntil` page job не короче настроенного claim lease: большой Redis backlog не завершает job до первого `handle()`. Уже сериализованные payload сохраняют старый deadline; после его истечения `failed()` освобождает claim, и следующий queued cron выбирает страницу повторно.
 ```
 
-- [ ] **Step 6: Format and run full verification**
+- [x] **Step 6: Format and run full verification**
 
 Run:
 
@@ -118,7 +118,7 @@ git diff --check
 
 Expected: Pint passes, docs are current, full PHPUnit suite has zero failures, and `git diff --check` prints no errors.
 
-- [ ] **Step 7: Record verification, commit, push and reload workers**
+- [x] **Step 7: Record verification, commit, push and reload workers**
 
 Mark Steps 1–6 complete in this plan, then run:
 
@@ -132,7 +132,7 @@ php artisan queue:restart
 
 Expected: branch is `main`, project Git hooks accept the complete staging set, origin receives the commit, and workers restart without queue cleanup.
 
-- [ ] **Step 8: Verify runtime and complete the plan**
+- [x] **Step 8: Verify runtime and complete the plan**
 
 Run:
 

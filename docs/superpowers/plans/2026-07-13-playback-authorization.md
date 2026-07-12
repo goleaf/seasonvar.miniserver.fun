@@ -95,5 +95,5 @@
 - Modify: `docs/MAINTENANCE_LOG.md`
 - Modify: this plan
 
-- [ ] Run focused tests, relevant catalog/security/importer tests, full PHPUnit, Pint, syntax, Composer/npm audits, docs check and frontend build.
-- [ ] Inspect the complete authorized diff, verify `main`, commit, push without force and confirm a clean tree.
+- [x] Run focused tests, relevant catalog/security/importer tests, full PHPUnit, Pint, syntax, Composer/npm audits, docs check and frontend build.
+- [x] Inspect the complete authorized diff, verify `main`, commit, push without force and confirm a clean tree.
