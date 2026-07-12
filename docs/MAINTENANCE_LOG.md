@@ -5,6 +5,7 @@
 - Доведена нормализация query-state каталога: `/titles` больше не читает `$filterView->catalogQueryState[...]` из Blade, scalar-поля идут через `CatalogTitlesViewModel::scalarState()`, list-поля — через `listState()`.
 - Пустые display-значения расширенных фильтров `/titles` больше не создают активные chips, даже если raw query-key присутствует в URL.
 - Активные расширенные фильтры `/titles` теперь раскрывают блок `<details>` сразу, чтобы состояние URL было видно без дополнительного клика.
+- Добавлен `CatalogStatsPosterUrlGuard`: `/stats` больше не рендерит `poster_src` для неразрешимых или небезопасных poster hosts, блок последних постеров оставляет только proxyable кандидатов, а proxy responder использует тот же guard перед внешним HTTP-запросом.
 - Укреплена страница `/titles`: Blade больше не перебирает raw scalar/list query-state для скрытых полей и чекбоксов качества, а мобильная выдача получила явный переход к фильтрам без изменения порядка результатов.
 - Снижена нагрузка `/stats`: Livewire polling переведен на `wire:poll.15s.visible`, fresh TTL снимка увеличен до 15 секунд, документация синхронизирована с новым интервалом.
 - Rate limiter переведен на отдельный `CACHE_LIMITER_STORE=file`, чтобы throttle-счетчики публичных маршрутов не создавали частые записи в SQLite `cache` table.

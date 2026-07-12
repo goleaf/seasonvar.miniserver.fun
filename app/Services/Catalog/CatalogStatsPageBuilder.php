@@ -22,6 +22,8 @@ class CatalogStatsPageBuilder
 
     private const VIDEO_SITEMAP_PAGE_SIZE = 5000;
 
+    private const STATS_POSTER_CANDIDATE_LIMIT = 32;
+
     /**
      * @var array<string, array{table: string, pivot: string, related_key: string}>
      */
@@ -67,6 +69,10 @@ class CatalogStatsPageBuilder
      * @var Collection<int, array{table: string, name: string, unique: bool, origin: string, partial: bool, columns: string}>|null
      */
     private ?Collection $databaseIndexes = null;
+
+    public function __construct(
+        private readonly CatalogStatsPosterUrlGuard $posterUrls,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -376,15 +382,18 @@ class CatalogStatsPageBuilder
             ->where('poster_url', '!=', '')
             ->latest('indexed_at')
             ->latest('id')
-            ->limit(8)
+            ->limit(self::STATS_POSTER_CANDIDATE_LIMIT)
             ->get()
+            ->filter(fn (CatalogTitle $title): bool => $this->posterUrls->safeUrl($title->poster_url) !== null)
+            ->take(8)
             ->map(fn (CatalogTitle $title): array => $this->titlePreviewRow(
                 $title,
                 'Обновлена',
                 $this->dateValue($title->indexed_at),
                 'fa-solid fa-clock',
                 'sky',
-            ));
+            ))
+            ->values();
     }
 
     /**
@@ -434,7 +443,7 @@ class CatalogStatsPageBuilder
      */
     private function titlePreviewRow(CatalogTitle $title, string $label, string $meta, string $icon, string $tone): array
     {
-        $hasPoster = is_string($title->poster_url) && trim($title->poster_url) !== '';
+        $hasProxyablePoster = $this->posterUrls->safeUrl($title->poster_url) !== null;
 
         return [
             'id' => (int) $title->id,
@@ -443,7 +452,7 @@ class CatalogStatsPageBuilder
             'label' => $label,
             'meta' => $meta,
             'href' => route('titles.show', $title),
-            'poster_src' => $hasPoster ? route('stats.poster', $title) : null,
+            'poster_src' => $hasProxyablePoster ? route('stats.poster', $title) : null,
             'icon' => $icon,
             'tone' => $tone,
         ];

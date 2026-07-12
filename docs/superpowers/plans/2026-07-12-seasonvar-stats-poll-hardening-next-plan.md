@@ -22,6 +22,10 @@
 - `advancedFilterChips()` отбрасывает пустые display-значения, чтобы некорректные пустые query keys не создавали пустые активные chips.
 - В `CatalogTitlesViewModel` добавлен `hasAdvancedFilters()`, а `<details>` расширенных фильтров открывается сразу при активных расширенных параметрах.
 - На `/titles` добавлен `#catalog-filters`, мобильный переход «К фильтрам», desktop sticky-sidebar и более читаемый summary для расширенных фильтров.
+- Добавлен `CatalogStatsPosterUrlGuard`, который отбрасывает не-HTTPS, неразрешимые, localhost, `.local`, private и reserved poster hosts.
+- `CatalogStatsPageBuilder` использует `CatalogStatsPosterUrlGuard` и не рендерит `poster_src`, если poster proxy заведомо вернет `404`.
+- Блок последних постеров `/stats` берет до 32 кандидатов и оставляет 8 proxyable строк, чтобы небезопасные poster URL не занимали видимые места с заглушками.
+- `CatalogStatsPosterResponder` использует тот же guard перед внешним HTTP-запросом, чтобы safety-логика сборки snapshot и responder не расходилась.
 - Git-правило `main` only зафиксировано в `AGENTS.md`, `README.md`, `docs/CODE_STANDARDS.md`, `docs/development.md` и этом плане.
 - Временный stash, созданный только для переноса незакоммиченных правок на `main`, проверен и удален после успешного переноса.
 - Документация синхронизирована с новым режимом polling:
@@ -70,12 +74,18 @@
   - проверено наличие `wire:poll.15s.visible`
   - проверено наличие текста `Данные обновляются примерно раз в 15 секунд.`
   - проверено наличие `data-livewire-stats-dashboard`
+- Browser QA через Chromium:
+  - `/titles?quality=1080p&exclude_country=rossiya&video=available&rating_source=imdb&updated=week` проверен на desktop `1440x1200` и mobile `390x844`
+  - `/stats` проверен на desktop `1440x1200` и mobile `390x844`
+  - проверены HTTP status `200`, отсутствие horizontal overflow, отсутствие console/page errors, отсутствие failed requests и local `4xx/5xx`
+  - первоначально найден root cause: `/stats` рендерил proxy image URLs для poster hosts, которые responder потом отвергал как `404`
+  - после `CatalogStatsPosterUrlGuard` повторная browser QA завершилась без failures
 
 ## Ограничения этого прохода
 
 - Новые test-файлы не создавались.
 - PHPUnit и `php artisan test` не запускались.
-- Playwright browser QA не используется как обязательная проверка, пока в окружении нет установленного браузера Playwright.
+- Playwright browser QA выполнена через уже доступный Chromium/playwright-core окружения; package.json, package-lock.json и test-файлы не изменялись.
 - Production dependencies не добавлялись.
 - `.env` не редактировался.
 
@@ -156,6 +166,8 @@
 - Добавить в sanitizer явные правила для новых типов данных, если stats page начнет показывать новые поля.
 - Если данные не предназначены для UI, не передавать их в stats snapshot.
 - Для poster thumbnails продолжить использовать только `stats.poster` internal proxy route.
+- Поддерживать единый `CatalogStatsPosterUrlGuard` для snapshot builder и responder, чтобы `/stats` не создавал browser requests к proxy URLs, которые responder сам отвергнет.
+- Если появится отдельное хранилище trusted poster hosts, добавлять его только в guard, а не в Blade.
 
 ### 6. Оптимизировать сборку stats snapshot
 
