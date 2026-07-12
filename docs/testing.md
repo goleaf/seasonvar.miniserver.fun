@@ -5,7 +5,7 @@
 ## Стек
 
 - Тесты пишутся как PHPUnit-классы в `tests/Feature` и `tests/Unit`; Pest в проекте не установлен.
-- PHPUnit использует SQLite в памяти через `phpunit.xml`.
+- PHPUnit использует SQLite в памяти через `phpunit.xml`; обычный cache и отдельный rate-limiter store используют `array`, поэтому counters браузерной QA или другого test-процесса не протекают между запусками.
 - Параллельный importer проверяется в `SeasonvarParallelImportTest`: тесты используют array lock store и `Queue::fake()`, поэтому не требуют живого Redis. HTTP-поведение остается закрыто `Http::fake()` и `Http::preventStrayRequests()`.
 - Для тестов, которые пишут в базу, использовать `RefreshDatabase`.
 - Базовый `Tests\TestCase` вызывает `withoutVite()`, поэтому feature-тесты не зависят от собранного Vite manifest.
