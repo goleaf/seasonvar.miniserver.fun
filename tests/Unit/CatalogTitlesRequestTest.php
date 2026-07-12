@@ -6,6 +6,8 @@ use App\Enums\CatalogFilterType;
 use App\Enums\CatalogSort;
 use App\Http\Requests\CatalogTitlesRequest;
 use App\Rules\CatalogFilterSlug;
+use App\Services\Catalog\CatalogTitlesCriteria;
+use App\Services\Catalog\Search\CatalogSearchQueryParser;
 use Illuminate\Support\Facades\Validator;
 use Tests\TestCase;
 
@@ -117,5 +119,38 @@ class CatalogTitlesRequestTest extends TestCase
         $this->assertSame('list', $request->view());
         $this->assertSame(48, $request->perPage());
         $this->assertSame(CatalogSort::ImdbRating, $request->sort());
+    }
+
+    public function test_catalog_titles_criteria_captures_and_copies_normalized_state(): void
+    {
+        $request = CatalogTitlesRequest::create('/titles', 'GET', [
+            'q' => 'Знахарь 2019',
+            'year' => ['2019', '2020'],
+            'genre' => ['drama'],
+            'exclude_country' => ['ssha'],
+            'updated' => 'week',
+            'view' => 'list',
+            'per_page' => '48',
+            'sort' => 'year_desc',
+        ]);
+        $request->setContainer(app())->setRedirector(app('redirect'));
+        $request->validateResolved();
+        $search = app(CatalogSearchQueryParser::class)->parse($request->normalizedSearch());
+
+        $criteria = CatalogTitlesCriteria::fromRequest($request, $search, 42, false);
+
+        $this->assertSame([2019, 2020], $criteria->years);
+        $this->assertSame(['drama'], $criteria->filterSlugs['genre']);
+        $this->assertSame(['ssha'], $criteria->excludedFilterSlugs['country']);
+        $this->assertSame(CatalogSort::YearDesc, $criteria->sort);
+        $this->assertSame('list', $criteria->view);
+        $this->assertSame(48, $criteria->perPage);
+        $this->assertSame(42, $criteria->titleContextId);
+        $this->assertTrue($criteria->hasContentFilters());
+        $this->assertSame(6, $criteria->activeFilterCount());
+        $this->assertNotNull($criteria->updatedAfter());
+        $this->assertSame([], $criteria->withoutYears()->years);
+        $this->assertSame([], $criteria->withoutRelation('genre')->filterSlugs['genre']);
+        $this->assertSame(['drama'], $criteria->filterSlugs['genre']);
     }
 }

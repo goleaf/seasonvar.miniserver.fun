@@ -72,7 +72,7 @@ class CatalogValidationTest extends TestCase
             ->from(route('titles.index'))
             ->get(route('titles.index', ['genre' => 'Bad Slug']))
             ->assertRedirect(route('titles.index'))
-            ->assertSessionHasErrors('genre');
+            ->assertSessionHasErrors('genre.0');
     }
 
     public function test_catalog_show_request_rejects_invalid_selected_episode_and_media_ids(): void
@@ -106,5 +106,38 @@ class CatalogValidationTest extends TestCase
             ->assertOk()
             ->assertSeeText('Ничего не найдено.')
             ->assertDontSeeText('Видимый сериал');
+    }
+
+    public function test_catalog_rejects_more_than_twenty_values_per_filter(): void
+    {
+        $this->from(route('titles.index'))
+            ->get(route('titles.index', ['genre' => array_map(fn (int $index): string => 'genre-'.$index, range(1, 21))]))
+            ->assertRedirect(route('titles.index'))
+            ->assertSessionHasErrors([
+                'genre' => 'Выбрано слишком много значений фильтра.',
+            ]);
+    }
+
+    public function test_catalog_rejects_inverted_ranges(): void
+    {
+        $this->from(route('titles.index'))
+            ->get(route('titles.index', ['year_from' => 2024, 'year_to' => 2010]))
+            ->assertRedirect(route('titles.index'))
+            ->assertSessionHasErrors([
+                'year_from' => 'Начало диапазона не может быть больше конца.',
+            ]);
+    }
+
+    public function test_catalog_rejects_the_same_included_and_excluded_value(): void
+    {
+        $this->from(route('titles.index'))
+            ->get(route('titles.index', [
+                'country' => ['rossiya'],
+                'exclude_country' => ['rossiya'],
+            ]))
+            ->assertRedirect(route('titles.index'))
+            ->assertSessionHasErrors([
+                'country' => 'Одно значение нельзя одновременно включить и исключить.',
+            ]);
     }
 }

@@ -538,7 +538,7 @@ class CatalogPageTest extends TestCase
         }
     }
 
-    public function test_invalid_year_filter_does_not_fall_back_to_full_catalog(): void
+    public function test_invalid_year_filter_is_rejected_before_catalog_query(): void
     {
         CatalogTitle::factory()->create([
             'title' => 'Видимый сериал',
@@ -546,12 +546,12 @@ class CatalogPageTest extends TestCase
             'year' => 2024,
         ]);
 
-        $response = $this->get(route('titles.index', ['year' => 'abcd']));
-
-        $response
-            ->assertOk()
-            ->assertSeeText('Год: abcd не найден')
-            ->assertDontSeeText('Видимый сериал');
+        $this->from(route('titles.index'))
+            ->get(route('titles.index', ['year' => 'abcd']))
+            ->assertRedirect(route('titles.index'))
+            ->assertSessionHasErrors([
+                'year.0' => 'Год должен быть целым числом.',
+            ]);
     }
 
     public function test_title_page_uses_readable_related_lists_without_country_section(): void

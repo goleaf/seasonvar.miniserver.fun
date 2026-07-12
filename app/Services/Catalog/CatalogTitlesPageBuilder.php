@@ -43,7 +43,7 @@ class CatalogTitlesPageBuilder
     {
         $search = $request->normalizedSearch();
         $searchQuery = $this->searchParser->parse($search);
-        $sort = $request->sort();
+        $sort = $request->sort()->value;
         $requestedYear = $request->requestedYear();
         $year = $request->year();
         $invalidYear = $request->invalidYear();
