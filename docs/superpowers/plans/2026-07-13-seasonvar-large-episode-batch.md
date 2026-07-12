@@ -28,11 +28,11 @@
 - Consumes: `SeasonvarCatalogImporter::syncEpisodes(array $seasons, SourcePage $page, array $episodes, ?callable $progress = null): void`.
 - Produces: тот же private interface с bounded read/write queries.
 
-- [ ] **Step 1: Write the failing feature test**
+- [x] **Step 1: Write the failing feature test**
 
 Добавить тест `test_it_imports_more_episodes_than_a_single_sqlite_upsert_can_bind`, который создаёт массив из 2600 названий серий, подменяет Seasonvar HTTP через `Http::fake()`, запускает `seasonvar:import` для одного URL и проверяет exit code `0`, количество `2600` и последнюю серию.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run:
 
@@ -42,11 +42,11 @@ php artisan test tests/Feature/SeasonvarParsePageCommandTest.php --filter=test_i
 
 Expected: FAIL с `too many SQL variables` или ненулевым кодом команды.
 
-- [ ] **Step 3: Implement bounded reads and writes**
+- [x] **Step 3: Implement bounded reads and writes**
 
 В `syncEpisodes()` удалить большой `whereIn('number', ...)` из запроса существующих серий. Значения `$rowsForUpsert` разбить через `chunk(50)` и вызвать существующий `Episode::query()->upsert(...)` для каждого пакета с прежними unique/update columns.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run:
 
@@ -57,7 +57,7 @@ php artisan test tests/Feature/SeasonvarParsePageCommandTest.php
 
 Expected: PASS.
 
-- [ ] **Step 5: Format and verify broadly**
+- [x] **Step 5: Format and verify broadly**
 
 Run:
 

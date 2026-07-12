@@ -126,6 +126,35 @@ class SeasonvarParsePageCommandTest extends TestCase
             ->count());
     }
 
+    public function test_it_imports_more_episodes_than_a_single_sqlite_upsert_can_bind(): void
+    {
+        Http::preventStrayRequests();
+
+        $episodes = collect(range(1, 2600))
+            ->mapWithKeys(fn (int $number): array => [$number => "{$number} серия"])
+            ->all();
+
+        Http::fake([
+            'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html' => Http::response($this->seasonPageHtml(4, $episodes)),
+            'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-1-season.html' => Http::response($this->seasonPageHtml(1, [])),
+        ]);
+
+        $this->artisan('seasonvar:import', [
+            'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
+        ])->assertExitCode(0);
+
+        $catalogTitle = CatalogTitle::query()->where('external_id', '47915')->firstOrFail();
+
+        $this->assertSame(2600, Episode::query()
+            ->whereHas('season', fn ($query) => $query->where('catalog_title_id', $catalogTitle->id))
+            ->count());
+        $this->assertDatabaseHas('episodes', [
+            'season_id' => $catalogTitle->seasons()->where('number', 4)->sole()->id,
+            'number' => 2600,
+            'title' => '2600 серия',
+        ]);
+    }
+
     public function test_it_imports_m3u_playlist_discovered_in_page_html(): void
     {
         Http::preventStrayRequests();

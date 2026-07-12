@@ -1061,16 +1061,15 @@ class SeasonvarCatalogImporter
             ? Episode::withTrashed()
                 ->whereIn('season_id', $seasonIds)
                 ->where('kind', ReleaseKind::Regular->value)
-                ->whereIn('number', $rowsByKey->pluck('number')->unique())
                 ->get()
                 ->keyBy(fn (Episode $episode): string => $episode->season_id.'|'.$episode->number)
             : collect();
         $rowsForUpsert = $rowsByKey
             ->filter(fn (array $row, string $key): bool => $this->episodeRowChanged($existingEpisodes->get($key), $row));
 
-        if ($rowsForUpsert->isNotEmpty()) {
+        foreach ($rowsForUpsert->values()->chunk(50) as $rows) {
             Episode::query()->upsert(
-                $rowsForUpsert->values()->all(),
+                $rows->all(),
                 ['season_id', 'kind', 'number'],
                 [
                     'source_page_id',
