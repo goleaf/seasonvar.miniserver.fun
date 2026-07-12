@@ -34,12 +34,9 @@ class CatalogValidationTest extends TestCase
     public function test_catalog_search_rejects_one_character_with_russian_validation_message(): void
     {
         $this
-            ->from(route('titles.index'))
             ->get(route('titles.index', ['q' => 'я']))
-            ->assertRedirect(route('titles.index'))
-            ->assertSessionHasErrors([
-                'q' => 'Введите не менее 2 символов для поиска.',
-            ]);
+            ->assertOk()
+            ->assertSeeText('Введите не менее 2 символов для поиска.');
     }
 
     public function test_catalog_search_allows_eighty_cyrillic_characters(): void
@@ -57,22 +54,17 @@ class CatalogValidationTest extends TestCase
         $longSearch = str_repeat('я', 81);
 
         $this
-            ->from(route('titles.index'))
             ->get(route('titles.index', ['q' => $longSearch]))
-            ->assertRedirect(route('titles.index'))
-            ->assertSessionHasErrors([
-                'q' => 'Поисковый запрос слишком длинный.',
-            ])
-            ->assertSessionHasInput('q', $longSearch);
+            ->assertOk()
+            ->assertSeeText('Поисковый запрос слишком длинный.');
     }
 
     public function test_catalog_filter_request_rejects_malformed_filter_slug(): void
     {
         $this
-            ->from(route('titles.index'))
             ->get(route('titles.index', ['genre' => 'Bad Slug']))
-            ->assertRedirect(route('titles.index'))
-            ->assertSessionHasErrors('genre.0');
+            ->assertOk()
+            ->assertSeeText('Поле жанр должно быть slug: строчные латинские буквы, цифры и дефисы, до 120 символов.');
     }
 
     public function test_catalog_show_request_rejects_invalid_selected_episode_and_media_ids(): void
@@ -109,34 +101,28 @@ class CatalogValidationTest extends TestCase
 
     public function test_catalog_rejects_more_than_twenty_values_per_filter(): void
     {
-        $this->from(route('titles.index'))
+        $this
             ->get(route('titles.index', ['genre' => array_map(fn (int $index): string => 'genre-'.$index, range(1, 21))]))
-            ->assertRedirect(route('titles.index'))
-            ->assertSessionHasErrors([
-                'genre' => 'Выбрано слишком много значений фильтра.',
-            ]);
+            ->assertOk()
+            ->assertSeeText('Выбрано слишком много значений фильтра.');
     }
 
     public function test_catalog_rejects_inverted_ranges(): void
     {
-        $this->from(route('titles.index'))
+        $this
             ->get(route('titles.index', ['year_from' => 2024, 'year_to' => 2010]))
-            ->assertRedirect(route('titles.index'))
-            ->assertSessionHasErrors([
-                'year_from' => 'Начало диапазона не может быть больше конца.',
-            ]);
+            ->assertOk()
+            ->assertSeeText('Начало диапазона не может быть больше конца.');
     }
 
     public function test_catalog_rejects_the_same_included_and_excluded_value(): void
     {
-        $this->from(route('titles.index'))
+        $this
             ->get(route('titles.index', [
                 'country' => ['rossiya'],
                 'exclude_country' => ['rossiya'],
             ]))
-            ->assertRedirect(route('titles.index'))
-            ->assertSessionHasErrors([
-                'country' => 'Одно значение нельзя одновременно включить и исключить.',
-            ]);
+            ->assertOk()
+            ->assertSeeText('Одно значение нельзя одновременно включить и исключить.');
     }
 }

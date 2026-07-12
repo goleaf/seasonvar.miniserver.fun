@@ -9,6 +9,7 @@
   - `CatalogHomePageBuilder` готовит данные главной страницы.
   - `CatalogTitlesPageBuilder` готовит выдачу каталога, фильтры, счетчики и SEO для списка.
   - `CatalogTitlePageBuilder` готовит страницу тайтла, выбранную серию, медиа, рекомендации и SEO.
+- `/titles`, `/titles/year/{year}` и taxonomy-маршруты обслуживает full-page `App\Livewire\CatalogSeries`. Компонент отвечает только за URL/page state и пользовательские действия, валидирует состояние через `CatalogTitlesRequest` и ровно один раз за render делегирует данные в `CatalogTitlesPageBuilder`.
 - Sitemap, feed, OpenSearch и `llms.txt` обслуживает отдельный `CatalogSitemapController`, который делегирует XML/text-ответы в `CatalogSitemapResponder`.
 - JSON API обслуживает `App\Http\Controllers\Api\CatalogTitleController`: контроллер только принимает Form Request/model binding и возвращает API Resources, а выбор публичных связей выполняет `CatalogApiTitleQuery`.
 - `/stats` обслуживается тонким controller-view слоем: `CatalogController::stats()` отдает SEO и Livewire-обертку, live-данные рендерит `App\Livewire\StatsDashboard`, а постеры статистики отдает `CatalogStatsPosterResponder` через внутренний proxy-маршрут.
@@ -25,6 +26,7 @@
 ## Запросы и валидация
 
 - Входные параметры списка каталога нормализует и проверяет `CatalogTitlesRequest`.
+- URL-состояние `/titles` хранит `CatalogSeriesFilters`: только скаляры и ограниченные массивы slug/годов. Route-контекст года и taxonomy защищён `#[Locked]`; paginator, Eloquent-модели, фасеты и SEO не сериализуются в публичный Livewire snapshot.
 - `CatalogTitlesPageBuilder` один раз разбирает нормализованный `q` через `CatalogSearchQueryParser` и собирает неизменяемый `CatalogTitlesCriteria`; тот же объект передается в выдачу, контекстные счетчики связей и счетчики годов.
 - Multi-select фильтры каталога передаются как повторяемые query-параметры: годы остаются набором допустимых годов, relation-фильтры резолвятся пакетно по slug, а `CatalogTitlesCriteria` хранит только нормализованные уникальные ID поддерживаемых справочников с лимитом 20 значений на тип.
 - Query-параметры выбранной серии и видео на странице карточки проверяет `CatalogShowRequest`.

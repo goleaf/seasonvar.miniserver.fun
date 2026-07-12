@@ -171,6 +171,11 @@ final readonly class CatalogTitlesCriteria
         return $this->copy(years: []);
     }
 
+    public function invalidated(): self
+    {
+        return $this->copy(invalidYear: true);
+    }
+
     public function withoutRelation(string $type): self
     {
         $filterSlugs = $this->filterSlugs;

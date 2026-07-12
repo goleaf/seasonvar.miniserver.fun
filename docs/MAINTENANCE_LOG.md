@@ -2,6 +2,7 @@
 
 ## 2026-07-12
 
+- `/titles` переведён на full-page Livewire 4.3: bounded URL-synced form state, server-side поиск/фильтры/сортировка/пагинация, точечные и полные сбросы, loading/error/empty states и стабильные `wire:key`; вся выборка по-прежнему делегируется общей public query boundary, а GET fallback сохранён.
 - Публичные выборки тайтлов сведены к `CatalogTitleQuery`: каталог, API, фасеты, sitemap/feed, рекомендации и публичные счетчики начинают запрос с единой user-aware publication boundary; `CatalogTitlesCriteria` передает нормализованные ID фильтров, а enum-сортировки имеют стабильный `id` tie-breaker.
 - Relation-фильтры и legacy-поиск оставляют ID в SQL-подзапросах: pivot joins не размножают тайтлы, paginator total совпадает с выдачей, а полный список поисковых кандидатов больше не загружается в PHP.
 - Левая панель «Быстрый доступ» на странице сериала стала плоской: у меню, текущего выбора и счетчиков убраны декоративные рамки, а сами счетчики получили локальные FontAwesome-иконки.

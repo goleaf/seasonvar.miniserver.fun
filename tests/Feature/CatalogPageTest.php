@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\CatalogSeries;
 use App\Livewire\StatsDashboard;
 use App\Models\Actor;
 use App\Models\CatalogTitle;
@@ -38,6 +39,57 @@ class CatalogPageTest extends TestCase
         $response->assertDontSeeText('Состояние базы');
         $response->assertSeeText('Сейчас можно смотреть');
         $response->assertDontSeeText('Быстрый выбор');
+    }
+
+    public function test_livewire_catalog_hydrates_url_state_and_filters_results(): void
+    {
+        $genre = Genre::query()->create([
+            'name' => 'Драма',
+            'slug' => 'drama',
+        ]);
+        $matching = CatalogTitle::factory()->create([
+            'title' => 'Искомая драма',
+            'slug' => 'iskomaia-drama',
+        ]);
+        $matching->genres()->attach($genre);
+        CatalogTitle::factory()->create([
+            'title' => 'Посторонняя комедия',
+            'slug' => 'postoronniaia-komediia',
+        ]);
+
+        Livewire::withQueryParams([
+            'q' => 'Искомая',
+            'genre' => ['drama'],
+            'sort' => 'title_asc',
+        ])->test(CatalogSeries::class)
+            ->assertSet('filters.search', 'Искомая')
+            ->assertSet('filters.genre', ['drama'])
+            ->assertSet('filters.sort', 'title_asc')
+            ->assertSee($matching->title)
+            ->assertDontSee('Посторонняя комедия')
+            ->assertSeeHtml('wire:key="catalog-title-'.$matching->id.'"');
+    }
+
+    public function test_livewire_catalog_resets_pagination_for_state_changes_and_reset_actions(): void
+    {
+        CatalogTitle::factory()->count(30)->create();
+
+        Livewire::test(CatalogSeries::class)
+            ->call('setPage', 2)
+            ->assertSet('paginators.page', 2)
+            ->set('filters.genre', ['drama'])
+            ->call('applyFilters')
+            ->assertSet('paginators.page', 1)
+            ->call('resetGroup', 'genre')
+            ->assertSet('filters.genre', [])
+            ->set('filters.sort', 'year_desc')
+            ->assertSet('paginators.page', 1)
+            ->call('resetAll')
+            ->assertSet('filters.search', '')
+            ->assertSet('filters.genre', [])
+            ->assertSet('filters.sort', 'updated')
+            ->assertSet('filters.view', 'grid')
+            ->assertSet('filters.perPage', 24);
     }
 
     public function test_home_page_lists_country_filters_without_four_item_cap(): void
@@ -583,12 +635,10 @@ class CatalogPageTest extends TestCase
             'year' => 2024,
         ]);
 
-        $this->from(route('titles.index'))
-            ->get(route('titles.index', ['year' => 'abcd']))
-            ->assertRedirect(route('titles.index'))
-            ->assertSessionHasErrors([
-                'year.0' => 'Год должен быть целым числом.',
-            ]);
+        $this->get(route('titles.index', ['year' => 'abcd']))
+            ->assertOk()
+            ->assertSeeText('Год должен быть целым числом.')
+            ->assertDontSeeText('Видимый сериал');
     }
 
     public function test_title_page_uses_readable_related_lists_without_country_section(): void

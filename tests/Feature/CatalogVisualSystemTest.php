@@ -114,6 +114,23 @@ class CatalogVisualSystemTest extends TestCase
             ->assertDontSee('dark:', false);
     }
 
+    public function test_catalog_exposes_livewire_controls_loading_feedback_and_stable_rows(): void
+    {
+        CatalogTitle::factory()->create();
+        CatalogTitle::factory()->count(24)->create();
+
+        $this->get(route('titles.index'))
+            ->assertOk()
+            ->assertSee('wire:model.live.debounce.400ms="filters.search"', false)
+            ->assertSee('wire:submit="applyFilters"', false)
+            ->assertSee('wire:loading.delay', false)
+            ->assertDontSee('wire:loading.delay.flex', false)
+            ->assertSee('wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,clearSearch,resetAll,previousPage,nextPage,gotoPage"', false)
+            ->assertSee('wire:loading', false)
+            ->assertSee('wire:key="catalog-title-', false)
+            ->assertSee('wire:click="nextPage(\'page\')"', false);
+    }
+
     public function test_title_poster_uses_non_cropping_fit_by_default(): void
     {
         $title = CatalogTitle::factory()->make([

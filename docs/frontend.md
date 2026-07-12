@@ -7,7 +7,7 @@
 - Vite 8 и `laravel-vite-plugin` 3 собирают фронтенд.
 - Tailwind CSS 4 подключается через `@tailwindcss/vite` и `resources/css/app.css`.
 - FontAwesome, Plyr и HLS подключаются из локальных npm-пакетов, без CDN.
-- Livewire 4 используется для live-страницы `/stats`; ассеты Livewire подключаются явно через layout.
+- Livewire 4 используется для интерактивного каталога `/titles` и live-страницы `/stats`; ассеты Livewire подключаются явно через layout.
 
 ## Команды
 
@@ -29,6 +29,7 @@ composer dev
 - `resources/js/app.js` импортирует `resources/css/app.css` и глобальные стили FontAwesome.
 - Player-код для Plyr/HLS находится в `resources/js/player.js` и загружается dynamic import только на страницах с `video.js-catalog-player`.
 - Локальный поиск внутри длинных групп фильтров `/titles` находится в `resources/js/app.js` и работает только как progressive enhancement: серверная GET-форма остается рабочей без JavaScript.
+- Серверное состояние `/titles` ведёт `CatalogSeries`: строка поиска обновляется с debounce 400 мс, checkbox/расширенные поля применяются по submit, а сортировка, вид, размер страницы, алфавит и пагинация обновляются отдельными Livewire actions. Для всех форм сохранён обычный GET fallback.
 - Для HLS используется `hls.js/light`: он сохраняет воспроизведение HLS-плейлистов и не тянет модули субтитров, DRM и расширенной аналитики, которые сейчас не используются интерфейсом.
 - Layout подключает ассеты через `@vite('resources/js/app.js')`; не добавлять raw `<script>`/`<style>` для обычных assets.
 - Layout также содержит `@livewireStyles` и `@livewireScripts`; не дублировать Livewire/Alpine через CDN или отдельный npm-bundle.
@@ -36,4 +37,5 @@ composer dev
 - FontAwesome собирается из локальных `fontawesome.min.css`, `solid.min.css` и `regular.min.css`; brands/v4 font-файлы не входят в bundle.
 - Plyr получает локальный Vite URL из `resources/images/plyr.svg`, а HLS-код загружается только когда браузеру действительно нужен `hls.js/light`.
 - Проектная pagination переопределена в `resources/views/vendor/pagination/tailwind.blade.php`: весь текст русский, тема только светлая, элементы управления имеют высоту не менее 44 пикселей.
+- Livewire pagination каталога переопределена в `resources/views/vendor/livewire/tailwind.blade.php`: русские подписи, стабильные `wire:key`, светлая тема и элементы управления не менее 44 пикселей.
 - Blade не должен содержать `@php`/`@endphp` или asset-логику на PHP; используйте Laravel/Vite helpers и конфигурацию Vite.

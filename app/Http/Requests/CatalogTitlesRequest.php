@@ -103,6 +103,7 @@ class CatalogTitlesRequest extends FormRequest
 
         foreach (CatalogFilterType::cases() as $filterType) {
             $attributes[$filterType->value] = $filterType->label();
+            $attributes[$filterType->value.'.*'] = $filterType->label();
         }
 
         return $attributes;

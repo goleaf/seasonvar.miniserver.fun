@@ -41,8 +41,12 @@ class CatalogTitlesPageBuilder
     /**
      * @return array<string, mixed>
      */
-    public function data(CatalogTitlesRequest $request, ?string $type = null, ?string $taxonomy = null): array
-    {
+    public function data(
+        CatalogTitlesRequest $request,
+        ?string $type = null,
+        ?string $taxonomy = null,
+        bool $invalidInput = false,
+    ): array {
         $search = $request->normalizedSearch();
         $searchQuery = $this->searchParser->parse($search);
         $requestedYear = $request->requestedYear();
@@ -152,6 +156,10 @@ class CatalogTitlesPageBuilder
             excluded: $excludedTaxonomyIds,
             invalidYear: $invalidYear,
         );
+
+        if ($invalidInput) {
+            $criteria = $criteria->invalidated();
+        }
         $catalogQueryState = $this->sanitizedCatalogQueryState($request->catalogQueryState(), $filterTypes, $selectedFilterSlugs, $selectedExcludedFilterSlugs, $years, $invalidYear);
         $paginationQuery = $this->paginationQuery($catalogQueryState, $search, $sort, $titleContext);
 

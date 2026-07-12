@@ -9,6 +9,7 @@
 - Для тестов, которые пишут в базу, использовать `RefreshDatabase`.
 - Базовый `Tests\TestCase` вызывает `withoutVite()`, поэтому feature-тесты не зависят от собранного Vite manifest.
 - Для данных каталога использовать существующие фабрики: `CatalogTitle`, `Season`, `Episode`, `LicensedMedia`, `Source`, `SourcePage`, `User`.
+- Livewire-каталог проверяется через `Livewire::withQueryParams(...)->test(CatalogSeries::class)`: URL hydration, нормализация, server-side выдача, reset paginator и групповые/полные сбросы должны оставаться покрыты существующими feature-тестами.
 - Production-данные не сидируются; seeders не являются частью обычного тестового сценария.
 
 ## Паттерны
