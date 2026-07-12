@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Models\Genre;
 use App\View\ViewModels\CatalogTitlesViewModel;
 use Tests\TestCase;
 
@@ -29,5 +30,34 @@ class CatalogTitlesViewModelTest extends TestCase
             'year_asc' => 'Год: старые сначала',
             'title_asc' => 'Название: А-я',
         ], $viewModel->sortLabels);
+    }
+
+    public function test_search_and_filter_reset_queries_preserve_only_relevant_state(): void
+    {
+        $genre = new Genre([
+            'name' => 'Драма',
+            'slug' => 'drama',
+        ]);
+        $viewModel = new CatalogTitlesViewModel(
+            search: 'Знахарь',
+            sort: 'year_desc',
+            year: 2019,
+            requestedYear: '2019',
+            invalidYear: false,
+            activeTaxonomies: collect(['genre' => $genre]),
+            activeFilterSlugs: ['genre' => 'drama'],
+            invalidFilterSlugs: [],
+            titleContext: null,
+        );
+
+        $this->assertSame([
+            'genre' => 'drama',
+            'sort' => 'year_desc',
+            'year' => 2019,
+        ], $viewModel->withoutSearchQuery);
+        $this->assertSame([
+            'q' => 'Знахарь',
+            'sort' => 'year_desc',
+        ], $viewModel->withoutFiltersQuery);
     }
 }

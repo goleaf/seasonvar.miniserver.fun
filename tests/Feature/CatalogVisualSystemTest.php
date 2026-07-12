@@ -96,4 +96,33 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('href="'.$genreUrl.'"', $cardHtml);
         $this->assertStringContainsString('href="'.$genreUrl.'"', $rowHtml);
     }
+
+    public function test_catalog_pagination_is_russian_responsive_and_light_only(): void
+    {
+        CatalogTitle::factory()->count(30)->create();
+
+        $response = $this->get(route('titles.index'));
+
+        $response
+            ->assertOk()
+            ->assertSeeText('Показано 1–24 из 30')
+            ->assertSeeText('Назад')
+            ->assertSeeText('Вперед')
+            ->assertSee('aria-current="page"', false)
+            ->assertDontSeeText('pagination.previous')
+            ->assertDontSeeText('pagination.next')
+            ->assertDontSee('dark:', false);
+    }
+
+    public function test_title_poster_uses_non_cropping_fit_by_default(): void
+    {
+        $title = CatalogTitle::factory()->make([
+            'poster_url' => 'https://media.example.com/poster.jpg',
+        ]);
+
+        $html = Blade::render('<x-title-poster :title="$title" />', ['title' => $title]);
+
+        $this->assertStringContainsString('object-contain', $html);
+        $this->assertStringNotContainsString('object-cover', $html);
+    }
 }

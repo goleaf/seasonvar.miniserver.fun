@@ -1,6 +1,6 @@
 # Тестирование
 
-Обновлено: 09.07.2026
+Обновлено: 12.07.2026
 
 ## Стек
 
@@ -19,6 +19,8 @@
 - Если тестируемая логика окажется внутри Blade, сначала перенести ее в request, service, view-model, component class, accessor или enum, а затем тестировать PHP-код.
 - JSON API покрывается feature-тестами через `getJson()` и fluent JSON assertions; тесты ресурсов должны проверять отсутствие приватных source/media/importer полей.
 - Operational notifications тестируются через `Notification::fake()` и direct content tests на `toMail()`; реальные письма в тестах не отправляются.
+- `CatalogSearchPageTest` фиксирует hard-year, short-token, AND-person, unpublished, true-zero и insufficient состояния поиска.
+- `CatalogVisualSystemTest` фиксирует shell, порядок страниц, один title tab-stop, non-cropping poster и русскую светлую pagination.
 
 ## Команды
 

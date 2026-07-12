@@ -134,7 +134,7 @@ class CatalogBladeComponentTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('href="#season-2"', false)
-            ->assertSeeText('Сезоны сериала')
+            ->assertSee('aria-label="Сезоны сериала"', false)
             ->assertDontSeeText('Быстрый выбор сезона')
             ->assertSee('id="season-2" class="group scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48"', false)
             ->assertDontSee('id="season-2" class="grid', false);

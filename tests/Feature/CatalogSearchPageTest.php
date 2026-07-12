@@ -146,4 +146,31 @@ class CatalogSearchPageTest extends TestCase
             ->assertOk()
             ->assertDontSee('href="'.route('titles.show', $unpublishedTitle).'"', false);
     }
+
+    public function test_unknown_query_keeps_a_true_zero_result(): void
+    {
+        CatalogTitle::factory()->create([
+            'title' => 'Посторонний сериал',
+            'slug' => 'postoronnii-serial',
+        ]);
+
+        $this->get(route('titles.index', ['q' => 'шерлокк']))
+            ->assertOk()
+            ->assertSeeText('По запросу «шерлокк» ничего не найдено.')
+            ->assertDontSeeText('Посторонний сериал')
+            ->assertDontSeeText('ближайшие результаты');
+    }
+
+    public function test_stopword_only_query_has_an_insufficient_state(): void
+    {
+        CatalogTitle::factory()->create([
+            'title' => 'Посторонний сериал',
+            'slug' => 'postoronnii-serial',
+        ]);
+
+        $this->get(route('titles.index', ['q' => 'смотреть онлайн']))
+            ->assertOk()
+            ->assertSeeText('Запрос «смотреть онлайн» слишком общий.')
+            ->assertDontSeeText('Посторонний сериал');
+    }
 }
