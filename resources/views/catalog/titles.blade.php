@@ -2,7 +2,7 @@
 
 @section('content')
     <section class="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]">
-        <aside class="order-2 space-y-4 lg:order-1">
+        <aside id="catalog-filters" class="order-2 scroll-mt-24 space-y-4 lg:sticky lg:top-24 lg:order-1 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
             <x-ui.panel title="Фильтры каталога" icon="fa-solid fa-sliders">
                 <div class="space-y-5">
                     <x-catalog.filter-section title="Годы" icon="fa-solid fa-calendar-days" empty="Годы не указаны.">
@@ -62,6 +62,11 @@
                             :filter-view="$filterView"
                             :total="$titles->total()"
                         />
+
+                        <a href="#catalog-filters" class="mt-3 inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-50 lg:hidden">
+                            <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                            <span>К фильтрам</span>
+                        </a>
                     </div>
 
                     <form method="GET" action="{{ route('titles.index') }}" class="flex w-full max-w-md flex-col gap-2 sm:flex-row">

@@ -245,6 +245,20 @@ class CatalogTitlesViewModel
             || collect($filterKeys)->contains(fn (string $key): bool => array_key_exists($key, $this->catalogQueryState));
     }
 
+    /** @return list<string> */
+    public function listState(string $key): array
+    {
+        $value = $this->catalogQueryState[$key] ?? [];
+        $values = is_array($value) ? $value : [$value];
+
+        return collect($values)
+            ->filter(fn (mixed $item): bool => is_scalar($item) && trim((string) $item) !== '')
+            ->map(fn (mixed $item): string => trim((string) $item))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     /** @return array<string, mixed> */
     public function viewQuery(string $view): array
     {

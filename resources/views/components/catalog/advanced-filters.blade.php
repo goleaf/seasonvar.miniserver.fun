@@ -7,8 +7,14 @@
     'perPage',
 ])
 
-<details {{ $attributes->merge(['class' => 'rounded-control border border-slate-200 bg-slate-50 p-3']) }}>
-    <summary class="cursor-pointer text-sm font-bold text-slate-700">Расширенные фильтры</summary>
+<details {{ $attributes->merge(['class' => 'group rounded-control border border-slate-200 bg-slate-50 p-3']) }}>
+    <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-control px-1 text-sm font-bold text-slate-700">
+        <span class="inline-flex min-w-0 items-center gap-2">
+            <i class="fa-solid fa-sliders shrink-0 text-slate-400" aria-hidden="true"></i>
+            <span class="min-w-0 break-words">Расширенные фильтры</span>
+        </span>
+        <i class="fa-solid fa-chevron-down shrink-0 text-slate-400 transition group-open:rotate-180" aria-hidden="true"></i>
+    </summary>
 
     <form method="GET" action="{{ route('titles.index') }}" class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         @if ($titleContext !== null)
@@ -23,11 +29,11 @@
             @endforeach
         @endforeach
         @foreach (['exclude_country', 'exclude_genre'] as $excludedType)
-            @foreach (($filterView->catalogQueryState[$excludedType] ?? []) as $slug)
+            @foreach ($filterView->listState($excludedType) as $slug)
                 <input type="hidden" name="{{ $excludedType }}[]" value="{{ $slug }}">
             @endforeach
         @endforeach
-        @foreach (($filterView->catalogQueryState['year'] ?? []) as $selectedYear)
+        @foreach ($filterView->listState('year') as $selectedYear)
             <input type="hidden" name="year[]" value="{{ $selectedYear }}">
         @endforeach
         @if ($sort !== 'updated')
@@ -112,7 +118,7 @@
             <div class="flex flex-wrap gap-2">
                 @foreach (['2160p', '1440p', '1080p', '720p', '480p', '360p', '240p'] as $quality)
                     <label class="inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600">
-                        <input type="checkbox" name="quality[]" value="{{ $quality }}" @checked(in_array($quality, $filterView->catalogQueryState['quality'] ?? [], true))>
+                        <input type="checkbox" name="quality[]" value="{{ $quality }}" @checked(in_array($quality, $filterView->listState('quality'), true))>
                         <span>{{ $quality }}</span>
                     </label>
                 @endforeach
