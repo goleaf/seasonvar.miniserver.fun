@@ -511,6 +511,33 @@ class CatalogPageTest extends TestCase
             ->assertDontSeeText('Сериал без актера');
     }
 
+    public function test_catalog_sort_uses_descending_id_as_the_final_tie_breaker(): void
+    {
+        $indexedAt = now()->subHour();
+        $firstTitle = CatalogTitle::factory()->create([
+            'title' => 'Одинаковое название',
+            'slug' => 'odinakovoe-nazvanie-pervoe',
+            'year' => 2024,
+            'indexed_at' => $indexedAt,
+        ]);
+        $secondTitle = CatalogTitle::factory()->create([
+            'title' => 'Одинаковое название',
+            'slug' => 'odinakovoe-nazvanie-vtoroe',
+            'year' => 2024,
+            'indexed_at' => $indexedAt,
+        ]);
+        $expectedOrder = [
+            'href="'.route('titles.show', $secondTitle).'"',
+            'href="'.route('titles.show', $firstTitle).'"',
+        ];
+
+        foreach (['updated', 'year_desc', 'year_asc', 'episodes_desc', 'title_asc', 'with_video'] as $sort) {
+            $this->get(route('titles.index', ['sort' => $sort]))
+                ->assertOk()
+                ->assertSeeInOrder($expectedOrder, false);
+        }
+    }
+
     public function test_invalid_year_filter_does_not_fall_back_to_full_catalog(): void
     {
         CatalogTitle::factory()->create([

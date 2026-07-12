@@ -4,6 +4,9 @@ namespace App\Services\Catalog;
 
 use App\Http\Requests\CatalogTitlesRequest;
 use App\Models\CatalogTitle;
+use App\Services\Catalog\Search\CatalogSearchQuery;
+use App\Services\Catalog\Search\CatalogSearchQueryParser;
+use App\Services\Catalog\Search\CatalogSearchState;
 use App\View\ViewModels\CatalogTitlesViewModel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -31,6 +34,7 @@ class CatalogTitlesPageBuilder
         private readonly CatalogSeoBuilder $seo,
         private readonly CatalogTitleQuery $query,
         private readonly CatalogTaxonomyRegistry $taxonomies,
+        private readonly CatalogSearchQueryParser $searchParser,
     ) {}
 
     /**
@@ -39,6 +43,7 @@ class CatalogTitlesPageBuilder
     public function data(CatalogTitlesRequest $request, ?string $type = null, ?string $taxonomy = null): array
     {
         $search = $request->normalizedSearch();
+        $searchQuery = $this->searchParser->parse($search);
         $sort = $request->sort();
         $requestedYear = $request->requestedYear();
         $year = $request->year();
@@ -101,7 +106,7 @@ class CatalogTitlesPageBuilder
             ->mapWithKeys(fn (Model $record, string $filterType): array => [$filterType => $record->slug])
             ->all();
 
-        $querySearch = $search;
+        $querySearch = $searchQuery;
         $searchFallback = false;
         $catalogTitles = $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $querySearch, $year, null, $invalidYear, $titleContext?->id)
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'])
@@ -110,8 +115,16 @@ class CatalogTitlesPageBuilder
         $this->applySort($catalogTitles, $sort);
         $catalogTitles = $catalogTitles->paginate(24)->withQueryString();
 
-        if ($search !== '' && $catalogTitles->total() === 0) {
-            $querySearch = '';
+        if ($search !== '' && $searchQuery->year === null && $catalogTitles->total() === 0) {
+            $querySearch = new CatalogSearchQuery(
+                raw: '',
+                normalized: '',
+                terms: [],
+                year: null,
+                state: CatalogSearchState::Empty,
+                ftsExpression: '',
+                exactNameHashes: [],
+            );
             $searchFallback = true;
             $catalogTitles = $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $querySearch, $year, null, $invalidYear, $titleContext?->id)
                 ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'])
@@ -260,12 +273,12 @@ class CatalogTitlesPageBuilder
     private function applySort(Builder $query, string $sort): void
     {
         match ($sort) {
-            'year_desc' => $query->orderByDesc('year')->latest('indexed_at'),
-            'year_asc' => $query->orderBy('year')->latest('indexed_at'),
-            'episodes_desc' => $query->orderByDesc('episodes_count')->latest('indexed_at'),
-            'title_asc' => $query->orderBy('title')->latest('indexed_at'),
-            'with_video' => $query->orderByDesc('published_media_count')->latest('indexed_at'),
-            default => $query->latest('indexed_at'),
+            'year_desc' => $query->orderByDesc('year')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+            'year_asc' => $query->orderBy('year')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+            'episodes_desc' => $query->orderByDesc('episodes_count')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+            'title_asc' => $query->orderBy('title')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+            'with_video' => $query->orderByDesc('published_media_count')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+            default => $query->latest('indexed_at')->orderByDesc('catalog_titles.id'),
         };
     }
 }

@@ -4,7 +4,9 @@ namespace App\Services\Catalog;
 
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
-use App\Services\Catalog\Search\CatalogSearchQueryParser;
+use App\Services\Catalog\Search\CatalogSearchNormalizer;
+use App\Services\Catalog\Search\CatalogSearchQuery;
+use App\Services\Catalog\Search\CatalogSearchState;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -16,7 +18,7 @@ class CatalogTitleQuery
 {
     public function __construct(
         private readonly CatalogTaxonomyRegistry $taxonomies,
-        private readonly CatalogSearchQueryParser $searchParser,
+        private readonly CatalogSearchNormalizer $searchNormalizer,
     ) {}
 
     /**
@@ -27,19 +29,25 @@ class CatalogTitleQuery
     public function filteredTitles(
         Collection $activeTaxonomies,
         array $invalidFilterSlugs,
-        string $search,
+        CatalogSearchQuery $search,
         ?int $year = null,
         ?string $exceptTaxonomyType = null,
         bool $invalidYear = false,
         ?int $titleContextId = null,
     ): Builder {
-        $query = CatalogTitle::query();
+        $query = CatalogTitle::query()->published();
 
         if ($invalidFilterSlugs !== [] || $invalidYear) {
             $query->whereRaw('1 = 0');
         }
 
-        if ($year !== null) {
+        if ($search->year !== null) {
+            if ($year !== null && $year !== $search->year) {
+                $query->whereRaw('1 = 0');
+            } else {
+                $query->where('year', $search->year);
+            }
+        } elseif ($year !== null) {
             $query->where('year', $year);
         }
 
@@ -47,7 +55,7 @@ class CatalogTitleQuery
             $query->whereKey($titleContextId);
         }
 
-        $this->applySearchFilter($query, $search);
+        $this->applySearchFilter($query, $search, $titleContextId);
         $this->applyRelationFilters($query, $activeTaxonomies, $exceptTaxonomyType);
 
         return $query;
@@ -63,7 +71,7 @@ class CatalogTitleQuery
         Collection $filterTaxonomies,
         Collection $activeTaxonomies,
         array $invalidFilterSlugs,
-        string $search,
+        CatalogSearchQuery $search,
         ?int $year,
         bool $invalidYear,
         ?int $titleContextId = null,
@@ -127,20 +135,25 @@ class CatalogTitleQuery
     /**
      * @param  Builder<CatalogTitle>  $query
      */
-    private function applySearchFilter(Builder $query, string $search): void
+    private function applySearchFilter(Builder $query, CatalogSearchQuery $search, ?int $titleContextId): void
     {
-        if ($search === '') {
+        if ($search->state === CatalogSearchState::Empty) {
             return;
         }
 
-        $terms = $this->searchTerms($search);
+        if ($search->state === CatalogSearchState::Insufficient) {
+            if ($titleContextId === null) {
+                $query->whereRaw('1 = 0');
+            }
 
-        if ($terms->isEmpty()) {
             return;
         }
 
-        $catalogTitleTable = (new CatalogTitle)->getTable();
-        $exactTitleIds = $this->exactTitleSearchIds($terms);
+        if ($search->terms === []) {
+            return;
+        }
+
+        $exactTitleIds = $this->exactTitleSearchIds($search);
 
         if ($exactTitleIds->isNotEmpty()) {
             $query->whereKey($exactTitleIds);
@@ -148,125 +161,59 @@ class CatalogTitleQuery
             return;
         }
 
-        $query->where(function (Builder $query) use ($search, $terms, $catalogTitleTable): void {
-            $this->whereCatalogTextMatches($query, $search, $catalogTitleTable);
+        $catalogTitleTable = (new CatalogTitle)->getTable();
 
-            foreach ($this->taxonomies->relationNames() as $relation) {
-                $this->orWhereRelationNameMatches($query, $relation, $search, $catalogTitleTable);
-            }
+        foreach ($search->terms as $term) {
+            $variants = collect($this->searchNormalizer->legacyVariants($term));
 
-            $terms->each(function (string $term) use ($query, $catalogTitleTable): void {
-                if (preg_match('/^\d{4}$/', $term) === 1) {
-                    $query->orWhere('year', (int) $term);
-                }
-
-                $this->searchTermVariants($term)->each(function (string $variant) use ($query, $catalogTitleTable): void {
-                    $this->orWhereCatalogTextMatches($query, $variant, $catalogTitleTable);
-
-                    foreach ($this->taxonomies->relationNames() as $relation) {
-                        $this->orWhereRelationNameMatches($query, $relation, $variant, $catalogTitleTable);
-                    }
+            $query->where(function (Builder $query) use ($variants, $catalogTitleTable): void {
+                $variants->each(function (string $variant) use ($query): void {
+                    $this->orWhereCatalogTextMatches($query, $variant);
                 });
+
+                $query->orWhereIn($catalogTitleTable.'.id', $this->aliasSearchTitleIdsSubquery($variants));
+
+                foreach ($this->taxonomies->relationNames() as $relation) {
+                    $query->orWhereIn(
+                        $catalogTitleTable.'.id',
+                        $this->relationTitleIdsByNameSubquery($relation, $variants),
+                    );
+                }
             });
-        });
+        }
     }
 
     /**
-     * @param  Collection<int, string>  $terms
      * @return Collection<int, int>
      */
-    private function exactTitleSearchIds(Collection $terms): Collection
+    private function exactTitleSearchIds(CatalogSearchQuery $search): Collection
     {
-        $titleTerms = $terms
-            ->reject(fn (string $term): bool => preg_match('/^\d{4}$/', $term) === 1)
+        $variants = collect($this->searchNormalizer->legacyVariants($search->phrase()))
+            ->flatMap(fn (string $variant): array => [$variant, Str::ucfirst($variant)])
+            ->unique()
             ->values();
 
-        if ($titleTerms->isEmpty()) {
+        if ($variants->isEmpty()) {
             return collect();
-        }
-
-        $exactAliasIds = $this->exactAliasSearchIds($titleTerms);
-
-        if ($exactAliasIds->isNotEmpty() && $exactAliasIds->count() <= 3) {
-            return $exactAliasIds->values();
         }
 
         $catalogTitleTable = (new CatalogTitle)->getTable();
-        $ids = CatalogTitle::query()
-            ->select('id')
-            ->where(function (Builder $query) use ($titleTerms, $catalogTitleTable): void {
-                $titleTerms->each(function (string $term) use ($query, $catalogTitleTable): void {
-                    $variants = $this->searchTermVariants($term);
 
-                    $query->where(function (Builder $query) use ($variants, $catalogTitleTable): void {
-                        $variants->each(function (string $variant) use ($query, $catalogTitleTable): void {
-                            $query->orWhere('title', 'like', "%{$variant}%")
-                                ->orWhere('original_title', 'like', "%{$variant}%")
-                                ->orWhere('slug', 'like', "%{$variant}%")
-                                ->orWhere('external_id', 'like', "%{$variant}%")
-                                ->orWhereIn($catalogTitleTable.'.id', $this->aliasSearchTitleIdsSubquery(collect([$variant])));
-                        });
-                    });
-                });
+        return CatalogTitle::query()
+            ->published()
+            ->select($catalogTitleTable.'.id')
+            ->where(function (Builder $query) use ($catalogTitleTable, $search, $variants): void {
+                $query->whereIn('title', $variants)
+                    ->orWhereIn('original_title', $variants)
+                    ->orWhereIn(
+                        $catalogTitleTable.'.id',
+                        CatalogTitleAlias::query()
+                            ->select('catalog_title_id')
+                            ->whereIn('name_hash', $search->exactNameHashes),
+                    );
             })
-            ->orderBy('id')
-            ->limit(6)
-            ->pluck('id');
-
-        if ($ids->isNotEmpty() && $ids->count() <= 3) {
-            return $ids->values();
-        }
-
-        foreach ($titleTerms as $term) {
-            $variants = $this->searchTermVariants($term);
-            $ids = CatalogTitle::query()
-                ->select('id')
-                ->where(function (Builder $query) use ($variants, $catalogTitleTable): void {
-                    $variants->each(function (string $variant) use ($query, $catalogTitleTable): void {
-                        $query->orWhere('title', 'like', "%{$variant}%")
-                            ->orWhere('original_title', 'like', "%{$variant}%")
-                            ->orWhere('slug', 'like', "%{$variant}%")
-                            ->orWhere('external_id', 'like', "%{$variant}%")
-                            ->orWhereIn($catalogTitleTable.'.id', $this->aliasSearchTitleIdsSubquery(collect([$variant])));
-                    });
-                })
-                ->orderBy('id')
-                ->limit(6)
-                ->pluck('id');
-
-            if ($ids->isNotEmpty() && $ids->count() <= 3) {
-                return $ids->values();
-            }
-        }
-
-        return collect();
-    }
-
-    /**
-     * @param  Collection<int, string>  $terms
-     * @return Collection<int, int>
-     */
-    private function exactAliasSearchIds(Collection $terms): Collection
-    {
-        $phrases = collect([$terms->implode(' ')])
-            ->when($terms->count() === 1, fn (Collection $phrases): Collection => $phrases->merge($terms))
-            ->flatMap(fn (string $phrase): Collection => $this->searchTermVariants($phrase))
-            ->map(fn (string $phrase): string => hash('sha256', Str::lower(Str::squish($phrase))))
-            ->filter()
-            ->unique()
-            ->values();
-
-        if ($phrases->isEmpty()) {
-            return collect();
-        }
-
-        return CatalogTitleAlias::query()
-            ->select('catalog_title_id')
-            ->whereIn('name_hash', $phrases)
-            ->orderBy('catalog_title_id')
-            ->limit(6)
-            ->pluck('catalog_title_id')
-            ->unique()
+            ->orderBy($catalogTitleTable.'.id')
+            ->pluck($catalogTitleTable.'.id')
             ->values();
     }
 
@@ -288,38 +235,19 @@ class CatalogTitleQuery
     /**
      * @param  Builder<CatalogTitle>  $query
      */
-    private function whereCatalogTextMatches(Builder $query, string $variant, string $catalogTitleTable): void
-    {
-        $query->where('title', 'like', "%{$variant}%")
-            ->orWhere('original_title', 'like', "%{$variant}%")
-            ->orWhere('description', 'like', "%{$variant}%")
-            ->orWhere('slug', 'like', "%{$variant}%")
-            ->orWhere('external_id', 'like', "%{$variant}%")
-            ->orWhereIn($catalogTitleTable.'.id', $this->aliasSearchTitleIdsSubquery(collect([$variant])));
-    }
-
-    /**
-     * @param  Builder<CatalogTitle>  $query
-     */
-    private function orWhereCatalogTextMatches(Builder $query, string $variant, string $catalogTitleTable): void
+    private function orWhereCatalogTextMatches(Builder $query, string $variant): void
     {
         $query->orWhere('title', 'like', "%{$variant}%")
             ->orWhere('original_title', 'like', "%{$variant}%")
             ->orWhere('description', 'like', "%{$variant}%")
             ->orWhere('slug', 'like', "%{$variant}%")
-            ->orWhere('external_id', 'like', "%{$variant}%")
-            ->orWhereIn($catalogTitleTable.'.id', $this->aliasSearchTitleIdsSubquery(collect([$variant])));
+            ->orWhere('external_id', 'like', "%{$variant}%");
     }
 
     /**
-     * @param  Builder<CatalogTitle>  $query
+     * @param  Collection<int, string>  $variants
      */
-    private function orWhereRelationNameMatches(Builder $query, string $relationName, string $variant, string $catalogTitleTable): void
-    {
-        $query->orWhereIn($catalogTitleTable.'.id', $this->relationTitleIdsByNameSubquery($relationName, $variant));
-    }
-
-    private function relationTitleIdsByNameSubquery(string $relationName, string $variant): QueryBuilder
+    private function relationTitleIdsByNameSubquery(string $relationName, Collection $variants): QueryBuilder
     {
         $relation = (new CatalogTitle)->{$relationName}();
         $pivotTable = $relation->getTable();
@@ -331,42 +259,11 @@ class CatalogTitleQuery
         return DB::table($pivotTable)
             ->select($pivotTable.'.'.$titlePivotKey)
             ->join($relatedTable, $relatedTable.'.'.$relatedKey, '=', $pivotTable.'.'.$relatedPivotKey)
-            ->where($relatedTable.'.name', 'like', "%{$variant}%");
-    }
-
-    /**
-     * @return Collection<int, string>
-     */
-    private function searchTerms(string $search): Collection
-    {
-        $normalized = preg_replace('/[^\pL\pN]+/u', ' ', $search) ?: '';
-
-        return collect(explode(' ', $normalized))
-            ->map(fn (string $term): string => trim($term))
-            ->filter()
-            ->reject(fn (string $term): bool => $this->searchParser->isStopWord(mb_strtolower($term)))
-            ->filter(fn (string $term): bool => preg_match('/^\d{4}$/', $term) === 1 || mb_strlen($term) >= 3)
-            ->unique(fn (string $term): string => mb_strtolower($term))
-            ->take(8)
-            ->values();
-    }
-
-    /**
-     * @return Collection<int, string>
-     */
-    private function searchTermVariants(string $term): Collection
-    {
-        return collect([
-            $term,
-            mb_strtolower($term),
-            str_replace(['ё', 'Ё'], ['е', 'Е'], $term),
-            mb_convert_case($term, MB_CASE_TITLE, 'UTF-8'),
-            mb_strtoupper($term),
-        ])
-            ->map(fn (string $variant): string => trim($variant))
-            ->filter()
-            ->unique()
-            ->values();
+            ->where(function (QueryBuilder $query) use ($relatedTable, $variants): void {
+                $variants->each(function (string $variant) use ($query, $relatedTable): void {
+                    $query->orWhere($relatedTable.'.name', 'like', "%{$variant}%");
+                });
+            });
     }
 
     /**
