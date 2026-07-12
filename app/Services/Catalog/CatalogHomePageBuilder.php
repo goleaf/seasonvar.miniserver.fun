@@ -3,10 +3,9 @@
 namespace App\Services\Catalog;
 
 use App\Models\CatalogTitle;
-use App\Models\Country;
 use App\Models\Episode;
-use App\Models\Genre;
 use App\Models\LicensedMedia;
+use App\Models\Season;
 use App\Models\Tag;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -14,6 +13,7 @@ class CatalogHomePageBuilder
 {
     public function __construct(
         private readonly CatalogSeoBuilder $seo,
+        private readonly CatalogFacetQuery $facets,
         private readonly CatalogTaxonomyRegistry $taxonomies,
     ) {}
 
@@ -22,12 +22,21 @@ class CatalogHomePageBuilder
      */
     public function data(): array
     {
+        $genres = $this->facets->taxonomies('genre');
+        $countries = $this->facets->taxonomies('country');
         $stats = [
-            'titles' => CatalogTitle::query()->count(),
-            'episodes' => Episode::query()->count(),
-            'genres' => Genre::query()->count(),
-            'countries' => Country::query()->count(),
-            'videos' => LicensedMedia::query()->published()->count(),
+            'titles' => CatalogTitle::query()->published()->count(),
+            'episodes' => Episode::query()
+                ->whereIn('season_id', Season::query()
+                    ->select('id')
+                    ->whereIn('catalog_title_id', CatalogTitle::query()->published()->select('id')))
+                ->count(),
+            'genres' => $genres->count(),
+            'countries' => $countries->count(),
+            'videos' => LicensedMedia::query()
+                ->published()
+                ->whereIn('catalog_title_id', CatalogTitle::query()->published()->select('id'))
+                ->count(),
         ];
         $latestTitles = $this->titleSummaryQuery()
             ->with($this->taxonomies->listRowRelations())
@@ -42,16 +51,21 @@ class CatalogHomePageBuilder
             ->get();
         $videoTitles = $this->titleSummaryQuery()
             ->with($this->taxonomies->cardRelations())
-            ->whereHas('licensedMedia', fn (Builder $query): Builder => $query->published())
+            ->whereIn('id', LicensedMedia::query()
+                ->published()
+                ->whereNotNull('catalog_title_id')
+                ->select('catalog_title_id'))
             ->orderByDesc('published_media_count')
             ->latest('indexed_at')
             ->limit(8)
             ->get();
         $latestMedia = LicensedMedia::query()
             ->published()
+            ->whereIn('catalog_title_id', CatalogTitle::query()->published()->select('id'))
             ->select(['id', 'catalog_title_id', 'season_id', 'episode_id', 'title', 'quality', 'translation_name', 'format', 'published_at'])
             ->with([
                 'catalogTitle' => fn ($query) => $query
+                    ->published()
                     ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'])
                     ->withCount(['seasons', 'episodes']),
                 'season:id,catalog_title_id,number,title',
@@ -62,6 +76,7 @@ class CatalogHomePageBuilder
             ->limit(12)
             ->get();
         $yearBuckets = CatalogTitle::query()
+            ->published()
             ->select('year')
             ->selectRaw('count(*) as titles_count')
             ->whereNotNull('year')
@@ -80,18 +95,11 @@ class CatalogHomePageBuilder
             'videoTitles' => $videoTitles,
             'latestMedia' => $latestMedia,
             'yearBuckets' => $yearBuckets,
-            'genres' => Genre::query()
-                ->withCount('catalogTitles')
-                ->orderByDesc('catalog_titles_count')
-                ->limit(18)
-                ->get(),
-            'countries' => Country::query()
-                ->withCount('catalogTitles')
-                ->orderByDesc('catalog_titles_count')
-                ->get(),
+            'genres' => $genres->take(18)->values(),
+            'countries' => $countries,
             'subtitleTag' => Tag::query()
                 ->where('slug', 'subtitry')
-                ->withCount('catalogTitles')
+                ->withCount(['catalogTitles' => fn (Builder $query): Builder => $query->published()])
                 ->first(),
             'seo' => $this->seo->home($stats, $latestTitles),
         ];
@@ -103,6 +111,7 @@ class CatalogHomePageBuilder
     private function titleSummaryQuery(): Builder
     {
         return CatalogTitle::query()
+            ->published()
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url', 'indexed_at'])
             ->withCount([
                 'seasons',

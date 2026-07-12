@@ -14,7 +14,7 @@ class CatalogFacetQuery
     ) {}
 
     /** @return Collection<int, Model> */
-    public function taxonomies(string $filterType, int $limit): Collection
+    public function taxonomies(string $filterType, ?int $limit = null): Collection
     {
         $modelClass = $this->taxonomies->modelClass($filterType);
         $model = new $modelClass;
@@ -31,16 +31,19 @@ class CatalogFacetQuery
             ->selectRaw('count(distinct '.$catalogTitleTable.'.id) as catalog_titles_count')
             ->groupBy($pivotTable.'.'.$relatedPivotKey);
 
-        return $modelClass::query()
+        $query = $modelClass::query()
             ->joinSub($counts, $countAlias, $model->getTable().'.id', '=', $countAlias.'.relation_id')
             ->select($model->getTable().'.*')
             ->addSelect($countAlias.'.catalog_titles_count')
             ->orderByDesc($countAlias.'.catalog_titles_count')
             ->orderBy($model->getTable().'.name')
-            ->orderBy($model->getTable().'.id')
-            ->limit($limit)
-            ->get()
-            ->values();
+            ->orderBy($model->getTable().'.id');
+
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
+        return $query->get()->values();
     }
 
     /** @return Collection<int, object> */
