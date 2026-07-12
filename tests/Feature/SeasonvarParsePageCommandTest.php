@@ -6,6 +6,7 @@ use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendationSignal;
 use App\Models\Genre;
 use App\Models\Season;
+use App\Models\SeasonvarImportEvent;
 use App\Models\Source;
 use App\Services\Seasonvar\SeasonvarCatalogParser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -125,6 +126,16 @@ class SeasonvarParsePageCommandTest extends TestCase
             'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
         ])->assertExitCode(0);
 
+        $this->assertDatabaseHas('seasons', ['number' => 4]);
+        $this->assertDatabaseHas('episodes', ['number' => 2]);
+        $this->assertSame([], SeasonvarImportEvent::query()
+            ->where('level', 'error')
+            ->get(['event', 'context'])
+            ->toArray());
+        $this->assertSame([], SeasonvarImportEvent::query()
+            ->where('event', 'like', 'seasonvar-media-%')
+            ->get(['event', 'context'])
+            ->toArray());
         $this->assertDatabaseHas('licensed_media', [
             'title' => 'Черный список: На кухне S04E02',
             'storage_disk' => 'external_playlist',
