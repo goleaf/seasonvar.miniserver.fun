@@ -48,10 +48,7 @@
                                         <i class="fa-solid fa-calendar-days shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
                                         <span>{{ $filterView->bucketYear($bucket) }}</span>
                                     </span>
-                                    <span class="flex items-center gap-1 text-xs">
-                                        <span class="font-bold">{{ $bucket->context_titles_count }}</span>
-                                        <span class="text-slate-400">/ {{ $bucket->titles_count }}</span>
-                                    </span>
+                                    <span class="text-xs font-bold">{{ $bucket->context_titles_count }}</span>
                                 </label>
                             @empty
                                 <p class="text-sm text-slate-500">Годы не указаны.</p>
@@ -80,7 +77,7 @@
                                         <input type="checkbox" wire:model="filters.publicationTypes" name="publication_type[]" value="{{ $option->value }}" class="h-4 w-4 shrink-0 accent-emerald-700" @checked(in_array($option->value, $filterView->listState('publication_type'), true))>
                                         <span>{{ $option->label }}</span>
                                     </span>
-                                    <span class="text-xs font-bold">{{ $option->titles_count }}</span>
+                                    <span class="text-xs font-bold">{{ $option->context_titles_count }}</span>
                                 </label>
                             @empty
                                 <p class="text-sm text-slate-500">Типы не указаны.</p>
@@ -99,14 +96,17 @@
                             @endif
                         </div>
                         <div class="space-y-1">
-                            @foreach (['available' => 'Есть', 'missing' => 'Нет'] as $subtitleValue => $subtitleLabel)
+                            @foreach ($subtitleOptions as $option)
                                 <label @class([
-                                    'flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm transition',
-                                    'bg-emerald-50 font-bold text-emerald-700' => in_array($subtitleValue, $filterView->listState('subtitles'), true),
-                                    'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! in_array($subtitleValue, $filterView->listState('subtitles'), true),
+                                    'flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm transition',
+                                    'bg-emerald-50 font-bold text-emerald-700' => in_array($option->value, $filterView->listState('subtitles'), true),
+                                    'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! in_array($option->value, $filterView->listState('subtitles'), true),
                                 ])>
-                                    <input type="checkbox" wire:model="filters.subtitles" name="subtitles[]" value="{{ $subtitleValue }}" class="h-4 w-4 shrink-0 accent-emerald-700" @checked(in_array($subtitleValue, $filterView->listState('subtitles'), true))>
-                                    <span>{{ $subtitleLabel }}</span>
+                                    <span class="inline-flex min-w-0 items-center gap-2">
+                                        <input type="checkbox" wire:model="filters.subtitles" name="subtitles[]" value="{{ $option->value }}" class="h-4 w-4 shrink-0 accent-emerald-700" @checked(in_array($option->value, $filterView->listState('subtitles'), true))>
+                                        <span>{{ $option->label }}</span>
+                                    </span>
+                                    <span class="text-xs font-bold">{{ $option->context_titles_count }}</span>
                                 </label>
                             @endforeach
                         </div>
@@ -164,10 +164,7 @@
                                             <i class="{{ $filterView->icon($filterType) }} shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
                                             <span>{{ $taxonomy->name }}</span>
                                         </span>
-                                        <span class="flex items-center gap-1 text-xs">
-                                            <span class="font-bold">{{ $taxonomy->context_titles_count }}</span>
-                                            <span class="text-slate-400">/ {{ $taxonomy->catalog_titles_count }}</span>
-                                        </span>
+                                        <span class="text-xs font-bold">{{ $taxonomy->context_titles_count }}</span>
                                     </label>
                                 @empty
                                     <p class="text-sm text-slate-500">{{ in_array($filterType, ['actor', 'director'], true) && mb_strlen($optionSearch[$filterType] ?? '') >= 2 ? 'Ничего не найдено.' : 'Нет данных.' }}</p>

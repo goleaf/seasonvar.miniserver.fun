@@ -137,6 +137,32 @@ class CatalogTitleQuery
         ];
     }
 
+    /** @return array{available: int, missing: int} */
+    public function subtitleContextCounts(CatalogTitlesCriteria $criteria, ?User $user): array
+    {
+        $contextTitles = $this
+            ->filteredTitles($criteria->withoutSubtitleAvailability(), $user)
+            ->select('catalog_titles.id');
+        $availableTitles = $this
+            ->publishedMediaTitleIds($user, true)
+            ->groupBy('catalog_title_id');
+        $counts = DB::query()
+            ->fromSub($contextTitles, 'subtitle_context_titles')
+            ->leftJoinSub($availableTitles, 'subtitle_available_titles', function ($join): void {
+                $join->on('subtitle_available_titles.catalog_title_id', '=', 'subtitle_context_titles.id');
+            })
+            ->selectRaw('count(*) as total_count')
+            ->selectRaw('count(subtitle_available_titles.catalog_title_id) as available_count')
+            ->first();
+        $total = (int) ($counts->total_count ?? 0);
+        $available = (int) ($counts->available_count ?? 0);
+
+        return [
+            'available' => $available,
+            'missing' => max(0, $total - $available),
+        ];
+    }
+
     /**
      * @param  Collection<string, Collection<int, Model>>  $filterTaxonomies
      * @return Collection<string, int>
@@ -146,13 +172,6 @@ class CatalogTitleQuery
         CatalogTitlesCriteria $criteria,
         ?User $user,
     ): Collection {
-        if (! $this->hasRelationContextConstraints($criteria)) {
-            return $filterTaxonomies
-                ->flatMap(fn (Collection $items, string $filterType): Collection => $items->mapWithKeys(
-                    fn (Model $record): array => [$filterType.'|'.$record->id => (int) ($record->catalog_titles_count ?? 0)],
-                ));
-        }
-
         $visibleIdsByType = $filterTaxonomies
             ->map(fn (Collection $items): Collection => $items->pluck('id')->values())
             ->filter(fn (Collection $ids): bool => $ids->isNotEmpty());
@@ -193,22 +212,6 @@ class CatalogTitleQuery
             ->fromSub($unionQuery, 'relation_context_counts')
             ->get()
             ->mapWithKeys(fn (object $row): array => [$row->filter_type.'|'.$row->relation_id => (int) $row->context_titles_count]);
-    }
-
-    private function hasRelationContextConstraints(CatalogTitlesCriteria $criteria): bool
-    {
-        $hasAdvancedFilters = collect($criteria->queryFilters())->contains(
-            fn (mixed $value): bool => $value !== null && $value !== [],
-        );
-
-        return $criteria->search->state !== CatalogSearchState::Empty
-            || $criteria->years !== []
-            || $criteria->titleContextId !== null
-            || $criteria->invalidTitleContext
-            || $criteria->invalidYear
-            || $criteria->selectedTaxonomyIds !== []
-            || $criteria->excludedTaxonomyIds !== []
-            || $hasAdvancedFilters;
     }
 
     public function mediaQualityRank(?string $quality): int

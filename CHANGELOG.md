@@ -2,6 +2,8 @@
 
 ## 2026-07-12
 
+- Reworked catalog totals and facets around unique visible title IDs: relation, year, publication-type, and subtitle counts now use own-group-excluded context, bounded grouped aggregates, selected zero-count retention, and no stale cross-request cache.
+- Applied actor/director top-N limits after contextual filtering, removed misleading global count denominators from `/titles`, and added lifecycle/query-budget regression coverage without introducing per-option queries.
 - Hardened catalog search, sorting, pagination, and Livewire URL state as one validated flow: NFKC/whitespace normalization, safe fallbacks for malformed scalar values and unsupported sort keys, 650 ms search debounce, stable browser-history state, and automatic recovery from out-of-range pages.
 - Added indexed exact external-provider-ID search and the additive `catalog_title_aliases(name_hash, catalog_title_id)` lookup index while preserving visibility-first SQL subqueries, duplicate-free totals, and deterministic allowlisted sorting.
 - Added consistent OR-within-group and AND-between-group catalog matching for years, all existing taxonomy relations, publication types, video qualities, and subtitle availability, with normalized bounded URL arrays and per-value/group resets.

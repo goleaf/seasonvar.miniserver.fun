@@ -176,12 +176,17 @@ final readonly class CatalogTitlesCriteria
 
     public function withoutYears(): self
     {
-        return $this->copy(years: []);
+        return $this->copy(years: [], clearYearRange: true, invalidYear: false);
     }
 
     public function withoutPublicationTypes(): self
     {
         return $this->copy(publicationTypes: []);
+    }
+
+    public function withoutSubtitleAvailability(): self
+    {
+        return $this->copy(subtitleAvailability: []);
     }
 
     public function invalidated(): self
@@ -219,6 +224,10 @@ final readonly class CatalogTitlesCriteria
         ?array $selectedTaxonomyIds = null,
         ?array $excludedTaxonomyIds = null,
         ?array $publicationTypes = null,
+        ?array $subtitleAvailability = null,
+        ?int $yearFrom = null,
+        ?int $yearTo = null,
+        bool $clearYearRange = false,
         ?bool $invalidYear = null,
     ): self {
         return new self(
@@ -226,8 +235,8 @@ final readonly class CatalogTitlesCriteria
             years: $years ?? $this->years,
             filterSlugs: $filterSlugs ?? $this->filterSlugs,
             excludedFilterSlugs: $this->excludedFilterSlugs,
-            yearFrom: $this->yearFrom,
-            yearTo: $this->yearTo,
+            yearFrom: $clearYearRange ? null : ($yearFrom ?? $this->yearFrom),
+            yearTo: $clearYearRange ? null : ($yearTo ?? $this->yearTo),
             seasonsMin: $this->seasonsMin,
             seasonsMax: $this->seasonsMax,
             episodesMin: $this->episodesMin,
@@ -236,7 +245,7 @@ final readonly class CatalogTitlesCriteria
             ratingMin: $this->ratingMin,
             votesMin: $this->votesMin,
             videoAvailability: $this->videoAvailability,
-            subtitleAvailability: $this->subtitleAvailability,
+            subtitleAvailability: $subtitleAvailability ?? $this->subtitleAvailability,
             qualities: $this->qualities,
             publicationTypes: $publicationTypes ?? $this->publicationTypes,
             updatedPeriod: $this->updatedPeriod,

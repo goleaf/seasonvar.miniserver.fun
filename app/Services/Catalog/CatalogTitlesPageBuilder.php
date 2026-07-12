@@ -8,7 +8,6 @@ use App\Models\CatalogTitle;
 use App\Services\Catalog\Search\CatalogSearchQueryParser;
 use App\Services\Catalog\Search\CatalogSearchState;
 use App\View\ViewModels\CatalogTitlesViewModel;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
@@ -105,7 +104,6 @@ class CatalogTitlesPageBuilder
             $modelClass = $this->taxonomies->modelClass($filterType);
             $records = $modelClass::query()
                 ->whereIn('slug', $slugs)
-                ->withCount(['catalogTitles' => fn (Builder $query): Builder => $this->query->constrainVisible($query, $request->user())])
                 ->get()
                 ->keyBy('slug');
 
@@ -178,7 +176,7 @@ class CatalogTitlesPageBuilder
         $catalogTitles = $catalogTitles->paginate($perPage)->appends($paginationQuery);
         $seoRequest = $this->sanitizedSeoRequest($request, $paginationQuery, (int) $catalogTitles->currentPage());
 
-        $filterTaxonomies = collect($filterTypes)->mapWithKeys(function (string $filterType) use ($request, $facetSearch): array {
+        $filterTaxonomies = collect($filterTypes)->mapWithKeys(function (string $filterType) use ($request, $facetSearch, $criteria): array {
             $search = in_array($filterType, ['actor', 'director'], true)
                 ? ($facetSearch[$filterType] ?? null)
                 : null;
@@ -188,50 +186,44 @@ class CatalogTitlesPageBuilder
                 $this->filterLimit($filterType),
                 $request->user(),
                 is_string($search) ? $search : null,
+                $criteria,
             )];
         });
 
-        $selectedTaxonomies->each(function (Collection $selected, string $filterType) use ($filterTaxonomies): void {
-            $items = $filterTaxonomies->get($filterType, collect());
+        $missingSelectedTaxonomies = collect();
+        $filterTaxonomies = $filterTaxonomies->map(function (Collection $items, string $filterType) use ($selectedTaxonomies, $missingSelectedTaxonomies): Collection {
+            $selected = $selectedTaxonomies->get($filterType, collect());
+            $itemsById = $items->keyBy(fn (Model $record): int => (int) $record->id);
+            $selectedWithContext = $selected->map(function (Model $record) use ($itemsById): Model {
+                return $itemsById->get((int) $record->id, $record);
+            });
+            $missingSelectedTaxonomies->put(
+                $filterType,
+                $selectedWithContext->filter(
+                    fn (Model $record): bool => ! array_key_exists('context_titles_count', $record->getAttributes()),
+                )->values(),
+            );
             $selectedIds = $selected->pluck('id')->map(fn (mixed $id): int => (int) $id);
             $remainingItems = $items
                 ->reject(fn (Model $record): bool => $selectedIds->contains((int) $record->id))
                 ->values();
 
-            $filterTaxonomies->put($filterType, $selected->concat($remainingItems)->values());
+            return $selectedWithContext->concat($remainingItems)->values();
         });
 
-        $taxonomyContextCounts = $this->query->relationContextCounts($filterTaxonomies, $criteria, $request->user());
+        $taxonomyContextCounts = $this->query->relationContextCounts($missingSelectedTaxonomies, $criteria, $request->user());
         $filterTaxonomies = $filterTaxonomies->map(function (Collection $items, string $filterType) use ($taxonomyContextCounts): Collection {
             return $items->map(function (Model $record) use ($filterType, $taxonomyContextCounts): Model {
-                $record->context_titles_count = (int) ($taxonomyContextCounts->get($filterType.'|'.$record->id) ?? 0);
+                if (! array_key_exists('context_titles_count', $record->getAttributes())) {
+                    $record->context_titles_count = (int) ($taxonomyContextCounts->get($filterType.'|'.$record->id) ?? 0);
+                }
 
                 return $record;
             });
         });
-        $yearBuckets = $this->facets->years($years, 20, $request->user());
-        $publicationTypeOptions = $this->facets->publicationTypes($request->user());
-
-        $hasCatalogContext = $criteria->hasContentFilters()
-            || $invalidYear
-            || $searchQuery->state !== CatalogSearchState::Empty
-            || $selectedTaxonomyIds !== []
-            || $excludedTaxonomyIds !== [];
-
-        $yearContextCounts = $hasCatalogContext
-            ? $this->query->filteredTitles($criteria->withoutYears(), $request->user())
-                ->select('year')
-                ->selectRaw('count(*) as context_titles_count')
-                ->whereNotNull('year')
-                ->where('year', '>=', 1900)
-                ->where('year', '<=', (int) now()->format('Y') + 1)
-                ->groupBy('year')
-                ->pluck('context_titles_count', 'year')
-            : $yearBuckets->pluck('titles_count', 'year');
-
-        $yearBuckets->each(function (object $bucket) use ($yearContextCounts): void {
-            $bucket->context_titles_count = (int) ($yearContextCounts->get((int) $bucket->year) ?? 0);
-        });
+        $yearBuckets = $this->facets->years($criteria, $years, 20, $request->user());
+        $publicationTypeOptions = $this->facets->publicationTypes($criteria, $request->user());
+        $subtitleOptions = $this->facets->subtitleAvailability($criteria, $request->user());
 
         $filterView = new CatalogTitlesViewModel(
             search: $search,
@@ -274,6 +266,7 @@ class CatalogTitlesPageBuilder
             'filterView' => $filterView,
             'yearBuckets' => $yearBuckets,
             'publicationTypeOptions' => $publicationTypeOptions,
+            'subtitleOptions' => $subtitleOptions,
             'seo' => $this->seo->titles(
                 $seoRequest,
                 (int) $catalogTitles->total(),

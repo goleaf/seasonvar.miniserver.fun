@@ -231,72 +231,54 @@ git diff --check -- app/Services/Catalog/CatalogTitleQuery.php app/Services/Cata
 
 ---
 
-### Task 3: Build Bounded Contextual Facets and Browse Indexes
+### Task 3: Build Bounded Contextual Facets and Review Browse Indexes
 
 **Files:**
 
-- Create: `app/Services/Catalog/CatalogFacetQuery.php`
+- Modify: `app/Services/Catalog/CatalogFacetQuery.php`
 - Modify: `app/Services/Catalog/CatalogTitlesPageBuilder.php`
 - Modify: `app/Services/Catalog/CatalogTitleQuery.php`
-- Create: `database/migrations/2026_07_12_000001_add_catalog_browse_indexes.php`
-- Create: `tests/Unit/CatalogFacetQueryTest.php`
 - Modify: `tests/Feature/CatalogAdvancedFilterTest.php`
 
 **Interfaces:**
 
-- `CatalogFacetQuery::relationFacets(...)` returns `Collection<string, Collection<int, Model>>` with `context_titles_count`.
-- `CatalogFacetQuery::yearFacets(...)` returns bounded published year objects with contextual counts.
+- `CatalogFacetQuery::taxonomies(...)` returns a bounded relation collection with `context_titles_count`.
+- `CatalogFacetQuery::years(...)`, `publicationTypes(...)` and `subtitleAvailability(...)` return contextual fixed-value facets.
 - Current-dimension include/exclude constraints are omitted; all other criteria and the candidate ID collection are applied.
 
-- [ ] **Step 1: Write facet behavior and query-budget tests**
+- [x] **Step 1: Write facet behavior and query-budget tests**
 
-Assert country facets ignore the selected country but respect actor/year/media constraints, unpublished titles never contribute, selected values outside the limit remain, zero-count selected values remain removable, actor/director results are bounded, and query count does not grow with option count.
+Extend `CatalogAdvancedFilterTest` to assert country facets ignore the selected country but respect actor/year/media constraints, unpublished titles never contribute, selected values outside the limit remain, zero-count selected values remain removable, actor/director results are bounded, fixed publication/subtitle facets use the same own-group-excluded context, and query count does not grow with option count. Do not create a new test file.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
-php artisan test --filter=CatalogFacetQueryTest
+php artisan test --filter='/facet|count|paginator/' tests/Feature/CatalogAdvancedFilterTest.php
 ```
 
-Expected: service missing.
+Observed before implementation: the global top-N excluded a context-relevant actor, publication types had no contextual count, subtitles exposed no counts, and relation models retained the global denominator.
 
-- [ ] **Step 3: Implement grouped pivot facets**
+- [x] **Step 3: Implement grouped pivot facets**
 
 For each registry relation, clone the context result query with that type omitted, join its selected `catalog_titles.id` subquery to the pivot, group by related ID, then join/count only matching lookup rows. Order selected-first, contextual count descending, then name; apply per-type limits and merge selected models outside the limit. Do not call lookup-model `withCount()` and do not calculate a second global count.
 
-- [ ] **Step 4: Implement year and availability summaries**
+- [x] **Step 4: Implement year and availability summaries**
 
 Build year buckets from a criteria copy without year selections/range; group published candidates by year and include selected years outside the normal newest-year window. Add one conditional aggregate for the availability summary shown in the filter panel, reusing the same context query.
 
-- [ ] **Step 5: Generate and edit an additive migration**
+- [x] **Step 5: Review indexes and avoid a speculative migration**
 
-Run `php artisan make:migration add_catalog_browse_indexes`, then use the generated file (renamed only if needed for the documented path) to add reversible indexes:
+Inspect the live schema and query plans before adding indexes. The existing `catalog_titles_publication_lookup_idx`, unique title-first pivot indexes, and reverse relation-first pivot indexes cover the implemented query shapes. No migration is needed for this task; the live production-like database is not migrated.
 
-```php
-Schema::table('catalog_titles', function (Blueprint $table): void {
-    $table->index(['is_published', 'title', 'id'], 'catalog_titles_published_title_id_idx');
-    $table->index(['is_published', 'year', 'indexed_at', 'id'], 'catalog_titles_browse_year_idx');
-});
-
-Schema::table('licensed_media', function (Blueprint $table): void {
-    $table->index(['status', 'check_status', 'catalog_title_id'], 'licensed_media_watchable_title_idx');
-    $table->index(['status', 'quality', 'catalog_title_id'], 'licensed_media_quality_title_idx');
-    $table->index(['status', 'has_subtitles', 'catalog_title_id'], 'licensed_media_subtitles_title_idx');
-});
-```
-
-Do not migrate the live production-like database. `RefreshDatabase` verifies the migration in memory.
-
-- [ ] **Step 6: Verify facets, schema, and query plans**
+- [x] **Step 6: Verify facets, schema, and query plans**
 
 ```bash
-php artisan test --filter=CatalogFacetQueryTest
 php artisan test --filter=CatalogAdvancedFilterTest
-./vendor/bin/pint --dirty --format agent
-git diff --check -- app/Services/Catalog/CatalogFacetQuery.php app/Services/Catalog/CatalogTitlesPageBuilder.php app/Services/Catalog/CatalogTitleQuery.php database/migrations tests/Unit/CatalogFacetQueryTest.php tests/Feature/CatalogAdvancedFilterTest.php
+./vendor/bin/pint --format agent app/Services/Catalog/CatalogFacetQuery.php app/Services/Catalog/CatalogTitlesPageBuilder.php app/Services/Catalog/CatalogTitleQuery.php app/Services/Catalog/CatalogTitlesCriteria.php tests/Feature/CatalogAdvancedFilterTest.php
+git diff --check -- app/Services/Catalog/CatalogFacetQuery.php app/Services/Catalog/CatalogTitlesPageBuilder.php app/Services/Catalog/CatalogTitleQuery.php tests/Feature/CatalogAdvancedFilterTest.php
 ```
 
-On a copied/isolated SQLite database run `EXPLAIN QUERY PLAN` for updated, year, title, quality, subtitles, and watchable filters. Confirm the intended indexes appear; adjust/remove any unused speculative index before proceeding.
+`EXPLAIN QUERY PLAN` confirmed `catalog_titles_publication_lookup_idx` plus the existing pivot indexes; `PRAGMA integrity_check` returned `ok`. Facet query count remains constant as option cardinality grows.
 
 ---
 

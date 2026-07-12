@@ -4,14 +4,19 @@ namespace Tests\Feature;
 
 use App\Enums\ContentAudience;
 use App\Enums\PublicationStatus;
+use App\Http\Requests\CatalogTitlesRequest;
 use App\Models\Actor;
 use App\Models\CatalogTitle;
 use App\Models\Country;
+use App\Models\Episode;
 use App\Models\Genre;
 use App\Models\LicensedMedia;
+use App\Models\Season;
 use App\Models\Translation;
 use App\Models\User;
+use App\Services\Catalog\CatalogTitlesPageBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class CatalogAdvancedFilterTest extends TestCase
@@ -145,6 +150,219 @@ class CatalogAdvancedFilterTest extends TestCase
             ->assertSeeText($partial->title);
     }
 
+    public function test_contextual_relation_facets_exclude_their_own_group_and_match_exact_result_ids(): void
+    {
+        $actorA = Actor::query()->create(['name' => 'Актер А', 'slug' => 'akter-a']);
+        $actorB = Actor::query()->create(['name' => 'Актер Б', 'slug' => 'akter-b']);
+        $russia = Country::query()->create(['name' => 'Россия', 'slug' => 'rossiya']);
+        $usa = Country::query()->create(['name' => 'США', 'slug' => 'ssha']);
+        $canada = Country::query()->create(['name' => 'Канада', 'slug' => 'kanada']);
+        $drama = Genre::query()->create(['name' => 'Драма', 'slug' => 'drama']);
+        $thriller = Genre::query()->create(['name' => 'Триллер', 'slug' => 'thriller']);
+
+        $matching = CatalogTitle::factory()->create(['title' => 'Россия А драма', 'year' => 2024]);
+        $matching->actors()->attach($actorA);
+        $matching->countries()->attach($russia);
+        $matching->genres()->attach($drama);
+
+        $otherCountry = CatalogTitle::factory()->create(['title' => 'США А триллер', 'year' => 2024]);
+        $otherCountry->actors()->attach($actorA);
+        $otherCountry->countries()->attach($usa);
+        $otherCountry->genres()->attach($thriller);
+
+        $otherActor = CatalogTitle::factory()->create(['title' => 'Россия Б триллер', 'year' => 2024]);
+        $otherActor->actors()->attach($actorB);
+        $otherActor->countries()->attach($russia);
+        $otherActor->genres()->attach($thriller);
+
+        $wrongYear = CatalogTitle::factory()->create(['title' => 'Россия А старый', 'year' => 2023]);
+        $wrongYear->actors()->attach($actorA);
+        $wrongYear->countries()->attach($russia);
+        $wrongYear->genres()->attach($drama);
+
+        $unpublished = CatalogTitle::factory()->create([
+            'title' => 'Скрытый Канада А',
+            'year' => 2024,
+            'publication_status' => PublicationStatus::Hidden,
+        ]);
+        $unpublished->actors()->attach($actorA);
+        $unpublished->countries()->attach($canada);
+
+        $data = $this->catalogData([
+            'year' => [2024],
+            'actor' => [$actorA->slug],
+            'country' => [$russia->slug],
+        ]);
+
+        $this->assertSame(1, $data['titles']->total());
+        $this->assertSame([$matching->id], $data['titles']->getCollection()->pluck('id')->all());
+
+        $countries = $data['filterTaxonomies']->get('country')->keyBy('slug');
+        $this->assertSame(1, $countries->get('rossiya')->context_titles_count);
+        $this->assertSame(1, $countries->get('ssha')->context_titles_count);
+        $this->assertFalse($countries->has('kanada'));
+        $this->assertArrayNotHasKey('catalog_titles_count', $countries->get('rossiya')->getAttributes());
+
+        $actors = $data['filterTaxonomies']->get('actor')->keyBy('slug');
+        $this->assertSame(1, $actors->get('akter-a')->context_titles_count);
+        $this->assertSame(1, $actors->get('akter-b')->context_titles_count);
+
+        $genres = $data['filterTaxonomies']->get('genre')->keyBy('slug');
+        $this->assertSame(1, $genres->get('drama')->context_titles_count);
+        $this->assertFalse($genres->has('thriller'));
+    }
+
+    public function test_contextual_relation_limits_are_applied_after_other_filters(): void
+    {
+        $russia = Country::query()->create(['name' => 'Россия', 'slug' => 'rossiya']);
+
+        foreach (range(1, 24) as $number) {
+            $actor = Actor::query()->create([
+                'name' => sprintf('Актер %02d', $number),
+                'slug' => 'akter-'.$number,
+            ]);
+            $title = CatalogTitle::factory()->create(['title' => 'Посторонний '.$number]);
+            $title->actors()->attach($actor);
+        }
+
+        $contextActor = Actor::query()->create(['name' => 'Я Контекст', 'slug' => 'ia-kontekst']);
+        $contextTitle = CatalogTitle::factory()->create(['title' => 'Контекстный сериал']);
+        $contextTitle->actors()->attach($contextActor);
+        $contextTitle->countries()->attach($russia);
+
+        $actors = $this->catalogData(['country' => [$russia->slug]])['filterTaxonomies']
+            ->get('actor')
+            ->keyBy('slug');
+
+        $this->assertCount(1, $actors);
+        $this->assertSame(1, $actors->get('ia-kontekst')->context_titles_count);
+    }
+
+    public function test_fixed_facets_use_contextual_own_group_excluded_counts(): void
+    {
+        $actorA = Actor::query()->create(['name' => 'Актер А', 'slug' => 'akter-a']);
+        $actorB = Actor::query()->create(['name' => 'Актер Б', 'slug' => 'akter-b']);
+
+        $serial = CatalogTitle::factory()->create(['title' => 'Сериал с субтитрами', 'type' => 'serial']);
+        $serial->actors()->attach($actorA);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $serial->id,
+            'status' => 'published',
+            'published_at' => now(),
+            'has_subtitles' => true,
+        ]);
+
+        $anime = CatalogTitle::factory()->create(['title' => 'Аниме без субтитров', 'type' => 'anime']);
+        $anime->actors()->attach($actorA);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $anime->id,
+            'status' => 'published',
+            'published_at' => now(),
+            'has_subtitles' => false,
+        ]);
+
+        $documentary = CatalogTitle::factory()->create(['title' => 'Чужой документальный', 'type' => 'documentary']);
+        $documentary->actors()->attach($actorB);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $documentary->id,
+            'status' => 'published',
+            'published_at' => now(),
+            'has_subtitles' => true,
+        ]);
+
+        $publicationContext = $this->catalogData([
+            'actor' => [$actorA->slug],
+            'publication_type' => ['serial'],
+        ]);
+        $publicationTypes = $publicationContext['publicationTypeOptions']->keyBy('value');
+
+        $this->assertSame(1, $publicationContext['titles']->total());
+        $this->assertSame(1, $publicationTypes->get('serial')->context_titles_count);
+        $this->assertSame(1, $publicationTypes->get('anime')->context_titles_count);
+        $this->assertSame(0, $publicationTypes->get('documentary')->context_titles_count);
+
+        $subtitleContext = $this->catalogData([
+            'actor' => [$actorA->slug],
+            'subtitles' => ['available'],
+        ]);
+        $subtitles = $subtitleContext['subtitleOptions']->keyBy('value');
+
+        $this->assertSame(1, $subtitleContext['titles']->total());
+        $this->assertSame(1, $subtitles->get('available')->context_titles_count);
+        $this->assertSame(1, $subtitles->get('missing')->context_titles_count);
+    }
+
+    public function test_facet_query_count_does_not_grow_with_option_count(): void
+    {
+        $firstActor = Actor::query()->create([
+            'name' => 'Счетчик 1',
+            'slug' => 'schetchik-1',
+        ]);
+        $firstTitle = CatalogTitle::factory()->create(['title' => 'Сериал счетчика 1']);
+        $firstTitle->actors()->attach($firstActor);
+
+        $queriesWithoutOptions = $this->catalogQueryCount();
+
+        foreach (range(2, 20) as $number) {
+            $actor = Actor::query()->create([
+                'name' => 'Счетчик '.$number,
+                'slug' => 'schetchik-'.$number,
+            ]);
+            $title = CatalogTitle::factory()->create(['title' => 'Сериал счетчика '.$number]);
+            $title->actors()->attach($actor);
+        }
+
+        $this->assertSame($queriesWithoutOptions, $this->catalogQueryCount());
+    }
+
+    public function test_contextual_counts_are_fresh_after_catalog_lifecycle_changes(): void
+    {
+        $actor = Actor::query()->create(['name' => 'Жизненный цикл', 'slug' => 'zhiznennyi-tsikl']);
+        $title = CatalogTitle::factory()->create(['title' => 'Изменяемый сериал']);
+        $title->actors()->attach($actor);
+        $media = LicensedMedia::factory()->create([
+            'catalog_title_id' => $title->id,
+            'status' => 'published',
+            'published_at' => now(),
+            'has_subtitles' => true,
+        ]);
+
+        $this->assertSame(1, $this->catalogData()['filterTaxonomies']->get('actor')->firstWhere('id', $actor->id)->context_titles_count);
+
+        $title->update(['publication_status' => PublicationStatus::Hidden]);
+        $this->assertNull($this->catalogData()['filterTaxonomies']->get('actor')->firstWhere('id', $actor->id));
+
+        $title->update(['publication_status' => PublicationStatus::Published]);
+        $title->delete();
+        $this->assertNull($this->catalogData()['filterTaxonomies']->get('actor')->firstWhere('id', $actor->id));
+
+        $title->restore();
+        $title->actors()->detach($actor);
+        $this->assertNull($this->catalogData()['filterTaxonomies']->get('actor')->firstWhere('id', $actor->id));
+
+        $title->actors()->attach($actor);
+        $subtitles = $this->catalogData()['subtitleOptions']->keyBy('value');
+        $this->assertSame(1, $subtitles->get('available')->context_titles_count);
+
+        $media->update(['status' => 'unavailable']);
+        $subtitles = $this->catalogData()['subtitleOptions']->keyBy('value');
+        $this->assertSame(0, $subtitles->get('available')->context_titles_count);
+        $this->assertSame(1, $subtitles->get('missing')->context_titles_count);
+
+        $selectedActor = $this->catalogData(['actor' => [$actor->slug], 'episodes_min' => 1])['filterTaxonomies']
+            ->get('actor')
+            ->firstWhere('id', $actor->id);
+        $this->assertSame(0, $selectedActor->context_titles_count);
+
+        $season = Season::factory()->create(['catalog_title_id' => $title->id]);
+        Episode::factory()->create(['season_id' => $season->id]);
+
+        $actorOption = $this->catalogData(['actor' => [$actor->slug], 'episodes_min' => 1])['filterTaxonomies']
+            ->get('actor')
+            ->firstWhere('id', $actor->id);
+        $this->assertSame(1, $actorOption->context_titles_count);
+    }
+
     public function test_fixed_and_relation_groups_use_or_inside_group_and_and_between_groups(): void
     {
         $dubbed = Translation::query()->create(['name' => 'Дубляж', 'slug' => 'dubliazh']);
@@ -213,5 +431,27 @@ class CatalogAdvancedFilterTest extends TestCase
             ->assertOk()
             ->assertSeeText('Ничего не найдено.')
             ->assertDontSeeText('Не должен появиться');
+    }
+
+    /** @return array<string, mixed> */
+    private function catalogData(array $query = []): array
+    {
+        $request = CatalogTitlesRequest::create(route('titles.index'), 'GET', $query);
+        $request->setContainer(app())->setRedirector(app('redirect'));
+        $request->setUserResolver(fn (): null => null);
+        $request->validateResolved();
+
+        return app(CatalogTitlesPageBuilder::class)->data($request);
+    }
+
+    private function catalogQueryCount(): int
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->catalogData();
+        $count = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $count;
     }
 }

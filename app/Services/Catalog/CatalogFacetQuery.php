@@ -18,34 +18,46 @@ class CatalogFacetQuery
     ) {}
 
     /** @return Collection<int, Model> */
-    public function taxonomies(string $filterType, ?int $limit = null, ?User $user = null, ?string $search = null): Collection
-    {
+    public function taxonomies(
+        string $filterType,
+        ?int $limit = null,
+        ?User $user = null,
+        ?string $search = null,
+        ?CatalogTitlesCriteria $criteria = null,
+    ): Collection {
         $modelClass = $this->taxonomies->modelClass($filterType);
         $model = new $modelClass;
         $relation = $model->catalogTitles();
         $pivotTable = $relation->getTable();
         $taxonomyPivotKey = $relation->getForeignPivotKeyName();
         $catalogTitlePivotKey = $relation->getRelatedPivotKeyName();
-        $countAlias = 'published_facet_counts';
+        $countAlias = 'context_facet_counts';
+        $contextTitles = $criteria === null
+            ? $this->titles->visibleTo($user)
+            : $this->titles->filteredTitles($criteria->withoutRelation($filterType), $user);
         $counts = DB::table($pivotTable)
             ->joinSub(
-                $this->titles->visibleTo($user)->select('catalog_titles.id'),
-                'visible_catalog_titles',
-                'visible_catalog_titles.id',
+                $contextTitles->select('catalog_titles.id'),
+                'context_catalog_titles',
+                'context_catalog_titles.id',
                 '=',
                 $pivotTable.'.'.$catalogTitlePivotKey,
             )
             ->select($pivotTable.'.'.$taxonomyPivotKey.' as relation_id')
-            ->selectRaw('count(distinct visible_catalog_titles.id) as catalog_titles_count')
+            ->selectRaw('count(distinct context_catalog_titles.id) as context_titles_count')
             ->groupBy($pivotTable.'.'.$taxonomyPivotKey);
 
         $query = $modelClass::query()
             ->joinSub($counts, $countAlias, $model->getTable().'.id', '=', $countAlias.'.relation_id')
             ->select($model->getTable().'.*')
-            ->addSelect($countAlias.'.catalog_titles_count')
-            ->orderByDesc($countAlias.'.catalog_titles_count')
+            ->addSelect($countAlias.'.context_titles_count')
+            ->orderByDesc($countAlias.'.context_titles_count')
             ->orderBy($model->getTable().'.name')
             ->orderBy($model->getTable().'.id');
+
+        if ($criteria === null) {
+            $query->addSelect($countAlias.'.context_titles_count as catalog_titles_count');
+        }
 
         $search = Str::limit(Str::squish((string) $search), 80, '');
         if (mb_strlen($search) >= 2) {
@@ -66,43 +78,68 @@ class CatalogFacetQuery
         return $query->get()->values();
     }
 
-    /** @return Collection<int, object{value: string, label: string, titles_count: int}> */
-    public function publicationTypes(?User $user = null): Collection
+    /** @return Collection<int, object{value: string, label: string, context_titles_count: int}> */
+    public function publicationTypes(CatalogTitlesCriteria $criteria, ?User $user = null): Collection
     {
-        $counts = $this->titles->visibleTo($user)
+        $counts = $this->titles
+            ->filteredTitles($criteria->withoutPublicationTypes(), $user)
             ->select('type')
-            ->selectRaw('count(*) as titles_count')
+            ->selectRaw('count(*) as context_titles_count')
             ->groupBy('type')
-            ->pluck('titles_count', 'type');
+            ->pluck('context_titles_count', 'type');
 
         return collect(CatalogPublicationType::cases())
             ->map(function (CatalogPublicationType $type) use ($counts): object {
-                $titlesCount = collect($type->databaseValues())
+                $contextTitlesCount = collect($type->databaseValues())
                     ->sum(fn (string $databaseValue): int => (int) ($counts->get($databaseValue) ?? 0));
 
                 return (object) [
                     'value' => $type->value,
                     'label' => $type->label(),
-                    'titles_count' => $titlesCount,
+                    'context_titles_count' => $contextTitlesCount,
                 ];
             })
-            ->filter(fn (object $option): bool => $option->titles_count > 0)
             ->values();
+    }
+
+    /** @return Collection<int, object{value: string, label: string, context_titles_count: int}> */
+    public function subtitleAvailability(CatalogTitlesCriteria $criteria, ?User $user = null): Collection
+    {
+        $counts = $this->titles->subtitleContextCounts($criteria, $user);
+
+        return collect([
+            (object) [
+                'value' => 'available',
+                'label' => 'Есть',
+                'context_titles_count' => $counts['available'],
+            ],
+            (object) [
+                'value' => 'missing',
+                'label' => 'Нет',
+                'context_titles_count' => $counts['missing'],
+            ],
+        ]);
     }
 
     /**
      * @param  list<int>  $selectedYears
      * @return Collection<int, object>
      */
-    public function years(array $selectedYears, int $limit, ?User $user = null): Collection
-    {
-        $yearBuckets = $this->titles->visibleTo($user)
+    public function years(
+        CatalogTitlesCriteria $criteria,
+        array $selectedYears,
+        int $limit,
+        ?User $user = null,
+    ): Collection {
+        $context = $this->titles
+            ->filteredTitles($criteria->withoutYears(), $user)
             ->select('year')
-            ->selectRaw('count(*) as titles_count')
+            ->selectRaw('count(*) as context_titles_count')
             ->whereNotNull('year')
             ->where('year', '>=', 1900)
             ->where('year', '<=', (int) now()->format('Y') + 1)
-            ->groupBy('year')
+            ->groupBy('year');
+        $yearBuckets = (clone $context)
             ->orderByDesc('year')
             ->limit($limit)
             ->get();
@@ -123,18 +160,15 @@ class CatalogFacetQuery
             ->values();
         $selectedYearBuckets = $missingYears->isEmpty()
             ? collect()
-            : $this->titles->visibleTo($user)
-                ->select('year')
-                ->selectRaw('count(*) as titles_count')
+            : (clone $context)
                 ->whereIn('year', $missingYears->all())
-                ->groupBy('year')
                 ->get()
                 ->keyBy(fn (CatalogTitle $bucket): int => (int) $bucket->year);
 
         $selectedBuckets = $selectedYears
             ->map(fn (int $selectedYear): object => $visibleYears->get($selectedYear) ?? $selectedYearBuckets->get($selectedYear) ?? (object) [
                 'year' => $selectedYear,
-                'titles_count' => 0,
+                'context_titles_count' => 0,
             ]);
         $remainingBuckets = $yearBuckets
             ->reject(fn (CatalogTitle $bucket): bool => $selectedYears->contains((int) $bucket->year))

@@ -24,6 +24,7 @@
 - `CatalogSearchPageTest` фиксирует hard-year, short-token, AND-person, exact external ID, duplicate-free totals, unpublished, true-zero и insufficient состояния поиска.
 - `CatalogVisualSystemTest` фиксирует shell, 650 ms search debounce, порядок страниц, один title tab-stop, non-cropping poster и русскую светлую pagination.
 - `CatalogPageTest` фиксирует Livewire URL hydration, malformed и out-of-range page recovery, сохранение search/filter state при сортировке, reverse-pivot facet aggregation, единый запрет public binding неопубликованных тайтлов, отсутствие HTTP-запроса для их poster proxy и поддержку image-ответов без `Content-Length`.
+- `CatalogAdvancedFilterTest` сравнивает paginator total с фактическими ID, проверяет OR-внутри/AND-между группами, own-group-excluded счетчики relation/year/publication/subtitle фасетов, bounded top-N после контекста, выбранные нулевые значения, постоянный query budget и свежесть после publish/unpublish, soft delete/restore, pivot/media и episode lifecycle изменений.
 
 ## Команды
 
