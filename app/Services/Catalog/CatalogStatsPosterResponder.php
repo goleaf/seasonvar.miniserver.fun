@@ -33,6 +33,7 @@ class CatalogStatsPosterResponder
         try {
             $remote = Http::timeout(4)
                 ->connectTimeout(2)
+                ->withoutRedirecting()
                 ->accept('image/*')
                 ->get($url);
         } catch (Throwable) {
@@ -47,6 +48,14 @@ class CatalogStatsPosterResponder
 
         if (! in_array($contentType, self::IMAGE_CONTENT_TYPES, true)) {
             abort(404);
+        }
+
+        $contentLengthHeader = $remote->header('Content-Length');
+        if (is_string($contentLengthHeader)) {
+            $contentLength = (int) trim($contentLengthHeader);
+            if ($contentLength === 0 || $contentLength > self::MAX_IMAGE_BYTES) {
+                abort(404);
+            }
         }
 
         $body = $remote->body();
