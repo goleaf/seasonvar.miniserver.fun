@@ -1,3 +1,27 @@
+maksimalno peredelaj footer, maksimalno vyvedi tam poleznuju informaciju, no ne delaj pustye i ne nuznye veshi, podkliuci mcp dlia codex ctob rabotat s dizainom i rabotalo namnogo lucse cem sejcias,
+  ctob dizajn byl namnogo lucse cem sejcias
+  polnostju peredelaj stranicu ili element dlia pagination, sejcias dizajn ciornyj, a nadpisi vse na anglijskom, a portal na russkom: Showing 1 to 24 of 23729 results
+ 
+  peredelaj vsio na russkom a potom peredelaj pagination ctob byl svetlogo cveta, a tak ze sdelaj mobile responsive dlia pagination, sejcias netu nikakix perevodov dlia pagination na mobile. a tak ze
+  peredelaj i lucse sdelaj mobile versiju portala
+  vezde gde est takie filtry:
+ 
+  Недавно обновленные
+  Видео: больше сначала
+  Серий: больше сначала
+  Год: новые сначала
+  Год: старые сначала
+  Название: А-я
+ 
+  sdelaj esio bolse punktov dlia filtra, no sdelaj tak ctob dizajn ne byl peregruzonyj i bylo udobno polzovatsia imi i bylo vsio intuitivno jasno, posmotri informaciju v internete i realizuj eto
+  naprimer na stranice: https://seasonvar.miniserver.fun/titles?actor=irina-rozanova&sort=title_asc u nas est tolko filtraciaj po aktioru, a ja xociu ctob mozno bylo dobavit esio kakie nibud aktiory, i
+  drugije momenty, goda, rezisior, strany i ne odnu, vezde eto nado sdelat, ctob byl odin giganskij universalnyj poisk dlia podkliucenija obsoliutno vsex etix punktov. obnovi eto delo. sdelaj plan i
+  nacni programirovanija, ne zadavaja nikakix voprosov. delaj vsio po tvoej rekomendaciji, najdi v vsiu nuznuju informaciju v internete. podkliuci skills, podkliuci mcp, obnovi vse md fajly, delaj vsiu
+  rabotu ot samogo naciala plana i do samogo konca plana
+ 
+  Create a plan?  shift + tab use Plan mode   esc dismiss
+
+
 # Catalog Facets, Complete Title Pages, and Metadata Backfill Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
@@ -449,7 +473,7 @@ php artisan test --filter=CatalogRelationNameSanitizerTest
 
 ---
 
-### Task 7: Add Versioned Snapshot and Derived-Relation Backfill to the Import Cycle
+### Task 7: Build the Versioned Local Metadata Backfill Core
 
 **Files:**
 
@@ -459,27 +483,17 @@ php artisan test --filter=CatalogRelationNameSanitizerTest
 - Modify: `app/Models/SourcePageSnapshot.php`
 - Create: `app/Services/Seasonvar/SeasonvarCatalogMetadataBackfill.php`
 - Modify: `app/Services/Seasonvar/SeasonvarCatalogParser.php`
-- Modify: `app/Services/Seasonvar/SeasonvarCatalogImporter.php`
-- Modify: `app/Services/Seasonvar/SeasonvarRefreshPlanner.php`
-- Modify: `app/Services/Seasonvar/SeasonvarImportPipeline.php`
-- Modify: `app/Services/Seasonvar/SeasonvarImportStorageMaintenance.php`
-- Modify: `app/Services/Seasonvar/SeasonvarTitleMerger.php`
-- Modify: `app/Console/Commands/Concerns/OutputsSeasonvarProgress.php`
 - Modify: `config/seasonvar.php`
 - Modify: `.env.example`
 - Create: `tests/Feature/SeasonvarCatalogMetadataBackfillTest.php`
-- Modify: `tests/Feature/SeasonvarImportMaintenanceTest.php`
-- Modify: `tests/Feature/SeasonvarParsePageCommandTest.php`
-- Modify: `tests/Feature/SeasonvarTitleMergeTest.php`
 - Modify: `tests/Unit/EloquentRelationshipTest.php`
-- Modify: `tests/Unit/SeasonvarImportStorageMaintenanceTest.php`
 
 **Interfaces:**
 
 - `SeasonvarCatalogParser::METADATA_VERSION` is the current parser contract.
 - `source_pages.metadata_parser_version`, `metadata_attempted_version`, `metadata_parsed_at`, `metadata_presence`, and `catalog_titles.relation_metadata_version` are additive; version columns default to zero and are indexed with ID.
 - `SeasonvarCatalogMetadataBackfill::run(?callable $progress): array{pages_checked:int,pages_updated:int,titles_checked:int,titles_updated:int,relations_attached:int,failed:int}`.
-- Pipeline calls backfill in bounded chunks and records its result in the import run summary.
+- Local backfill performs no HTTP and is independently callable by the existing pipeline in Task 8.
 
 - [ ] **Step 1: Write migration/model contract tests**
 
@@ -489,9 +503,9 @@ Assert all version columns cast to integer, default to zero in both schema and m
 
 Create a parsed page/version zero, linked title/version zero, and retained snapshots containing official translations/studio/network. Make the most recently captured snapshot reuse an older row ID/hash and assert it is selected by `captured_at`. Run the service and assert relations attach, parser/attempted/title versions advance only after success, presence states are stored, a second run is idempotent with zero newly attached pivots, and no HTTP request occurs (`Http::preventStrayRequests()` plus `Http::assertNothingSent()`).
 
-Add a season-linked source page without direct `catalog_titles.source_page_id`, resolve it through the season source hash, and assert the correct title is updated. Add a media-only title with `HDRuDub` and assert normalized `RuDub` attaches. Add a deliberately invalid snapshot and assert the parser version remains stale, the attempted version advances, it is counted only once locally, later valid rows are not starved, and the page becomes a remote-refresh candidate.
+Add a season-linked source page without direct `catalog_titles.source_page_id`, resolve it through the season source hash, and assert the correct title is updated. Add a media-only title with `HDRuDub` and assert normalized `RuDub` attaches. Add a deliberately invalid snapshot and assert the parser version remains stale, the attempted version advances, it is counted only once locally, and later valid rows are not starved. Remote-refresh eligibility is covered at the planner integration boundary in Task 8.
 
-Assert hard per-cycle page/title limits cap total records rather than only chunk memory. Assert presence precedence is `present` over `rejected_invalid` over `absent_in_source` without persisting raw rejected values. Force relation sync failure and assert pivots and every version roll back together.
+Assert hard per-cycle page/title limits cap total records rather than only chunk memory. Assert presence precedence is `present` over `rejected_invalid` over `absent_in_source` without persisting raw rejected values. Force relation sync failure and assert pivots and every version roll back together. A missing snapshot is skipped without being counted as a parser failure.
 
 - [ ] **Step 3: Verify RED**
 
@@ -511,30 +525,82 @@ $table->json('metadata_presence')->nullable();
 $table->index(['page_type', 'metadata_parser_version', 'metadata_attempted_version', 'id'], 'source_pages_metadata_queue_idx');
 ```
 
-and the equivalent title column/index, plus the snapshot lookup index. The service uses `lazyById(...)->take($hardLimit)`, latest retained snapshots, shared parsing/sync, title media/season eager loads, per-record database-only transactions, and separately configured chunk sizes and hard per-cycle limits. DOM parsing and validation occur before the transaction.
+and the equivalent title column/index, plus the snapshot lookup index. Generate the migration with Artisan and keep its actual unique timestamp. The service uses `lazyById(...)->take($hardLimit)`, latest retained snapshots, shared parsing/sync, title media/season eager loads, per-record database-only transactions, and separately configured chunk sizes and hard per-cycle limits. DOM parsing and validation occur before the transaction. Deterministic invalid HTML advances only `metadata_attempted_version`; database/infrastructure failures advance no version.
 
-- [ ] **Step 5: Make skip/planner version-aware**
-
-The unchanged-page fast path may skip only when `metadata_parser_version >= METADATA_VERSION`. Reserve pages with retained snapshots and `metadata_attempted_version < METADATA_VERSION` for local work so generic stale selection cannot fetch them early. Add a bounded `stale_metadata` refresh reason for pages without a snapshot or with `metadata_attempted_version >= METADATA_VERSION` and a stale parser version; order it before generic `stale`. On successful remote parse update both page versions. Preserve existing media retry flags; do not add `no_studio` or `no_network` retry loops.
-
-- [ ] **Step 6: Integrate pipeline and snapshot retention**
-
-Run metadata backfill after retention maintenance and before relation cleanup, recommendation rebuild, and remote page selection. Prefix cycle counters with `metadata_` and store the raw result under `summary.last_metadata_backfill` so its `failed` count cannot overwrite remote-page failures. Add Russian progress labels. Snapshot maintenance may prune old duplicates but must always retain each page's latest captured snapshot. When titles merge, keep the minimum `relation_metadata_version` so stale derived metadata is never hidden by a current canonical record.
-
-- [ ] **Step 7: Verify GREEN**
+- [ ] **Step 5: Verify GREEN and checkpoint**
 
 ```bash
 php artisan test --filter=SeasonvarCatalogMetadataBackfillTest
-php artisan test --filter=SeasonvarImportMaintenanceTest
-php artisan test --filter=SeasonvarParsePageCommandTest
-./vendor/bin/pint --dirty --format agent
+php artisan test --filter=EloquentRelationshipTest
+./vendor/bin/pint --format agent <exact Task 7 PHP files>
 ```
 
-Expected: versioned local backfill is idempotent, bounded, and does not create unbounded remote calls.
+Expected: versioned local backfill is idempotent, hard-bounded, transactional, and sends no HTTP.
 
 ---
 
-### Task 8: Documentation, Full Verification, Browser QA, and Independent Review
+### Task 8: Integrate Metadata Backfill, Refresh Planning, and Retention
+
+**Files:**
+
+- Modify: `app/Services/Seasonvar/SeasonvarCatalogImporter.php`
+- Modify: `app/Services/Seasonvar/SeasonvarRefreshPlanner.php`
+- Modify: `app/Services/Seasonvar/SeasonvarImportPipeline.php`
+- Modify: `app/Services/Seasonvar/SeasonvarImportStorageMaintenance.php`
+- Modify: `app/Services/Seasonvar/SeasonvarTitleMerger.php`
+- Modify: `app/Services/Seasonvar/SeasonvarUrl.php`
+- Modify: `app/Console/Commands/Concerns/OutputsSeasonvarProgress.php`
+- Modify: `tests/Feature/SeasonvarImportMaintenanceTest.php`
+- Modify: `tests/Feature/SeasonvarParsePageCommandTest.php`
+- Modify: `tests/Feature/SeasonvarTitleMergeTest.php`
+- Modify: `tests/Unit/SeasonvarImportStorageMaintenanceTest.php`
+- Modify: `tests/Unit/SeasonvarCatalogParserTest.php`
+
+**Interfaces:**
+
+- Pipeline calls the Task 7 service once per cycle before remote page selection and stores its raw result under `summary.last_metadata_backfill`.
+- `stale_metadata` selects only pages that cannot still be handled by an unattempted retained snapshot.
+- Seasonvar catalog/source URLs are HTTPS-only.
+
+- [ ] **Step 1: Write failing integration tests**
+
+Assert an unchanged page skips only at the current parser version, while a stale version reparses and successful remote parsing advances both page versions. Assert an unattempted retained snapshot is excluded from every remote planner reason; a missing snapshot or deterministic attempted failure is eligible for bounded `stale_metadata`, ordered before generic `stale`.
+
+Assert maintenance always retains the snapshot selected by `captured_at`, a title merge preserves the minimum `relation_metadata_version`, pipeline progress exposes all six prefixed metadata counters with Russian labels, and `last_metadata_backfill.failed` never overwrites the remote parse failure counter. Assert `http://seasonvar.ru/...` is rejected while HTTPS catalog URLs remain accepted.
+
+- [ ] **Step 2: Verify RED**
+
+```bash
+php artisan test --filter=SeasonvarImportMaintenanceTest
+php artisan test --filter=SeasonvarImportStorageMaintenanceTest
+php artisan test --filter=SeasonvarTitleMergeTest
+php artisan test --filter=SeasonvarParsePageCommandTest
+```
+
+- [ ] **Step 3: Make remote import and planner version-aware**
+
+The unchanged-page fast path may skip only when `metadata_parser_version >= METADATA_VERSION`. Reserve pages with retained snapshots and `metadata_attempted_version < METADATA_VERSION` for local work so generic stale selection cannot fetch them early. Add a hard-bounded `stale_metadata` reason for pages without a snapshot or with `metadata_attempted_version >= METADATA_VERSION` and a stale parser version; order it before generic `stale`. On successful remote parse update both page versions. Preserve existing media retry flags; do not add `no_studio` or `no_network` retry loops. Enforce the HTTPS Seasonvar source boundary in the shared URL service.
+
+- [ ] **Step 4: Integrate pipeline, progress, retention, and merging**
+
+Run metadata backfill after retention maintenance and before relation cleanup, recommendation rebuild, and remote page selection. Prefix cycle counters with `metadata_` and store the raw result under `summary.last_metadata_backfill` so its `failed` count cannot overwrite remote-page failures. Add Russian progress labels. Snapshot maintenance may prune old duplicates but must always retain each page's latest captured snapshot. When titles merge, keep the minimum `relation_metadata_version` so stale derived metadata is never hidden by a current canonical record.
+
+- [ ] **Step 5: Verify GREEN and checkpoint**
+
+```bash
+php artisan test --filter=SeasonvarImportMaintenanceTest
+php artisan test --filter=SeasonvarImportStorageMaintenanceTest
+php artisan test --filter=SeasonvarTitleMergeTest
+php artisan test --filter=SeasonvarParsePageCommandTest
+php artisan test --filter=Seasonvar
+./vendor/bin/pint --format agent <exact Task 8 PHP files>
+```
+
+Expected: the existing `seasonvar:import` lifecycle performs bounded local recovery first, never creates unbounded remote calls, and preserves existing remote failure semantics.
+
+---
+
+### Task 9: Documentation, Full Verification, Browser QA, and Independent Review
 
 **Files:**
 
