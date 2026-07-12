@@ -66,7 +66,9 @@ class CatalogTitlesPageBuilder
         $filterTypes = $this->taxonomies->filterTypes();
         $legacyType = $request->legacyType($filterTypes);
         $legacyTaxonomy = $request->legacyTaxonomy();
-        $invalidInputFilterSlugs = [];
+        $routeTaxonomyFilterType = null;
+        $selectedFilterSlugs = [];
+        $selectedExcludedFilterSlugs = [];
 
         $requestedFilterSlugs = $request->filterSlugs();
 
@@ -74,12 +76,9 @@ class CatalogTitlesPageBuilder
             $requestedFilterSlugs[$legacyType] = [$legacyTaxonomy];
         }
 
-        if ($legacyType !== '' && $legacyTaxonomy === null) {
-            $invalidInputFilterSlugs[$legacyType] = 'invalid';
-        }
-
         if ($type !== null && in_array($type, $filterTypes, true) && $taxonomy !== null) {
             $requestedFilterSlugs[$type] = [$taxonomy];
+            $routeTaxonomyFilterType = $type;
         }
 
         if ($taxonomy !== null && ! in_array($type, $filterTypes, true)) {
@@ -102,20 +101,23 @@ class CatalogTitlesPageBuilder
                 ->get()
                 ->keyBy('slug');
 
-            if ($records->count() !== count($slugs)) {
-                $invalidInputFilterSlugs[$filterType] = 'invalid';
+            if ($records->isEmpty()) {
+                if ($routeTaxonomyFilterType === $filterType) {
+                    abort(404);
+                }
+
+                continue;
             }
 
-            if ($records->isNotEmpty()) {
-                $orderedRecords = collect($slugs)
-                    ->map(fn (string $slug): ?Model => $records->get($slug))
-                    ->filter()
-                    ->values();
+            $orderedRecords = collect($slugs)
+                ->map(fn (string $slug): ?Model => $records->get($slug))
+                ->filter()
+                ->values();
 
-                $selectedTaxonomyIds[$filterType] = $orderedRecords->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all();
-                $selectedTaxonomies->put($filterType, $orderedRecords);
-                $activeTaxonomies->put($filterType, $orderedRecords->first());
-            }
+            $selectedFilterSlugs[$filterType] = $orderedRecords->pluck('slug')->map(fn (mixed $slug): string => (string) $slug)->values()->all();
+            $selectedTaxonomyIds[$filterType] = $orderedRecords->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all();
+            $selectedTaxonomies->put($filterType, $orderedRecords);
+            $activeTaxonomies->put($filterType, $orderedRecords->first());
         }
 
         $excludedTaxonomyIds = [];
@@ -128,20 +130,23 @@ class CatalogTitlesPageBuilder
             $modelClass = $this->taxonomies->modelClass($filterType);
             $records = $modelClass::query()->whereIn('slug', $slugs)->get();
 
-            if ($records->count() !== count($slugs)) {
-                $invalidInputFilterSlugs['exclude_'.$filterType] = 'invalid';
+            if ($records->isEmpty()) {
+                continue;
             }
 
+            $selectedExcludedFilterSlugs[$filterType] = $records->pluck('slug')->map(fn (mixed $slug): string => (string) $slug)->values()->all();
             $excludedTaxonomyIds[$filterType] = $records->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all();
             $excludedTaxonomies->put($filterType, $records->values());
         }
 
-        $invalidFilterSlugs = $invalidInputFilterSlugs;
+        $invalidFilterSlugs = [];
         $activeFilterSlugs = $activeTaxonomies
             ->mapWithKeys(fn (Model $record, string $filterType): array => [$filterType => $record->slug])
             ->all();
 
         $advancedFilters = $criteria->queryFilters();
+        $catalogQueryState = $this->sanitizedCatalogQueryState($request->catalogQueryState(), $filterTypes, $selectedFilterSlugs, $selectedExcludedFilterSlugs, $years, $invalidYear);
+        $paginationQuery = $this->paginationQuery($catalogQueryState, $search, $sort, $titleContext);
 
         $catalogTitles = $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $searchQuery, $year, null, $invalidYear, $titleContext?->id, $years, $selectedTaxonomyIds, $excludedTaxonomyIds, $advancedFilters)
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'])
@@ -154,7 +159,8 @@ class CatalogTitlesPageBuilder
             $catalogTitles->withMax($this->ratingAggregates(), 'rating');
         }
         $this->applySort($catalogTitles, $sortOption);
-        $catalogTitles = $catalogTitles->paginate($perPage)->withQueryString();
+        $catalogTitles = $catalogTitles->paginate($perPage)->appends($paginationQuery);
+        $seoRequest = $this->sanitizedSeoRequest($request, $paginationQuery, (int) $catalogTitles->currentPage());
 
         $filterTaxonomies = collect($filterTypes)->mapWithKeys(function (string $filterType): array {
             return [$filterType => $this->facets->taxonomies($filterType, $this->filterLimit($filterType))];
@@ -213,10 +219,10 @@ class CatalogTitlesPageBuilder
             activeFilterSlugs: $activeFilterSlugs,
             invalidFilterSlugs: $invalidFilterSlugs,
             titleContext: $titleContext,
-            selectedFilterSlugs: $requestedFilterSlugs,
+            selectedFilterSlugs: $selectedFilterSlugs,
             view: $view,
             perPage: $perPage,
-            catalogQueryState: $request->catalogQueryState(),
+            catalogQueryState: $catalogQueryState,
             excludedTaxonomies: $excludedTaxonomies,
         );
 
@@ -243,7 +249,7 @@ class CatalogTitlesPageBuilder
             'filterView' => $filterView,
             'yearBuckets' => $yearBuckets,
             'seo' => $this->seo->titles(
-                $request,
+                $seoRequest,
                 (int) $catalogTitles->total(),
                 $search,
                 $year,
@@ -259,6 +265,85 @@ class CatalogTitlesPageBuilder
                 $titleContext,
             ),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $catalogQueryState
+     * @param  list<string>  $filterTypes
+     * @param  array<string, list<string>>  $selectedFilterSlugs
+     * @param  array<string, list<string>>  $selectedExcludedFilterSlugs
+     * @param  list<int>  $years
+     * @return array<string, mixed>
+     */
+    private function sanitizedCatalogQueryState(array $catalogQueryState, array $filterTypes, array $selectedFilterSlugs, array $selectedExcludedFilterSlugs, array $years, bool $invalidYear): array
+    {
+        foreach ($filterTypes as $filterType) {
+            unset($catalogQueryState[$filterType]);
+        }
+
+        unset($catalogQueryState['exclude_country'], $catalogQueryState['exclude_genre']);
+
+        foreach ($selectedFilterSlugs as $filterType => $slugs) {
+            if ($slugs !== []) {
+                $catalogQueryState[$filterType] = $slugs;
+            }
+        }
+
+        foreach ($selectedExcludedFilterSlugs as $filterType => $slugs) {
+            if ($slugs !== []) {
+                $catalogQueryState['exclude_'.$filterType] = $slugs;
+            }
+        }
+
+        if ($years !== []) {
+            $catalogQueryState['year'] = $years;
+        } elseif (! $invalidYear) {
+            unset($catalogQueryState['year']);
+        }
+
+        return $catalogQueryState;
+    }
+
+    /**
+     * @param  array<string, mixed>  $catalogQueryState
+     * @return array<string, mixed>
+     */
+    private function paginationQuery(array $catalogQueryState, string $search, string $sort, ?CatalogTitle $titleContext): array
+    {
+        $query = $catalogQueryState;
+
+        if ($search !== '') {
+            $query['q'] = $search;
+        }
+
+        if ($titleContext !== null) {
+            $query['title'] = $titleContext->slug;
+        }
+
+        if ($sort !== CatalogSort::Updated->value) {
+            $query['sort'] = $sort;
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param  array<string, mixed>  $paginationQuery
+     */
+    private function sanitizedSeoRequest(CatalogTitlesRequest $request, array $paginationQuery, int $currentPage): CatalogTitlesRequest
+    {
+        $seoRequest = clone $request;
+        $query = $paginationQuery;
+
+        if ($currentPage > 1) {
+            $query['page'] = $currentPage;
+        } else {
+            unset($query['page']);
+        }
+
+        $seoRequest->query->replace($query);
+
+        return $seoRequest;
     }
 
     /**

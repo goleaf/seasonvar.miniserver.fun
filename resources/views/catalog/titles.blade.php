@@ -127,7 +127,7 @@
                             <span>К фильтрам</span>
                         </a>
 
-                        @if ($search !== '' || $selectedTaxonomies->isNotEmpty() || $excludedTaxonomies->isNotEmpty() || $filterView->advancedFilterChips() !== [] || $titleContext !== null || $filterView->selectedYears() !== [] || $invalidYear || $invalidFilterSlugs !== [])
+                        @if ($search !== '' || $selectedTaxonomies->isNotEmpty() || $excludedTaxonomies->isNotEmpty() || $filterView->advancedFilterChips() !== [] || $titleContext !== null || $filterView->selectedYears() !== [] || $invalidYear)
                             <div class="mt-3 space-y-3 text-sm">
                                 <div class="flex flex-wrap items-center gap-2">
                                     @if ($search !== '')
@@ -157,15 +157,9 @@
                                             {{ $chip['label'] }}: {{ $chip['value'] }} · убрать
                                         </x-ui.taxonomy-chip>
                                     @endforeach
-                                    @foreach ($invalidFilterSlugs as $filterType => $slug)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->invalidFilterQuery($filterType))" :icon="$filterView->icon($filterType)" active>{{ $filterView->label($filterType) }}: {{ $slug }} не найден · убрать</x-ui.taxonomy-chip>
-                                    @endforeach
                                 </div>
                                 <div class="flex flex-wrap gap-3 text-slate-500">
                                     <span><i class="fa-solid fa-diagram-project text-slate-400" aria-hidden="true"></i> Активных фильтров: {{ count($filterView->selectedYears()) + $selectedTaxonomies->sum(fn ($taxonomies) => $taxonomies->count()) + $excludedTaxonomies->sum(fn ($taxonomies) => $taxonomies->count()) }}</span>
-                                    @if ($invalidFilterSlugs !== [])
-                                        <span><i class="fa-solid fa-triangle-exclamation text-amber-600" aria-hidden="true"></i> Ошибочных фильтров: {{ count($invalidFilterSlugs) }}</span>
-                                    @endif
                                     @if ($invalidYear)
                                         <span><i class="fa-solid fa-calendar-xmark text-amber-600" aria-hidden="true"></i> Ошибочный год: {{ $requestedYear }}</span>
                                     @endif
