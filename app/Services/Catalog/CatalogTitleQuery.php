@@ -2,8 +2,8 @@
 
 namespace App\Services\Catalog;
 
-use App\Enums\CatalogSort;
 use App\Enums\CatalogPublicationType;
+use App\Enums\CatalogSort;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
 use App\Models\CatalogTitleRating;
