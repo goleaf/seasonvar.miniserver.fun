@@ -5,7 +5,6 @@ namespace App\Services\Catalog;
 use App\Enums\CatalogSort;
 use App\Http\Requests\CatalogTitlesRequest;
 use App\Models\CatalogTitle;
-use App\Models\CatalogTitleRating;
 use App\Services\Catalog\Search\CatalogSearchQueryParser;
 use App\Services\Catalog\Search\CatalogSearchState;
 use App\View\ViewModels\CatalogTitlesViewModel;
@@ -142,6 +141,10 @@ class CatalogTitlesPageBuilder
                 ? array_merge(['seasons'], $this->taxonomies->cardRelations())
                 : $this->taxonomies->cardRelations())
             ->withCount($this->cardCounts());
+
+        if (in_array($sortOption, [CatalogSort::KinopoiskRating, CatalogSort::ImdbRating], true)) {
+            $catalogTitles->withMax($this->ratingAggregates(), 'rating');
+        }
         $this->applySort($catalogTitles, $sortOption);
         $catalogTitles = $catalogTitles->paginate($perPage)->withQueryString();
 
@@ -293,6 +296,15 @@ class CatalogTitlesPageBuilder
         ];
     }
 
+    /** @return array<string, \Closure(Builder): Builder> */
+    private function ratingAggregates(): array
+    {
+        return [
+            'ratings as kinopoisk_rating' => fn (Builder $query): Builder => $query->where('provider', 'kinopoisk'),
+            'ratings as imdb_rating' => fn (Builder $query): Builder => $query->where('provider', 'imdb'),
+        ];
+    }
+
     private function filterLimit(string $filterType): int
     {
         return self::FILTER_LIMITS[$filterType] ?? 24;
@@ -341,20 +353,10 @@ class CatalogTitlesPageBuilder
             CatalogSort::TitleAsc => $query->orderBy('title')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
             CatalogSort::TitleDesc => $query->orderByDesc('title')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
             CatalogSort::VideoDesc => $query->orderByDesc('published_media_count')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::KinopoiskRating => $query->orderByDesc($this->ratingSubquery('kinopoisk'))->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::ImdbRating => $query->orderByDesc($this->ratingSubquery('imdb'))->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+            CatalogSort::KinopoiskRating => $query->orderByDesc('kinopoisk_rating')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+            CatalogSort::ImdbRating => $query->orderByDesc('imdb_rating')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
             CatalogSort::Popularity => $query->orderByDesc('published_media_count')->orderByDesc('episodes_count')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
             CatalogSort::Updated => $query->latest('indexed_at')->orderByDesc('catalog_titles.id'),
         };
-    }
-
-    /** @return Builder<CatalogTitleRating> */
-    private function ratingSubquery(string $provider): Builder
-    {
-        return CatalogTitleRating::query()
-            ->select('rating')
-            ->whereColumn('catalog_title_id', 'catalog_titles.id')
-            ->where('provider', $provider)
-            ->limit(1);
     }
 }
