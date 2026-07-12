@@ -37,7 +37,7 @@ class TitleListRow extends Component
         $this->seasonsCount = (int) ($title->seasons_count ?? ($title->relationLoaded('seasons') ? $title->seasons->count() : 0));
         $this->episodesCount = (int) ($title->episodes_count ?? 0);
         $this->mediaCount = (int) ($title->published_media_count ?? $title->licensed_media_count ?? 0);
-        $this->latestSeason = $title->relationLoaded('seasons') ? $title->seasons->sortByDesc('number')->first() : null;
+        $this->latestSeason = $title->relationLoaded('latestSeason') ? $title->latestSeason : null;
         $this->posterClass = match (true) {
             $readable => 'aspect-[2/3] w-20 sm:w-24',
             $compact => 'h-24 w-16',

@@ -145,7 +145,7 @@ class CatalogTitlesPageBuilder
         $catalogTitles = $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $searchQuery, $year, null, $invalidYear, $titleContext?->id, $years, $selectedTaxonomyIds, $excludedTaxonomyIds, $advancedFilters)
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'])
             ->with($view === 'list'
-                ? array_merge(['seasons'], $this->taxonomies->cardRelations())
+                ? array_merge(['latestSeason'], $this->taxonomies->cardRelations())
                 : $this->taxonomies->cardRelations())
             ->withCount($this->cardCounts());
 

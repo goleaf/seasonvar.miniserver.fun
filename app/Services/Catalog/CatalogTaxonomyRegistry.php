@@ -71,7 +71,7 @@ class CatalogTaxonomyRegistry
     public function listRowRelations(): array
     {
         return array_values(array_unique([
-            'seasons',
+            'latestSeason',
             ...$this->cardRelations(),
         ]));
     }

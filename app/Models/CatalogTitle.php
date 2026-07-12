@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'source_id',
@@ -70,6 +71,14 @@ class CatalogTitle extends Model
     public function seasons(): HasMany
     {
         return $this->hasMany(Season::class);
+    }
+
+    /**
+     * @return HasOne<Season, $this>
+     */
+    public function latestSeason(): HasOne
+    {
+        return $this->hasOne(Season::class)->latestOfMany('number');
     }
 
     /**
