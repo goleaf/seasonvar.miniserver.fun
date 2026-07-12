@@ -22,7 +22,6 @@ use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -40,6 +39,7 @@ class SeasonvarCatalogImporter
         private readonly ExternalMediaMetadata $mediaMetadata,
         private readonly SeasonvarCatalogRelationSyncer $relationSyncer,
         private readonly SeasonvarRelationMetadataNormalizer $relationMetadata,
+        private readonly SeasonvarDatabaseTransaction $databaseTransaction,
     ) {}
 
     /**
@@ -485,7 +485,7 @@ class SeasonvarCatalogImporter
             'info_labels' => $data['parse_meta']['info_labels'] ?? [],
         ]);
 
-        $transactionResult = DB::transaction(function () use ($page, $data, $contentHash, $progress): array {
+        $transactionResult = $this->databaseTransaction->run(function () use ($page, $data, $contentHash, $progress): array {
             $catalogTitle = $this->upsertCatalogTitle($page, $data, $contentHash, $progress);
             $this->relationSyncer->sync($catalogTitle, $data['taxonomies'], $progress);
             $this->syncCatalogAliases($catalogTitle, $data['aliases'], $progress);
@@ -504,7 +504,11 @@ class SeasonvarCatalogImporter
                 'catalog_title' => $catalogTitle,
                 'seasons' => $seasons,
             ];
-        }, attempts: $this->importTransactionAttempts());
+        },
+            attempts: $this->importTransactionAttempts(),
+            baseDelayMilliseconds: $this->transactionRetryDelayMilliseconds(),
+            progress: $progress,
+        );
         $catalogTitle = $transactionResult['catalog_title'];
         $mediaResult = $this->mergeMediaResult(
             $this->syncParsedMedia($catalogTitle, $transactionResult['seasons'], $data['media'], $progress),
@@ -1801,6 +1805,11 @@ class SeasonvarCatalogImporter
     private function importTransactionAttempts(): int
     {
         return min(10, max(1, (int) config('seasonvar.import.transaction_attempts', 5)));
+    }
+
+    private function transactionRetryDelayMilliseconds(): int
+    {
+        return min(5000, max(0, (int) config('seasonvar.import.transaction_retry_delay_ms', 250)));
     }
 
     private function catalogTitleNeedsMediaRefresh(CatalogTitle $catalogTitle): bool

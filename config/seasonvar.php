@@ -12,6 +12,7 @@ return [
         'lock_seconds' => (int) env('SEASONVAR_IMPORT_LOCK_SECONDS', 604800),
         'stale_after_minutes' => (int) env('SEASONVAR_IMPORT_STALE_AFTER_MINUTES', 15),
         'transaction_attempts' => (int) env('SEASONVAR_IMPORT_TRANSACTION_ATTEMPTS', 5),
+        'transaction_retry_delay_ms' => (int) env('SEASONVAR_IMPORT_TRANSACTION_RETRY_DELAY_MS', 250),
         'storage_maintenance_enabled' => filter_var(env('SEASONVAR_IMPORT_STORAGE_MAINTENANCE_ENABLED', true), FILTER_VALIDATE_BOOL),
         'event_retention_days' => (int) env('SEASONVAR_IMPORT_EVENT_RETENTION_DAYS', 7),
         'snapshot_retention_days' => (int) env('SEASONVAR_IMPORT_SNAPSHOT_RETENTION_DAYS', 14),

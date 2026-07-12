@@ -9,10 +9,12 @@ use App\Models\Season;
 use App\Models\Source;
 use App\Models\SourcePage;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
+use App\Services\Seasonvar\SeasonvarDatabaseTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Mockery;
 use Tests\TestCase;
 
 class SeasonvarParsePageCommandTest extends TestCase
@@ -419,6 +421,42 @@ class SeasonvarParsePageCommandTest extends TestCase
         Http::assertSentCount(2);
         $this->assertTrue($freshPage->last_changed_at->greaterThan($firstChangedAt));
         $this->assertTrue($freshPage->last_imported_at->greaterThan($firstImportedAt));
+    }
+
+    public function test_importer_uses_retrying_transaction_for_catalog_writes(): void
+    {
+        Http::preventStrayRequests();
+        $url = 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html';
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $page = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+            'page_type' => 'serial',
+            'parse_status' => 'pending',
+        ]);
+        Http::fake([
+            $url => Http::response($this->seasonPageHtml(4, [1 => 'Пилот'])),
+        ]);
+        $transactions = Mockery::mock(SeasonvarDatabaseTransaction::class);
+        $transactions->shouldReceive('run')
+            ->once()
+            ->withArgs(function ($callback, int $attempts, int $delay, $progress): bool {
+                return is_callable($callback)
+                    && $attempts === 5
+                    && $delay === 250
+                    && $progress === null;
+            })
+            ->andReturnUsing(fn ($callback) => $callback());
+        $this->app->instance(SeasonvarDatabaseTransaction::class, $transactions);
+
+        app(SeasonvarCatalogImporter::class)->parsePage($page);
+
+        $this->assertSame('parsed', $page->fresh()->parse_status);
     }
 
     /**
