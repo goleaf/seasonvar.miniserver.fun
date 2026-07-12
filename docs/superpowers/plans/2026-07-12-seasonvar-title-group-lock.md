@@ -94,7 +94,7 @@ php artisan test tests/Feature/SeasonvarParallelImportTest.php
 
 Expected: все tests PASS; Pint сообщает `passed` или форматирует только изменённые PHP-файлы.
 
-- [ ] **Step 5: Run regression suite**
+- [x] **Step 5: Run regression suite**
 
 Run:
 
@@ -105,7 +105,7 @@ php artisan project:docs-refresh --check
 
 Expected: весь PHPUnit suite PASS; документация актуальна.
 
-- [ ] **Step 6: Commit on main after Task 2**
+- [x] **Step 6: Commit on main after Task 2**
 
 После освобождения рабочего дерева соседней сессией:
 
@@ -143,7 +143,7 @@ Expected: FAIL, потому что worker использует сериализ
 
 Загрузить `SourcePage` после проверки/продления claim, обработать отсутствующую page с release claim, вычислить canonical key и только затем получить Redis lock. Существующие counters, retry/release и importer transaction flow сохранить.
 
-- [ ] **Step 4: Verify focused and full suites**
+- [x] **Step 4: Verify focused and full suites**
 
 Run:
 
@@ -186,6 +186,6 @@ Set the SQLite connection option to:
 
 Document `DB_TRANSACTION_MODE=IMMEDIATE` in `.env.example`.
 
-- [ ] **Step 3: Verify importer and regression suites**
+- [x] **Step 3: Verify importer and regression suites**
 
 Run focused importer tests, Pint for the changed PHP files, then the full suite. Expected: focused tests PASS; any remaining full-suite failures must be proven unrelated before commit.
