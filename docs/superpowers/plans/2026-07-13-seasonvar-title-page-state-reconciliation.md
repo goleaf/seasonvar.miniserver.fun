@@ -374,7 +374,7 @@ git push origin main
 - Consumes: the service and tests from Task 2.
 - Produces: project documentation that explains bounded sibling reconciliation and why it reduces duplicate recovery traffic.
 
-- [ ] **Step 1: Add concrete documentation**
+- [x] **Step 1: Add concrete documentation**
 
 Add these project-specific statements:
 
@@ -385,7 +385,7 @@ Add these project-specific statements:
 
 Record the production stale counts and completed fix in `docs/MAINTENANCE_LOG.md` without claiming that historical rows were bulk-rewritten.
 
-- [ ] **Step 2: Run broad verification**
+- [x] **Step 2: Run broad verification**
 
 Run:
 
@@ -397,7 +397,7 @@ git diff --check
 
 Expected: Pint succeeds, the complete PHPUnit suite passes, and `git diff --check` prints nothing.
 
-- [ ] **Step 3: Mark plan steps complete and commit docs**
+- [x] **Step 3: Mark plan steps complete and commit docs**
 
 Change every completed checkbox in this plan to `[x]`, then run:
 

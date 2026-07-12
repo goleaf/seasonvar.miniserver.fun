@@ -1,6 +1,6 @@
 # Архитектура приложения
 
-Обновлено: 12.07.2026
+Обновлено: 13.07.2026
 
 ## Контроллеры
 
@@ -21,6 +21,7 @@
 - Дискретные бизнес-операции оформляются как небольшие сервисы или action-классы с constructor/method injection; контроллеры и команды не должны держать тяжелую логику внутри `handle()` или action-методов.
 - Параллельный режим `seasonvar:import --queued` использует `SeasonvarQueuedImportDispatcher`, атомарные lease в `SeasonvarPageClaimManager`, Redis job `ImportSeasonvarSourcePage` и единый `FinalizeSeasonvarQueuedImport`. SQLite не используется как очередь импорта.
 - `SeasonvarRefreshPlanner` перед обычными due-кандидатами выбирает не более одного import chunk страниц `missing_data`, отсортированных по времени следующей попытки и последнего импорта. Planner исключает страницы с живым claim до применения limit, поэтому recovery chunk заполняется реально доступными страницами; истёкшие claims остаются кандидатами.
+- `SeasonvarTitlePageStateSynchronizer` пересчитывает title-level `missing_data_flags` после успешного parse или unchanged-skip и одним bounded update синхронизирует только уже parsed/unclaimed страницы того же тайтла. Связанные страницы находятся по canonical id и стабильным season URL hashes; mutable `seasons.source_page_id` для этого не используется.
 - Worker проверяет lease token до HTTP-запроса и пересчитывает Redis lock по canonical slug текущей `SourcePage`; поэтому разные numeric ID сезонов одного тайтла не могут одновременно менять общие связи, включая jobs из уже накопленного backlog.
 - SQLite catalog transactions используют `IMMEDIATE` mode вместе с WAL и busy timeout, чтобы разные workers не сталкивались на DEFERRED read-to-write upgrade; внешний fetch остаётся за пределами transaction.
 - `RecordSeasonvarPageFailure` является единственной границей записи ошибочного состояния `SourcePage`; `SeasonvarImportFailureClassifier` разделяет transient connection/408/425/429/5xx/SQLite-lock ошибки и permanent ошибки страницы. Только transient exception покидает queued job и активирует Laravel backoff/retry window.
