@@ -47,6 +47,15 @@ class CatalogTitlesRequestTest extends TestCase
         $this->assertArrayHasKey('taxonomy', $rules);
     }
 
+    public function test_catalog_search_requires_two_and_allows_eighty_characters(): void
+    {
+        $request = CatalogTitlesRequest::create('/titles', 'GET');
+        $rules = $request->rules();
+
+        $this->assertContains('min:2', $rules['q']);
+        $this->assertContains('max:80', $rules['q']);
+    }
+
     public function test_catalog_filter_slug_rule_rejects_malformed_slugs(): void
     {
         $request = CatalogTitlesRequest::create('/titles', 'GET');

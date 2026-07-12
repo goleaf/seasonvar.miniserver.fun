@@ -31,18 +31,39 @@ class CatalogValidationTest extends TestCase
             ->assertDontSeeText('Другой сериал');
     }
 
-    public function test_catalog_search_form_shows_validation_error_and_preserves_old_input(): void
+    public function test_catalog_search_rejects_one_character_with_russian_validation_message(): void
     {
-        $longSearch = str_repeat('я', 161);
+        $this
+            ->from(route('titles.index'))
+            ->get(route('titles.index', ['q' => 'я']))
+            ->assertRedirect(route('titles.index'))
+            ->assertSessionHasErrors([
+                'q' => 'Введите не менее 2 символов для поиска.',
+            ]);
+    }
+
+    public function test_catalog_search_allows_eighty_cyrillic_characters(): void
+    {
+        $search = str_repeat('я', 80);
 
         $this
-            ->followingRedirects()
+            ->get(route('titles.index', ['q' => $search]))
+            ->assertOk()
+            ->assertSessionDoesntHaveErrors('q');
+    }
+
+    public function test_catalog_search_rejects_eighty_one_characters_and_preserves_old_input(): void
+    {
+        $longSearch = str_repeat('я', 81);
+
+        $this
             ->from(route('titles.index'))
             ->get(route('titles.index', ['q' => $longSearch]))
-            ->assertOk()
-            ->assertSeeText('Поисковый запрос слишком длинный.')
-            ->assertSee('aria-invalid="true"', false)
-            ->assertSee('value="'.$longSearch.'"', false);
+            ->assertRedirect(route('titles.index'))
+            ->assertSessionHasErrors([
+                'q' => 'Поисковый запрос слишком длинный.',
+            ])
+            ->assertSessionHasInput('q', $longSearch);
     }
 
     public function test_catalog_filter_request_rejects_malformed_filter_slug(): void

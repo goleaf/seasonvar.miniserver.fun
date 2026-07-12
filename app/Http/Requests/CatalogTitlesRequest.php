@@ -22,7 +22,7 @@ class CatalogTitlesRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
-            'q' => ['nullable', 'string', 'max:160'],
+            'q' => ['nullable', 'string', 'min:2', 'max:80'],
             'year' => ['nullable', 'string', 'max:16'],
             'title' => $this->slugRules(),
             'sort' => ['nullable', 'string', Rule::in(['updated', 'year_desc', 'year_asc', 'episodes_desc', 'title_asc', 'with_video'])],
@@ -44,6 +44,7 @@ class CatalogTitlesRequest extends FormRequest
     {
         return [
             'q.string' => 'Поисковый запрос должен быть строкой.',
+            'q.min' => 'Введите не менее 2 символов для поиска.',
             'q.max' => 'Поисковый запрос слишком длинный.',
             'year.string' => 'Год должен быть строкой.',
             'year.max' => 'Год слишком длинный.',
@@ -93,14 +94,7 @@ class CatalogTitlesRequest extends FormRequest
 
     public function normalizedSearch(): string
     {
-        $search = $this->stringQuery('q');
-        $search = preg_replace('/\s+/u', ' ', trim($search)) ?: '';
-
-        if (mb_strlen($search) < 2) {
-            return '';
-        }
-
-        return mb_substr($search, 0, 80);
+        return preg_replace('/\s+/u', ' ', trim($this->stringQuery('q'))) ?: '';
     }
 
     public function requestedYear(): string
