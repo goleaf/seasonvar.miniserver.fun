@@ -4,7 +4,7 @@
 
 `SeasonvarCatalogImporter` calculates `missing_data_flags` from the whole `CatalogTitle`, but stores the result only on the `SourcePage` that has just been parsed. During a multi-season import, the first page can therefore persist flags such as `seasons_without_episodes` before a later season page supplies the missing episodes or media. The later page receives the correct final state while the earlier page remains `missing_data` and is selected for an unnecessary retry.
 
-Production data confirms that this is not an isolated display issue: 391 linked pages retain `seasons_without_episodes` after their title has no empty seasons, and 1,343 retain `episodes_without_video` after every episode has published media.
+Production data confirms that this is not an isolated display issue. An audit using stable canonical and season URL hashes found 1,103 linked pages retaining `seasons_without_episodes` after their title had no empty seasons, and 3,317 retaining `episodes_without_video` after every episode had published media. The earlier audit through mutable `seasons.source_page_id` undercounted linked pages.
 
 ## Chosen approach
 
