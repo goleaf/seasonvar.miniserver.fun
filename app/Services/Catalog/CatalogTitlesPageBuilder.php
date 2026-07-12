@@ -147,11 +147,11 @@ class CatalogTitlesPageBuilder
         $filterTaxonomies = collect($filterTypes)->mapWithKeys(function (string $filterType): array {
             $modelClass = $this->taxonomies->modelClass($filterType);
             $items = $modelClass::query()
+                ->whereHas('catalogTitles', fn (Builder $query): Builder => $query->published())
                 ->withCount(['catalogTitles' => fn (Builder $query): Builder => $query->published()])
                 ->orderByDesc('catalog_titles_count')
                 ->limit($this->filterLimit($filterType))
                 ->get()
-                ->filter(fn (Model $record): bool => $record->catalog_titles_count > 0)
                 ->values();
 
             return [$filterType => $items];
@@ -204,14 +204,29 @@ class CatalogTitlesPageBuilder
             ]);
         }
 
-        $yearContextCounts = $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $searchQuery, null, null, $invalidYear, $titleContext?->id, [], $selectedTaxonomyIds, $excludedTaxonomyIds, $advancedFilters)
-            ->select('year')
-            ->selectRaw('count(*) as context_titles_count')
-            ->whereNotNull('year')
-            ->where('year', '>=', 1900)
-            ->where('year', '<=', (int) now()->format('Y') + 1)
-            ->groupBy('year')
-            ->pluck('context_titles_count', 'year');
+        $hasAdvancedFilters = collect($advancedFilters)->contains(
+            fn (mixed $value): bool => $value !== null && $value !== [],
+        );
+        $hasCatalogContext = $activeTaxonomies->isNotEmpty()
+            || $invalidFilterSlugs !== []
+            || $invalidYear
+            || $searchQuery->state !== CatalogSearchState::Empty
+            || $years !== []
+            || $titleContext !== null
+            || $selectedTaxonomyIds !== []
+            || $excludedTaxonomyIds !== []
+            || $hasAdvancedFilters;
+
+        $yearContextCounts = $hasCatalogContext
+            ? $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $searchQuery, null, null, $invalidYear, $titleContext?->id, [], $selectedTaxonomyIds, $excludedTaxonomyIds, $advancedFilters)
+                ->select('year')
+                ->selectRaw('count(*) as context_titles_count')
+                ->whereNotNull('year')
+                ->where('year', '>=', 1900)
+                ->where('year', '<=', (int) now()->format('Y') + 1)
+                ->groupBy('year')
+                ->pluck('context_titles_count', 'year')
+            : $yearBuckets->pluck('titles_count', 'year');
 
         $yearBuckets->each(function (object $bucket) use ($yearContextCounts): void {
             $bucket->context_titles_count = (int) ($yearContextCounts->get((int) $bucket->year) ?? 0);

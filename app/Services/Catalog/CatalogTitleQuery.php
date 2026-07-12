@@ -19,6 +19,12 @@ class CatalogTitleQuery
     /** @var array<string, Collection<int, int>> */
     private array $exactTitleIdsCache = [];
 
+    /** @var array<string, Collection<int, string>> */
+    private array $legacyVariantsCache = [];
+
+    /** @var array<string, Collection<int, int>> */
+    private array $searchCandidateIdsCache = [];
+
     public function __construct(
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogSearchNormalizer $searchNormalizer,
@@ -90,6 +96,23 @@ class CatalogTitleQuery
         array $excludedTaxonomyIds = [],
         array $advancedFilters = [],
     ): Collection {
+        if (! $this->hasRelationContextConstraints(
+            $activeTaxonomies,
+            $invalidFilterSlugs,
+            $search,
+            $year,
+            $years,
+            $titleContextId,
+            $selectedTaxonomyIds,
+            $excludedTaxonomyIds,
+            $advancedFilters,
+        )) {
+            return $filterTaxonomies
+                ->flatMap(fn (Collection $items, string $filterType): Collection => $items->mapWithKeys(
+                    fn (Model $record): array => [$filterType.'|'.$record->id => (int) ($record->catalog_titles_count ?? 0)],
+                ));
+        }
+
         $visibleIdsByType = $filterTaxonomies
             ->map(fn (Collection $items): Collection => $items->pluck('id')->values())
             ->filter(fn (Collection $ids): bool => $ids->isNotEmpty());
@@ -132,6 +155,38 @@ class CatalogTitleQuery
             ->mapWithKeys(fn (object $row): array => [$row->filter_type.'|'.$row->relation_id => (int) $row->context_titles_count]);
     }
 
+    /**
+     * @param  Collection<string, Model>  $activeTaxonomies
+     * @param  array<string, list<int>>  $selectedTaxonomyIds
+     * @param  array<string, list<int>>  $excludedTaxonomyIds
+     * @param  array<string, mixed>  $advancedFilters
+     */
+    private function hasRelationContextConstraints(
+        Collection $activeTaxonomies,
+        array $invalidFilterSlugs,
+        CatalogSearchQuery $search,
+        ?int $year,
+        array $years,
+        ?int $titleContextId,
+        array $selectedTaxonomyIds,
+        array $excludedTaxonomyIds,
+        array $advancedFilters,
+    ): bool {
+        $hasAdvancedFilters = collect($advancedFilters)->contains(
+            fn (mixed $value): bool => $value !== null && $value !== [],
+        );
+
+        return $activeTaxonomies->isNotEmpty()
+            || $invalidFilterSlugs !== []
+            || $search->state !== CatalogSearchState::Empty
+            || $year !== null
+            || $years !== []
+            || $titleContextId !== null
+            || $selectedTaxonomyIds !== []
+            || $excludedTaxonomyIds !== []
+            || $hasAdvancedFilters;
+    }
+
     public function mediaQualityRank(?string $quality): int
     {
         return match (Str::lower((string) $quality)) {
@@ -167,18 +222,39 @@ class CatalogTitleQuery
             return;
         }
 
-        $exactTitleIds = $this->exactTitleSearchIds($search);
+        $query->whereKey($this->searchCandidateIds($search));
+    }
 
-        if ($exactTitleIds->isNotEmpty()) {
-            $query->whereKey($exactTitleIds);
-
-            return;
+    /** @return Collection<int, int> */
+    private function searchCandidateIds(CatalogSearchQuery $search): Collection
+    {
+        if (array_key_exists($search->normalized, $this->searchCandidateIdsCache)) {
+            return $this->searchCandidateIdsCache[$search->normalized];
         }
 
+        $exactTitleIds = $this->exactTitleSearchIds($search);
+        if ($exactTitleIds->isNotEmpty()) {
+            return $this->searchCandidateIdsCache[$search->normalized] = $exactTitleIds;
+        }
+
+        $query = CatalogTitle::query()->published()->select('catalog_titles.id');
+        $this->applyLegacySearchTerms($query, $search);
+
+        return $this->searchCandidateIdsCache[$search->normalized] = $query
+            ->orderBy('catalog_titles.id')
+            ->pluck('catalog_titles.id')
+            ->values();
+    }
+
+    /**
+     * @param  Builder<CatalogTitle>  $query
+     */
+    private function applyLegacySearchTerms(Builder $query, CatalogSearchQuery $search): void
+    {
         $catalogTitleTable = (new CatalogTitle)->getTable();
 
         foreach ($search->terms as $term) {
-            $variants = collect($this->searchNormalizer->legacyVariants($term));
+            $variants = $this->legacyVariants($term);
 
             $query->where(function (Builder $query) use ($variants, $catalogTitleTable): void {
                 $variants->each(function (string $variant) use ($query): void {
@@ -206,7 +282,7 @@ class CatalogTitleQuery
             return $this->exactTitleIdsCache[$search->normalized];
         }
 
-        $variants = collect($this->searchNormalizer->legacyVariants($search->phrase()))
+        $variants = $this->legacyVariants($search->phrase())
             ->flatMap(fn (string $variant): array => [$variant, Str::ucfirst($variant)])
             ->unique()
             ->values();
@@ -233,6 +309,13 @@ class CatalogTitleQuery
             ->orderBy($catalogTitleTable.'.id')
             ->pluck($catalogTitleTable.'.id')
             ->values();
+    }
+
+    /** @return Collection<int, string> */
+    private function legacyVariants(string $term): Collection
+    {
+        return $this->legacyVariantsCache[$term]
+            ??= collect($this->searchNormalizer->legacyVariants($term))->values();
     }
 
     /**
