@@ -100,14 +100,35 @@ class CatalogStatsPosterResponder
 
     private function blockedHost(string $host): bool
     {
-        if ($host === 'localhost' || str_ends_with($host, '.localhost')) {
+        if ($host === 'localhost' || str_ends_with($host, '.localhost') || str_ends_with($host, '.local')) {
             return true;
         }
 
-        if (filter_var($host, FILTER_VALIDATE_IP) === false) {
+        $addresses = filter_var($host, FILTER_VALIDATE_IP) !== false
+            ? [$host]
+            : (gethostbynamel($host) ?: []);
+
+        if ($addresses === []) {
+            $ipv6Records = dns_get_record($host, DNS_AAAA);
+            if (is_array($ipv6Records) && $ipv6Records !== []) {
+                foreach ($ipv6Records as $record) {
+                    if (is_string($record['ipv6'] ?? null)) {
+                        $addresses[] = $record['ipv6'];
+                    }
+                }
+            }
+        }
+
+        if ($addresses === []) {
             return false;
         }
 
-        return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
+        foreach ($addresses as $address) {
+            if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
