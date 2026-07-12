@@ -8,6 +8,7 @@
 - OAuth client secrets, Google ADC/service-account JSON, refresh tokens, MCP bearer tokens и приватные пути к credential-файлам не хранятся в репозитории.
 - Код приложения читает переменные окружения через `config()`. Прямые `env()` допустимы только в `config/*.php`.
 - Публичные страницы каталога остаются read-only и проходят строгую валидацию query-параметров через Form Request-классы.
+- Публичная карточка `/titles/{slug}` и все её рекомендации доступны только для `CatalogTitle` с `is_published=true`; неопубликованный тайтл возвращает `404`.
 - Служебная страница `/stats` доступна гостям как read-only Livewire-сводка, дополнительно ограничена rate limiter `catalog-stats` и не выводит raw source URLs, приватные media URLs, stack traces или внутренние имена маршрутов.
 - Livewire-компонент `/stats` получает данные через очищенный snapshot: полный массив статистики не хранится в публичных свойствах компонента и не должен попадать в `wire:snapshot`.
 - Внешние URL Seasonvar нормализуются и допускаются только для `seasonvar.ru`; внешние playlist URL не могут указывать на localhost, `.local`, private или reserved IP.

@@ -195,8 +195,7 @@ class CatalogTitlePageBuilder
             ->limit($this->recommendationDisplayLimit())
             ->with([
                 'recommendedTitle' => function ($query): void {
-                    $this->titleSummaryQuery($query->getQuery())
-                        ->where('is_published', true);
+                    $this->titleSummaryQuery($query->getQuery());
                 },
             ])
             ->get()
@@ -221,6 +220,7 @@ class CatalogTitlePageBuilder
     private function titleSummaryQuery(Builder $query): Builder
     {
         return $query
+            ->published()
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url', 'indexed_at'])
             ->with($this->taxonomies->cardRelations())
             ->withCount($this->cardCounts());
