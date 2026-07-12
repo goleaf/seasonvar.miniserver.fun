@@ -31,12 +31,12 @@
 - Consumes: existing factories, `CatalogSeries`, `CatalogTitlesRequest`, and public catalog routes.
 - Produces: regression coverage for OR/AND semantics, duplicate-free totals, enum arrays, invalid values, resets, paginator reset, and remote facet search.
 
-- [ ] Replace the old same-group AND expectation with `(actor A OR actor B) AND (genre A OR genre B) AND (year A OR year B)` assertions.
-- [ ] Add publication type, quality, translation, and subtitle array combinations using existing models/factories.
-- [ ] Add normalization assertions for empty/duplicate/unsupported array values and missing taxonomy records.
-- [ ] Add Livewire assertions that one-value removal and group reset preserve unrelated state and reset pagination.
-- [ ] Add a server-side actor search assertion proving an option outside the default 24-result facet can be found.
-- [ ] Run focused tests and confirm expected RED failures in current AND semantics/missing groups/search.
+- [x] Replace the old same-group AND expectation with `(actor A OR actor B) AND (genre A OR genre B) AND (year A OR year B)` assertions.
+- [x] Add publication type, quality, translation, and subtitle array combinations using existing models/factories.
+- [x] Add normalization assertions for empty/duplicate/unsupported array values and missing taxonomy records.
+- [x] Add Livewire assertions that one-value removal and group reset preserve unrelated state and reset pagination.
+- [x] Add a server-side actor search assertion proving an option outside the default 24-result facet can be found.
+- [x] Run focused tests and confirm expected RED failures in current AND semantics/missing groups/search.
 
 ### Task 2: Extend normalized filter state and query semantics
 
@@ -52,12 +52,12 @@
 - `CatalogTitlesRequest::publicationTypes(): list<string>` and `subtitleAvailability(): list<string>` return normalized bounded arrays.
 - `CatalogTitlesCriteria::withoutPublicationTypes(): self` supports contextual facet counts.
 
-- [ ] Validate `publication_type[]` with the backed enum and `subtitles[]` with the two supported availability values.
-- [ ] Normalize values through existing repeated-query preparation and expose them in catalog query state.
-- [ ] Store both arrays in the Livewire form with URL history, reset/remove support, and safe defaults.
-- [ ] Change pivot filtering to one grouped `whereIn` subquery per group without a same-group `having count = selected count` requirement.
-- [ ] Apply publication types and subtitle choices with bound subqueries while preserving AND between separate groups.
-- [ ] Run focused request/query/Livewire tests until green.
+- [x] Validate `publication_type[]` with the backed enum and `subtitles[]` with the two supported availability values.
+- [x] Normalize values through existing repeated-query preparation and expose them in catalog query state.
+- [x] Store both arrays in the Livewire form with URL history, reset/remove support, and safe defaults.
+- [x] Change pivot filtering to one grouped `whereIn` subquery per group without a same-group `having count = selected count` requirement.
+- [x] Apply publication types and subtitle choices with bound subqueries while preserving AND between separate groups.
+- [x] Run focused request/query/Livewire tests until green.
 
 ### Task 3: Add bounded server-side options and UI controls
 
@@ -73,11 +73,11 @@
 - `CatalogSeries::$optionSearch` holds only `actor` and `director` ephemeral search terms and is not URL-synchronized.
 - Builder render data includes bounded publication-type options and selected values.
 
-- [ ] Add debounced `wire:model.live.debounce.350ms` actor/director option search with a maximum 80-character normalized term.
-- [ ] Keep default actor/director results at 24 and searched results bounded at 24; pin already-selected records without duplicates.
-- [ ] Add publication type and subtitle checkbox groups with group reset and individual active-chip removal.
-- [ ] Rename the existing translation label to accurately describe stored voice/translation data.
-- [ ] Keep ordinary taxonomy local search as progressive enhancement and preserve GET fallback hidden state.
+- [x] Add debounced `wire:model.live.debounce.350ms` actor/director option search with a maximum 80-character normalized term.
+- [x] Keep default actor/director results at 24 and searched results bounded at 24; pin already-selected records without duplicates.
+- [x] Add publication type and subtitle checkbox groups with group reset and individual active-chip removal.
+- [x] Rename the existing translation label to accurately describe stored voice/translation data.
+- [x] Keep ordinary taxonomy local search as progressive enhancement and preserve GET fallback hidden state.
 - [ ] Run focused view/component tests and `npm run build`.
 
 ### Task 4: Verify, document, and deliver
@@ -95,8 +95,8 @@
 **Interfaces:**
 - Documents exact groups, OR/AND semantics, URL names, limits, and unsupported normalized language-track limitations.
 
-- [ ] Inspect generated SQL and confirm results are unique with exact paginator totals.
-- [ ] Measure query count and ensure option search remains bounded without per-option queries.
+- [x] Inspect generated SQL and confirm results are unique with exact paginator totals.
+- [x] Measure query count and ensure option search remains bounded without per-option queries.
 - [ ] Run Pint, PHP syntax, Laravel cache checks, focused/full PHPUnit, dependency audits, and Vite build.
 - [ ] Run desktop/tablet/mobile Playwright QA for search, multi-group selections, reset, URL/history, overflow, console, and network errors.
 - [ ] Inspect the complete diff, commit on `main`, push without force, and confirm a clean tree with `HEAD == origin/main`.

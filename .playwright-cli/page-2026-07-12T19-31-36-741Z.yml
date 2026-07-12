@@ -1,0 +1,929 @@
+- generic [active] [ref=e1]:
+  - link "Перейти к содержанию" [ref=e2] [cursor=pointer]:
+    - /url: "#main-content"
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - link "Каталог сериалов" [ref=e5] [cursor=pointer]:
+        - /url: http://127.0.0.1:8013
+      - search "Поиск по всему каталогу" [ref=e9]:
+        - generic [ref=e10]:
+          - generic [ref=e11]: Поиск по всему каталогу
+          - searchbox "Поиск по всему каталогу" [ref=e15]
+        - button "Найти" [ref=e16]
+      - navigation "Основная навигация" [ref=e19]:
+        - link "Главная" [ref=e20] [cursor=pointer]:
+          - /url: http://127.0.0.1:8013
+        - link "Каталог" [ref=e23] [cursor=pointer]:
+          - /url: http://127.0.0.1:8013/titles
+  - main [ref=e26]:
+    - navigation "Хлебные крошки" [ref=e27]:
+      - list [ref=e28]:
+        - listitem [ref=e29]:
+          - link "Главная" [ref=e30] [cursor=pointer]:
+            - /url: http://127.0.0.1:8013
+        - listitem [ref=e31]:
+          - generic [ref=e33]: Сериалы
+    - generic [ref=e34]:
+      - complementary [ref=e35]:
+        - generic [ref=e36]:
+          - heading "Фильтры каталога" [level=2] [ref=e42]
+          - generic [ref=e44]:
+            - generic [ref=e45]:
+              - generic [ref=e46]: Годы
+              - generic [ref=e50]:
+                - generic [ref=e51] [cursor=pointer]:
+                  - generic [ref=e52]:
+                    - checkbox "2010 1 / 1" [ref=e53]
+                    - generic [ref=e55]: "2010"
+                  - generic [ref=e56]:
+                    - generic [ref=e57]: "1"
+                    - generic [ref=e58]: / 1
+                - generic [ref=e59] [cursor=pointer]:
+                  - generic [ref=e60]:
+                    - checkbox "2009 2 / 2" [ref=e61]
+                    - generic [ref=e63]: "2009"
+                  - generic [ref=e64]:
+                    - generic [ref=e65]: "2"
+                    - generic [ref=e66]: / 2
+                - generic [ref=e67] [cursor=pointer]:
+                  - generic [ref=e68]:
+                    - checkbox "2006 1 / 1" [ref=e69]
+                    - generic [ref=e71]: "2006"
+                  - generic [ref=e72]:
+                    - generic [ref=e73]: "1"
+                    - generic [ref=e74]: / 1
+                - generic [ref=e75] [cursor=pointer]:
+                  - generic [ref=e76]:
+                    - checkbox "2003 1 / 1" [ref=e77]
+                    - generic [ref=e79]: "2003"
+                  - generic [ref=e80]:
+                    - generic [ref=e81]: "1"
+                    - generic [ref=e82]: / 1
+                - generic [ref=e83] [cursor=pointer]:
+                  - generic [ref=e84]:
+                    - checkbox "2001 1 / 1" [ref=e85]
+                    - generic [ref=e87]: "2001"
+                  - generic [ref=e88]:
+                    - generic [ref=e89]: "1"
+                    - generic [ref=e90]: / 1
+            - generic [ref=e91]:
+              - generic [ref=e92]: Тип публикации
+              - generic [ref=e97] [cursor=pointer]:
+                - generic [ref=e98]:
+                  - checkbox "Сериал 6" [ref=e99]
+                  - generic [ref=e100]: Сериал
+                - generic [ref=e101]: "6"
+            - generic [ref=e102]:
+              - generic [ref=e103]: Субтитры
+              - generic [ref=e107]:
+                - generic [ref=e108] [cursor=pointer]:
+                  - checkbox "Есть" [ref=e109]
+                  - generic [ref=e110]: Есть
+                - generic [ref=e111] [cursor=pointer]:
+                  - checkbox "Нет" [ref=e112]
+                  - generic [ref=e113]: Нет
+            - generic [ref=e114]:
+              - generic [ref=e115]: Жанры
+              - generic [ref=e119]:
+                - generic [ref=e120] [cursor=pointer]:
+                  - generic [ref=e121]:
+                    - checkbox "комедия 4 / 4" [ref=e122]
+                    - generic [ref=e124]: комедия
+                  - generic [ref=e125]:
+                    - generic [ref=e126]: "4"
+                    - generic [ref=e127]: / 4
+                - generic [ref=e128] [cursor=pointer]:
+                  - generic [ref=e129]:
+                    - checkbox "боевики 2 / 2" [ref=e130]
+                    - generic [ref=e132]: боевики
+                  - generic [ref=e133]:
+                    - generic [ref=e134]: "2"
+                    - generic [ref=e135]: / 2
+                - generic [ref=e136] [cursor=pointer]:
+                  - generic [ref=e137]:
+                    - checkbox "детективы 1 / 1" [ref=e138]
+                    - generic [ref=e140]: детективы
+                  - generic [ref=e141]:
+                    - generic [ref=e142]: "1"
+                    - generic [ref=e143]: / 1
+                - generic [ref=e144] [cursor=pointer]:
+                  - generic [ref=e145]:
+                    - checkbox "драмы 1 / 1" [ref=e146]
+                    - generic [ref=e148]: драмы
+                  - generic [ref=e149]:
+                    - generic [ref=e150]: "1"
+                    - generic [ref=e151]: / 1
+                - generic [ref=e152] [cursor=pointer]:
+                  - generic [ref=e153]:
+                    - checkbox "криминальные 1 / 1" [ref=e154]
+                    - generic [ref=e156]: криминальные
+                  - generic [ref=e157]:
+                    - generic [ref=e158]: "1"
+                    - generic [ref=e159]: / 1
+                - generic [ref=e160] [cursor=pointer]:
+                  - generic [ref=e161]:
+                    - checkbox "мелодрамы 1 / 1" [ref=e162]
+                    - generic [ref=e164]: мелодрамы
+                  - generic [ref=e165]:
+                    - generic [ref=e166]: "1"
+                    - generic [ref=e167]: / 1
+                - generic [ref=e168] [cursor=pointer]:
+                  - generic [ref=e169]:
+                    - checkbox "отечественные 1 / 1" [ref=e170]
+                    - generic [ref=e172]: отечественные
+                  - generic [ref=e173]:
+                    - generic [ref=e174]: "1"
+                    - generic [ref=e175]: / 1
+                - generic [ref=e176] [cursor=pointer]:
+                  - generic [ref=e177]:
+                    - checkbox "триллеры 1 / 1" [ref=e178]
+                    - generic [ref=e180]: триллеры
+                  - generic [ref=e181]:
+                    - generic [ref=e182]: "1"
+                    - generic [ref=e183]: / 1
+            - generic [ref=e184]:
+              - generic [ref=e185]: Страны
+              - generic [ref=e189]:
+                - generic [ref=e190] [cursor=pointer]:
+                  - generic [ref=e191]:
+                    - checkbox "США 5 / 5" [ref=e192]
+                    - generic [ref=e194]: США
+                  - generic [ref=e195]:
+                    - generic [ref=e196]: "5"
+                    - generic [ref=e197]: / 5
+                - generic [ref=e198] [cursor=pointer]:
+                  - generic [ref=e199]:
+                    - checkbox "Россия 1 / 1" [ref=e200]
+                    - generic [ref=e202]: Россия
+                  - generic [ref=e203]:
+                    - generic [ref=e204]: "1"
+                    - generic [ref=e205]: / 1
+                - generic [ref=e206] [cursor=pointer]:
+                  - generic [ref=e207]:
+                    - checkbox "Украина 1 / 1" [ref=e208]
+                    - generic [ref=e210]: Украина
+                  - generic [ref=e211]:
+                    - generic [ref=e212]: "1"
+                    - generic [ref=e213]: / 1
+            - generic [ref=e214]:
+              - generic [ref=e215]: Актеры
+              - generic [ref=e219]: Найти в группе Актеры
+              - searchbox "Найти в группе Актеры" [ref=e222]
+              - generic [ref=e223]:
+                - generic [ref=e224] [cursor=pointer]:
+                  - generic [ref=e225]:
+                    - checkbox "Ада Роговцева 1 / 1" [ref=e226]
+                    - generic [ref=e228]: Ада Роговцева
+                  - generic [ref=e229]:
+                    - generic [ref=e230]: "1"
+                    - generic [ref=e231]: / 1
+                - generic [ref=e232] [cursor=pointer]:
+                  - generic [ref=e233]:
+                    - checkbox "Алек Болдуин 1 / 1" [ref=e234]
+                    - generic [ref=e236]: Алек Болдуин
+                  - generic [ref=e237]:
+                    - generic [ref=e238]: "1"
+                    - generic [ref=e239]: / 1
+                - generic [ref=e240] [cursor=pointer]:
+                  - generic [ref=e241]:
+                    - checkbox "Александр Пашков 1 / 1" [ref=e242]
+                    - generic [ref=e244]: Александр Пашков
+                  - generic [ref=e245]:
+                    - generic [ref=e246]: "1"
+                    - generic [ref=e247]: / 1
+                - generic [ref=e248] [cursor=pointer]:
+                  - generic [ref=e249]:
+                    - checkbox "Анатолий Котенёв 1 / 1" [ref=e250]
+                    - generic [ref=e252]: Анатолий Котенёв
+                  - generic [ref=e253]:
+                    - generic [ref=e254]: "1"
+                    - generic [ref=e255]: / 1
+                - generic [ref=e256] [cursor=pointer]:
+                  - generic [ref=e257]:
+                    - checkbox "Валентина Лосовская 1 / 1" [ref=e258]
+                    - generic [ref=e260]: Валентина Лосовская
+                  - generic [ref=e261]:
+                    - generic [ref=e262]: "1"
+                    - generic [ref=e263]: / 1
+                - generic [ref=e264] [cursor=pointer]:
+                  - generic [ref=e265]:
+                    - checkbox "Владимир Башкиров 1 / 1" [ref=e266]
+                    - generic [ref=e268]: Владимир Башкиров
+                  - generic [ref=e269]:
+                    - generic [ref=e270]: "1"
+                    - generic [ref=e271]: / 1
+                - generic [ref=e272] [cursor=pointer]:
+                  - generic [ref=e273]:
+                    - checkbox "Владимир Горянский 1 / 1" [ref=e274]
+                    - generic [ref=e276]: Владимир Горянский
+                  - generic [ref=e277]:
+                    - generic [ref=e278]: "1"
+                    - generic [ref=e279]: / 1
+                - generic [ref=e280] [cursor=pointer]:
+                  - generic [ref=e281]:
+                    - checkbox "Гленн Моршауэр 1 / 1" [ref=e282]
+                    - generic [ref=e284]: Гленн Моршауэр
+                  - generic [ref=e285]:
+                    - generic [ref=e286]: "1"
+                    - generic [ref=e287]: / 1
+                - generic [ref=e288] [cursor=pointer]:
+                  - generic [ref=e289]:
+                    - checkbox "Деннис Хейсбёрт 1 / 1" [ref=e290]
+                    - generic [ref=e292]: Деннис Хейсбёрт
+                  - generic [ref=e293]:
+                    - generic [ref=e294]: "1"
+                    - generic [ref=e295]: / 1
+                - generic [ref=e296] [cursor=pointer]:
+                  - generic [ref=e297]:
+                    - checkbox "Джеймс Моррисон 1 / 1" [ref=e298]
+                    - generic [ref=e300]: Джеймс Моррисон
+                  - generic [ref=e301]:
+                    - generic [ref=e302]: "1"
+                    - generic [ref=e303]: / 1
+                - generic [ref=e304] [cursor=pointer]:
+                  - generic [ref=e305]:
+                    - checkbox "Джейн Краковски 1 / 1" [ref=e306]
+                    - generic [ref=e308]: Джейн Краковски
+                  - generic [ref=e309]:
+                    - generic [ref=e310]: "1"
+                    - generic [ref=e311]: / 1
+                - generic [ref=e312] [cursor=pointer]:
+                  - generic [ref=e313]:
+                    - checkbox "Джек МакБрайер 1 / 1" [ref=e314]
+                    - generic [ref=e316]: Джек МакБрайер
+                  - generic [ref=e317]:
+                    - generic [ref=e318]: "1"
+                    - generic [ref=e319]: / 1
+                - generic [ref=e320] [cursor=pointer]:
+                  - generic [ref=e321]:
+                    - checkbox "Дженнифер Бини Тейлор 1 / 1" [ref=e322]
+                    - generic [ref=e324]: Дженнифер Бини Тейлор
+                  - generic [ref=e325]:
+                    - generic [ref=e326]: "1"
+                    - generic [ref=e327]: / 1
+                - generic [ref=e328] [cursor=pointer]:
+                  - generic [ref=e329]:
+                    - checkbox "Джо Манганьелло 1 / 1" [ref=e330]
+                    - generic [ref=e332]: Джо Манганьелло
+                  - generic [ref=e333]:
+                    - generic [ref=e334]: "1"
+                    - generic [ref=e335]: / 1
+                - generic [ref=e336] [cursor=pointer]:
+                  - generic [ref=e337]:
+                    - checkbox "Джолин Парди 1 / 1" [ref=e338]
+                    - generic [ref=e340]: Джолин Парди
+                  - generic [ref=e341]:
+                    - generic [ref=e342]: "1"
+                    - generic [ref=e343]: / 1
+                - generic [ref=e344] [cursor=pointer]:
+                  - generic [ref=e345]:
+                    - checkbox "Джон Крайер 1 / 1" [ref=e346]
+                    - generic [ref=e348]: Джон Крайер
+                  - generic [ref=e349]:
+                    - generic [ref=e350]: "1"
+                    - generic [ref=e351]: / 1
+                - generic [ref=e352] [cursor=pointer]:
+                  - generic [ref=e353]:
+                    - checkbox "Джуд Чикколелла 1 / 1" [ref=e354]
+                    - generic [ref=e356]: Джуд Чикколелла
+                  - generic [ref=e357]:
+                    - generic [ref=e358]: "1"
+                    - generic [ref=e359]: / 1
+                - generic [ref=e360] [cursor=pointer]:
+                  - generic [ref=e361]:
+                    - checkbox "Джуда Фридландер 1 / 1" [ref=e362]
+                    - generic [ref=e364]: Джуда Фридландер
+                  - generic [ref=e365]:
+                    - generic [ref=e366]: "1"
+                    - generic [ref=e367]: / 1
+                - generic [ref=e368] [cursor=pointer]:
+                  - generic [ref=e369]:
+                    - checkbox "Дэвид Уолтон 1 / 1" [ref=e370]
+                    - generic [ref=e372]: Дэвид Уолтон
+                  - generic [ref=e373]:
+                    - generic [ref=e374]: "1"
+                    - generic [ref=e375]: / 1
+                - generic [ref=e376] [cursor=pointer]:
+                  - generic [ref=e377]:
+                    - checkbox "Дэна Дэвис 1 / 1" [ref=e378]
+                    - generic [ref=e380]: Дэна Дэвис
+                  - generic [ref=e381]:
+                    - generic [ref=e382]: "1"
+                    - generic [ref=e383]: / 1
+                - generic [ref=e384] [cursor=pointer]:
+                  - generic [ref=e385]:
+                    - checkbox "Евгений Плиско-Куприн 1 / 1" [ref=e386]
+                    - generic [ref=e388]: Евгений Плиско-Куприн
+                  - generic [ref=e389]:
+                    - generic [ref=e390]: "1"
+                    - generic [ref=e391]: / 1
+                - generic [ref=e392] [cursor=pointer]:
+                  - generic [ref=e393]:
+                    - checkbox "Иван Лапин 1 / 1" [ref=e394]
+                    - generic [ref=e396]: Иван Лапин
+                  - generic [ref=e397]:
+                    - generic [ref=e398]: "1"
+                    - generic [ref=e399]: / 1
+                - generic [ref=e400] [cursor=pointer]:
+                  - generic [ref=e401]:
+                    - checkbox "Итан Пек 1 / 1" [ref=e402]
+                    - generic [ref=e404]: Итан Пек
+                  - generic [ref=e405]:
+                    - generic [ref=e406]: "1"
+                    - generic [ref=e407]: / 1
+                - generic [ref=e408] [cursor=pointer]:
+                  - generic [ref=e409]:
+                    - checkbox "Кайл Каплан 1 / 1" [ref=e410]
+                    - generic [ref=e412]: Кайл Каплан
+                  - generic [ref=e413]:
+                    - generic [ref=e414]: "1"
+                    - generic [ref=e415]: / 1
+            - generic [ref=e416]:
+              - generic [ref=e417]: Режиссеры
+              - generic [ref=e421]: Найти в группе Режиссеры
+              - searchbox "Найти в группе Режиссеры" [ref=e424]
+              - generic [ref=e425]:
+                - generic [ref=e426] [cursor=pointer]:
+                  - generic [ref=e427]:
+                    - checkbox "Адам Бернштейн 1 / 1" [ref=e428]
+                    - generic [ref=e430]: Адам Бернштейн
+                  - generic [ref=e431]:
+                    - generic [ref=e432]: "1"
+                    - generic [ref=e433]: / 1
+                - generic [ref=e434] [cursor=pointer]:
+                  - generic [ref=e435]:
+                    - checkbox "Брайан Спайсер 1 / 1" [ref=e436]
+                    - generic [ref=e438]: Брайан Спайсер
+                  - generic [ref=e439]:
+                    - generic [ref=e440]: "1"
+                    - generic [ref=e441]: / 1
+                - generic [ref=e442] [cursor=pointer]:
+                  - generic [ref=e443]:
+                    - checkbox "Брэд Тернер 1 / 1" [ref=e444]
+                    - generic [ref=e446]: Брэд Тернер
+                  - generic [ref=e447]:
+                    - generic [ref=e448]: "1"
+                    - generic [ref=e449]: / 1
+                - generic [ref=e450] [cursor=pointer]:
+                  - generic [ref=e451]:
+                    - checkbox "Валерий Шалига 1 / 1" [ref=e452]
+                    - generic [ref=e454]: Валерий Шалига
+                  - generic [ref=e455]:
+                    - generic [ref=e456]: "1"
+                    - generic [ref=e457]: / 1
+                - generic [ref=e458] [cursor=pointer]:
+                  - generic [ref=e459]:
+                    - checkbox "Гари Хэлворсон 1 / 1" [ref=e460]
+                    - generic [ref=e462]: Гари Хэлворсон
+                  - generic [ref=e463]:
+                    - generic [ref=e464]: "1"
+                    - generic [ref=e465]: / 1
+                - generic [ref=e466] [cursor=pointer]:
+                  - generic [ref=e467]:
+                    - checkbox "Генри Чан 1 / 1" [ref=e468]
+                    - generic [ref=e470]: Генри Чан
+                  - generic [ref=e471]:
+                    - generic [ref=e472]: "1"
+                    - generic [ref=e473]: / 1
+                - generic [ref=e474] [cursor=pointer]:
+                  - generic [ref=e475]:
+                    - checkbox "Джеймс Уиддоуз 1 / 1" [ref=e476]
+                    - generic [ref=e478]: Джеймс Уиддоуз
+                  - generic [ref=e479]:
+                    - generic [ref=e480]: "1"
+                    - generic [ref=e481]: / 1
+                - generic [ref=e482] [cursor=pointer]:
+                  - generic [ref=e483]:
+                    - checkbox "Джерри Закс 1 / 1" [ref=e484]
+                    - generic [ref=e486]: Джерри Закс
+                  - generic [ref=e487]:
+                    - generic [ref=e488]: "1"
+                    - generic [ref=e489]: / 1
+                - generic [ref=e490] [cursor=pointer]:
+                  - generic [ref=e491]:
+                    - checkbox "Джил Джангер 1 / 1" [ref=e492]
+                    - generic [ref=e494]: Джил Джангер
+                  - generic [ref=e495]:
+                    - generic [ref=e496]: "1"
+                    - generic [ref=e497]: / 1
+                - generic [ref=e498] [cursor=pointer]:
+                  - generic [ref=e499]:
+                    - checkbox "Джон Кассар 1 / 1" [ref=e500]
+                    - generic [ref=e502]: Джон Кассар
+                  - generic [ref=e503]:
+                    - generic [ref=e504]: "1"
+                    - generic [ref=e505]: / 1
+                - generic [ref=e506] [cursor=pointer]:
+                  - generic [ref=e507]:
+                    - checkbox "Дон Скардино 1 / 1" [ref=e508]
+                    - generic [ref=e510]: Дон Скардино
+                  - generic [ref=e511]:
+                    - generic [ref=e512]: "1"
+                    - generic [ref=e513]: / 1
+                - generic [ref=e514] [cursor=pointer]:
+                  - generic [ref=e515]:
+                    - checkbox "Кристофер Мойнихэн 1 / 1" [ref=e516]
+                    - generic [ref=e518]: Кристофер Мойнихэн
+                  - generic [ref=e519]:
+                    - generic [ref=e520]: "1"
+                    - generic [ref=e521]: / 1
+                - generic [ref=e522] [cursor=pointer]:
+                  - generic [ref=e523]:
+                    - checkbox "Майкл Энглер 1 / 1" [ref=e524]
+                    - generic [ref=e526]: Майкл Энглер
+                  - generic [ref=e527]:
+                    - generic [ref=e528]: "1"
+                    - generic [ref=e529]: / 1
+                - generic [ref=e530] [cursor=pointer]:
+                  - generic [ref=e531]:
+                    - checkbox "Милисент Шелтон 1 / 1" [ref=e532]
+                    - generic [ref=e534]: Милисент Шелтон
+                  - generic [ref=e535]:
+                    - generic [ref=e536]: "1"
+                    - generic [ref=e537]: / 1
+                - generic [ref=e538] [cursor=pointer]:
+                  - generic [ref=e539]:
+                    - checkbox "Памела Фрайман 1 / 1" [ref=e540]
+                    - generic [ref=e542]: Памела Фрайман
+                  - generic [ref=e543]:
+                    - generic [ref=e544]: "1"
+                    - generic [ref=e545]: / 1
+                - generic [ref=e546] [cursor=pointer]:
+                  - generic [ref=e547]:
+                    - checkbox "Роберт Берлингер 1 / 1" [ref=e548]
+                    - generic [ref=e550]: Роберт Берлингер
+                  - generic [ref=e551]:
+                    - generic [ref=e552]: "1"
+                    - generic [ref=e553]: / 1
+                - generic [ref=e554] [cursor=pointer]:
+                  - generic [ref=e555]:
+                    - checkbox "Скотт Эллис 1 / 1" [ref=e556]
+                    - generic [ref=e558]: Скотт Эллис
+                  - generic [ref=e559]:
+                    - generic [ref=e560]: "1"
+                    - generic [ref=e561]: / 1
+                - generic [ref=e562] [cursor=pointer]:
+                  - generic [ref=e563]:
+                    - checkbox "Стив Бушеми 1 / 1" [ref=e564]
+                    - generic [ref=e566]: Стив Бушеми
+                  - generic [ref=e567]:
+                    - generic [ref=e568]: "1"
+                    - generic [ref=e569]: / 1
+                - generic [ref=e570] [cursor=pointer]:
+                  - generic [ref=e571]:
+                    - checkbox "Тодд Холлэнд 1 / 1" [ref=e572]
+                    - generic [ref=e574]: Тодд Холлэнд
+                  - generic [ref=e575]:
+                    - generic [ref=e576]: "1"
+                    - generic [ref=e577]: / 1
+                - generic [ref=e578] [cursor=pointer]:
+                  - generic [ref=e579]:
+                    - checkbox "Фил Трэйл 1 / 1" [ref=e580]
+                    - generic [ref=e582]: Фил Трэйл
+                  - generic [ref=e583]:
+                    - generic [ref=e584]: "1"
+                    - generic [ref=e585]: / 1
+            - generic [ref=e586]:
+              - generic [ref=e587]: Возрастной рейтинг
+              - generic [ref=e592] [cursor=pointer]:
+                - generic [ref=e593]:
+                  - checkbox "18+ 6 / 6" [ref=e594]
+                  - generic [ref=e596]: 18+
+                - generic [ref=e597]:
+                  - generic [ref=e598]: "6"
+                  - generic [ref=e599]: / 6
+            - generic [ref=e600]:
+              - generic [ref=e601]: Озвучка / перевод
+              - generic [ref=e605]: Найти в группе Озвучка / перевод
+              - searchbox "Найти в группе Озвучка / перевод" [ref=e608]
+              - generic [ref=e609]:
+                - generic [ref=e610] [cursor=pointer]:
+                  - generic [ref=e611]:
+                    - checkbox "NewStudio 2 / 2" [ref=e612]
+                    - generic [ref=e614]: NewStudio
+                  - generic [ref=e615]:
+                    - generic [ref=e616]: "2"
+                    - generic [ref=e617]: / 2
+                - generic [ref=e618] [cursor=pointer]:
+                  - generic [ref=e619]:
+                    - checkbox "LostFilm 1 / 1" [ref=e620]
+                    - generic [ref=e622]: LostFilm
+                  - generic [ref=e623]:
+                    - generic [ref=e624]: "1"
+                    - generic [ref=e625]: / 1
+                - generic [ref=e626] [cursor=pointer]:
+                  - generic [ref=e627]:
+                    - checkbox "ProjektorShow 1 / 1" [ref=e628]
+                    - generic [ref=e630]: ProjektorShow
+                  - generic [ref=e631]:
+                    - generic [ref=e632]: "1"
+                    - generic [ref=e633]: / 1
+                - generic [ref=e634] [cursor=pointer]:
+                  - generic [ref=e635]:
+                    - checkbox "SET 1 / 1" [ref=e636]
+                    - generic [ref=e638]: SET
+                  - generic [ref=e639]:
+                    - generic [ref=e640]: "1"
+                    - generic [ref=e641]: / 1
+                - generic [ref=e642] [cursor=pointer]:
+                  - generic [ref=e643]:
+                    - checkbox "f-train 1 / 1" [ref=e644]
+                    - generic [ref=e646]: f-train
+                  - generic [ref=e647]:
+                    - generic [ref=e648]: "1"
+                    - generic [ref=e649]: / 1
+                - generic [ref=e650] [cursor=pointer]:
+                  - generic [ref=e651]:
+                    - checkbox "novafilm 1 / 1" [ref=e652]
+                    - generic [ref=e654]: novafilm
+                  - generic [ref=e655]:
+                    - generic [ref=e656]: "1"
+                    - generic [ref=e657]: / 1
+                - generic [ref=e658] [cursor=pointer]:
+                  - generic [ref=e659]:
+                    - checkbox "Кравец 1 / 1" [ref=e660]
+                    - generic [ref=e662]: Кравец
+                  - generic [ref=e663]:
+                    - generic [ref=e664]: "1"
+                    - generic [ref=e665]: / 1
+                - generic [ref=e666] [cursor=pointer]:
+                  - generic [ref=e667]:
+                    - checkbox "НТВ 1 / 1" [ref=e668]
+                    - generic [ref=e670]: НТВ
+                  - generic [ref=e671]:
+                    - generic [ref=e672]: "1"
+                    - generic [ref=e673]: / 1
+                - generic [ref=e674] [cursor=pointer]:
+                  - generic [ref=e675]:
+                    - checkbox "Стандартный 1 / 1" [ref=e676]
+                    - generic [ref=e678]: Стандартный
+                  - generic [ref=e679]:
+                    - generic [ref=e680]: "1"
+                    - generic [ref=e681]: / 1
+            - generic [ref=e682]:
+              - generic [ref=e683]: Статус
+              - paragraph [ref=e688]: Нет данных.
+            - generic [ref=e689]:
+              - generic [ref=e690]: Каналы
+              - generic [ref=e694]:
+                - generic [ref=e695] [cursor=pointer]:
+                  - generic [ref=e696]:
+                    - checkbox "CBS 1 / 1" [ref=e697]
+                    - generic [ref=e699]: CBS
+                  - generic [ref=e700]:
+                    - generic [ref=e701]: "1"
+                    - generic [ref=e702]: / 1
+                - generic [ref=e703] [cursor=pointer]:
+                  - generic [ref=e704]:
+                    - checkbox "FOX 1 / 1" [ref=e705]
+                    - generic [ref=e707]: FOX
+                  - generic [ref=e708]:
+                    - generic [ref=e709]: "1"
+                    - generic [ref=e710]: / 1
+            - generic [ref=e711]:
+              - generic [ref=e712]: Студии
+              - paragraph [ref=e717]: Нет данных.
+            - generic [ref=e718]:
+              - generic [ref=e719]: Теги
+              - generic [ref=e723]: Найти в группе Теги
+              - searchbox "Найти в группе Теги" [ref=e726]
+              - generic [ref=e727]:
+                - generic [ref=e728] [cursor=pointer]:
+                  - generic [ref=e729]:
+                    - checkbox "молодежный 2 / 2" [ref=e730]
+                    - generic [ref=e732]: молодежный
+                  - generic [ref=e733]:
+                    - generic [ref=e734]: "2"
+                    - generic [ref=e735]: / 2
+                - generic [ref=e736] [cursor=pointer]:
+                  - generic [ref=e737]:
+                    - checkbox "CBS 1 / 1" [ref=e738]
+                    - generic [ref=e740]: CBS
+                  - generic [ref=e741]:
+                    - generic [ref=e742]: "1"
+                    - generic [ref=e743]: / 1
+                - generic [ref=e744] [cursor=pointer]:
+                  - generic [ref=e745]:
+                    - checkbox "FOX 1 / 1" [ref=e746]
+                    - generic [ref=e748]: FOX
+                  - generic [ref=e749]:
+                    - generic [ref=e750]: "1"
+                    - generic [ref=e751]: / 1
+                - generic [ref=e752] [cursor=pointer]:
+                  - generic [ref=e753]:
+                    - checkbox "Спецслужбы 1 / 1" [ref=e754]
+                    - generic [ref=e756]: Спецслужбы
+                  - generic [ref=e757]:
+                    - generic [ref=e758]: "1"
+                    - generic [ref=e759]: / 1
+                - generic [ref=e760] [cursor=pointer]:
+                  - generic [ref=e761]:
+                    - checkbox "ЦРУ 1 / 1" [ref=e762]
+                    - generic [ref=e764]: ЦРУ
+                  - generic [ref=e765]:
+                    - generic [ref=e766]: "1"
+                    - generic [ref=e767]: / 1
+                - generic [ref=e768] [cursor=pointer]:
+                  - generic [ref=e769]:
+                    - checkbox "Шпионы 1 / 1" [ref=e770]
+                    - generic [ref=e772]: Шпионы
+                  - generic [ref=e773]:
+                    - generic [ref=e774]: "1"
+                    - generic [ref=e775]: / 1
+                - generic [ref=e776] [cursor=pointer]:
+                  - generic [ref=e777]:
+                    - checkbox "субтитры 1 / 1" [ref=e778]
+                    - generic [ref=e780]: субтитры
+                  - generic [ref=e781]:
+                    - generic [ref=e782]: "1"
+                    - generic [ref=e783]: / 1
+                - generic [ref=e784] [cursor=pointer]:
+                  - generic [ref=e785]:
+                    - checkbox "террористы 1 / 1" [ref=e786]
+                    - generic [ref=e788]: террористы
+                  - generic [ref=e789]:
+                    - generic [ref=e790]: "1"
+                    - generic [ref=e791]: / 1
+                - generic [ref=e792] [cursor=pointer]:
+                  - generic [ref=e793]:
+                    - checkbox "школа 1 / 1" [ref=e794]
+                    - generic [ref=e796]: школа
+                  - generic [ref=e797]:
+                    - generic [ref=e798]: "1"
+                    - generic [ref=e799]: / 1
+            - generic [ref=e800]:
+              - button "Применить выбранное" [ref=e801]
+              - link "Сбросить фильтры" [ref=e804] [cursor=pointer]:
+                - /url: http://127.0.0.1:8013/titles
+      - generic [ref=e807]:
+        - generic [ref=e809]:
+          - generic [ref=e810]:
+            - generic [ref=e811]:
+              - heading "Все сериалы онлайн" [level=1] [ref=e812]
+              - paragraph [ref=e815]: 6 сериалов в подборке. Выдача учитывает названия, оригинальные названия, алиасы, описания, жанры, страны, актеров и режиссеров.
+              - generic [ref=e816]: "Найдено: 6"
+            - generic [ref=e818]:
+              - generic [ref=e819]:
+                - generic [ref=e820]: Поиск по каталогу
+                - searchbox "Поиск по каталогу" [ref=e824]
+              - button "Найти" [ref=e825]
+          - generic [ref=e828]:
+            - generic [ref=e829]:
+              - generic [ref=e830]: Найдено
+              - generic [ref=e831]: "6"
+            - generic [ref=e834]:
+              - generic [ref=e835]: На странице
+              - generic [ref=e836]: "6"
+            - generic [ref=e839]:
+              - generic [ref=e840]: Сортировка
+              - generic [ref=e841]: Недавно обновленные
+          - generic [ref=e844]:
+            - link "Недавно обновленные" [ref=e845] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles
+            - 'link "Год: новые сначала" [ref=e848] [cursor=pointer]':
+              - /url: http://127.0.0.1:8013/titles?sort=year_desc
+            - 'link "Год: старые сначала" [ref=e851] [cursor=pointer]':
+              - /url: http://127.0.0.1:8013/titles?sort=year_asc
+            - 'link "Серий: больше сначала" [ref=e854] [cursor=pointer]':
+              - /url: http://127.0.0.1:8013/titles?sort=episodes_desc
+            - 'link "Сезонов: больше сначала" [ref=e857] [cursor=pointer]':
+              - /url: http://127.0.0.1:8013/titles?sort=seasons_desc
+            - 'link "Видео: больше сначала" [ref=e860] [cursor=pointer]':
+              - /url: http://127.0.0.1:8013/titles?sort=with_video
+            - 'link "Название: А-я" [ref=e863] [cursor=pointer]':
+              - /url: http://127.0.0.1:8013/titles?sort=title_asc
+            - 'link "Название: Я-а" [ref=e866] [cursor=pointer]':
+              - /url: http://127.0.0.1:8013/titles?sort=title_desc
+            - link "Рейтинг КиноПоиска" [ref=e869] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?sort=kinopoisk_desc
+            - link "Рейтинг IMDb" [ref=e872] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?sort=imdb_desc
+            - link "По популярности" [ref=e875] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?sort=popularity_desc
+          - generic [ref=e878]:
+            - generic [ref=e879]: "Вид:"
+            - link "Сетка" [ref=e880] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles
+            - link "Список" [ref=e881] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?view=list
+            - generic [ref=e882]: "На странице:"
+            - link "24" [ref=e883] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles
+            - link "48" [ref=e884] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?per_page=48
+            - link "96" [ref=e885] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?per_page=96
+          - navigation "Алфавитный переход по названиям" [ref=e886]:
+            - generic [ref=e887]: "Алфавит:"
+            - link "#" [ref=e888] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%23
+            - link "A–Z" [ref=e889] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=latin
+            - link "А" [ref=e890] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%90
+            - link "Б" [ref=e891] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%91
+            - link "В" [ref=e892] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%92
+            - link "Г" [ref=e893] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%93
+            - link "Д" [ref=e894] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%94
+            - link "Е" [ref=e895] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%95
+            - link "Ж" [ref=e896] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%96
+            - link "З" [ref=e897] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%97
+            - link "И" [ref=e898] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%98
+            - link "Й" [ref=e899] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%99
+            - link "К" [ref=e900] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%9A
+            - link "Л" [ref=e901] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%9B
+            - link "М" [ref=e902] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%9C
+            - link "Н" [ref=e903] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%9D
+            - link "О" [ref=e904] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%9E
+            - link "П" [ref=e905] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%9F
+            - link "Р" [ref=e906] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%A0
+            - link "С" [ref=e907] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%A1
+            - link "Т" [ref=e908] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%A2
+            - link "У" [ref=e909] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%A3
+            - link "Ф" [ref=e910] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%A4
+            - link "Х" [ref=e911] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%A5
+            - link "Ц" [ref=e912] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%A6
+            - link "Ч" [ref=e913] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%A7
+            - link "Ш" [ref=e914] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%A8
+            - link "Щ" [ref=e915] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%A9
+            - link "Ъ" [ref=e916] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%AA
+            - link "Ы" [ref=e917] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%AB
+            - link "Ь" [ref=e918] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%AC
+            - link "Э" [ref=e919] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%AD
+            - link "Ю" [ref=e920] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%AE
+            - link "Я" [ref=e921] [cursor=pointer]:
+              - /url: http://127.0.0.1:8013/titles?letter=%D0%AF
+          - group [ref=e922]:
+            - generic "Расширенные фильтры" [ref=e923] [cursor=pointer]
+            - option "Любое" [selected]
+            - option "Есть видео"
+            - option "Нет видео"
+            - option "Любой" [selected]
+            - option "КиноПоиск"
+            - option "IMDb"
+            - option "За всё время" [selected]
+            - option "За день"
+            - option "За неделю"
+            - option "За месяц"
+            - option "За год"
+        - generic [ref=e929]:
+          - article [ref=e930]:
+            - img "Постер 30 Потрясений/30 Rock" [ref=e933]
+            - generic [ref=e934]:
+              - generic [ref=e935]:
+                - generic [ref=e936]: сериал
+                - generic [ref=e939]: "2006"
+              - heading [level=3] [ref=e942]:
+                - link "30 Потрясений/30 Rock" [ref=e943] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/30-potriasenii30-rock
+              - generic [ref=e944]:
+                - generic [ref=e945]: 7 сезон(ов)
+                - generic [ref=e948]: 134 серий
+                - generic [ref=e951]: 131 видео
+              - generic [ref=e954]:
+                - link "комедия" [ref=e955] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/genre/komediia
+                - link "США" [ref=e958] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/country/ssa
+                - link "18+" [ref=e961] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/age_rating/18
+          - article [ref=e964]:
+            - img "Постер 24 Часа/24" [ref=e967]
+            - generic [ref=e968]:
+              - generic [ref=e969]:
+                - generic [ref=e970]: сериал
+                - generic [ref=e973]: "2001"
+              - heading [level=3] [ref=e976]:
+                - link "24 Часа/24" [ref=e977] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/24-casa24
+              - generic [ref=e978]:
+                - generic [ref=e979]: 9 сезон(ов)
+                - generic [ref=e982]: 204 серий
+                - generic [ref=e985]: 204 видео
+              - generic [ref=e988]:
+                - link "боевики" [ref=e989] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/genre/boeviki
+                - link "триллеры" [ref=e992] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/genre/trillery
+                - link "детективы" [ref=e995] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/genre/detektivy
+          - article [ref=e998]:
+            - img "Постер 2,5 человека/Two and a Half Men" [ref=e1001]
+            - generic [ref=e1002]:
+              - generic [ref=e1003]:
+                - generic [ref=e1004]: сериал
+                - generic [ref=e1007]: "2003"
+              - heading [level=3] [ref=e1010]:
+                - link "2,5 человека/Two and a Half Men" [ref=e1011] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/25-celovekatwo-and-a-half-men
+              - generic [ref=e1012]:
+                - generic [ref=e1013]: 12 сезон(ов)
+                - generic [ref=e1016]: 262 серий
+                - generic [ref=e1019]: 300 видео
+              - generic [ref=e1022]:
+                - link "комедия" [ref=e1023] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/genre/komediia
+                - link "США" [ref=e1026] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/country/ssa
+                - link "18+" [ref=e1029] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/age_rating/18
+          - article [ref=e1032]:
+            - img "Постер 1941" [ref=e1035]
+            - generic [ref=e1036]:
+              - generic [ref=e1037]:
+                - generic [ref=e1038]: сериал
+                - generic [ref=e1041]: "2009"
+              - heading [level=3] [ref=e1044]:
+                - link "1941" [ref=e1045] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/1941
+              - generic [ref=e1046]:
+                - generic [ref=e1047]: 1 сезон(ов)
+                - generic [ref=e1050]: 12 серий
+                - generic [ref=e1053]: 12 видео
+              - generic [ref=e1056]:
+                - link "боевики" [ref=e1057] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/genre/boeviki
+                - link "отечественные" [ref=e1060] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/genre/otecestvennye
+                - link "драмы" [ref=e1063] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/genre/dramy
+          - article [ref=e1066]:
+            - img "Постер 100 Вопросов/100 Questions" [ref=e1069]
+            - generic [ref=e1070]:
+              - generic [ref=e1071]:
+                - generic [ref=e1072]: сериал
+                - generic [ref=e1075]: "2010"
+              - heading [level=3] [ref=e1078]:
+                - link "100 Вопросов/100 Questions" [ref=e1079] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/100-voprosov100-questions
+              - generic [ref=e1080]:
+                - generic [ref=e1081]: 1 сезон(ов)
+                - generic [ref=e1084]: 6 серий
+                - generic [ref=e1087]: 6 видео
+              - generic [ref=e1090]:
+                - link "комедия" [ref=e1091] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/genre/komediia
+                - link "США" [ref=e1094] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/country/ssa
+                - link "18+" [ref=e1097] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/age_rating/18
+          - article [ref=e1100]:
+            - img "Постер 10 причин моей ненависти/10 Things I Hate About You" [ref=e1103]
+            - generic [ref=e1104]:
+              - generic [ref=e1105]:
+                - generic [ref=e1106]: сериал
+                - generic [ref=e1109]: "2009"
+              - heading [level=3] [ref=e1112]:
+                - link "10 причин моей ненависти/10 Things I Hate About You" [ref=e1113] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/10-pricin-moei-nenavisti10-things-i-hate-about-you
+              - generic [ref=e1114]:
+                - generic [ref=e1115]: 1 сезон(ов)
+                - generic [ref=e1118]: 20 серий
+                - generic [ref=e1121]: 20 видео
+              - generic [ref=e1124]:
+                - link "комедия" [ref=e1125] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/genre/komediia
+                - link "мелодрамы" [ref=e1128] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/genre/melodramy
+                - link "США" [ref=e1131] [cursor=pointer]:
+                  - /url: http://127.0.0.1:8013/titles/country/ssa
+  - contentinfo [ref=e1134]:
+    - generic [ref=e1135]:
+      - generic [ref=e1136]: Каталог сериалов
+      - navigation "Техническая навигация" [ref=e1139]:
+        - link "Каталог" [ref=e1140] [cursor=pointer]:
+          - /url: http://127.0.0.1:8013/titles
+        - link "Карта сайта" [ref=e1141] [cursor=pointer]:
+          - /url: http://127.0.0.1:8013/sitemap.xml
+        - link "RSS" [ref=e1142] [cursor=pointer]:
+          - /url: http://127.0.0.1:8013/feed.xml

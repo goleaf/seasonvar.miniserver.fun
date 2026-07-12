@@ -28,7 +28,7 @@ composer dev
 - Основная точка входа Vite одна: `resources/js/app.js`.
 - `resources/js/app.js` импортирует `resources/css/app.css` и глобальные стили FontAwesome.
 - Player-код для Plyr/HLS находится в `resources/js/player.js` и загружается dynamic import только на страницах с `video.js-catalog-player`.
-- Локальный поиск внутри длинных групп фильтров `/titles` находится в `resources/js/app.js` и работает только как progressive enhancement: серверная GET-форма остается рабочей без JavaScript.
+- Поиск актеров и режиссеров выполняется Livewire на сервере с debounce 350 мс и лимитом 24 результата, поэтому полный справочник не попадает в браузер. Локальный поиск для остальных длинных групп остается progressive enhancement из `resources/js/app.js`; GET-форма работает без JavaScript.
 - Серверное состояние `/titles` ведёт `CatalogSeries`: строка поиска обновляется с debounce 400 мс, checkbox/расширенные поля применяются по submit, а сортировка, вид, размер страницы, алфавит и пагинация обновляются отдельными Livewire actions. Для всех форм сохранён обычный GET fallback.
 - Для HLS используется `hls.js/light`: он сохраняет воспроизведение HLS-плейлистов и не тянет модули субтитров, DRM и расширенной аналитики, которые сейчас не используются интерфейсом.
 - Layout подключает ассеты через `@vite('resources/js/app.js')`; не добавлять raw `<script>`/`<style>` для обычных assets.
