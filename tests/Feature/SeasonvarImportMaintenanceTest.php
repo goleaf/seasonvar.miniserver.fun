@@ -175,6 +175,14 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $this->assertSame('available', $media->check_status);
         $this->assertSame(206, $media->last_http_status);
         $this->assertNotNull($media->checked_at);
+
+        $event = SeasonvarImportEvent::query()
+            ->where('event', 'seasonvar-media-url-checked')
+            ->firstOrFail();
+
+        $this->assertSame('[redacted-url]', $event->context['url']);
+        $this->assertSame(206, $event->context['http_status']);
+        $this->assertStringNotContainsString('media.example.com', (string) json_encode($event->context));
     }
 
     public function test_it_marks_legacy_parsed_source_pages_as_imported(): void

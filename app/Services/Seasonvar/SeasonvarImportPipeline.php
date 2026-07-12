@@ -42,6 +42,7 @@ class SeasonvarImportPipeline
         private readonly SeasonvarRefreshPlanner $refreshPlanner,
         private readonly CatalogTitleRecommendationBuilder $recommendations,
         private readonly CatalogRelationNameSanitizer $relationNames,
+        private readonly SeasonvarImportStorageMaintenance $storageMaintenance,
     ) {}
 
     /**
@@ -149,6 +150,9 @@ class SeasonvarImportPipeline
             'cycle' => $cycle,
         ]);
 
+        $storageMaintenanceResult = $this->storageMaintenance->prune();
+        $progress('seasonvar-import-storage-pruned', $storageMaintenanceResult);
+
         $earlyRelationCleanupResult = $this->cleanupInvalidCatalogRelations($progress);
         $sourceStatusBackfillResult = $this->backfillParsedSourcePageStatuses($progress);
         $cycleResult = $argument === null
@@ -167,6 +171,7 @@ class SeasonvarImportPipeline
             'media_updated' => $mediaBacklogResult['media_updated'],
             'media_failed' => $mediaBacklogResult['media_failed'],
         ], [
+            'last_storage_maintenance' => $storageMaintenanceResult,
             'last_merge' => $mergeResult,
             'last_source_status_backfill' => $sourceStatusBackfillResult,
             'last_media_metadata_backlog' => $mediaMetadataResult,
@@ -179,6 +184,8 @@ class SeasonvarImportPipeline
         $progress('seasonvar-import-cycle-complete', [
             'cycle' => $cycle,
             ...$cycleResult,
+            'storage_events_deleted' => $storageMaintenanceResult['events_deleted'],
+            'storage_snapshots_deleted' => $storageMaintenanceResult['snapshots_deleted'],
             'source_status_backfilled' => $sourceStatusBackfillResult['backfilled'],
             'media_metadata_checked' => $mediaMetadataResult['media_checked'],
             'media_metadata_updated' => $mediaMetadataResult['media_updated'],
@@ -1140,13 +1147,15 @@ class SeasonvarImportPipeline
     private function recordImportEvent(SeasonvarImportRun $run, string $event, array $context): void
     {
         try {
+            $storedContext = $this->storageMaintenance->sanitizeEventContext($context);
+
             SeasonvarImportEvent::query()->create([
                 'seasonvar_import_run_id' => $run->id,
                 'source_page_id' => $context['source_page_id'] ?? null,
                 'catalog_title_id' => $context['catalog_title_id'] ?? null,
                 'event' => $event,
                 'level' => $this->eventLevel($event),
-                'context' => $context,
+                'context' => $storedContext,
             ]);
         } catch (Throwable) {
             // Журнал событий не должен останавливать обновление каталога.
