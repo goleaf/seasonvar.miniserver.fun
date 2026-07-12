@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'mode',
+    'execution_mode',
     'status',
     'argument',
     'force',
@@ -54,6 +55,14 @@ class SeasonvarImportRun extends Model
     public function lastImportedSourcePages(): HasMany
     {
         return $this->hasMany(SourcePage::class, 'last_import_run_id');
+    }
+
+    /**
+     * @return HasMany<SourcePage, $this>
+     */
+    public function claimedSourcePages(): HasMany
+    {
+        return $this->hasMany(SourcePage::class, 'import_claim_run_id');
     }
 
     /**

@@ -7,7 +7,7 @@ return [
     'import' => [
         'chunk_size' => (int) env('SEASONVAR_IMPORT_CHUNK_SIZE', 100),
         'sleep_seconds' => (int) env('SEASONVAR_IMPORT_SLEEP_SECONDS', 60),
-        'refresh_after_hours' => (int) env('SEASONVAR_IMPORT_REFRESH_AFTER_HOURS', 168),
+        'refresh_after_hours' => (int) env('SEASONVAR_IMPORT_REFRESH_AFTER_HOURS', 24),
         'missing_data_retry_hours' => (int) env('SEASONVAR_IMPORT_MISSING_DATA_RETRY_HOURS', 24),
         'lock_seconds' => (int) env('SEASONVAR_IMPORT_LOCK_SECONDS', 604800),
         'stale_after_minutes' => (int) env('SEASONVAR_IMPORT_STALE_AFTER_MINUTES', 15),
@@ -16,6 +16,15 @@ return [
         'event_retention_days' => (int) env('SEASONVAR_IMPORT_EVENT_RETENTION_DAYS', 7),
         'snapshot_retention_days' => (int) env('SEASONVAR_IMPORT_SNAPSHOT_RETENTION_DAYS', 14),
         'maintenance_chunk_size' => (int) env('SEASONVAR_IMPORT_MAINTENANCE_CHUNK_SIZE', 500),
+    ],
+    'queue' => [
+        'connection' => env('SEASONVAR_QUEUE_CONNECTION', 'redis'),
+        'queue' => env('SEASONVAR_QUEUE_NAME', 'seasonvar-import'),
+        'lock_store' => env('SEASONVAR_QUEUE_LOCK_STORE', 'redis'),
+        'claim_seconds' => (int) env('SEASONVAR_QUEUE_CLAIM_SECONDS', 86400),
+        'worker_timeout' => (int) env('SEASONVAR_QUEUE_WORKER_TIMEOUT', 900),
+        'retry_window_seconds' => (int) env('SEASONVAR_QUEUE_RETRY_WINDOW_SECONDS', 21600),
+        'finalizer_delay_seconds' => (int) env('SEASONVAR_QUEUE_FINALIZER_DELAY_SECONDS', 60),
     ],
     'media_check' => [
         'enabled' => filter_var(env('SEASONVAR_MEDIA_CHECK_ENABLED', true), FILTER_VALIDATE_BOOL),

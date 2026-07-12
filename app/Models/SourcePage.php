@@ -30,6 +30,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'failure_count',
     'last_import_run_id',
     'last_imported_at',
+    'import_claim_token',
+    'import_claimed_at',
+    'import_claim_expires_at',
+    'import_claim_run_id',
 ])]
 class SourcePage extends Model
 {
@@ -109,6 +113,14 @@ class SourcePage extends Model
     }
 
     /**
+     * @return BelongsTo<SeasonvarImportRun, $this>
+     */
+    public function importClaimRun(): BelongsTo
+    {
+        return $this->belongsTo(SeasonvarImportRun::class, 'import_claim_run_id');
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -121,6 +133,8 @@ class SourcePage extends Model
             'retry_after_at' => 'datetime',
             'failure_count' => 'integer',
             'last_imported_at' => 'datetime',
+            'import_claimed_at' => 'datetime',
+            'import_claim_expires_at' => 'datetime',
         ];
     }
 }
