@@ -79,6 +79,7 @@ final readonly class CatalogTitlesCriteria
         $now = CarbonImmutable::now()->startOfDay();
 
         return match ($this->updatedPeriod) {
+            'day' => $now->subDay(),
             'week' => $now->subWeek(),
             'month' => $now->subMonth(),
             'year' => $now->subYear(),

@@ -59,6 +59,9 @@ class CatalogTitlesViewModel
     /** @var array<string, mixed> */
     public array $catalogQueryState;
 
+    /** @var Collection<string, Collection<int, Model>> */
+    public readonly Collection $excludedTaxonomies;
+
     /** @var list<string> */
     public array $alphabet;
 
@@ -106,12 +109,14 @@ class CatalogTitlesViewModel
         public readonly string $view = 'grid',
         public readonly int $perPage = 24,
         array $catalogQueryState = [],
+        ?Collection $excludedTaxonomies = null,
     ) {
         $sorts = collect(CatalogSort::cases())->mapWithKeys(fn (CatalogSort $option): array => [$option->value => $option]);
         $this->sortLabels = $sorts->mapWithKeys(fn (CatalogSort $option): array => [$option->value => $option->label()])->all();
         $this->sortIcons = $sorts->mapWithKeys(fn (CatalogSort $option): array => [$option->value => $option->icon()])->all();
         $this->selectedFilterSlugs = $selectedFilterSlugs;
         $this->catalogQueryState = $catalogQueryState;
+        $this->excludedTaxonomies = $excludedTaxonomies ?? collect();
         $this->alphabet = ['#', 'latin', ...mb_str_split('АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ')];
         $letter = $this->catalogQueryState['letter'] ?? null;
         $this->activeLetter = is_scalar($letter) ? mb_strtoupper((string) $letter) : null;
@@ -125,11 +130,19 @@ class CatalogTitlesViewModel
 
     public function icon(string $filterType): string
     {
+        if ($filterType === 'title') {
+            return 'fa-solid fa-clapperboard';
+        }
+
         return $this->typeIcons[$filterType] ?? 'fa-solid fa-tag';
     }
 
     public function label(string $filterType): string
     {
+        if ($filterType === 'title') {
+            return 'Сериал';
+        }
+
         return $this->typeLabels[$filterType] ?? $filterType;
     }
 
@@ -174,6 +187,14 @@ class CatalogTitlesViewModel
 
         if ($this->sort !== 'updated') {
             $query['sort'] = $this->sort;
+        }
+
+        if ($this->view !== 'grid') {
+            $query['view'] = $this->view;
+        }
+
+        if ($this->perPage !== 24) {
+            $query['per_page'] = $this->perPage;
         }
 
         return $query;
@@ -260,12 +281,31 @@ class CatalogTitlesViewModel
                 && ! ($key === 'year' && $this->year !== null))
             ->map(function (string $label, string $key): array {
                 $value = $this->catalogQueryState[$key];
-                $display = is_array($value) ? implode(', ', $value) : (string) $value;
 
-                return ['key' => $key, 'label' => $label, 'value' => $display];
+                return ['key' => $key, 'label' => $label, 'value' => $this->advancedFilterValue($key, $value)];
             })
             ->values()
             ->all();
+    }
+
+    private function advancedFilterValue(string $key, mixed $value): string
+    {
+        if (is_array($value)) {
+            return implode(', ', $value);
+        }
+
+        return match ($key) {
+            'updated' => match ($value) {
+                'day' => 'за день',
+                'week' => 'за неделю',
+                'month' => 'за месяц',
+                'year' => 'за год',
+                default => (string) $value,
+            },
+            'video', 'subtitles' => $value === 'available' ? 'есть' : 'нет',
+            'rating_source' => $value === 'kinopoisk' ? 'КиноПоиск' : 'IMDb',
+            default => (string) $value,
+        };
     }
 
     /** @return array<string, mixed> */
@@ -319,6 +359,23 @@ class CatalogTitlesViewModel
         }
 
         return $this->appendSearchAndYear($query);
+    }
+
+    /** @return array<string, mixed> */
+    public function exclusionQuery(string $filterType, string $slug): array
+    {
+        $key = 'exclude_'.$filterType;
+        $query = $this->sortQuery($this->sort);
+        $values = is_array($query[$key] ?? null) ? $query[$key] : [];
+        $values = array_values(array_diff($values, [$slug]));
+
+        if ($values === []) {
+            unset($query[$key]);
+        } else {
+            $query[$key] = $values;
+        }
+
+        return $query;
     }
 
     /**
@@ -472,6 +529,14 @@ class CatalogTitlesViewModel
 
         if ($this->sort !== 'updated') {
             $query['sort'] = $this->sort;
+        }
+
+        if ($this->view !== 'grid') {
+            $query['view'] = $this->view;
+        }
+
+        if ($this->perPage !== 24) {
+            $query['per_page'] = $this->perPage;
         }
 
         return $query;

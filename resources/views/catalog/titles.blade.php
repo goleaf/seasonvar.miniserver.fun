@@ -73,7 +73,7 @@
                             <span>{{ $seo['h1'] ?? 'Сериалы' }}</span>
                         </h1>
                         <p class="mt-2 text-sm text-slate-500">{{ $seo['lead'] ?? 'Поиск по названиям, описаниям, актерам, жанрам и связям каталога.' }}</p>
-                        @if ($search !== '' || $selectedTaxonomies->isNotEmpty() || $filterView->advancedFilterChips() !== [] || $titleContext !== null || $year !== null || $invalidYear || $invalidFilterSlugs !== [])
+                        @if ($search !== '' || $selectedTaxonomies->isNotEmpty() || $excludedTaxonomies->isNotEmpty() || $filterView->advancedFilterChips() !== [] || $titleContext !== null || $year !== null || $invalidYear || $invalidFilterSlugs !== [])
                             <div class="mt-3 space-y-3 text-sm">
                                 <div class="flex flex-wrap items-center gap-2">
                                     @if ($search !== '')
@@ -93,6 +93,11 @@
                                             <x-ui.taxonomy-chip :href="route('titles.index', $filterView->filterQuery($filterType, $taxonomy->slug))" :icon="$filterView->icon($filterType)" active>{{ $filterView->label($filterType) }}: {{ $taxonomy->name }} · убрать</x-ui.taxonomy-chip>
                                         @endforeach
                                     @endforeach
+                                    @foreach ($excludedTaxonomies as $filterType => $taxonomies)
+                                        @foreach ($taxonomies as $taxonomy)
+                                            <x-ui.taxonomy-chip :href="route('titles.index', $filterView->exclusionQuery($filterType, $taxonomy->slug))" active icon="fa-solid fa-minus">Без {{ $filterView->label($filterType) }}: {{ $taxonomy->name }} · убрать</x-ui.taxonomy-chip>
+                                        @endforeach
+                                    @endforeach
                                     @foreach ($filterView->advancedFilterChips() as $chip)
                                         <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutCatalogState($chip['key']))" active icon="fa-solid fa-sliders">
                                             {{ $chip['label'] }}: {{ $chip['value'] }} · убрать
@@ -103,7 +108,7 @@
                                     @endforeach
                                 </div>
                                 <div class="flex flex-wrap gap-3 text-slate-500">
-                                    <span><i class="fa-solid fa-diagram-project text-slate-400" aria-hidden="true"></i> Активных связей: {{ $selectedTaxonomies->sum(fn ($taxonomies) => $taxonomies->count()) }}</span>
+                                    <span><i class="fa-solid fa-diagram-project text-slate-400" aria-hidden="true"></i> Активных связей: {{ $selectedTaxonomies->sum(fn ($taxonomies) => $taxonomies->count()) + $excludedTaxonomies->sum(fn ($taxonomies) => $taxonomies->count()) }}</span>
                                     @if ($invalidFilterSlugs !== [])
                                         <span><i class="fa-solid fa-triangle-exclamation text-amber-600" aria-hidden="true"></i> Ошибочных фильтров: {{ count($invalidFilterSlugs) }}</span>
                                     @endif
@@ -315,6 +320,7 @@
                             <span class="mb-1 block">Обновлено</span>
                             <select name="updated" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700">
                                 <option value="">За всё время</option>
+                                <option value="day" @selected(($filterView->catalogQueryState['updated'] ?? '') === 'day')>За день</option>
                                 <option value="week" @selected(($filterView->catalogQueryState['updated'] ?? '') === 'week')>За неделю</option>
                                 <option value="month" @selected(($filterView->catalogQueryState['updated'] ?? '') === 'month')>За месяц</option>
                                 <option value="year" @selected(($filterView->catalogQueryState['updated'] ?? '') === 'year')>За год</option>

@@ -11,7 +11,6 @@ use App\View\ViewModels\CatalogTitlesViewModel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 class CatalogTitlesPageBuilder
 {
@@ -34,6 +33,7 @@ class CatalogTitlesPageBuilder
     public function __construct(
         private readonly CatalogSeoBuilder $seo,
         private readonly CatalogTitleQuery $query,
+        private readonly CatalogFacetQuery $facets,
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogSearchQueryParser $searchParser,
     ) {}
@@ -67,6 +67,11 @@ class CatalogTitlesPageBuilder
         $legacyType = $request->legacyType($filterTypes);
         $legacyTaxonomy = $request->legacyTaxonomy();
         $invalidInputFilterSlugs = [];
+
+        if ($criteria->invalidTitleContext && $titleContextSlug !== null) {
+            $invalidInputFilterSlugs['title'] = $titleContextSlug;
+        }
+
         $requestedFilterSlugs = $request->filterSlugs();
 
         if ($legacyType !== '' && $legacyTaxonomy !== null && $requestedFilterSlugs[$legacyType] === []) {
@@ -113,6 +118,7 @@ class CatalogTitlesPageBuilder
         }
 
         $excludedTaxonomyIds = [];
+        $excludedTaxonomies = collect();
         foreach ($request->excludedFilterSlugs() as $filterType => $slugs) {
             if ($slugs === []) {
                 continue;
@@ -126,6 +132,7 @@ class CatalogTitlesPageBuilder
             }
 
             $excludedTaxonomyIds[$filterType] = $records->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all();
+            $excludedTaxonomies->put($filterType, $records->values());
         }
 
         $invalidFilterSlugs = $invalidInputFilterSlugs;
@@ -149,7 +156,7 @@ class CatalogTitlesPageBuilder
         $catalogTitles = $catalogTitles->paginate($perPage)->withQueryString();
 
         $filterTaxonomies = collect($filterTypes)->mapWithKeys(function (string $filterType): array {
-            return [$filterType => $this->facetTaxonomies($filterType)];
+            return [$filterType => $this->facets->taxonomies($filterType, $this->filterLimit($filterType))];
         });
 
         $selectedTaxonomies->each(function (Collection $selected, string $filterType) use ($filterTaxonomies): void {
@@ -172,45 +179,14 @@ class CatalogTitlesPageBuilder
                 return $record;
             });
         });
-        $yearBuckets = CatalogTitle::query()
-            ->published()
-            ->select('year')
-            ->selectRaw('count(*) as titles_count')
-            ->whereNotNull('year')
-            ->where('year', '>=', 1900)
-            ->where('year', '<=', (int) now()->format('Y') + 1)
-            ->groupBy('year')
-            ->orderByDesc('year')
-            ->limit(20)
-            ->get();
+        $yearBuckets = $this->facets->years($year, 20);
 
-        if ($year !== null && ! $yearBuckets->contains(fn (CatalogTitle $bucket): bool => (int) $bucket->year === $year)) {
-            $selectedYearBucket = CatalogTitle::query()
-                ->published()
-                ->select('year')
-                ->selectRaw('count(*) as titles_count')
-                ->where('year', $year)
-                ->groupBy('year')
-                ->first();
-
-            $yearBuckets->prepend($selectedYearBucket ?? (object) [
-                'year' => $year,
-                'titles_count' => 0,
-            ]);
-        }
-
-        $hasAdvancedFilters = collect($advancedFilters)->contains(
-            fn (mixed $value): bool => $value !== null && $value !== [],
-        );
-        $hasCatalogContext = $activeTaxonomies->isNotEmpty()
+        $hasCatalogContext = $criteria->hasContentFilters()
             || $invalidFilterSlugs !== []
             || $invalidYear
             || $searchQuery->state !== CatalogSearchState::Empty
-            || $years !== []
-            || $titleContext !== null
             || $selectedTaxonomyIds !== []
-            || $excludedTaxonomyIds !== []
-            || $hasAdvancedFilters;
+            || $excludedTaxonomyIds !== [];
 
         $yearContextCounts = $hasCatalogContext
             ? $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $searchQuery, null, null, $invalidYear, $titleContext?->id, [], $selectedTaxonomyIds, $excludedTaxonomyIds, $advancedFilters)
@@ -242,6 +218,7 @@ class CatalogTitlesPageBuilder
             view: $view,
             perPage: $perPage,
             catalogQueryState: $request->catalogQueryState(),
+            excludedTaxonomies: $excludedTaxonomies,
         );
 
         return [
@@ -259,6 +236,7 @@ class CatalogTitlesPageBuilder
             'selectedTaxonomy' => $activeTaxonomies->first(),
             'activeTaxonomies' => $activeTaxonomies,
             'selectedTaxonomies' => $selectedTaxonomies,
+            'excludedTaxonomies' => $excludedTaxonomies,
             'activeFilterSlugs' => $activeFilterSlugs,
             'invalidFilterSlugs' => $invalidFilterSlugs,
             'filterTaxonomies' => $filterTaxonomies,
@@ -308,36 +286,6 @@ class CatalogTitlesPageBuilder
     private function filterLimit(string $filterType): int
     {
         return self::FILTER_LIMITS[$filterType] ?? 24;
-    }
-
-    /** @return Collection<int, Model> */
-    private function facetTaxonomies(string $filterType): Collection
-    {
-        $modelClass = $this->taxonomies->modelClass($filterType);
-        $model = new $modelClass;
-        $relation = $model->catalogTitles();
-        $pivotTable = $relation->getTable();
-        $catalogTitleTable = (new CatalogTitle)->getTable();
-        $titlePivotKey = $relation->getForeignPivotKeyName();
-        $relatedPivotKey = $relation->getRelatedPivotKeyName();
-        $countAlias = 'published_facet_counts';
-        $counts = DB::table($pivotTable)
-            ->join($catalogTitleTable, $catalogTitleTable.'.id', '=', $pivotTable.'.'.$titlePivotKey)
-            ->where($catalogTitleTable.'.is_published', true)
-            ->select($pivotTable.'.'.$relatedPivotKey.' as relation_id')
-            ->selectRaw('count(distinct '.$catalogTitleTable.'.id) as catalog_titles_count')
-            ->groupBy($pivotTable.'.'.$relatedPivotKey);
-
-        return $modelClass::query()
-            ->joinSub($counts, $countAlias, $model->getTable().'.id', '=', $countAlias.'.relation_id')
-            ->select($model->getTable().'.*')
-            ->addSelect($countAlias.'.catalog_titles_count')
-            ->orderByDesc($countAlias.'.catalog_titles_count')
-            ->orderBy($model->getTable().'.name')
-            ->orderBy($model->getTable().'.id')
-            ->limit($this->filterLimit($filterType))
-            ->get()
-            ->values();
     }
 
     /**

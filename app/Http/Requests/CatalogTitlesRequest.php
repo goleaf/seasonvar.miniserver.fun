@@ -51,8 +51,8 @@ class CatalogTitlesRequest extends FormRequest
             'subtitles' => ['nullable', Rule::in(['available', 'missing'])],
             'quality' => ['nullable', 'array', 'max:'.self::MAX_SELECTIONS],
             'quality.*' => ['string', 'distinct', Rule::in(['2160p', '1440p', '1080p', '720p', '480p', '360p', '240p'])],
-            'updated' => ['nullable', Rule::in(['week', 'month', 'year'])],
-            'letter' => ['nullable', 'string', 'regex:/^(?:[A-Za-zА-Яа-яЁё]|#)$/u'],
+            'updated' => ['nullable', Rule::in(['day', 'week', 'month', 'year'])],
+            'letter' => ['nullable', 'string', 'regex:/^(?:latin|[A-Za-zА-Яа-яЁё]|#)$/iu'],
             'view' => ['nullable', Rule::in(['grid', 'list'])],
             'per_page' => ['nullable', 'integer', Rule::in([24, 48, 96])],
         ];

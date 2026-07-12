@@ -4,6 +4,10 @@ namespace App\Services\Catalog;
 
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
+use App\Models\CatalogTitleRating;
+use App\Models\Episode;
+use App\Models\LicensedMedia;
+use App\Models\Season;
 use App\Services\Catalog\Search\CatalogSearchNormalizer;
 use App\Services\Catalog\Search\CatalogSearchQuery;
 use App\Services\Catalog\Search\CatalogSearchState;
@@ -427,6 +431,7 @@ class CatalogTitleQuery
      */
     private function applyAdvancedFilters(Builder $query, array $filters): void
     {
+        $catalogTitleTable = (new CatalogTitle)->getTable();
         $yearFrom = $filters['year_from'] ?? null;
         $yearTo = $filters['year_to'] ?? null;
 
@@ -438,33 +443,36 @@ class CatalogTitleQuery
             $query->where('year', '<=', $yearTo);
         }
 
-        foreach ([['seasons', 'seasons_min', 'seasons_max'], ['episodes', 'episodes_min', 'episodes_max']] as [$relation, $minimumKey, $maximumKey]) {
-            if (($filters[$minimumKey] ?? null) !== null) {
-                $query->has($relation, '>=', $filters[$minimumKey]);
+        foreach ([['seasons_min', 'seasons_max', 'seasonTitleIdsByCount'], ['episodes_min', 'episodes_max', 'episodeTitleIdsByCount']] as [$minimumKey, $maximumKey, $subqueryMethod]) {
+            $minimum = $filters[$minimumKey] ?? null;
+            $maximum = $filters[$maximumKey] ?? null;
+
+            if ($minimum !== null && (int) $minimum > 0) {
+                $query->whereIn($catalogTitleTable.'.id', $this->{$subqueryMethod}('>=', (int) $minimum));
             }
 
-            if (($filters[$maximumKey] ?? null) !== null) {
-                $query->has($relation, '<=', $filters[$maximumKey]);
+            if ($maximum !== null) {
+                $query->whereNotIn($catalogTitleTable.'.id', $this->{$subqueryMethod}('>', (int) $maximum));
             }
         }
 
         $videoAvailability = $filters['video'] ?? null;
         if ($videoAvailability === 'available') {
-            $query->whereHas('licensedMedia', fn (Builder $media): Builder => $media->published());
+            $query->whereIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds());
         } elseif ($videoAvailability === 'missing') {
-            $query->whereDoesntHave('licensedMedia', fn (Builder $media): Builder => $media->published());
+            $query->whereNotIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds());
         }
 
         $subtitleAvailability = $filters['subtitles'] ?? null;
         if ($subtitleAvailability === 'available') {
-            $query->whereHas('licensedMedia', fn (Builder $media): Builder => $media->published()->where('has_subtitles', true));
+            $query->whereIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds(true));
         } elseif ($subtitleAvailability === 'missing') {
-            $query->whereDoesntHave('licensedMedia', fn (Builder $media): Builder => $media->published()->where('has_subtitles', true));
+            $query->whereNotIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds(true));
         }
 
         $qualities = $filters['quality'] ?? [];
         if ($qualities !== []) {
-            $query->whereHas('licensedMedia', fn (Builder $media): Builder => $media->published()->whereIn('quality', $qualities));
+            $query->whereIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds(null, $qualities));
         }
 
         $updatedAfter = $filters['updated_after'] ?? null;
@@ -489,19 +497,75 @@ class CatalogTitleQuery
         $ratingMin = $filters['rating_min'] ?? null;
         $votesMin = $filters['votes_min'] ?? null;
         if ($ratingSource !== null || $ratingMin !== null || $votesMin !== null) {
-            $query->whereHas('ratings', function (Builder $ratings) use ($ratingSource, $ratingMin, $votesMin): void {
-                if ($ratingSource !== null) {
-                    $ratings->where('provider', $ratingSource);
-                }
-
-                if ($ratingMin !== null) {
-                    $ratings->where('rating', '>=', $ratingMin);
-                }
-
-                if ($votesMin !== null) {
-                    $ratings->where('votes', '>=', $votesMin);
-                }
-            });
+            $query->whereIn($catalogTitleTable.'.id', $this->ratingTitleIds($ratingSource, $ratingMin, $votesMin));
         }
+    }
+
+    /** @return Builder<CatalogTitleRating> */
+    private function ratingTitleIds(?string $source, ?float $minimumRating, ?int $minimumVotes): Builder
+    {
+        $query = CatalogTitleRating::query()
+            ->select('catalog_title_id')
+            ->whereNotNull('catalog_title_id');
+
+        if ($source !== null) {
+            $query->where('provider', $source);
+        }
+
+        if ($minimumRating !== null) {
+            $query->where('rating', '>=', $minimumRating);
+        }
+
+        if ($minimumVotes !== null) {
+            $query->where('votes', '>=', $minimumVotes);
+        }
+
+        return $query;
+    }
+
+    private function seasonTitleIdsByCount(string $operator, int $count): QueryBuilder
+    {
+        $seasonTable = (new Season)->getTable();
+
+        return DB::table($seasonTable)
+            ->select($seasonTable.'.catalog_title_id')
+            ->whereNotNull($seasonTable.'.catalog_title_id')
+            ->groupBy($seasonTable.'.catalog_title_id')
+            ->havingRaw('count(*) '.$operator.' ?', [$count]);
+    }
+
+    private function episodeTitleIdsByCount(string $operator, int $count): QueryBuilder
+    {
+        $episodeTable = (new Episode)->getTable();
+        $seasonTable = (new Season)->getTable();
+
+        return DB::table($episodeTable)
+            ->join($seasonTable, $seasonTable.'.id', '=', $episodeTable.'.season_id')
+            ->select($seasonTable.'.catalog_title_id')
+            ->whereNotNull($seasonTable.'.catalog_title_id')
+            ->groupBy($seasonTable.'.catalog_title_id')
+            ->havingRaw('count(*) '.$operator.' ?', [$count]);
+    }
+
+    /**
+     * @param  list<string>  $qualities
+     * @return Builder<LicensedMedia>
+     */
+    private function publishedMediaTitleIds(?bool $requiresSubtitles = null, array $qualities = []): Builder
+    {
+        $query = LicensedMedia::query()
+            ->select('catalog_title_id')
+            ->whereNotNull('catalog_title_id')
+            ->published();
+
+        if ($requiresSubtitles !== null) {
+            $query->where('has_subtitles', $requiresSubtitles);
+        }
+
+        if ($qualities !== []) {
+            $query->whereIn('quality', $qualities);
+        }
+
+        return $query;
     }
 }
