@@ -97,6 +97,6 @@
 
 - [x] Inspect generated SQL and confirm results are unique with exact paginator totals.
 - [x] Measure query count and ensure option search remains bounded without per-option queries.
-- [ ] Run Pint, PHP syntax, Laravel cache checks, focused/full PHPUnit, dependency audits, and Vite build.
+- [x] Run Pint, PHP syntax, Laravel cache checks, focused/full PHPUnit, dependency audits, and Vite build.
 - [x] Run desktop/tablet/mobile Playwright QA for search, multi-group selections, reset, URL/history, overflow, console, and network errors.
-- [ ] Inspect the complete diff, commit on `main`, push without force, and confirm a clean tree with `HEAD == origin/main`.
+- [x] Inspect the complete diff, commit on `main`, push without force, and confirm a clean tree with `HEAD == origin/main`.
