@@ -8,7 +8,9 @@ Production data confirms that this is not an isolated display issue: 391 linked 
 
 ## Chosen approach
 
-After every successful parse, calculate the title-level flags once from a freshly loaded title and synchronize them to every already parsed source page linked to that title. Linked page ids come from the title's canonical `source_page_id` and its seasons' `source_page_id` values.
+After every successful parse, calculate the title-level flags once from a freshly loaded title and synchronize them to every already parsed source page linked to that title. Linked page ids come from the current page, the title's canonical `source_page_id`, and source pages whose `url_hash` matches a season's `source_url_hash`.
+
+Season `source_page_id` cannot identify every linked page because the existing season upsert associates all season rows with the page currently supplying their metadata. The stable cross-page identity is the normalized season URL hash.
 
 The synchronization updates only pages whose `parse_status` is `parsed` and whose `import_status` is `parsed` or `missing_data`, plus the current successfully parsed page. It must not change pending, claimed, or failed pages because their page-level lifecycle still requires independent work or retry handling.
 
@@ -19,7 +21,7 @@ The current page continues to receive its own `last_imported_at`, `last_import_r
 1. Parse and persist the current page, seasons, episodes, and external media as today.
 2. Reload the `CatalogTitle` with seasons, episodes, season media, and title media.
 3. Calculate the final title-level missing-data flags once.
-4. Collect the canonical and season source-page ids from the reloaded title.
+4. Collect the current and canonical page ids, then resolve every stored season URL hash to a source page from the same source.
 5. Update the current page's successful import metadata and derived state.
 6. Bulk-update the derived state on eligible parsed sibling pages.
 7. A later season page can therefore clear or replace stale flags written by an earlier page without another HTTP request.
@@ -40,7 +42,7 @@ The implementation remains safe for the synchronous targeted command because it 
 
 - `php artisan seasonvar:import` remains the only public importer command.
 - No dependency, migration, video download, or new remote request is introduced.
-- Failed, pending, and claimed sibling pages retain their independent status.
+- Failed, pending, and claimed sibling pages retain their independent status; active claim tokens are an explicit exclusion even when the prior import status is `parsed` or `missing_data`.
 - Page-specific crawl timestamps, hashes, failures, claims, and import-run attribution are not copied between pages.
 
 ## Tests
