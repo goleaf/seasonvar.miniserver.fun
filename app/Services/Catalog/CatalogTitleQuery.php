@@ -374,8 +374,6 @@ class CatalogTitleQuery
     /**
      * @param  Builder<CatalogTitle>  $query
      * @param  Collection<string, Model>  $activeTaxonomies
-     */
-    /**
      * @param  array<string, list<int>>  $selectedTaxonomyIds
      * @param  array<string, list<int>>  $excludedTaxonomyIds
      */
@@ -403,15 +401,17 @@ class CatalogTitleQuery
             $pivotTable = $relation->getTable();
             $titlePivotKey = $relation->getForeignPivotKeyName();
             $relatedPivotKey = $relation->getRelatedPivotKeyName();
-            $selectedIds = $selectedTaxonomyIds[$filterType] ?? [];
-            $excludedIds = $excludedTaxonomyIds[$filterType] ?? [];
+            $selectedIds = $this->normalizeRelationIds($selectedTaxonomyIds[$filterType] ?? []);
+            $excludedIds = $this->normalizeRelationIds($excludedTaxonomyIds[$filterType] ?? []);
 
             if ($selectedIds !== []) {
                 $query->whereIn(
                     $catalogTitleTable.'.id',
                     DB::table($pivotTable)
                         ->select($pivotTable.'.'.$titlePivotKey)
-                        ->whereIn($pivotTable.'.'.$relatedPivotKey, $selectedIds),
+                        ->whereIn($pivotTable.'.'.$relatedPivotKey, $selectedIds)
+                        ->groupBy($pivotTable.'.'.$titlePivotKey)
+                        ->havingRaw('count(distinct '.$pivotTable.'.'.$relatedPivotKey.') = ?', [count($selectedIds)]),
                 );
             }
 
@@ -424,6 +424,20 @@ class CatalogTitleQuery
                 );
             }
         }
+    }
+
+    /**
+     * @param  list<int>  $ids
+     * @return list<int>
+     */
+    private function normalizeRelationIds(array $ids): array
+    {
+        return collect($ids)
+            ->map(fn (int $id): int => $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

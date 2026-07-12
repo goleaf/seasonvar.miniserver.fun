@@ -4,7 +4,17 @@
     <section class="grid gap-5 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]">
         <aside id="catalog-filters" class="order-2 scroll-mt-24 space-y-4 lg:sticky lg:top-24 lg:order-1 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
             <x-ui.panel title="Фильтры каталога" icon="fa-solid fa-sliders">
-                <div class="space-y-5">
+                <form method="GET" action="{{ route('titles.index') }}" class="space-y-5">
+                    @foreach ($filterView->filterFormState() as $stateKey => $stateValue)
+                        @if (is_array($stateValue))
+                            @foreach ($stateValue as $stateItem)
+                                <input type="hidden" name="{{ $stateKey }}[]" value="{{ $stateItem }}">
+                            @endforeach
+                        @else
+                            <input type="hidden" name="{{ $stateKey }}" value="{{ $stateValue }}">
+                        @endif
+                    @endforeach
+
                     <div>
                         <div class="mb-2 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
                             <i class="fa-solid fa-calendar-days text-slate-400" aria-hidden="true"></i>
@@ -12,12 +22,13 @@
                         </div>
                         <div class="space-y-1">
                             @forelse ($yearBuckets as $bucket)
-                                <a href="{{ route('titles.index', $filterView->isActiveYear($bucket) ? $filterView->yearQuery(null) : $filterView->yearQuery($filterView->bucketYear($bucket))) }}" @class([
-                                    'flex items-center justify-between rounded-lg px-3 py-2 text-sm transition',
+                                <label @class([
+                                    'flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm transition',
                                     'bg-emerald-50 font-bold text-emerald-700' => $filterView->isActiveYear($bucket),
                                     'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveYear($bucket),
                                 ])>
                                     <span class="inline-flex min-w-0 items-center gap-2">
+                                        <input type="checkbox" name="year[]" value="{{ $filterView->bucketYear($bucket) }}" class="h-4 w-4 shrink-0 accent-emerald-700" @checked($filterView->isActiveYear($bucket))>
                                         <i class="fa-solid fa-calendar-days shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
                                         <span>{{ $filterView->bucketYear($bucket) }}</span>
                                     </span>
@@ -25,7 +36,7 @@
                                         <span class="font-bold">{{ $bucket->context_titles_count }}</span>
                                         <span class="text-slate-400">/ {{ $bucket->titles_count }}</span>
                                     </span>
-                                </a>
+                                </label>
                             @empty
                                 <p class="text-sm text-slate-500">Годы не указаны.</p>
                             @endforelse
@@ -40,12 +51,13 @@
                             </div>
                             <div class="space-y-1">
                                 @forelse ($filterTaxonomies->get($filterType, collect()) as $taxonomy)
-                                    <a href="{{ route('titles.index', $filterView->filterQuery($filterType, $filterView->isActiveTaxonomy($filterType, $taxonomy) ? null : $taxonomy->slug)) }}" @class([
-                                        'flex items-center justify-between rounded-lg px-3 py-2 text-sm transition',
+                                    <label @class([
+                                        'flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm transition',
                                         'bg-emerald-50 font-bold text-emerald-700' => $filterView->isActiveTaxonomy($filterType, $taxonomy),
                                         'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveTaxonomy($filterType, $taxonomy),
                                     ])>
                                         <span class="inline-flex min-w-0 items-center gap-2">
+                                            <input type="checkbox" name="{{ $filterType }}[]" value="{{ $taxonomy->slug }}" class="h-4 w-4 shrink-0 accent-emerald-700" @checked($filterView->isActiveTaxonomy($filterType, $taxonomy))>
                                             <i class="{{ $filterView->icon($filterType) }} shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
                                             <span>{{ $taxonomy->name }}</span>
                                         </span>
@@ -53,14 +65,25 @@
                                             <span class="font-bold">{{ $taxonomy->context_titles_count }}</span>
                                             <span class="text-slate-400">/ {{ $taxonomy->catalog_titles_count }}</span>
                                         </span>
-                                    </a>
+                                    </label>
                                 @empty
                                     <p class="text-sm text-slate-500">Нет данных.</p>
                                 @endforelse
                             </div>
                         </div>
                     @endforeach
-                </div>
+
+                    <div class="sticky bottom-0 -mx-1 space-y-2 bg-white/95 px-1 pb-1 pt-3 backdrop-blur">
+                        <button type="submit" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600">
+                            <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                            <span>Применить выбранное</span>
+                        </button>
+                        <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
+                            <i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i>
+                            <span>Сбросить фильтры</span>
+                        </a>
+                    </div>
+                </form>
             </x-ui.panel>
         </aside>
 
@@ -79,7 +102,7 @@
                             <span>К фильтрам</span>
                         </a>
 
-                        @if ($search !== '' || $selectedTaxonomies->isNotEmpty() || $excludedTaxonomies->isNotEmpty() || $filterView->advancedFilterChips() !== [] || $titleContext !== null || $year !== null || $invalidYear || $invalidFilterSlugs !== [])
+                        @if ($search !== '' || $selectedTaxonomies->isNotEmpty() || $excludedTaxonomies->isNotEmpty() || $filterView->advancedFilterChips() !== [] || $titleContext !== null || $filterView->selectedYears() !== [] || $invalidYear || $invalidFilterSlugs !== [])
                             <div class="mt-3 space-y-3 text-sm">
                                 <div class="flex flex-wrap items-center gap-2">
                                     @if ($search !== '')
@@ -88,9 +111,9 @@
                                     @if ($titleContext !== null)
                                         <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutTitleQuery)" active icon="fa-solid fa-clapperboard">Сериал: {{ $titleContext->title }} · убрать</x-ui.taxonomy-chip>
                                     @endif
-                                    @if ($year !== null)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutYearQuery)" active icon="fa-solid fa-calendar-days">Год: {{ $year }} · убрать</x-ui.taxonomy-chip>
-                                    @endif
+                                    @foreach ($filterView->selectedYears() as $selectedYear)
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->yearQuery($selectedYear))" active icon="fa-solid fa-calendar-days">Год: {{ $selectedYear }} · убрать</x-ui.taxonomy-chip>
+                                    @endforeach
                                     @if ($invalidYear)
                                         <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutYearQuery)" active icon="fa-solid fa-calendar-days">Год: {{ $requestedYear }} не найден · убрать</x-ui.taxonomy-chip>
                                     @endif
@@ -114,15 +137,15 @@
                                     @endforeach
                                 </div>
                                 <div class="flex flex-wrap gap-3 text-slate-500">
-                                    <span><i class="fa-solid fa-diagram-project text-slate-400" aria-hidden="true"></i> Активных связей: {{ $selectedTaxonomies->sum(fn ($taxonomies) => $taxonomies->count()) + $excludedTaxonomies->sum(fn ($taxonomies) => $taxonomies->count()) }}</span>
+                                    <span><i class="fa-solid fa-diagram-project text-slate-400" aria-hidden="true"></i> Активных фильтров: {{ count($filterView->selectedYears()) + $selectedTaxonomies->sum(fn ($taxonomies) => $taxonomies->count()) + $excludedTaxonomies->sum(fn ($taxonomies) => $taxonomies->count()) }}</span>
                                     @if ($invalidFilterSlugs !== [])
                                         <span><i class="fa-solid fa-triangle-exclamation text-amber-600" aria-hidden="true"></i> Ошибочных фильтров: {{ count($invalidFilterSlugs) }}</span>
                                     @endif
                                     @if ($invalidYear)
                                         <span><i class="fa-solid fa-calendar-xmark text-amber-600" aria-hidden="true"></i> Ошибочный год: {{ $requestedYear }}</span>
                                     @endif
-                                    @if ($year !== null)
-                                        <span><i class="fa-solid fa-calendar-days text-slate-400" aria-hidden="true"></i> Год: {{ $year }}</span>
+                                    @if ($filterView->selectedYears() !== [])
+                                        <span><i class="fa-solid fa-calendar-days text-slate-400" aria-hidden="true"></i> Годы: {{ implode(', ', $filterView->selectedYears()) }}</span>
                                     @endif
                                     @if ($titleContext !== null)
                                         <span><i class="fa-solid fa-clapperboard text-slate-400" aria-hidden="true"></i> Сериал: {{ $titleContext->title }}</span>
@@ -398,7 +421,7 @@
                                         <span>Очистить поиск</span>
                                     </a>
                                 @endif
-                                @if ($filterView->hasActiveFilters() || $titleContext !== null || $year !== null || $invalidYear)
+                                @if ($filterView->hasActiveFilters() || $titleContext !== null || $filterView->selectedYears() !== [] || $invalidYear)
                                     <a href="{{ route('titles.index', $filterView->withoutFiltersQuery) }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                                         <i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i>
                                         <span>Сбросить фильтры</span>

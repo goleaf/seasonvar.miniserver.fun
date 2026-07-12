@@ -111,9 +111,14 @@ class CatalogTitlesPageBuilder
             }
 
             if ($records->isNotEmpty()) {
-                $selectedTaxonomyIds[$filterType] = $records->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all();
-                $selectedTaxonomies->put($filterType, $records->values());
-                $activeTaxonomies->put($filterType, $records->first());
+                $orderedRecords = collect($slugs)
+                    ->map(fn (string $slug): ?Model => $records->get($slug))
+                    ->filter()
+                    ->values();
+
+                $selectedTaxonomyIds[$filterType] = $orderedRecords->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all();
+                $selectedTaxonomies->put($filterType, $orderedRecords);
+                $activeTaxonomies->put($filterType, $orderedRecords->first());
             }
         }
 
@@ -179,7 +184,7 @@ class CatalogTitlesPageBuilder
                 return $record;
             });
         });
-        $yearBuckets = $this->facets->years($year, 20);
+        $yearBuckets = $this->facets->years($years, 20);
 
         $hasCatalogContext = $criteria->hasContentFilters()
             || $invalidFilterSlugs !== []

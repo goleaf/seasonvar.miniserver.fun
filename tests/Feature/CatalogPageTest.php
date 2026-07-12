@@ -789,6 +789,8 @@ class CatalogPageTest extends TestCase
             ->assertOk()
             ->assertSeeText('Выбрана 2 серия')
             ->assertSeeText('720P / Дубляж / M3U8')
+            ->assertSeeText('Быстрый доступ')
+            ->assertSeeText('Сейчас открыто')
             ->assertSee('data-hls-src="https://media.example.com/video.m3u8"', false)
             ->assertSee('type="application/x-mpegURL"', false);
     }

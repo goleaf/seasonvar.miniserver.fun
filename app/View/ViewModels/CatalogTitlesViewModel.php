@@ -68,22 +68,22 @@ class CatalogTitlesViewModel
     public ?string $activeLetter;
 
     /**
-     * @var array<string, string|int|null>
+     * @var array<string, mixed>
      */
     public array $withoutYearQuery;
 
     /**
-     * @var array<string, string|int|null>
+     * @var array<string, mixed>
      */
     public array $withoutTitleQuery;
 
     /**
-     * @var array<string, string|int|null>
+     * @var array<string, mixed>
      */
     public array $withoutSearchQuery;
 
     /**
-     * @var array<string, string|int|null>
+     * @var array<string, mixed>
      */
     public array $withoutFiltersQuery;
 
@@ -200,6 +200,41 @@ class CatalogTitlesViewModel
         return $query;
     }
 
+    /** @return array<string, mixed> */
+    public function filterFormState(): array
+    {
+        $query = $this->withCatalogState($this->baseQuery);
+        unset($query['page'], $query['year']);
+
+        foreach (array_keys($this->typeLabels) as $filterType) {
+            unset($query[$filterType]);
+        }
+
+        if ($this->search !== '') {
+            $query['q'] = $this->search;
+        }
+
+        if ($this->sort !== 'updated') {
+            $query['sort'] = $this->sort;
+        } else {
+            unset($query['sort']);
+        }
+
+        if ($this->view !== 'grid') {
+            $query['view'] = $this->view;
+        } else {
+            unset($query['view']);
+        }
+
+        if ($this->perPage !== 24) {
+            $query['per_page'] = $this->perPage;
+        } else {
+            unset($query['per_page']);
+        }
+
+        return $query;
+    }
+
     public function hasActiveFilters(): bool
     {
         $filterKeys = [
@@ -242,6 +277,19 @@ class CatalogTitlesViewModel
             ->filter(fn (mixed $item): bool => is_scalar($item) && trim((string) $item) !== '')
             ->map(fn (mixed $item): string => trim((string) $item))
             ->unique()
+            ->values()
+            ->all();
+    }
+
+    /** @return list<int> */
+    public function selectedYears(): array
+    {
+        return collect($this->listState('year'))
+            ->filter(fn (string $year): bool => preg_match('/^\d{4}$/', $year) === 1)
+            ->map(fn (string $year): int => (int) $year)
+            ->filter(fn (int $year): bool => $year >= 1900 && $year <= ((int) now()->format('Y') + 1))
+            ->unique()
+            ->sortDesc()
             ->values()
             ->all();
     }
@@ -308,7 +356,7 @@ class CatalogTitlesViewModel
 
         return collect($labels)
             ->filter(fn (string $label, string $key): bool => array_key_exists($key, $this->catalogQueryState)
-                && ! ($key === 'year' && $this->year !== null))
+                && $key !== 'year')
             ->map(function (string $label, string $key): array {
                 $value = $this->catalogQueryState[$key];
                 $displayValue = $this->advancedFilterValue($key, $value);
@@ -350,7 +398,7 @@ class CatalogTitlesViewModel
     }
 
     /**
-     * @return array<string, string|int|null>
+     * @return array<string, mixed>
      */
     public function sortQuery(string $sort): array
     {
@@ -366,7 +414,7 @@ class CatalogTitlesViewModel
     }
 
     /**
-     * @return array<string, string|int|null>
+     * @return array<string, mixed>
      */
     public function filterQuery(string $filterType, ?string $slug = null): array
     {
@@ -411,12 +459,31 @@ class CatalogTitlesViewModel
     }
 
     /**
-     * @return array<string, string|int|null>
+     * @return array<string, mixed>
      */
     public function yearQuery(?int $selectedYear): array
     {
         $query = $this->withCatalogState(array_merge($this->baseQuery, $this->allFilterSlugs));
-        unset($query['year']);
+
+        if ($selectedYear === null) {
+            unset($query['year']);
+        } else {
+            $values = $this->selectedYears();
+
+            if (in_array($selectedYear, $values, true)) {
+                $values = array_values(array_diff($values, [$selectedYear]));
+            } else {
+                $values[] = $selectedYear;
+            }
+
+            $values = collect($values)->unique()->sortDesc()->values()->all();
+
+            if ($values === []) {
+                unset($query['year']);
+            } else {
+                $query['year'] = $values;
+            }
+        }
 
         if ($this->search !== '') {
             $query['q'] = $this->search;
@@ -426,15 +493,19 @@ class CatalogTitlesViewModel
             $query['sort'] = $this->sort;
         }
 
-        if ($selectedYear !== null) {
-            $query['year'] = $selectedYear;
+        if ($this->view !== 'grid') {
+            $query['view'] = $this->view;
+        }
+
+        if ($this->perPage !== 24) {
+            $query['per_page'] = $this->perPage;
         }
 
         return $query;
     }
 
     /**
-     * @return array<string, string|int|null>
+     * @return array<string, mixed>
      */
     public function invalidFilterQuery(string $filterType): array
     {
@@ -451,24 +522,31 @@ class CatalogTitlesViewModel
 
     public function isActiveYear(object $bucket): bool
     {
-        return $this->year === $this->bucketYear($bucket);
+        return in_array($this->bucketYear($bucket), $this->selectedYears(), true);
     }
 
     public function currentTaxonomy(string $filterType): ?Model
     {
-        $taxonomy = $this->activeTaxonomies->get($filterType);
+        $taxonomies = $this->selectedTaxonomies->get($filterType);
+        $taxonomy = $taxonomies instanceof Collection ? $taxonomies->first() : $this->activeTaxonomies->get($filterType);
 
         return $taxonomy instanceof Model ? $taxonomy : null;
     }
 
     public function isActiveTaxonomy(string $filterType, Model $taxonomy): bool
     {
+        $taxonomies = $this->selectedTaxonomies->get($filterType);
+
+        if ($taxonomies instanceof Collection) {
+            return $taxonomies->contains(fn (Model $record): bool => $record->getKey() === $taxonomy->getKey());
+        }
+
         return $this->currentTaxonomy($filterType)?->getKey() === $taxonomy->getKey();
     }
 
     /**
-     * @param  array<string, string|int|null>  $query
-     * @return array<string, string|int|null>
+     * @param  array<string, mixed>  $query
+     * @return array<string, mixed>
      */
     private function appendSearchAndYear(array $query): array
     {
@@ -502,7 +580,7 @@ class CatalogTitlesViewModel
     }
 
     /**
-     * @return array<string, string|int|null>
+     * @return array<string, mixed>
      */
     private function buildWithoutYearQuery(): array
     {
@@ -521,7 +599,7 @@ class CatalogTitlesViewModel
     }
 
     /**
-     * @return array<string, string|int|null>
+     * @return array<string, mixed>
      */
     private function buildWithoutTitleQuery(): array
     {
@@ -529,7 +607,7 @@ class CatalogTitlesViewModel
     }
 
     /**
-     * @return array<string, string|int|null>
+     * @return array<string, mixed>
      */
     private function buildWithoutSearchQuery(): array
     {
@@ -549,7 +627,7 @@ class CatalogTitlesViewModel
     }
 
     /**
-     * @return array<string, string|int|null>
+     * @return array<string, mixed>
      */
     private function buildWithoutFiltersQuery(): array
     {

@@ -335,8 +335,9 @@ class CatalogSeoBuilder
     private function canonicalFromRequest(Request $request): string
     {
         $query = collect($request->query())
-            ->filter(fn (mixed $value): bool => is_scalar($value) && trim((string) $value) !== '')
-            ->map(fn (mixed $value): string => (string) $value)
+            ->reject(fn (mixed $value, string $key): bool => in_array($key, ['sort', 'view', 'per_page'], true))
+            ->map(fn (mixed $value): mixed => $this->canonicalQueryValue($value))
+            ->filter(fn (mixed $value): bool => $value !== null && $value !== [])
             ->sortKeys()
             ->all();
 
@@ -361,7 +362,7 @@ class CatalogSeoBuilder
             $query['page'] = $currentPage;
         }
 
-        if ($activeTaxonomies->count() === 1) {
+        if ($activeTaxonomies->count() === 1 && ! $this->hasSearchQuery($request) && ! $this->hasComplexCatalogQuery($request)) {
             $filterType = (string) $activeTaxonomies->keys()->first();
             $taxonomy = $activeTaxonomies->first();
             $url = route('titles.taxonomy', ['type' => $filterType, 'taxonomy' => $taxonomy->slug]);
@@ -388,6 +389,34 @@ class CatalogSeoBuilder
         }
 
         return $this->canonicalFromRequest($request);
+    }
+
+    private function hasSearchQuery(Request $request): bool
+    {
+        $search = $request->query('q');
+
+        return is_scalar($search) && trim((string) $search) !== '';
+    }
+
+    private function canonicalQueryValue(mixed $value): mixed
+    {
+        if (is_array($value)) {
+            return collect($value)
+                ->filter(fn (mixed $item): bool => is_scalar($item) && trim((string) $item) !== '')
+                ->map(fn (mixed $item): string => trim((string) $item))
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+        }
+
+        if (! is_scalar($value)) {
+            return null;
+        }
+
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
     }
 
     private function hasComplexCatalogQuery(Request $request): bool

@@ -46,8 +46,11 @@ class CatalogFacetQuery
         return $query->get()->values();
     }
 
-    /** @return Collection<int, object> */
-    public function years(?int $selectedYear, int $limit): Collection
+    /**
+     * @param  list<int>  $selectedYears
+     * @return Collection<int, object>
+     */
+    public function years(array $selectedYears, int $limit): Collection
     {
         $yearBuckets = CatalogTitle::query()
             ->published()
@@ -61,21 +64,46 @@ class CatalogFacetQuery
             ->limit($limit)
             ->get();
 
-        if ($selectedYear === null || $yearBuckets->contains(fn (CatalogTitle $bucket): bool => (int) $bucket->year === $selectedYear)) {
+        $selectedYears = collect($selectedYears)
+            ->filter(fn (int $year): bool => $year >= 1900 && $year <= ((int) now()->format('Y') + 1))
+            ->unique()
+            ->sortDesc()
+            ->values();
+
+        if ($selectedYears->isEmpty()) {
             return $yearBuckets;
         }
 
-        $selectedYearBucket = CatalogTitle::query()
+        $visibleYears = $yearBuckets
+            ->pluck('year')
+            ->map(fn (mixed $year): int => (int) $year)
+            ->all();
+        $missingYears = $selectedYears
+            ->reject(fn (int $year): bool => in_array($year, $visibleYears, true))
+            ->values();
+
+        if ($missingYears->isEmpty()) {
+            return $yearBuckets;
+        }
+
+        $selectedYearBuckets = CatalogTitle::query()
             ->published()
             ->select('year')
             ->selectRaw('count(*) as titles_count')
-            ->where('year', $selectedYear)
+            ->whereIn('year', $missingYears->all())
             ->groupBy('year')
-            ->first();
+            ->get()
+            ->keyBy(fn (CatalogTitle $bucket): int => (int) $bucket->year);
 
-        return $yearBuckets->prepend($selectedYearBucket ?? (object) [
-            'year' => $selectedYear,
-            'titles_count' => 0,
-        ]);
+        $prependedBuckets = $missingYears
+            ->map(fn (int $selectedYear): object => $selectedYearBuckets->get($selectedYear) ?? (object) [
+                'year' => $selectedYear,
+                'titles_count' => 0,
+            ]);
+
+        return $prependedBuckets
+            ->concat($yearBuckets)
+            ->unique(fn (object $bucket): int => (int) $bucket->year)
+            ->values();
     }
 }
