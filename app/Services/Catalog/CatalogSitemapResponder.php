@@ -333,7 +333,7 @@ class CatalogSitemapResponder
         return response()->stream(function (): void {
             $titleCount = CatalogTitle::query()->where('is_published', true)->count();
             $episodeCount = Episode::query()->count();
-            $mediaCount = LicensedMedia::query()->published()->count();
+            $mediaCount = LicensedMedia::query()->published()->forAvailableReleases(null)->count();
 
             echo '# '.$this->siteName()."\n\n";
             echo "Каталог сериалов онлайн на русском языке. Данные автоматически обновляются и включают названия, оригинальные названия, алиасы, описания, постеры, жанры, страны, актеров, режиссеров, рейтинги, сезоны, серии и удаленные видео-файлы.\n\n";
@@ -435,6 +435,7 @@ class CatalogSitemapResponder
     {
         return LicensedMedia::query()
             ->published()
+            ->forAvailableReleases(null)
             ->where(function (Builder $query): void {
                 $query->where('playback_url', 'like', 'https://%')
                     ->orWhere('playback_url', 'like', 'http://%')

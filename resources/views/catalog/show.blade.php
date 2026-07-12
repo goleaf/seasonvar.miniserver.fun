@@ -366,7 +366,7 @@
                             <div class="px-4 pb-4">
                                 @if ($showView->seasonEpisodeCount($season) > 0)
                                     <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                                        @foreach ($season->episodes->sortBy('number')->values() as $episode)
+                                        @foreach ($season->episodes as $episode)
                                             <x-catalog.episode-link :title="$title" :episode="$episode" :show-view="$showView" />
                                         @endforeach
                                     </div>

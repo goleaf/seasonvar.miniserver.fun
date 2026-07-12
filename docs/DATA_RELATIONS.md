@@ -45,6 +45,17 @@
 - Каждая модель связи каталога относится ко многим `CatalogTitle` через явную pivot-таблицу.
 - Для метаданных каталога не используются morph- или polymorphic-связи.
 
+## Целостность выпуска и публикации
+
+- `CatalogStatus` через `catalog_status_catalog_title` описывает production status источника (`выходит`, `завершён` и подобные значения) и не управляет публичной видимостью.
+- `publication_status` у `CatalogTitle`, `Season` и `Episode` использует `draft`, `published` или `hidden`; публичный scope дополнительно проверяет `available_from`, `available_until`, `audience` и `deleted_at`.
+- `audience=public` доступна гостю, `audience=authenticated` — только переданному в `availableTo(User)` пользователю. Модели подписок и территориальных лицензий пока отсутствуют и не симулируются.
+- `CatalogTitle.is_published` временно сохраняется как legacy-совместимый второй защитный флаг. Публичный тайтл обязан одновременно иметь `is_published=true` и `publication_status=published`.
+- Обычные сезоны и серии имеют `kind=regular`, спецвыпуски — `kind=special`. Unique-ключи `(catalog_title_id, kind, number)` и `(season_id, kind, number)` разрешают специальный и обычный выпуск с одним номером, но запрещают дубли внутри вида.
+- Порядок сезонов и серий детерминирован: `kind`, `sort_order`, `number`, `id`; обычные выпуски идут до специальных и не перенумеровываются из-за specials.
+- `CatalogTitle`, `Season`, `Episode` и `LicensedMedia` используют soft delete; merge импортёра применяет физическое удаление только к уже объединённым дублям, чтобы не оставлять конфликтующие provider keys.
+- Публичные медиа проверяют собственный status/window/audience и доступность связанных сезона и серии.
+
 ## Типы фильтров справочников
 
 Эти типы справочников участвуют в фильтрах и должны иметь локальные страницы:
@@ -83,6 +94,10 @@
 - `licensed_media_title_status_published_idx` по `catalog_title_id, status, published_at` нужен для списков медиа карточки.
 - `licensed_media_episode_status_quality_idx` по `episode_id, status, quality` нужен для выбора медиа серии.
 - Уникальная пара `licensed_media.catalog_title_id + source_media_key` нужна для стабильного обновления видео-ссылок.
+- Unique-пары `catalog_titles.source_id + external_id` и `catalog_titles.source_id + source_url_hash` сохраняют стабильную идентичность тайтла у внешнего провайдера.
+- `catalog_title_ratings.catalog_title_id + provider` запрещает второй рейтинг того же провайдера для тайтла.
+- Каждая metadata pivot-таблица имеет составной primary key по `catalog_title_id` и related ID, поэтому одну связь нельзя присоединить дважды.
+- Publication lookup и display-order индексы на тайтлах, сезонах, сериях и медиа обслуживают публичные scopes и упорядоченные relationship loads.
 - Индексы состояния страниц источника по `import_status`, `retry_after_at` и `last_imported_at` нужны для единственной команды импорта.
 
 ## Поля импортера
@@ -128,6 +143,7 @@
 - Без аргументов команда читает sitemap Seasonvar, сохраняет все найденные ссылки страниц каталога, затем обрабатывает очередь по одному запросу.
 - С URL-аргументом команда обновляет эту карточку и найденные прямые страницы сезонов.
 - Существующие связи, серии и медиа сохраняются, если они исчезли со страницы источника.
+- Импортируемые сезоны и серии всегда записываются как `regular`, получают `sort_order=number`, публичное состояние и восстанавливаются после soft delete по стабильному составному ключу.
 - Измененные название, описание, постер, рейтинг и поля видео-ссылок обновляются.
 - Дубли страниц сезонов объединяются в одну `CatalogTitle`; сезоны остаются внутренними записями.
 - Один запуск импорта держит cache lock, чтобы две копии `seasonvar:import` не обновляли одну очередь одновременно.

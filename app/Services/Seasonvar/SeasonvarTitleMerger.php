@@ -119,6 +119,7 @@ class SeasonvarTitleMerger
                 $targetSeason = Season::query()->firstOrCreate(
                     [
                         'catalog_title_id' => $canonical->id,
+                        'kind' => $season->kind,
                         'number' => $season->number,
                     ],
                     [
@@ -126,6 +127,11 @@ class SeasonvarTitleMerger
                         'title' => $season->title,
                         'source_url' => $season->source_url,
                         'source_url_hash' => $season->source_url_hash,
+                        'sort_order' => $season->sort_order,
+                        'publication_status' => $season->publication_status,
+                        'audience' => $season->audience,
+                        'available_from' => $season->available_from,
+                        'available_until' => $season->available_until,
                     ],
                 );
 
@@ -144,7 +150,7 @@ class SeasonvarTitleMerger
                 $movedEpisodes += $this->mergeEpisodes($season, $targetSeason, $canonical);
                 $this->moveMediaForSeason($season->id, $canonical, $targetSeason);
 
-                $season->delete();
+                $season->forceDelete();
                 $mergedSeasons++;
             }
 
@@ -153,7 +159,7 @@ class SeasonvarTitleMerger
             $this->mergeReviews($canonical, $duplicate);
             $this->moveLooseMedia($duplicate, $canonical);
 
-            $duplicate->delete();
+            $duplicate->forceDelete();
             $mergedTitles++;
         }
 
@@ -189,6 +195,7 @@ class SeasonvarTitleMerger
         foreach ($fromSeason->episodes as $episode) {
             $targetEpisode = Episode::query()
                 ->where('season_id', $targetSeason->id)
+                ->where('kind', $episode->kind)
                 ->where('number', $episode->number)
                 ->first();
 
@@ -212,7 +219,7 @@ class SeasonvarTitleMerger
                 'summary' => $targetEpisode->summary ?? $episode->summary,
             ])->save();
 
-            $episode->delete();
+            $episode->forceDelete();
             $moved++;
         }
 
@@ -267,7 +274,7 @@ class SeasonvarTitleMerger
                 'last_http_status' => $media->last_http_status ?? $existing->last_http_status,
                 'checked_at' => $media->checked_at ?? $existing->checked_at,
             ])->save();
-            $media->delete();
+            $media->forceDelete();
 
             return $existing;
         }

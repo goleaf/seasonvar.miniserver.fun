@@ -2,6 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\ContentAudience;
+use App\Enums\PublicationStatus;
+use App\Enums\ReleaseKind;
+use App\Models\Concerns\HasPublicationAvailability;
 use Database\Factories\CatalogTitleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'source_id',
@@ -28,12 +33,16 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'source_url_hash',
     'content_hash',
     'is_published',
+    'publication_status',
+    'audience',
+    'available_from',
+    'available_until',
     'indexed_at',
 ])]
 class CatalogTitle extends Model
 {
     /** @use HasFactory<CatalogTitleFactory> */
-    use HasFactory;
+    use HasFactory, HasPublicationAvailability, SoftDeletes;
 
     public function getRouteKeyName(): string
     {
@@ -48,16 +57,7 @@ class CatalogTitle extends Model
      */
     public function resolveRouteBindingQuery($query, $value, $field = null)
     {
-        return parent::resolveRouteBindingQuery($query, $value, $field)->published();
-    }
-
-    /**
-     * @param  Builder<CatalogTitle>  $query
-     * @return Builder<CatalogTitle>
-     */
-    public function scopePublished(Builder $query): Builder
-    {
-        return $query->where('is_published', true);
+        return parent::resolveRouteBindingQuery($query, $value, $field)->availableTo(request()->user());
     }
 
     /**
@@ -81,7 +81,11 @@ class CatalogTitle extends Model
      */
     public function seasons(): HasMany
     {
-        return $this->hasMany(Season::class);
+        return $this->hasMany(Season::class)
+            ->orderBy('kind')
+            ->orderBy('sort_order')
+            ->orderBy('number')
+            ->orderBy('id');
     }
 
     /**
@@ -89,7 +93,9 @@ class CatalogTitle extends Model
      */
     public function latestSeason(): HasOne
     {
-        return $this->hasOne(Season::class)->latestOfMany('number');
+        return $this->hasOne(Season::class)
+            ->where('kind', ReleaseKind::Regular->value)
+            ->latestOfMany('number');
     }
 
     /**
@@ -97,7 +103,13 @@ class CatalogTitle extends Model
      */
     public function episodes(): HasManyThrough
     {
-        return $this->hasManyThrough(Episode::class, Season::class);
+        return $this->hasManyThrough(Episode::class, Season::class)
+            ->orderBy('seasons.kind')
+            ->orderBy('seasons.sort_order')
+            ->orderBy('episodes.kind')
+            ->orderBy('episodes.sort_order')
+            ->orderBy('episodes.number')
+            ->orderBy('episodes.id');
     }
 
     /**
@@ -113,7 +125,7 @@ class CatalogTitle extends Model
      */
     public function publishedLicensedMedia(): HasMany
     {
-        return $this->licensedMedia()->published();
+        return $this->licensedMedia()->published()->forAvailableReleases(null);
     }
 
     /**
@@ -260,7 +272,16 @@ class CatalogTitle extends Model
         return [
             'year' => 'integer',
             'is_published' => 'boolean',
+            'publication_status' => PublicationStatus::class,
+            'audience' => ContentAudience::class,
+            'available_from' => 'datetime',
+            'available_until' => 'datetime',
             'indexed_at' => 'datetime',
         ];
+    }
+
+    protected function usesLegacyPublicationFlag(): bool
+    {
+        return true;
     }
 }

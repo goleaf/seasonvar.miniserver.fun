@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${SEASONVAR_SKIP_GIT_GUARD:-}" == "1" ]]; then
+    exit 0
+fi
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+source "$repo_root/.githooks/lib/git-guard.sh"
+
+seasonvar_git_guard_require_main
+seasonvar_git_guard_require_no_unstaged_changes
+seasonvar_git_guard_require_no_untracked_files

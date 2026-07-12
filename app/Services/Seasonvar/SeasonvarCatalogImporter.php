@@ -2,6 +2,9 @@
 
 namespace App\Services\Seasonvar;
 
+use App\Enums\ContentAudience;
+use App\Enums\PublicationStatus;
+use App\Enums\ReleaseKind;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
 use App\Models\CatalogTitleRating;
@@ -15,6 +18,7 @@ use App\Models\SourcePageSnapshot;
 use App\Services\Crawler\PoliteHttpClient;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\ExternalPlaylistImporter;
+use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -594,6 +598,10 @@ class SeasonvarCatalogImporter
             || $catalogTitle->source_page_id === null
             || (int) $catalogTitle->source_page_id === (int) $page->id;
 
+        if ($catalogTitle->trashed()) {
+            $catalogTitle->restore();
+        }
+
         $catalogTitle->fill([
             'source_page_id' => $catalogTitle->source_page_id ?? $page->id,
             'external_id' => $catalogTitle->external_id ?? $data['external_id'],
@@ -609,6 +617,8 @@ class SeasonvarCatalogImporter
             'source_url_hash' => $catalogTitle->source_url_hash ?: $sourceUrlHash,
             'content_hash' => $isCanonicalSourcePage ? $contentHash : $catalogTitle->content_hash,
             'is_published' => true,
+            'publication_status' => PublicationStatus::Published,
+            'audience' => ContentAudience::Public,
             'indexed_at' => now(),
         ]);
         $catalogTitle->save();
@@ -628,7 +638,7 @@ class SeasonvarCatalogImporter
 
     private function findCatalogTitleBySourceUrlHash(SourcePage $page, string $sourceUrlHash): ?CatalogTitle
     {
-        return CatalogTitle::query()
+        return CatalogTitle::withTrashed()
             ->where('source_id', $page->source_id)
             ->where('source_url_hash', $sourceUrlHash)
             ->first();
@@ -639,7 +649,7 @@ class SeasonvarCatalogImporter
         $titleKey = $this->normalizedSeriesTitleKey($title);
         $seriesTitle = $this->seriesTitleKey($title);
 
-        return CatalogTitle::query()
+        return CatalogTitle::withTrashed()
             ->where('source_id', $page->source_id)
             ->where('type', $type)
             ->where(function ($query) use ($title, $seriesTitle): void {
@@ -928,6 +938,8 @@ class SeasonvarCatalogImporter
                 return [$number => [
                     'catalog_title_id' => $catalogTitle->id,
                     'number' => $number,
+                    'kind' => ReleaseKind::Regular->value,
+                    'sort_order' => $number,
                     'source_page_id' => $page->id,
                     'title' => $season['title'],
                     'source_url' => $season['source_url'],
@@ -937,14 +949,18 @@ class SeasonvarCatalogImporter
                     'episodes_total' => $season['episodes_total'] ?? null,
                     'translation_name' => $season['translation_name'] ?? null,
                     'release_status_text' => $season['release_status_text'] ?? null,
+                    'publication_status' => PublicationStatus::Published->value,
+                    'audience' => ContentAudience::Public->value,
+                    'deleted_at' => null,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]];
             });
 
         $existingSeasons = $rowsByNumber->isNotEmpty()
-            ? Season::query()
+            ? Season::withTrashed()
                 ->where('catalog_title_id', $catalogTitle->id)
+                ->where('kind', ReleaseKind::Regular->value)
                 ->whereIn('number', $rowsByNumber->keys())
                 ->get()
                 ->keyBy(fn (Season $season): int => (int) $season->number)
@@ -955,7 +971,7 @@ class SeasonvarCatalogImporter
         if ($rowsForUpsert->isNotEmpty()) {
             Season::query()->upsert(
                 $rowsForUpsert->values()->all(),
-                ['catalog_title_id', 'number'],
+                ['catalog_title_id', 'kind', 'number'],
                 [
                     'source_page_id',
                     'title',
@@ -966,6 +982,10 @@ class SeasonvarCatalogImporter
                     'episodes_total',
                     'translation_name',
                     'release_status_text',
+                    'sort_order',
+                    'publication_status',
+                    'audience',
+                    'deleted_at',
                     'updated_at',
                 ],
             );
@@ -973,6 +993,7 @@ class SeasonvarCatalogImporter
 
         $syncedSeasons = Season::query()
             ->where('catalog_title_id', $catalogTitle->id)
+            ->where('kind', ReleaseKind::Regular->value)
             ->whereIn('number', $rowsByNumber->keys())
             ->get()
             ->keyBy(fn (Season $season): int => (int) $season->number)
@@ -1022,10 +1043,15 @@ class SeasonvarCatalogImporter
             return [$season->id.'|'.$number => [
                 'season_id' => $season->id,
                 'number' => $number,
+                'kind' => ReleaseKind::Regular->value,
+                'sort_order' => $number,
                 'source_page_id' => $page->id,
                 'title' => $episode['title'],
                 'source_url' => $episode['source_url'],
                 'source_url_hash' => $episode['source_url'] ? $this->seasonvarUrl->hash($episode['source_url']) : null,
+                'publication_status' => PublicationStatus::Published->value,
+                'audience' => ContentAudience::Public->value,
+                'deleted_at' => null,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]];
@@ -1033,8 +1059,9 @@ class SeasonvarCatalogImporter
 
         $seasonIds = $rowsByKey->pluck('season_id')->unique()->values();
         $existingEpisodes = $rowsByKey->isNotEmpty()
-            ? Episode::query()
+            ? Episode::withTrashed()
                 ->whereIn('season_id', $seasonIds)
+                ->where('kind', ReleaseKind::Regular->value)
                 ->whereIn('number', $rowsByKey->pluck('number')->unique())
                 ->get()
                 ->keyBy(fn (Episode $episode): string => $episode->season_id.'|'.$episode->number)
@@ -1045,12 +1072,16 @@ class SeasonvarCatalogImporter
         if ($rowsForUpsert->isNotEmpty()) {
             Episode::query()->upsert(
                 $rowsForUpsert->values()->all(),
-                ['season_id', 'number'],
+                ['season_id', 'kind', 'number'],
                 [
                     'source_page_id',
                     'title',
                     'source_url',
                     'source_url_hash',
+                    'sort_order',
+                    'publication_status',
+                    'audience',
+                    'deleted_at',
                     'updated_at',
                 ],
             );
@@ -1083,6 +1114,10 @@ class SeasonvarCatalogImporter
             'episodes_total',
             'translation_name',
             'release_status_text',
+            'sort_order',
+            'publication_status',
+            'audience',
+            'deleted_at',
         ] as $field) {
             if ($this->comparableImportValue($field, $season->{$field}) !== $this->comparableImportValue($field, $row[$field] ?? null)) {
                 return true;
@@ -1101,7 +1136,7 @@ class SeasonvarCatalogImporter
             return true;
         }
 
-        foreach (['source_page_id', 'title', 'source_url', 'source_url_hash'] as $field) {
+        foreach (['source_page_id', 'title', 'source_url', 'source_url_hash', 'sort_order', 'publication_status', 'audience', 'deleted_at'] as $field) {
             if ($this->comparableImportValue($field, $episode->{$field}) !== $this->comparableImportValue($field, $row[$field] ?? null)) {
                 return true;
             }
@@ -1112,6 +1147,10 @@ class SeasonvarCatalogImporter
 
     private function comparableImportValue(string $field, mixed $value): mixed
     {
+        if ($value instanceof BackedEnum) {
+            return $value->value;
+        }
+
         if ($value instanceof Carbon) {
             return $value->toDateString();
         }
@@ -1210,6 +1249,7 @@ class SeasonvarCatalogImporter
             ->values();
         $episodesBySeasonAndNumber = Episode::query()
             ->whereIn('season_id', $seasonIds)
+            ->where('kind', ReleaseKind::Regular->value)
             ->get()
             ->keyBy(fn (Episode $episode): string => $episode->season_id.'|'.$episode->number);
 
@@ -1259,11 +1299,11 @@ class SeasonvarCatalogImporter
             $format = $this->parsedMediaExtension($playbackUrl);
             $variant = $this->mediaMetadata->playbackVariant($item['title'], $item['source_url'], $playbackUrl);
             $sourceMediaKey = $this->sourceMediaKey($catalogTitle, $season, $episode, $item, $playbackUrl, $quality, $format);
-            $media = LicensedMedia::query()
+            $media = LicensedMedia::withTrashed()
                 ->where('catalog_title_id', $catalogTitle->id)
                 ->where('source_media_key', $sourceMediaKey)
                 ->first()
-                ?? LicensedMedia::query()
+                ?? LicensedMedia::withTrashed()
                     ->where('catalog_title_id', $catalogTitle->id)
                     ->where('playback_url', $playbackUrl)
                     ->first()
@@ -1272,6 +1312,10 @@ class SeasonvarCatalogImporter
                     'source_media_key' => $sourceMediaKey,
                 ]);
             $wasExisting = $media->exists;
+
+            if ($media->trashed()) {
+                $media->restore();
+            }
             $mediaUpdates = [
                 'catalog_title_id' => $catalogTitle->id,
                 'season_id' => $season?->id,

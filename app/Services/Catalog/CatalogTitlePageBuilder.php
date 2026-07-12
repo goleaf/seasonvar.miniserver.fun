@@ -10,6 +10,7 @@ use App\Models\LicensedMedia;
 use App\Services\Media\ExternalMediaMetadata;
 use App\View\ViewModels\CatalogShowViewModel;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -34,14 +35,23 @@ class CatalogTitlePageBuilder
             'sourcePage',
             'aliases',
             'ratings',
-            'seasons.episodes',
-            'licensedMedia' => fn ($query) => $query->published()->with(['season', 'episode'])->latest('published_at')->latest(),
+            'seasons' => fn (HasMany $query): HasMany => $query
+                ->availableTo($request->user())
+                ->with([
+                    'episodes' => fn (HasMany $query): HasMany => $query->availableTo($request->user()),
+                ]),
+            'licensedMedia' => fn (HasMany $query): HasMany => $query
+                ->availableTo($request->user())
+                ->forAvailableReleases($request->user())
+                ->with(['season', 'episode'])
+                ->latest('published_at')
+                ->latest(),
         ], $this->taxonomies->relationNames()));
         $taxonomiesByType = collect($this->taxonomies->relations())
             ->mapWithKeys(fn (array $config, string $filterType): array => [$filterType => $catalogTitle->{$config['relation']}->values()]);
-        $seasons = $catalogTitle->seasons->sortBy('number')->values();
+        $seasons = $catalogTitle->seasons->values();
         $episodes = $seasons
-            ->flatMap(fn ($season): Collection => $season->episodes->sortBy('number')->values())
+            ->flatMap(fn ($season): Collection => $season->episodes->values())
             ->values();
 
         $mediaItems = $catalogTitle->licensedMedia
@@ -232,9 +242,13 @@ class CatalogTitlePageBuilder
     private function cardCounts(): array
     {
         return [
-            'seasons',
-            'episodes',
-            'licensedMedia as published_media_count' => fn (Builder $query): Builder => $query->published(),
+            'seasons' => fn (Builder $query): Builder => $query->published(),
+            'episodes' => fn (Builder $query): Builder => $query
+                ->published()
+                ->whereHas('season', fn (Builder $query): Builder => $query->published()),
+            'licensedMedia as published_media_count' => fn (Builder $query): Builder => $query
+                ->published()
+                ->forAvailableReleases(null),
         ];
     }
 

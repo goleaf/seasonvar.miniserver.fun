@@ -15,13 +15,22 @@
 - Связи, которые читает Blade или JSON Resource, должны быть загружены в page-builder/query/service слое через `with()`, `load()` или `loadMissing()`.
 - Счетчики связей для списков нужно получать через `withCount()` или агрегированные запросы; не считать их в Blade.
 - Resource-классы должны использовать `whenLoaded()` и `whenCounted()`, чтобы сериализация не вызывала lazy loading.
-- Для опубликованных карточек используйте `CatalogTitle::published()`, а для опубликованных медиа — `LicensedMedia::published()`.
+- Для гостевых карточек используйте `CatalogTitle::published()`, а при наличии текущего пользователя — `CatalogTitle::availableTo($user)`.
+- Для сезонов и серий действуют те же scopes. Публичные media query дополнительно вызывают `forAvailableReleases($user)`, чтобы hidden/draft дочерняя запись не раскрывалась через видео.
+- Relationship `seasons()` и `episodes()` уже содержит deterministic ordering `kind, sort_order, number, id`; Blade не должен сортировать эти коллекции повторно.
 
 ## Casts
 
 - Числовые колонки счетчиков и HTTP-статусов явно кастуются в `integer`.
 - Флаги кастуются в `boolean`, JSON-поля — в `array`, даты импорта и публикации — в `date` или `datetime`.
 - Новые поля моделей должны получать cast одновременно с миграцией, если их тип не строковый.
+- `publication_status`, `audience` и `kind` кастуются в `PublicationStatus`, `ContentAudience` и `ReleaseKind`; окна доступности и soft-delete timestamps кастуются Eloquent как даты.
+
+## Границы справочников
+
+- Люди и роли представлены существующими `Actor` и `Director` с отдельными pivot-таблицами; общий `Person` не добавляется без отдельной миграционной стратегии слияния.
+- Языки озвучки сейчас представлены `Translation` и `licensed_media.translation_name`; наличие субтитров — `licensed_media.has_subtitles`.
+- Нормализованные audio/subtitle track records не создаются, пока внешний источник не предоставляет устойчивые track identifiers. Это известное ограничение, а не повод хранить дублирующие строки при каждом импорте.
 
 ## Blade
 

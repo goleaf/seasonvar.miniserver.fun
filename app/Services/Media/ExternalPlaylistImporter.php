@@ -2,6 +2,7 @@
 
 namespace App\Services\Media;
 
+use App\Enums\ReleaseKind;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
@@ -106,11 +107,11 @@ class ExternalPlaylistImporter
             }
 
             $sourceMediaKey = $this->sourceMediaKey($match['catalogTitle'], $entry, $baseUrl);
-            $media = LicensedMedia::query()
+            $media = LicensedMedia::withTrashed()
                 ->where('catalog_title_id', $match['catalogTitle']->id)
                 ->where('source_media_key', $sourceMediaKey)
                 ->first()
-                ?? LicensedMedia::query()
+                ?? LicensedMedia::withTrashed()
                     ->where('catalog_title_id', $match['catalogTitle']->id)
                     ->where('playback_url', $entry['url'])
                     ->first()
@@ -119,6 +120,10 @@ class ExternalPlaylistImporter
                     'source_media_key' => $sourceMediaKey,
                 ]);
             $wasRecentlyCreated = ! $media->exists;
+
+            if ($media->trashed()) {
+                $media->restore();
+            }
 
             $variant = $this->mediaMetadata->playbackVariant($entry['title'], $baseUrl, $entry['url']);
 
@@ -238,7 +243,8 @@ class ExternalPlaylistImporter
         $season = $this->matchSeason($catalogTitle, $entry);
         $episode = $season === null || $entry['episode_number'] === null
             ? null
-            : $season->episodes->firstWhere('number', $entry['episode_number']);
+            : $season->episodes->first(fn (Episode $episode): bool => $episode->kind === ReleaseKind::Regular
+                && $episode->number === $entry['episode_number']);
 
         return [
             'catalogTitle' => $catalogTitle,
@@ -286,7 +292,8 @@ class ExternalPlaylistImporter
     private function matchSeason(CatalogTitle $catalogTitle, array $entry): ?Season
     {
         if ($entry['season_number'] !== null) {
-            return $catalogTitle->seasons->firstWhere('number', $entry['season_number']);
+            return $catalogTitle->seasons->first(fn (Season $season): bool => $season->kind === ReleaseKind::Regular
+                && $season->number === $entry['season_number']);
         }
 
         if ($entry['episode_number'] === null) {
@@ -294,7 +301,9 @@ class ExternalPlaylistImporter
         }
 
         $matchingSeasons = $catalogTitle->seasons
-            ->filter(fn (Season $season): bool => $season->episodes->contains('number', $entry['episode_number']))
+            ->filter(fn (Season $season): bool => $season->kind === ReleaseKind::Regular
+                && $season->episodes->contains(fn (Episode $episode): bool => $episode->kind === ReleaseKind::Regular
+                    && $episode->number === $entry['episode_number']))
             ->values();
 
         return $matchingSeasons->count() === 1

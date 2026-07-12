@@ -4,6 +4,7 @@ namespace App\Services\Catalog;
 
 use App\Models\CatalogTitle;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -38,7 +39,7 @@ class CatalogApiTitleQuery
             ->select(self::TITLE_COLUMNS)
             ->published()
             ->with($this->publicTaxonomyRelations())
-            ->withCount(['seasons', 'episodes', 'publishedLicensedMedia'])
+            ->withCount($this->publicCounts())
             ->orderByDesc('indexed_at')
             ->orderByDesc('id')
             ->paginate($perPage)
@@ -56,28 +57,30 @@ class CatalogApiTitleQuery
                 [
                     'seasons' => function (HasMany $query): void {
                         $query
+                            ->published()
                             ->select([
                                 'id',
                                 'catalog_title_id',
                                 'number',
+                                'kind',
+                                'sort_order',
                                 'title',
                                 'latest_episode_released_at',
                                 'episodes_released',
                                 'episodes_total',
                                 'translation_name',
                             ])
-                            ->orderBy('number')
                             ->with([
                                 'episodes' => function (HasMany $query): void {
                                     $query
-                                        ->select(['id', 'season_id', 'number', 'title', 'released_at', 'summary'])
-                                        ->orderBy('number');
+                                        ->published()
+                                        ->select(['id', 'season_id', 'number', 'kind', 'sort_order', 'title', 'released_at', 'summary']);
                                 },
                             ]);
                     },
                 ],
             ))
-            ->withCount(['seasons', 'episodes', 'publishedLicensedMedia'])
+            ->withCount($this->publicCounts())
             ->firstOrFail();
     }
 
@@ -103,5 +106,19 @@ class CatalogApiTitleQuery
         }
 
         return $relations;
+    }
+
+    /**
+     * @return array<int|string, string|\Closure(Builder): Builder>
+     */
+    private function publicCounts(): array
+    {
+        return [
+            'seasons' => fn (Builder $query): Builder => $query->published(),
+            'episodes' => fn (Builder $query): Builder => $query
+                ->published()
+                ->whereHas('season', fn (Builder $query): Builder => $query->published()),
+            'publishedLicensedMedia',
+        ];
     }
 }

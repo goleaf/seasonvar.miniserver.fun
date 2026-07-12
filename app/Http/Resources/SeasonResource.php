@@ -19,6 +19,7 @@ class SeasonResource extends JsonResource
         return [
             'id' => $this->id,
             'number' => $this->number,
+            'kind' => $this->kind->value,
             'title' => $this->title,
             'latest_episode_released_at' => $this->latest_episode_released_at?->toDateString(),
             'episodes_released' => $this->episodes_released,

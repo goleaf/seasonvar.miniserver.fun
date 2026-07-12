@@ -2,18 +2,38 @@
 
 namespace App\Models;
 
+use App\Enums\ContentAudience;
+use App\Enums\PublicationStatus;
+use App\Enums\ReleaseKind;
+use App\Models\Concerns\HasPublicationAvailability;
 use Database\Factories\EpisodeFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['season_id', 'source_page_id', 'number', 'title', 'source_url', 'source_url_hash', 'released_at', 'summary'])]
+#[Fillable([
+    'season_id',
+    'source_page_id',
+    'number',
+    'kind',
+    'sort_order',
+    'title',
+    'source_url',
+    'source_url_hash',
+    'released_at',
+    'summary',
+    'publication_status',
+    'audience',
+    'available_from',
+    'available_until',
+])]
 class Episode extends Model
 {
     /** @use HasFactory<EpisodeFactory> */
-    use HasFactory;
+    use HasFactory, HasPublicationAvailability, SoftDeletes;
 
     /**
      * @return BelongsTo<Season, $this>
@@ -46,7 +66,13 @@ class Episode extends Model
     {
         return [
             'number' => 'integer',
+            'kind' => ReleaseKind::class,
+            'sort_order' => 'integer',
             'released_at' => 'date',
+            'publication_status' => PublicationStatus::class,
+            'audience' => ContentAudience::class,
+            'available_from' => 'datetime',
+            'available_until' => 'datetime',
         ];
     }
 }

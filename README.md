@@ -73,7 +73,7 @@ GitHub Actions проверяет Composer, npm build, тесты, Pint, depende
 
 ## Git workflow
 
-Работа ведется только в существующей ветке `main`. Не создавайте feature branches, временные ветки, worktree-ветки, PR-ветки или дополнительные `main`-подобные ветки без прямого нового указания пользователя. Перед commit/push проверяйте `git status --short --branch` и не отправляйте изменения из веток, отличных от `main`.
+Работа ведется только в существующей ветке `main`. Не создавайте feature branches, временные ветки, worktree-ветки, PR-ветки или дополнительные `main`-подобные ветки без прямого нового указания пользователя. Перед commit/push проверяйте `git status --short --branch` и не отправляйте изменения из веток, отличных от `main`. Рабочее дерево должно оставаться закоммиченным: версионируемые хуки `.githooks/pre-commit` и `.githooks/pre-push` через `core.hooksPath=.githooks` блокируют частичные коммиты с unstaged/untracked файлами и push с dirty tree.
 
 <!-- project-docs:start -->
 ## Автоматически обновляемое состояние

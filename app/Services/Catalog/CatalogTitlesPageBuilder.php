@@ -187,7 +187,6 @@ class CatalogTitlesPageBuilder
         $yearBuckets = $this->facets->years($years, 20);
 
         $hasCatalogContext = $criteria->hasContentFilters()
-            || $invalidFilterSlugs !== []
             || $invalidYear
             || $searchQuery->state !== CatalogSearchState::Empty
             || $selectedTaxonomyIds !== []
@@ -352,9 +351,13 @@ class CatalogTitlesPageBuilder
     private function cardCounts(): array
     {
         return [
-            'seasons',
-            'episodes',
-            'licensedMedia as published_media_count' => fn (Builder $query): Builder => $query->published(),
+            'seasons' => fn (Builder $query): Builder => $query->published(),
+            'episodes' => fn (Builder $query): Builder => $query
+                ->published()
+                ->whereHas('season', fn (Builder $query): Builder => $query->published()),
+            'licensedMedia as published_media_count' => fn (Builder $query): Builder => $query
+                ->published()
+                ->forAvailableReleases(null),
         ];
     }
 

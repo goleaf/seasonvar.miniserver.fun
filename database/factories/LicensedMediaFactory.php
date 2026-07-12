@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\ContentAudience;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -25,6 +26,7 @@ class LicensedMediaFactory extends Factory
             'path' => 'licensed/'.fake()->uuid().'.mp4',
             'duration_seconds' => fake()->numberBetween(1200, 3600),
             'status' => 'draft',
+            'audience' => ContentAudience::Public,
         ];
     }
 }

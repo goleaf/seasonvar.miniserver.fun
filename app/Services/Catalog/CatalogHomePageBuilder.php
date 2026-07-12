@@ -27,7 +27,10 @@ class CatalogHomePageBuilder
         $stats = [
             'titles' => CatalogTitle::query()->published()->count(),
             'episodes' => Episode::query()
+                ->published()
+                ->whereHas('season', fn (Builder $query): Builder => $query->published())
                 ->whereIn('season_id', Season::query()
+                    ->published()
                     ->select('id')
                     ->whereIn('catalog_title_id', CatalogTitle::query()->published()->select('id')))
                 ->count(),
@@ -35,6 +38,7 @@ class CatalogHomePageBuilder
             'countries' => $countries->count(),
             'videos' => LicensedMedia::query()
                 ->published()
+                ->forAvailableReleases(null)
                 ->whereIn('catalog_title_id', CatalogTitle::query()->published()->select('id'))
                 ->count(),
         ];
@@ -53,6 +57,7 @@ class CatalogHomePageBuilder
             ->with($this->taxonomies->cardRelations())
             ->whereIn('id', LicensedMedia::query()
                 ->published()
+                ->forAvailableReleases(null)
                 ->whereNotNull('catalog_title_id')
                 ->select('catalog_title_id'))
             ->orderByDesc('published_media_count')
@@ -61,15 +66,21 @@ class CatalogHomePageBuilder
             ->get();
         $latestMedia = LicensedMedia::query()
             ->published()
+            ->forAvailableReleases(null)
             ->whereIn('catalog_title_id', CatalogTitle::query()->published()->select('id'))
             ->select(['id', 'catalog_title_id', 'season_id', 'episode_id', 'title', 'quality', 'translation_name', 'format', 'published_at'])
             ->with([
                 'catalogTitle' => fn ($query) => $query
                     ->published()
                     ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'])
-                    ->withCount(['seasons', 'episodes']),
-                'season:id,catalog_title_id,number,title',
-                'episode:id,season_id,number,title,released_at',
+                    ->withCount([
+                        'seasons' => fn (Builder $query): Builder => $query->published(),
+                        'episodes' => fn (Builder $query): Builder => $query
+                            ->published()
+                            ->whereHas('season', fn (Builder $query): Builder => $query->published()),
+                    ]),
+                'season:id,catalog_title_id,number,kind,sort_order,title',
+                'episode:id,season_id,number,kind,sort_order,title,released_at',
             ])
             ->latest('published_at')
             ->latest()
@@ -114,9 +125,13 @@ class CatalogHomePageBuilder
             ->published()
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url', 'indexed_at'])
             ->withCount([
-                'seasons',
-                'episodes',
-                'licensedMedia as published_media_count' => fn (Builder $query): Builder => $query->published(),
+                'seasons' => fn (Builder $query): Builder => $query->published(),
+                'episodes' => fn (Builder $query): Builder => $query
+                    ->published()
+                    ->whereHas('season', fn (Builder $query): Builder => $query->published()),
+                'licensedMedia as published_media_count' => fn (Builder $query): Builder => $query
+                    ->published()
+                    ->forAvailableReleases(null),
             ]);
     }
 }

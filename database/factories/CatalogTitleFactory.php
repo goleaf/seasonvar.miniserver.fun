@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Enums\ContentAudience;
+use App\Enums\PublicationStatus;
 use App\Models\CatalogTitle;
 use App\Models\Source;
 use App\Models\SourcePage;
@@ -35,6 +37,8 @@ class CatalogTitleFactory extends Factory
             'source_url' => $url,
             'source_url_hash' => hash('sha256', $url),
             'is_published' => true,
+            'publication_status' => PublicationStatus::Published,
+            'audience' => ContentAudience::Public,
             'indexed_at' => now(),
         ];
     }

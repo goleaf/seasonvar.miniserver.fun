@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Enums\ContentAudience;
+use App\Models\Concerns\HasPublicationAvailability;
 use Database\Factories\LicensedMediaFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'catalog_title_id',
@@ -20,6 +23,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'duration_seconds',
     'status',
     'published_at',
+    'audience',
+    'available_from',
+    'available_until',
     'source_media_key',
     'source_url',
     'quality',
@@ -36,20 +42,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class LicensedMedia extends Model
 {
     /** @use HasFactory<LicensedMediaFactory> */
-    use HasFactory;
+    use HasFactory, HasPublicationAvailability, SoftDeletes;
 
     protected $attributes = [
         'has_subtitles' => false,
     ];
-
-    /**
-     * @param  Builder<LicensedMedia>  $query
-     * @return Builder<LicensedMedia>
-     */
-    public function scopePublished(Builder $query): Builder
-    {
-        return $query->where('status', 'published');
-    }
 
     /**
      * @return BelongsTo<CatalogTitle, $this>
@@ -76,6 +73,27 @@ class LicensedMedia extends Model
     }
 
     /**
+     * @param  Builder<LicensedMedia>  $query
+     * @return Builder<LicensedMedia>
+     */
+    public function scopeForAvailableReleases(Builder $query, ?User $user): Builder
+    {
+        return $query
+            ->where(function (Builder $query) use ($user): void {
+                $query
+                    ->whereNull('season_id')
+                    ->orWhereHas('season', fn (Builder $query): Builder => $query->availableTo($user));
+            })
+            ->where(function (Builder $query) use ($user): void {
+                $query
+                    ->whereNull('episode_id')
+                    ->orWhereHas('episode', fn (Builder $query): Builder => $query
+                        ->availableTo($user)
+                        ->whereHas('season', fn (Builder $query): Builder => $query->availableTo($user)));
+            });
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -85,7 +103,25 @@ class LicensedMedia extends Model
             'has_subtitles' => 'boolean',
             'last_http_status' => 'integer',
             'published_at' => 'datetime',
+            'audience' => ContentAudience::class,
+            'available_from' => 'datetime',
+            'available_until' => 'datetime',
             'checked_at' => 'datetime',
         ];
+    }
+
+    protected function publicationStatusColumn(): string
+    {
+        return 'status';
+    }
+
+    protected function publishedStatusValue(): string
+    {
+        return 'published';
+    }
+
+    protected function usesPublishedAtGate(): bool
+    {
+        return true;
     }
 }

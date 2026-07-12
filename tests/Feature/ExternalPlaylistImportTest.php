@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ReleaseKind;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
@@ -42,6 +43,16 @@ class ExternalPlaylistImportTest extends TestCase
         ]);
         $episode = Episode::factory()->create([
             'season_id' => $season->id,
+            'number' => 2,
+        ]);
+        $specialSeason = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'kind' => ReleaseKind::Special,
+            'number' => 1,
+        ]);
+        Episode::factory()->create([
+            'season_id' => $specialSeason->id,
+            'kind' => ReleaseKind::Special,
             'number' => 2,
         ]);
 

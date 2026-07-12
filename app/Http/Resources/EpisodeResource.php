@@ -19,6 +19,7 @@ class EpisodeResource extends JsonResource
         return [
             'id' => $this->id,
             'number' => $this->number,
+            'kind' => $this->kind->value,
             'title' => $this->title,
             'released_at' => $this->released_at?->toDateString(),
             'summary' => $this->summary,

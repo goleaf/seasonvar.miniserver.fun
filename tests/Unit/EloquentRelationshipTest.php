@@ -2,6 +2,9 @@
 
 namespace Tests\Unit;
 
+use App\Enums\ContentAudience;
+use App\Enums\PublicationStatus;
+use App\Enums\ReleaseKind;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleReview;
 use App\Models\Episode;
@@ -12,6 +15,8 @@ use App\Models\SeasonvarImportRun;
 use App\Models\Source;
 use App\Models\SourcePage;
 use App\Models\SourcePageSnapshot;
+use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -179,5 +184,89 @@ class EloquentRelationshipTest extends TestCase
         $this->assertSame(206, $media->last_http_status);
         $this->assertSame(200, $snapshot->refresh()->http_status);
         $this->assertSame(512, $snapshot->body_bytes);
+    }
+
+    public function test_publication_scopes_exclude_hidden_scheduled_expired_and_inaccessible_records(): void
+    {
+        $published = CatalogTitle::factory()->create([
+            'publication_status' => PublicationStatus::Published,
+            'audience' => ContentAudience::Public,
+            'available_from' => now()->subMinute(),
+            'available_until' => now()->addMinute(),
+        ]);
+        $authenticated = CatalogTitle::factory()->create([
+            'publication_status' => PublicationStatus::Published,
+            'audience' => ContentAudience::Authenticated,
+        ]);
+        CatalogTitle::factory()->create(['publication_status' => PublicationStatus::Draft]);
+        CatalogTitle::factory()->create(['publication_status' => PublicationStatus::Hidden]);
+        CatalogTitle::factory()->create([
+            'publication_status' => PublicationStatus::Published,
+            'available_from' => now()->addMinute(),
+        ]);
+        CatalogTitle::factory()->create([
+            'publication_status' => PublicationStatus::Published,
+            'available_until' => now()->subMinute(),
+        ]);
+        $deleted = CatalogTitle::factory()->create(['publication_status' => PublicationStatus::Published]);
+        $deleted->delete();
+
+        $this->assertSame([$published->id], CatalogTitle::query()->published()->pluck('id')->all());
+        $this->assertEqualsCanonicalizing(
+            [$published->id, $authenticated->id],
+            CatalogTitle::query()->availableTo(User::factory()->create())->pluck('id')->all(),
+        );
+    }
+
+    public function test_release_relationships_are_deterministic_and_specials_do_not_collide_with_regular_numbers(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $regularSecond = Season::factory()->create([
+            'catalog_title_id' => $title->id,
+            'kind' => ReleaseKind::Regular,
+            'number' => 2,
+            'sort_order' => 20,
+        ]);
+        $special = Season::factory()->create([
+            'catalog_title_id' => $title->id,
+            'kind' => ReleaseKind::Special,
+            'number' => 2,
+            'sort_order' => 1,
+        ]);
+        $regularFirst = Season::factory()->create([
+            'catalog_title_id' => $title->id,
+            'kind' => ReleaseKind::Regular,
+            'number' => 1,
+            'sort_order' => 10,
+        ]);
+        $regularEpisode = Episode::factory()->create([
+            'season_id' => $regularFirst->id,
+            'kind' => ReleaseKind::Regular,
+            'number' => 1,
+            'sort_order' => 10,
+        ]);
+        $specialEpisode = Episode::factory()->create([
+            'season_id' => $regularFirst->id,
+            'kind' => ReleaseKind::Special,
+            'number' => 1,
+            'sort_order' => 1,
+        ]);
+
+        $this->assertSame(
+            [$regularFirst->id, $regularSecond->id, $special->id],
+            $title->seasons()->pluck('id')->all(),
+        );
+        $this->assertSame(
+            [$regularEpisode->id, $specialEpisode->id],
+            $regularFirst->episodes()->pluck('id')->all(),
+        );
+
+        $this->expectException(QueryException::class);
+
+        Season::factory()->create([
+            'catalog_title_id' => $title->id,
+            'kind' => ReleaseKind::Regular,
+            'number' => 1,
+        ]);
     }
 }

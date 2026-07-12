@@ -55,6 +55,8 @@ class SeasonvarParsePageCommandTest extends TestCase
         $this->assertDatabaseHas('catalog_titles', [
             'title' => 'Черный список: На кухне',
             'external_id' => '47915',
+            'publication_status' => 'published',
+            'audience' => 'public',
         ]);
         $this->assertDatabaseHas('genres', [
             'name' => 'Кулинария',
@@ -65,11 +67,24 @@ class SeasonvarParsePageCommandTest extends TestCase
         $this->assertDatabaseHas('translations', [
             'name' => 'Оригинал',
         ]);
-        $this->assertDatabaseHas('seasons', ['number' => 1]);
-        $this->assertDatabaseHas('seasons', ['number' => 4]);
+        $this->assertDatabaseHas('seasons', [
+            'number' => 1,
+            'kind' => 'regular',
+            'sort_order' => 1,
+            'publication_status' => 'published',
+        ]);
+        $this->assertDatabaseHas('seasons', [
+            'number' => 4,
+            'kind' => 'regular',
+            'sort_order' => 4,
+            'publication_status' => 'published',
+        ]);
         $this->assertDatabaseHas('episodes', [
             'number' => 1,
             'title' => 'Начало',
+            'kind' => 'regular',
+            'sort_order' => 1,
+            'publication_status' => 'published',
         ]);
         $this->assertDatabaseHas('episodes', [
             'number' => 2,

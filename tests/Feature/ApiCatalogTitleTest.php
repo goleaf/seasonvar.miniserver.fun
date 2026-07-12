@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\PublicationStatus;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\Genre;
@@ -121,6 +122,24 @@ class ApiCatalogTitleTest extends TestCase
             'released_at' => now()->toDateString(),
             'source_url' => 'https://seasonvar.ru/episode-private-api.html',
         ]);
+        Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 2,
+            'title' => 'Скрытый сезон',
+            'publication_status' => PublicationStatus::Hidden,
+        ]);
+        Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 2,
+            'title' => 'Будущая серия',
+            'available_from' => now()->addDay(),
+        ]);
+        $deletedEpisode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 3,
+            'title' => 'Удалённая серия',
+        ]);
+        $deletedEpisode->delete();
         LicensedMedia::factory()->create([
             'catalog_title_id' => $catalogTitle->id,
             'season_id' => $season->id,
@@ -152,6 +171,7 @@ class ApiCatalogTitleTest extends TestCase
                             ->where('number', 1)
                             ->where('title', 'Серия 1')
                             ->where('summary', 'Описание серии')
+                            ->where('kind', 'regular')
                             ->missing('source_url')
                             ->etc())
                         ->missing('source_url')
@@ -167,6 +187,10 @@ class ApiCatalogTitleTest extends TestCase
             ->assertDontSee('https://seasonvar.ru/video-private-show.html', false)
             ->assertDontSee('https://cdn.example.com/private-show-playback.m3u8', false)
             ->assertDontSee('licensed/private-show-video.mp4', false);
+        $response
+            ->assertDontSee('Скрытый сезон', false)
+            ->assertDontSee('Будущая серия', false)
+            ->assertDontSee('Удалённая серия', false);
     }
 
     public function test_unpublished_titles_are_not_exposed_through_api(): void

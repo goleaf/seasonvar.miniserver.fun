@@ -107,3 +107,78 @@
 - [x] Document the exact reset labels in `docs/UI_STANDARDS.md`.
 - [x] Record the UI behavior in `docs/MAINTENANCE_LOG.md`.
 - [x] Verify with non-test commands only: Blade syntax through Laravel render, Vite build, HTTP smoke, and browser click smoke.
+
+### Task 6: Remove stale invalid-filter query state from the catalog view model
+
+**Files:**
+
+- Modify: `app/View/ViewModels/CatalogTitlesViewModel.php`
+- Modify: `app/Services/Catalog/CatalogTitlesPageBuilder.php`
+- Modify: `docs/MAINTENANCE_LOG.md`
+- Modify: this living plan.
+
+**Interfaces:**
+
+- Public `/titles` links are built only from selected valid filter slugs and sanitized catalog query-state.
+- `invalidFilterSlugs` may still be accepted by the constructor for compatibility, but it must not mark the page as filtered or reappear in sorting, view, year, alphabet, reset, pagination, or chip-removal URLs.
+- No test files are created or edited for this task.
+
+- [x] Keep the existing constructor argument for compatibility with current callers.
+- [x] Stop merging `invalidFilterSlugs` into `allFilterSlugs`.
+- [x] Stop counting `invalidFilterSlugs` as active filters in the view model.
+- [x] Remove the unused invalid-filter URL helper from the view model.
+- [x] Stop treating ignored invalid slugs as catalog context in the page builder.
+- [x] Record the cleanup in `docs/MAINTENANCE_LOG.md`.
+- [x] Verify with non-test commands only: PHP syntax lint, targeted Pint, documentation refresh, HTTP smoke for stale filter URLs, browser smoke for reset/catalog actions, and diff checks.
+
+### Task 7: Restore local catalog smoke after pending publication schema changes
+
+**Files:**
+
+- Modify: `database/migrations/2026_07_12_174219_enforce_catalog_domain_publication_integrity.php`
+- Modify: `docs/MAINTENANCE_LOG.md`
+- Modify: this living plan.
+
+**Interfaces:**
+
+- `/titles` must not return HTTP 500 while the working tree contains publication availability model changes.
+- Additive publication columns and backfilled values must exist before the new `published()` scopes run against local SQLite.
+- The SQLite table-rebuilding enforce migration stays pending until it is reviewed separately.
+- No test files are created or edited for this task.
+
+- [x] Reproduce the HTTP 500 with `/titles?genre[]=not-found-genre`.
+- [x] Confirm the root cause from Laravel logs: missing `catalog_titles.publication_status` under the dirty publication scope.
+- [x] Run `php artisan migrate --pretend` before mutating the database.
+- [x] Remove the no-effect `use RuntimeException` statement that made the pending migration fail on Laravel's warning handling.
+- [x] Apply only the additive column migration and publication backfill migration.
+- [x] Confirm `2026_07_12_174219_enforce_catalog_domain_publication_integrity` remains pending.
+- [x] Re-run HTTP and browser smoke for stale filters and reset/catalog actions.
+
+### Task 8: Enforce clean main-branch Git workflow with hooks
+
+**Files:**
+
+- Create: `.githooks/lib/git-guard.sh`
+- Create: `.githooks/pre-commit`
+- Create: `.githooks/pre-push`
+- Modify: `AGENTS.md`
+- Modify: `README.md`
+- Modify: `docs/development.md`
+- Modify: `docs/CODE_STANDARDS.md`
+- Modify: `docs/MAINTENANCE_LOG.md`
+- Modify: this living plan.
+
+**Interfaces:**
+
+- `core.hooksPath=.githooks` remains the project hook location.
+- Commits are allowed only from the existing `main` branch.
+- `pre-commit` blocks unstaged tracked changes and untracked files so a commit cannot leave a dirty working tree by accident.
+- `pre-push` blocks push outside `main` and push with dirty tree.
+- `SEASONVAR_SKIP_GIT_GUARD=1` remains an explicit emergency bypass, not normal workflow.
+- No test files are created or edited for this task.
+
+- [x] Add a shared `.githooks/lib/git-guard.sh` helper for branch and dirty-tree checks.
+- [x] Add `.githooks/pre-commit` guard for `main`, unstaged tracked changes and untracked files.
+- [x] Add `.githooks/pre-push` guard for `main` and clean tree.
+- [x] Document the rule in AGENTS, README, development docs, CODE_STANDARDS and maintenance log.
+- [ ] Verify hook syntax and behavior without running PHP tests.

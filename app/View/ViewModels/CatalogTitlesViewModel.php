@@ -121,7 +121,7 @@ class CatalogTitlesViewModel
         $letter = $this->catalogQueryState['letter'] ?? null;
         $this->activeLetter = is_scalar($letter) ? mb_strtoupper((string) $letter) : null;
         $this->baseQuery = $this->titleContext === null ? [] : ['title' => $this->titleContext->slug];
-        $this->allFilterSlugs = array_merge($this->selectedFilterSlugs, $this->invalidFilterSlugs);
+        $this->allFilterSlugs = $this->selectedFilterSlugs;
         $this->withoutYearQuery = $this->buildWithoutYearQuery();
         $this->withoutTitleQuery = $this->buildWithoutTitleQuery();
         $this->withoutSearchQuery = $this->buildWithoutSearchQuery();
@@ -258,7 +258,6 @@ class CatalogTitlesViewModel
         ];
 
         return $this->selectedTaxonomies->isNotEmpty()
-            || $this->invalidFilterSlugs !== []
             || collect($filterKeys)->contains(fn (string $key): bool => array_key_exists($key, $this->catalogQueryState));
     }
 
@@ -508,20 +507,6 @@ class CatalogTitlesViewModel
         if ($this->perPage !== 24) {
             $query['per_page'] = $this->perPage;
         }
-
-        return $query;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function invalidFilterQuery(string $filterType): array
-    {
-        $query = array_merge($this->baseQuery, $this->allFilterSlugs);
-        unset($query[$filterType]);
-
-        $query = $this->appendSearchAndYear($query);
-        unset($query[$filterType]);
 
         return $query;
     }

@@ -570,7 +570,8 @@ class CatalogTitleQuery
         $query = LicensedMedia::query()
             ->select('catalog_title_id')
             ->whereNotNull('catalog_title_id')
-            ->published();
+            ->published()
+            ->forAvailableReleases(null);
 
         if ($requiresSubtitles !== null) {
             $query->where('has_subtitles', $requiresSubtitles);
