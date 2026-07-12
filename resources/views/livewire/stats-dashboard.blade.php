@@ -1,4 +1,4 @@
-<div wire:poll.1s="refreshStats" class="space-y-5" data-livewire-stats-dashboard>
+<div wire:poll.15s.visible="refreshStats" class="space-y-5" data-livewire-stats-dashboard>
     <section class="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm shadow-slate-200/60">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div class="min-w-0">
@@ -22,7 +22,7 @@
                         'fa-triangle-exclamation' => $snapshotMeta['is_stale'] ?? false,
                         'fa-arrows-rotate' => ! ($snapshotMeta['is_stale'] ?? false),
                     ]) aria-hidden="true"></i>
-                    <span>{{ $snapshotMeta['message'] ?? 'Данные обновляются каждую секунду.' }}</span>
+                    <span>{{ $snapshotMeta['message'] ?? 'Данные обновляются примерно раз в 15 секунд.' }}</span>
                 </span>
                 <span class="inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-slate-500 ring-1 ring-slate-200">
                     <i class="fa-regular fa-clock" aria-hidden="true"></i>

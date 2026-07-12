@@ -227,6 +227,36 @@ class CatalogTitlesViewModel
             || collect($filterKeys)->contains(fn (string $key): bool => array_key_exists($key, $this->catalogQueryState));
     }
 
+    public function hasAdvancedFilters(): bool
+    {
+        return $this->advancedFilterChips() !== [];
+    }
+
+    /** @return list<string> */
+    public function listState(string $key): array
+    {
+        $value = $this->catalogQueryState[$key] ?? [];
+        $values = is_array($value) ? $value : [$value];
+
+        return collect($values)
+            ->filter(fn (mixed $item): bool => is_scalar($item) && trim((string) $item) !== '')
+            ->map(fn (mixed $item): string => trim((string) $item))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    public function scalarState(string $key): string
+    {
+        $value = $this->catalogQueryState[$key] ?? '';
+
+        if (! is_scalar($value)) {
+            return '';
+        }
+
+        return trim((string) $value);
+    }
+
     /** @return array<string, mixed> */
     public function viewQuery(string $view): array
     {
@@ -281,9 +311,11 @@ class CatalogTitlesViewModel
                 && ! ($key === 'year' && $this->year !== null))
             ->map(function (string $label, string $key): array {
                 $value = $this->catalogQueryState[$key];
+                $displayValue = $this->advancedFilterValue($key, $value);
 
-                return ['key' => $key, 'label' => $label, 'value' => $this->advancedFilterValue($key, $value)];
+                return ['key' => $key, 'label' => $label, 'value' => $displayValue];
             })
+            ->filter(fn (array $chip): bool => $chip['value'] !== '')
             ->values()
             ->all();
     }
@@ -291,7 +323,7 @@ class CatalogTitlesViewModel
     private function advancedFilterValue(string $key, mixed $value): string
     {
         if (is_array($value)) {
-            return implode(', ', $value);
+            return implode(', ', $this->listState($key));
         }
 
         return match ($key) {

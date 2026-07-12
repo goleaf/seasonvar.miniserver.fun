@@ -13,7 +13,9 @@ class CatalogStatsSnapshotCache
 
     private const LOCK_KEY = 'catalog.stats.snapshot.rebuild';
 
-    private const FRESH_SECONDS = 1;
+    private const FRESH_SECONDS = 15;
+
+    private const FRESH_MESSAGE = 'Данные обновляются примерно раз в 15 секунд.';
 
     private const STALE_SECONDS = 900;
 
@@ -84,7 +86,7 @@ class CatalogStatsSnapshotCache
                 'built_at_display' => $builtAt->format('d.m.Y H:i:s'),
                 'served_at_display' => $builtAt->format('d.m.Y H:i:s'),
                 'is_stale' => false,
-                'message' => 'Данные обновляются каждую секунду.',
+                'message' => self::FRESH_MESSAGE,
             ],
         ];
     }
@@ -114,7 +116,7 @@ class CatalogStatsSnapshotCache
     {
         $snapshot['meta']['served_at_display'] = now()->format('d.m.Y H:i:s');
         $snapshot['meta']['is_stale'] = (bool) ($snapshot['meta']['is_stale'] ?? false);
-        $snapshot['meta']['message'] = (string) ($snapshot['meta']['message'] ?? 'Данные обновляются каждую секунду.');
+        $snapshot['meta']['message'] = (string) ($snapshot['meta']['message'] ?? self::FRESH_MESSAGE);
 
         return [
             'data' => is_array($snapshot['data'] ?? null) ? $snapshot['data'] : $this->fallbackData(),

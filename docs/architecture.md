@@ -43,7 +43,8 @@
 
 - Основные страницы каталога остаются публичными read-only страницами.
 - Служебная страница `/stats` тоже доступна как публичная read-only сводка, но остается под rate limiter и не раскрывает raw source URLs, приватные media URLs или stack traces.
-- Livewire update endpoint дополнительно использует `throttle:catalog-stats`, а сам лимит рассчитан на нормальный `wire:poll.1s`.
+- Livewire update endpoint дополнительно использует `throttle:catalog-stats`, а страница `/stats` использует щадящий `wire:poll.15s.visible`, чтобы не держать polling в скрытой вкладке и не перегружать общий лимит.
+- Счетчики rate limiter используют `CACHE_LIMITER_STORE=file`, отдельно от основного `CACHE_STORE=database`, чтобы публичный throttle не усиливал SQLite write contention.
 - Новые write/admin/import-control endpoints должны получать отдельный gate или policy до регистрации маршрута.
 
 ## Представление и SEO

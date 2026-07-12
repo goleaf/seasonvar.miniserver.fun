@@ -14,6 +14,7 @@ Production-значения должны задаваться сервером, 
 - `APP_URL` с публичным HTTPS URL
 - `DB_CONNECTION` и `DB_DATABASE` для SQLite или соответствующие host/database/user/password ключи для другого драйвера
 - `CACHE_STORE=database`
+- `CACHE_LIMITER_STORE=file` — отдельное хранилище счетчиков throttle, чтобы публичные rate limiters не писали каждый запрос в SQLite cache table
 - `QUEUE_CONNECTION=database`
 - `SESSION_DRIVER=database`
 - `FILESYSTEM_DISK=local`

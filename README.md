@@ -71,6 +71,10 @@ Google Search Console и Google Analytics подготовлены как вык
 
 GitHub Actions проверяет Composer, npm build, тесты, Pint, dependency audits и доступную статическую проверку PHP-синтаксиса. Команды и кеширование описаны в `docs/ci.md`.
 
+## Git workflow
+
+Работа ведется только в существующей ветке `main`. Не создавайте feature branches, временные ветки, worktree-ветки, PR-ветки или дополнительные `main`-подобные ветки без прямого нового указания пользователя. Перед commit/push проверяйте `git status --short --branch` и не отправляйте изменения из веток, отличных от `main`.
+
 <!-- project-docs:start -->
 ## Автоматически обновляемое состояние
 

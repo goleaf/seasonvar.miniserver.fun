@@ -2,16 +2,23 @@
 
 ## 2026-07-09
 
+- Доведена нормализация query-state каталога: `/titles` больше не читает `$filterView->catalogQueryState[...]` из Blade, scalar-поля идут через `CatalogTitlesViewModel::scalarState()`, list-поля — через `listState()`.
+- Пустые display-значения расширенных фильтров `/titles` больше не создают активные chips, даже если raw query-key присутствует в URL.
+- Активные расширенные фильтры `/titles` теперь раскрывают блок `<details>` сразу, чтобы состояние URL было видно без дополнительного клика.
+- Укреплена страница `/titles`: Blade больше не перебирает raw scalar/list query-state для скрытых полей и чекбоксов качества, а мобильная выдача получила явный переход к фильтрам без изменения порядка результатов.
+- Снижена нагрузка `/stats`: Livewire polling переведен на `wire:poll.15s.visible`, fresh TTL снимка увеличен до 15 секунд, документация синхронизирована с новым интервалом.
+- Rate limiter переведен на отдельный `CACHE_LIMITER_STORE=file`, чтобы throttle-счетчики публичных маршрутов не создавали частые записи в SQLite `cache` table.
+- Зафиксировано проектное Git-правило: рабочая ветка только существующая `main`; feature branches, worktree-ветки, временные ветки и дополнительные `main`-подобные ветки запрещены без прямого нового указания пользователя.
 - Добавлены read-only Google summary-команды `google:search-console:summary` и `google:analytics:summary`, lightweight service-account OAuth JWT flow без новых Composer-зависимостей и тесты с `Http::fake()`.
 - Добавлена команда `php artisan integrations:doctor` для read-only диагностики MCP, Google Search Console/Analytics config, user-level MCP registration и CLI-инструментов без раскрытия секретов; глобально зарегистрированы `openaiDeveloperDocs` и Google Workspace MCP endpoints, но Google OAuth login требует отдельный OAuth client ID.
 - Добавлен безопасный слой MCP/Google-интеграций: проектные skills `seasonvar-importer`, `seasonvar-ui`, `seasonvar-seo`, `seasonvar-mcp-ops`, шаблон `.codex/mcp.example.toml`, документация `docs/integrations/mcp-catalog.md` и `docs/integrations/google.md`, а также выключенные read-only Google placeholders в `.env.example` и `config/services.php`.
 - Eloquent-модели дополнены обратными связями для `SourcePage`, `SeasonvarImportRun` и событий импорта, числовые поля приведены к явным casts, а правила моделей и query usage вынесены в `docs/models.md`.
 - Синхронизирована Markdown-документация с текущими маршрутами, командами, Laravel/Livewire архитектурой, MCP-настройкой, CI, setup/testing/deployment правилами и no-`@php` Blade-подходом.
 - Добавлен GitHub Actions CI workflow: backend проверяет Composer, Pint, PHP syntax lint, Laravel cache-команды и тесты; frontend выполняет `npm ci`, `npm audit` и `npm run build` через официальный npm registry.
-- `/stats` перенесена на Livewire 4: страница обновляет все видимые блоки через `wire:poll.1s`, использует `CatalogStatsSnapshotCache` с секундным fresh TTL и fallback на последний успешный снимок, а полный stats-массив не хранится в публичном состоянии Livewire.
+- `/stats` перенесена на Livewire 4: страница обновляет все видимые блоки через `wire:poll.15s.visible`, использует `CatalogStatsSnapshotCache` с 15-секундным fresh TTL и fallback на последний успешный снимок, а полный stats-массив не хранится в публичном состоянии Livewire.
 - Добавлены `CatalogStatsSnapshotBuilder` и `CatalogStatsSnapshotSanitizer`: stats-данные приводятся к массивам и очищаются от внешних source/media URL перед рендером, чтобы HTML и Livewire-ответы не раскрывали приватные адреса.
 - `seasonvar:import` после завершения запуска обновляет stats snapshot; отдельные публичные команды для обновления статистики не добавлялись.
-- Лимит `catalog-stats` увеличен до 180 запросов в минуту и применен к Livewire update endpoint, чтобы секундный polling `/stats` работал без ложных `429`.
+- Лимит `catalog-stats` увеличен до 180 запросов в минуту и применен к Livewire update endpoint; polling `/stats` переведен на 15 секунд и viewport-only режим, чтобы не создавать лишние update-запросы в скрытой вкладке.
 - Страница `/stats` открыта для гостевого read-only доступа: route `can('viewCatalogStats')` снят со статистики и proxy постеров, сохранен `catalog-stats` throttle и запрет на вывод raw source/private URLs.
 - Ранее для служебной статистики добавлялась authorization-граница; после решения открыть `/stats` публично соответствующие route `can` middleware и gate сняты, а тесты/документация обновлены под гостевой доступ.
 - `seasonvar:import` подготовлена для частого cron-запуска: если предыдущий импорт еще держит lock, новая копия пропускается с успешным кодом выхода, а все обновления остаются внутри единой команды импорта.
