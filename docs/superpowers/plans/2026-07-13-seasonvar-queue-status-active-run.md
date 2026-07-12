@@ -89,7 +89,7 @@ php artisan project:docs-refresh --check
 
 Expected: runtime shows run `#5` while it owns the dominant backlog; full suite and docs check PASS.
 
-- [ ] **Step 7: Commit and push main**
+- [x] **Step 7: Commit and push main**
 
 ```bash
 git add -A
