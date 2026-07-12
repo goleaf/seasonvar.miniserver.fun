@@ -27,7 +27,7 @@
 - Consumes: the existing `seasonvar:import` targeted URL flow and `seasonPageHtml()` fixture.
 - Produces: a regression assertion that all parsed pages of the title receive the same final title-level flags.
 
-- [ ] **Step 1: Add the failing assertions**
+- [x] **Step 1: Add the failing assertions**
 
 At the end of `test_it_parses_requested_page_and_all_detected_seasons_into_one_title()`, add:
 
@@ -49,7 +49,7 @@ $this->assertSame($seasonOnePage->missing_data_flags, $seasonFourPage->missing_d
 $this->assertNotContains('seasons_without_episodes', $seasonFourPage->missing_data_flags);
 ```
 
-- [ ] **Step 2: Run the regression and verify RED**
+- [x] **Step 2: Run the regression and verify RED**
 
 Run:
 
@@ -59,7 +59,7 @@ php artisan test --compact tests/Feature/SeasonvarParsePageCommandTest.php --fil
 
 Expected: FAIL because season 4 retains `seasons_without_episodes` after season 1 has been imported.
 
-- [ ] **Step 3: Commit the RED test with the implementation task, not separately**
+- [x] **Step 3: Commit the RED test with the implementation task, not separately**
 
 Keep the failing test unstaged until Task 2 is green so `main` is never pushed in a failing state.
 
@@ -76,7 +76,7 @@ Keep the failing test unstaged until Task 2 is green so `main` is never pushed i
 - Consumes: `CatalogTitle`, the current `SourcePage`, nullable import run id, `seasonvar.import.missing_data_retry_hours`, and already persisted seasons/episodes/media.
 - Produces: `SeasonvarTitlePageStateSynchronizer::synchronize(CatalogTitle $catalogTitle, SourcePage $currentPage, ?int $importRunId): array`, returning `list<string>` final flags.
 
-- [ ] **Step 1: Add the lifecycle-boundary test**
+- [x] **Step 1: Add the lifecycle-boundary test**
 
 Create `tests/Feature/SeasonvarTitlePageStateSynchronizerTest.php`:
 
@@ -179,7 +179,7 @@ class SeasonvarTitlePageStateSynchronizerTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run both tests and verify RED**
+- [x] **Step 2: Run both tests and verify RED**
 
 Run:
 
@@ -189,7 +189,7 @@ php artisan test --compact --filter='SeasonvarParsePageCommandTest|SeasonvarTitl
 
 Expected: FAIL because the synchronizer class does not exist and the first page remains stale.
 
-- [ ] **Step 3: Implement the synchronizer**
+- [x] **Step 3: Implement the synchronizer**
 
 Create a final service with this public flow:
 
@@ -231,7 +231,7 @@ public function synchronize(CatalogTitle $catalogTitle, SourcePage $currentPage,
             $query->whereKey($currentPage->id);
 
             if ($catalogTitle->source_page_id !== null) {
-                $query->orWhereKey($catalogTitle->source_page_id);
+                $query->orWhere('id', $catalogTitle->source_page_id);
             }
 
             if ($seasonUrlHashes->isNotEmpty()) {
@@ -317,7 +317,7 @@ private function missingDataFlags(CatalogTitle $catalogTitle): array
 
 Import `Builder`, `CatalogTitle`, `LicensedMedia`, `Season`, and `SourcePage` in the service. This is the complete evaluator currently owned by the importer; do not retain a duplicate.
 
-- [ ] **Step 4: Delegate both successful importer exits**
+- [x] **Step 4: Delegate both successful importer exits**
 
 Inject the service into `SeasonvarCatalogImporter`:
 
@@ -340,7 +340,7 @@ $missingDataFlags = $this->titlePageStateSynchronizer
 
 Remove `missingDataFlags()` and `missingDataRetryAfter()` from the importer. Add `'missing_data_flags' => $missingDataFlags` to the existing `page-parse-complete` progress context so the local result remains observable and is not dead code.
 
-- [ ] **Step 5: Run focused tests and verify GREEN**
+- [x] **Step 5: Run focused tests and verify GREEN**
 
 Run:
 
@@ -351,7 +351,7 @@ php artisan test --compact --filter='SeasonvarParsePageCommandTest|SeasonvarTitl
 
 Expected: all selected tests PASS and Pint exits successfully.
 
-- [ ] **Step 6: Commit the tested implementation**
+- [x] **Step 6: Commit the tested implementation**
 
 ```bash
 git status --short --branch

@@ -125,6 +125,22 @@ class SeasonvarParsePageCommandTest extends TestCase
             ->where('catalog_title_id', $catalogTitle->id)
             ->where('signal_type', 'page_quality')
             ->count());
+
+        $sourcePages = SourcePage::query()
+            ->whereIn('url', [
+                'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
+                'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-1-season.html',
+            ])
+            ->get()
+            ->keyBy('url');
+
+        $seasonFourPage = $sourcePages->get('https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html');
+        $seasonOnePage = $sourcePages->get('https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-1-season.html');
+
+        $this->assertNotNull($seasonFourPage);
+        $this->assertNotNull($seasonOnePage);
+        $this->assertSame($seasonOnePage->missing_data_flags, $seasonFourPage->missing_data_flags);
+        $this->assertNotContains('seasons_without_episodes', $seasonFourPage->missing_data_flags);
     }
 
     public function test_it_imports_more_episodes_than_a_single_sqlite_upsert_can_bind(): void

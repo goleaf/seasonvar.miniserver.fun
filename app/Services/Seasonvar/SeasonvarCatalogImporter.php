@@ -44,6 +44,7 @@ class SeasonvarCatalogImporter
         private readonly SeasonvarRelationMetadataNormalizer $relationMetadata,
         private readonly SeasonvarDatabaseTransaction $databaseTransaction,
         private readonly RecordSeasonvarPageFailure $recordPageFailure,
+        private readonly SeasonvarTitlePageStateSynchronizer $titlePageStateSynchronizer,
     ) {}
 
     /**
@@ -429,14 +430,7 @@ class SeasonvarCatalogImporter
             && $this->catalogTitleNeedsMediaRefresh($existingCatalogTitle);
 
         if (! $force && ! $contentChanged && $page->parse_status === 'parsed' && $existingCatalogTitle !== null && ! $needsMediaRefresh) {
-            $page->update([
-                'import_status' => 'parsed',
-                'missing_data_flags' => [],
-                'retry_after_at' => null,
-                'failure_count' => 0,
-                'last_imported_at' => now(),
-                'last_import_run_id' => $importRunId,
-            ]);
+            $this->titlePageStateSynchronizer->synchronize($existingCatalogTitle, $page, $importRunId);
 
             $this->report($progress, 'page-parse-skipped-unchanged', [
                 'source_page_id' => $page->id,
@@ -510,16 +504,8 @@ class SeasonvarCatalogImporter
             $this->importParsedPlaylists($catalogTitle, $data['media'], $progress),
         );
         $this->syncMediaTranslations($catalogTitle, $progress);
-        $missingDataFlags = $this->missingDataFlags($catalogTitle->fresh(['seasons.episodes', 'seasons.licensedMedia', 'licensedMedia']) ?? $catalogTitle);
-
-        $page->update([
-            'import_status' => $missingDataFlags === [] ? 'parsed' : 'missing_data',
-            'missing_data_flags' => $missingDataFlags,
-            'retry_after_at' => $missingDataFlags === [] ? null : $this->missingDataRetryAfter(),
-            'failure_count' => 0,
-            'last_imported_at' => now(),
-            'last_import_run_id' => $importRunId,
-        ]);
+        $missingDataFlags = $this->titlePageStateSynchronizer
+            ->synchronize($catalogTitle, $page, $importRunId);
 
         $this->report($progress, 'page-parse-complete', [
             'source_page_id' => $page->id,
@@ -530,6 +516,7 @@ class SeasonvarCatalogImporter
             'media_updated' => $mediaResult['updated'],
             'media_skipped' => $mediaResult['skipped'],
             'media_failed' => $mediaResult['failed'],
+            'missing_data_flags' => $missingDataFlags,
             'url' => $page->url,
         ]);
 
@@ -1839,13 +1826,6 @@ class SeasonvarCatalogImporter
         return Str::lower(pathinfo((string) parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION));
     }
 
-    private function missingDataRetryAfter(): Carbon
-    {
-        $hours = max(1, (int) config('seasonvar.import.missing_data_retry_hours', 24));
-
-        return now()->addHours($hours);
-    }
-
     private function importTransactionAttempts(): int
     {
         return min(10, max(1, (int) config('seasonvar.import.transaction_attempts', 5)));
@@ -1926,61 +1906,6 @@ class SeasonvarCatalogImporter
                 'captured_at' => now(),
             ],
         );
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function missingDataFlags(CatalogTitle $catalogTitle): array
-    {
-        $flags = [];
-        $seasons = $catalogTitle->seasons;
-        $episodes = $seasons->flatMap->episodes;
-        $media = $catalogTitle->licensedMedia;
-        $publishedMedia = $media->where('status', 'published');
-
-        if (! $seasons->isNotEmpty()) {
-            $flags[] = 'no_seasons';
-        }
-
-        if (! $episodes->isNotEmpty()) {
-            $flags[] = 'no_episodes';
-        }
-
-        if ($seasons->contains(fn (Season $season): bool => $season->episodes->isEmpty())) {
-            $flags[] = 'seasons_without_episodes';
-        }
-
-        if (! $media->isNotEmpty()) {
-            $flags[] = 'no_video';
-        }
-
-        if ($media->isNotEmpty() && ! $publishedMedia->isNotEmpty()) {
-            $flags[] = 'no_published_video';
-        }
-
-        if ($seasons->contains(fn (Season $season): bool => $season->licensedMedia->where('status', 'published')->isEmpty())) {
-            $flags[] = 'seasons_without_video';
-        }
-
-        if ($episodes->isNotEmpty()) {
-            $publishedEpisodeIds = $publishedMedia
-                ->pluck('episode_id')
-                ->filter()
-                ->unique()
-                ->values();
-
-            if ($episodes->whereNotIn('id', $publishedEpisodeIds)->isNotEmpty()) {
-                $flags[] = 'episodes_without_video';
-            }
-        }
-
-        if ($media->contains(fn (LicensedMedia $media): bool => $media->status === 'unavailable'
-            || in_array($media->check_status, ['check_failed', 'unavailable'], true))) {
-            $flags[] = 'unavailable_video';
-        }
-
-        return $flags;
     }
 
     /**

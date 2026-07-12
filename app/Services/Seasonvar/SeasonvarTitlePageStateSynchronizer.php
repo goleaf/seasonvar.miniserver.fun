@@ -1,0 +1,128 @@
+<?php
+
+namespace App\Services\Seasonvar;
+
+use App\Models\CatalogTitle;
+use App\Models\LicensedMedia;
+use App\Models\Season;
+use App\Models\SourcePage;
+use Illuminate\Database\Eloquent\Builder;
+
+final class SeasonvarTitlePageStateSynchronizer
+{
+    /**
+     * @return list<string>
+     */
+    public function synchronize(CatalogTitle $catalogTitle, SourcePage $currentPage, ?int $importRunId): array
+    {
+        $catalogTitle = $catalogTitle->fresh([
+            'seasons.episodes',
+            'seasons.licensedMedia',
+            'licensedMedia',
+        ]) ?? $catalogTitle;
+
+        $flags = $this->missingDataFlags($catalogTitle);
+        $retryAfter = $flags === [] ? null : now()->addHours(
+            max(1, (int) config('seasonvar.import.missing_data_retry_hours', 24)),
+        );
+
+        $currentPage->update([
+            'import_status' => $flags === [] ? 'parsed' : 'missing_data',
+            'missing_data_flags' => $flags,
+            'retry_after_at' => $retryAfter,
+            'failure_count' => 0,
+            'last_imported_at' => now(),
+            'last_import_run_id' => $importRunId,
+        ]);
+
+        $seasonUrlHashes = $catalogTitle->seasons
+            ->pluck('source_url_hash')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $linkedPageIds = SourcePage::query()
+            ->where('source_id', $catalogTitle->source_id)
+            ->where(function (Builder $query) use ($catalogTitle, $currentPage, $seasonUrlHashes): void {
+                $query->whereKey($currentPage->id);
+
+                if ($catalogTitle->source_page_id !== null) {
+                    $query->orWhere('id', $catalogTitle->source_page_id);
+                }
+
+                if ($seasonUrlHashes->isNotEmpty()) {
+                    $query->orWhereIn('url_hash', $seasonUrlHashes);
+                }
+            })
+            ->pluck('id');
+
+        SourcePage::query()
+            ->whereKey($linkedPageIds)
+            ->where('id', '!=', $currentPage->id)
+            ->where('parse_status', 'parsed')
+            ->whereIn('import_status', ['parsed', 'missing_data'])
+            ->whereNull('import_claim_token')
+            ->update([
+                'import_status' => $flags === [] ? 'parsed' : 'missing_data',
+                'missing_data_flags' => json_encode($flags, JSON_THROW_ON_ERROR),
+                'retry_after_at' => $retryAfter,
+            ]);
+
+        return $flags;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function missingDataFlags(CatalogTitle $catalogTitle): array
+    {
+        $flags = [];
+        $seasons = $catalogTitle->seasons;
+        $episodes = $seasons->flatMap->episodes;
+        $media = $catalogTitle->licensedMedia;
+        $publishedMedia = $media->where('status', 'published');
+
+        if (! $seasons->isNotEmpty()) {
+            $flags[] = 'no_seasons';
+        }
+
+        if (! $episodes->isNotEmpty()) {
+            $flags[] = 'no_episodes';
+        }
+
+        if ($seasons->contains(fn (Season $season): bool => $season->episodes->isEmpty())) {
+            $flags[] = 'seasons_without_episodes';
+        }
+
+        if (! $media->isNotEmpty()) {
+            $flags[] = 'no_video';
+        }
+
+        if ($media->isNotEmpty() && ! $publishedMedia->isNotEmpty()) {
+            $flags[] = 'no_published_video';
+        }
+
+        if ($seasons->contains(fn (Season $season): bool => $season->licensedMedia->where('status', 'published')->isEmpty())) {
+            $flags[] = 'seasons_without_video';
+        }
+
+        if ($episodes->isNotEmpty()) {
+            $publishedEpisodeIds = $publishedMedia
+                ->pluck('episode_id')
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($episodes->whereNotIn('id', $publishedEpisodeIds)->isNotEmpty()) {
+                $flags[] = 'episodes_without_video';
+            }
+        }
+
+        if ($media->contains(fn (LicensedMedia $media): bool => $media->status === 'unavailable'
+            || in_array($media->check_status, ['check_failed', 'unavailable'], true))) {
+            $flags[] = 'unavailable_video';
+        }
+
+        return $flags;
+    }
+}
