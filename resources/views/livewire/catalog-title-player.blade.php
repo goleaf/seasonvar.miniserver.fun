@@ -3,6 +3,18 @@
     class="scroll-mt-40 space-y-5 sm:scroll-mt-44 lg:scroll-mt-48"
     x-on:catalog-progress="$wire.recordProgress($event.detail.episodeId, $event.detail.positionSeconds, $event.detail.durationSeconds, $event.detail.completed)"
     x-on:click.capture="if ($event.target.closest('[data-catalog-history]')) window.history.pushState({}, '', window.location.href)"
+    x-on:popstate.window="
+        const targetUrl = window.location.href;
+        const query = new URLSearchParams(window.location.search);
+        $wire.$set('season', query.get('season') ?? '', false);
+        $wire.$set('episode', query.get('episode') ?? '', false);
+        $wire.$set('media', query.get('media') ?? '', false);
+        $wire.$set('variant', query.get('variant') ?? '', false);
+        $wire.$set('quality', query.get('quality') ?? '', false);
+        $wire.$set('format', query.get('format') ?? '', false);
+        await $wire.$refresh();
+        window.history.replaceState({}, '', targetUrl);
+    "
 >
     <x-ui.panel title="Просмотр" icon="fa-solid fa-circle-play">
         <div class="flex flex-col gap-3 rounded-lg bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
