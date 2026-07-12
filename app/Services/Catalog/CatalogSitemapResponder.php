@@ -258,9 +258,8 @@ class CatalogSitemapResponder
                 ->get()
                 ->each(function (LicensedMedia $media): void {
                     $title = $media->catalogTitle;
-                    $contentUrl = $media->playback_url ?: $media->path;
 
-                    if ($title === null || ! $this->isAbsoluteUrl($contentUrl)) {
+                    if ($title === null) {
                         return;
                     }
 
@@ -276,7 +275,6 @@ class CatalogSitemapResponder
                         $title->poster_url,
                         $media->title ?: $title->title,
                         $this->seoDescription($title->description ?: 'Сериал '.$title->title.' смотреть онлайн во встроенном плеере.'),
-                        $contentUrl,
                     );
                 });
 
@@ -418,7 +416,6 @@ class CatalogSitemapResponder
         ?string $thumbnailUrl,
         string $title,
         string $description,
-        string $contentUrl,
     ): void {
         echo "    <url>\n";
         echo '        <loc>'.$this->xml($loc)."</loc>\n";
@@ -431,7 +428,6 @@ class CatalogSitemapResponder
 
         echo '            <video:title>'.$this->xml(Str::limit($title, 100, ''))."</video:title>\n";
         echo '            <video:description>'.$this->xml(Str::limit($description, 2000, ''))."</video:description>\n";
-        echo '            <video:content_loc>'.$this->xml($contentUrl)."</video:content_loc>\n";
         echo '            <video:player_loc>'.$this->xml($loc.'#player')."</video:player_loc>\n";
         echo '            <video:publication_date>'.$this->xml($this->sitemapDate($lastmod))."</video:publication_date>\n";
         echo "            <video:family_friendly>yes</video:family_friendly>\n";
@@ -448,22 +444,9 @@ class CatalogSitemapResponder
         return LicensedMedia::query()
             ->published()
             ->forAvailableReleases(null)
-            ->whereIn('catalog_title_id', $this->titles->visibleTo(null)->select('id'))
-            ->where(function (Builder $query): void {
-                $query->where('playback_url', 'like', 'https://%')
-                    ->orWhere('playback_url', 'like', 'http://%')
-                    ->orWhere('path', 'like', 'https://%')
-                    ->orWhere('path', 'like', 'http://%');
-            });
-    }
-
-    private function isAbsoluteUrl(?string $url): bool
-    {
-        if ($url === null || trim($url) === '') {
-            return false;
-        }
-
-        return Str::startsWith($url, ['https://', 'http://']);
+            ->withPlaybackLocation()
+            ->withoutKnownFailures()
+            ->whereIn('catalog_title_id', $this->titles->visibleTo(null)->select('id'));
     }
 
     /**

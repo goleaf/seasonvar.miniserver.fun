@@ -1,5 +1,13 @@
 # Журнал обслуживания
 
+## 13.07.2026 — Централизованная выдача playback source
+
+- Raw provider URLs удалены из HTML и Livewire payload; плеер использует короткоживущий signed endpoint с viewer binding и rate limit.
+- Video sitemap переведен с raw `video:content_loc` на внутренний `video:player_loc`, который проходит ту же server-side playback boundary.
+- На resolve и direct access повторяются publication/audience/window и hierarchy checks; известные failures исключаются из публичных counts и автоматического выбора.
+- Проверка внешнего media URL использует общий HTTPS/DNS allowlist, запрещает redirects, работает в stream mode с Range/timeouts/size bound и не пишет полный URL или exception message в события.
+- Возрастной профиль, территория, entitlement/subscription и concurrent-stream учет пока отсутствуют в доменной модели и не симулируются; будущие правила должны подключаться к `CatalogPlaybackSourceResolver`.
+
 ## 2026-07-13
 
 - Livewire-плеер карточки тайтла получил кнопки предыдущей/следующей доступной серии. Навигация использует keyset-запросы по `sort_order`, номеру и ID, переходит между видимыми сезонами, пропускает hidden/expired/source-less записи и не смешивает обычные выпуски со спецвыпусками.

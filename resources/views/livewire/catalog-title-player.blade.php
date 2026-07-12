@@ -50,7 +50,7 @@
                     @endif
                 </div>
 
-                @if ($selectedMedia && $showView->selectedMediaUrl)
+                @if ($selectedMedia && $playbackSource->isPlayable() && $showView->selectedMediaUrl)
                     <div
                         wire:key="catalog-player-media-shell-{{ $selectedMedia->id }}"
                         wire:ignore
@@ -76,7 +76,7 @@
                         <div class="grid aspect-video place-items-center p-6 text-center text-amber-700">
                             <div>
                                 <i class="fa-solid fa-circle-play text-3xl text-amber-600" aria-hidden="true"></i>
-                                <div class="mt-3 text-lg font-bold text-amber-800">Видео пока недоступно</div>
+                                <div class="mt-3 text-lg font-bold text-amber-800">{{ $playbackSource->message }}</div>
                                 <p class="mt-1 text-sm">Выберите другой доступный сезон или серию.</p>
                             </div>
                         </div>

@@ -84,7 +84,7 @@ class SitemapAndRobotsTest extends TestCase
         $this->assertStringContainsString('Постер Сериал с постером', $content);
     }
 
-    public function test_video_sitemap_contains_only_published_media_with_absolute_urls(): void
+    public function test_video_sitemap_uses_internal_player_locations_without_exposing_media_sources(): void
     {
         $title = CatalogTitle::factory()->create([
             'slug' => 'serial-s-video',
@@ -119,7 +119,8 @@ class SitemapAndRobotsTest extends TestCase
         $content = $response->streamedContent();
 
         $this->assertStringContainsString('<video:video>', $content);
-        $this->assertStringContainsString('https://media.example.com/serial/s01e02.mp4', $content);
+        $this->assertStringContainsString('<video:player_loc>', $content);
+        $this->assertStringNotContainsString('https://media.example.com/serial/s01e02.mp4', $content);
         $this->assertStringNotContainsString('licensed/local-video.mp4', $content);
     }
 

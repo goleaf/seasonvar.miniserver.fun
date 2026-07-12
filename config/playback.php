@@ -1,0 +1,19 @@
+<?php
+
+return [
+    'signed_url_ttl_seconds' => (int) env('PLAYBACK_SIGNED_URL_TTL_SECONDS', 300),
+    'allowed_hosts' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('PLAYBACK_ALLOWED_HOSTS', '11cdn.org')),
+    ))),
+    'enforce_public_dns' => filter_var(env('PLAYBACK_ENFORCE_PUBLIC_DNS', true), FILTER_VALIDATE_BOOL),
+    'allowed_storage_disks' => ['local', 's3'],
+    'allowed_formats' => ['m3u8', 'mp4', 'm4v', 'webm', 'mov'],
+    'supported_qualities' => ['4320p', '2160p', '1440p', '1080p', '720p', '576p', '540p', '480p', '360p', '240p'],
+    'provider_priority' => [
+        'seasonvar_parsed' => 100,
+        'local' => 90,
+        's3' => 80,
+        'external_playlist' => 50,
+    ],
+];

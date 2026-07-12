@@ -56,7 +56,8 @@ Google-интеграции по умолчанию выключены. Если
 - `SEASONVAR_IMPORT_SLEEP_SECONDS` — пауза между циклами `--forever`.
 - `SEASONVAR_IMPORT_REFRESH_AFTER_HOURS` и `SEASONVAR_IMPORT_MISSING_DATA_RETRY_HOURS` — частота повторной проверки страниц источника.
 - `SEASONVAR_IMPORT_LOCK_SECONDS` и `SEASONVAR_IMPORT_STALE_AFTER_MINUTES` — защита от параллельного и зависшего импорта.
-- `SEASONVAR_MEDIA_CHECK_*` — включение, timeout, retries, размер пачки и возраст повторной проверки внешних media URL.
+- `SEASONVAR_MEDIA_CHECK_*` — включение, timeout, retries, максимальный ответ, размер пачки и возраст повторной проверки внешних media URL.
+- `PLAYBACK_SIGNED_URL_TTL_SECONDS`, `PLAYBACK_ALLOWED_HOSTS`, `PLAYBACK_ENFORCE_PUBLIC_DNS` — срок внутренней playback-ссылки и HTTPS/DNS allowlist provider sources. После изменения выполнить `php artisan config:cache`; в allowlist добавляются только официальные media-домены лицензированных провайдеров.
 - `SEASONVAR_MEDIA_METADATA_CHUNK_SIZE` и `SEASONVAR_MEDIA_SOURCE_KEY_CHUNK_SIZE` — размеры сервисных дозаполнений старых media rows.
 - `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_PROJECT_ID` — runtime credential/project значения для Google API или локальных MCP, если они включены.
 - `GOOGLE_SEARCH_CONSOLE_*` — read-only настройки Search Console.

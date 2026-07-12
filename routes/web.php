@@ -3,6 +3,7 @@
 use App\Enums\CatalogFilterType;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogSitemapController;
+use App\Http\Controllers\PlaybackSourceController;
 use App\Livewire\CatalogSeries;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -28,6 +29,10 @@ Route::get('/stats', [CatalogController::class, 'stats'])
 Route::get('/stats/poster/{catalogTitle:slug}', [CatalogController::class, 'statsPoster'])
     ->middleware('throttle:catalog-stats')
     ->name('stats.poster');
+Route::get('/playback/{licensedMedia}', PlaybackSourceController::class)
+    ->middleware(['signed', 'throttle:playback-source'])
+    ->whereNumber('licensedMedia')
+    ->name('playback.source');
 Route::get('/titles', CatalogSeries::class)->name('titles.index');
 Route::get('/titles/year/{year}', CatalogSeries::class)
     ->where('year', '(?:19|20)\d{2}')

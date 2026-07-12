@@ -2,13 +2,17 @@
 
 namespace App\Services\Seasonvar;
 
+use App\Services\Media\PlaybackSourceUrlGuard;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Throwable;
 
 class SeasonvarMediaAvailabilityChecker
 {
-    public function __construct(private readonly SeasonvarUrl $seasonvarUrl) {}
+    public function __construct(
+        private readonly SeasonvarUrl $seasonvarUrl,
+        private readonly PlaybackSourceUrlGuard $urls,
+    ) {}
 
     /**
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
@@ -25,6 +29,22 @@ class SeasonvarMediaAvailabilityChecker
             ];
         }
 
+        $safeUrl = $this->urls->safeExternalUrl($url);
+
+        if ($safeUrl === null) {
+            $this->report($progress, 'seasonvar-media-url-check-failed', [
+                'url' => '[redacted-url]',
+                'reason' => 'invalid_url',
+            ]);
+
+            return [
+                'available' => false,
+                'status' => 'invalid_url',
+                'http_status' => null,
+                'checked_at' => now(),
+            ];
+        }
+
         try {
             $response = Http::withHeaders([
                 'Accept' => '*/*',
@@ -34,14 +54,20 @@ class SeasonvarMediaAvailabilityChecker
             ])
                 ->timeout((int) config('seasonvar.media_check.timeout_seconds', 10))
                 ->connectTimeout((int) config('seasonvar.media_check.connect_timeout_seconds', 5))
+                ->withoutRedirecting()
+                ->withOptions(['stream' => true])
                 ->retry((int) config('seasonvar.media_check.retries', 3), 500, throw: false)
-                ->get($url);
+                ->get($safeUrl);
 
             $status = $response->status();
-            $available = ($status >= 200 && $status < 400) || $status === 206;
+            $contentLength = filter_var($response->header('Content-Length'), FILTER_VALIDATE_INT);
+            $maxResponseBytes = max(1, (int) config('seasonvar.media_check.max_response_bytes', 65536));
+            $withinSizeLimit = $contentLength === false || $contentLength <= $maxResponseBytes;
+            $available = $status >= 200 && $status < 300 && $withinSizeLimit;
+            $response->toPsrResponse()->getBody()->close();
 
             $this->report($progress, 'seasonvar-media-url-checked', [
-                'url' => $url,
+                'url' => '[redacted-url]',
                 'http_status' => $status,
                 'successful' => $available,
             ]);
@@ -54,9 +80,8 @@ class SeasonvarMediaAvailabilityChecker
             ];
         } catch (Throwable $exception) {
             $this->report($progress, 'seasonvar-media-url-check-failed', [
-                'url' => $url,
+                'url' => '[redacted-url]',
                 'exception' => $exception::class,
-                'message' => $exception->getMessage(),
             ]);
 
             return [

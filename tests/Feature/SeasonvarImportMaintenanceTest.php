@@ -19,6 +19,7 @@ use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use App\Services\Seasonvar\SeasonvarImportProcessInspector;
+use App\Services\Seasonvar\SeasonvarMediaAvailabilityChecker;
 use App\Services\Seasonvar\SeasonvarRefreshPlanner;
 use App\Services\Seasonvar\SeasonvarSitemapMirror;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -183,6 +184,33 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $this->assertSame('[redacted-url]', $event->context['url']);
         $this->assertSame(206, $event->context['http_status']);
         $this->assertStringNotContainsString('media.example.com', (string) json_encode($event->context));
+    }
+
+    public function test_media_availability_checks_reject_unsafe_urls_and_do_not_follow_redirects(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake([
+            'media.example.com/*' => Http::response('', 302, [
+                'Location' => 'http://127.0.0.1/private.m3u8',
+            ]),
+        ]);
+        $events = [];
+        $progress = function (string $event, array $context) use (&$events): void {
+            $events[] = compact('event', 'context');
+        };
+        $checker = app(SeasonvarMediaAvailabilityChecker::class);
+
+        $unsafe = $checker->check('https://127.0.0.1/private.m3u8', $progress);
+        $redirect = $checker->check('https://media.example.com/redirect.m3u8', $progress);
+
+        $this->assertFalse($unsafe['available']);
+        $this->assertSame('invalid_url', $unsafe['status']);
+        $this->assertFalse($redirect['available']);
+        $this->assertSame('unavailable', $redirect['status']);
+        $this->assertSame(302, $redirect['http_status']);
+        $this->assertSame('[redacted-url]', $events[0]['context']['url']);
+        $this->assertSame('[redacted-url]', $events[1]['context']['url']);
+        Http::assertSentCount(1);
     }
 
     public function test_it_marks_legacy_parsed_source_pages_as_imported(): void
@@ -1030,6 +1058,39 @@ class SeasonvarImportMaintenanceTest extends TestCase
 
         $this->assertSame('1080p', $media->quality);
         $this->assertSame('mp4', $media->format);
+    }
+
+    public function test_targeted_url_import_does_not_run_global_media_metadata_backfill(): void
+    {
+        Http::preventStrayRequests();
+        config(['seasonvar.media_check.enabled' => false]);
+
+        $unrelatedTitle = CatalogTitle::factory()->create();
+        $unrelatedMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $unrelatedTitle->id,
+            'title' => 'Серия WEB-DL',
+            'playback_url' => 'https://media.example.com/unrelated.1920x1080.mp4',
+            'path' => 'https://media.example.com/unrelated.1920x1080.mp4',
+            'quality' => null,
+            'format' => null,
+        ]);
+        $url = 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-1-season.html';
+
+        Http::fake([
+            'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-1-season.html' => Http::response(
+                $this->refreshPlannerSeasonPageHtml([1 => 'Начало']),
+            ),
+        ]);
+
+        $this->artisan('seasonvar:import', [
+            'url' => $url,
+            '--force' => true,
+        ])->assertExitCode(0);
+
+        $unrelatedMedia->refresh();
+
+        $this->assertNull($unrelatedMedia->quality);
+        $this->assertNull($unrelatedMedia->format);
     }
 
     public function test_it_backfills_all_missing_media_metadata_across_chunks(): void

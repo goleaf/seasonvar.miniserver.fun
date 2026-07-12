@@ -63,6 +63,29 @@ class SeasonvarParallelImportTest extends TestCase
         $this->assertSame('IMMEDIATE', config('database.connections.sqlite.transaction_mode'));
     }
 
+    public function test_page_job_retry_deadline_covers_the_longer_retry_or_claim_window(): void
+    {
+        $this->travelTo('2026-07-13 12:00:00');
+
+        config([
+            'seasonvar.queue.retry_window_seconds' => 21600,
+            'seasonvar.queue.claim_seconds' => 86400,
+        ]);
+
+        $claimBoundJob = new ImportSeasonvarSourcePage(1, 1, 'claim-token', 'seasonvar-title:1');
+
+        $this->assertSame(now()->addDay()->getTimestamp(), $claimBoundJob->retryUntil()->getTimestamp());
+
+        config([
+            'seasonvar.queue.retry_window_seconds' => 172800,
+            'seasonvar.queue.claim_seconds' => 86400,
+        ]);
+
+        $retryBoundJob = new ImportSeasonvarSourcePage(1, 1, 'claim-token', 'seasonvar-title:1');
+
+        $this->assertSame(now()->addDays(2)->getTimestamp(), $retryBoundJob->retryUntil()->getTimestamp());
+    }
+
     public function test_page_claim_is_atomic_owned_and_recoverable_after_expiry(): void
     {
         $run = $this->queuedRun();

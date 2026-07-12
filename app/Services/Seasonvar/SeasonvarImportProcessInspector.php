@@ -180,7 +180,7 @@ class SeasonvarImportProcessInspector
 
         $procCommand = $this->readProcCommand($pid);
         if ($procCommand !== null) {
-            $procMatches = $this->isSeasonvarImportCommand($procCommand);
+            $procMatches = $this->isImportExecutionCommand($procCommand);
             $commandMatches = $commandMatches || $procMatches;
             $checks[] = 'proc-cmdline:'.($procMatches ? 'match' : 'miss');
         } else {
@@ -255,7 +255,7 @@ class SeasonvarImportProcessInspector
         $stat = isset($parts[1]) ? (string) $parts[1] : '';
         $elapsedSeconds = isset($parts[2]) ? max(0, (int) $parts[2]) : null;
         $command = isset($parts[3]) ? (string) $parts[3] : '';
-        $commandMatches = $this->isSeasonvarImportCommand($command);
+        $commandMatches = $this->isImportExecutionCommand($command);
         $zombie = str_starts_with($stat, 'Z');
         $processTooNew = false;
         $checks = [
@@ -326,7 +326,7 @@ class SeasonvarImportProcessInspector
                 continue;
             }
 
-            if ($this->isSeasonvarImportCommand($parsed['command'])) {
+            if ($this->isImportExecutionCommand($parsed['command'])) {
                 return [
                     'running' => true,
                     'verified' => true,
@@ -375,7 +375,7 @@ class SeasonvarImportProcessInspector
                 continue;
             }
 
-            if ($this->isSeasonvarImportCommand($command)) {
+            if ($this->isImportExecutionCommand($command)) {
                 return [
                     'running' => true,
                     'verified' => true,
@@ -416,12 +416,15 @@ class SeasonvarImportProcessInspector
         return $pid === $currentPid || ($parentPid !== null && $pid === $parentPid);
     }
 
-    private function isSeasonvarImportCommand(string $command): bool
+    public function isImportExecutionCommand(string $command): bool
     {
-        $normalized = mb_strtolower(str_replace("\0", ' ', $command));
+        $normalized = trim(mb_strtolower(str_replace("\0", ' ', $command)));
 
-        return str_contains($normalized, 'seasonvar:import')
-            && (str_contains($normalized, 'artisan') || str_contains($normalized, 'php'));
+        if (preg_match('/^\s*(?:\S*\/)?php(?:\d+(?:\.\d+)*)?\s+(?:\S*\/)?artisan\s+seasonvar:import(?:\s|$)/u', $normalized) !== 1) {
+            return false;
+        }
+
+        return preg_match('/(?:^|\s)--(?:status|queued|help)(?:\s|$)/u', $normalized) !== 1;
     }
 
     private function runCommand(array $command): ?string

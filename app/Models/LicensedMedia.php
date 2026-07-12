@@ -109,6 +109,25 @@ class LicensedMedia extends Model
     }
 
     /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeWithoutKnownFailures(Builder $query): Builder
+    {
+        return $query
+            ->where(function (Builder $query): void {
+                $query
+                    ->whereNull($this->qualifyColumn('check_status'))
+                    ->orWhereNotIn($this->qualifyColumn('check_status'), ['unavailable', 'check_failed', 'invalid_url']);
+            })
+            ->where(function (Builder $query): void {
+                $query
+                    ->whereNull($this->qualifyColumn('last_http_status'))
+                    ->orWhere($this->qualifyColumn('last_http_status'), '<', 400);
+            });
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array

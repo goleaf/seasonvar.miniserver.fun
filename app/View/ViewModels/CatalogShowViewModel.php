@@ -2,6 +2,7 @@
 
 namespace App\View\ViewModels;
 
+use App\DTOs\PlaybackSourceData;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
@@ -173,6 +174,7 @@ class CatalogShowViewModel
         public readonly ?Episode $selectedEpisode,
         public readonly ?LicensedMedia $selectedMedia,
         public readonly ExternalMediaMetadata $mediaMetadata,
+        public readonly ?PlaybackSourceData $playbackSource = null,
         ?int $episodeCount = null,
         ?int $taxonomyCount = null,
         ?int $parsedSeasonCount = null,
@@ -191,15 +193,9 @@ class CatalogShowViewModel
         $this->tags = $this->taxonomies('tag');
         $this->taxonomyRows = $this->buildTaxonomyRows();
         $this->mediaByEpisodeId = $this->mediaItems->whereNotNull('episode_id')->groupBy('episode_id');
-        $this->selectedMediaUrl = $this->selectedMedia ? ($this->selectedMedia->playback_url ?: $this->selectedMedia->path) : null;
-        $this->selectedMediaFormat = $this->selectedMedia ? Str::lower((string) $this->mediaFormat($this->selectedMedia)) : '';
-        $this->selectedMediaType = match ($this->selectedMediaFormat) {
-            'm3u8' => 'application/x-mpegURL',
-            'mp4', 'm4v' => 'video/mp4',
-            'webm' => 'video/webm',
-            'mov' => 'video/quicktime',
-            default => null,
-        };
+        $this->selectedMediaUrl = $this->playbackSource?->url;
+        $this->selectedMediaFormat = $this->playbackSource?->format ?? '';
+        $this->selectedMediaType = $this->playbackSource?->mimeType;
         $this->selectedEpisodeMediaItems = $this->selectedEpisode
             ? $this->mediaByEpisodeId->get($this->selectedEpisode->id, collect())
             : collect();

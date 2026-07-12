@@ -70,7 +70,7 @@ git diff --check
 
 Expected: все команды завершаются успешно.
 
-- [ ] **Step 6: Commit, push and reload workers**
+- [x] **Step 6: Commit, push and reload workers**
 
 Run:
 

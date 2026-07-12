@@ -6,12 +6,14 @@ namespace App\Livewire;
 
 use App\DTOs\CatalogEpisodeNavigation;
 use App\DTOs\CatalogPrimaryAction;
+use App\DTOs\PlaybackPreferencesData;
 use App\Enums\ReleaseKind;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\Catalog\CatalogPlaybackSourceResolver;
 use App\Services\Catalog\CatalogPrimaryActionResolver;
 use App\Services\Catalog\CatalogTitlePlaybackQuery;
 use App\Services\Catalog\CatalogUserStateService;
@@ -53,6 +55,8 @@ class CatalogTitlePlayer extends Component
 
     protected CatalogPrimaryActionResolver $primaryActions;
 
+    protected CatalogPlaybackSourceResolver $sources;
+
     protected CatalogUserStateService $userState;
 
     protected ExternalMediaMetadata $mediaMetadata;
@@ -67,11 +71,13 @@ class CatalogTitlePlayer extends Component
     public function boot(
         CatalogTitlePlaybackQuery $playback,
         CatalogPrimaryActionResolver $primaryActions,
+        CatalogPlaybackSourceResolver $sources,
         CatalogUserStateService $userState,
         ExternalMediaMetadata $mediaMetadata,
     ): void {
         $this->playback = $playback;
         $this->primaryActions = $primaryActions;
+        $this->sources = $sources;
         $this->userState = $userState;
         $this->mediaMetadata = $mediaMetadata;
     }
@@ -254,6 +260,25 @@ class CatalogTitlePlayer extends Component
             $mediaItems = collect([$selectedMedia]);
         }
 
+        $exactMediaId = $requestedMedia !== null && $selectedMedia?->id === $requestedMedia
+            ? $requestedMedia
+            : null;
+
+        $playbackSource = $this->sources->resolve(
+            $title,
+            $user,
+            $selectedEpisode,
+            $exactMediaId,
+            new PlaybackPreferencesData(
+                variant: $this->normalizedProfileValue($this->variant, 160),
+                quality: $this->normalizedProfileValue($this->quality, 32),
+                format: $this->normalizedProfileValue($this->format, 32),
+            ),
+        );
+        $selectedMedia = $playbackSource->mediaId !== null
+            ? ($mediaItems->firstWhere('id', $playbackSource->mediaId) ?? $selectedMedia)
+            : $selectedMedia;
+
         $showView = new CatalogShowViewModel(
             title: $title,
             taxonomiesByType: collect(),
@@ -262,6 +287,7 @@ class CatalogTitlePlayer extends Component
             selectedEpisode: $selectedEpisode,
             selectedMedia: $selectedMedia,
             mediaMetadata: $this->mediaMetadata,
+            playbackSource: $playbackSource,
             episodeCount: $seasons->sum('available_episodes_count'),
             parsedSeasonCount: $seasons->filter(fn (Season $season): bool => (int) $season->available_episodes_count > 0)->count(),
             mediaCount: $seasons->sum('available_media_count'),
@@ -277,6 +303,7 @@ class CatalogTitlePlayer extends Component
             'selectedEpisode' => $selectedEpisode,
             'episodeNavigation' => $episodeNavigation,
             'selectedMedia' => $selectedMedia,
+            'playbackSource' => $playbackSource,
             'mediaItems' => $mediaItems,
             'showView' => $showView,
             'inWatchlist' => (bool) ($state?->in_watchlist ?? false),

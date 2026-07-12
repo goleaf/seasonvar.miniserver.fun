@@ -28,7 +28,18 @@ class CatalogTitlePlaybackQuery
     {
         return $this->titles
             ->visibleTo($user)
-            ->select(['id', 'slug', 'title', 'poster_url'])
+            ->select([
+                'id',
+                'slug',
+                'title',
+                'poster_url',
+                'is_published',
+                'publication_status',
+                'audience',
+                'available_from',
+                'available_until',
+                'deleted_at',
+            ])
             ->findOrFail($catalogTitleId);
     }
 
@@ -53,6 +64,11 @@ class CatalogTitlePlaybackQuery
                 'episodes_released',
                 'episodes_total',
                 'translation_name',
+                'publication_status',
+                'audience',
+                'available_from',
+                'available_until',
+                'deleted_at',
             ])
             ->withCount([
                 'episodes as available_episodes_count' => fn (Builder $query): Builder => $query
@@ -61,7 +77,8 @@ class CatalogTitlePlaybackQuery
                 'licensedMedia as available_media_count' => fn (Builder $query): Builder => $query
                     ->availableTo($user)
                     ->forAvailableReleases($user)
-                    ->withPlaybackLocation(),
+                    ->withPlaybackLocation()
+                    ->withoutKnownFailures(),
             ])
             ->get();
     }
@@ -95,6 +112,11 @@ class CatalogTitlePlaybackQuery
                 $episode->qualifyColumn('number'),
                 $episode->qualifyColumn('kind'),
                 $episode->qualifyColumn('sort_order'),
+                $episode->qualifyColumn('publication_status'),
+                $episode->qualifyColumn('audience'),
+                $episode->qualifyColumn('available_from'),
+                $episode->qualifyColumn('available_until'),
+                $episode->qualifyColumn('deleted_at'),
             ])
             ->addSelect([
                 $season->qualifyColumn('kind').' as season_order_kind',
@@ -171,12 +193,27 @@ class CatalogTitlePlaybackQuery
                     ->select('episode_id')
                     ->groupBy('episode_id'),
             )
-            ->select(['id', 'season_id', 'number', 'kind', 'sort_order', 'title', 'released_at', 'summary'])
+            ->select([
+                'id',
+                'season_id',
+                'number',
+                'kind',
+                'sort_order',
+                'title',
+                'released_at',
+                'summary',
+                'publication_status',
+                'audience',
+                'available_from',
+                'available_until',
+                'deleted_at',
+            ])
             ->with([
                 'licensedMedia' => fn (HasMany $query): HasMany => $query
                     ->availableTo($user)
                     ->forAvailableReleases($user)
                     ->withPlaybackLocation()
+                    ->withoutKnownFailures()
                     ->where('catalog_title_id', $catalogTitle->id)
                     ->select([
                         'id',
@@ -184,6 +221,7 @@ class CatalogTitlePlaybackQuery
                         'season_id',
                         'episode_id',
                         'title',
+                        'storage_disk',
                         'path',
                         'playback_url',
                         'quality',
@@ -194,6 +232,15 @@ class CatalogTitlePlaybackQuery
                         'has_subtitles',
                         'format',
                         'source_url',
+                        'status',
+                        'published_at',
+                        'audience',
+                        'available_from',
+                        'available_until',
+                        'check_status',
+                        'last_http_status',
+                        'checked_at',
+                        'deleted_at',
                     ])
                     ->latest('published_at')
                     ->latest(),
@@ -295,6 +342,7 @@ class CatalogTitlePlaybackQuery
             ->availableTo($user)
             ->forAvailableReleases($user)
             ->withPlaybackLocation()
+            ->withoutKnownFailures()
             ->where('catalog_title_id', $catalogTitle->id);
     }
 
@@ -307,6 +355,7 @@ class CatalogTitlePlaybackQuery
             'season_id',
             'episode_id',
             'title',
+            'storage_disk',
             'path',
             'playback_url',
             'quality',
@@ -317,6 +366,15 @@ class CatalogTitlePlaybackQuery
             'has_subtitles',
             'format',
             'source_url',
+            'status',
+            'published_at',
+            'audience',
+            'available_from',
+            'available_until',
+            'check_status',
+            'last_http_status',
+            'checked_at',
+            'deleted_at',
         ]);
     }
 

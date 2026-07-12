@@ -31,6 +31,8 @@
 - Статистика `/stats` собирается через `CatalogStatsSnapshotBuilder`, очищается `CatalogStatsSnapshotSanitizer` и кешируется `CatalogStatsSnapshotCache`; Livewire-компонент не хранит полный stats-массив в публичном состоянии.
 - `CatalogStatsPosterUrlGuard` проверяет, можно ли безопасно проксировать внешний poster URL; `CatalogStatsPageBuilder` не рендерит `poster_src` для URL, которые guard отвергнет, а `CatalogStatsPosterResponder` повторно применяет тот же guard перед HTTP-запросом.
 - `CatalogTitlePlaybackQuery` является общей playback boundary карточки: видимые summaries, точные counts, один активный сезон, playable media и deterministic next episode. `CatalogPrimaryActionResolver` выбирает continue/next/replay/start, а `CatalogUserStateService` записывает watchlist, rating и progress только после повторной проверки доступности.
+- `CatalogPlaybackSourceResolver` является единственной границей выдачи playback source: проверяет title/season/episode/media в момент разрешения и повторно на signed `/playback/{licensedMedia}`, ранжирует источники по явно заданным предпочтениям, provider priority, успешной проверке и качеству, затем возвращает небольшой `PlaybackSourceData`. Raw provider URL не передается в Livewire snapshot или Blade.
+- `PlaybackSourceUrlGuard` разделяется resolver и `SeasonvarMediaAvailabilityChecker`: допускаются только HTTPS-hosts из allowlist с публичными DNS-адресами. Availability checker не следует редиректам, использует Range/streaming, timeouts и лимит `Content-Length`, а progress context получает только `[redacted-url]`.
 
 ## Запросы и валидация
 

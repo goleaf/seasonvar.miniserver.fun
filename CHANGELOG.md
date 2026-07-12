@@ -2,6 +2,8 @@
 
 ## 2026-07-13
 
+- Centralized playback authorization and source selection in `CatalogPlaybackSourceResolver`: Blade/Livewire now receive a short-lived signed, viewer-bound internal URL instead of the stored provider URL, direct access rechecks the complete publication hierarchy and source ownership, and video sitemaps publish only internal player locations.
+- Added provider/format/quality preference ranking, known-failure exclusion from public episode media/counts, explicit Russian playback availability states, an HTTPS/DNS provider allowlist, redirect-free streamed availability probes, bounded response metadata, redacted probe events, and playback endpoint throttling.
 - Added publication-aware previous/next episode navigation to the Livewire title player. Navigation stays inside the current regular/special release lane, crosses into the next or previous visible season, skips inaccessible or source-less episodes, and keeps season state shareable in the URL.
 - Added defensive labels and null-safe keyset ordering for missing release numbers while treating `sort_order` as the provider sequence. Livewire season changes retain watchlist/rating state, browser-supplied season/episode IDs are revalidated against the visible title hierarchy, and each multi-field playback change now creates one coherent browser-history entry.
 

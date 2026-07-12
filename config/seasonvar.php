@@ -34,6 +34,7 @@ return [
         'retries' => (int) env('SEASONVAR_MEDIA_CHECK_RETRIES', 3),
         'timeout_seconds' => (int) env('SEASONVAR_MEDIA_CHECK_TIMEOUT', 10),
         'connect_timeout_seconds' => (int) env('SEASONVAR_MEDIA_CHECK_CONNECT_TIMEOUT', 5),
+        'max_response_bytes' => (int) env('SEASONVAR_MEDIA_CHECK_MAX_RESPONSE_BYTES', 65536),
         'chunk_size' => (int) env('SEASONVAR_MEDIA_CHECK_CHUNK_SIZE', 25),
         'refresh_after_hours' => (int) env('SEASONVAR_MEDIA_CHECK_REFRESH_AFTER_HOURS', 168),
     ],

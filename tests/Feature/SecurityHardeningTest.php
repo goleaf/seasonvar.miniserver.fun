@@ -2,11 +2,21 @@
 
 namespace Tests\Feature;
 
+use App\DTOs\PlaybackPreferencesData;
+use App\Enums\ContentAudience;
+use App\Enums\PlaybackAvailability;
+use App\Models\CatalogTitle;
+use App\Models\Episode;
+use App\Models\LicensedMedia;
+use App\Models\Season;
 use App\Models\User;
+use App\Services\Catalog\CatalogPlaybackSourceResolver;
 use App\Services\Media\ExternalPlaylistImporter;
+use App\Services\Media\PlaybackSourceUrlGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\URL;
 use InvalidArgumentException;
 use Tests\TestCase;
 
@@ -58,5 +68,181 @@ class SecurityHardeningTest extends TestCase
                 $this->assertSame('Этот хост заблокирован.', $exception->getMessage());
             }
         }
+    }
+
+    public function test_playback_source_requires_a_valid_signature_bound_to_the_current_viewer(): void
+    {
+        $media = $this->playableMedia();
+
+        $this->get(route('playback.source', ['licensedMedia' => $media, 'viewer' => 0]))
+            ->assertForbidden();
+
+        $expiredUrl = URL::temporarySignedRoute('playback.source', now()->subSecond(), [
+            'licensedMedia' => $media->id,
+            'viewer' => 0,
+        ]);
+        $this->get($expiredUrl)->assertForbidden();
+
+        $guestUrl = URL::temporarySignedRoute('playback.source', now()->addMinutes(5), [
+            'licensedMedia' => $media->id,
+            'viewer' => 0,
+        ]);
+
+        $this->get($guestUrl)
+            ->assertRedirect('https://data00-cdn.11cdn.org/video.m3u8')
+            ->assertHeader('Cache-Control', 'max-age=0, no-store, private')
+            ->assertHeader('Referrer-Policy', 'no-referrer');
+
+        $this->actingAs(User::factory()->create())
+            ->get($guestUrl)
+            ->assertForbidden();
+    }
+
+    public function test_playback_availability_only_exposes_states_backed_by_the_current_access_model(): void
+    {
+        $this->assertSame([
+            'ready',
+            'authentication_required',
+            'not_yet_published',
+            'expired',
+            'temporarily_unavailable',
+            'not_found',
+        ], array_column(PlaybackAvailability::cases(), 'value'));
+    }
+
+    public function test_playback_source_rechecks_parent_and_media_availability_on_direct_access(): void
+    {
+        $media = $this->playableMedia();
+        $url = fn (): string => URL::temporarySignedRoute('playback.source', now()->addMinutes(5), [
+            'licensedMedia' => $media->id,
+            'viewer' => 0,
+        ]);
+
+        $media->catalogTitle()->update(['audience' => ContentAudience::Authenticated]);
+        $this->get($url())->assertUnauthorized()->assertSeeText('Для просмотра необходимо войти.');
+
+        $media->catalogTitle()->update([
+            'audience' => ContentAudience::Public,
+            'available_until' => now()->subMinute(),
+        ]);
+        $this->get($url())->assertStatus(410)->assertSeeText('Срок доступности видео истёк.');
+
+        $media->catalogTitle()->update(['available_until' => null]);
+        $media->update(['published_at' => now()->addMinute()]);
+        $this->get($url())->assertStatus(425)->assertSeeText('Видео ещё не опубликовано.');
+
+        $media->update([
+            'published_at' => now()->subMinute(),
+            'status' => 'unavailable',
+            'check_status' => 'unavailable',
+        ]);
+        $this->get($url())->assertServiceUnavailable()->assertSeeText('Видео временно недоступно.');
+    }
+
+    public function test_playback_url_guard_rejects_credentials_private_networks_and_unlisted_hosts(): void
+    {
+        config()->set('playback.allowed_hosts', ['11cdn.org', '127.0.0.1', '169.254.169.254']);
+        config()->set('playback.enforce_public_dns', true);
+        $guard = app(PlaybackSourceUrlGuard::class);
+
+        $this->assertNull($guard->safeExternalUrl('https://127.0.0.1/video.m3u8'));
+        $this->assertNull($guard->safeExternalUrl('https://169.254.169.254/latest/meta-data'));
+        $this->assertNull($guard->safeExternalUrl('https://user:secret@data00-cdn.11cdn.org/video.m3u8'));
+        $this->assertNull($guard->safeExternalUrl('http://data00-cdn.11cdn.org/video.m3u8'));
+        $this->assertNull($guard->safeExternalUrl('https://evil11cdn.org/video.m3u8'));
+    }
+
+    public function test_playback_resolution_prefers_matching_available_sources_and_never_crosses_episode_boundaries(): void
+    {
+        $failedPreferred = $this->playableMedia();
+        $failedPreferred->update([
+            'quality' => '720p',
+            'translation_name' => 'Русский',
+            'check_status' => 'unavailable',
+        ]);
+        $fallback = LicensedMedia::factory()->create([
+            'catalog_title_id' => $failedPreferred->catalog_title_id,
+            'season_id' => $failedPreferred->season_id,
+            'episode_id' => $failedPreferred->episode_id,
+            'storage_disk' => 'external_playlist',
+            'path' => 'https://data00-cdn.11cdn.org/fallback.m3u8',
+            'playback_url' => 'https://data00-cdn.11cdn.org/fallback.m3u8',
+            'quality' => '1080p',
+            'translation_name' => 'English',
+            'format' => 'm3u8',
+            'status' => 'published',
+            'published_at' => now()->subMinute(),
+            'check_status' => 'available',
+        ]);
+        $matching = LicensedMedia::factory()->create([
+            'catalog_title_id' => $failedPreferred->catalog_title_id,
+            'season_id' => $failedPreferred->season_id,
+            'episode_id' => $failedPreferred->episode_id,
+            'storage_disk' => 'seasonvar_parsed',
+            'path' => 'https://data00-cdn.11cdn.org/preferred.m3u8',
+            'playback_url' => 'https://data00-cdn.11cdn.org/preferred.m3u8',
+            'quality' => '720p',
+            'translation_name' => 'Русский',
+            'format' => 'm3u8',
+            'status' => 'published',
+            'published_at' => now()->subMinute(),
+            'check_status' => 'available',
+        ]);
+        $episode = Episode::query()->findOrFail($failedPreferred->episode_id);
+        $title = CatalogTitle::query()->findOrFail($failedPreferred->catalog_title_id);
+        $resolver = app(CatalogPlaybackSourceResolver::class);
+
+        $resolved = $resolver->resolve(
+            $title,
+            null,
+            $episode,
+            null,
+            new PlaybackPreferencesData(audioLanguage: 'Русский', quality: '720p'),
+        );
+
+        $this->assertSame(PlaybackAvailability::Ready, $resolved->status);
+        $this->assertStringContainsString('/playback/'.$matching->id.'?', (string) $resolved->url);
+        $this->assertStringNotContainsString('/playback/'.$fallback->id.'?', (string) $resolved->url);
+
+        $blocked = $resolver->resolve(
+            $title,
+            null,
+            $episode,
+            $failedPreferred->id,
+            new PlaybackPreferencesData,
+        );
+
+        $this->assertSame(PlaybackAvailability::TemporarilyUnavailable, $blocked->status);
+
+        $otherEpisodeMedia = $this->playableMedia();
+        $crossEpisode = $resolver->resolve(
+            $title,
+            null,
+            $episode,
+            $otherEpisodeMedia->id,
+            new PlaybackPreferencesData,
+        );
+
+        $this->assertSame(PlaybackAvailability::NotFound, $crossEpisode->status);
+    }
+
+    private function playableMedia(): LicensedMedia
+    {
+        $title = CatalogTitle::factory()->create();
+        $season = Season::factory()->for($title)->create();
+        $episode = Episode::factory()->for($season)->create();
+
+        return LicensedMedia::factory()->create([
+            'catalog_title_id' => $title->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'storage_disk' => 'seasonvar_parsed',
+            'path' => 'https://data00-cdn.11cdn.org/video.m3u8',
+            'playback_url' => 'https://data00-cdn.11cdn.org/video.m3u8',
+            'format' => 'm3u8',
+            'status' => 'published',
+            'published_at' => now()->subMinute(),
+            'check_status' => 'available',
+        ]);
     }
 }

@@ -1570,6 +1570,7 @@ class SeasonvarCatalogImporter
     private function parseSeasonvarPlaylistItem(array $playlistItem, ?callable $progress = null): array
     {
         $playlistUrl = $this->safeSeasonvarPlaylistUrl($playlistItem['url']);
+        $playlistSourceUrl = $this->stableSeasonvarPlaylistSourceUrl($playlistUrl);
         $response = $this->httpClient->get($playlistUrl, 0, $progress);
 
         if (! $response->successful()) {
@@ -1610,7 +1611,7 @@ class SeasonvarCatalogImporter
                 'title' => $title,
                 'season_number' => $seasonNumber,
                 'episode_number' => $episodeNumber,
-                'source_url' => $playlistUrl,
+                'source_url' => $playlistSourceUrl,
                 'kind' => $this->parsedMediaExtension($url) === 'm3u8' ? 'playlist' : 'file',
             ];
         }
@@ -1662,6 +1663,33 @@ class SeasonvarCatalogImporter
         }
 
         return $normalizedUrl;
+    }
+
+    private function stableSeasonvarPlaylistSourceUrl(string $url): string
+    {
+        $parts = parse_url($url);
+
+        if (! is_array($parts) || ! isset($parts['scheme'], $parts['host'])) {
+            return $url;
+        }
+
+        parse_str((string) ($parts['query'] ?? ''), $query);
+        unset($query['time']);
+        ksort($query);
+
+        $stableUrl = Str::lower((string) $parts['scheme']).'://'.Str::lower((string) $parts['host']);
+
+        if (isset($parts['port'])) {
+            $stableUrl .= ':'.$parts['port'];
+        }
+
+        $stableUrl .= $parts['path'] ?? '/';
+
+        if ($query !== []) {
+            $stableUrl .= '?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+        }
+
+        return $stableUrl;
     }
 
     private function decodeSeasonvarPlaylistFile(string $file): ?string

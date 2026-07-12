@@ -43,6 +43,11 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('catalog-api', fn (Request $request): Limit => Limit::perMinute(60)->by($request->ip()));
+        RateLimiter::for('playback-source', function (Request $request): Limit {
+            $viewer = $request->user()?->getAuthIdentifier();
+
+            return Limit::perMinute(120)->by($viewer === null ? 'ip:'.$request->ip() : 'user:'.$viewer);
+        });
 
         Model::shouldBeStrict(! $this->app->isProduction());
         DB::prohibitDestructiveCommands($this->app->isProduction());

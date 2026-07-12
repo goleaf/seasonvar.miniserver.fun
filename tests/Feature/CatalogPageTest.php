@@ -1486,18 +1486,50 @@ class CatalogPageTest extends TestCase
             'season_id' => $season->id,
             'episode_id' => $episode->id,
             'title' => 'Видео 720p',
-            'path' => 'https://media.example.com/video.m3u8',
+            'storage_disk' => 'seasonvar_parsed',
+            'path' => 'https://data00-cdn.11cdn.org/video.m3u8',
+            'playback_url' => 'https://data00-cdn.11cdn.org/video.m3u8',
             'quality' => '720p',
             'translation_name' => 'Дубляж',
             'format' => 'm3u8',
             'status' => 'published',
+            'check_status' => 'available',
             'published_at' => now(),
+        ]);
+        $failedMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'title' => 'Сломанное видео',
+            'storage_disk' => 'seasonvar_parsed',
+            'path' => 'https://data00-cdn.11cdn.org/broken.m3u8',
+            'playback_url' => 'https://data00-cdn.11cdn.org/broken.m3u8',
+            'quality' => '1080p',
+            'format' => 'm3u8',
+            'status' => 'published',
+            'check_status' => 'unavailable',
+            'published_at' => $media->published_at,
+        ]);
+        $lowerPriorityMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'title' => 'Резервное видео',
+            'storage_disk' => 'external_playlist',
+            'path' => 'https://data00-cdn.11cdn.org/fallback.m3u8',
+            'playback_url' => 'https://data00-cdn.11cdn.org/fallback.m3u8',
+            'quality' => '720p',
+            'translation_name' => 'Дубляж',
+            'format' => 'm3u8',
+            'status' => 'published',
+            'check_status' => 'available',
+            'published_at' => $media->published_at,
+            'created_at' => now()->addMinute(),
         ]);
 
         $response = $this->get(route('titles.show', [
             'catalogTitle' => $catalogTitle,
             'episode' => $episode->id,
-            'media' => $media->id,
         ]));
 
         $response
@@ -1506,7 +1538,21 @@ class CatalogPageTest extends TestCase
             ->assertSeeText('720P / Дубляж / M3U8')
             ->assertSeeText('Быстрый доступ')
             ->assertSeeText('Сейчас открыто')
-            ->assertSee('data-hls-src="https://media.example.com/video.m3u8"', false)
+            ->assertDontSee('https://data00-cdn.11cdn.org/video.m3u8', false)
+            ->assertSee('/playback/'.$media->id.'?', false)
+            ->assertDontSee('/playback/'.$failedMedia->id.'?', false)
+            ->assertDontSee('/playback/'.$lowerPriorityMedia->id.'?', false)
+            ->assertSee('expires=', false)
+            ->assertSee('signature=', false)
             ->assertSee('type="application/x-mpegURL"', false);
+
+        $this->get(route('titles.show', [
+            'catalogTitle' => $catalogTitle,
+            'episode' => $episode->id,
+            'media' => $lowerPriorityMedia->id,
+        ]))
+            ->assertOk()
+            ->assertSee('/playback/'.$lowerPriorityMedia->id.'?', false)
+            ->assertDontSee('https://data00-cdn.11cdn.org/fallback.m3u8', false);
     }
 }

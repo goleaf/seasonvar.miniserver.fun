@@ -6,6 +6,7 @@ use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendationSignal;
 use App\Models\Episode;
 use App\Models\Genre;
+use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\Source;
 use App\Models\SourcePage;
@@ -208,6 +209,55 @@ class SeasonvarParsePageCommandTest extends TestCase
             'quality' => '720p',
             'status' => 'published',
         ]);
+    }
+
+    public function test_it_ignores_the_volatile_playlist_time_when_identifying_existing_media(): void
+    {
+        Http::preventStrayRequests();
+
+        $mediaUrl = 'https://media.example.com/kitchen/s04e02.mp4';
+        $playlistBody = json_encode([
+            [
+                'title' => '2 серия SD/HD<br>',
+                'file' => $this->encodedSeasonvarPlayerFile('//media.example.com/kitchen/s04e02.mp4'),
+                'id' => '2',
+            ],
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+
+        Http::fake([
+            'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html' => Http::sequence()
+                ->push($this->seasonPageHtml(
+                    4,
+                    [2 => 'Проверка'],
+                    seasonvarPlaylists: ['/playls2/hash/trans/47915/plist.txt?time=1783594881'],
+                ))
+                ->push($this->seasonPageHtml(
+                    4,
+                    [2 => 'Проверка'],
+                    seasonvarPlaylists: ['/playls2/hash/trans/47915/plist.txt?time=1783594882'],
+                )),
+            'seasonvar.ru/playls2/hash/trans/47915/plist.txt?time=1783594881' => Http::response($playlistBody),
+            'seasonvar.ru/playls2/hash/trans/47915/plist.txt?time=1783594882' => Http::response($playlistBody),
+        ]);
+
+        $this->artisan('seasonvar:import', [
+            'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
+        ])->assertExitCode(0);
+
+        $media = LicensedMedia::query()->where('playback_url', $mediaUrl)->sole();
+        $originalUpdatedAt = $media->updated_at;
+        $this->travel(1)->minute();
+
+        $this->artisan('seasonvar:import', [
+            'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
+            '--force' => true,
+        ])->assertExitCode(0);
+
+        $media->refresh();
+
+        $this->assertSame($originalUpdatedAt?->toDateTimeString(), $media->updated_at?->toDateTimeString());
+        $this->assertSame('https://seasonvar.ru/playls2/hash/trans/47915/plist.txt', $media->source_url);
+        $this->assertSame(1, LicensedMedia::query()->where('playback_url', $mediaUrl)->count());
     }
 
     public function test_it_imports_nested_seasonvar_player_playlist_folders(): void

@@ -39,8 +39,13 @@ class ImportSeasonvarSourcePage implements ShouldQueue
         public readonly bool $force = false,
     ) {
         $this->timeout = max(60, (int) config('seasonvar.queue.worker_timeout', 900));
+        $retryWindowSeconds = max(
+            300,
+            (int) config('seasonvar.queue.retry_window_seconds', 21600),
+            (int) config('seasonvar.queue.claim_seconds', 86400),
+        );
         $this->retryUntilTimestamp = now()
-            ->addSeconds(max(300, (int) config('seasonvar.queue.retry_window_seconds', 21600)))
+            ->addSeconds($retryWindowSeconds)
             ->getTimestamp();
         $this->onConnection((string) config('seasonvar.queue.connection', 'redis'));
         $this->onQueue((string) config('seasonvar.queue.queue', 'seasonvar-import'));

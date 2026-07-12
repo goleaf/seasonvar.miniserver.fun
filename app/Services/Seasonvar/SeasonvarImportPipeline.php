@@ -204,14 +204,30 @@ class SeasonvarImportPipeline
             'cycle' => $cycle,
         ]);
 
+        if ($argument !== null) {
+            $cycleResult = $this->runUrlCycle($run, $argument, $force, $progress);
+
+            $this->addRunCounters($run, [
+                'cycles' => 1,
+            ], [
+                'targeted_maintenance_skipped' => true,
+            ]);
+
+            $progress('seasonvar-import-cycle-complete', [
+                'cycle' => $cycle,
+                ...$cycleResult,
+                'targeted_maintenance_skipped' => true,
+            ]);
+
+            return;
+        }
+
         $storageMaintenanceResult = $this->storageMaintenance->prune();
         $progress('seasonvar-import-storage-pruned', $storageMaintenanceResult);
 
         $earlyRelationCleanupResult = $this->cleanupInvalidCatalogRelations($progress);
         $sourceStatusBackfillResult = $this->backfillParsedSourcePageStatuses($progress);
-        $cycleResult = $argument === null
-            ? $this->runSitemapCycle($run, $force, $discover, $progress)
-            : $this->runUrlCycle($run, $argument, $force, $progress);
+        $cycleResult = $this->runSitemapCycle($run, $force, $discover, $progress);
         $mediaMetadataResult = $this->refreshMediaMetadataBacklog($progress);
         $mediaSourceKeyResult = $this->backfillMediaSourceKeys($progress);
         $mediaBacklogResult = $this->refreshMediaBacklog($progress);

@@ -67,18 +67,24 @@ class ExternalPlaylistImportTest extends TestCase
             'playback_url' => 'https://media.example.com/files/6_kadrov_s01e02.mp4',
             'status' => 'published',
         ]);
+        $media = LicensedMedia::query()
+            ->where('catalog_title_id', $catalogTitle->id)
+            ->where('episode_id', $episode->id)
+            ->sole();
 
         $this->get(route('titles.show', $catalogTitle))
             ->assertOk()
             ->assertSeeText('Начать с 2 серии')
             ->assertSeeText('Выбрана 2 серия')
-            ->assertSee('https://media.example.com/files/6_kadrov_s01e02.mp4');
+            ->assertSee('/playback/'.$media->id.'?', false)
+            ->assertDontSee('https://media.example.com/files/6_kadrov_s01e02.mp4', false);
 
         $this->get(route('titles.show', ['catalogTitle' => $catalogTitle, 'episode' => $episode->id]))
             ->assertOk()
             ->assertSeeText('Выбрана 2 серия')
             ->assertDontSeeText('видео найдено')
-            ->assertSee('https://media.example.com/files/6_kadrov_s01e02.mp4');
+            ->assertSee('/playback/'.$media->id.'?', false)
+            ->assertDontSee('https://media.example.com/files/6_kadrov_s01e02.mp4', false);
     }
 
     public function test_it_can_force_all_playlist_files_to_one_catalog_title(): void

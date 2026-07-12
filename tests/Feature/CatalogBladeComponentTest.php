@@ -212,7 +212,7 @@ class CatalogBladeComponentTest extends TestCase
             'status' => 'published',
             'published_at' => now(),
         ]);
-        LicensedMedia::factory()->create([
+        $secondVoiceMedia = LicensedMedia::factory()->create([
             'catalog_title_id' => $catalogTitle->id,
             'season_id' => $season->id,
             'episode_id' => $secondEpisode->id,
@@ -264,7 +264,9 @@ class CatalogBladeComponentTest extends TestCase
 
         $variantResponse
             ->assertOk()
-            ->assertSee('https://media.example.com/big-bang-s01e02-sub.mp4', false)
+            ->assertSee('/playback/'.$secondSubtitleMedia->id.'?', false)
+            ->assertDontSee('/playback/'.$secondVoiceMedia->id.'?', false)
+            ->assertDontSee('https://media.example.com/big-bang-s01e02-sub.mp4', false)
             ->assertDontSee('https://media.example.com/big-bang-s01e02-voice.mp4', false);
     }
 }
