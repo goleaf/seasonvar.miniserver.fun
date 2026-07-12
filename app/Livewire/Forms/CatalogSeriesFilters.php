@@ -67,6 +67,12 @@ class CatalogSeriesFilters extends Form
     #[Url(as: 'quality', history: true, except: [])]
     public array $qualities = [];
 
+    #[Url(as: 'publication_type', history: true, except: [])]
+    public array $publicationTypes = [];
+
+    #[Url(history: true, except: [])]
+    public array $subtitles = [];
+
     #[Url(as: 'title', history: true, except: '')]
     public string|int $titleContext = '';
 
@@ -101,9 +107,6 @@ class CatalogSeriesFilters extends Form
     public string $video = '';
 
     #[Url(history: true, except: '')]
-    public string $subtitles = '';
-
-    #[Url(history: true, except: '')]
     public string $updated = '';
 
     #[Url(history: true, except: '')]
@@ -127,6 +130,8 @@ class CatalogSeriesFilters extends Form
             'exclude_country' => $this->excludeCountry,
             'exclude_genre' => $this->excludeGenre,
             'quality' => $this->qualities,
+            'publication_type' => $this->publicationTypes,
+            'subtitles' => $this->subtitles,
             'title' => $this->titleContext,
             'year_from' => $this->yearFrom,
             'year_to' => $this->yearTo,
@@ -138,7 +143,6 @@ class CatalogSeriesFilters extends Form
             'rating_min' => $this->ratingMin,
             'votes_min' => $this->votesMin,
             'video' => $this->video,
-            'subtitles' => $this->subtitles,
             'updated' => $this->updated,
             'letter' => $this->letter,
             'sort' => $this->sort,
@@ -162,6 +166,8 @@ class CatalogSeriesFilters extends Form
         $this->excludeCountry = $request->excludedFilterSlugs()['country'];
         $this->excludeGenre = $request->excludedFilterSlugs()['genre'];
         $this->qualities = $request->qualities();
+        $this->publicationTypes = $request->publicationTypes();
+        $this->subtitles = $request->subtitleAvailability();
         $this->titleContext = $request->titleContextSlug() ?? '';
         $this->yearFrom = $request->yearFrom() ?? '';
         $this->yearTo = $request->yearTo() ?? '';
@@ -173,7 +179,6 @@ class CatalogSeriesFilters extends Form
         $this->ratingMin = $request->ratingMin() ?? '';
         $this->votesMin = $request->votesMin() ?? '';
         $this->video = $request->videoAvailability() ?? '';
-        $this->subtitles = $request->subtitleAvailability() ?? '';
         $this->updated = $request->updatedPeriod() ?? '';
         $this->letter = $request->letter() ?? '';
         $this->sort = $request->sort()->value;
@@ -192,6 +197,8 @@ class CatalogSeriesFilters extends Form
             'exclude_country' => 'excludeCountry',
             'exclude_genre' => 'excludeGenre',
             'quality' => 'qualities',
+            'publication_type' => 'publicationTypes',
+            'subtitles' => 'subtitles',
             default => self::TAXONOMY_PROPERTIES[$group] ?? null,
         };
 
@@ -217,7 +224,6 @@ class CatalogSeriesFilters extends Form
             'rating_min' => 'ratingMin',
             'votes_min' => 'votesMin',
             'video' => 'video',
-            'subtitles' => 'subtitles',
             'updated' => 'updated',
             'letter' => 'letter',
             default => null,
@@ -258,6 +264,24 @@ class CatalogSeriesFilters extends Form
         }
 
         $this->{$property} = array_values(array_diff($this->{$property}, [$slug]));
+
+        return true;
+    }
+
+    public function removeChoice(string $group, string $value): bool
+    {
+        $property = match ($group) {
+            'publication_type' => 'publicationTypes',
+            'subtitles' => 'subtitles',
+            'quality' => 'qualities',
+            default => null,
+        };
+
+        if ($property === null) {
+            return false;
+        }
+
+        $this->{$property} = array_values(array_diff($this->{$property}, [$value]));
 
         return true;
     }

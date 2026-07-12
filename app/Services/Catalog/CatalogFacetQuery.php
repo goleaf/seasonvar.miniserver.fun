@@ -2,11 +2,13 @@
 
 namespace App\Services\Catalog;
 
+use App\Enums\CatalogPublicationType;
 use App\Models\CatalogTitle;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class CatalogFacetQuery
 {
@@ -16,7 +18,7 @@ class CatalogFacetQuery
     ) {}
 
     /** @return Collection<int, Model> */
-    public function taxonomies(string $filterType, ?int $limit = null, ?User $user = null): Collection
+    public function taxonomies(string $filterType, ?int $limit = null, ?User $user = null, ?string $search = null): Collection
     {
         $modelClass = $this->taxonomies->modelClass($filterType);
         $model = new $modelClass;
@@ -45,11 +47,47 @@ class CatalogFacetQuery
             ->orderBy($model->getTable().'.name')
             ->orderBy($model->getTable().'.id');
 
+        $search = Str::limit(Str::squish((string) $search), 80, '');
+        if (mb_strlen($search) >= 2) {
+            $nameSearch = '%'.str_replace(['%', '_'], '', $search).'%';
+            $slugSearch = '%'.str_replace(['%', '_'], '', Str::slug($search)).'%';
+
+            $query->where(function ($query) use ($model, $nameSearch, $slugSearch): void {
+                $query
+                    ->where($model->getTable().'.name', 'like', $nameSearch)
+                    ->orWhere($model->getTable().'.slug', 'like', $slugSearch);
+            });
+        }
+
         if ($limit !== null) {
             $query->limit($limit);
         }
 
         return $query->get()->values();
+    }
+
+    /** @return Collection<int, object{value: string, label: string, titles_count: int}> */
+    public function publicationTypes(?User $user = null): Collection
+    {
+        $counts = $this->titles->visibleTo($user)
+            ->select('type')
+            ->selectRaw('count(*) as titles_count')
+            ->groupBy('type')
+            ->pluck('titles_count', 'type');
+
+        return collect(CatalogPublicationType::cases())
+            ->map(function (CatalogPublicationType $type) use ($counts): object {
+                $titlesCount = collect($type->databaseValues())
+                    ->sum(fn (string $databaseValue): int => (int) ($counts->get($databaseValue) ?? 0));
+
+                return (object) [
+                    'value' => $type->value,
+                    'label' => $type->label(),
+                    'titles_count' => $titlesCount,
+                ];
+            })
+            ->filter(fn (object $option): bool => $option->titles_count > 0)
+            ->values();
     }
 
     /**

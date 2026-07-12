@@ -125,4 +125,19 @@ class CatalogValidationTest extends TestCase
             ->assertOk()
             ->assertSeeText('Одно значение нельзя одновременно включить и исключить.');
     }
+
+    public function test_catalog_ignores_missing_filter_records_without_errors(): void
+    {
+        $visible = CatalogTitle::factory()->create([
+            'title' => 'Видимый при пустом фильтре',
+            'slug' => 'vidimyi-pri-pustom-filtre',
+        ]);
+
+        $this->get(route('titles.index', [
+            'actor' => ['', 'missing-actor', 'missing-actor'],
+        ]))
+            ->assertOk()
+            ->assertSeeText($visible->title)
+            ->assertDontSeeText('Проверьте параметры каталога.');
+    }
 }

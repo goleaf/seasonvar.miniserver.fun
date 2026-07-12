@@ -2,6 +2,7 @@
 
 namespace App\View\ViewModels;
 
+use App\Enums\CatalogPublicationType;
 use App\Enums\CatalogSort;
 use App\Models\CatalogTitle;
 use Illuminate\Database\Eloquent\Model;
@@ -18,7 +19,7 @@ class CatalogTitlesViewModel
         'actor' => 'Актеры',
         'director' => 'Режиссеры',
         'age_rating' => 'Возрастной рейтинг',
-        'translation' => 'Перевод',
+        'translation' => 'Озвучка / перевод',
         'status' => 'Статус',
         'network' => 'Каналы',
         'studio' => 'Студии',
@@ -253,6 +254,7 @@ class CatalogTitlesViewModel
             'video',
             'subtitles',
             'quality',
+            'publication_type',
             'updated',
             'letter',
         ];
@@ -263,7 +265,7 @@ class CatalogTitlesViewModel
 
     public function hasAdvancedFilters(): bool
     {
-        return $this->advancedFilterChips() !== [];
+        return $this->advancedFilterChips() !== [] || $this->listState('quality') !== [];
     }
 
     /** @return list<string> */
@@ -347,8 +349,6 @@ class CatalogTitlesViewModel
             'rating_min' => 'Рейтинг от',
             'votes_min' => 'Голосов от',
             'video' => 'Видео',
-            'subtitles' => 'Субтитры',
-            'quality' => 'Качество',
             'updated' => 'Обновлено',
             'letter' => 'Буква',
         ];
@@ -394,6 +394,31 @@ class CatalogTitlesViewModel
         unset($query[$key]);
 
         return $query;
+    }
+
+    /** @return array<string, mixed> */
+    public function choiceQuery(string $group, string $value): array
+    {
+        $query = $this->sortQuery($this->sort);
+        $values = array_values(array_diff($this->listState($group), [$value]));
+
+        if ($values === []) {
+            unset($query[$group]);
+        } else {
+            $query[$group] = $values;
+        }
+
+        return $query;
+    }
+
+    public function publicationTypeLabel(string $value): string
+    {
+        return CatalogPublicationType::tryFrom($value)?->label() ?? $value;
+    }
+
+    public function subtitleLabel(string $value): string
+    {
+        return $value === 'available' ? 'Есть' : 'Нет';
     }
 
     /**

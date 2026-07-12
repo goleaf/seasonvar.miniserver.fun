@@ -59,6 +59,59 @@
                         </div>
                     </div>
 
+                    <div>
+                        <div class="mb-2 flex items-center justify-between gap-2">
+                            <div class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                                <i class="fa-solid fa-clapperboard text-slate-400" aria-hidden="true"></i>
+                                <span>Тип публикации</span>
+                            </div>
+                            @if ($filterView->listState('publication_type') !== [])
+                                <a href="{{ route('titles.index', $filterView->withoutCatalogState('publication_type')) }}" wire:click.prevent="resetGroup('publication_type')" class="text-xs font-bold text-emerald-700 hover:text-emerald-600">Сбросить</a>
+                            @endif
+                        </div>
+                        <div class="space-y-1">
+                            @forelse ($publicationTypeOptions as $option)
+                                <label @class([
+                                    'flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm transition',
+                                    'bg-emerald-50 font-bold text-emerald-700' => in_array($option->value, $filterView->listState('publication_type'), true),
+                                    'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! in_array($option->value, $filterView->listState('publication_type'), true),
+                                ])>
+                                    <span class="inline-flex min-w-0 items-center gap-2">
+                                        <input type="checkbox" wire:model="filters.publicationTypes" name="publication_type[]" value="{{ $option->value }}" class="h-4 w-4 shrink-0 accent-emerald-700" @checked(in_array($option->value, $filterView->listState('publication_type'), true))>
+                                        <span>{{ $option->label }}</span>
+                                    </span>
+                                    <span class="text-xs font-bold">{{ $option->titles_count }}</span>
+                                </label>
+                            @empty
+                                <p class="text-sm text-slate-500">Типы не указаны.</p>
+                            @endforelse
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="mb-2 flex items-center justify-between gap-2">
+                            <div class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                                <i class="fa-solid fa-closed-captioning text-slate-400" aria-hidden="true"></i>
+                                <span>Субтитры</span>
+                            </div>
+                            @if ($filterView->listState('subtitles') !== [])
+                                <a href="{{ route('titles.index', $filterView->withoutCatalogState('subtitles')) }}" wire:click.prevent="resetGroup('subtitles')" class="text-xs font-bold text-emerald-700 hover:text-emerald-600">Сбросить</a>
+                            @endif
+                        </div>
+                        <div class="space-y-1">
+                            @foreach (['available' => 'Есть', 'missing' => 'Нет'] as $subtitleValue => $subtitleLabel)
+                                <label @class([
+                                    'flex min-h-11 cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm transition',
+                                    'bg-emerald-50 font-bold text-emerald-700' => in_array($subtitleValue, $filterView->listState('subtitles'), true),
+                                    'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! in_array($subtitleValue, $filterView->listState('subtitles'), true),
+                                ])>
+                                    <input type="checkbox" wire:model="filters.subtitles" name="subtitles[]" value="{{ $subtitleValue }}" class="h-4 w-4 shrink-0 accent-emerald-700" @checked(in_array($subtitleValue, $filterView->listState('subtitles'), true))>
+                                    <span>{{ $subtitleLabel }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+
                     @foreach ($filterView->typeLabels as $filterType => $label)
                         <div data-catalog-filter-group>
                             <div class="mb-2 flex items-center justify-between gap-2">
@@ -70,7 +123,22 @@
                                     <a href="{{ route('titles.index', $filterView->filterQuery($filterType, null)) }}" wire:click.prevent="resetGroup('{{ $filterType }}')" class="shrink-0 text-xs font-bold text-emerald-700 hover:text-emerald-600">Сбросить</a>
                                 @endif
                             </div>
-                            @if ($filterTaxonomies->get($filterType, collect())->count() > 8)
+                            @if (in_array($filterType, ['actor', 'director'], true))
+                                <label class="sr-only" for="catalog-filter-search-{{ $filterType }}">Найти в группе {{ $label }}</label>
+                                <div class="mb-2 flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                                    <i class="fa-solid fa-magnifying-glass shrink-0 text-slate-400" aria-hidden="true"></i>
+                                    <input
+                                        id="catalog-filter-search-{{ $filterType }}"
+                                        type="search"
+                                        autocomplete="off"
+                                        maxlength="80"
+                                        placeholder="Введите имя (от 2 знаков)"
+                                        wire:model.live.debounce.350ms="optionSearch.{{ $filterType }}"
+                                        class="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 placeholder:text-slate-400 focus:outline-none"
+                                    >
+                                    <i wire:loading wire:target="optionSearch.{{ $filterType }}" class="fa-solid fa-spinner fa-spin shrink-0 text-emerald-700" aria-hidden="true"></i>
+                                </div>
+                            @elseif ($filterTaxonomies->get($filterType, collect())->count() > 8)
                                 <label class="sr-only" for="catalog-filter-search-{{ $filterType }}">Найти в группе {{ $label }}</label>
                                 <div class="mb-2 flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm text-slate-500">
                                     <i class="fa-solid fa-magnifying-glass shrink-0 text-slate-400" aria-hidden="true"></i>
@@ -102,7 +170,7 @@
                                         </span>
                                     </label>
                                 @empty
-                                    <p class="text-sm text-slate-500">Нет данных.</p>
+                                    <p class="text-sm text-slate-500">{{ in_array($filterType, ['actor', 'director'], true) && mb_strlen($optionSearch[$filterType] ?? '') >= 2 ? 'Ничего не найдено.' : 'Нет данных.' }}</p>
                                 @endforelse
                             </div>
                             <p class="hidden px-3 py-2 text-sm text-slate-500" data-catalog-filter-empty>В этой группе ничего не найдено.</p>
@@ -138,7 +206,7 @@
                             <span>К фильтрам</span>
                         </a>
 
-                        @if ($search !== '' || $selectedTaxonomies->isNotEmpty() || $excludedTaxonomies->isNotEmpty() || $filterView->advancedFilterChips() !== [] || $titleContext !== null || $filterView->selectedYears() !== [] || $invalidYear)
+                        @if ($search !== '' || $filterView->hasActiveFilters() || $excludedTaxonomies->isNotEmpty() || $titleContext !== null || $invalidYear)
                             <div class="mt-3 space-y-3 text-sm">
                                 <div class="flex flex-wrap items-center gap-2">
                                     @if ($search !== '')
@@ -162,6 +230,15 @@
                                         @foreach ($taxonomies as $taxonomy)
                                             <x-ui.taxonomy-chip :href="route('titles.index', $filterView->exclusionQuery($filterType, $taxonomy->slug))" wire:click.prevent="removeExcluded('{{ $filterType }}', '{{ $taxonomy->slug }}')" active icon="fa-solid fa-minus">Без {{ $filterView->label($filterType) }}: {{ $taxonomy->name }} · убрать</x-ui.taxonomy-chip>
                                         @endforeach
+                                    @endforeach
+                                    @foreach ($filterView->listState('publication_type') as $publicationType)
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('publication_type', $publicationType))" wire:click.prevent="removeChoice('publication_type', '{{ $publicationType }}')" active icon="fa-solid fa-clapperboard">Тип: {{ $filterView->publicationTypeLabel($publicationType) }} · убрать</x-ui.taxonomy-chip>
+                                    @endforeach
+                                    @foreach ($filterView->listState('subtitles') as $subtitleValue)
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('subtitles', $subtitleValue))" wire:click.prevent="removeChoice('subtitles', '{{ $subtitleValue }}')" active icon="fa-solid fa-closed-captioning">Субтитры: {{ $filterView->subtitleLabel($subtitleValue) }} · убрать</x-ui.taxonomy-chip>
+                                    @endforeach
+                                    @foreach ($filterView->listState('quality') as $quality)
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('quality', $quality))" wire:click.prevent="removeChoice('quality', '{{ $quality }}')" active icon="fa-solid fa-display">Качество: {{ $quality }} · убрать</x-ui.taxonomy-chip>
                                     @endforeach
                                     @foreach ($filterView->advancedFilterChips() as $chip)
                                         <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutCatalogState($chip['key']))" wire:click.prevent="resetAdvanced('{{ $chip['key'] }}')" active icon="fa-solid fa-sliders">
@@ -316,6 +393,11 @@
                         @foreach ($filterView->listState('year') as $selectedYear)
                             <input type="hidden" name="year[]" value="{{ $selectedYear }}">
                         @endforeach
+                        @foreach (['publication_type', 'subtitles'] as $fixedGroup)
+                            @foreach ($filterView->listState($fixedGroup) as $fixedValue)
+                                <input type="hidden" name="{{ $fixedGroup }}[]" value="{{ $fixedValue }}">
+                            @endforeach
+                        @endforeach
                         @if ($sort !== 'updated')
                             <input type="hidden" name="sort" value="{{ $sort }}">
                         @endif
@@ -355,14 +437,6 @@
                                 <option value="">Любое</option>
                                 <option value="available" @selected($filterView->scalarState('video') === 'available')>Есть видео</option>
                                 <option value="missing" @selected($filterView->scalarState('video') === 'missing')>Нет видео</option>
-                            </select>
-                        </label>
-                        <label class="text-sm font-semibold text-slate-600">
-                            <span class="mb-1 block">Субтитры</span>
-                            <select wire:model="filters.subtitles" name="subtitles" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700">
-                                <option value="">Любые</option>
-                                <option value="available" @selected($filterView->scalarState('subtitles') === 'available')>Есть субтитры</option>
-                                <option value="missing" @selected($filterView->scalarState('subtitles') === 'missing')>Нет субтитров</option>
                             </select>
                         </label>
                         <label class="text-sm font-semibold text-slate-600">

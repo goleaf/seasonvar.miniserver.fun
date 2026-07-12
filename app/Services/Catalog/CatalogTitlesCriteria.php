@@ -17,6 +17,8 @@ final readonly class CatalogTitlesCriteria
      * @param  array<string, list<string>>  $filterSlugs
      * @param  array{country: list<string>, genre: list<string>}  $excludedFilterSlugs
      * @param  list<string>  $qualities
+     * @param  list<string>  $publicationTypes
+     * @param  list<string>  $subtitleAvailability
      * @param  array<string, list<int>>  $selectedTaxonomyIds
      * @param  array<string, list<int>>  $excludedTaxonomyIds
      */
@@ -35,8 +37,9 @@ final readonly class CatalogTitlesCriteria
         public ?float $ratingMin,
         public ?int $votesMin,
         public ?string $videoAvailability,
-        public ?string $subtitleAvailability,
+        public array $subtitleAvailability,
         public array $qualities,
+        public array $publicationTypes,
         public ?string $updatedPeriod,
         public ?string $letter,
         public string $view,
@@ -72,6 +75,7 @@ final readonly class CatalogTitlesCriteria
             videoAvailability: $request->videoAvailability(),
             subtitleAvailability: $request->subtitleAvailability(),
             qualities: $request->qualities(),
+            publicationTypes: $request->publicationTypes(),
             updatedPeriod: $request->updatedPeriod(),
             letter: $request->letter(),
             view: $request->view(),
@@ -124,6 +128,7 @@ final readonly class CatalogTitlesCriteria
             'video' => $this->videoAvailability,
             'subtitles' => $this->subtitleAvailability,
             'quality' => $this->qualities,
+            'publication_type' => $this->publicationTypes,
             'updated_after' => $this->updatedAfter(),
             'letter' => $this->letter,
             'rating_source' => $this->ratingSource,
@@ -145,8 +150,9 @@ final readonly class CatalogTitlesCriteria
             || $this->ratingMin !== null
             || $this->votesMin !== null
             || $this->videoAvailability !== null
-            || $this->subtitleAvailability !== null
+            || $this->subtitleAvailability !== []
             || $this->qualities !== []
+            || $this->publicationTypes !== []
             || $this->letter !== null;
     }
 
@@ -163,12 +169,19 @@ final readonly class CatalogTitlesCriteria
             + $selectedCount
             + $excludedCount
             + ($this->updatedPeriod === null ? 0 : 1)
+            + count($this->subtitleAvailability)
+            + count($this->publicationTypes)
             + ($this->titleContextId === null && ! $this->invalidTitleContext ? 0 : 1);
     }
 
     public function withoutYears(): self
     {
         return $this->copy(years: []);
+    }
+
+    public function withoutPublicationTypes(): self
+    {
+        return $this->copy(publicationTypes: []);
     }
 
     public function invalidated(): self
@@ -205,6 +218,7 @@ final readonly class CatalogTitlesCriteria
         ?array $filterSlugs = null,
         ?array $selectedTaxonomyIds = null,
         ?array $excludedTaxonomyIds = null,
+        ?array $publicationTypes = null,
         ?bool $invalidYear = null,
     ): self {
         return new self(
@@ -224,6 +238,7 @@ final readonly class CatalogTitlesCriteria
             videoAvailability: $this->videoAvailability,
             subtitleAvailability: $this->subtitleAvailability,
             qualities: $this->qualities,
+            publicationTypes: $publicationTypes ?? $this->publicationTypes,
             updatedPeriod: $this->updatedPeriod,
             letter: $this->letter,
             view: $this->view,

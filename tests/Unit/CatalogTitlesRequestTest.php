@@ -90,8 +90,9 @@ class CatalogTitlesRequestTest extends TestCase
             'rating_min' => '7.5',
             'votes_min' => '1000',
             'video' => 'available',
-            'subtitles' => 'available',
-            'quality' => ['1080p', '720p'],
+            'subtitles' => ['available', '', 'missing', 'available'],
+            'quality' => ['1080p', '', '720p', '1080p'],
+            'publication_type' => ['serial', '', 'anime', 'serial'],
             'updated' => 'month',
             'letter' => 'Ж',
             'view' => 'list',
@@ -112,13 +113,32 @@ class CatalogTitlesRequestTest extends TestCase
         $this->assertSame(7.5, $request->ratingMin());
         $this->assertSame(1000, $request->votesMin());
         $this->assertSame(['1080p', '720p'], $request->qualities());
+        $this->assertSame(['serial', 'anime'], $request->publicationTypes());
         $this->assertSame('available', $request->videoAvailability());
-        $this->assertSame('available', $request->subtitleAvailability());
+        $this->assertSame(['available', 'missing'], $request->subtitleAvailability());
         $this->assertSame('month', $request->updatedPeriod());
         $this->assertSame('Ж', $request->letter());
         $this->assertSame('list', $request->view());
         $this->assertSame(48, $request->perPage());
         $this->assertSame(CatalogSort::ImdbRating, $request->sort());
+    }
+
+    public function test_catalog_titles_request_rejects_unsupported_fixed_group_values(): void
+    {
+        $request = CatalogTitlesRequest::create('/titles', 'GET');
+        $validator = Validator::make(
+            [
+                'publication_type' => ['serial', 'movie'],
+                'subtitles' => ['available', 'sometimes'],
+            ],
+            $request->rules(),
+            $request->messages(),
+            $request->attributes(),
+        );
+
+        $this->assertTrue($validator->fails());
+        $this->assertArrayHasKey('publication_type.1', $validator->errors()->messages());
+        $this->assertArrayHasKey('subtitles.1', $validator->errors()->messages());
     }
 
     public function test_catalog_titles_criteria_captures_and_copies_normalized_state(): void
@@ -128,6 +148,8 @@ class CatalogTitlesRequestTest extends TestCase
             'year' => ['2019', '2020'],
             'genre' => ['drama'],
             'exclude_country' => ['ssha'],
+            'publication_type' => ['serial', 'anime'],
+            'subtitles' => ['available'],
             'updated' => 'week',
             'view' => 'list',
             'per_page' => '48',
@@ -142,14 +164,17 @@ class CatalogTitlesRequestTest extends TestCase
         $this->assertSame([2019, 2020], $criteria->years);
         $this->assertSame(['drama'], $criteria->filterSlugs['genre']);
         $this->assertSame(['ssha'], $criteria->excludedFilterSlugs['country']);
+        $this->assertSame(['serial', 'anime'], $criteria->publicationTypes);
+        $this->assertSame(['available'], $criteria->subtitleAvailability);
         $this->assertSame(CatalogSort::YearDesc, $criteria->sort);
         $this->assertSame('list', $criteria->view);
         $this->assertSame(48, $criteria->perPage);
         $this->assertSame(42, $criteria->titleContextId);
         $this->assertTrue($criteria->hasContentFilters());
-        $this->assertSame(6, $criteria->activeFilterCount());
+        $this->assertSame(9, $criteria->activeFilterCount());
         $this->assertNotNull($criteria->updatedAfter());
         $this->assertSame([], $criteria->withoutYears()->years);
+        $this->assertSame([], $criteria->withoutPublicationTypes()->publicationTypes);
         $this->assertSame([], $criteria->withoutRelation('genre')->filterSlugs['genre']);
         $this->assertSame(['drama'], $criteria->filterSlugs['genre']);
     }

@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Enums\CatalogFilterType;
+use App\Enums\CatalogPublicationType;
 use App\Enums\CatalogSort;
 use App\Http\Requests\CatalogTitlesRequest;
 use App\Livewire\Forms\CatalogSeriesFilters;
@@ -10,6 +11,7 @@ use App\Rules\CatalogFilterSlug;
 use App\Services\Catalog\CatalogTitlesPageBuilder;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -20,6 +22,12 @@ class CatalogSeries extends Component
     use WithPagination;
 
     public CatalogSeriesFilters $filters;
+
+    /** @var array{actor: string, director: string} */
+    public array $optionSearch = [
+        'actor' => '',
+        'director' => '',
+    ];
 
     #[Locked]
     public ?int $routeYear = null;
@@ -50,6 +58,24 @@ class CatalogSeries extends Component
 
     public function updated(string $property): void
     {
+        if (str_starts_with($property, 'optionSearch.')) {
+            $filterType = str($property)->after('optionSearch.')->toString();
+
+            if (! in_array($filterType, ['actor', 'director'], true)) {
+                unset($this->optionSearch[$filterType]);
+
+                return;
+            }
+
+            $this->optionSearch[$filterType] = Str::limit(
+                Str::squish((string) ($this->optionSearch[$filterType] ?? '')),
+                80,
+                '',
+            );
+
+            return;
+        }
+
         if (! str_starts_with($property, 'filters.')) {
             return;
         }
@@ -196,6 +222,21 @@ class CatalogSeries extends Component
         }
     }
 
+    public function removeChoice(string $group, string $value): void
+    {
+        $valid = match ($group) {
+            'publication_type' => CatalogPublicationType::tryFrom($value) !== null,
+            'subtitles' => in_array($value, ['available', 'missing'], true),
+            'quality' => in_array($value, ['2160p', '1440p', '1080p', '720p', '480p', '360p', '240p'], true),
+            default => false,
+        };
+
+        if ($valid && $this->filters->removeChoice($group, $value)) {
+            $this->resetErrorBag($group);
+            $this->resetPage();
+        }
+    }
+
     public function resetAll(): mixed
     {
         if ($this->routeYear !== null || $this->routeFilterType !== null) {
@@ -216,6 +257,7 @@ class CatalogSeries extends Component
             $this->routeFilterType,
             $this->routeTaxonomy,
             $this->getErrorBag()->isNotEmpty(),
+            $this->facetSearch(),
         );
 
         return view('catalog.titles', $data)
@@ -276,5 +318,15 @@ class CatalogSeries extends Component
         $request->setUserResolver(fn () => $user);
 
         return $request;
+    }
+
+    /** @return array{actor?: string, director?: string} */
+    private function facetSearch(): array
+    {
+        return collect($this->optionSearch)
+            ->only(['actor', 'director'])
+            ->map(fn (mixed $term): string => Str::limit(Str::squish((string) $term), 80, ''))
+            ->filter(fn (string $term): bool => mb_strlen($term) >= 2)
+            ->all();
     }
 }

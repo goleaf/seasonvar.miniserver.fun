@@ -46,6 +46,7 @@ class CatalogTitlesPageBuilder
         ?string $type = null,
         ?string $taxonomy = null,
         bool $invalidInput = false,
+        array $facetSearch = [],
     ): array {
         $search = $request->normalizedSearch();
         $searchQuery = $this->searchParser->parse($search);
@@ -177,8 +178,17 @@ class CatalogTitlesPageBuilder
         $catalogTitles = $catalogTitles->paginate($perPage)->appends($paginationQuery);
         $seoRequest = $this->sanitizedSeoRequest($request, $paginationQuery, (int) $catalogTitles->currentPage());
 
-        $filterTaxonomies = collect($filterTypes)->mapWithKeys(function (string $filterType) use ($request): array {
-            return [$filterType => $this->facets->taxonomies($filterType, $this->filterLimit($filterType), $request->user())];
+        $filterTaxonomies = collect($filterTypes)->mapWithKeys(function (string $filterType) use ($request, $facetSearch): array {
+            $search = in_array($filterType, ['actor', 'director'], true)
+                ? ($facetSearch[$filterType] ?? null)
+                : null;
+
+            return [$filterType => $this->facets->taxonomies(
+                $filterType,
+                $this->filterLimit($filterType),
+                $request->user(),
+                is_string($search) ? $search : null,
+            )];
         });
 
         $selectedTaxonomies->each(function (Collection $selected, string $filterType) use ($filterTaxonomies): void {
@@ -200,6 +210,7 @@ class CatalogTitlesPageBuilder
             });
         });
         $yearBuckets = $this->facets->years($years, 20, $request->user());
+        $publicationTypeOptions = $this->facets->publicationTypes($request->user());
 
         $hasCatalogContext = $criteria->hasContentFilters()
             || $invalidYear
@@ -262,6 +273,7 @@ class CatalogTitlesPageBuilder
             'filterTypes' => $filterTypes,
             'filterView' => $filterView,
             'yearBuckets' => $yearBuckets,
+            'publicationTypeOptions' => $publicationTypeOptions,
             'seo' => $this->seo->titles(
                 $seoRequest,
                 (int) $catalogTitles->total(),

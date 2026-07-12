@@ -92,6 +92,53 @@ class CatalogPageTest extends TestCase
             ->assertSet('filters.perPage', 24);
     }
 
+    public function test_livewire_catalog_removes_one_choice_and_resets_only_the_requested_group(): void
+    {
+        CatalogTitle::factory()->count(30)->create();
+
+        Livewire::test(CatalogSeries::class)
+            ->set('filters.genre', ['drama', 'thriller'])
+            ->set('filters.country', ['rossiya'])
+            ->set('filters.publicationTypes', ['serial', 'anime'])
+            ->set('filters.subtitles', ['available', 'missing'])
+            ->call('setPage', 2)
+            ->call('removeChoice', 'publication_type', 'anime')
+            ->assertSet('filters.publicationTypes', ['serial'])
+            ->assertSet('filters.genre', ['drama', 'thriller'])
+            ->assertSet('filters.country', ['rossiya'])
+            ->assertSet('filters.subtitles', ['available', 'missing'])
+            ->assertSet('paginators.page', 1)
+            ->call('resetGroup', 'genre')
+            ->assertSet('filters.genre', [])
+            ->assertSet('filters.country', ['rossiya'])
+            ->assertSet('filters.publicationTypes', ['serial']);
+    }
+
+    public function test_livewire_catalog_searches_bounded_actor_options_on_the_server(): void
+    {
+        foreach (range(1, 24) as $number) {
+            $actor = Actor::query()->create([
+                'name' => sprintf('Актер %02d', $number),
+                'slug' => 'akter-'.$number,
+            ]);
+            $title = CatalogTitle::factory()->create();
+            $title->actors()->attach($actor);
+        }
+
+        $target = Actor::query()->create([
+            'name' => 'Искомый редкий актер',
+            'slug' => 'iskomyi-redkii-akter',
+        ]);
+        $targetTitle = CatalogTitle::factory()->create();
+        $targetTitle->actors()->attach($target);
+
+        Livewire::test(CatalogSeries::class)
+            ->assertDontSee($target->name)
+            ->set('optionSearch.actor', 'Искомый редкий')
+            ->assertSee($target->name)
+            ->assertSet('paginators.page', 1);
+    }
+
     public function test_home_page_lists_country_filters_without_four_item_cap(): void
     {
         $catalogTitle = CatalogTitle::factory()->create();

@@ -3,6 +3,7 @@
 namespace App\Services\Catalog;
 
 use App\Enums\CatalogSort;
+use App\Enums\CatalogPublicationType;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
 use App\Models\CatalogTitleRating;
@@ -426,8 +427,7 @@ class CatalogTitleQuery
                     DB::table($pivotTable)
                         ->select($pivotTable.'.'.$titlePivotKey)
                         ->whereIn($pivotTable.'.'.$relatedPivotKey, $selectedIds)
-                        ->groupBy($pivotTable.'.'.$titlePivotKey)
-                        ->havingRaw('count(distinct '.$pivotTable.'.'.$relatedPivotKey.') = ?', [count($selectedIds)]),
+                        ->groupBy($pivotTable.'.'.$titlePivotKey),
                 );
             }
 
@@ -493,11 +493,22 @@ class CatalogTitleQuery
             $query->whereNotIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds($user));
         }
 
-        $subtitleAvailability = $filters['subtitles'] ?? null;
-        if ($subtitleAvailability === 'available') {
+        $subtitleAvailability = $filters['subtitles'] ?? [];
+        if ($subtitleAvailability === ['available']) {
             $query->whereIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds($user, true));
-        } elseif ($subtitleAvailability === 'missing') {
+        } elseif ($subtitleAvailability === ['missing']) {
             $query->whereNotIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds($user, true));
+        }
+
+        $publicationTypes = collect($filters['publication_type'] ?? [])
+            ->map(fn (mixed $type): ?CatalogPublicationType => is_string($type) ? CatalogPublicationType::tryFrom($type) : null)
+            ->filter()
+            ->flatMap(fn (CatalogPublicationType $type): array => $type->databaseValues())
+            ->unique()
+            ->values()
+            ->all();
+        if ($publicationTypes !== []) {
+            $query->whereIn($catalogTitleTable.'.type', $publicationTypes);
         }
 
         $qualities = $filters['quality'] ?? [];

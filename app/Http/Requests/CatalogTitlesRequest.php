@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Enums\CatalogFilterType;
+use App\Enums\CatalogPublicationType;
 use App\Enums\CatalogSort;
 use App\Rules\CatalogFilterSlug;
 use Closure;
@@ -48,9 +49,12 @@ class CatalogTitlesRequest extends FormRequest
             'rating_min' => ['nullable', 'numeric', 'between:0,10'],
             'votes_min' => ['nullable', 'integer', 'min:0'],
             'video' => ['nullable', Rule::in(['available', 'missing'])],
-            'subtitles' => ['nullable', Rule::in(['available', 'missing'])],
+            'subtitles' => ['nullable', 'array', 'max:2'],
+            'subtitles.*' => ['string', 'distinct:strict', Rule::in(['available', 'missing'])],
             'quality' => ['nullable', 'array', 'max:'.self::MAX_SELECTIONS],
             'quality.*' => ['string', 'distinct', Rule::in(['2160p', '1440p', '1080p', '720p', '480p', '360p', '240p'])],
+            'publication_type' => ['nullable', 'array', 'max:'.count(CatalogPublicationType::cases())],
+            'publication_type.*' => ['string', 'distinct:strict', Rule::enum(CatalogPublicationType::class)],
             'updated' => ['nullable', Rule::in(['day', 'week', 'month', 'year'])],
             'letter' => ['nullable', 'string', 'regex:/^(?:latin|[A-Za-zА-Яа-яЁё]|#)$/iu'],
             'view' => ['nullable', Rule::in(['grid', 'list'])],
@@ -84,6 +88,8 @@ class CatalogTitlesRequest extends FormRequest
             '*.max' => 'Выбрано слишком много значений фильтра.',
             'letter.regex' => 'Выбрана неподдерживаемая буква.',
             'quality.*.in' => 'Выбрано неподдерживаемое качество видео.',
+            'subtitles.*.in' => 'Выбрано неподдерживаемое состояние субтитров.',
+            'publication_type.*.enum' => 'Выбран неподдерживаемый тип публикации.',
         ];
     }
 
@@ -99,6 +105,8 @@ class CatalogTitlesRequest extends FormRequest
             'sort' => 'сортировка',
             'type' => 'тип фильтра',
             'taxonomy' => 'значение фильтра',
+            'publication_type' => 'тип публикации',
+            'subtitles' => 'субтитры',
         ];
 
         foreach (CatalogFilterType::cases() as $filterType) {
@@ -113,7 +121,7 @@ class CatalogTitlesRequest extends FormRequest
     {
         $normalized = [];
         $repeatedKeys = array_merge(
-            ['year', 'exclude_country', 'exclude_genre', 'quality'],
+            ['year', 'exclude_country', 'exclude_genre', 'quality', 'publication_type', 'subtitles'],
             CatalogFilterType::values(),
         );
 
@@ -126,7 +134,7 @@ class CatalogTitlesRequest extends FormRequest
             $normalized[$key] = $this->normalizeRepeatedValues($values);
         }
 
-        foreach (['q', 'title', 'sort', 'type', 'taxonomy', 'year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_source', 'rating_min', 'votes_min', 'video', 'subtitles', 'updated', 'letter', 'view', 'per_page'] as $key) {
+        foreach (['q', 'title', 'sort', 'type', 'taxonomy', 'year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_source', 'rating_min', 'votes_min', 'video', 'updated', 'letter', 'view', 'per_page'] as $key) {
             if (! $this->query->has($key) || ! is_scalar($this->query($key))) {
                 continue;
             }
@@ -256,9 +264,16 @@ class CatalogTitlesRequest extends FormRequest
         return $this->nullableString('video');
     }
 
-    public function subtitleAvailability(): ?string
+    /** @return list<string> */
+    public function subtitleAvailability(): array
     {
-        return $this->nullableString('subtitles');
+        return $this->scalarStringList('subtitles');
+    }
+
+    /** @return list<string> */
+    public function publicationTypes(): array
+    {
+        return $this->scalarStringList('publication_type');
     }
 
     public function updatedPeriod(): ?string
@@ -291,9 +306,9 @@ class CatalogTitlesRequest extends FormRequest
     public function catalogQueryState(): array
     {
         $keys = array_merge(
-            ['year', 'exclude_country', 'exclude_genre', 'quality'],
+            ['year', 'exclude_country', 'exclude_genre', 'quality', 'publication_type', 'subtitles'],
             CatalogFilterType::values(),
-            ['year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_source', 'rating_min', 'votes_min', 'video', 'subtitles', 'updated', 'letter', 'view', 'per_page'],
+            ['year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_source', 'rating_min', 'votes_min', 'video', 'updated', 'letter', 'view', 'per_page'],
         );
 
         return collect($keys)
@@ -386,6 +401,10 @@ class CatalogTitlesRequest extends FormRequest
         $normalized = [];
 
         foreach ($values as $value) {
+            if ($value === null) {
+                continue;
+            }
+
             if (! is_scalar($value)) {
                 $normalized[] = $value;
 
