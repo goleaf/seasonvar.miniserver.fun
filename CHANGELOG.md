@@ -4,6 +4,7 @@
 
 - Added consistent OR-within-group and AND-between-group catalog matching for years, all existing taxonomy relations, publication types, video qualities, and subtitle availability, with normalized bounded URL arrays and per-value/group resets.
 - Added bounded debounced server-side actor/director option search, canonical publication-type aliases, duplicate-free grouped pivot subqueries, and regression coverage for invalid/missing URL values, exact paginator totals, Livewire state preservation, and multi-group combinations.
+- Hardened Livewire browser-history hydration for empty URL fields and corrected the visible active-filter count to include fixed list and advanced scalar groups.
 - Refactored the main `/titles` catalog into a full-page Livewire 4.3 component with bounded URL-synchronized state, debounced server search, multi-select and advanced filters, deterministic sorting, stable pagination, group/full reset actions, loading/error/empty feedback, and no Eloquent collections in the public snapshot.
 - Preserved the existing GET form fallback and centralized `CatalogTitlesRequest` validation plus the shared `CatalogTitlesPageBuilder`/`CatalogTitleQuery` data path; added Russian Livewire pagination and regression coverage in existing feature tests.
 - Centralized public title visibility, normalized catalog filtering, facet counts, API queries, sitemap/feed selection, public statistics, and recommendation candidates in the reusable `CatalogTitleQuery` layer.

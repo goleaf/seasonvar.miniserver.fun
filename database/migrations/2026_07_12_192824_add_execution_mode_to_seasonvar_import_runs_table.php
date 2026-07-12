@@ -22,6 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('seasonvar_import_runs', function (Blueprint $table): void {
+            $table->dropIndex(['execution_mode']);
             $table->dropColumn('execution_mode');
         });
     }

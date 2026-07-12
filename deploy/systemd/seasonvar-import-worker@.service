@@ -1,0 +1,18 @@
+[Unit]
+Description=Seasonvar import queue worker %i
+After=network.target redis.service
+
+[Service]
+Type=simple
+User=www
+Group=www
+WorkingDirectory=/www/wwwroot/seasonvar.miniserver.fun
+ExecStart=/usr/bin/php artisan queue:work redis --queue=seasonvar-import --sleep=1 --tries=0 --timeout=900 --max-time=3600 --max-jobs=1000
+ExecReload=/usr/bin/php artisan queue:restart
+Restart=always
+RestartSec=5
+TimeoutStopSec=1200
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

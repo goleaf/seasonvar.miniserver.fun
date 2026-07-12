@@ -68,4 +68,35 @@ class CatalogTitlesViewModelTest extends TestCase
             'sort' => 'year_desc',
         ], $viewModel->withoutFiltersQuery);
     }
+
+    public function test_active_filter_count_includes_relation_fixed_list_and_scalar_groups(): void
+    {
+        $genre = new Genre([
+            'name' => 'Драма',
+            'slug' => 'drama',
+        ]);
+        $viewModel = new CatalogTitlesViewModel(
+            search: '',
+            sort: 'updated',
+            year: null,
+            requestedYear: '',
+            invalidYear: false,
+            activeTaxonomies: collect(['genre' => $genre]),
+            selectedTaxonomies: collect(['genre' => collect([$genre])]),
+            activeFilterSlugs: ['genre' => 'drama'],
+            invalidFilterSlugs: [],
+            titleContext: null,
+            selectedFilterSlugs: ['genre' => ['drama']],
+            catalogQueryState: [
+                'genre' => ['drama'],
+                'year' => ['2024', '2025'],
+                'publication_type' => ['serial', 'anime'],
+                'subtitles' => ['available'],
+                'quality' => ['1080p', '720p'],
+                'video' => 'available',
+            ],
+        );
+
+        $this->assertSame(9, $viewModel->activeFilterCount());
+    }
 }

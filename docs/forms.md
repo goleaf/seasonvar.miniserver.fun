@@ -8,6 +8,7 @@
 - Header search использует тот же маршрут и тот же параметр `q`; значение для layout готовит `App\View\ViewData\AppLayoutData`.
 - `CatalogSeriesFilters` хранит только нормализуемые scalar/list значения. Livewire actions сбрасывают страницу при изменении поиска, фильтров, сортировки или размера выдачи; скрытые поля сохраняют те же активные параметры для GET fallback.
 - Multi-value свойства используют `#[Url(history: true)]`, поэтому выбранные значения сохраняются при сортировке, пагинации, обновлении страницы и browser back/forward. Удаление одного chip меняет только одно значение, групповой сброс очищает только указанную группу.
+- Empty-state свойства формы допускают `null` на границе Livewire hydration, потому что Laravel преобразует пустые JSON-строки до lifecycle hooks; `CatalogSeriesFilters::toRequestInput()` отбрасывает `null`, а успешная нормализация возвращает UI-default `''`.
 - `optionSearch.actor` и `optionSearch.director` — временные строки серверного поиска вариантов: они не попадают в URL и не заменяют выбранные actor/director slug.
 
 ## Компоненты

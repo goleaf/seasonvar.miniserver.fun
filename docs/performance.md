@@ -41,6 +41,8 @@
 ## Импорт
 
 - `seasonvar:import` обновляет счетчики активного запуска после каждого обработанного chunk страницы или отдельного URL.
+- Queued-режим пишет задания в Redis-очередь `seasonvar-import`; десять workers не резервируют jobs в SQLite и выполняют внешние HTTP-запросы вне catalog transactions.
+- Диспетчер может запускаться десять раз в сутки, но живые lease и 24-часовой freshness interval не позволяют повторно ставить или скачивать свежую страницу при каждом cron tick.
 - Страница состояния не должна ждать завершения длинного цикла, чтобы показать выбранные, обработанные, ошибочные и добавленные видео.
 - После завершения `seasonvar:import` команда принудительно обновляет stats snapshot, чтобы следующий Livewire poll показывал финальные счетчики запуска.
 - Регрессия закрыта тестом `SeasonvarImportMaintenanceTest::test_it_updates_import_run_counters_after_each_processed_page_chunk`.

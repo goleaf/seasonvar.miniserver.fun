@@ -202,7 +202,7 @@ class SeasonvarImportMaintenanceTest extends TestCase
             'page_type' => 'serial',
             'parse_status' => 'parsed',
             'import_status' => 'pending',
-            'last_crawled_at' => now()->subDay(),
+            'last_crawled_at' => now()->subHours(23),
         ]);
 
         $this->artisan('seasonvar:import', ['--no-discovery' => true])
@@ -472,7 +472,7 @@ class SeasonvarImportMaintenanceTest extends TestCase
                 'page_type' => 'serial',
                 'parse_status' => 'parsed',
                 'import_status' => 'pending',
-                'last_crawled_at' => now()->subDay(),
+                'last_crawled_at' => now()->subHours(23),
                 'last_imported_at' => null,
             ]);
         }

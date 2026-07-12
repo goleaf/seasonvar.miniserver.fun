@@ -19,6 +19,7 @@ npm install
 php artisan seasonvar:import
 php artisan seasonvar:import "https://seasonvar.ru/serial-615--Bez_sleda_pssmtlk-1-season.html" --force
 php artisan seasonvar:import --forever
+php artisan seasonvar:import --queued
 php artisan integrations:doctor
 php artisan project:docs-refresh
 php artisan test --compact
@@ -35,7 +36,15 @@ npm run build
 
 Команда защищена от параллельного запуска, постепенно проверяет старые видео-ссылки без статуса доступности, дополняет старые медиа качеством/форматом/стабильным ключом, нормализует статусы уже разобранных страниц и отключает некорректные склеенные ссылки источника.
 
-Для cron используется та же команда `php artisan seasonvar:import`. Если предыдущий импорт еще идет, новый cron-запуск спокойно пропускается с успешным кодом выхода, чтобы все обновления оставались в одной очереди импорта.
+Для параллельного production-импорта используется `php artisan seasonvar:import --queued`. Диспетчер закрепляет только подходящие страницы, Redis-очередь распределяет их между workers, а lease и блокировка тайтла исключают повторное скачивание одной страницы и конкурентное изменение сезонов одного сериала. Свежая успешно импортированная страница проверяется повторно через 24 часа, а изменившийся `content_hash` запускает повторный разбор постера и остальных данных.
+
+```bash
+redis-cli ping
+php artisan migrate --force
+php artisan seasonvar:import --queued
+```
+
+`redis-cli ping` должен вернуть `PONG`. Надёжная установка десяти workers и точная cron-строка приведены в `docs/deployment.md`.
 
 После завершения импорта команда обновляет серверный снимок статистики, который использует live-страница `/stats`.
 

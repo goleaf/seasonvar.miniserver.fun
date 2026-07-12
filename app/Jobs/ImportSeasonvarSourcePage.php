@@ -79,7 +79,7 @@ class ImportSeasonvarSourcePage implements ShouldQueue
             $page = SourcePage::query()->with('source')->find($this->sourcePageId);
 
             if ($page === null) {
-                $runs->addCounters($this->importRunId, ['selected' => 1, 'failed' => 1]);
+                $runs->addCounters($this->importRunId, ['failed' => 1]);
                 $releaseClaim = true;
 
                 return;
@@ -87,7 +87,6 @@ class ImportSeasonvarSourcePage implements ShouldQueue
 
             $result = $importer->parsePages(collect([$page]), null, $this->force, $this->importRunId);
             $runs->addCounters($this->importRunId, [
-                'selected' => 1,
                 'parsed' => $result['parsed'],
                 'failed' => $result['failed'],
                 'media_attached' => $result['media_attached'],

@@ -247,7 +247,7 @@
                                     @endforeach
                                 </div>
                                 <div class="flex flex-wrap gap-3 text-slate-500">
-                                    <span><i class="fa-solid fa-diagram-project text-slate-400" aria-hidden="true"></i> Активных фильтров: {{ count($filterView->selectedYears()) + $selectedTaxonomies->sum(fn ($taxonomies) => $taxonomies->count()) + $excludedTaxonomies->sum(fn ($taxonomies) => $taxonomies->count()) }}</span>
+                                    <span><i class="fa-solid fa-diagram-project text-slate-400" aria-hidden="true"></i> Активных фильтров: {{ $filterView->activeFilterCount() }}</span>
                                     @if ($invalidYear)
                                         <span><i class="fa-solid fa-calendar-xmark text-amber-600" aria-hidden="true"></i> Ошибочный год: {{ $requestedYear }}</span>
                                     @endif

@@ -23,7 +23,7 @@ class CatalogSeriesFilters extends Form
     ];
 
     #[Url(as: 'q', history: true, except: '')]
-    public string|int $search = '';
+    public string|int|null $search = '';
 
     #[Url(as: 'year', history: true, except: [])]
     public array $years = [];
@@ -74,43 +74,43 @@ class CatalogSeriesFilters extends Form
     public array $subtitles = [];
 
     #[Url(as: 'title', history: true, except: '')]
-    public string|int $titleContext = '';
+    public string|int|null $titleContext = '';
 
     #[Url(as: 'year_from', history: true, except: '')]
-    public string|int $yearFrom = '';
+    public string|int|null $yearFrom = '';
 
     #[Url(as: 'year_to', history: true, except: '')]
-    public string|int $yearTo = '';
+    public string|int|null $yearTo = '';
 
     #[Url(as: 'seasons_min', history: true, except: '')]
-    public string|int $seasonsMin = '';
+    public string|int|null $seasonsMin = '';
 
     #[Url(as: 'seasons_max', history: true, except: '')]
-    public string|int $seasonsMax = '';
+    public string|int|null $seasonsMax = '';
 
     #[Url(as: 'episodes_min', history: true, except: '')]
-    public string|int $episodesMin = '';
+    public string|int|null $episodesMin = '';
 
     #[Url(as: 'episodes_max', history: true, except: '')]
-    public string|int $episodesMax = '';
+    public string|int|null $episodesMax = '';
 
     #[Url(as: 'rating_source', history: true, except: '')]
-    public string $ratingSource = '';
+    public ?string $ratingSource = '';
 
     #[Url(as: 'rating_min', history: true, except: '')]
-    public string|int|float $ratingMin = '';
+    public string|int|float|null $ratingMin = '';
 
     #[Url(as: 'votes_min', history: true, except: '')]
-    public string|int $votesMin = '';
+    public string|int|null $votesMin = '';
 
     #[Url(history: true, except: '')]
-    public string $video = '';
+    public ?string $video = '';
 
     #[Url(history: true, except: '')]
-    public string $updated = '';
+    public ?string $updated = '';
 
     #[Url(history: true, except: '')]
-    public string $letter = '';
+    public ?string $letter = '';
 
     #[Url(history: true, except: 'updated')]
     public string $sort = 'updated';
@@ -293,7 +293,8 @@ class CatalogSeriesFilters extends Form
 
     private function isDefaultValue(string $key, mixed $value): bool
     {
-        return $value === ''
+        return $value === null
+            || $value === ''
             || $value === []
             || ($key === 'sort' && $value === 'updated')
             || ($key === 'view' && $value === 'grid')

@@ -379,13 +379,60 @@ class SeasonvarParsePageCommandTest extends TestCase
         ]);
     }
 
+    public function test_changed_source_page_updates_poster(): void
+    {
+        $this->travelTo('2026-07-10 08:00:00');
+        Http::preventStrayRequests();
+        $url = 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html';
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $page = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+            'page_type' => 'serial',
+            'parse_status' => 'pending',
+            'content_hash' => null,
+        ]);
+        Http::fake([
+            $url => Http::sequence()
+                ->push($this->seasonPageHtml(4, [1 => 'Пилот'], posterUrl: 'https://img.example.com/old.jpg'))
+                ->push($this->seasonPageHtml(4, [1 => 'Пилот'], posterUrl: 'https://img.example.com/new.jpg')),
+        ]);
+        $importer = app(SeasonvarCatalogImporter::class);
+
+        $importer->parsePage($page);
+        $firstChangedAt = $page->fresh()->last_changed_at;
+        $firstImportedAt = $page->fresh()->last_imported_at;
+        $this->travel(25)->hours();
+        $importer->parsePage($page->fresh());
+
+        $freshPage = $page->fresh();
+
+        $this->assertSame(
+            'https://img.example.com/new.jpg',
+            CatalogTitle::query()->where('external_id', '47915')->value('poster_url'),
+        );
+        Http::assertSentCount(2);
+        $this->assertTrue($freshPage->last_changed_at->greaterThan($firstChangedAt));
+        $this->assertTrue($freshPage->last_imported_at->greaterThan($firstImportedAt));
+    }
+
     /**
      * @param  array<int, string>  $episodes
      * @param  list<string>  $mediaUrls
      * @param  list<string>  $seasonvarPlaylists
      */
-    private function seasonPageHtml(int $seasonNumber, array $episodes, array $mediaUrls = [], array $seasonvarPlaylists = []): string
-    {
+    private function seasonPageHtml(
+        int $seasonNumber,
+        array $episodes,
+        array $mediaUrls = [],
+        array $seasonvarPlaylists = [],
+        ?string $posterUrl = null,
+    ): string {
         $episodeItems = collect($episodes)
             ->mapWithKeys(fn (string $title, int $number): array => [
                 "{$number}_seriya" => ['n' => (string) $number, 'title' => $title],
@@ -394,12 +441,14 @@ class SeasonvarParsePageCommandTest extends TestCase
         $episodesJson = json_encode([$episodeItems], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
         $mediaJson = json_encode($mediaUrls, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
         $playlistsJson = json_encode($seasonvarPlaylists, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $posterMeta = $posterUrl === null ? '' : '<meta property="og:image" content="'.$posterUrl.'">';
 
         return <<<HTML
             <html>
                 <head>
                     <title>Черный список: На кухне {$seasonNumber} сезон смотреть онлайн</title>
                     <meta name="description" content="Описание передачи">
+                    {$posterMeta}
                 </head>
                 <body>
                     <h1>Сериал Черный список: На кухне {$seasonNumber} сезон онлайн</h1>

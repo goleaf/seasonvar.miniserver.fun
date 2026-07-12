@@ -17,6 +17,8 @@
 ## Actions и сервисы
 
 - Дискретные бизнес-операции оформляются как небольшие сервисы или action-классы с constructor/method injection; контроллеры и команды не должны держать тяжелую логику внутри `handle()` или action-методов.
+- Параллельный режим `seasonvar:import --queued` использует `SeasonvarQueuedImportDispatcher`, атомарные lease в `SeasonvarPageClaimManager`, Redis job `ImportSeasonvarSourcePage` и единый `FinalizeSeasonvarQueuedImport`. SQLite не используется как очередь импорта.
+- Worker проверяет lease token до HTTP-запроса, а Redis lock по external ID не позволяет разным сезонным страницам одного тайтла одновременно менять общие связи.
 - Сервисы возвращают типизированный результат или готовые данные для вызывающего слоя, а вывод сообщений, HTTP-ответы и консольные коды остаются в контроллере или команде.
 - Не добавлять repository-классы для простых Eloquent-связей; reusable запросы остаются в query-сервисах, scopes или page-builder сервисах.
 - `project:docs-refresh` делегирует обновление управляемых блоков документации в `App\Services\ProjectDocumentation\ProjectDocumentationRefresher`, а команда только печатает результат и возвращает код выхода.

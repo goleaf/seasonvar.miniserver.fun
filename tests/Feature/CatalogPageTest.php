@@ -139,6 +139,20 @@ class CatalogPageTest extends TestCase
             ->assertSet('paginators.page', 1);
     }
 
+    public function test_livewire_catalog_normalizes_null_empty_url_state_without_uninitializing_the_form(): void
+    {
+        CatalogTitle::factory()->create();
+
+        Livewire::test(CatalogSeries::class)
+            ->set('filters.search', null)
+            ->set('filters.yearFrom', null)
+            ->set('filters.video', null)
+            ->assertSet('filters.search', '')
+            ->assertSet('filters.yearFrom', '')
+            ->assertSet('filters.video', '')
+            ->assertHasNoErrors();
+    }
+
     public function test_home_page_lists_country_filters_without_four_item_cap(): void
     {
         $catalogTitle = CatalogTitle::factory()->create();

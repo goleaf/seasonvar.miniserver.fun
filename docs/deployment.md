@@ -59,8 +59,57 @@ Google-интеграции по умолчанию выключены. Если
 - `UPLOADS_MAX_IMAGE_KILOBYTES` — максимальный размер изображения для reusable upload-валидации.
 - `NOTIFICATIONS_MAIL_QUEUE` — queue для email notification jobs.
 - `SEASONVAR_IMPORT_FAILURE_MAIL_TO` и `SEASONVAR_IMPORT_FAILURE_MAIL_TO_NAME` — optional получатель письма об ошибке queued import; пустое значение отключает отправку.
+- `SEASONVAR_QUEUE_CONNECTION=redis`, `SEASONVAR_QUEUE_NAME=seasonvar-import` и `SEASONVAR_QUEUE_LOCK_STORE=redis` — отдельная очередь и locks параллельного импортера.
+- `SEASONVAR_QUEUE_CLAIM_SECONDS=86400`, `SEASONVAR_QUEUE_WORKER_TIMEOUT=900` и `SEASONVAR_IMPORT_REFRESH_AFTER_HOURS=24` — lease, timeout и период повторной проверки источника.
 
 В коде приложения эти значения читаются через `config('seasonvar.*')`, `config('queue.*')`, `config('database.*')` и другие config-файлы, а не через прямой `env()`.
+
+## Десять workers импорта Seasonvar
+
+Перед запуском примените additive migrations и проверьте Redis:
+
+```bash
+cd /www/wwwroot/seasonvar.miniserver.fun
+redis-cli ping
+php artisan migrate --force
+php artisan seasonvar:import --queued
+```
+
+Для временного фонового запуска без нового process-manager:
+
+```bash
+cd /www/wwwroot/seasonvar.miniserver.fun
+for worker in $(seq 1 10); do
+  nohup /usr/bin/php artisan queue:work redis --queue=seasonvar-import --sleep=1 --tries=0 --timeout=900 --max-time=3600 \
+    >> "storage/logs/seasonvar-worker-${worker}.log" 2>&1 &
+done
+```
+
+`nohup` подходит для немедленного ручного запуска. Для постоянной работы после перезагрузки установите версионируемый systemd template:
+
+```bash
+sudo cp deploy/systemd/seasonvar-import-worker@.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now seasonvar-import-worker@{1..10}.service
+systemctl --no-pager --type=service 'seasonvar-import-worker@*'
+```
+
+Управление и диагностика:
+
+```bash
+sudo systemctl restart 'seasonvar-import-worker@*.service'
+journalctl -u 'seasonvar-import-worker@*' -f
+php artisan queue:failed
+php artisan queue:retry all
+```
+
+Добавьте в crontab пользователя `www` ровно одну строку с десятью запусками в сутки:
+
+```cron
+0 0,2,5,7,10,12,14,17,19,22 * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan seasonvar:import --queued >> storage/logs/seasonvar-cron.log 2>&1
+```
+
+Повторный cron не дублирует живые jobs: coordinator lock сериализует постановку, page lease защищает конкретный URL, а Redis title lock сериализует сезоны одного сериала. Каждая просроченная страница запрашивается заново и сравнивается по `content_hash`; видео не скачивается.
 
 ## Правила конфигурации
 

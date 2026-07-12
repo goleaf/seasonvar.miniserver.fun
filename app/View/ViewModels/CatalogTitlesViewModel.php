@@ -268,6 +268,33 @@ class CatalogTitlesViewModel
         return $this->advancedFilterChips() !== [] || $this->listState('quality') !== [];
     }
 
+    public function activeFilterCount(): int
+    {
+        $listCount = collect(['publication_type', 'subtitles', 'quality'])
+            ->sum(fn (string $key): int => count($this->listState($key)));
+        $scalarCount = collect([
+            'year_from',
+            'year_to',
+            'seasons_min',
+            'seasons_max',
+            'episodes_min',
+            'episodes_max',
+            'rating_source',
+            'rating_min',
+            'votes_min',
+            'video',
+            'updated',
+            'letter',
+        ])->filter(fn (string $key): bool => $this->scalarState($key) !== '')->count();
+
+        return count($this->selectedYears())
+            + $this->selectedTaxonomies->sum(fn (Collection $taxonomies): int => $taxonomies->count())
+            + $this->excludedTaxonomies->sum(fn (Collection $taxonomies): int => $taxonomies->count())
+            + $listCount
+            + $scalarCount
+            + ($this->invalidYear ? 1 : 0);
+    }
+
     /** @return list<string> */
     public function listState(string $key): array
     {

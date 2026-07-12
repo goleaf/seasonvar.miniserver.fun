@@ -136,6 +136,60 @@ class SeasonvarImportPipeline
     }
 
     /**
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     */
+    public function finalizeQueuedRun(SeasonvarImportRun $run, ?callable $progress = null): SeasonvarImportRun
+    {
+        $loggedProgress = fn (string $event, array $context = []) => $this->recordProgress(
+            $run,
+            $progress,
+            $event,
+            $context,
+        );
+
+        try {
+            $storageMaintenanceResult = $this->storageMaintenance->prune();
+            $sourceStatusBackfillResult = $this->backfillParsedSourcePageStatuses($loggedProgress);
+            $mediaMetadataResult = $this->refreshMediaMetadataBacklog($loggedProgress);
+            $mediaSourceKeyResult = $this->backfillMediaSourceKeys($loggedProgress);
+            $mediaBacklogResult = $this->refreshMediaBacklog($loggedProgress);
+            $relationCleanupResult = $this->cleanupInvalidCatalogRelations($loggedProgress);
+            $mergeResult = $this->titleMerger->merge($loggedProgress);
+            $recommendationResult = $this->recommendations->rebuild($loggedProgress);
+
+            $this->addRunCounters($run, [
+                'cycles' => 1,
+                'media_updated' => $mediaBacklogResult['media_updated'],
+                'media_failed' => $mediaBacklogResult['media_failed'],
+            ], [
+                'last_storage_maintenance' => $storageMaintenanceResult,
+                'last_source_status_backfill' => $sourceStatusBackfillResult,
+                'last_media_metadata_backlog' => $mediaMetadataResult,
+                'last_media_source_key_backlog' => $mediaSourceKeyResult,
+                'last_media_backlog' => $mediaBacklogResult,
+                'last_relation_cleanup' => $relationCleanupResult,
+                'last_merge' => $mergeResult,
+                'last_recommendations' => $recommendationResult,
+            ]);
+
+            $run->fill([
+                'status' => 'completed',
+                'finished_at' => now(),
+            ])->save();
+
+            return $run->refresh();
+        } catch (Throwable $exception) {
+            $run->fill([
+                'status' => 'failed',
+                'last_error' => $exception->getMessage(),
+                'finished_at' => now(),
+            ])->save();
+
+            throw $exception;
+        }
+    }
+
+    /**
      * @param  callable(string, array<string, mixed>): void  $progress
      */
     private function runCycle(

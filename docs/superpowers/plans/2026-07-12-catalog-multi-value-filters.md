@@ -78,7 +78,7 @@
 - [x] Add publication type and subtitle checkbox groups with group reset and individual active-chip removal.
 - [x] Rename the existing translation label to accurately describe stored voice/translation data.
 - [x] Keep ordinary taxonomy local search as progressive enhancement and preserve GET fallback hidden state.
-- [ ] Run focused view/component tests and `npm run build`.
+- [x] Run focused view/component tests and `npm run build`.
 
 ### Task 4: Verify, document, and deliver
 
@@ -98,5 +98,5 @@
 - [x] Inspect generated SQL and confirm results are unique with exact paginator totals.
 - [x] Measure query count and ensure option search remains bounded without per-option queries.
 - [ ] Run Pint, PHP syntax, Laravel cache checks, focused/full PHPUnit, dependency audits, and Vite build.
-- [ ] Run desktop/tablet/mobile Playwright QA for search, multi-group selections, reset, URL/history, overflow, console, and network errors.
+- [x] Run desktop/tablet/mobile Playwright QA for search, multi-group selections, reset, URL/history, overflow, console, and network errors.
 - [ ] Inspect the complete diff, commit on `main`, push without force, and confirm a clean tree with `HEAD == origin/main`.

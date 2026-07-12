@@ -7,6 +7,7 @@ use App\Models\SeasonvarImportRun;
 use App\Services\Catalog\CatalogStatsSnapshotCache;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use App\Services\Seasonvar\SeasonvarImportProcessInspector;
+use App\Services\Seasonvar\SeasonvarQueuedImportDispatcher;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -14,7 +15,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Throwable;
 
-#[Signature('seasonvar:import {url? : Ссылка страницы seasonvar.ru для обновления одного сериала} {--force : Обновить данные даже если страница не изменилась} {--forever : Работать циклами без остановки} {--sleep= : Пауза между циклами в секундах} {--no-discovery : Не обновлять карту сайта в этом запуске}')]
+#[Signature('seasonvar:import {url? : Ссылка страницы seasonvar.ru для обновления одного сериала} {--force : Обновить данные даже если страница не изменилась} {--forever : Работать циклами без остановки} {--sleep= : Пауза между циклами в секундах} {--no-discovery : Не обновлять карту сайта в этом запуске} {--queued : Поставить подходящие страницы в Redis-очередь для параллельной обработки}')]
 #[Description('Находит страницы seasonvar.ru, обновляет каталог, сезоны, серии и видео одной командой')]
 class ImportSeasonvar extends Command
 {
@@ -32,8 +33,13 @@ class ImportSeasonvar extends Command
     public function handle(
         SeasonvarImportPipeline $pipeline,
         SeasonvarImportProcessInspector $processInspector,
+        SeasonvarQueuedImportDispatcher $queuedDispatcher,
         CatalogStatsSnapshotCache $statsSnapshots,
     ): int {
+        if ((bool) $this->option('queued')) {
+            return $this->handleQueued($queuedDispatcher);
+        }
+
         $this->pipeline = $pipeline;
         $this->registerSignalHandlers();
         $lockSeconds = (int) config('seasonvar.import.lock_seconds', 604800);
@@ -96,6 +102,7 @@ class ImportSeasonvar extends Command
     {
         $runningRuns = SeasonvarImportRun::query()
             ->where('status', 'running')
+            ->where('execution_mode', 'sync')
             ->latest('updated_at')
             ->get();
         $lockProcess = Cache::get(self::LOCK_PROCESS_KEY);
@@ -183,6 +190,57 @@ class ImportSeasonvar extends Command
         }
 
         return max(1, (int) $value);
+    }
+
+    private function handleQueued(SeasonvarQueuedImportDispatcher $dispatcher): int
+    {
+        if ($this->argument('url')) {
+            $this->error('Опция --queued предназначена только для полного импорта без URL.');
+
+            return self::FAILURE;
+        }
+
+        if ((bool) $this->option('forever')) {
+            $this->error('Опции --queued и --forever нельзя использовать одновременно.');
+
+            return self::FAILURE;
+        }
+
+        if ($this->option('sleep') !== null && $this->option('sleep') !== '') {
+            $this->error('Опция --sleep доступна только для синхронного режима --forever.');
+
+            return self::FAILURE;
+        }
+
+        $lock = Cache::store((string) config('seasonvar.queue.lock_store', 'redis'))
+            ->lock('seasonvar-import-coordinator', 300);
+
+        if (! $lock->get()) {
+            $this->warn('Диспетчер уже запущен. Этот cron-запуск пропущен.');
+
+            return self::SUCCESS;
+        }
+
+        try {
+            $run = $dispatcher->dispatch(
+                force: (bool) $this->option('force'),
+                discover: ! (bool) $this->option('no-discovery'),
+            );
+
+            $this->info(sprintf(
+                'Запуск #%d: поставлено в очередь: %d страниц.',
+                $run->id,
+                $run->selected,
+            ));
+
+            return $run->status === 'failed' ? self::FAILURE : self::SUCCESS;
+        } catch (Throwable $exception) {
+            $this->error($exception->getMessage());
+
+            return self::FAILURE;
+        } finally {
+            $lock->release();
+        }
     }
 
     private function registerSignalHandlers(): void
