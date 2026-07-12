@@ -86,3 +86,24 @@
 - [x] Run `./vendor/bin/pint --dirty --format agent`.
 - [x] Run focused test classes, `php artisan test`, Composer validation/audit, npm audit/build, documentation check, and diff checks.
 - [x] Inspect the complete diff and confirm that only the intended implementation, existing tests, and project documentation changed.
+
+### Task 5: Clarify empty catalog reset actions
+
+**Files:**
+
+- Modify: `resources/views/catalog/titles.blade.php`
+- Modify: `docs/UI_STANDARDS.md`
+- Modify: `docs/MAINTENANCE_LOG.md`
+
+**Interfaces:**
+
+- The empty `/titles` state keeps three distinct actions:
+  - `Очистить поиск` removes only `q`.
+  - `Убрать фильтры` removes filter/title/year state while preserving the current search.
+  - `Показать весь каталог` opens clean `/titles`.
+- The sidebar global reset may still use `Сбросить фильтры` because it intentionally opens the clean catalog from the filter form.
+
+- [x] Rename the empty-state filter-preserving reset label from `Сбросить фильтры` to `Убрать фильтры`.
+- [x] Document the exact reset labels in `docs/UI_STANDARDS.md`.
+- [x] Record the UI behavior in `docs/MAINTENANCE_LOG.md`.
+- [x] Verify with non-test commands only: Blade syntax through Laravel render, Vite build, HTTP smoke, and browser click smoke.
