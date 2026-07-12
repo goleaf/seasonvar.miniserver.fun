@@ -449,7 +449,7 @@
                                 @if ($filterView->hasActiveFilters() || $titleContext !== null || $filterView->selectedYears() !== [] || $invalidYear)
                                     <a href="{{ route('titles.index', $filterView->withoutFiltersQuery) }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                                         <i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i>
-                                        <span>Сбросить фильтры</span>
+                                        <span>Убрать фильтры</span>
                                     </a>
                                 @endif
                                 <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100">
