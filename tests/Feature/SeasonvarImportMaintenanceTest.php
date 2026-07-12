@@ -874,6 +874,64 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $this->assertSame(2, $events[0]['context']['selected'] ?? null);
     }
 
+    public function test_refresh_planner_fills_the_attention_batch_with_claimable_pages(): void
+    {
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+
+        collect(range(1, 2))->each(function (int $index) use ($source): void {
+            SourcePage::factory()->create([
+                'source_id' => $source->id,
+                'page_type' => 'serial',
+                'parse_status' => 'parsed',
+                'import_status' => 'missing_data',
+                'missing_data_flags' => ['episodes_without_video'],
+                'last_imported_at' => now()->subHours(4 - $index),
+                'retry_after_at' => now()->addHours($index),
+                'import_claim_token' => 'live-claim-'.$index,
+                'import_claimed_at' => now(),
+                'import_claim_expires_at' => now()->addHour(),
+                'import_claim_run_id' => null,
+            ]);
+        });
+
+        $expiredClaimPage = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'page_type' => 'serial',
+            'parse_status' => 'parsed',
+            'import_status' => 'missing_data',
+            'missing_data_flags' => ['episodes_without_video'],
+            'last_imported_at' => now()->subHour(),
+            'retry_after_at' => now()->addHours(3),
+            'import_claim_token' => 'expired-claim',
+            'import_claimed_at' => now()->subHours(2),
+            'import_claim_expires_at' => now()->subHour(),
+            'import_claim_run_id' => null,
+        ]);
+        $unclaimedPage = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'page_type' => 'serial',
+            'parse_status' => 'parsed',
+            'import_status' => 'missing_data',
+            'missing_data_flags' => ['episodes_without_video'],
+            'last_imported_at' => now(),
+            'retry_after_at' => now()->addHours(4),
+        ]);
+        $pages = collect();
+
+        foreach (app(SeasonvarRefreshPlanner::class)->pageChunksForImportCycle(
+            2,
+            now()->subHours(168),
+        ) as $chunk) {
+            $pages = $pages->merge($chunk);
+        }
+
+        $this->assertSame([$expiredClaimPage->id, $unclaimedPage->id], $pages->pluck('id')->all());
+    }
+
     public function test_refresh_planner_selects_direct_season_page_when_linked_season_has_no_episodes(): void
     {
         $source = Source::factory()->create([
