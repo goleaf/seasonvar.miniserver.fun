@@ -85,7 +85,6 @@ class CatalogSeoBuilder
         Request $request,
         int $total,
         string $search,
-        bool $searchFallback,
         ?int $year,
         Collection $activeTaxonomies,
         array $invalidFilterSlugs,
@@ -122,7 +121,6 @@ class CatalogSeoBuilder
             $filterText !== '' ? 'Фильтры: '.$filterText.'.' : null,
             $year !== null ? 'Год выхода: '.$year.'.' : null,
             $search !== '' ? 'Поисковый запрос: '.$search.'.' : null,
-            $searchFallback ? 'Точных совпадений не найдено, поэтому показаны ближайшие страницы каталога.' : null,
             $invalidYear ? 'Год '.$requestedYear.' не найден.' : null,
             $invalidFilterSlugs !== [] ? 'Часть фильтров не найдена.' : null,
         ])->filter()->implode(' ');
@@ -141,10 +139,8 @@ class CatalogSeoBuilder
 
         return [
             'title' => $title,
-            'h1' => $searchFallback ? 'Поиск "'.$search.'" - ближайшие результаты каталога' : $this->catalogSeoHeading($search, $year, $activeTaxonomies),
-            'lead' => $searchFallback
-                ? 'По точному запросу совпадений не найдено, поэтому ниже показаны ближайшие страницы каталога, популярные сериалы и связанные подборки.'
-                : $this->catalogSeoLead($total, $search, $year, $activeTaxonomies),
+            'h1' => $this->catalogSeoHeading($search, $year, $activeTaxonomies),
+            'lead' => $this->catalogSeoLead($total, $search, $year, $activeTaxonomies),
             'description' => $this->seoDescription($descriptionParts),
             'keywords' => $keywords->implode(', '),
             'news_keywords' => $keywords->take(10)->implode(', '),
@@ -156,9 +152,7 @@ class CatalogSeoBuilder
             'updated_time' => now()->toAtomString(),
             'section' => 'Сериалы',
             'tags' => $tags,
-            'seo_text' => collect($searchFallback ? [
-                'По точному запросу «'.$search.'» совпадений пока нет, поэтому страница автоматически показывает ближайшие результаты каталога и связанные SEO-направления.',
-            ] : [])->merge($this->catalogSeoText($total, $search, $year, $activeTaxonomies))->values()->all(),
+            'seo_text' => $this->catalogSeoText($total, $search, $year, $activeTaxonomies),
             'search_phrases' => $this->catalogSearchPhrases($search, $year, $activeTaxonomies),
             'keyword_clusters' => $this->catalogKeywordClusters($search, $year, $activeTaxonomies),
             'related_links' => $this->catalogRelatedLinks($search, $year, $activeTaxonomies),
@@ -761,7 +755,7 @@ class CatalogSeoBuilder
             $activeTaxonomies->isNotEmpty() ? 'фильтры: '.$activeTaxonomies->pluck('name')->implode(', ') : null,
         ])->filter()->implode(', ');
 
-        return ucfirst($parts).'. Автоматическая выдача учитывает названия, описания, жанры, страны, актеров, режиссеров, сезоны, серии и доступное видео.';
+        return ucfirst($parts).'. Выдача учитывает названия, оригинальные названия, алиасы, описания, жанры, страны, актеров и режиссеров.';
     }
 
     private function titleKeywordCollection(

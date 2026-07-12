@@ -85,6 +85,16 @@ class CatalogTitlesViewModel
     public array $withoutTitleQuery;
 
     /**
+     * @var array<string, string|int|null>
+     */
+    public array $withoutSearchQuery;
+
+    /**
+     * @var array<string, string|int|null>
+     */
+    public array $withoutFiltersQuery;
+
+    /**
      * @param  Collection<string, Model>  $activeTaxonomies
      * @param  array<string, string>  $activeFilterSlugs
      * @param  array<string, string>  $invalidFilterSlugs
@@ -104,6 +114,8 @@ class CatalogTitlesViewModel
         $this->allFilterSlugs = array_merge($this->activeFilterSlugs, $this->invalidFilterSlugs);
         $this->withoutYearQuery = $this->buildWithoutYearQuery();
         $this->withoutTitleQuery = $this->buildWithoutTitleQuery();
+        $this->withoutSearchQuery = $this->buildWithoutSearchQuery();
+        $this->withoutFiltersQuery = $this->buildWithoutFiltersQuery();
     }
 
     public function icon(string $filterType): string
@@ -267,5 +279,43 @@ class CatalogTitlesViewModel
     private function buildWithoutTitleQuery(): array
     {
         return $this->appendSearchAndYear($this->allFilterSlugs);
+    }
+
+    /**
+     * @return array<string, string|int|null>
+     */
+    private function buildWithoutSearchQuery(): array
+    {
+        $query = array_merge($this->baseQuery, $this->allFilterSlugs);
+
+        if ($this->sort !== 'updated') {
+            $query['sort'] = $this->sort;
+        }
+
+        if ($this->year !== null) {
+            $query['year'] = $this->year;
+        } elseif ($this->invalidYear) {
+            $query['year'] = $this->requestedYear;
+        }
+
+        return $query;
+    }
+
+    /**
+     * @return array<string, string|int|null>
+     */
+    private function buildWithoutFiltersQuery(): array
+    {
+        $query = [];
+
+        if ($this->search !== '') {
+            $query['q'] = $this->search;
+        }
+
+        if ($this->sort !== 'updated') {
+            $query['sort'] = $this->sort;
+        }
+
+        return $query;
     }
 }

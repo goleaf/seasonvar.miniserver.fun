@@ -73,9 +73,12 @@
                             <span>{{ $seo['h1'] ?? 'Сериалы' }}</span>
                         </h1>
                         <p class="mt-2 text-sm text-slate-500">{{ $seo['lead'] ?? 'Поиск по названиям, описаниям, актерам, жанрам и связям каталога.' }}</p>
-                        @if ($activeTaxonomies->isNotEmpty() || $titleContext !== null || $year !== null || $invalidYear || $invalidFilterSlugs !== [])
+                        @if ($search !== '' || $activeTaxonomies->isNotEmpty() || $titleContext !== null || $year !== null || $invalidYear || $invalidFilterSlugs !== [])
                             <div class="mt-3 space-y-3 text-sm">
                                 <div class="flex flex-wrap items-center gap-2">
+                                    @if ($search !== '')
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutSearchQuery)" active icon="fa-solid fa-magnifying-glass">Поиск: {{ $search }} · очистить</x-ui.taxonomy-chip>
+                                    @endif
                                     @if ($titleContext !== null)
                                         <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutTitleQuery)" active icon="fa-solid fa-clapperboard">Сериал: {{ $titleContext->title }} · убрать</x-ui.taxonomy-chip>
                                     @endif
@@ -198,18 +201,44 @@
                     <x-title-card :title="$catalogTitle" />
                 @empty
                     <x-ui.panel class="col-span-full border-dashed">
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex flex-col gap-4">
                             <div>
                                 <div class="inline-flex items-center gap-2 text-base font-bold text-slate-700">
                                     <i class="fa-solid fa-magnifying-glass text-slate-400" aria-hidden="true"></i>
-                                    <span>Ничего не найдено.</span>
+                                    @if ($insufficientSearch)
+                                        <span>Запрос «{{ $search }}» слишком общий.</span>
+                                    @elseif ($search !== '')
+                                        <span>По запросу «{{ $search }}» ничего не найдено.</span>
+                                    @else
+                                        <span>Ничего не найдено.</span>
+                                    @endif
                                 </div>
-                                <p class="mt-1 text-sm text-slate-500">Попробуйте изменить поиск или сбросить выбранные фильтры.</p>
+                                @if ($insufficientSearch)
+                                    <p class="mt-1 text-sm text-slate-500">Добавьте название, имя актера, режиссера или жанр.</p>
+                                @elseif ($search !== '')
+                                    <p class="mt-1 text-sm text-slate-500">Проверьте написание или измените фильтры.</p>
+                                @else
+                                    <p class="mt-1 text-sm text-slate-500">Измените или сбросьте выбранные фильтры.</p>
+                                @endif
                             </div>
-                            <a href="{{ route('titles.index') }}" class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-100">
-                                <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
-                                <span>Сбросить фильтры</span>
-                            </a>
+                            <div class="flex flex-wrap gap-2">
+                                @if ($search !== '')
+                                    <a href="{{ route('titles.index', $filterView->withoutSearchQuery) }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-4 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                                        <i class="fa-solid fa-magnifying-glass-minus" aria-hidden="true"></i>
+                                        <span>Очистить поиск</span>
+                                    </a>
+                                @endif
+                                @if ($activeTaxonomies->isNotEmpty() || $titleContext !== null || $year !== null || $invalidYear || $invalidFilterSlugs !== [])
+                                    <a href="{{ route('titles.index', $filterView->withoutFiltersQuery) }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-4 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                                        <i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i>
+                                        <span>Сбросить фильтры</span>
+                                    </a>
+                                @endif
+                                <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-100">
+                                    <i class="fa-solid fa-table-cells-large" aria-hidden="true"></i>
+                                    <span>Показать весь каталог</span>
+                                </a>
+                            </div>
                         </div>
                     </x-ui.panel>
                 @endforelse

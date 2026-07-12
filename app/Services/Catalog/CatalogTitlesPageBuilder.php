@@ -4,7 +4,6 @@ namespace App\Services\Catalog;
 
 use App\Http\Requests\CatalogTitlesRequest;
 use App\Models\CatalogTitle;
-use App\Services\Catalog\Search\CatalogSearchQuery;
 use App\Services\Catalog\Search\CatalogSearchQueryParser;
 use App\Services\Catalog\Search\CatalogSearchState;
 use App\View\ViewModels\CatalogTitlesViewModel;
@@ -106,33 +105,12 @@ class CatalogTitlesPageBuilder
             ->mapWithKeys(fn (Model $record, string $filterType): array => [$filterType => $record->slug])
             ->all();
 
-        $querySearch = $searchQuery;
-        $searchFallback = false;
-        $catalogTitles = $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $querySearch, $year, null, $invalidYear, $titleContext?->id)
+        $catalogTitles = $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $searchQuery, $year, null, $invalidYear, $titleContext?->id)
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'])
             ->with($this->taxonomies->cardRelations())
             ->withCount($this->cardCounts());
         $this->applySort($catalogTitles, $sort);
         $catalogTitles = $catalogTitles->paginate(24)->withQueryString();
-
-        if ($search !== '' && $searchQuery->year === null && $catalogTitles->total() === 0) {
-            $querySearch = new CatalogSearchQuery(
-                raw: '',
-                normalized: '',
-                terms: [],
-                year: null,
-                state: CatalogSearchState::Empty,
-                ftsExpression: '',
-                exactNameHashes: [],
-            );
-            $searchFallback = true;
-            $catalogTitles = $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $querySearch, $year, null, $invalidYear, $titleContext?->id)
-                ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'])
-                ->with($this->taxonomies->cardRelations())
-                ->withCount($this->cardCounts());
-            $this->applySort($catalogTitles, $sort);
-            $catalogTitles = $catalogTitles->paginate(24)->withQueryString();
-        }
 
         $filterTaxonomies = collect($filterTypes)->mapWithKeys(function (string $filterType): array {
             $modelClass = $this->taxonomies->modelClass($filterType);
@@ -155,7 +133,7 @@ class CatalogTitlesPageBuilder
             }
         });
 
-        $taxonomyContextCounts = $this->query->relationContextCounts($filterTaxonomies, $activeTaxonomies, $invalidFilterSlugs, $querySearch, $year, $invalidYear, $titleContext?->id);
+        $taxonomyContextCounts = $this->query->relationContextCounts($filterTaxonomies, $activeTaxonomies, $invalidFilterSlugs, $searchQuery, $year, $invalidYear, $titleContext?->id);
         $filterTaxonomies = $filterTaxonomies->map(function (Collection $items, string $filterType) use ($taxonomyContextCounts): Collection {
             return $items->map(function (Model $record) use ($filterType, $taxonomyContextCounts): Model {
                 $record->context_titles_count = (int) ($taxonomyContextCounts->get($filterType.'|'.$record->id) ?? 0);
@@ -188,7 +166,7 @@ class CatalogTitlesPageBuilder
             ]);
         }
 
-        $yearContextCounts = $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $querySearch, null, null, $invalidYear, $titleContext?->id)
+        $yearContextCounts = $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $searchQuery, null, null, $invalidYear, $titleContext?->id)
             ->select('year')
             ->selectRaw('count(*) as context_titles_count')
             ->whereNotNull('year')
@@ -220,7 +198,8 @@ class CatalogTitlesPageBuilder
             'year' => $year,
             'requestedYear' => $requestedYear,
             'invalidYear' => $invalidYear,
-            'searchFallback' => $searchFallback,
+            'searchState' => $searchQuery->state->value,
+            'insufficientSearch' => $searchQuery->state === CatalogSearchState::Insufficient && $titleContext === null,
             'titleContext' => $titleContext,
             'selectedTaxonomy' => $activeTaxonomies->first(),
             'activeTaxonomies' => $activeTaxonomies,
@@ -234,7 +213,6 @@ class CatalogTitlesPageBuilder
                 $request,
                 (int) $catalogTitles->total(),
                 $search,
-                $searchFallback,
                 $year,
                 $activeTaxonomies,
                 $invalidFilterSlugs,

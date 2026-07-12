@@ -1,7 +1,7 @@
 @props([
     'title',
     'emptyLabel' => 'Нет постера',
-    'imageClass' => 'h-full w-full object-cover',
+    'imageClass' => 'h-full w-full object-contain',
     'emptyClass' => 'grid h-full place-items-center px-2 text-center text-xs font-semibold text-slate-500',
 ])
 
