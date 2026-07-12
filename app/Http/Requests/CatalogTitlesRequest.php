@@ -166,7 +166,9 @@ class CatalogTitlesRequest extends FormRequest
 
     public function titleContextSlug(): ?string
     {
-        return $this->filterSlug($this->query('title', ''));
+        $slug = $this->filterSlug($this->query('title', ''));
+
+        return $slug === '' ? null : $slug;
     }
 
     public function sort(): CatalogSort

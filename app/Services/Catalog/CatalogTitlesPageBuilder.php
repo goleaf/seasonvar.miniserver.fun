@@ -166,14 +166,12 @@ class CatalogTitlesPageBuilder
 
         $selectedTaxonomies->each(function (Collection $selected, string $filterType) use ($filterTaxonomies): void {
             $items = $filterTaxonomies->get($filterType, collect());
+            $selectedIds = $selected->pluck('id')->map(fn (mixed $id): int => (int) $id);
+            $remainingItems = $items
+                ->reject(fn (Model $record): bool => $selectedIds->contains((int) $record->id))
+                ->values();
 
-            $selected->reverse()->each(function (Model $selectedTaxonomy) use (&$items): void {
-                if (! $items->contains(fn (Model $record): bool => $record->id === $selectedTaxonomy->id)) {
-                    $items = $items->prepend($selectedTaxonomy);
-                }
-            });
-
-            $filterTaxonomies->put($filterType, $items->values());
+            $filterTaxonomies->put($filterType, $selected->concat($remainingItems)->values());
         });
 
         $taxonomyContextCounts = $this->query->relationContextCounts($filterTaxonomies, $activeTaxonomies, $invalidFilterSlugs, $searchQuery, $year, $invalidYear, $titleContext?->id, $years, $selectedTaxonomyIds, $excludedTaxonomyIds, $advancedFilters);

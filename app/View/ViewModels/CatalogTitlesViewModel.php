@@ -419,6 +419,7 @@ class CatalogTitlesViewModel
     public function filterQuery(string $filterType, ?string $slug = null): array
     {
         $query = $this->withCatalogState(array_merge($this->baseQuery, $this->allFilterSlugs));
+        $removeFilterType = $slug === null;
 
         if ($slug === null) {
             unset($query[$filterType]);
@@ -433,12 +434,19 @@ class CatalogTitlesViewModel
 
             if ($values === []) {
                 unset($query[$filterType]);
+                $removeFilterType = true;
             } else {
                 $query[$filterType] = array_values(array_unique($values));
             }
         }
 
-        return $this->appendSearchAndYear($query);
+        $query = $this->appendSearchAndYear($query);
+
+        if ($removeFilterType) {
+            unset($query[$filterType]);
+        }
+
+        return $query;
     }
 
     /** @return array<string, mixed> */
@@ -512,7 +520,10 @@ class CatalogTitlesViewModel
         $query = array_merge($this->baseQuery, $this->allFilterSlugs);
         unset($query[$filterType]);
 
-        return $this->appendSearchAndYear($query);
+        $query = $this->appendSearchAndYear($query);
+        unset($query[$filterType]);
+
+        return $query;
     }
 
     public function bucketYear(object $bucket): int

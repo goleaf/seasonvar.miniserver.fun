@@ -16,9 +16,14 @@
                     @endforeach
 
                     <div>
-                        <div class="mb-2 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                            <i class="fa-solid fa-calendar-days text-slate-400" aria-hidden="true"></i>
-                            <span>Годы</span>
+                        <div class="mb-2 flex items-center justify-between gap-2">
+                            <div class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                                <i class="fa-solid fa-calendar-days text-slate-400" aria-hidden="true"></i>
+                                <span>Годы</span>
+                            </div>
+                            @if ($filterView->selectedYears() !== [])
+                                <a href="{{ route('titles.index', $filterView->yearQuery(null)) }}" class="text-xs font-bold text-emerald-700 hover:text-emerald-600">Сбросить</a>
+                            @endif
                         </div>
                         <div class="space-y-1">
                             @forelse ($yearBuckets as $bucket)
@@ -45,9 +50,14 @@
 
                     @foreach ($filterView->typeLabels as $filterType => $label)
                         <div data-catalog-filter-group>
-                            <div class="mb-2 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                                <i class="{{ $filterView->icon($filterType) }} text-slate-400" aria-hidden="true"></i>
-                                <span>{{ $label }}</span>
+                            <div class="mb-2 flex items-center justify-between gap-2">
+                                <div class="inline-flex min-w-0 items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                                    <i class="{{ $filterView->icon($filterType) }} shrink-0 text-slate-400" aria-hidden="true"></i>
+                                    <span>{{ $label }}</span>
+                                </div>
+                                @if ($selectedTaxonomies->get($filterType, collect())->isNotEmpty())
+                                    <a href="{{ route('titles.index', $filterView->filterQuery($filterType, null)) }}" class="shrink-0 text-xs font-bold text-emerald-700 hover:text-emerald-600">Сбросить</a>
+                                @endif
                             </div>
                             @if ($filterTaxonomies->get($filterType, collect())->count() > 8)
                                 <label class="sr-only" for="catalog-filter-search-{{ $filterType }}">Найти в группе {{ $label }}</label>
