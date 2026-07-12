@@ -2,6 +2,8 @@
 
 ## 2026-07-12
 
+- Hardened catalog search, sorting, pagination, and Livewire URL state as one validated flow: NFKC/whitespace normalization, safe fallbacks for malformed scalar values and unsupported sort keys, 650 ms search debounce, stable browser-history state, and automatic recovery from out-of-range pages.
+- Added indexed exact external-provider-ID search and the additive `catalog_title_aliases(name_hash, catalog_title_id)` lookup index while preserving visibility-first SQL subqueries, duplicate-free totals, and deterministic allowlisted sorting.
 - Added consistent OR-within-group and AND-between-group catalog matching for years, all existing taxonomy relations, publication types, video qualities, and subtitle availability, with normalized bounded URL arrays and per-value/group resets.
 - Added bounded debounced server-side actor/director option search, canonical publication-type aliases, duplicate-free grouped pivot subqueries, and regression coverage for invalid/missing URL values, exact paginator totals, Livewire state preservation, and multi-group combinations.
 - Hardened Livewire browser-history hydration for empty URL fields and corrected the visible active-filter count to include fixed list and advanced scalar groups.

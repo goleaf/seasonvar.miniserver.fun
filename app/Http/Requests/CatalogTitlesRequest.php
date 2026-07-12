@@ -6,6 +6,7 @@ use App\Enums\CatalogFilterType;
 use App\Enums\CatalogPublicationType;
 use App\Enums\CatalogSort;
 use App\Rules\CatalogFilterSlug;
+use App\Services\Catalog\Search\CatalogSearchNormalizer;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -135,14 +136,24 @@ class CatalogTitlesRequest extends FormRequest
         }
 
         foreach (['q', 'title', 'sort', 'type', 'taxonomy', 'year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_source', 'rating_min', 'votes_min', 'video', 'updated', 'letter', 'view', 'per_page'] as $key) {
-            if (! $this->query->has($key) || ! is_scalar($this->query($key))) {
+            if (! $this->query->has($key)) {
                 continue;
             }
 
-            $value = trim((string) $this->query($key));
-            $normalized[$key] = $key === 'q'
-                ? (preg_replace('/\s+/u', ' ', $value) ?: '')
-                : $value;
+            $value = $this->query($key);
+
+            if (! is_scalar($value)) {
+                $normalized[$key] = $key === 'sort' ? CatalogSort::Updated->value : '';
+
+                continue;
+            }
+
+            $value = trim((string) $value);
+            $normalized[$key] = match ($key) {
+                'q' => app(CatalogSearchNormalizer::class)->display($value),
+                'sort' => CatalogSort::tryFrom($value)?->value ?? CatalogSort::Updated->value,
+                default => $value,
+            };
         }
 
         $this->merge($normalized);
@@ -150,7 +161,7 @@ class CatalogTitlesRequest extends FormRequest
 
     public function normalizedSearch(): string
     {
-        return preg_replace('/\s+/u', ' ', trim($this->stringQuery('q'))) ?: '';
+        return app(CatalogSearchNormalizer::class)->display($this->stringQuery('q'));
     }
 
     public function requestedYear(): string

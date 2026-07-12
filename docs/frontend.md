@@ -29,7 +29,7 @@ composer dev
 - `resources/js/app.js` импортирует `resources/css/app.css` и глобальные стили FontAwesome.
 - Player-код для Plyr/HLS находится в `resources/js/player.js` и загружается dynamic import только на страницах с `video.js-catalog-player`.
 - Поиск актеров и режиссеров выполняется Livewire на сервере с debounce 350 мс и лимитом 24 результата, поэтому полный справочник не попадает в браузер. Локальный поиск для остальных длинных групп остается progressive enhancement из `resources/js/app.js`; GET-форма работает без JavaScript.
-- Серверное состояние `/titles` ведёт `CatalogSeries`: строка поиска обновляется с debounce 400 мс, checkbox/расширенные поля применяются по submit, а сортировка, вид, размер страницы, алфавит и пагинация обновляются отдельными Livewire actions. Для всех форм сохранён обычный GET fallback.
+- Серверное состояние `/titles` ведёт `CatalogSeries`: строка поиска обновляется с debounce 650 мс, checkbox/расширенные поля применяются по submit, а сортировка, вид, размер страницы, алфавит и пагинация обновляются отдельными Livewire actions. Для всех форм сохранён обычный GET fallback; malformed и out-of-range `page` канонизируется redirect-ом, чтобы адресная строка не сохраняла stale границу.
 - Для HLS используется `hls.js/light`: он сохраняет воспроизведение HLS-плейлистов и не тянет модули субтитров, DRM и расширенной аналитики, которые сейчас не используются интерфейсом.
 - Layout подключает ассеты через `@vite('resources/js/app.js')`; не добавлять raw `<script>`/`<style>` для обычных assets.
 - Layout также содержит `@livewireStyles` и `@livewireScripts`; не дублировать Livewire/Alpine через CDN или отдельный npm-bundle.

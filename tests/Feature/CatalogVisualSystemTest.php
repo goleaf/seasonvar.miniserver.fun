@@ -121,7 +121,7 @@ class CatalogVisualSystemTest extends TestCase
 
         $this->get(route('titles.index'))
             ->assertOk()
-            ->assertSee('wire:model.live.debounce.400ms="filters.search"', false)
+            ->assertSee('wire:model.live.debounce.650ms="filters.search"', false)
             ->assertSee('wire:submit="applyFilters"', false)
             ->assertSee('wire:loading.delay', false)
             ->assertDontSee('wire:loading.delay.flex', false)

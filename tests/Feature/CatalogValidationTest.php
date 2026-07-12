@@ -59,6 +59,29 @@ class CatalogValidationTest extends TestCase
             ->assertSeeText('Поисковый запрос слишком длинный.');
     }
 
+    public function test_catalog_safely_ignores_array_search_and_unsupported_sort_direction(): void
+    {
+        $visible = CatalogTitle::factory()->create([
+            'title' => 'Безопасный каталог',
+            'slug' => 'bezopasnyi-katalog',
+        ]);
+
+        $url = route('titles.index', [
+            'q' => ['bad'],
+            'sort' => 'not-supported',
+            'direction' => 'desc; drop table catalog_titles',
+            'page' => ['999'],
+        ]);
+
+        $this->get($url)->assertRedirect(route('titles.index'));
+
+        $this->followingRedirects()->get($url)
+            ->assertOk()
+            ->assertSessionDoesntHaveErrors(['q', 'sort'])
+            ->assertSeeText($visible->title)
+            ->assertSeeText('Недавно обновленные');
+    }
+
     public function test_catalog_filter_request_rejects_malformed_filter_slug(): void
     {
         $this

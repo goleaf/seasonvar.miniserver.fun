@@ -54,6 +54,10 @@ class CatalogSeries extends Component
         $this->routeFilterType = $type;
         $this->routeTaxonomy = $taxonomy;
         $this->validateAndNormalizeState(Arr::except(request()->query->all(), ['page']));
+
+        if ($this->initialPageNeedsCanonicalization()) {
+            $this->redirect($this->catalogUrl(), navigate: true);
+        }
     }
 
     public function updated(string $property): void
@@ -252,13 +256,13 @@ class CatalogSeries extends Component
 
     public function render(): View
     {
-        $data = $this->pages->data(
-            $this->catalogRequest($this->renderInput()),
-            $this->routeFilterType,
-            $this->routeTaxonomy,
-            $this->getErrorBag()->isNotEmpty(),
-            $this->facetSearch(),
-        );
+        $data = $this->pageData();
+        $titles = $data['titles'];
+
+        if ($titles->currentPage() > $titles->lastPage()) {
+            $this->setPage(max(1, $titles->lastPage()));
+            $this->redirect($this->catalogUrl($titles->lastPage()), navigate: true);
+        }
 
         return view('catalog.titles', $data)
             ->extends('layouts.app', [
@@ -266,6 +270,56 @@ class CatalogSeries extends Component
                 'seo' => $data['seo'] ?? [],
             ])
             ->section('content');
+    }
+
+    /** @return array<string, mixed> */
+    private function pageData(): array
+    {
+        return $this->pages->data(
+            $this->catalogRequest($this->renderInput()),
+            $this->routeFilterType,
+            $this->routeTaxonomy,
+            $this->getErrorBag()->isNotEmpty(),
+            $this->facetSearch(),
+        );
+    }
+
+    private function initialPageNeedsCanonicalization(): bool
+    {
+        if (! request()->query->has('page')) {
+            return false;
+        }
+
+        $page = request()->query('page');
+
+        return ! is_scalar($page)
+            || filter_var($page, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) === false
+            || (int) $page === 1;
+    }
+
+    private function catalogUrl(int $page = 1): string
+    {
+        $query = $this->filters->toRequestInput();
+
+        if ($page > 1) {
+            $query['page'] = $page;
+        }
+
+        if ($this->routeYear !== null) {
+            $url = route('titles.year', ['year' => $this->routeYear]);
+
+            return $query === [] ? $url : $url.'?'.Arr::query($query);
+        }
+
+        if ($this->routeFilterType !== null && $this->routeTaxonomy !== null) {
+            return route('titles.taxonomy', [
+                'type' => $this->routeFilterType,
+                'taxonomy' => $this->routeTaxonomy,
+                ...$query,
+            ]);
+        }
+
+        return route('titles.index', $query);
     }
 
     public function paginationView(): string

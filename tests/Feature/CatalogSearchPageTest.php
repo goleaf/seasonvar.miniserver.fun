@@ -134,6 +134,46 @@ class CatalogSearchPageTest extends TestCase
             ->assertDontSee('href="'.route('titles.show', $broaderTitle).'"', false);
     }
 
+    public function test_exact_external_provider_id_wins_over_broad_text_matches(): void
+    {
+        $exact = CatalogTitle::factory()->create([
+            'title' => 'Сериал по внешнему ID',
+            'slug' => 'serial-po-vneshnemu-id',
+            'external_id' => '47915',
+        ]);
+        $broad = CatalogTitle::factory()->create([
+            'title' => 'Постороннее описание',
+            'slug' => 'postoronnee-opisanie',
+            'external_id' => '99999',
+            'description' => 'Служебная заметка 47915',
+        ]);
+
+        $this->get(route('titles.index', ['q' => '47915']))
+            ->assertOk()
+            ->assertSee('href="'.route('titles.show', $exact).'"', false)
+            ->assertDontSee('href="'.route('titles.show', $broad).'"', false);
+    }
+
+    public function test_multiple_matching_people_do_not_duplicate_search_rows_or_totals(): void
+    {
+        $title = CatalogTitle::factory()->create([
+            'title' => 'Один сериал с двумя совпадениями',
+            'slug' => 'odin-serial-s-dvumia-sovpadeniiami',
+        ]);
+        foreach (['Иван Петров', 'Иван Сидоров'] as $index => $name) {
+            $actor = Actor::query()->create([
+                'name' => $name,
+                'slug' => 'ivan-'.($index + 1),
+            ]);
+            $title->actors()->attach($actor);
+        }
+
+        $this->get(route('titles.index', ['q' => 'Иван']))
+            ->assertOk()
+            ->assertSeeText('Найдено сейчас: 1')
+            ->assertSee('href="'.route('titles.show', $title).'"', false);
+    }
+
     public function test_unpublished_exact_title_is_absent(): void
     {
         $unpublishedTitle = CatalogTitle::factory()->create([

@@ -35,6 +35,32 @@ class CatalogTitlesRequestTest extends TestCase
         $this->assertNull($request->filterSlug(['bad']));
     }
 
+    public function test_catalog_titles_request_sanitizes_malformed_search_and_sort_url_values(): void
+    {
+        $request = CatalogTitlesRequest::create('/titles', 'GET', [
+            'q' => ['not-a-scalar'],
+            'sort' => ['title_asc'],
+            'direction' => 'drop table catalog_titles',
+        ]);
+        $request->setContainer(app())->setRedirector(app('redirect'));
+        $request->validateResolved();
+
+        $this->assertSame('', $request->normalizedSearch());
+        $this->assertSame(CatalogSort::Updated, $request->sort());
+        $this->assertArrayNotHasKey('direction', $request->catalogQueryState());
+    }
+
+    public function test_catalog_titles_request_uses_unicode_normalization_before_validation(): void
+    {
+        $request = CatalogTitlesRequest::create('/titles', 'GET', [
+            'q' => "  ＯＡ\u{00A0}\u{2003}тест  ",
+        ]);
+        $request->setContainer(app())->setRedirector(app('redirect'));
+        $request->validateResolved();
+
+        $this->assertSame('OA тест', $request->normalizedSearch());
+    }
+
     public function test_catalog_titles_request_declares_filter_rules_for_every_supported_filter_type(): void
     {
         $request = CatalogTitlesRequest::create('/titles', 'GET');

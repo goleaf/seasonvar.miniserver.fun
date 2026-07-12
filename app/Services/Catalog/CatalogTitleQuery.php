@@ -309,6 +309,7 @@ class CatalogTitleQuery
             ->where(function (Builder $query) use ($catalogTitleTable, $search, $variants): void {
                 $query->whereIn('title', $variants)
                     ->orWhereIn('original_title', $variants)
+                    ->orWhere('external_id', $search->raw)
                     ->orWhereIn(
                         $catalogTitleTable.'.id',
                         CatalogTitleAlias::query()

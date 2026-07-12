@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Services\Catalog\CatalogStatsPageBuilder;
 use App\Services\Catalog\CatalogStatsPosterUrlGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -151,6 +152,75 @@ class CatalogPageTest extends TestCase
             ->assertSet('filters.yearFrom', '')
             ->assertSet('filters.video', '')
             ->assertHasNoErrors();
+    }
+
+    public function test_livewire_catalog_sanitizes_malformed_url_sort_and_page_values(): void
+    {
+        CatalogTitle::factory()->create(['title' => 'Безопасный результат']);
+
+        Livewire::withQueryParams([
+            'sort' => ['title_asc'],
+            'page' => ['999'],
+        ])->test(CatalogSeries::class)
+            ->assertRedirect(route('titles.index'));
+    }
+
+    public function test_livewire_catalog_recovers_to_the_last_page_when_result_count_shrinks(): void
+    {
+        CatalogTitle::factory()->count(25)->create();
+
+        Livewire::withQueryParams(['page' => 999])
+            ->test(CatalogSeries::class)
+            ->assertRedirect(route('titles.index', ['page' => 2]));
+
+        $this->get(route('titles.index', ['page' => 999]))
+            ->assertRedirect(route('titles.index', ['page' => 2]));
+
+        $this->followingRedirects()
+            ->get(route('titles.index', ['page' => 999]))
+            ->assertOk()
+            ->assertSeeText('25')
+            ->assertDontSeeText('Ничего не найдено.');
+    }
+
+    public function test_livewire_catalog_canonicalizes_page_one_on_scoped_routes(): void
+    {
+        Livewire::withQueryParams([
+            'q' => 'Знахарь',
+            'year' => [2025],
+            'page' => 1,
+        ])
+            ->test(CatalogSeries::class, ['year' => 2024])
+            ->assertRedirect(route('titles.year', ['year' => 2024]).'?'.Arr::query([
+                'q' => 'Знахарь',
+                'year' => [2025],
+            ]));
+
+        Livewire::withQueryParams(['page' => 1])
+            ->test(CatalogSeries::class, ['type' => 'genre', 'taxonomy' => 'drama'])
+            ->assertRedirect(route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => 'drama']));
+    }
+
+    public function test_livewire_catalog_preserves_search_and_filters_when_sorting_changes(): void
+    {
+        $genre = Genre::query()->create([
+            'name' => 'Драма',
+            'slug' => 'drama',
+        ]);
+        CatalogTitle::factory()->count(30)->create([
+            'title' => 'Знахарь',
+        ])->each(fn (CatalogTitle $title) => $title->genres()->attach($genre));
+
+        Livewire::withQueryParams([
+            'q' => 'Знахарь',
+            'genre' => ['drama'],
+            'page' => 2,
+        ])->test(CatalogSeries::class)
+            ->call('sortBy', 'year_desc')
+            ->assertSet('filters.search', 'Знахарь')
+            ->assertSet('filters.genre', ['drama'])
+            ->assertSet('filters.sort', 'year_desc')
+            ->assertSet('paginators.page', 1);
     }
 
     public function test_home_page_lists_country_filters_without_four_item_cap(): void
