@@ -41,8 +41,6 @@ class CatalogController extends Controller
 
     public function show(CatalogShowRequest $request, CatalogTitle $catalogTitle): View
     {
-        abort_unless($catalogTitle->is_published, 404);
-
         return view('catalog.show', $this->titlePage->data($request, $catalogTitle));
     }
 

@@ -21,15 +21,15 @@ class CatalogFacetQuery
         $relation = $model->catalogTitles();
         $pivotTable = $relation->getTable();
         $catalogTitleTable = (new CatalogTitle)->getTable();
-        $titlePivotKey = $relation->getForeignPivotKeyName();
-        $relatedPivotKey = $relation->getRelatedPivotKeyName();
+        $taxonomyPivotKey = $relation->getForeignPivotKeyName();
+        $catalogTitlePivotKey = $relation->getRelatedPivotKeyName();
         $countAlias = 'published_facet_counts';
         $counts = DB::table($pivotTable)
-            ->join($catalogTitleTable, $catalogTitleTable.'.id', '=', $pivotTable.'.'.$titlePivotKey)
+            ->join($catalogTitleTable, $catalogTitleTable.'.id', '=', $pivotTable.'.'.$catalogTitlePivotKey)
             ->where($catalogTitleTable.'.is_published', true)
-            ->select($pivotTable.'.'.$relatedPivotKey.' as relation_id')
+            ->select($pivotTable.'.'.$taxonomyPivotKey.' as relation_id')
             ->selectRaw('count(distinct '.$catalogTitleTable.'.id) as catalog_titles_count')
-            ->groupBy($pivotTable.'.'.$relatedPivotKey);
+            ->groupBy($pivotTable.'.'.$taxonomyPivotKey);
 
         $query = $modelClass::query()
             ->joinSub($counts, $countAlias, $model->getTable().'.id', '=', $countAlias.'.relation_id')

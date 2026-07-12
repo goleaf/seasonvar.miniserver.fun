@@ -55,7 +55,7 @@ class CatalogStatsPosterResponder
         }
 
         $contentLengthHeader = $remote->header('Content-Length');
-        if (is_string($contentLengthHeader)) {
+        if (is_string($contentLengthHeader) && trim($contentLengthHeader) !== '') {
             $contentLength = (int) trim($contentLengthHeader);
             if ($contentLength === 0 || $contentLength > self::MAX_IMAGE_BYTES) {
                 abort(404);

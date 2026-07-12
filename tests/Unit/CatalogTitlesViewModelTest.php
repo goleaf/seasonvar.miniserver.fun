@@ -17,6 +17,7 @@ class CatalogTitlesViewModelTest extends TestCase
             requestedYear: '',
             invalidYear: false,
             activeTaxonomies: collect(),
+            selectedTaxonomies: collect(),
             activeFilterSlugs: [],
             invalidFilterSlugs: [],
             titleContext: null,
@@ -24,11 +25,16 @@ class CatalogTitlesViewModelTest extends TestCase
 
         $this->assertSame([
             'updated' => 'Недавно обновленные',
-            'with_video' => 'Видео: больше сначала',
-            'episodes_desc' => 'Серий: больше сначала',
             'year_desc' => 'Год: новые сначала',
             'year_asc' => 'Год: старые сначала',
+            'episodes_desc' => 'Серий: больше сначала',
+            'seasons_desc' => 'Сезонов: больше сначала',
+            'with_video' => 'Видео: больше сначала',
             'title_asc' => 'Название: А-я',
+            'title_desc' => 'Название: Я-а',
+            'kinopoisk_desc' => 'Рейтинг КиноПоиска',
+            'imdb_desc' => 'Рейтинг IMDb',
+            'popularity_desc' => 'По популярности',
         ], $viewModel->sortLabels);
     }
 
@@ -45,13 +51,15 @@ class CatalogTitlesViewModelTest extends TestCase
             requestedYear: '2019',
             invalidYear: false,
             activeTaxonomies: collect(['genre' => $genre]),
+            selectedTaxonomies: collect(['genre' => collect([$genre])]),
             activeFilterSlugs: ['genre' => 'drama'],
             invalidFilterSlugs: [],
             titleContext: null,
+            selectedFilterSlugs: ['genre' => ['drama']],
         );
 
         $this->assertSame([
-            'genre' => 'drama',
+            'genre' => ['drama'],
             'sort' => 'year_desc',
             'year' => 2019,
         ], $viewModel->withoutSearchQuery);

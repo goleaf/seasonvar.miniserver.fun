@@ -21,6 +21,7 @@
 - Operational notifications тестируются через `Notification::fake()` и direct content tests на `toMail()`; реальные письма в тестах не отправляются.
 - `CatalogSearchPageTest` фиксирует hard-year, short-token, AND-person, unpublished, true-zero и insufficient состояния поиска.
 - `CatalogVisualSystemTest` фиксирует shell, порядок страниц, один title tab-stop, non-cropping poster и русскую светлую pagination.
+- `CatalogPageTest` фиксирует reverse-pivot facet aggregation, единый запрет public binding неопубликованных тайтлов, отсутствие HTTP-запроса для их poster proxy и поддержку image-ответов без `Content-Length`.
 
 ## Команды
 

@@ -254,7 +254,7 @@
 
                 <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold">
                     <span class="text-slate-400">Вид:</span>
-                    @foreach (['grid' => 'Карточки', 'list' => 'Список'] as $viewKey => $viewLabel)
+                    @foreach (['grid' => 'Сетка', 'list' => 'Список'] as $viewKey => $viewLabel)
                         <a href="{{ route('titles.index', $filterView->viewQuery($viewKey)) }}" @class([
                             'rounded-full px-2.5 py-1',
                             'bg-emerald-50 text-emerald-700' => $view === $viewKey,

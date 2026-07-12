@@ -17,6 +17,7 @@ use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use App\Models\User;
 use App\Services\Catalog\CatalogStatsPageBuilder;
+use App\Services\Catalog\CatalogStatsPosterUrlGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -195,16 +196,22 @@ class CatalogPageTest extends TestCase
         ]);
 
         $this->actingAs(User::factory()->create());
+        $this->mock(CatalogStatsPosterUrlGuard::class)
+            ->shouldReceive('safeUrl')
+            ->atLeast()
+            ->once()
+            ->with($posterUrl)
+            ->andReturn($posterUrl);
 
         $response = $this->get(route('stats'));
 
         $response
             ->assertOk()
             ->assertSeeLivewire('stats-dashboard')
-            ->assertSee('wire:poll.1s="refreshStats"', false)
+            ->assertSee('wire:poll.15s.visible="refreshStats"', false)
             ->assertSee('/vendor/livewire/livewire.js?id=', false)
             ->assertSeeText('Сводка каталога')
-            ->assertSeeText('Данные обновляются каждую секунду')
+            ->assertSeeText('Данные обновляются примерно раз в 15 секунд')
             ->assertSeeText('Показано:')
             ->assertSeeText('Сериалов каталога')
             ->assertSeeText('Сезоны и серии')
@@ -292,6 +299,11 @@ class CatalogPageTest extends TestCase
         Http::fake([
             $posterUrl => Http::response('fake-image-body', 200, ['Content-Type' => 'image/jpeg']),
         ]);
+        $this->mock(CatalogStatsPosterUrlGuard::class)
+            ->shouldReceive('safeUrl')
+            ->once()
+            ->with($posterUrl)
+            ->andReturn($posterUrl);
 
         $response = $this->get(route('stats.poster', $catalogTitle));
 
@@ -299,6 +311,31 @@ class CatalogPageTest extends TestCase
             ->assertOk()
             ->assertHeader('Content-Type', 'image/jpeg')
             ->assertSee('fake-image-body', false);
+    }
+
+    public function test_unpublished_titles_cannot_be_resolved_by_public_routes(): void
+    {
+        Http::preventStrayRequests();
+
+        $posterUrl = 'https://media.example.com/unpublished-poster.jpg';
+        $catalogTitle = CatalogTitle::factory()->create([
+            'slug' => 'unpublished-public-route',
+            'poster_url' => $posterUrl,
+            'is_published' => false,
+        ]);
+
+        Http::fake([
+            $posterUrl => Http::response('private-image-body', 200, ['Content-Type' => 'image/jpeg']),
+        ]);
+        $this->mock(CatalogStatsPosterUrlGuard::class)
+            ->shouldReceive('safeUrl')
+            ->with($posterUrl)
+            ->andReturn($posterUrl);
+
+        $this->get(route('titles.show', $catalogTitle))->assertNotFound();
+        $this->get(route('stats.poster', $catalogTitle))->assertNotFound();
+
+        Http::assertNothingSent();
     }
 
     public function test_stats_issue_rows_merge_multiple_issue_categories(): void

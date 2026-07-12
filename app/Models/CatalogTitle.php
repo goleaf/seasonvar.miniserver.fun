@@ -41,6 +41,17 @@ class CatalogTitle extends Model
     }
 
     /**
+     * Keep every current public route binding inside the publication boundary.
+     *
+     * @param  Model|Builder<CatalogTitle>|\Illuminate\Database\Eloquent\Relations\Relation<*, *, *>  $query
+     * @return Builder<CatalogTitle>
+     */
+    public function resolveRouteBindingQuery($query, $value, $field = null)
+    {
+        return parent::resolveRouteBindingQuery($query, $value, $field)->published();
+    }
+
+    /**
      * @param  Builder<CatalogTitle>  $query
      * @return Builder<CatalogTitle>
      */

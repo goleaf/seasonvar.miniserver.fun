@@ -12,19 +12,19 @@ class CatalogAdvancedFilterTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_years_are_or_and_relation_dimensions_are_and(): void
+    public function test_years_are_or_and_multiple_values_inside_relation_dimensions_are_and(): void
     {
         $russia = Country::query()->create(['name' => 'Россия', 'slug' => 'rossiya']);
         $canada = Country::query()->create(['name' => 'Канада', 'slug' => 'kanada']);
         $actor = Actor::query()->create(['name' => 'Иван Петров', 'slug' => 'ivan-petrov']);
 
-        $russianMatch = CatalogTitle::factory()->create(['title' => 'Россия с Иваном', 'slug' => 'rossiya-s-ivanom', 'year' => 2023]);
-        $russianMatch->countries()->attach($russia);
-        $russianMatch->actors()->attach($actor);
+        $firstMatch = CatalogTitle::factory()->create(['title' => 'Обе страны 2023', 'slug' => 'obe-strany-2023', 'year' => 2023]);
+        $firstMatch->countries()->attach([$russia->id, $canada->id]);
+        $firstMatch->actors()->attach($actor);
 
-        $canadianMatch = CatalogTitle::factory()->create(['title' => 'Канада с Иваном', 'slug' => 'kanada-s-ivanom', 'year' => 2024]);
-        $canadianMatch->countries()->attach($canada);
-        $canadianMatch->actors()->attach($actor);
+        $secondMatch = CatalogTitle::factory()->create(['title' => 'Обе страны 2024', 'slug' => 'obe-strany-2024', 'year' => 2024]);
+        $secondMatch->countries()->attach([$russia->id, $canada->id]);
+        $secondMatch->actors()->attach($actor);
 
         $withoutActor = CatalogTitle::factory()->create(['title' => 'Россия без Ивана', 'slug' => 'rossiya-bez-ivana', 'year' => 2024]);
         $withoutActor->countries()->attach($russia);
@@ -39,8 +39,8 @@ class CatalogAdvancedFilterTest extends TestCase
             'actor' => ['ivan-petrov'],
         ]))
             ->assertOk()
-            ->assertSeeText('Россия с Иваном')
-            ->assertSeeText('Канада с Иваном')
+            ->assertSeeText('Обе страны 2023')
+            ->assertSeeText('Обе страны 2024')
             ->assertDontSeeText('Россия без Ивана')
             ->assertDontSeeText('Сериал 2022');
     }
