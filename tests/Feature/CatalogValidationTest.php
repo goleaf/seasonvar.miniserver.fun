@@ -94,7 +94,7 @@ class CatalogValidationTest extends TestCase
             ->assertSessionHasErrors(['episode', 'media']);
     }
 
-    public function test_valid_but_unknown_taxonomy_filter_does_not_fall_back_to_full_catalog(): void
+    public function test_unknown_taxonomy_route_returns_not_found_instead_of_full_catalog(): void
     {
         CatalogTitle::factory()->create([
             'slug' => 'vidimyi-serial',
@@ -103,8 +103,7 @@ class CatalogValidationTest extends TestCase
 
         $this
             ->get(route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => 'neizvestnyi-zhanr']))
-            ->assertOk()
-            ->assertSeeText('Ничего не найдено.')
+            ->assertNotFound()
             ->assertDontSeeText('Видимый сериал');
     }
 
