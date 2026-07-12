@@ -16,6 +16,9 @@ use Illuminate\Support\Str;
 
 class CatalogTitleQuery
 {
+    /** @var array<string, Collection<int, int>> */
+    private array $exactTitleIdsCache = [];
+
     public function __construct(
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogSearchNormalizer $searchNormalizer,
@@ -34,6 +37,10 @@ class CatalogTitleQuery
         ?string $exceptTaxonomyType = null,
         bool $invalidYear = false,
         ?int $titleContextId = null,
+        array $years = [],
+        array $selectedTaxonomyIds = [],
+        array $excludedTaxonomyIds = [],
+        array $advancedFilters = [],
     ): Builder {
         $query = CatalogTitle::query()->published();
 
@@ -42,11 +49,13 @@ class CatalogTitleQuery
         }
 
         if ($search->year !== null) {
-            if ($year !== null && $year !== $search->year) {
+            if ($years !== [] && ! in_array($search->year, $years, true)) {
                 $query->whereRaw('1 = 0');
             } else {
                 $query->where('year', $search->year);
             }
+        } elseif ($years !== []) {
+            $query->whereIn('year', $years);
         } elseif ($year !== null) {
             $query->where('year', $year);
         }
@@ -56,7 +65,8 @@ class CatalogTitleQuery
         }
 
         $this->applySearchFilter($query, $search, $titleContextId);
-        $this->applyRelationFilters($query, $activeTaxonomies, $exceptTaxonomyType);
+        $this->applyRelationFilters($query, $activeTaxonomies, $exceptTaxonomyType, $selectedTaxonomyIds, $excludedTaxonomyIds);
+        $this->applyAdvancedFilters($query, $advancedFilters);
 
         return $query;
     }
@@ -75,6 +85,10 @@ class CatalogTitleQuery
         ?int $year,
         bool $invalidYear,
         ?int $titleContextId = null,
+        array $years = [],
+        array $selectedTaxonomyIds = [],
+        array $excludedTaxonomyIds = [],
+        array $advancedFilters = [],
     ): Collection {
         $visibleIdsByType = $filterTaxonomies
             ->map(fn (Collection $items): Collection => $items->pluck('id')->values())
@@ -86,14 +100,14 @@ class CatalogTitleQuery
 
         $catalogTitleTable = (new CatalogTitle)->getTable();
         $contextQueries = $visibleIdsByType
-            ->map(function (Collection $recordIds, string $filterType) use ($activeTaxonomies, $invalidFilterSlugs, $search, $year, $invalidYear, $titleContextId, $catalogTitleTable) {
+            ->map(function (Collection $recordIds, string $filterType) use ($activeTaxonomies, $invalidFilterSlugs, $search, $year, $invalidYear, $titleContextId, $years, $selectedTaxonomyIds, $excludedTaxonomyIds, $advancedFilters, $catalogTitleTable) {
                 $relationName = $this->taxonomies->relationName($filterType);
                 $catalogTitleRelation = (new CatalogTitle)->{$relationName}();
                 $pivotTable = $catalogTitleRelation->getTable();
                 $titlePivotKey = $catalogTitleRelation->getForeignPivotKeyName();
                 $relatedPivotKey = $catalogTitleRelation->getRelatedPivotKeyName();
                 $filteredTitlesQuery = $this
-                    ->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $search, $year, $filterType, $invalidYear, $titleContextId)
+                    ->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $search, $year, $filterType, $invalidYear, $titleContextId, $years, $selectedTaxonomyIds, $excludedTaxonomyIds, $advancedFilters)
                     ->select($catalogTitleTable.'.id');
                 $alias = 'filtered_titles_'.preg_replace('/[^a-z0-9_]+/i', '_', $filterType);
 
@@ -188,18 +202,22 @@ class CatalogTitleQuery
      */
     private function exactTitleSearchIds(CatalogSearchQuery $search): Collection
     {
+        if (array_key_exists($search->normalized, $this->exactTitleIdsCache)) {
+            return $this->exactTitleIdsCache[$search->normalized];
+        }
+
         $variants = collect($this->searchNormalizer->legacyVariants($search->phrase()))
             ->flatMap(fn (string $variant): array => [$variant, Str::ucfirst($variant)])
             ->unique()
             ->values();
 
         if ($variants->isEmpty()) {
-            return collect();
+            return $this->exactTitleIdsCache[$search->normalized] = collect();
         }
 
         $catalogTitleTable = (new CatalogTitle)->getTable();
 
-        return CatalogTitle::query()
+        return $this->exactTitleIdsCache[$search->normalized] = CatalogTitle::query()
             ->published()
             ->select($catalogTitleTable.'.id')
             ->where(function (Builder $query) use ($catalogTitleTable, $search, $variants): void {
@@ -270,11 +288,26 @@ class CatalogTitleQuery
      * @param  Builder<CatalogTitle>  $query
      * @param  Collection<string, Model>  $activeTaxonomies
      */
-    private function applyRelationFilters(Builder $query, Collection $activeTaxonomies, ?string $exceptTaxonomyType = null): void
-    {
+    /**
+     * @param  array<string, list<int>>  $selectedTaxonomyIds
+     * @param  array<string, list<int>>  $excludedTaxonomyIds
+     */
+    private function applyRelationFilters(
+        Builder $query,
+        Collection $activeTaxonomies,
+        ?string $exceptTaxonomyType = null,
+        array $selectedTaxonomyIds = [],
+        array $excludedTaxonomyIds = [],
+    ): void {
         $catalogTitleTable = (new CatalogTitle)->getTable();
 
-        foreach ($activeTaxonomies as $filterType => $activeTaxonomy) {
+        $filterTypes = collect(array_keys($selectedTaxonomyIds))
+            ->merge(array_keys($excludedTaxonomyIds))
+            ->merge($activeTaxonomies->keys())
+            ->unique()
+            ->values();
+
+        foreach ($filterTypes as $filterType) {
             if ($filterType === $exceptTaxonomyType) {
                 continue;
             }
@@ -283,13 +316,109 @@ class CatalogTitleQuery
             $pivotTable = $relation->getTable();
             $titlePivotKey = $relation->getForeignPivotKeyName();
             $relatedPivotKey = $relation->getRelatedPivotKeyName();
+            $selectedIds = $selectedTaxonomyIds[$filterType] ?? [];
+            $excludedIds = $excludedTaxonomyIds[$filterType] ?? [];
 
-            $query->whereIn(
-                $catalogTitleTable.'.id',
-                DB::table($pivotTable)
-                    ->select($pivotTable.'.'.$titlePivotKey)
-                    ->where($pivotTable.'.'.$relatedPivotKey, $activeTaxonomy->getKey()),
-            );
+            if ($selectedIds !== []) {
+                $query->whereIn(
+                    $catalogTitleTable.'.id',
+                    DB::table($pivotTable)
+                        ->select($pivotTable.'.'.$titlePivotKey)
+                        ->whereIn($pivotTable.'.'.$relatedPivotKey, $selectedIds),
+                );
+            }
+
+            if ($excludedIds !== []) {
+                $query->whereNotIn(
+                    $catalogTitleTable.'.id',
+                    DB::table($pivotTable)
+                        ->select($pivotTable.'.'.$titlePivotKey)
+                        ->whereIn($pivotTable.'.'.$relatedPivotKey, $excludedIds),
+                );
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    private function applyAdvancedFilters(Builder $query, array $filters): void
+    {
+        $yearFrom = $filters['year_from'] ?? null;
+        $yearTo = $filters['year_to'] ?? null;
+
+        if ($yearFrom !== null) {
+            $query->where('year', '>=', $yearFrom);
+        }
+
+        if ($yearTo !== null) {
+            $query->where('year', '<=', $yearTo);
+        }
+
+        foreach ([['seasons', 'seasons_min', 'seasons_max'], ['episodes', 'episodes_min', 'episodes_max']] as [$relation, $minimumKey, $maximumKey]) {
+            if (($filters[$minimumKey] ?? null) !== null) {
+                $query->has($relation, '>=', $filters[$minimumKey]);
+            }
+
+            if (($filters[$maximumKey] ?? null) !== null) {
+                $query->has($relation, '<=', $filters[$maximumKey]);
+            }
+        }
+
+        $videoAvailability = $filters['video'] ?? null;
+        if ($videoAvailability === 'available') {
+            $query->whereHas('licensedMedia', fn (Builder $media): Builder => $media->published());
+        } elseif ($videoAvailability === 'missing') {
+            $query->whereDoesntHave('licensedMedia', fn (Builder $media): Builder => $media->published());
+        }
+
+        $subtitleAvailability = $filters['subtitles'] ?? null;
+        if ($subtitleAvailability === 'available') {
+            $query->whereHas('licensedMedia', fn (Builder $media): Builder => $media->published()->where('has_subtitles', true));
+        } elseif ($subtitleAvailability === 'missing') {
+            $query->whereDoesntHave('licensedMedia', fn (Builder $media): Builder => $media->published()->where('has_subtitles', true));
+        }
+
+        $qualities = $filters['quality'] ?? [];
+        if ($qualities !== []) {
+            $query->whereHas('licensedMedia', fn (Builder $media): Builder => $media->published()->whereIn('quality', $qualities));
+        }
+
+        $updatedAfter = $filters['updated_after'] ?? null;
+        if ($updatedAfter !== null) {
+            $query->where('indexed_at', '>=', $updatedAfter);
+        }
+
+        $letter = Str::upper(trim((string) ($filters['letter'] ?? '')));
+        if ($letter !== '') {
+            if ($letter === 'Е') {
+                $query->where(fn (Builder $titles): Builder => $titles->where('title', 'like', 'Е%')->orWhere('title', 'like', 'Ё%'));
+            } elseif ($letter === '#') {
+                $query->whereRaw("title NOT GLOB '[A-Za-zА-Яа-яЁё]*'");
+            } elseif ($letter === 'LATIN') {
+                $query->where('title', 'glob', '[A-Za-z]*');
+            } else {
+                $query->where('title', 'like', $letter.'%');
+            }
+        }
+
+        $ratingSource = $filters['rating_source'] ?? null;
+        $ratingMin = $filters['rating_min'] ?? null;
+        $votesMin = $filters['votes_min'] ?? null;
+        if ($ratingSource !== null || $ratingMin !== null || $votesMin !== null) {
+            $query->whereHas('ratings', function (Builder $ratings) use ($ratingSource, $ratingMin, $votesMin): void {
+                if ($ratingSource !== null) {
+                    $ratings->where('provider', $ratingSource);
+                }
+
+                if ($ratingMin !== null) {
+                    $ratings->where('rating', '>=', $ratingMin);
+                }
+
+                if ($votesMin !== null) {
+                    $ratings->where('votes', '>=', $votesMin);
+                }
+            });
         }
     }
 }

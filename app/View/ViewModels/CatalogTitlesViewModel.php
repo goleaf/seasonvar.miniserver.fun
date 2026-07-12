@@ -64,15 +64,17 @@ class CatalogTitlesViewModel
         'title_asc' => 'fa-solid fa-arrow-down-a-z',
     ];
 
-    /**
-     * @var array<string, string>
-     */
+    /** @var array<string, mixed> */
     public array $baseQuery;
 
-    /**
-     * @var array<string, string>
-     */
+    /** @var array<string, mixed> */
     public array $allFilterSlugs;
+
+    /** @var array<string, list<string>> */
+    public array $selectedFilterSlugs;
+
+    /** @var array<string, mixed> */
+    public array $catalogQueryState;
 
     /**
      * @var array<string, string|int|null>
@@ -96,7 +98,9 @@ class CatalogTitlesViewModel
 
     /**
      * @param  Collection<string, Model>  $activeTaxonomies
+     * @param  Collection<string, Collection<int, Model>>  $selectedTaxonomies
      * @param  array<string, string>  $activeFilterSlugs
+     * @param  array<string, list<string>>  $selectedFilterSlugs
      * @param  array<string, string>  $invalidFilterSlugs
      */
     public function __construct(
@@ -106,12 +110,19 @@ class CatalogTitlesViewModel
         public readonly string $requestedYear,
         public readonly bool $invalidYear,
         public readonly Collection $activeTaxonomies,
+        public readonly Collection $selectedTaxonomies,
         public readonly array $activeFilterSlugs,
         public readonly array $invalidFilterSlugs,
         public readonly ?CatalogTitle $titleContext,
+        array $selectedFilterSlugs = [],
+        public readonly string $view = 'grid',
+        public readonly int $perPage = 24,
+        array $catalogQueryState = [],
     ) {
+        $this->selectedFilterSlugs = $selectedFilterSlugs;
+        $this->catalogQueryState = $catalogQueryState;
         $this->baseQuery = $this->titleContext === null ? [] : ['title' => $this->titleContext->slug];
-        $this->allFilterSlugs = array_merge($this->activeFilterSlugs, $this->invalidFilterSlugs);
+        $this->allFilterSlugs = array_merge($this->selectedFilterSlugs, $this->invalidFilterSlugs);
         $this->withoutYearQuery = $this->buildWithoutYearQuery();
         $this->withoutTitleQuery = $this->buildWithoutTitleQuery();
         $this->withoutSearchQuery = $this->buildWithoutSearchQuery();
@@ -143,6 +154,77 @@ class CatalogTitlesViewModel
         return $this->sort === $sort;
     }
 
+    /** @return array<string, mixed> */
+    public function viewQuery(string $view): array
+    {
+        $query = $this->sortQuery($this->sort);
+
+        if ($view === 'grid') {
+            unset($query['view']);
+        } else {
+            $query['view'] = $view;
+        }
+
+        return $query;
+    }
+
+    /** @return array<string, mixed> */
+    public function perPageQuery(int $perPage): array
+    {
+        $query = $this->sortQuery($this->sort);
+
+        if ($perPage === 24) {
+            unset($query['per_page']);
+        } else {
+            $query['per_page'] = $perPage;
+        }
+
+        return $query;
+    }
+
+    /** @return list<array{key: string, label: string, value: string}> */
+    public function advancedFilterChips(): array
+    {
+        $labels = [
+            'year' => 'Годы',
+            'year_from' => 'Год от',
+            'year_to' => 'Год до',
+            'seasons_min' => 'Сезонов от',
+            'seasons_max' => 'Сезонов до',
+            'episodes_min' => 'Серий от',
+            'episodes_max' => 'Серий до',
+            'rating_source' => 'Источник рейтинга',
+            'rating_min' => 'Рейтинг от',
+            'votes_min' => 'Голосов от',
+            'video' => 'Видео',
+            'subtitles' => 'Субтитры',
+            'quality' => 'Качество',
+            'updated' => 'Обновлено',
+            'letter' => 'Буква',
+        ];
+
+        return collect($labels)
+            ->filter(fn (string $label, string $key): bool => array_key_exists($key, $this->catalogQueryState)
+                && ! ($key === 'year' && $this->year !== null))
+            ->map(function (string $label, string $key): array {
+                $value = $this->catalogQueryState[$key];
+                $display = is_array($value) ? implode(', ', $value) : (string) $value;
+
+                return ['key' => $key, 'label' => $label, 'value' => $display];
+            })
+            ->values()
+            ->all();
+    }
+
+    /** @return array<string, mixed> */
+    public function withoutCatalogState(string $key): array
+    {
+        $query = $this->sortQuery($this->sort);
+        unset($query[$key]);
+
+        return $query;
+    }
+
     /**
      * @return array<string, string|int|null>
      */
@@ -164,12 +246,24 @@ class CatalogTitlesViewModel
      */
     public function filterQuery(string $filterType, ?string $slug = null): array
     {
-        $query = array_merge($this->baseQuery, $this->allFilterSlugs);
+        $query = $this->withCatalogState(array_merge($this->baseQuery, $this->allFilterSlugs));
 
         if ($slug === null) {
             unset($query[$filterType]);
         } else {
-            $query[$filterType] = $slug;
+            $values = is_array($query[$filterType] ?? null) ? $query[$filterType] : [];
+
+            if (in_array($slug, $values, true)) {
+                $values = array_values(array_diff($values, [$slug]));
+            } else {
+                $values[] = $slug;
+            }
+
+            if ($values === []) {
+                unset($query[$filterType]);
+            } else {
+                $query[$filterType] = array_values(array_unique($values));
+            }
         }
 
         return $this->appendSearchAndYear($query);
@@ -180,7 +274,8 @@ class CatalogTitlesViewModel
      */
     public function yearQuery(?int $selectedYear): array
     {
-        $query = array_merge($this->baseQuery, $this->allFilterSlugs);
+        $query = $this->withCatalogState(array_merge($this->baseQuery, $this->allFilterSlugs));
+        unset($query['year']);
 
         if ($this->search !== '') {
             $query['q'] = $this->search;
@@ -236,6 +331,8 @@ class CatalogTitlesViewModel
      */
     private function appendSearchAndYear(array $query): array
     {
+        $query = $this->withCatalogState($query);
+
         if ($this->search !== '') {
             $query['q'] = $this->search;
         }
@@ -252,6 +349,14 @@ class CatalogTitlesViewModel
             $query['year'] = $this->requestedYear;
         }
 
+        if ($this->view !== 'grid') {
+            $query['view'] = $this->view;
+        }
+
+        if ($this->perPage !== 24) {
+            $query['per_page'] = $this->perPage;
+        }
+
         return $query;
     }
 
@@ -260,7 +365,8 @@ class CatalogTitlesViewModel
      */
     private function buildWithoutYearQuery(): array
     {
-        $query = array_merge($this->baseQuery, $this->allFilterSlugs);
+        $query = $this->withCatalogState(array_merge($this->baseQuery, $this->allFilterSlugs));
+        unset($query['year']);
 
         if ($this->search !== '') {
             $query['q'] = $this->search;
@@ -286,7 +392,7 @@ class CatalogTitlesViewModel
      */
     private function buildWithoutSearchQuery(): array
     {
-        $query = array_merge($this->baseQuery, $this->allFilterSlugs);
+        $query = $this->withCatalogState(array_merge($this->baseQuery, $this->allFilterSlugs));
 
         if ($this->sort !== 'updated') {
             $query['sort'] = $this->sort;
@@ -317,5 +423,11 @@ class CatalogTitlesViewModel
         }
 
         return $query;
+    }
+
+    /** @param array<string, mixed> $query @return array<string, mixed> */
+    private function withCatalogState(array $query): array
+    {
+        return array_merge($this->catalogQueryState, $query);
     }
 }

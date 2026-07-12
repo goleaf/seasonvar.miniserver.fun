@@ -55,67 +55,107 @@ class CatalogTitlesPageBuilder
         $legacyType = $request->legacyType($filterTypes);
         $legacyTaxonomy = $request->legacyTaxonomy();
         $invalidInputFilterSlugs = [];
+        $requestedFilterSlugs = $request->filterSlugs();
+
+        if ($legacyType !== '' && $legacyTaxonomy !== null && $requestedFilterSlugs[$legacyType] === []) {
+            $requestedFilterSlugs[$legacyType] = [$legacyTaxonomy];
+        }
 
         if ($legacyType !== '' && $legacyTaxonomy === null) {
             $invalidInputFilterSlugs[$legacyType] = 'invalid';
         }
 
-        $activeFilterSlugs = collect($filterTypes)
-            ->mapWithKeys(function (string $filterType) use ($request, $type, $taxonomy, $legacyType, $legacyTaxonomy, &$invalidInputFilterSlugs): array {
-                $value = $type === $filterType
-                    ? $taxonomy
-                    : $request->query($filterType, '');
-
-                if ($value === '' && $legacyType === $filterType && $legacyTaxonomy !== null) {
-                    $value = $legacyTaxonomy;
-                }
-
-                $value = $request->filterSlug($value);
-
-                if ($value === null) {
-                    $invalidInputFilterSlugs[$filterType] = 'invalid';
-
-                    return [];
-                }
-
-                return $value === '' ? [] : [$filterType => $value];
-            })
-            ->all();
+        if ($type !== null && in_array($type, $filterTypes, true) && $taxonomy !== null) {
+            $requestedFilterSlugs[$type] = [$taxonomy];
+        }
 
         if ($taxonomy !== null && ! in_array($type, $filterTypes, true)) {
             abort(404);
         }
 
         $activeTaxonomies = collect();
+        $selectedTaxonomies = collect();
+        $selectedTaxonomyIds = [];
 
-        foreach ($activeFilterSlugs as $filterType => $slug) {
+        foreach ($requestedFilterSlugs as $filterType => $slugs) {
+            if (! in_array($filterType, $filterTypes, true) || $slugs === []) {
+                continue;
+            }
+
             $modelClass = $this->taxonomies->modelClass($filterType);
-            $record = $modelClass::query()
-                ->where('slug', $slug)
-                ->withCount('catalogTitles')
-                ->first();
+            $records = $modelClass::query()
+                ->whereIn('slug', $slugs)
+                ->withCount(['catalogTitles' => fn (Builder $query): Builder => $query->published()])
+                ->get()
+                ->keyBy('slug');
 
-            if ($record !== null) {
-                $activeTaxonomies->put($filterType, $record);
+            if ($records->count() !== count($slugs)) {
+                $invalidInputFilterSlugs[$filterType] = 'invalid';
+            }
+
+            if ($records->isNotEmpty()) {
+                $selectedTaxonomyIds[$filterType] = $records->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all();
+                $selectedTaxonomies->put($filterType, $records->values());
+                $activeTaxonomies->put($filterType, $records->first());
             }
         }
 
-        $invalidFilterSlugs = $invalidInputFilterSlugs + array_diff_key($activeFilterSlugs, $activeTaxonomies->all());
+        $excludedTaxonomyIds = [];
+        foreach ($request->excludedFilterSlugs() as $filterType => $slugs) {
+            if ($slugs === []) {
+                continue;
+            }
+
+            $modelClass = $this->taxonomies->modelClass($filterType);
+            $records = $modelClass::query()->whereIn('slug', $slugs)->get();
+
+            if ($records->count() !== count($slugs)) {
+                $invalidInputFilterSlugs['exclude_'.$filterType] = 'invalid';
+            }
+
+            $excludedTaxonomyIds[$filterType] = $records->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all();
+        }
+
+        $invalidFilterSlugs = $invalidInputFilterSlugs;
         $activeFilterSlugs = $activeTaxonomies
             ->mapWithKeys(fn (Model $record, string $filterType): array => [$filterType => $record->slug])
             ->all();
 
-        $catalogTitles = $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $searchQuery, $year, null, $invalidYear, $titleContext?->id)
+        $advancedFilters = [
+            'year_from' => $request->yearFrom(),
+            'year_to' => $request->yearTo(),
+            'seasons_min' => $request->seasonsMin(),
+            'seasons_max' => $request->seasonsMax(),
+            'episodes_min' => $request->episodesMin(),
+            'episodes_max' => $request->episodesMax(),
+            'video' => $request->videoAvailability(),
+            'subtitles' => $request->subtitleAvailability(),
+            'quality' => $request->qualities(),
+            'updated_after' => match ($request->updatedPeriod()) {
+                'week' => now()->subWeek(),
+                'month' => now()->subMonth(),
+                'year' => now()->subYear(),
+                default => null,
+            },
+            'letter' => $request->letter(),
+            'rating_source' => $request->ratingSource(),
+            'rating_min' => $request->ratingMin(),
+            'votes_min' => $request->votesMin(),
+        ];
+
+        $catalogTitles = $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $searchQuery, $year, null, $invalidYear, $titleContext?->id, $request->years(), $selectedTaxonomyIds, $excludedTaxonomyIds, $advancedFilters)
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'])
-            ->with($this->taxonomies->cardRelations())
+            ->with($request->view() === 'list'
+                ? array_merge(['seasons'], $this->taxonomies->cardRelations())
+                : $this->taxonomies->cardRelations())
             ->withCount($this->cardCounts());
         $this->applySort($catalogTitles, $sort);
-        $catalogTitles = $catalogTitles->paginate(24)->withQueryString();
+        $catalogTitles = $catalogTitles->paginate($request->perPage())->withQueryString();
 
         $filterTaxonomies = collect($filterTypes)->mapWithKeys(function (string $filterType): array {
             $modelClass = $this->taxonomies->modelClass($filterType);
             $items = $modelClass::query()
-                ->withCount('catalogTitles')
+                ->withCount(['catalogTitles' => fn (Builder $query): Builder => $query->published()])
                 ->orderByDesc('catalog_titles_count')
                 ->limit($this->filterLimit($filterType))
                 ->get()
@@ -125,15 +165,19 @@ class CatalogTitlesPageBuilder
             return [$filterType => $items];
         });
 
-        $activeTaxonomies->each(function (Model $activeTaxonomy, string $filterType) use ($filterTaxonomies): void {
+        $selectedTaxonomies->each(function (Collection $selected, string $filterType) use ($filterTaxonomies): void {
             $items = $filterTaxonomies->get($filterType, collect());
 
-            if (! $items->contains(fn (Model $record): bool => $record->id === $activeTaxonomy->id)) {
-                $filterTaxonomies->put($filterType, $items->prepend($activeTaxonomy)->values());
-            }
+            $selected->reverse()->each(function (Model $selectedTaxonomy) use (&$items): void {
+                if (! $items->contains(fn (Model $record): bool => $record->id === $selectedTaxonomy->id)) {
+                    $items = $items->prepend($selectedTaxonomy);
+                }
+            });
+
+            $filterTaxonomies->put($filterType, $items->values());
         });
 
-        $taxonomyContextCounts = $this->query->relationContextCounts($filterTaxonomies, $activeTaxonomies, $invalidFilterSlugs, $searchQuery, $year, $invalidYear, $titleContext?->id);
+        $taxonomyContextCounts = $this->query->relationContextCounts($filterTaxonomies, $activeTaxonomies, $invalidFilterSlugs, $searchQuery, $year, $invalidYear, $titleContext?->id, $request->years(), $selectedTaxonomyIds, $excludedTaxonomyIds, $advancedFilters);
         $filterTaxonomies = $filterTaxonomies->map(function (Collection $items, string $filterType) use ($taxonomyContextCounts): Collection {
             return $items->map(function (Model $record) use ($filterType, $taxonomyContextCounts): Model {
                 $record->context_titles_count = (int) ($taxonomyContextCounts->get($filterType.'|'.$record->id) ?? 0);
@@ -142,6 +186,7 @@ class CatalogTitlesPageBuilder
             });
         });
         $yearBuckets = CatalogTitle::query()
+            ->published()
             ->select('year')
             ->selectRaw('count(*) as titles_count')
             ->whereNotNull('year')
@@ -154,6 +199,7 @@ class CatalogTitlesPageBuilder
 
         if ($year !== null && ! $yearBuckets->contains(fn (CatalogTitle $bucket): bool => (int) $bucket->year === $year)) {
             $selectedYearBucket = CatalogTitle::query()
+                ->published()
                 ->select('year')
                 ->selectRaw('count(*) as titles_count')
                 ->where('year', $year)
@@ -166,7 +212,7 @@ class CatalogTitlesPageBuilder
             ]);
         }
 
-        $yearContextCounts = $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $searchQuery, null, null, $invalidYear, $titleContext?->id)
+        $yearContextCounts = $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $searchQuery, null, null, $invalidYear, $titleContext?->id, [], $selectedTaxonomyIds, $excludedTaxonomyIds, $advancedFilters)
             ->select('year')
             ->selectRaw('count(*) as context_titles_count')
             ->whereNotNull('year')
@@ -186,15 +232,22 @@ class CatalogTitlesPageBuilder
             requestedYear: $requestedYear,
             invalidYear: $invalidYear,
             activeTaxonomies: $activeTaxonomies,
+            selectedTaxonomies: $selectedTaxonomies,
             activeFilterSlugs: $activeFilterSlugs,
             invalidFilterSlugs: $invalidFilterSlugs,
             titleContext: $titleContext,
+            selectedFilterSlugs: $requestedFilterSlugs,
+            view: $request->view(),
+            perPage: $request->perPage(),
+            catalogQueryState: $request->catalogQueryState(),
         );
 
         return [
             'titles' => $catalogTitles,
             'search' => $search,
             'sort' => $sort,
+            'view' => $request->view(),
+            'perPage' => $request->perPage(),
             'year' => $year,
             'requestedYear' => $requestedYear,
             'invalidYear' => $invalidYear,
@@ -203,6 +256,7 @@ class CatalogTitlesPageBuilder
             'titleContext' => $titleContext,
             'selectedTaxonomy' => $activeTaxonomies->first(),
             'activeTaxonomies' => $activeTaxonomies,
+            'selectedTaxonomies' => $selectedTaxonomies,
             'activeFilterSlugs' => $activeFilterSlugs,
             'invalidFilterSlugs' => $invalidFilterSlugs,
             'filterTaxonomies' => $filterTaxonomies,

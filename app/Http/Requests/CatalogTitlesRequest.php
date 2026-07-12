@@ -8,9 +8,9 @@ use App\Rules\CatalogFilterSlug;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Validator;
 
 class CatalogTitlesRequest extends FormRequest
 {
@@ -203,25 +203,101 @@ class CatalogTitlesRequest extends FormRequest
         ];
     }
 
-    public function yearFrom(): ?int { return $this->nullableInt('year_from'); }
-    public function yearTo(): ?int { return $this->nullableInt('year_to'); }
-    public function seasonsMin(): ?int { return $this->nullableInt('seasons_min'); }
-    public function seasonsMax(): ?int { return $this->nullableInt('seasons_max'); }
-    public function episodesMin(): ?int { return $this->nullableInt('episodes_min'); }
-    public function episodesMax(): ?int { return $this->nullableInt('episodes_max'); }
-    public function ratingSource(): ?string { return $this->nullableString('rating_source'); }
-    public function ratingMin(): ?float { return $this->nullableFloat('rating_min'); }
-    public function votesMin(): ?int { return $this->nullableInt('votes_min'); }
-    public function videoAvailability(): ?string { return $this->nullableString('video'); }
-    public function subtitleAvailability(): ?string { return $this->nullableString('subtitles'); }
-    public function updatedPeriod(): ?string { return $this->nullableString('updated'); }
-    public function letter(): ?string { return $this->nullableString('letter'); }
+    public function yearFrom(): ?int
+    {
+        return $this->nullableInt('year_from');
+    }
+
+    public function yearTo(): ?int
+    {
+        return $this->nullableInt('year_to');
+    }
+
+    public function seasonsMin(): ?int
+    {
+        return $this->nullableInt('seasons_min');
+    }
+
+    public function seasonsMax(): ?int
+    {
+        return $this->nullableInt('seasons_max');
+    }
+
+    public function episodesMin(): ?int
+    {
+        return $this->nullableInt('episodes_min');
+    }
+
+    public function episodesMax(): ?int
+    {
+        return $this->nullableInt('episodes_max');
+    }
+
+    public function ratingSource(): ?string
+    {
+        return $this->nullableString('rating_source');
+    }
+
+    public function ratingMin(): ?float
+    {
+        return $this->nullableFloat('rating_min');
+    }
+
+    public function votesMin(): ?int
+    {
+        return $this->nullableInt('votes_min');
+    }
+
+    public function videoAvailability(): ?string
+    {
+        return $this->nullableString('video');
+    }
+
+    public function subtitleAvailability(): ?string
+    {
+        return $this->nullableString('subtitles');
+    }
+
+    public function updatedPeriod(): ?string
+    {
+        return $this->nullableString('updated');
+    }
+
+    public function letter(): ?string
+    {
+        return $this->nullableString('letter');
+    }
 
     /** @return list<string> */
-    public function qualities(): array { return $this->scalarStringList('quality'); }
+    public function qualities(): array
+    {
+        return $this->scalarStringList('quality');
+    }
 
-    public function view(): string { return $this->nullableString('view') ?? 'grid'; }
-    public function perPage(): int { return $this->nullableInt('per_page') ?? 24; }
+    public function view(): string
+    {
+        return $this->nullableString('view') ?? 'grid';
+    }
+
+    public function perPage(): int
+    {
+        return $this->nullableInt('per_page') ?? 24;
+    }
+
+    /** @return array<string, mixed> */
+    public function catalogQueryState(): array
+    {
+        $keys = array_merge(
+            ['year', 'exclude_country', 'exclude_genre', 'quality'],
+            CatalogFilterType::values(),
+            ['year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_source', 'rating_min', 'votes_min', 'video', 'subtitles', 'updated', 'letter', 'view', 'per_page'],
+        );
+
+        return collect($keys)
+            ->filter(fn (string $key): bool => $this->query->has($key))
+            ->mapWithKeys(fn (string $key): array => [$key => $this->query($key)])
+            ->all();
+    }
 
     /** @return list<Closure(Validator): void> */
     public function after(): array
@@ -309,6 +385,7 @@ class CatalogTitlesRequest extends FormRequest
         foreach ($values as $value) {
             if (! is_scalar($value)) {
                 $normalized[] = $value;
+
                 continue;
             }
 

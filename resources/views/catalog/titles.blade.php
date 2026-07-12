@@ -73,7 +73,7 @@
                             <span>{{ $seo['h1'] ?? 'Сериалы' }}</span>
                         </h1>
                         <p class="mt-2 text-sm text-slate-500">{{ $seo['lead'] ?? 'Поиск по названиям, описаниям, актерам, жанрам и связям каталога.' }}</p>
-                        @if ($search !== '' || $activeTaxonomies->isNotEmpty() || $titleContext !== null || $year !== null || $invalidYear || $invalidFilterSlugs !== [])
+                        @if ($search !== '' || $selectedTaxonomies->isNotEmpty() || $filterView->advancedFilterChips() !== [] || $titleContext !== null || $year !== null || $invalidYear || $invalidFilterSlugs !== [])
                             <div class="mt-3 space-y-3 text-sm">
                                 <div class="flex flex-wrap items-center gap-2">
                                     @if ($search !== '')
@@ -88,15 +88,22 @@
                                     @if ($invalidYear)
                                         <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutYearQuery)" active icon="fa-solid fa-calendar-days">Год: {{ $requestedYear }} не найден · убрать</x-ui.taxonomy-chip>
                                     @endif
-                                    @foreach ($activeTaxonomies as $filterType => $taxonomy)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->filterQuery($filterType, null))" :icon="$filterView->icon($filterType)" active>{{ $filterView->label($filterType) }}: {{ $taxonomy->name }} · убрать</x-ui.taxonomy-chip>
+                                    @foreach ($selectedTaxonomies as $filterType => $taxonomies)
+                                        @foreach ($taxonomies as $taxonomy)
+                                            <x-ui.taxonomy-chip :href="route('titles.index', $filterView->filterQuery($filterType, $taxonomy->slug))" :icon="$filterView->icon($filterType)" active>{{ $filterView->label($filterType) }}: {{ $taxonomy->name }} · убрать</x-ui.taxonomy-chip>
+                                        @endforeach
+                                    @endforeach
+                                    @foreach ($filterView->advancedFilterChips() as $chip)
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutCatalogState($chip['key']))" active icon="fa-solid fa-sliders">
+                                            {{ $chip['label'] }}: {{ $chip['value'] }} · убрать
+                                        </x-ui.taxonomy-chip>
                                     @endforeach
                                     @foreach ($invalidFilterSlugs as $filterType => $slug)
                                         <x-ui.taxonomy-chip :href="route('titles.index', $filterView->invalidFilterQuery($filterType))" :icon="$filterView->icon($filterType)" active>{{ $filterView->label($filterType) }}: {{ $slug }} не найден · убрать</x-ui.taxonomy-chip>
                                     @endforeach
                                 </div>
                                 <div class="flex flex-wrap gap-3 text-slate-500">
-                                    <span><i class="fa-solid fa-diagram-project text-slate-400" aria-hidden="true"></i> Активных связей: {{ $activeTaxonomies->count() }}</span>
+                                    <span><i class="fa-solid fa-diagram-project text-slate-400" aria-hidden="true"></i> Активных связей: {{ $selectedTaxonomies->sum(fn ($taxonomies) => $taxonomies->count()) }}</span>
                                     @if ($invalidFilterSlugs !== [])
                                         <span><i class="fa-solid fa-triangle-exclamation text-amber-600" aria-hidden="true"></i> Ошибочных фильтров: {{ count($invalidFilterSlugs) }}</span>
                                     @endif
@@ -128,8 +135,10 @@
                         @if ($titleContext !== null)
                             <input type="hidden" name="title" value="{{ $titleContext->slug }}">
                         @endif
-                        @foreach ($activeFilterSlugs as $filterType => $slug)
-                            <input type="hidden" name="{{ $filterType }}" value="{{ $slug }}">
+                        @foreach ($filterView->selectedFilterSlugs as $filterType => $slugs)
+                            @foreach ($slugs as $slug)
+                                <input type="hidden" name="{{ $filterType }}[]" value="{{ $slug }}">
+                            @endforeach
                         @endforeach
                         @foreach ($invalidFilterSlugs as $filterType => $slug)
                             <input type="hidden" name="{{ $filterType }}" value="{{ $slug }}">
@@ -194,11 +203,37 @@
                         </a>
                     @endforeach
                 </div>
+
+                <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold">
+                    <span class="text-slate-400">Вид:</span>
+                    @foreach (['grid' => 'Карточки', 'list' => 'Список'] as $viewKey => $viewLabel)
+                        <a href="{{ route('titles.index', $filterView->viewQuery($viewKey)) }}" @class([
+                            'rounded-full px-2.5 py-1 ring-1',
+                            'bg-emerald-50 text-emerald-700 ring-emerald-100' => $view === $viewKey,
+                            'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700' => $view !== $viewKey,
+                        ])>{{ $viewLabel }}</a>
+                    @endforeach
+                    <span class="ml-2 text-slate-400">На странице:</span>
+                    @foreach ([24, 48, 96] as $pageSize)
+                        <a href="{{ route('titles.index', $filterView->perPageQuery($pageSize)) }}" @class([
+                            'rounded-full px-2.5 py-1 ring-1',
+                            'bg-emerald-50 text-emerald-700 ring-emerald-100' => $perPage === $pageSize,
+                            'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700' => $perPage !== $pageSize,
+                        ])>{{ $pageSize }}</a>
+                    @endforeach
+                </div>
             </x-ui.panel>
 
-            <div class="grid auto-rows-fr gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4">
+            <div @class([
+                'divide-y divide-slate-200 overflow-hidden rounded-panel border border-slate-200 bg-white' => $view === 'list',
+                'grid auto-rows-fr gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4' => $view !== 'list',
+            ])>
                 @forelse ($titles as $catalogTitle)
-                    <x-title-card :title="$catalogTitle" />
+                    @if ($view === 'list')
+                        <x-title-list-row :title="$catalogTitle" readable />
+                    @else
+                        <x-title-card :title="$catalogTitle" />
+                    @endif
                 @empty
                     <x-ui.panel class="col-span-full border-dashed">
                         <div class="flex flex-col gap-4">
