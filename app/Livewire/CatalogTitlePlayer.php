@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\DTOs\CatalogEpisodeNavigation;
 use App\DTOs\CatalogPrimaryAction;
+use App\Enums\ReleaseKind;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
@@ -29,22 +31,22 @@ class CatalogTitlePlayer extends Component
     #[Locked]
     public int $catalogTitleId;
 
-    #[Url(history: true, except: '')]
+    #[Url(except: '')]
     public string|int|null $season = '';
 
-    #[Url(history: true, except: '')]
+    #[Url(except: '')]
     public string|int|null $episode = '';
 
-    #[Url(history: true, except: '')]
+    #[Url(except: '')]
     public string|int|null $media = '';
 
-    #[Url(history: true, except: '')]
+    #[Url(except: '')]
     public ?string $variant = '';
 
-    #[Url(history: true, except: '')]
+    #[Url(except: '')]
     public ?string $quality = '';
 
-    #[Url(history: true, except: '')]
+    #[Url(except: '')]
     public ?string $format = '';
 
     protected CatalogTitlePlaybackQuery $playback;
@@ -56,6 +58,8 @@ class CatalogTitlePlayer extends Component
     protected ExternalMediaMetadata $mediaMetadata;
 
     protected ?CatalogTitle $resolvedTitle = null;
+
+    protected ?Episode $resolvedEpisode = null;
 
     /** @var Collection<int, Season>|null */
     protected ?Collection $resolvedSeasons = null;
@@ -103,6 +107,7 @@ class CatalogTitlePlayer extends Component
         $this->season = (string) $season->id;
         $this->episode = '';
         $this->media = '';
+        $this->resolvedEpisode = null;
     }
 
     public function selectEpisode(int $episodeId): void
@@ -113,6 +118,7 @@ class CatalogTitlePlayer extends Component
         if ($episode === null) {
             $this->episode = '';
             $this->media = '';
+            $this->resolvedEpisode = null;
 
             return;
         }
@@ -128,6 +134,7 @@ class CatalogTitlePlayer extends Component
         $this->season = (string) $episode->season_id;
         $this->episode = (string) $episode->id;
         $this->media = $media !== null ? (string) $media->id : '';
+        $this->resolvedEpisode = $episode;
 
         if ($media !== null) {
             $this->syncMediaProfile($media);
@@ -211,7 +218,7 @@ class CatalogTitlePlayer extends Component
         $seasons = $this->seasonSummaries($title, $user);
         $requestedEpisode = $this->positiveId($this->episode);
         $requestedEpisodeModel = $requestedEpisode !== null
-            ? $this->playback->watchableEpisode($title, $user, $requestedEpisode)
+            ? $this->resolvedWatchableEpisode($title, $user, $requestedEpisode)
             : null;
         $requestedSeason = $this->positiveId($this->season);
 
@@ -229,6 +236,9 @@ class CatalogTitlePlayer extends Component
             ? $this->playback->episodesForSeason($title, $activeSeason, $user)
             : collect();
         $selectedEpisode = $this->selectedEpisode($episodes, $requestedEpisodeModel, $primaryAction, $activeSeason);
+        $episodeNavigation = $selectedEpisode !== null && $activeSeason !== null
+            ? $this->playback->episodeNavigation($title, $activeSeason, $user, $selectedEpisode)
+            : new CatalogEpisodeNavigation;
         $mediaItems = $episodes
             ->flatMap(fn (Episode $episode): Collection => $episode->licensedMedia)
             ->values();
@@ -265,6 +275,7 @@ class CatalogTitlePlayer extends Component
             'activeSeason' => $activeSeason,
             'episodes' => $episodes,
             'selectedEpisode' => $selectedEpisode,
+            'episodeNavigation' => $episodeNavigation,
             'selectedMedia' => $selectedMedia,
             'mediaItems' => $mediaItems,
             'showView' => $showView,
@@ -283,6 +294,31 @@ class CatalogTitlePlayer extends Component
         };
 
         return $count.' '.$noun;
+    }
+
+    public function episodeDisplayLabel(Episode $episode): string
+    {
+        if ($episode->kind === ReleaseKind::Special) {
+            return $episode->number !== null ? 'Спецвыпуск '.$episode->number : 'Спецвыпуск';
+        }
+
+        return $episode->number !== null ? $episode->number.' серия' : 'Серия без номера';
+    }
+
+    public function selectedEpisodeLabel(Episode $episode): string
+    {
+        return $episode->kind === ReleaseKind::Special
+            ? 'Выбран '.$this->episodeDisplayLabel($episode)
+            : 'Выбрана '.$this->episodeDisplayLabel($episode);
+    }
+
+    public function seasonDisplayLabel(Season $season): string
+    {
+        if ($season->kind === ReleaseKind::Special) {
+            return $season->number !== null ? 'Спецсезон '.$season->number : 'Спецсезон';
+        }
+
+        return $season->number !== null ? 'Сезон '.$season->number : 'Сезон без номера';
     }
 
     /** @param Collection<int, Season> $seasons */
@@ -395,6 +431,7 @@ class CatalogTitlePlayer extends Component
 
         $episodeId = $this->positiveId($this->episode);
         $episode = $episodeId !== null ? $this->playback->watchableEpisode($title, $user, $episodeId) : null;
+        $this->resolvedEpisode = $episode;
 
         if ($this->hasUrlValue($this->episode) && $episode === null) {
             $this->episode = '';
@@ -426,6 +463,15 @@ class CatalogTitlePlayer extends Component
     private function title(): CatalogTitle
     {
         return $this->resolvedTitle ??= $this->playback->visibleTitle($this->catalogTitleId, $this->user());
+    }
+
+    private function resolvedWatchableEpisode(CatalogTitle $title, ?User $user, int $episodeId): ?Episode
+    {
+        if ($this->resolvedEpisode?->id === $episodeId) {
+            return $this->resolvedEpisode;
+        }
+
+        return $this->resolvedEpisode = $this->playback->watchableEpisode($title, $user, $episodeId);
     }
 
     private function authorizedUser(): User

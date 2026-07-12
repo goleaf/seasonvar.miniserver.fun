@@ -144,4 +144,27 @@
 - [x] Inspect the 1228-episode title: 38 total HTTP queries including static recommendations/session, only active-season episode/media collections, 394-byte scalar-only Livewire snapshot, indexed SQL and `EXPLAIN QUERY PLAN`.
 - [x] Run Pint, 76 relevant PHPUnit tests (667 assertions), syntax lint, migration/schema checks, docs refresh check, audits and `npm run build`. Full suite is intentionally deferred while ten live importer workers are running, per `docs/testing.md`.
 - [x] Run desktop/mobile Playwright QA with managed Chromium fallback; verify season URL/Back restoration, zero horizontal overflow, no page errors or failed local assets. External poster/video requests were intentionally blocked.
-- [ ] Inspect full diff, ensure branch is `main`, commit all authorized changes, push without force and confirm clean status.
+- [x] Inspect full diff, ensure branch is `main`, commit all authorized changes, push without force and confirm clean status (`a326b15`, with follow-up documentation in `7d362f3`).
+
+---
+
+### Task 7: Add Release-Lane Episode Navigation
+
+**Files:**
+
+- Create: `app/DTOs/CatalogEpisodeNavigation.php`
+- Modify: `app/Services/Catalog/CatalogTitlePlaybackQuery.php`
+- Modify: `app/Livewire/CatalogTitlePlayer.php`
+- Modify: `resources/views/livewire/catalog-title-player.blade.php`
+- Modify: `tests/Feature/CatalogPageTest.php`
+
+**Interfaces:**
+
+- `episodeNavigation(CatalogTitle $title, Season $season, ?User $user, Episode $episode)` returns at most one previous and one next accessible episode.
+- The navigation lane is the pair `(season.kind, episode.kind)`; regular playback never falls through into specials.
+- Provider ordering uses `sort_order`, then a null-safe release number and stable ID. URL identifiers remain scalar and are resolved again through the visible playback query.
+
+- [x] Cover first, middle, last, cross-season, hidden, expired, source-less, special-season and provider-sequence cases in the existing catalog feature test.
+- [x] Add stable previous/next `wire:key` links without storing episode collections in public Livewire state.
+- [x] Collapse multi-property URL updates into one browser-history entry while retaining refresh and Back/Forward hydration.
+- [x] Run final formatting, focused/broad verification, inspect the authorized diff, commit and push on `main`.

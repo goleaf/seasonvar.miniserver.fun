@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ReleaseKind;
 use App\Livewire\CatalogSeries;
 use App\Livewire\CatalogTitlePlayer;
 use App\Livewire\StatsDashboard;
@@ -1157,11 +1158,156 @@ class CatalogPageTest extends TestCase
             ->assertSeeText('Смотреть сначала');
     }
 
+    public function test_catalog_title_player_navigates_only_accessible_episodes_inside_the_current_release_lane(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Сериал с навигацией',
+            'slug' => 'serial-s-navigatsiei',
+        ]);
+        $firstSeason = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 1,
+            'sort_order' => 1,
+        ]);
+        $secondSeason = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 2,
+            'sort_order' => 2,
+        ]);
+        $specialSeason = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 1,
+            'kind' => ReleaseKind::Special,
+            'sort_order' => 1,
+        ]);
+        $createEpisode = function (Season $season, array $attributes, bool $withSource = true) use ($catalogTitle): Episode {
+            $episode = Episode::factory()->create([
+                'season_id' => $season->id,
+                ...$attributes,
+            ]);
+
+            if ($withSource) {
+                LicensedMedia::factory()->create([
+                    'catalog_title_id' => $catalogTitle->id,
+                    'season_id' => $season->id,
+                    'episode_id' => $episode->id,
+                    'status' => 'published',
+                    'published_at' => now(),
+                ]);
+            }
+
+            return $episode;
+        };
+
+        $firstEpisode = $createEpisode($firstSeason, [
+            'number' => 101,
+            'sort_order' => 1,
+            'title' => 'Первый доступный выпуск',
+        ]);
+        $createEpisode($firstSeason, [
+            'number' => 102,
+            'sort_order' => 2,
+            'publication_status' => 'hidden',
+            'title' => 'Скрытый выпуск',
+        ]);
+        $createEpisode($firstSeason, [
+            'number' => 103,
+            'sort_order' => 3,
+            'available_until' => now()->subMinute(),
+            'title' => 'Истёкший выпуск',
+        ]);
+        $createEpisode($firstSeason, [
+            'number' => 104,
+            'sort_order' => 4,
+            'title' => 'Выпуск без источника',
+        ], false);
+        $lastFirstSeasonEpisode = $createEpisode($firstSeason, [
+            'number' => 105,
+            'sort_order' => 5,
+            'title' => 'Последний выпуск первого сезона',
+        ]);
+        $firstSpecial = $createEpisode($firstSeason, [
+            'number' => 1,
+            'kind' => ReleaseKind::Special,
+            'sort_order' => 1,
+            'title' => 'Первый спецвыпуск',
+        ]);
+        $firstSecondSeasonEpisode = $createEpisode($secondSeason, [
+            'number' => 201,
+            'sort_order' => 1,
+            'title' => 'Первый выпуск второго сезона',
+        ]);
+        $lastEpisode = $createEpisode($secondSeason, [
+            'number' => 202,
+            'sort_order' => 2,
+            'title' => 'Последний обычный выпуск',
+        ]);
+        $secondSpecial = $createEpisode($secondSeason, [
+            'number' => 1,
+            'kind' => ReleaseKind::Special,
+            'sort_order' => 1,
+            'title' => 'Второй спецвыпуск',
+        ]);
+        $specialSeasonEpisode = $createEpisode($specialSeason, [
+            'number' => 1,
+            'kind' => ReleaseKind::Special,
+            'sort_order' => 1,
+            'title' => 'Спецвыпуск отдельного сезона',
+        ]);
+
+        $component = Livewire::test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->assertSeeHtml('wire:key="episode-navigation-next-'.$lastFirstSeasonEpisode->id.'"')
+            ->assertDontSeeHtml('wire:key="episode-navigation-previous-')
+            ->assertDontSeeText('Скрытый выпуск')
+            ->assertDontSeeText('Истёкший выпуск')
+            ->assertDontSeeText('Выпуск без источника')
+            ->call('selectEpisode', $lastFirstSeasonEpisode->id)
+            ->assertSet('season', (string) $firstSeason->id)
+            ->assertSeeHtml('wire:key="episode-navigation-previous-'.$firstEpisode->id.'"')
+            ->assertSeeHtml('wire:key="episode-navigation-next-'.$firstSecondSeasonEpisode->id.'"')
+            ->call('selectEpisode', $firstSecondSeasonEpisode->id)
+            ->assertSet('season', (string) $secondSeason->id)
+            ->assertSeeHtml('wire:key="episode-navigation-previous-'.$lastFirstSeasonEpisode->id.'"')
+            ->assertSeeHtml('wire:key="episode-navigation-next-'.$lastEpisode->id.'"')
+            ->call('selectEpisode', $lastEpisode->id)
+            ->assertDontSeeHtml('wire:key="episode-navigation-next-')
+            ->call('selectEpisode', $firstSpecial->id)
+            ->assertSeeHtml('wire:key="episode-navigation-next-'.$secondSpecial->id.'"')
+            ->assertDontSeeHtml('wire:key="episode-navigation-next-'.$specialSeasonEpisode->id.'"')
+            ->call('selectEpisode', $secondSpecial->id)
+            ->assertDontSeeHtml('wire:key="episode-navigation-next-');
+
+        $component->call('selectEpisode', $specialSeasonEpisode->id)
+            ->assertSet('season', (string) $specialSeason->id)
+            ->assertDontSeeHtml('wire:key="episode-navigation-previous-')
+            ->assertDontSeeHtml('wire:key="episode-navigation-next-');
+
+        $user = User::factory()->create();
+        EpisodeViewProgress::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $catalogTitle->id,
+            'episode_id' => $lastEpisode->id,
+            'position_seconds' => 600,
+            'duration_seconds' => 600,
+            'completed_at' => now(),
+            'last_watched_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->assertSeeText('Смотреть сначала')
+            ->assertDontSeeText('Следующая: 1 серия');
+    }
+
     public function test_catalog_title_player_persists_only_the_authenticated_users_private_state(): void
     {
         $user = User::factory()->create();
         $catalogTitle = CatalogTitle::factory()->create();
         $season = Season::factory()->create(['catalog_title_id' => $catalogTitle->id]);
+        $secondSeason = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => $season->number + 1,
+        ]);
         $episode = Episode::factory()->create(['season_id' => $season->id]);
         LicensedMedia::factory()->create([
             'catalog_title_id' => $catalogTitle->id,
@@ -1176,6 +1322,8 @@ class CatalogPageTest extends TestCase
             ->call('toggleWatchlist')
             ->call('setRating', 8)
             ->call('recordProgress', $episode->id, 125, 600, false)
+            ->call('selectSeason', $secondSeason->id)
+            ->assertSet('season', (string) $secondSeason->id)
             ->assertSeeText('В списке просмотра')
             ->assertSeeText('Ваша оценка: 8 из 10');
 
@@ -1220,6 +1368,15 @@ class CatalogPageTest extends TestCase
             'slug' => 'serial-s-ogranicheniiami',
         ]);
         $season = Season::factory()->create(['catalog_title_id' => $catalogTitle->id, 'number' => 1]);
+        $hiddenSeason = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 2,
+            'publication_status' => 'hidden',
+        ]);
+        $foreignSeason = Season::factory()->create([
+            'catalog_title_id' => CatalogTitle::factory()->create()->id,
+            'number' => 1,
+        ]);
         $availableEpisode = Episode::factory()->create([
             'season_id' => $season->id,
             'number' => 1,
@@ -1282,7 +1439,11 @@ class CatalogPageTest extends TestCase
             ->assertDontSeeText('Серия без источника')
             ->assertDontSeeText('Серия после входа')
             ->call('selectEpisode', $missingSourceEpisode->id)
-            ->assertSet('episode', '');
+            ->assertSet('episode', '')
+            ->call('selectSeason', $hiddenSeason->id)
+            ->assertSet('season', '')
+            ->call('selectSeason', $foreignSeason->id)
+            ->assertSet('season', '');
 
         Livewire::actingAs(User::factory()->create())
             ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])

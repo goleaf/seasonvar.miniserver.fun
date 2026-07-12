@@ -14,6 +14,7 @@ class SeasonvarQueueStatusData
         public readonly int $reserved,
         public readonly ?int $oldestPendingTimestamp,
         public readonly int $liveClaims,
+        public readonly int $activeRuns,
         public readonly ?int $runId,
         public readonly ?string $runStatus,
         public readonly int $selected,

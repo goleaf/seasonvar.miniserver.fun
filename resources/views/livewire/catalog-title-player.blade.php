@@ -2,6 +2,7 @@
     id="player"
     class="scroll-mt-40 space-y-5 sm:scroll-mt-44 lg:scroll-mt-48"
     x-on:catalog-progress="$wire.recordProgress($event.detail.episodeId, $event.detail.positionSeconds, $event.detail.durationSeconds, $event.detail.completed)"
+    x-on:click.capture="if ($event.target.closest('[data-catalog-history]')) window.history.pushState({}, '', window.location.href)"
 >
     <x-ui.panel title="Просмотр" icon="fa-solid fa-circle-play">
         <div class="flex flex-col gap-3 rounded-lg bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -12,6 +13,7 @@
             <button
                 type="button"
                 wire:click="playPrimary"
+                data-catalog-history
                 @disabled(! $primaryAction->isPlayable())
                 class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
@@ -26,7 +28,7 @@
                 <div class="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600">
                     @if ($selectedEpisode)
                         <x-ui.status-pill icon="fa-solid fa-circle-play" variant="success">
-                            Выбрана {{ $selectedEpisode->number }} серия
+                            {{ $this->selectedEpisodeLabel($selectedEpisode) }}
                         </x-ui.status-pill>
                         @if ($selectedEpisode->title)
                             <x-ui.status-pill icon="fa-solid fa-file-lines">{{ $selectedEpisode->title }}</x-ui.status-pill>
@@ -76,6 +78,42 @@
                         </x-ui.status-pill>
                     </div>
                 @endif
+
+                @if ($selectedEpisode && ($episodeNavigation->previous || $episodeNavigation->next))
+                    <nav class="mt-3 grid gap-2 sm:grid-cols-2" aria-label="Навигация по доступным сериям">
+                        @if ($episodeNavigation->previous)
+                            <a
+                                href="{{ route('titles.show', $showView->episodeQuery($episodeNavigation->previous)).'#player' }}"
+                            wire:key="episode-navigation-previous-{{ $episodeNavigation->previous->id }}"
+                            wire:click.prevent="selectEpisode({{ $episodeNavigation->previous->id }})"
+                            data-catalog-history
+                                class="flex min-h-11 items-center gap-3 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
+                            >
+                                <i class="fa-solid fa-arrow-left shrink-0" aria-hidden="true"></i>
+                                <span class="min-w-0">
+                                    <span class="block text-xs uppercase tracking-wide text-slate-400">Предыдущая</span>
+                                    <span class="block break-words">{{ $this->episodeDisplayLabel($episodeNavigation->previous) }}</span>
+                                </span>
+                            </a>
+                        @endif
+
+                        @if ($episodeNavigation->next)
+                            <a
+                                href="{{ route('titles.show', $showView->episodeQuery($episodeNavigation->next)).'#player' }}"
+                            wire:key="episode-navigation-next-{{ $episodeNavigation->next->id }}"
+                            wire:click.prevent="selectEpisode({{ $episodeNavigation->next->id }})"
+                            data-catalog-history
+                                class="flex min-h-11 items-center justify-end gap-3 rounded-control bg-slate-50 px-3 py-2 text-right text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 sm:col-start-2"
+                            >
+                                <span class="min-w-0">
+                                    <span class="block text-xs uppercase tracking-wide text-slate-400">Следующая</span>
+                                    <span class="block break-words">{{ $this->episodeDisplayLabel($episodeNavigation->next) }}</span>
+                                </span>
+                                <i class="fa-solid fa-arrow-right shrink-0" aria-hidden="true"></i>
+                            </a>
+                        @endif
+                    </nav>
+                @endif
             </div>
 
             <section class="rounded-lg bg-slate-50 p-4" aria-label="Личное состояние просмотра">
@@ -124,6 +162,7 @@
                             href="{{ route('titles.show', $showView->variantQuery($episodeMedia)).'#player' }}"
                             wire:key="episode-media-{{ $episodeMedia->id }}"
                             wire:click.prevent="selectMedia({{ $episodeMedia->id }})"
+                            data-catalog-history
                             @if ($selectedMedia?->id === $episodeMedia->id) aria-current="true" @endif
                             @class([
                                 'min-h-11 rounded-control px-3 py-2 text-left text-sm font-bold',
@@ -148,6 +187,7 @@
                             href="{{ route('titles.show', ['catalogTitle' => $title, 'season' => $seasonOption->id]).'#seasons' }}"
                             wire:key="season-option-{{ $seasonOption->id }}"
                             wire:click.prevent="selectSeason({{ $seasonOption->id }})"
+                            data-catalog-history
                             @if ($activeSeason?->id === $seasonOption->id) aria-current="true" @endif
                             @class([
                                 'min-h-11 shrink-0 rounded-control px-3 py-2 text-sm font-bold',
@@ -155,7 +195,7 @@
                                 'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $activeSeason?->id !== $seasonOption->id,
                             ])
                         >
-                            Сезон {{ $seasonOption->number }} · {{ $this->episodeCountLabel((int) $seasonOption->available_episodes_count) }}
+                            {{ $this->seasonDisplayLabel($seasonOption) }} · {{ $this->episodeCountLabel((int) $seasonOption->available_episodes_count) }}
                         </a>
                     @endforeach
                 </div>
@@ -167,7 +207,7 @@
             >
                 @if ($activeSeason)
                     <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                        <h3 class="font-bold text-slate-700">Сезон {{ $activeSeason->number }}</h3>
+                        <h3 class="font-bold text-slate-700">{{ $this->seasonDisplayLabel($activeSeason) }}</h3>
                         <x-ui.status-pill variant="muted">{{ $this->episodeCountLabel($episodes->count()) }}</x-ui.status-pill>
                     </div>
                 @endif
@@ -180,6 +220,7 @@
                         href="{{ route('titles.show', $showView->episodeQuery($episodeOption)).'#player' }}"
                         wire:key="season-episode-{{ $episodeOption->id }}"
                         wire:click.prevent="selectEpisode({{ $episodeOption->id }})"
+                        data-catalog-history
                         @if ($selectedEpisode?->id === $episodeOption->id) aria-current="true" @endif
                         @class([
                             'min-h-16 rounded-lg px-3 py-3 text-left text-sm transition',
@@ -189,7 +230,7 @@
                     >
                         <span class="flex items-start gap-2 font-bold">
                             <i class="fa-solid fa-circle-play mt-0.5 text-emerald-700" aria-hidden="true"></i>
-                            <span>{{ $episodeOption->number }} серия</span>
+                            <span>{{ $this->episodeDisplayLabel($episodeOption) }}</span>
                         </span>
                         @if ($episodeOption->title)
                             <span class="mt-1 block text-xs font-semibold text-slate-500">{{ $episodeOption->title }}</span>

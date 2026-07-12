@@ -129,6 +129,11 @@ class SeasonvarRefreshPlanner
         return SourcePage::query()
             ->with('source')
             ->where('page_type', 'serial')
+            ->where(function (Builder $query): void {
+                $query->whereNull('import_claim_token')
+                    ->orWhereNull('import_claim_expires_at')
+                    ->orWhere('import_claim_expires_at', '<=', now());
+            })
             ->when($importRunId !== null, function (Builder $query) use ($importRunId): Builder {
                 return $query->where(function (Builder $query) use ($importRunId): void {
                     $query->whereNull('last_import_run_id')

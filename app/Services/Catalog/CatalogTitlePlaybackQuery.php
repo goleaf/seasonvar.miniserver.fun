@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Catalog;
 
+use App\DTOs\CatalogEpisodeNavigation;
+use App\Enums\ReleaseKind;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
@@ -130,42 +132,29 @@ class CatalogTitlePlaybackQuery
             return $this->firstWatchableEpisode($catalogTitle, $user);
         }
 
-        $episodeTable = (new Episode)->getTable();
-        $seasonTable = (new Season)->getTable();
-        $columns = [
-            $seasonTable.'.kind',
-            $seasonTable.'.sort_order',
-            $seasonTable.'.number',
-            $seasonTable.'.id',
-            $episodeTable.'.kind',
-            $episodeTable.'.sort_order',
-            $episodeTable.'.number',
-            $episodeTable.'.id',
-        ];
-        $values = [
-            $current->season_order_kind,
-            $current->season_order_sort,
-            $current->season_order_number,
-            $current->season_order_id,
-            $current->kind->value,
-            $current->sort_order,
-            $current->number,
-            $current->id,
-        ];
-        $query = $this->watchableEpisodes($catalogTitle, $user);
-        $query->where(function (Builder $query) use ($columns, $values): void {
-            foreach ($columns as $index => $column) {
-                $query->orWhere(function (Builder $branch) use ($columns, $values, $index, $column): void {
-                    foreach (array_slice($columns, 0, $index) as $prefixIndex => $prefixColumn) {
-                        $branch->where($prefixColumn, $values[$prefixIndex]);
-                    }
+        return $this->adjacentEpisode($catalogTitle, $user, $current, true);
+    }
 
-                    $branch->where($column, '>', $values[$index]);
-                });
-            }
-        });
+    public function episodeNavigation(
+        CatalogTitle $catalogTitle,
+        Season $season,
+        ?User $user,
+        Episode $episode,
+    ): CatalogEpisodeNavigation {
+        if ((int) $season->catalog_title_id !== $catalogTitle->id || (int) $episode->season_id !== $season->id) {
+            return new CatalogEpisodeNavigation;
+        }
 
-        return $query->first();
+        $current = clone $episode;
+        $current->setAttribute('season_order_kind', $this->releaseKindValue($season->kind));
+        $current->setAttribute('season_order_sort', $season->sort_order);
+        $current->setAttribute('season_order_number', $season->number);
+        $current->setAttribute('season_order_id', $season->id);
+
+        return new CatalogEpisodeNavigation(
+            previous: $this->adjacentEpisode($catalogTitle, $user, $current, false),
+            next: $this->adjacentEpisode($catalogTitle, $user, $current, true),
+        );
     }
 
     /** @return Collection<int, Episode> */
@@ -329,6 +318,68 @@ class CatalogTitlePlaybackQuery
             'format',
             'source_url',
         ]);
+    }
+
+    private function adjacentEpisode(
+        CatalogTitle $catalogTitle,
+        ?User $user,
+        Episode $current,
+        bool $next,
+    ): ?Episode {
+        $episode = new Episode;
+        $season = new Season;
+        $episodeTable = $episode->getTable();
+        $seasonTable = $season->getTable();
+        $seasonKind = $this->releaseKindValue($current->getAttribute('season_order_kind'));
+        $episodeKind = $this->releaseKindValue($current->kind);
+
+        if ($seasonKind === null || $episodeKind === null) {
+            return null;
+        }
+
+        $order = [
+            [$seasonTable.'.sort_order', (int) $current->getAttribute('season_order_sort')],
+            ["CASE WHEN {$seasonTable}.number IS NULL THEN 1 ELSE 0 END", $current->getAttribute('season_order_number') === null ? 1 : 0],
+            ["COALESCE({$seasonTable}.number, 0)", (int) ($current->getAttribute('season_order_number') ?? 0)],
+            [$seasonTable.'.id', (int) $current->getAttribute('season_order_id')],
+            [$episodeTable.'.sort_order', (int) $current->sort_order],
+            ["CASE WHEN {$episodeTable}.number IS NULL THEN 1 ELSE 0 END", $current->number === null ? 1 : 0],
+            ["COALESCE({$episodeTable}.number, 0)", (int) ($current->number ?? 0)],
+            [$episodeTable.'.id', $current->id],
+        ];
+        $query = $this->watchableEpisodes($catalogTitle, $user)
+            ->where($season->qualifyColumn('kind'), $seasonKind)
+            ->where($episode->qualifyColumn('kind'), $episodeKind)
+            ->reorder();
+        $operator = $next ? '>' : '<';
+        $direction = $next ? 'asc' : 'desc';
+
+        $query->where(function (Builder $query) use ($order, $operator): void {
+            foreach ($order as $index => [$expression, $value]) {
+                $query->orWhere(function (Builder $branch) use ($order, $index, $expression, $operator, $value): void {
+                    foreach (array_slice($order, 0, $index) as [$prefixExpression, $prefixValue]) {
+                        $branch->whereRaw("{$prefixExpression} = ?", [$prefixValue]);
+                    }
+
+                    $branch->whereRaw("{$expression} {$operator} ?", [$value]);
+                });
+            }
+        });
+
+        foreach ($order as [$expression]) {
+            $query->orderByRaw("{$expression} {$direction}");
+        }
+
+        return $query->first();
+    }
+
+    private function releaseKindValue(ReleaseKind|string|null $kind): ?string
+    {
+        if ($kind instanceof ReleaseKind) {
+            return $kind->value;
+        }
+
+        return is_string($kind) ? ReleaseKind::tryFrom($kind)?->value : null;
     }
 
     private function mediaVariantKey(LicensedMedia $media): ?string

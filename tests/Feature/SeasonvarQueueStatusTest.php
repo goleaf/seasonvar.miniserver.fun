@@ -42,6 +42,7 @@ class SeasonvarQueueStatusTest extends TestCase
         $this->assertSame(2, $status->delayed);
         $this->assertSame(1, $status->reserved);
         $this->assertSame(2, $status->liveClaims);
+        $this->assertSame(1, $status->activeRuns);
         $this->assertSame($run->id, $status->runId);
         $this->assertSame('running', $status->runStatus);
         $this->assertSame(20, $status->selected);
@@ -60,14 +61,50 @@ class SeasonvarQueueStatusTest extends TestCase
         $this->artisan('seasonvar:import', ['--status' => true])
             ->expectsOutputToContain('Очередь Seasonvar')
             ->expectsOutputToContain('Ожидают обработки')
+            ->expectsOutputToContain('Активных queued runs')
+            ->expectsOutputToContain('Основной active/last run')
             ->assertExitCode(0);
 
         $this->assertSame(1, SeasonvarImportRun::query()->count());
     }
 
-    private function queuedRun(): SeasonvarImportRun
+    public function test_it_reports_the_running_queue_run_with_the_most_live_claims(): void
     {
-        return SeasonvarImportRun::query()->create([
+        $dominantRun = $this->queuedRun([
+            'selected' => 100,
+            'parsed' => 40,
+            'failed' => 3,
+        ]);
+        $claims = app(SeasonvarPageClaimManager::class);
+
+        foreach (SourcePage::factory()->count(2)->create() as $page) {
+            $this->assertNotNull($claims->claim($page, $dominantRun->id, 3600));
+        }
+
+        $newerRun = $this->queuedRun([
+            'selected' => 5,
+            'parsed' => 0,
+            'failed' => 0,
+        ]);
+        $newerPage = SourcePage::factory()->create();
+        $this->assertNotNull($claims->claim($newerPage, $newerRun->id, 3600));
+        $this->mockQueue(oldestPendingTimestamp: now()->subMinute()->getTimestamp());
+
+        $status = app(SeasonvarQueueStatus::class)->read();
+
+        $this->assertSame($dominantRun->id, $status->runId);
+        $this->assertSame(2, $status->activeRuns);
+        $this->assertSame(100, $status->selected);
+        $this->assertSame(40, $status->parsed);
+        $this->assertSame(3, $status->failed);
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function queuedRun(array $attributes = []): SeasonvarImportRun
+    {
+        return SeasonvarImportRun::query()->create(array_merge([
             'mode' => 'sitemap',
             'execution_mode' => 'queue',
             'status' => 'running',
@@ -75,7 +112,7 @@ class SeasonvarQueueStatusTest extends TestCase
             'parsed' => 7,
             'failed' => 1,
             'started_at' => now(),
-        ]);
+        ], $attributes));
     }
 
     private function mockQueue(int $oldestPendingTimestamp): void

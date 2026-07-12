@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-07-13
+
+- Added publication-aware previous/next episode navigation to the Livewire title player. Navigation stays inside the current regular/special release lane, crosses into the next or previous visible season, skips inaccessible or source-less episodes, and keeps season state shareable in the URL.
+- Added defensive labels and null-safe keyset ordering for missing release numbers while treating `sort_order` as the provider sequence. Livewire season changes retain watchlist/rating state, browser-supplied season/episode IDs are revalidated against the visible title hierarchy, and each multi-field playback change now creates one coherent browser-history entry.
+
 ## 2026-07-12
 
 - Reworked catalog totals and facets around unique visible title IDs: relation, year, publication-type, and subtitle counts now use own-group-excluded context, bounded grouped aggregates, selected zero-count retention, and no stale cross-request cache.
