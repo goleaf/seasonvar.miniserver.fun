@@ -59,6 +59,11 @@ class CatalogTitlesViewModel
     /** @var array<string, mixed> */
     public array $catalogQueryState;
 
+    /** @var list<string> */
+    public array $alphabet;
+
+    public ?string $activeLetter;
+
     /**
      * @var array<string, string|int|null>
      */
@@ -107,6 +112,9 @@ class CatalogTitlesViewModel
         $this->sortIcons = $sorts->mapWithKeys(fn (CatalogSort $option): array => [$option->value => $option->icon()])->all();
         $this->selectedFilterSlugs = $selectedFilterSlugs;
         $this->catalogQueryState = $catalogQueryState;
+        $this->alphabet = ['#', 'latin', ...mb_str_split('АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ')];
+        $letter = $this->catalogQueryState['letter'] ?? null;
+        $this->activeLetter = is_scalar($letter) ? mb_strtoupper((string) $letter) : null;
         $this->baseQuery = $this->titleContext === null ? [] : ['title' => $this->titleContext->slug];
         $this->allFilterSlugs = array_merge($this->selectedFilterSlugs, $this->invalidFilterSlugs);
         $this->withoutYearQuery = $this->buildWithoutYearQuery();
@@ -138,6 +146,64 @@ class CatalogTitlesViewModel
     public function isActiveSort(string $sort): bool
     {
         return $this->sort === $sort;
+    }
+
+    public function isActiveLetter(string $letter): bool
+    {
+        return $this->activeLetter === mb_strtoupper($letter);
+    }
+
+    /** @return array<string, mixed> */
+    public function alphabetQuery(string $letter): array
+    {
+        $query = $this->sortQuery($this->sort);
+
+        if ($this->isActiveLetter($letter)) {
+            unset($query['letter']);
+        } else {
+            $query['letter'] = $letter;
+        }
+
+        return $query;
+    }
+
+    /** @return array<string, mixed> */
+    public function searchFormState(): array
+    {
+        $query = $this->withCatalogState($this->baseQuery);
+
+        if ($this->sort !== 'updated') {
+            $query['sort'] = $this->sort;
+        }
+
+        return $query;
+    }
+
+    public function hasActiveFilters(): bool
+    {
+        $filterKeys = [
+            'year',
+            'exclude_country',
+            'exclude_genre',
+            'year_from',
+            'year_to',
+            'seasons_min',
+            'seasons_max',
+            'episodes_min',
+            'episodes_max',
+            'rating_source',
+            'rating_min',
+            'votes_min',
+            'video',
+            'subtitles',
+            'quality',
+            'updated',
+            'letter',
+        ];
+
+        return $this->selectedTaxonomies->isNotEmpty()
+            || $this->invalidFilterSlugs !== []
+            || collect($filterKeys)->contains(fn (string $key): bool => array_key_exists($key, $this->catalogQueryState));
     }
 
     /** @return array<string, mixed> */

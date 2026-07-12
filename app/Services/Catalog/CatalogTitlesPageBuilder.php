@@ -12,6 +12,7 @@ use App\View\ViewModels\CatalogTitlesViewModel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class CatalogTitlesPageBuilder
 {
@@ -145,16 +146,7 @@ class CatalogTitlesPageBuilder
         $catalogTitles = $catalogTitles->paginate($perPage)->withQueryString();
 
         $filterTaxonomies = collect($filterTypes)->mapWithKeys(function (string $filterType): array {
-            $modelClass = $this->taxonomies->modelClass($filterType);
-            $items = $modelClass::query()
-                ->whereHas('catalogTitles', fn (Builder $query): Builder => $query->published())
-                ->withCount(['catalogTitles' => fn (Builder $query): Builder => $query->published()])
-                ->orderByDesc('catalog_titles_count')
-                ->limit($this->filterLimit($filterType))
-                ->get()
-                ->values();
-
-            return [$filterType => $items];
+            return [$filterType => $this->facetTaxonomies($filterType)];
         });
 
         $selectedTaxonomies->each(function (Collection $selected, string $filterType) use ($filterTaxonomies): void {
@@ -304,6 +296,36 @@ class CatalogTitlesPageBuilder
     private function filterLimit(string $filterType): int
     {
         return self::FILTER_LIMITS[$filterType] ?? 24;
+    }
+
+    /** @return Collection<int, Model> */
+    private function facetTaxonomies(string $filterType): Collection
+    {
+        $modelClass = $this->taxonomies->modelClass($filterType);
+        $model = new $modelClass;
+        $relation = $model->catalogTitles();
+        $pivotTable = $relation->getTable();
+        $catalogTitleTable = (new CatalogTitle)->getTable();
+        $titlePivotKey = $relation->getForeignPivotKeyName();
+        $relatedPivotKey = $relation->getRelatedPivotKeyName();
+        $countAlias = 'published_facet_counts';
+        $counts = DB::table($pivotTable)
+            ->join($catalogTitleTable, $catalogTitleTable.'.id', '=', $pivotTable.'.'.$titlePivotKey)
+            ->where($catalogTitleTable.'.is_published', true)
+            ->select($pivotTable.'.'.$relatedPivotKey.' as relation_id')
+            ->selectRaw('count(distinct '.$catalogTitleTable.'.id) as catalog_titles_count')
+            ->groupBy($pivotTable.'.'.$relatedPivotKey);
+
+        return $modelClass::query()
+            ->joinSub($counts, $countAlias, $model->getTable().'.id', '=', $countAlias.'.relation_id')
+            ->select($model->getTable().'.*')
+            ->addSelect($countAlias.'.catalog_titles_count')
+            ->orderByDesc($countAlias.'.catalog_titles_count')
+            ->orderBy($model->getTable().'.name')
+            ->orderBy($model->getTable().'.id')
+            ->limit($this->filterLimit($filterType))
+            ->get()
+            ->values();
     }
 
     /**

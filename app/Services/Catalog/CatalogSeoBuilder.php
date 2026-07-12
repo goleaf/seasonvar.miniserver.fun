@@ -125,7 +125,7 @@ class CatalogSeoBuilder
             $invalidFilterSlugs !== [] ? 'Часть фильтров не найдена.' : null,
         ])->filter()->implode(' ');
         $canonical = $this->catalogCanonicalUrl($request, $activeTaxonomies, $year, $currentPage, $titleContext);
-        $robots = $search === '' && $invalidFilterSlugs === [] && ! $invalidYear && $activeTaxonomies->count() <= 1
+        $robots = $search === '' && $invalidFilterSlugs === [] && ! $invalidYear && $activeTaxonomies->count() <= 1 && ! $this->hasComplexCatalogQuery($request)
             ? $this->indexRobots()
             : 'noindex,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
         $keywords = collect(['сериалы онлайн', 'каталог сериалов', 'смотреть сериалы'])
@@ -388,6 +388,38 @@ class CatalogSeoBuilder
         }
 
         return $this->canonicalFromRequest($request);
+    }
+
+    private function hasComplexCatalogQuery(Request $request): bool
+    {
+        $complexKeys = [
+            'exclude_country',
+            'exclude_genre',
+            'year_from',
+            'year_to',
+            'seasons_min',
+            'seasons_max',
+            'episodes_min',
+            'episodes_max',
+            'rating_source',
+            'rating_min',
+            'votes_min',
+            'video',
+            'subtitles',
+            'quality',
+            'updated',
+            'letter',
+            'view',
+            'per_page',
+        ];
+
+        if (collect($complexKeys)->contains(fn (string $key): bool => $request->query->has($key))) {
+            return true;
+        }
+
+        return collect($request->query())->contains(
+            fn (mixed $value): bool => is_array($value) && count($value) > 1,
+        );
     }
 
     /**
