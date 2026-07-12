@@ -2,6 +2,7 @@
 
 namespace App\View\ViewModels;
 
+use App\Enums\CatalogSort;
 use App\Models\CatalogTitle;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -40,29 +41,11 @@ class CatalogTitlesViewModel
         'tag' => 'fa-solid fa-tag',
     ];
 
-    /**
-     * @var array<string, string>
-     */
-    public array $sortLabels = [
-        'updated' => 'Недавно обновленные',
-        'with_video' => 'Видео: больше сначала',
-        'episodes_desc' => 'Серий: больше сначала',
-        'year_desc' => 'Год: новые сначала',
-        'year_asc' => 'Год: старые сначала',
-        'title_asc' => 'Название: А-я',
-    ];
+    /** @var array<string, string> */
+    public array $sortLabels;
 
-    /**
-     * @var array<string, string>
-     */
-    public array $sortIcons = [
-        'updated' => 'fa-solid fa-clock-rotate-left',
-        'with_video' => 'fa-solid fa-file-video',
-        'episodes_desc' => 'fa-solid fa-list-ol',
-        'year_desc' => 'fa-solid fa-calendar-days',
-        'year_asc' => 'fa-regular fa-calendar',
-        'title_asc' => 'fa-solid fa-arrow-down-a-z',
-    ];
+    /** @var array<string, string> */
+    public array $sortIcons;
 
     /** @var array<string, mixed> */
     public array $baseQuery;
@@ -119,6 +102,9 @@ class CatalogTitlesViewModel
         public readonly int $perPage = 24,
         array $catalogQueryState = [],
     ) {
+        $sorts = collect(CatalogSort::cases())->mapWithKeys(fn (CatalogSort $option): array => [$option->value => $option]);
+        $this->sortLabels = $sorts->mapWithKeys(fn (CatalogSort $option): array => [$option->value => $option->label()])->all();
+        $this->sortIcons = $sorts->mapWithKeys(fn (CatalogSort $option): array => [$option->value => $option->icon()])->all();
         $this->selectedFilterSlugs = $selectedFilterSlugs;
         $this->catalogQueryState = $catalogQueryState;
         $this->baseQuery = $this->titleContext === null ? [] : ['title' => $this->titleContext->slug];

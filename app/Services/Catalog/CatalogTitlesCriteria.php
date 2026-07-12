@@ -86,6 +86,27 @@ final readonly class CatalogTitlesCriteria
         };
     }
 
+    /** @return array<string, mixed> */
+    public function queryFilters(): array
+    {
+        return [
+            'year_from' => $this->yearFrom,
+            'year_to' => $this->yearTo,
+            'seasons_min' => $this->seasonsMin,
+            'seasons_max' => $this->seasonsMax,
+            'episodes_min' => $this->episodesMin,
+            'episodes_max' => $this->episodesMax,
+            'video' => $this->videoAvailability,
+            'subtitles' => $this->subtitleAvailability,
+            'quality' => $this->qualities,
+            'updated_after' => $this->updatedAfter(),
+            'letter' => $this->letter,
+            'rating_source' => $this->ratingSource,
+            'rating_min' => $this->ratingMin,
+            'votes_min' => $this->votesMin,
+        ];
+    }
+
     public function hasContentFilters(): bool
     {
         return $this->activeFilterCount() > 0
