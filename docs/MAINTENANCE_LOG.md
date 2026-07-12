@@ -3,6 +3,7 @@
 ## 13.07.2026 — Централизованная выдача playback source
 
 - Raw provider URLs удалены из HTML и Livewire payload; плеер использует короткоживущий signed endpoint с viewer binding и rate limit.
+- Persistent progress сохраняется одной строкой на user/episode: encrypted session token связывает user/title/episode/media, ULID и event sequence отбрасывают retries/out-of-order/старые вкладки, а короткая transaction атомарно обновляет source, trusted duration, percentage, first/last watched и completion. Completed episode не становится непросмотренным от позднего события или replay; отдельного unwatched product action пока нет.
 - Plyr/HLS переведён на одну guarded browser-session для точного `title:episode:media`: AbortController освобождает listeners/timers/resources при Livewire morph и навигации, generation token отменяет stale async init, progress сохраняется bounded heartbeat/lifecycle flush-ами, а старый session key не может записать прогресс новой серии. При уничтожении lifecycle-маркеры очищаются и с восстановленного Plyr media node; это проверено повторной навигацией, Back/Forward, сменой серии и мобильной ориентацией без duplicate instance и stale progress event.
 - Добавлены безопасные русские loading/buffering/retry/expired/unavailable/fatal состояния и локальная retry-кнопка без provider URL или текста исключений.
 - Video sitemap переведен с raw `video:content_loc` на внутренний `video:player_loc`, который проходит ту же server-side playback boundary.

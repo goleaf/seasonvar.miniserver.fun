@@ -41,6 +41,10 @@ class FrontendAssetContractTest extends TestCase
         $this->assertStringContainsString('new AbortController()', $player);
         $this->assertStringContainsString('PROGRESS_HEARTBEAT_MS = 30_000', $player);
         $this->assertStringContainsString('STABLE_SEEK_DELAY_MS = 750', $player);
+        $this->assertStringContainsString('this.progressSequence = 0', $player);
+        $this->assertStringContainsString('eventSequence: ++this.progressSequence', $player);
+        $this->assertStringContainsString('if (!completed && this.hasDispatchedProgress && progressDelta === 0)', $player);
+        $this->assertStringContainsString('data-progress-session', File::get(resource_path('views/livewire/catalog-title-player.blade.php')));
         $this->assertStringContainsString("addEventListener('play'", $player);
         $this->assertStringContainsString("addEventListener('pause'", $player);
         $this->assertStringContainsString("addEventListener('seeking'", $player);

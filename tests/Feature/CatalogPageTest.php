@@ -21,6 +21,7 @@ use App\Models\SeasonvarImportEvent;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use App\Models\User;
+use App\Services\Catalog\CatalogPlaybackProgressSession;
 use App\Services\Catalog\CatalogStatsPageBuilder;
 use App\Services\Catalog\CatalogStatsPosterUrlGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -1301,6 +1302,14 @@ class CatalogPageTest extends TestCase
 
     public function test_catalog_title_player_persists_only_the_authenticated_users_private_state(): void
     {
+        $this->assertTrue(Schema::hasColumns('episode_view_progress', [
+            'licensed_media_id',
+            'progress_percent',
+            'first_started_at',
+            'playback_session_id',
+            'playback_event_sequence',
+        ]));
+
         $user = User::factory()->create();
         $catalogTitle = CatalogTitle::factory()->create();
         $season = Season::factory()->create(['catalog_title_id' => $catalogTitle->id]);
@@ -1309,19 +1318,25 @@ class CatalogPageTest extends TestCase
             'number' => $season->number + 1,
         ]);
         $episode = Episode::factory()->create(['season_id' => $season->id]);
-        LicensedMedia::factory()->create([
+        $media = LicensedMedia::factory()->create([
             'catalog_title_id' => $catalogTitle->id,
             'season_id' => $season->id,
             'episode_id' => $episode->id,
+            'duration_seconds' => 600,
             'status' => 'published',
             'published_at' => now(),
         ]);
+        $progressSessions = app(CatalogPlaybackProgressSession::class);
+        $firstSession = $progressSessions->issue($user, $catalogTitle, $episode, $media);
+        $component = Livewire::actingAs($user)
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id]);
 
-        Livewire::actingAs($user)
-            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+        $component
             ->call('toggleWatchlist')
             ->call('setRating', 8)
-            ->call('recordProgress', $episode->id, 125, 600, false)
+            ->call('recordProgress', $episode->id, $firstSession, 1, 0, 600, false)
+            ->call('recordProgress', $episode->id, $firstSession, 1, 90, 600, false)
+            ->call('recordProgress', $episode->id, $firstSession, 2, 125, 1000, false)
             ->call('selectSeason', $secondSeason->id)
             ->assertSet('season', (string) $secondSeason->id)
             ->assertSeeText('В списке просмотра')
@@ -1339,13 +1354,144 @@ class CatalogPageTest extends TestCase
         $this->assertTrue($state->in_watchlist);
         $this->assertSame(8, $state->rating);
         $this->assertSame(125, $progress->position_seconds);
+        $this->assertSame(600, $progress->duration_seconds);
+        $this->assertSame(20, $progress->progress_percent);
+        $this->assertSame($media->id, $progress->licensed_media_id);
+        $this->assertSame(2, $progress->playback_event_sequence);
+        $this->assertSame(26, mb_strlen((string) $progress->playback_session_id));
+        $this->assertNotNull($progress->first_started_at);
         $this->assertNull($progress->completed_at);
+        $firstStartedAt = $progress->first_started_at;
+
+        $this->travel(1)->second();
+        $secondSession = $progressSessions->issue($user, $catalogTitle, $episode, $media);
+
+        $component
+            ->call('recordProgress', $episode->id, $secondSession, 1, 200, 600, false)
+            ->call('recordProgress', $episode->id, $firstSession, 3, 300, 600, false);
+
+        $progress->refresh();
+        $this->assertSame(200, $progress->position_seconds);
+        $this->assertSame(1, $progress->playback_event_sequence);
+        $this->assertSame($firstStartedAt?->toISOString(), $progress->first_started_at?->toISOString());
+
+        config()->set('playback.progress.completion_percent', 100);
+        config()->set('playback.progress.completion_remaining_seconds', 15);
+
+        $component->call('recordProgress', $episode->id, $secondSession, 2, 570, 600, false);
+
+        $progress->refresh();
+        $this->assertSame(95, $progress->progress_percent);
+        $this->assertNull($progress->completed_at);
+
+        $component
+            ->call('recordProgress', $episode->id, $secondSession, 3, 586, 600, false)
+            ->call('recordProgress', $episode->id, $secondSession, 2, 10, 600, false);
+
+        $progress->refresh();
+        $this->assertSame(586, $progress->position_seconds);
+        $this->assertSame(97, $progress->progress_percent);
+        $this->assertNotNull($progress->completed_at);
+        $completedAt = $progress->completed_at;
+
+        $this->travel(1)->second();
+        $replaySession = $progressSessions->issue($user, $catalogTitle, $episode, $media);
+
+        $component
+            ->call('recordProgress', $episode->id, $replaySession, 1, 10, 600, false)
+            ->call('recordProgress', $episode->id, $secondSession, 4, 580, 600, false);
+
+        $progress->refresh();
+        $this->assertSame(10, $progress->position_seconds);
+        $this->assertSame(1, $progress->progress_percent);
+        $this->assertSame($completedAt?->toISOString(), $progress->completed_at?->toISOString());
+        $this->assertSame(1, EpisodeViewProgress::query()
+            ->whereBelongsTo($user)
+            ->whereBelongsTo($episode)
+            ->count());
 
         Livewire::actingAs($user)
             ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
-            ->call('recordProgress', $episode->id, 1, 10, false);
+            ->assertSeeText('Продолжить '.$episode->number.' серию');
 
-        $this->assertNull($progress->fresh()->completed_at);
+        $component
+            ->call('recordProgress', $episode->id + 999999, $replaySession, 2, 20, 600, false)
+            ->call('recordProgress', $episode->id, $replaySession, 2, -1, 600, false)
+            ->call('recordProgress', $episode->id, $replaySession, 2, 20, -1, false)
+            ->call('recordProgress', $episode->id, $replaySession, 2, 606, 600, false);
+
+        $this->assertSame(10, $progress->refresh()->position_seconds);
+
+        $missingDurationEpisode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => $episode->number + 1,
+        ]);
+        $missingDurationMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $missingDurationEpisode->id,
+            'duration_seconds' => null,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        $missingDurationSession = $progressSessions->issue(
+            $user,
+            $catalogTitle,
+            $missingDurationEpisode,
+            $missingDurationMedia,
+        );
+
+        $component
+            ->call('recordProgress', $missingDurationEpisode->id, $missingDurationSession, 1, 100, 0, false)
+            ->call('recordProgress', $missingDurationEpisode->id, $missingDurationSession, 2, 100, 0, true);
+
+        $missingDurationProgress = EpisodeViewProgress::query()
+            ->whereBelongsTo($user)
+            ->whereBelongsTo($missingDurationEpisode)
+            ->sole();
+
+        $this->assertSame(0, $missingDurationProgress->duration_seconds);
+        $this->assertNull($missingDurationProgress->progress_percent);
+        $this->assertNotNull($missingDurationProgress->completed_at);
+
+        $missingDurationEpisode->update(['publication_status' => 'hidden']);
+
+        Livewire::actingAs($user)
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->call('recordProgress', $missingDurationEpisode->id, $missingDurationSession, 3, 200, 0, false)
+            ->assertNotFound();
+
+        $this->assertSame(100, $missingDurationProgress->refresh()->position_seconds);
+
+        $expiringEpisode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => $missingDurationEpisode->number + 1,
+        ]);
+        $expiringMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $expiringEpisode->id,
+            'duration_seconds' => 600,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        config()->set('playback.progress.session_ttl_seconds', 60);
+        $expiredSession = $progressSessions->issue($user, $catalogTitle, $expiringEpisode, $expiringMedia);
+        $this->travel(61)->seconds();
+
+        Livewire::actingAs($user)
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->call('recordProgress', $expiringEpisode->id, $expiredSession, 1, 30, 600, false)
+            ->call('recordProgress', $expiringEpisode->id, 'invalid-session', 1, 30, 600, false);
+
+        $this->assertFalse(EpisodeViewProgress::query()->whereBelongsTo($expiringEpisode)->exists());
+
+        $otherUser = User::factory()->create();
+        Livewire::actingAs($otherUser)
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->call('recordProgress', $episode->id, $replaySession, 2, 50, 600, false);
+
+        $this->assertFalse(EpisodeViewProgress::query()->whereBelongsTo($otherUser)->exists());
 
         Livewire::actingAs($user)
             ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])

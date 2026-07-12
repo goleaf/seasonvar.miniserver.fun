@@ -13,6 +13,7 @@ use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\Catalog\CatalogPlaybackProgressSession;
 use App\Services\Catalog\CatalogPlaybackSourceResolver;
 use App\Services\Catalog\CatalogPrimaryActionResolver;
 use App\Services\Catalog\CatalogTitlePlaybackQuery;
@@ -57,6 +58,8 @@ class CatalogTitlePlayer extends Component
 
     protected CatalogPlaybackSourceResolver $sources;
 
+    protected CatalogPlaybackProgressSession $progressSessions;
+
     protected CatalogUserStateService $userState;
 
     protected ExternalMediaMetadata $mediaMetadata;
@@ -72,12 +75,14 @@ class CatalogTitlePlayer extends Component
         CatalogTitlePlaybackQuery $playback,
         CatalogPrimaryActionResolver $primaryActions,
         CatalogPlaybackSourceResolver $sources,
+        CatalogPlaybackProgressSession $progressSessions,
         CatalogUserStateService $userState,
         ExternalMediaMetadata $mediaMetadata,
     ): void {
         $this->playback = $playback;
         $this->primaryActions = $primaryActions;
         $this->sources = $sources;
+        $this->progressSessions = $progressSessions;
         $this->userState = $userState;
         $this->mediaMetadata = $mediaMetadata;
     }
@@ -196,23 +201,23 @@ class CatalogTitlePlayer extends Component
     #[Renderless]
     public function recordProgress(
         int $episodeId,
+        string $playbackSessionToken,
+        int $eventSequence,
         int $positionSeconds,
-        int $durationSeconds,
-        bool $completed = false,
+        int $reportedDurationSeconds,
+        bool $ended = false,
     ): void {
         $user = $this->authorizedUser();
-
-        if ($positionSeconds < 0 || $durationSeconds < 1 || $durationSeconds > 86400) {
-            return;
-        }
 
         $this->userState->recordProgress(
             $user,
             $this->title(),
             $episodeId,
+            $playbackSessionToken,
+            $eventSequence,
             $positionSeconds,
-            $durationSeconds,
-            $completed,
+            $reportedDurationSeconds,
+            $ended,
         );
     }
 
@@ -281,6 +286,12 @@ class CatalogTitlePlayer extends Component
         $playerSessionKey = $selectedMedia !== null && $playbackSource->isPlayable()
             ? implode(':', [$title->id, $selectedEpisode?->id ?? 0, $selectedMedia->id])
             : '';
+        $progressSessionToken = $user !== null
+            && $selectedEpisode !== null
+            && $selectedMedia !== null
+            && $playbackSource->isPlayable()
+                ? $this->progressSessions->issue($user, $title, $selectedEpisode, $selectedMedia)
+                : '';
 
         $showView = new CatalogShowViewModel(
             title: $title,
@@ -308,6 +319,7 @@ class CatalogTitlePlayer extends Component
             'selectedMedia' => $selectedMedia,
             'playbackSource' => $playbackSource,
             'playerSessionKey' => $playerSessionKey,
+            'progressSessionToken' => $progressSessionToken,
             'mediaItems' => $mediaItems,
             'showView' => $showView,
             'inWatchlist' => (bool) ($state?->in_watchlist ?? false),

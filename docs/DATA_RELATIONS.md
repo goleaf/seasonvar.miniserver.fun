@@ -34,6 +34,7 @@
 - `LicensedMedia belongsTo CatalogTitle`
 - `LicensedMedia belongsTo Season`
 - `LicensedMedia belongsTo Episode`
+- `EpisodeViewProgress belongsTo LicensedMedia` как последний подтверждённый playback source; связь nullable, удаление media не удаляет историю.
 - `SourcePage belongsTo Source`
 - `SourcePage hasOne CatalogTitle`
 - `SourcePage hasMany Season`
@@ -46,7 +47,7 @@
 - `SeasonvarImportRun hasMany SourcePageSnapshot`
 - `SeasonvarImportRun hasMany SourcePage` через `last_import_run_id`
 - Каждая модель связи каталога относится ко многим `CatalogTitle` через явную pivot-таблицу.
-- `User hasMany CatalogTitleUserState` и `User hasMany EpisodeViewProgress`; unique `(user_id, catalog_title_id)` хранит одну watchlist/rating запись, unique `(user_id, episode_id)` — одну позицию выпуска.
+- `User hasMany CatalogTitleUserState` и `User hasMany EpisodeViewProgress`; unique `(user_id, catalog_title_id)` хранит одну watchlist/rating запись, unique `(user_id, episode_id)` — одну каноническую позицию выпуска. Progress дополнительно хранит trusted duration/percent, первый и последний просмотр, неизменяемый `completed_at`, source media, ULID активной playback session и последний принятый event sequence.
 - Для метаданных каталога не используются morph- или polymorphic-связи.
 
 ## Целостность выпуска и публикации

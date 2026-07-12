@@ -20,6 +20,10 @@ Additive migration `2026_07_12_235500_create_catalog_user_state_tables` созд
 
 Порядок rollout: штатно дождаться завершения текущих database writes, сделать backup SQLite, развернуть код, выполнить `php artisan migrate --force`, затем проверить гостевую и authenticated карточку. Код не требует остановки импортера из-за изменения catalog tables, но backup и короткое согласованное окно исключают конкуренцию schema lock SQLite. Rollback сначала удаляет `episode_view_progress`, затем `catalog_title_user_states`; catalog data при этом не меняется.
 
+Миграции `2026_07_12_235600_add_persistent_playback_fields_to_episode_view_progress_table` и `2026_07_12_235601_backfill_episode_view_progress_first_started_at` выполняются строго после создания user-state таблиц. Первая additive добавляет nullable source/percent/start/session поля и sequence с default 0, сохраняя unique `(user_id, episode_id)` и существующие индексы; вторая отдельно backfill-ит `first_started_at` из `created_at`/`last_watched_at`. Rollout: backup SQLite → deploy code → `php artisan migrate --force`. Rollback выполняется в обратном порядке; backfill timestamp намеренно не восстанавливается, после чего schema rollback удаляет новые поля, не меняя прежнюю позицию.
+
+Progress policy настраивается через `PLAYBACK_PROGRESS_SESSION_TTL_SECONDS`, `PLAYBACK_PROGRESS_MAX_DURATION_SECONDS`, `PLAYBACK_PROGRESS_POSITION_TOLERANCE_SECONDS`, `PLAYBACK_PROGRESS_COMPLETION_PERCENT` и `PLAYBACK_PROGRESS_COMPLETION_REMAINING_SECONDS`. Менять completion thresholds нужно согласованно на всех web workers после `config:cache`.
+
 ## Окружение
 
 Production-значения должны задаваться сервером, process manager или зашифрованным environment-файлом. Нельзя коммитить `.env` и настоящие секреты.

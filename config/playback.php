@@ -2,6 +2,13 @@
 
 return [
     'signed_url_ttl_seconds' => (int) env('PLAYBACK_SIGNED_URL_TTL_SECONDS', 300),
+    'progress' => [
+        'session_ttl_seconds' => (int) env('PLAYBACK_PROGRESS_SESSION_TTL_SECONDS', 21600),
+        'max_duration_seconds' => (int) env('PLAYBACK_PROGRESS_MAX_DURATION_SECONDS', 86400),
+        'position_tolerance_seconds' => (int) env('PLAYBACK_PROGRESS_POSITION_TOLERANCE_SECONDS', 5),
+        'completion_percent' => (int) env('PLAYBACK_PROGRESS_COMPLETION_PERCENT', 95),
+        'completion_remaining_seconds' => (int) env('PLAYBACK_PROGRESS_COMPLETION_REMAINING_SECONDS', 15),
+    ],
     'allowed_hosts' => array_values(array_filter(array_map(
         'trim',
         explode(',', (string) env('PLAYBACK_ALLOWED_HOSTS', '11cdn.org')),

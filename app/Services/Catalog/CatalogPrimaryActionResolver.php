@@ -12,7 +12,10 @@ use App\Models\User;
 
 class CatalogPrimaryActionResolver
 {
-    public function __construct(private readonly CatalogTitlePlaybackQuery $playback) {}
+    public function __construct(
+        private readonly CatalogTitlePlaybackQuery $playback,
+        private readonly CatalogPlaybackCompletionRule $completionRule,
+    ) {}
 
     public function resolve(CatalogTitle $catalogTitle, ?User $user): CatalogPrimaryAction
     {
@@ -25,7 +28,10 @@ class CatalogPrimaryActionResolver
                 ->latest()
                 ->first();
 
-            if ($progress !== null && $progress->completed_at === null) {
+            if ($progress !== null && ($progress->completed_at === null || $this->completionRule->isInProgress(
+                $progress->position_seconds,
+                $progress->duration_seconds,
+            ))) {
                 $episode = $this->playback->watchableEpisode($catalogTitle, $user, $progress->episode_id);
 
                 if ($episode !== null) {

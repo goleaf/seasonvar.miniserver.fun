@@ -358,6 +358,7 @@ class CatalogTitlePlaybackQuery
             'storage_disk',
             'path',
             'playback_url',
+            'duration_seconds',
             'quality',
             'translation_name',
             'variant_type',

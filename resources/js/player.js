@@ -125,6 +125,7 @@ class CatalogPlayerSession {
         this.Plyr = Plyr;
         this.Hls = Hls;
         this.sessionKey = video.dataset.playerSession || '';
+        this.playbackSessionToken = video.dataset.progressSession || '';
         this.shell = video.closest('[data-player-shell]');
         this.status = this.shell?.querySelector('[data-player-status]') || null;
         this.statusIcon = this.shell?.querySelector('[data-player-status-icon]') || null;
@@ -137,6 +138,8 @@ class CatalogPlayerSession {
         this.seekTimer = null;
         this.recoveryTimer = null;
         this.lastSavedPosition = Number.parseInt(video.dataset.progressPosition || '', 10) || 0;
+        this.progressSequence = 0;
+        this.hasDispatchedProgress = false;
         this.resumePosition = this.lastSavedPosition;
         this.networkRetries = 0;
         this.mediaRecoveries = 0;
@@ -195,6 +198,7 @@ class CatalogPlayerSession {
 
     handlePlay() {
         this.setStatus('playing', 'Видео воспроизводится.');
+        this.dispatchProgress(false, true, 'play');
         this.startHeartbeat();
     }
 
@@ -352,18 +356,21 @@ class CatalogPlayerSession {
             return;
         }
 
-        if (
-            !Number.isFinite(this.video.duration)
-            || this.video.duration < 1
-            || this.video.duration > MAX_PROGRESS_DURATION_SECONDS
-        ) {
+        if (!Number.isFinite(this.video.currentTime) || this.video.currentTime < 0) {
             return;
         }
 
-        const positionSeconds = Math.max(0, Math.floor(completed ? this.video.duration : this.video.currentTime));
+        const durationSeconds = Number.isFinite(this.video.duration)
+            && this.video.duration >= 1
+            && this.video.duration <= MAX_PROGRESS_DURATION_SECONDS
+            ? Math.floor(this.video.duration)
+            : 0;
+        const positionSeconds = Math.max(0, Math.floor(completed && durationSeconds > 0
+            ? durationSeconds
+            : this.video.currentTime));
         const progressDelta = Math.abs(positionSeconds - this.lastSavedPosition);
 
-        if (progressDelta === 0) {
+        if (!completed && this.hasDispatchedProgress && progressDelta === 0) {
             return;
         }
 
@@ -372,13 +379,16 @@ class CatalogPlayerSession {
         }
 
         this.lastSavedPosition = positionSeconds;
+        this.hasDispatchedProgress = true;
         this.video.dispatchEvent(new CustomEvent('catalog-progress', {
             bubbles: true,
             detail: {
                 sessionKey: this.sessionKey,
+                playbackSessionToken: this.playbackSessionToken,
+                eventSequence: ++this.progressSequence,
                 episodeId: Number.parseInt(this.video.dataset.progressEpisode || '', 10),
                 positionSeconds,
-                durationSeconds: Math.floor(this.video.duration),
+                durationSeconds,
                 completed,
                 reason,
             },
@@ -386,7 +396,11 @@ class CatalogPlayerSession {
     }
 
     canReportProgress() {
-        if (this.destroyed || this.video.dataset.progressEnabled !== '1') {
+        if (
+            this.destroyed
+            || this.video.dataset.progressEnabled !== '1'
+            || this.playbackSessionToken === ''
+        ) {
             return false;
         }
 

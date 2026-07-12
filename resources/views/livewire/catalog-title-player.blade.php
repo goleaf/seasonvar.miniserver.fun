@@ -4,7 +4,14 @@
     data-active-player-session="{{ $playerSessionKey }}"
     x-on:catalog-progress="
         if ($event.detail.sessionKey === $el.dataset.activePlayerSession) {
-            $wire.recordProgress($event.detail.episodeId, $event.detail.positionSeconds, $event.detail.durationSeconds, $event.detail.completed);
+            $wire.recordProgress(
+                $event.detail.episodeId,
+                $event.detail.playbackSessionToken,
+                $event.detail.eventSequence,
+                $event.detail.positionSeconds,
+                $event.detail.durationSeconds,
+                $event.detail.completed
+            );
         }
     "
     x-on:click.capture="if ($event.target.closest('[data-catalog-history]')) window.history.pushState({}, '', window.location.href)"
@@ -92,6 +99,7 @@
                             class="js-catalog-player aspect-video w-full bg-slate-100"
                             data-player-session="{{ $playerSessionKey }}"
                             data-progress-episode="{{ $selectedEpisode?->id }}"
+                            data-progress-session="{{ $progressSessionToken }}"
                             data-progress-position="{{ $primaryAction->episodeId === $selectedEpisode?->id ? $primaryAction->positionSeconds : 0 }}"
                             data-progress-enabled="{{ $isAuthenticated ? '1' : '0' }}"
                             @if ($showView->selectedMediaFormat === 'm3u8') data-hls-src="{{ $showView->selectedMediaUrl }}" @endif
