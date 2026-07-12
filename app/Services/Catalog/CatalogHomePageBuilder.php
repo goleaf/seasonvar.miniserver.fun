@@ -15,6 +15,7 @@ class CatalogHomePageBuilder
         private readonly CatalogSeoBuilder $seo,
         private readonly CatalogFacetQuery $facets,
         private readonly CatalogTaxonomyRegistry $taxonomies,
+        private readonly CatalogTitleQuery $titles,
     ) {}
 
     /**
@@ -25,21 +26,21 @@ class CatalogHomePageBuilder
         $genres = $this->facets->taxonomies('genre');
         $countries = $this->facets->taxonomies('country');
         $stats = [
-            'titles' => CatalogTitle::query()->published()->count(),
+            'titles' => $this->titles->visibleTo(null)->count(),
             'episodes' => Episode::query()
                 ->published()
                 ->whereHas('season', fn (Builder $query): Builder => $query->published())
                 ->whereIn('season_id', Season::query()
                     ->published()
                     ->select('id')
-                    ->whereIn('catalog_title_id', CatalogTitle::query()->published()->select('id')))
+                    ->whereIn('catalog_title_id', $this->titles->visibleTo(null)->select('id')))
                 ->count(),
             'genres' => $genres->count(),
             'countries' => $countries->count(),
             'videos' => LicensedMedia::query()
                 ->published()
                 ->forAvailableReleases(null)
-                ->whereIn('catalog_title_id', CatalogTitle::query()->published()->select('id'))
+                ->whereIn('catalog_title_id', $this->titles->visibleTo(null)->select('id'))
                 ->count(),
         ];
         $latestTitles = $this->titleSummaryQuery()
@@ -67,11 +68,11 @@ class CatalogHomePageBuilder
         $latestMedia = LicensedMedia::query()
             ->published()
             ->forAvailableReleases(null)
-            ->whereIn('catalog_title_id', CatalogTitle::query()->published()->select('id'))
+            ->whereIn('catalog_title_id', $this->titles->visibleTo(null)->select('id'))
             ->select(['id', 'catalog_title_id', 'season_id', 'episode_id', 'title', 'quality', 'translation_name', 'format', 'published_at'])
             ->with([
                 'catalogTitle' => fn ($query) => $query
-                    ->published()
+                    ->availableTo(null)
                     ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'])
                     ->withCount([
                         'seasons' => fn (Builder $query): Builder => $query->published(),
@@ -86,8 +87,7 @@ class CatalogHomePageBuilder
             ->latest()
             ->limit(12)
             ->get();
-        $yearBuckets = CatalogTitle::query()
-            ->published()
+        $yearBuckets = $this->titles->visibleTo(null)
             ->select('year')
             ->selectRaw('count(*) as titles_count')
             ->whereNotNull('year')
@@ -110,7 +110,7 @@ class CatalogHomePageBuilder
             'countries' => $countries,
             'subtitleTag' => Tag::query()
                 ->where('slug', 'subtitry')
-                ->withCount(['catalogTitles' => fn (Builder $query): Builder => $query->published()])
+                ->withCount(['catalogTitles' => fn (Builder $query): Builder => $this->titles->constrainVisible($query, null)])
                 ->first(),
             'seo' => $this->seo->home($stats, $latestTitles),
         ];
@@ -121,17 +121,8 @@ class CatalogHomePageBuilder
      */
     private function titleSummaryQuery(): Builder
     {
-        return CatalogTitle::query()
-            ->published()
+        return $this->titles->visibleTo(null)
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url', 'indexed_at'])
-            ->withCount([
-                'seasons' => fn (Builder $query): Builder => $query->published(),
-                'episodes' => fn (Builder $query): Builder => $query
-                    ->published()
-                    ->whereHas('season', fn (Builder $query): Builder => $query->published()),
-                'licensedMedia as published_media_count' => fn (Builder $query): Builder => $query
-                    ->published()
-                    ->forAvailableReleases(null),
-            ]);
+            ->withCount($this->titles->publicCardCounts(null));
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Services\Catalog;
 
 use App\Models\CatalogTitle;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -11,24 +12,29 @@ class CatalogFacetQuery
 {
     public function __construct(
         private readonly CatalogTaxonomyRegistry $taxonomies,
+        private readonly CatalogTitleQuery $titles,
     ) {}
 
     /** @return Collection<int, Model> */
-    public function taxonomies(string $filterType, ?int $limit = null): Collection
+    public function taxonomies(string $filterType, ?int $limit = null, ?User $user = null): Collection
     {
         $modelClass = $this->taxonomies->modelClass($filterType);
         $model = new $modelClass;
         $relation = $model->catalogTitles();
         $pivotTable = $relation->getTable();
-        $catalogTitleTable = (new CatalogTitle)->getTable();
         $taxonomyPivotKey = $relation->getForeignPivotKeyName();
         $catalogTitlePivotKey = $relation->getRelatedPivotKeyName();
         $countAlias = 'published_facet_counts';
         $counts = DB::table($pivotTable)
-            ->join($catalogTitleTable, $catalogTitleTable.'.id', '=', $pivotTable.'.'.$catalogTitlePivotKey)
-            ->where($catalogTitleTable.'.is_published', true)
+            ->joinSub(
+                $this->titles->visibleTo($user)->select('catalog_titles.id'),
+                'visible_catalog_titles',
+                'visible_catalog_titles.id',
+                '=',
+                $pivotTable.'.'.$catalogTitlePivotKey,
+            )
             ->select($pivotTable.'.'.$taxonomyPivotKey.' as relation_id')
-            ->selectRaw('count(distinct '.$catalogTitleTable.'.id) as catalog_titles_count')
+            ->selectRaw('count(distinct visible_catalog_titles.id) as catalog_titles_count')
             ->groupBy($pivotTable.'.'.$taxonomyPivotKey);
 
         $query = $modelClass::query()
@@ -50,10 +56,9 @@ class CatalogFacetQuery
      * @param  list<int>  $selectedYears
      * @return Collection<int, object>
      */
-    public function years(array $selectedYears, int $limit): Collection
+    public function years(array $selectedYears, int $limit, ?User $user = null): Collection
     {
-        $yearBuckets = CatalogTitle::query()
-            ->published()
+        $yearBuckets = $this->titles->visibleTo($user)
             ->select('year')
             ->selectRaw('count(*) as titles_count')
             ->whereNotNull('year')
@@ -80,8 +85,7 @@ class CatalogFacetQuery
             ->values();
         $selectedYearBuckets = $missingYears->isEmpty()
             ? collect()
-            : CatalogTitle::query()
-                ->published()
+            : $this->titles->visibleTo($user)
                 ->select('year')
                 ->selectRaw('count(*) as titles_count')
                 ->whereIn('year', $missingYears->all())

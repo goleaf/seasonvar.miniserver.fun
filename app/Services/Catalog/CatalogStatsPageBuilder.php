@@ -4,6 +4,7 @@ namespace App\Services\Catalog;
 
 use App\Models\CatalogTitle;
 use App\Models\Episode;
+use App\Models\LicensedMedia;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use Closure;
@@ -72,6 +73,7 @@ class CatalogStatsPageBuilder
 
     public function __construct(
         private readonly CatalogStatsPosterUrlGuard $posterUrls,
+        private readonly CatalogTitleQuery $titles,
     ) {}
 
     /**
@@ -86,7 +88,7 @@ class CatalogStatsPageBuilder
         $media = $this->tableCount('licensed_media');
         $sourcePages = $this->tableCount('source_pages');
         $publishedMedia = $this->whereCount('licensed_media', fn (QueryBuilder $query): QueryBuilder => $query->where('status', 'published'));
-        $publishedTitles = $this->whereCount('catalog_titles', fn (QueryBuilder $query): QueryBuilder => $query->where('is_published', true));
+        $publishedTitles = $this->titles->visibleTo(null)->count();
         $totalDatabaseRows = $databaseTables->sum('total');
         $pageStats = $this->pageStats();
         $databaseOptimization = $this->databaseOptimizationStats($databaseTables);
@@ -376,7 +378,7 @@ class CatalogStatsPageBuilder
      */
     private function statsPosterRows(): Collection
     {
-        return CatalogTitle::query()
+        return $this->titles->visibleTo(null)
             ->select(['id', 'slug', 'title', 'year', 'poster_url', 'indexed_at'])
             ->whereNotNull('poster_url')
             ->where('poster_url', '!=', '')
@@ -401,7 +403,7 @@ class CatalogStatsPageBuilder
      */
     private function statsIssueRows(): Collection
     {
-        $withoutPublishedMedia = CatalogTitle::query()
+        $withoutPublishedMedia = $this->titles->visibleTo(null)
             ->select(['id', 'slug', 'title', 'year', 'poster_url', 'indexed_at'])
             ->whereDoesntHave('licensedMedia', fn (EloquentBuilder $query): EloquentBuilder => $query->where('status', 'published'))
             ->latest('indexed_at')
@@ -409,7 +411,7 @@ class CatalogStatsPageBuilder
             ->get()
             ->map(fn (CatalogTitle $title): array => $this->titlePreviewRow($title, 'Без видео', 'нет опубликованного видео', 'fa-solid fa-circle-play', 'danger'));
 
-        $withoutPoster = CatalogTitle::query()
+        $withoutPoster = $this->titles->visibleTo(null)
             ->select(['id', 'slug', 'title', 'year', 'poster_url', 'indexed_at'])
             ->where(function (EloquentBuilder $query): void {
                 $query->whereNull('poster_url')->orWhere('poster_url', '');
@@ -419,7 +421,7 @@ class CatalogStatsPageBuilder
             ->get()
             ->map(fn (CatalogTitle $title): array => $this->titlePreviewRow($title, 'Без постера', 'картинка не найдена', 'fa-regular fa-image', 'warning'));
 
-        $withoutDescription = CatalogTitle::query()
+        $withoutDescription = $this->titles->visibleTo(null)
             ->select(['id', 'slug', 'title', 'year', 'poster_url', 'indexed_at'])
             ->where(function (EloquentBuilder $query): void {
                 $query->whereNull('description')->orWhere('description', '');
@@ -884,16 +886,15 @@ class CatalogStatsPageBuilder
 
     private function publishedTitleUrlCount(): int
     {
-        return $this->whereCount('catalog_titles', fn (QueryBuilder $query): QueryBuilder => $query
-            ->where('is_published', true)
+        return $this->titles->visibleTo(null)
             ->whereNotNull('slug')
-            ->where('slug', '!=', ''));
+            ->where('slug', '!=', '')
+            ->count();
     }
 
     private function publishedYearUrlCount(): int
     {
-        return (int) DB::table('catalog_titles')
-            ->where('is_published', true)
+        return (int) $this->titles->visibleTo(null)
             ->whereNotNull('year')
             ->where('year', '>=', 1900)
             ->where('year', '<=', (int) now()->format('Y') + 1)
@@ -905,8 +906,7 @@ class CatalogStatsPageBuilder
     {
         return collect(self::FILTER_LINKS)
             ->sum(fn (array $config): int => (int) DB::table($config['pivot'])
-                ->join('catalog_titles', 'catalog_titles.id', '=', $config['pivot'].'.catalog_title_id')
-                ->where('catalog_titles.is_published', true)
+                ->joinSub($this->titles->visibleTo(null)->select('catalog_titles.id'), 'visible_catalog_titles', 'visible_catalog_titles.id', '=', $config['pivot'].'.catalog_title_id')
                 ->distinct()
                 ->count($config['pivot'].'.'.$config['related_key']));
     }
@@ -917,16 +917,15 @@ class CatalogStatsPageBuilder
             ->sum(function (string $filterType): int {
                 $config = self::FILTER_LINKS[$filterType];
                 $query = DB::table($config['pivot'])
-                    ->join('catalog_titles', 'catalog_titles.id', '=', $config['pivot'].'.catalog_title_id')
-                    ->where('catalog_titles.is_published', true)
-                    ->whereNotNull('catalog_titles.year')
-                    ->where('catalog_titles.year', '>=', 1900)
-                    ->where('catalog_titles.year', '<=', (int) now()->format('Y') + 1)
+                    ->joinSub($this->titles->visibleTo(null)->select(['catalog_titles.id', 'catalog_titles.year']), 'visible_catalog_titles', 'visible_catalog_titles.id', '=', $config['pivot'].'.catalog_title_id')
+                    ->whereNotNull('visible_catalog_titles.year')
+                    ->where('visible_catalog_titles.year', '>=', 1900)
+                    ->where('visible_catalog_titles.year', '<=', (int) now()->format('Y') + 1)
                     ->select([
                         $config['pivot'].'.'.$config['related_key'].' as taxonomy_id',
-                        'catalog_titles.year as year',
+                        'visible_catalog_titles.year as year',
                     ])
-                    ->groupBy($config['pivot'].'.'.$config['related_key'], 'catalog_titles.year');
+                    ->groupBy($config['pivot'].'.'.$config['related_key'], 'visible_catalog_titles.year');
 
                 return (int) DB::query()->fromSub($query, 'landing_links')->count();
             });
@@ -934,25 +933,25 @@ class CatalogStatsPageBuilder
 
     private function publishedVideoUrlCount(): int
     {
-        return (int) DB::table('licensed_media')
-            ->join('catalog_titles', 'catalog_titles.id', '=', 'licensed_media.catalog_title_id')
-            ->where('catalog_titles.is_published', true)
-            ->where('licensed_media.status', 'published')
-            ->where(function (QueryBuilder $query): void {
+        return LicensedMedia::query()
+            ->availableTo(null)
+            ->forAvailableReleases(null)
+            ->whereIn('catalog_title_id', $this->titles->visibleTo(null)->select('id'))
+            ->where(function (EloquentBuilder $query): void {
                 $query->where('licensed_media.playback_url', 'like', 'https://%')
                     ->orWhere('licensed_media.playback_url', 'like', 'http://%')
                     ->orWhere('licensed_media.path', 'like', 'https://%')
                     ->orWhere('licensed_media.path', 'like', 'http://%');
             })
-            ->count('licensed_media.id');
+            ->count();
     }
 
     private function episodePlayerLinkCount(): int
     {
-        return (int) DB::table('licensed_media')
-            ->join('catalog_titles', 'catalog_titles.id', '=', 'licensed_media.catalog_title_id')
-            ->where('catalog_titles.is_published', true)
-            ->where('licensed_media.status', 'published')
+        return LicensedMedia::query()
+            ->availableTo(null)
+            ->forAvailableReleases(null)
+            ->whereIn('catalog_title_id', $this->titles->visibleTo(null)->select('id'))
             ->whereNotNull('licensed_media.episode_id')
             ->distinct()
             ->count('licensed_media.episode_id');

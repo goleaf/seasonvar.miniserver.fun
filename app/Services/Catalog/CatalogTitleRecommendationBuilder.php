@@ -49,6 +49,7 @@ class CatalogTitleRecommendationBuilder
 
     public function __construct(
         private readonly CatalogTaxonomyRegistry $taxonomies,
+        private readonly CatalogTitleQuery $titles,
     ) {}
 
     /**
@@ -134,19 +135,17 @@ class CatalogTitleRecommendationBuilder
     private function profiles(int $chunkSize): Collection
     {
         $profiles = collect();
+        $publicCounts = $this->titles->publicCardCounts(null);
 
-        CatalogTitle::query()
-            ->select(['id', 'type', 'year', 'is_published'])
-            ->where('is_published', true)
+        $this->titles->visibleTo(null)
+            ->select(['id', 'type', 'year'])
             ->with(array_merge($this->taxonomies->relationNames(), [
                 'ratings:id,catalog_title_id,rating',
                 'recommendationSignals' => fn ($query) => $query->positive(),
             ]))
             ->withCount([
                 'reviews',
-                'licensedMedia as published_media_count' => fn (Builder $query): Builder => $query
-                    ->published()
-                    ->forAvailableReleases(null),
+                'licensedMedia as published_media_count' => $publicCounts['licensedMedia as published_media_count'],
             ])
             ->lazyById($chunkSize)
             ->each(function (CatalogTitle $title) use ($profiles): void {
@@ -502,8 +501,8 @@ class CatalogTitleRecommendationBuilder
         return CatalogTitleRecommendation::query()
             ->where(function (Builder $query): void {
                 $query
-                    ->whereNotIn('catalog_title_id', CatalogTitle::query()->select('id')->where('is_published', true))
-                    ->orWhereNotIn('recommended_title_id', CatalogTitle::query()->select('id')->where('is_published', true));
+                    ->whereNotIn('catalog_title_id', $this->titles->visibleTo(null)->select('id'))
+                    ->orWhereNotIn('recommended_title_id', $this->titles->visibleTo(null)->select('id'));
             })
             ->delete();
     }

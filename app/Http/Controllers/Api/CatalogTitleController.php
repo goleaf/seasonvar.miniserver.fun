@@ -7,6 +7,7 @@ use App\Http\Requests\Api\CatalogTitleIndexRequest;
 use App\Http\Resources\CatalogTitleResource;
 use App\Models\CatalogTitle;
 use App\Services\Catalog\CatalogApiTitleQuery;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class CatalogTitleController extends Controller
@@ -18,14 +19,14 @@ class CatalogTitleController extends Controller
     public function index(CatalogTitleIndexRequest $request): AnonymousResourceCollection
     {
         return CatalogTitleResource::collection(
-            $this->titles->paginatePublished($request->perPage()),
+            $this->titles->paginateVisible($request->perPage(), $request->user()),
         );
     }
 
-    public function show(CatalogTitle $catalogTitle): CatalogTitleResource
+    public function show(Request $request, CatalogTitle $catalogTitle): CatalogTitleResource
     {
         return new CatalogTitleResource(
-            $this->titles->findPublishedForApi($catalogTitle),
+            $this->titles->findVisibleForApi($catalogTitle, $request->user()),
         );
     }
 }

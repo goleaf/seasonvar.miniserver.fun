@@ -181,4 +181,27 @@
 - [x] Add `.githooks/pre-commit` guard for `main`, unstaged tracked changes and untracked files.
 - [x] Add `.githooks/pre-push` guard for `main` and clean tree.
 - [x] Document the rule in AGENTS, README, development docs, CODE_STANDARDS and maintenance log.
-- [ ] Verify hook syntax and behavior without running PHP tests.
+- [x] Verify hook syntax and behavior without running PHP tests.
+
+### Task 9: Flatten title quick-access sidebar
+
+**Files:**
+
+- Modify: `resources/views/catalog/show.blade.php`
+- Modify: `docs/UI_STANDARDS.md`
+- Modify: `docs/MAINTENANCE_LOG.md`
+- Modify: this living plan.
+
+**Interfaces:**
+
+- The title page left quick-access panel keeps the same links: `Смотреть`, `Сезоны`, selected season, and `О сериале`.
+- Sidebar links, the current-selection block, and season/episode/media counters do not use decorative `border-*` or `ring-*` outlines.
+- Season, episode, and media counters remain visible on desktop, tablet, and mobile and include local FontAwesome icons.
+- No new temporary test files are created; existing PHP tests and browser smoke verify the change.
+
+- [x] Replace the bordered `x-ui.panel` quick-access wrapper with a flat semantic section.
+- [x] Remove decorative borders from the quick sidebar count cards and current-selection block.
+- [x] Add explicit icons to sidebar count cards.
+- [x] Document the design rule in `docs/UI_STANDARDS.md`.
+- [x] Record the change in `docs/MAINTENANCE_LOG.md`.
+- [x] Verify with existing PHP tests, Vite build, responsive browser smoke, and git checks.

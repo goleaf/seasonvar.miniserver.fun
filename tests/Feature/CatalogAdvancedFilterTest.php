@@ -2,9 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ContentAudience;
+use App\Enums\PublicationStatus;
 use App\Models\Actor;
 use App\Models\CatalogTitle;
 use App\Models\Country;
+use App\Models\Genre;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -58,5 +62,82 @@ class CatalogAdvancedFilterTest extends TestCase
             ->assertOk()
             ->assertSeeText('Российский сериал')
             ->assertDontSeeText('Американский сериал');
+    }
+
+    public function test_catalog_visibility_and_facets_are_resolved_for_the_current_user(): void
+    {
+        $memberGenre = Genre::query()->create(['name' => 'Для участников', 'slug' => 'dlia-uchastnikov']);
+        $publicTitle = CatalogTitle::factory()->create([
+            'title' => 'Публичный сериал',
+            'slug' => 'publichnyi-serial',
+        ]);
+        $memberTitle = CatalogTitle::factory()->create([
+            'title' => 'Сериал для участника',
+            'slug' => 'serial-dlia-uchastnika',
+            'audience' => ContentAudience::Authenticated,
+        ]);
+        $memberTitle->genres()->attach($memberGenre);
+        CatalogTitle::factory()->create([
+            'title' => 'Будущий сериал',
+            'slug' => 'budushchii-serial',
+            'available_from' => now()->addDay(),
+        ]);
+        CatalogTitle::factory()->create([
+            'title' => 'Скрытый сериал',
+            'slug' => 'skrytyi-serial',
+            'publication_status' => PublicationStatus::Hidden,
+        ]);
+
+        $this->get(route('titles.index'))
+            ->assertOk()
+            ->assertSeeText($publicTitle->title)
+            ->assertDontSeeText($memberTitle->title)
+            ->assertDontSeeText($memberGenre->name)
+            ->assertDontSeeText('Будущий сериал')
+            ->assertDontSeeText('Скрытый сериал');
+
+        $this->actingAs(User::factory()->create())
+            ->get(route('titles.index'))
+            ->assertOk()
+            ->assertSeeText($publicTitle->title)
+            ->assertSeeText($memberTitle->title)
+            ->assertSeeText($memberGenre->name)
+            ->assertDontSeeText('Будущий сериал')
+            ->assertDontSeeText('Скрытый сериал');
+    }
+
+    public function test_multi_value_pivot_filters_keep_one_row_and_exact_paginator_total(): void
+    {
+        $drama = Genre::query()->create(['name' => 'Драма', 'slug' => 'drama']);
+        $detective = Genre::query()->create(['name' => 'Детектив', 'slug' => 'detective']);
+        $matching = CatalogTitle::factory()->create([
+            'title' => 'Один подходящий сериал',
+            'slug' => 'odin-podkhodiashchii-serial',
+        ]);
+        $matching->genres()->attach([$drama->id, $detective->id]);
+        $partial = CatalogTitle::factory()->create([
+            'title' => 'Только драма',
+            'slug' => 'tolko-drama',
+        ]);
+        $partial->genres()->attach($drama);
+
+        $this->get(route('titles.index', ['genre' => ['drama', 'detective']]))
+            ->assertOk()
+            ->assertSeeText('Найдено сейчас: 1')
+            ->assertSeeText($matching->title)
+            ->assertDontSeeText($partial->title);
+    }
+
+    public function test_unknown_title_context_never_falls_back_to_the_full_catalog(): void
+    {
+        CatalogTitle::factory()->create([
+            'title' => 'Не должен появиться',
+            'slug' => 'ne-dolzhen-poiavitsia',
+        ]);
+
+        $this->get(route('titles.index', ['title' => 'neizvestnyi-serial']))
+            ->assertOk()
+            ->assertSeeText('Ничего не найдено.')
+            ->assertDontSeeText('Не должен появиться');
     }
 }

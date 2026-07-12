@@ -44,11 +44,14 @@ class CatalogSitemapResponder
 
     private const VIDEO_SITEMAP_PAGE_SIZE = 5000;
 
+    public function __construct(
+        private readonly CatalogTitleQuery $titles,
+    ) {}
+
     public function index(): StreamedResponse
     {
         return response()->stream(function (): void {
-            $titleSitemapPages = max(1, (int) ceil(CatalogTitle::query()
-                ->where('is_published', true)
+            $titleSitemapPages = max(1, (int) ceil($this->titles->visibleTo(null)
                 ->whereNotNull('slug')
                 ->count() / self::SITEMAP_PAGE_SIZE));
             $videoSitemapPages = max(1, (int) ceil($this->videoSitemapMediaQuery()->count() / self::VIDEO_SITEMAP_PAGE_SIZE));
@@ -79,9 +82,8 @@ class CatalogSitemapResponder
             $this->writeSitemapUrl(route('home'), now(), 'daily', '1.0');
             $this->writeSitemapUrl(route('titles.index'), now(), 'daily', '0.9');
 
-            CatalogTitle::query()
+            $this->titles->visibleTo(null)
                 ->select('year')
-                ->where('is_published', true)
                 ->whereNotNull('year')
                 ->where('year', '>=', 1900)
                 ->where('year', '<=', (int) now()->format('Y') + 1)
@@ -107,7 +109,7 @@ class CatalogSitemapResponder
 
                 $modelClass::query()
                     ->select(['id', 'slug'])
-                    ->whereHas('catalogTitles', fn (Builder $query): Builder => $query->where('is_published', true))
+                    ->whereHas('catalogTitles', fn (Builder $query): Builder => $this->titles->constrainVisible($query, null))
                     ->orderBy('id')
                     ->chunkById(1000, function (Collection $taxonomies) use ($filterType): void {
                         foreach ($taxonomies as $taxonomy) {
@@ -133,8 +135,8 @@ class CatalogSitemapResponder
 
                 $taxonomies = $modelClass::query()
                     ->select(['id', 'slug'])
-                    ->withCount(['catalogTitles as catalog_titles_count' => fn (Builder $query): Builder => $query->where('is_published', true)])
-                    ->whereHas('catalogTitles', fn (Builder $query): Builder => $query->where('is_published', true))
+                    ->withCount(['catalogTitles as catalog_titles_count' => fn (Builder $query): Builder => $this->titles->constrainVisible($query, null)])
+                    ->whereHas('catalogTitles', fn (Builder $query): Builder => $this->titles->constrainVisible($query, null))
                     ->orderByDesc('catalog_titles_count')
                     ->limit(80)
                     ->get();
@@ -180,22 +182,26 @@ class CatalogSitemapResponder
             return collect();
         }
 
-        $catalogTitleTable = (new CatalogTitle)->getTable();
         $catalogTitleRelation = (new CatalogTitle)->{self::FILTER_RELATIONS[$filterType]['relation']}();
         $pivotTable = $catalogTitleRelation->getTable();
         $titlePivotKey = $catalogTitleRelation->getForeignPivotKeyName();
         $relatedPivotKey = $catalogTitleRelation->getRelatedPivotKeyName();
 
         return DB::table($pivotTable)
-            ->join($catalogTitleTable, $catalogTitleTable.'.id', '=', $pivotTable.'.'.$titlePivotKey)
-            ->where($catalogTitleTable.'.is_published', true)
+            ->joinSub(
+                $this->titles->visibleTo(null)->select(['catalog_titles.id', 'catalog_titles.year']),
+                'visible_catalog_titles',
+                'visible_catalog_titles.id',
+                '=',
+                $pivotTable.'.'.$titlePivotKey,
+            )
             ->whereIn($pivotTable.'.'.$relatedPivotKey, $taxonomyIds)
-            ->whereIn($catalogTitleTable.'.year', $years)
+            ->whereIn('visible_catalog_titles.year', $years)
             ->select([
                 $pivotTable.'.'.$relatedPivotKey.' as taxonomy_id',
-                $catalogTitleTable.'.year as year',
+                'visible_catalog_titles.year as year',
             ])
-            ->groupBy($pivotTable.'.'.$relatedPivotKey, $catalogTitleTable.'.year')
+            ->groupBy($pivotTable.'.'.$relatedPivotKey, 'visible_catalog_titles.year')
             ->get()
             ->groupBy(fn (object $row): int => (int) $row->taxonomy_id)
             ->map(fn (Collection $rows): Collection => $rows
@@ -212,9 +218,8 @@ class CatalogSitemapResponder
             echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
             echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">'."\n";
 
-            CatalogTitle::query()
+            $this->titles->visibleTo(null)
                 ->select(['id', 'slug', 'title', 'poster_url', 'updated_at', 'indexed_at'])
-                ->where('is_published', true)
                 ->whereNotNull('slug')
                 ->orderBy('id')
                 ->forPage($page, self::SITEMAP_PAGE_SIZE)
@@ -291,9 +296,8 @@ class CatalogSitemapResponder
             echo '        <language>ru</language>'."\n";
             echo '        <atom:link href="'.$this->xml(route('feed')).'" rel="self" type="application/rss+xml" />'."\n";
 
-            CatalogTitle::query()
+            $this->titles->visibleTo(null)
                 ->select(['id', 'slug', 'title', 'description', 'poster_url', 'updated_at', 'indexed_at'])
-                ->where('is_published', true)
                 ->whereNotNull('slug')
                 ->latest('indexed_at')
                 ->cursor()
@@ -331,9 +335,17 @@ class CatalogSitemapResponder
     public function llms(): StreamedResponse
     {
         return response()->stream(function (): void {
-            $titleCount = CatalogTitle::query()->where('is_published', true)->count();
-            $episodeCount = Episode::query()->count();
-            $mediaCount = LicensedMedia::query()->published()->forAvailableReleases(null)->count();
+            $titleCount = $this->titles->visibleTo(null)->count();
+            $episodeCount = Episode::query()
+                ->availableTo(null)
+                ->whereHas('season', fn (Builder $query): Builder => $query->availableTo(null))
+                ->whereHas('season.catalogTitle', fn (Builder $query): Builder => $this->titles->constrainVisible($query, null))
+                ->count();
+            $mediaCount = LicensedMedia::query()
+                ->availableTo(null)
+                ->forAvailableReleases(null)
+                ->whereIn('catalog_title_id', $this->titles->visibleTo(null)->select('id'))
+                ->count();
 
             echo '# '.$this->siteName()."\n\n";
             echo "Каталог сериалов онлайн на русском языке. Данные автоматически обновляются и включают названия, оригинальные названия, алиасы, описания, постеры, жанры, страны, актеров, режиссеров, рейтинги, сезоны, серии и удаленные видео-файлы.\n\n";
@@ -436,6 +448,7 @@ class CatalogSitemapResponder
         return LicensedMedia::query()
             ->published()
             ->forAvailableReleases(null)
+            ->whereIn('catalog_title_id', $this->titles->visibleTo(null)->select('id'))
             ->where(function (Builder $query): void {
                 $query->where('playback_url', 'like', 'https://%')
                     ->orWhere('playback_url', 'like', 'http://%')
@@ -466,9 +479,8 @@ class CatalogSitemapResponder
      */
     private function landingYears(): Collection
     {
-        return CatalogTitle::query()
+        return $this->titles->visibleTo(null)
             ->select('year')
-            ->where('is_published', true)
             ->whereNotNull('year')
             ->where('year', '>=', 1900)
             ->where('year', '<=', (int) now()->format('Y') + 1)

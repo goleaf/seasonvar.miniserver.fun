@@ -2,6 +2,7 @@
 
 namespace App\Services\Catalog;
 
+use App\Enums\CatalogFilterType;
 use App\Enums\CatalogSort;
 use App\Http\Requests\CatalogTitlesRequest;
 use App\Services\Catalog\Search\CatalogSearchQuery;
@@ -9,13 +10,17 @@ use Carbon\CarbonImmutable;
 
 final readonly class CatalogTitlesCriteria
 {
+    private const MAX_SELECTIONS = 20;
+
     /**
      * @param  list<int>  $years
      * @param  array<string, list<string>>  $filterSlugs
      * @param  array{country: list<string>, genre: list<string>}  $excludedFilterSlugs
      * @param  list<string>  $qualities
+     * @param  array<string, list<int>>  $selectedTaxonomyIds
+     * @param  array<string, list<int>>  $excludedTaxonomyIds
      */
-    public function __construct(
+    private function __construct(
         public CatalogSearchQuery $search,
         public array $years,
         public array $filterSlugs,
@@ -39,6 +44,9 @@ final readonly class CatalogTitlesCriteria
         public CatalogSort $sort,
         public ?int $titleContextId,
         public bool $invalidTitleContext,
+        public array $selectedTaxonomyIds,
+        public array $excludedTaxonomyIds,
+        public bool $invalidYear,
     ) {}
 
     public static function fromRequest(
@@ -71,6 +79,22 @@ final readonly class CatalogTitlesCriteria
             sort: $request->sort(),
             titleContextId: $titleContextId,
             invalidTitleContext: $invalidTitleContext,
+            selectedTaxonomyIds: [],
+            excludedTaxonomyIds: [],
+            invalidYear: $request->invalidYear(),
+        );
+    }
+
+    /**
+     * @param  array<string, list<int>>  $selected
+     * @param  array<string, list<int>>  $excluded
+     */
+    public function withResolvedTaxonomies(array $selected, array $excluded, bool $invalidYear): self
+    {
+        return $this->copy(
+            selectedTaxonomyIds: $this->normalizeTaxonomyIds($selected),
+            excludedTaxonomyIds: $this->normalizeTaxonomyIds($excluded),
+            invalidYear: $invalidYear,
         );
     }
 
@@ -128,9 +152,16 @@ final readonly class CatalogTitlesCriteria
 
     public function activeFilterCount(): int
     {
+        $selectedCount = $this->selectedTaxonomyIds === []
+            ? collect($this->filterSlugs)->sum(fn (array $values): int => count($values))
+            : collect($this->selectedTaxonomyIds)->sum(fn (array $values): int => count($values));
+        $excludedCount = $this->excludedTaxonomyIds === []
+            ? collect($this->excludedFilterSlugs)->sum(fn (array $values): int => count($values))
+            : collect($this->excludedTaxonomyIds)->sum(fn (array $values): int => count($values));
+
         return count($this->years)
-            + collect($this->filterSlugs)->sum(fn (array $values): int => count($values))
-            + collect($this->excludedFilterSlugs)->sum(fn (array $values): int => count($values))
+            + $selectedCount
+            + $excludedCount
             + ($this->updatedPeriod === null ? 0 : 1)
             + ($this->titleContextId === null && ! $this->invalidTitleContext ? 0 : 1);
     }
@@ -143,20 +174,34 @@ final readonly class CatalogTitlesCriteria
     public function withoutRelation(string $type): self
     {
         $filterSlugs = $this->filterSlugs;
+        $selectedTaxonomyIds = $this->selectedTaxonomyIds;
+        $excludedTaxonomyIds = $this->excludedTaxonomyIds;
 
         if (array_key_exists($type, $filterSlugs)) {
             $filterSlugs[$type] = [];
         }
 
-        return $this->copy(filterSlugs: $filterSlugs);
+        $selectedTaxonomyIds[$type] = [];
+        $excludedTaxonomyIds[$type] = [];
+
+        return $this->copy(
+            filterSlugs: $filterSlugs,
+            selectedTaxonomyIds: $selectedTaxonomyIds,
+            excludedTaxonomyIds: $excludedTaxonomyIds,
+        );
     }
 
     /**
      * @param  list<int>|null  $years
      * @param  array<string, list<string>>|null  $filterSlugs
      */
-    private function copy(?array $years = null, ?array $filterSlugs = null): self
-    {
+    private function copy(
+        ?array $years = null,
+        ?array $filterSlugs = null,
+        ?array $selectedTaxonomyIds = null,
+        ?array $excludedTaxonomyIds = null,
+        ?bool $invalidYear = null,
+    ): self {
         return new self(
             search: $this->search,
             years: $years ?? $this->years,
@@ -181,6 +226,31 @@ final readonly class CatalogTitlesCriteria
             sort: $this->sort,
             titleContextId: $this->titleContextId,
             invalidTitleContext: $this->invalidTitleContext,
+            selectedTaxonomyIds: $selectedTaxonomyIds ?? $this->selectedTaxonomyIds,
+            excludedTaxonomyIds: $excludedTaxonomyIds ?? $this->excludedTaxonomyIds,
+            invalidYear: $invalidYear ?? $this->invalidYear,
         );
+    }
+
+    /**
+     * @param  array<string, list<int>>  $idsByType
+     * @return array<string, list<int>>
+     */
+    private function normalizeTaxonomyIds(array $idsByType): array
+    {
+        $supportedTypes = CatalogFilterType::values();
+
+        return collect($idsByType)
+            ->filter(fn (mixed $ids, string $type): bool => in_array($type, $supportedTypes, true) && is_array($ids))
+            ->map(fn (array $ids): array => collect($ids)
+                ->filter(fn (mixed $id): bool => is_int($id) || (is_string($id) && ctype_digit($id)))
+                ->map(fn (int|string $id): int => (int) $id)
+                ->filter(fn (int $id): bool => $id > 0)
+                ->unique()
+                ->take(self::MAX_SELECTIONS)
+                ->values()
+                ->all())
+            ->filter(fn (array $ids): bool => $ids !== [])
+            ->all();
     }
 }

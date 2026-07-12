@@ -3,7 +3,15 @@
 @section('content')
     <section class="grid min-w-0 gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
         <aside class="space-y-4">
-            <x-ui.panel title="Быстрый доступ" icon="fa-solid fa-compass" :pad="false" class="h-full overflow-hidden border-emerald-100">
+            <section class="h-full overflow-hidden rounded-panel bg-white shadow-panel">
+                <div class="bg-slate-50 px-4 py-3">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-emerald-50 text-emerald-700">
+                            <i class="fa-solid fa-compass" aria-hidden="true"></i>
+                        </span>
+                        <h2 class="text-sm font-bold text-slate-700">Быстрый доступ</h2>
+                    </div>
+                </div>
                 <div class="space-y-4 p-4">
                     <nav aria-label="Быстрые переходы по сериалу" class="grid gap-2">
                         <a href="#player" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-700 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-600">
@@ -30,23 +38,32 @@
                     </nav>
 
                     <div class="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
-                        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                            <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Сезонов</div>
+                        <div class="rounded-lg bg-slate-50 px-3 py-2">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Сезонов</div>
+                                <i class="fa-solid fa-layer-group text-slate-400" aria-hidden="true"></i>
+                            </div>
                             <div class="mt-1 text-lg font-black text-slate-800">{{ $showView->parsedSeasonCount }}</div>
                         </div>
 
-                        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                            <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Серий</div>
+                        <div class="rounded-lg bg-slate-50 px-3 py-2">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Серий</div>
+                                <i class="fa-solid fa-list-ol text-slate-400" aria-hidden="true"></i>
+                            </div>
                             <div class="mt-1 text-lg font-black text-slate-800">{{ $showView->episodeCount }}</div>
                         </div>
 
-                        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                            <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Видео</div>
+                        <div class="rounded-lg bg-slate-50 px-3 py-2">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Видео</div>
+                                <i class="fa-solid fa-file-video text-slate-400" aria-hidden="true"></i>
+                            </div>
                             <div class="mt-1 text-lg font-black text-slate-800">{{ $showView->mediaCount }}</div>
                         </div>
                     </div>
 
-                    <div class="rounded-lg border border-slate-200 bg-white p-3">
+                    <div class="rounded-lg bg-slate-50 p-3">
                         <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
                             <i class="fa-solid fa-bolt text-emerald-700" aria-hidden="true"></i>
                             <span>Сейчас открыто</span>
@@ -90,7 +107,7 @@
                         </div>
                     </div>
                 </div>
-            </x-ui.panel>
+            </section>
         </aside>
 
         <div class="min-w-0 space-y-5">

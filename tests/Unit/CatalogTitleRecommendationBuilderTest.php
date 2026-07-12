@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Enums\ContentAudience;
 use App\Models\Actor;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
@@ -197,5 +198,49 @@ class CatalogTitleRecommendationBuilderTest extends TestCase
         $this->assertSame([1, 2, 3], $sourceRecommendations->pluck('rank')->all());
         $this->assertCount(3, $sourceRecommendations);
         $this->assertLessThanOrEqual(3, (int) $largestStoredSet);
+    }
+
+    public function test_rebuild_uses_the_public_catalog_visibility_boundary(): void
+    {
+        config([
+            'seasonvar.recommendations.min_score' => 1,
+        ]);
+
+        $genre = Genre::query()->create([
+            'name' => 'Фантастика',
+            'slug' => 'fantastika',
+        ]);
+        $source = CatalogTitle::factory()->create([
+            'title' => 'Публичный источник',
+            'slug' => 'publichnyi-istochnik',
+        ]);
+        $source->genres()->attach($genre);
+        $publicCandidate = CatalogTitle::factory()->create([
+            'title' => 'Публичный кандидат',
+            'slug' => 'publichnyi-kandidat',
+        ]);
+        $publicCandidate->genres()->attach($genre);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $publicCandidate->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        $memberCandidate = CatalogTitle::factory()->create([
+            'title' => 'Кандидат для участника',
+            'slug' => 'kandidat-dlia-uchastnika',
+            'audience' => ContentAudience::Authenticated,
+        ]);
+        $memberCandidate->genres()->attach($genre);
+
+        $result = app(CatalogTitleRecommendationBuilder::class)->rebuild();
+
+        $this->assertSame(2, $result['titles']);
+        $this->assertDatabaseHas('catalog_title_recommendations', [
+            'catalog_title_id' => $source->id,
+            'recommended_title_id' => $publicCandidate->id,
+        ]);
+        $this->assertDatabaseMissing('catalog_title_recommendations', [
+            'recommended_title_id' => $memberCandidate->id,
+        ]);
     }
 }

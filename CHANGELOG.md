@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-07-12
+
+- Centralized public title visibility, normalized catalog filtering, facet counts, API queries, sitemap/feed selection, public statistics, and recommendation candidates in the reusable `CatalogTitleQuery` layer.
+- Kept pivot and search candidates in grouped SQL subqueries to prevent duplicate titles, accurate paginator totals, and full ID collection materialization; all mapped sorts now share a deterministic title ID tie-breaker.
+
 ## 2026-07-09
 
 - Added an optional queued email notification for failed queued Seasonvar imports, with safe env configuration, dispatch/content tests, and notification documentation.

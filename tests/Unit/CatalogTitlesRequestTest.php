@@ -153,4 +153,34 @@ class CatalogTitlesRequestTest extends TestCase
         $this->assertSame([], $criteria->withoutRelation('genre')->filterSlugs['genre']);
         $this->assertSame(['drama'], $criteria->filterSlugs['genre']);
     }
+
+    public function test_catalog_titles_criteria_normalizes_resolved_ids_and_invalid_state(): void
+    {
+        $request = CatalogTitlesRequest::create('/titles', 'GET', [
+            'genre' => ['drama'],
+            'exclude_country' => ['ssha'],
+        ]);
+        $request->setContainer(app())->setRedirector(app('redirect'));
+        $request->validateResolved();
+        $search = app(CatalogSearchQueryParser::class)->parse('');
+
+        $criteria = CatalogTitlesCriteria::fromRequest($request, $search, null, false)
+            ->withResolvedTaxonomies(
+                selected: [
+                    'genre' => [3, 3, 0, -1, ...range(4, 30)],
+                    'unsupported' => [99],
+                ],
+                excluded: [
+                    'country' => [8, 8, 0],
+                    'unsupported' => [100],
+                ],
+                invalidYear: true,
+            );
+
+        $this->assertSame(range(3, 22), $criteria->selectedTaxonomyIds['genre']);
+        $this->assertArrayNotHasKey('unsupported', $criteria->selectedTaxonomyIds);
+        $this->assertSame([8], $criteria->excludedTaxonomyIds['country']);
+        $this->assertTrue($criteria->invalidYear);
+        $this->assertSame([], $criteria->withoutRelation('genre')->selectedTaxonomyIds['genre']);
+    }
 }

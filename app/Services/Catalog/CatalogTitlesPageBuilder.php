@@ -51,12 +51,15 @@ class CatalogTitlesPageBuilder
         $titleContextSlug = $request->titleContextSlug();
         $titleContext = $titleContextSlug === null || $titleContextSlug === ''
             ? null
-            : CatalogTitle::query()->select(['id', 'slug', 'title'])->where('slug', $titleContextSlug)->first();
+            : $this->query->visibleTo($request->user())
+                ->select(['id', 'slug', 'title'])
+                ->where('slug', $titleContextSlug)
+                ->first();
         $criteria = CatalogTitlesCriteria::fromRequest(
             $request,
             $searchQuery,
             $titleContext?->id,
-            false,
+            $titleContextSlug !== null && $titleContext === null,
         );
         $years = $criteria->years;
         $sortOption = $criteria->sort;
@@ -97,7 +100,7 @@ class CatalogTitlesPageBuilder
             $modelClass = $this->taxonomies->modelClass($filterType);
             $records = $modelClass::query()
                 ->whereIn('slug', $slugs)
-                ->withCount(['catalogTitles' => fn (Builder $query): Builder => $query->published()])
+                ->withCount(['catalogTitles' => fn (Builder $query): Builder => $this->query->constrainVisible($query, $request->user())])
                 ->get()
                 ->keyBy('slug');
 
@@ -144,26 +147,30 @@ class CatalogTitlesPageBuilder
             ->mapWithKeys(fn (Model $record, string $filterType): array => [$filterType => $record->slug])
             ->all();
 
-        $advancedFilters = $criteria->queryFilters();
+        $criteria = $criteria->withResolvedTaxonomies(
+            selected: $selectedTaxonomyIds,
+            excluded: $excludedTaxonomyIds,
+            invalidYear: $invalidYear,
+        );
         $catalogQueryState = $this->sanitizedCatalogQueryState($request->catalogQueryState(), $filterTypes, $selectedFilterSlugs, $selectedExcludedFilterSlugs, $years, $invalidYear);
         $paginationQuery = $this->paginationQuery($catalogQueryState, $search, $sort, $titleContext);
 
-        $catalogTitles = $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $searchQuery, $year, null, $invalidYear, $titleContext?->id, $years, $selectedTaxonomyIds, $excludedTaxonomyIds, $advancedFilters)
+        $catalogTitles = $this->query->filteredTitles($criteria, $request->user())
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'])
             ->with($view === 'list'
                 ? array_merge(['latestSeason'], $this->taxonomies->cardRelations())
                 : $this->taxonomies->cardRelations())
-            ->withCount($this->cardCounts());
+            ->withCount($this->query->publicCardCounts($request->user()));
 
         if (in_array($sortOption, [CatalogSort::KinopoiskRating, CatalogSort::ImdbRating], true)) {
-            $catalogTitles->withMax($this->ratingAggregates(), 'rating');
+            $catalogTitles->withMax($this->query->ratingAggregates(), 'rating');
         }
-        $this->applySort($catalogTitles, $sortOption);
+        $this->query->sorted($catalogTitles, $sortOption);
         $catalogTitles = $catalogTitles->paginate($perPage)->appends($paginationQuery);
         $seoRequest = $this->sanitizedSeoRequest($request, $paginationQuery, (int) $catalogTitles->currentPage());
 
-        $filterTaxonomies = collect($filterTypes)->mapWithKeys(function (string $filterType): array {
-            return [$filterType => $this->facets->taxonomies($filterType, $this->filterLimit($filterType))];
+        $filterTaxonomies = collect($filterTypes)->mapWithKeys(function (string $filterType) use ($request): array {
+            return [$filterType => $this->facets->taxonomies($filterType, $this->filterLimit($filterType), $request->user())];
         });
 
         $selectedTaxonomies->each(function (Collection $selected, string $filterType) use ($filterTaxonomies): void {
@@ -176,7 +183,7 @@ class CatalogTitlesPageBuilder
             $filterTaxonomies->put($filterType, $selected->concat($remainingItems)->values());
         });
 
-        $taxonomyContextCounts = $this->query->relationContextCounts($filterTaxonomies, $activeTaxonomies, $invalidFilterSlugs, $searchQuery, $year, $invalidYear, $titleContext?->id, $years, $selectedTaxonomyIds, $excludedTaxonomyIds, $advancedFilters);
+        $taxonomyContextCounts = $this->query->relationContextCounts($filterTaxonomies, $criteria, $request->user());
         $filterTaxonomies = $filterTaxonomies->map(function (Collection $items, string $filterType) use ($taxonomyContextCounts): Collection {
             return $items->map(function (Model $record) use ($filterType, $taxonomyContextCounts): Model {
                 $record->context_titles_count = (int) ($taxonomyContextCounts->get($filterType.'|'.$record->id) ?? 0);
@@ -184,7 +191,7 @@ class CatalogTitlesPageBuilder
                 return $record;
             });
         });
-        $yearBuckets = $this->facets->years($years, 20);
+        $yearBuckets = $this->facets->years($years, 20, $request->user());
 
         $hasCatalogContext = $criteria->hasContentFilters()
             || $invalidYear
@@ -193,7 +200,7 @@ class CatalogTitlesPageBuilder
             || $excludedTaxonomyIds !== [];
 
         $yearContextCounts = $hasCatalogContext
-            ? $this->query->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $searchQuery, null, null, $invalidYear, $titleContext?->id, [], $selectedTaxonomyIds, $excludedTaxonomyIds, $advancedFilters)
+            ? $this->query->filteredTitles($criteria->withoutYears(), $request->user())
                 ->select('year')
                 ->selectRaw('count(*) as context_titles_count')
                 ->whereNotNull('year')
@@ -345,53 +352,8 @@ class CatalogTitlesPageBuilder
         return $seoRequest;
     }
 
-    /**
-     * @return array<int|string, string|\Closure(Builder): Builder>
-     */
-    private function cardCounts(): array
-    {
-        return [
-            'seasons' => fn (Builder $query): Builder => $query->published(),
-            'episodes' => fn (Builder $query): Builder => $query
-                ->published()
-                ->whereHas('season', fn (Builder $query): Builder => $query->published()),
-            'licensedMedia as published_media_count' => fn (Builder $query): Builder => $query
-                ->published()
-                ->forAvailableReleases(null),
-        ];
-    }
-
-    /** @return array<string, \Closure(Builder): Builder> */
-    private function ratingAggregates(): array
-    {
-        return [
-            'ratings as kinopoisk_rating' => fn (Builder $query): Builder => $query->where('provider', 'kinopoisk'),
-            'ratings as imdb_rating' => fn (Builder $query): Builder => $query->where('provider', 'imdb'),
-        ];
-    }
-
     private function filterLimit(string $filterType): int
     {
         return self::FILTER_LIMITS[$filterType] ?? 24;
-    }
-
-    /**
-     * @param  Builder<CatalogTitle>  $query
-     */
-    private function applySort(Builder $query, CatalogSort $sort): void
-    {
-        match ($sort) {
-            CatalogSort::YearDesc => $query->orderByDesc('year')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::YearAsc => $query->orderBy('year')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::EpisodesDesc => $query->orderByDesc('episodes_count')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::SeasonsDesc => $query->orderByDesc('seasons_count')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::TitleAsc => $query->orderBy('title')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::TitleDesc => $query->orderByDesc('title')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::VideoDesc => $query->orderByDesc('published_media_count')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::KinopoiskRating => $query->orderByDesc('kinopoisk_rating')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::ImdbRating => $query->orderByDesc('imdb_rating')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::Popularity => $query->orderByDesc('published_media_count')->orderByDesc('episodes_count')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::Updated => $query->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-        };
     }
 }

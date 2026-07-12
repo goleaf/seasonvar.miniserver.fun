@@ -2,12 +2,14 @@
 
 namespace App\Services\Catalog;
 
+use App\Enums\CatalogSort;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
 use App\Models\CatalogTitleRating;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
+use App\Models\User;
 use App\Services\Catalog\Search\CatalogSearchNormalizer;
 use App\Services\Catalog\Search\CatalogSearchQuery;
 use App\Services\Catalog\Search\CatalogSearchState;
@@ -20,14 +22,11 @@ use Illuminate\Support\Str;
 
 class CatalogTitleQuery
 {
-    /** @var array<string, Collection<int, int>> */
-    private array $exactTitleIdsCache = [];
+    /** @var array<string, bool> */
+    private array $exactMatchExistsCache = [];
 
     /** @var array<string, Collection<int, string>> */
     private array $legacyVariantsCache = [];
-
-    /** @var array<string, Collection<int, int>> */
-    private array $searchCandidateIdsCache = [];
 
     public function __construct(
         private readonly CatalogTaxonomyRegistry $taxonomies,
@@ -35,82 +34,118 @@ class CatalogTitleQuery
     ) {}
 
     /**
-     * @param  Collection<string, Model>  $activeTaxonomies
-     * @param  array<string, string>  $invalidFilterSlugs
+     * @return Builder<CatalogTitle>
+     */
+    public function visibleTo(?User $user): Builder
+    {
+        return $this->constrainVisible(CatalogTitle::query(), $user);
+    }
+
+    /**
+     * @param  Builder<CatalogTitle>  $query
+     * @return Builder<CatalogTitle>
+     */
+    public function constrainVisible(Builder $query, ?User $user): Builder
+    {
+        return $query->availableTo($user);
+    }
+
+    /**
      * @return Builder<CatalogTitle>
      */
     public function filteredTitles(
-        Collection $activeTaxonomies,
-        array $invalidFilterSlugs,
-        CatalogSearchQuery $search,
-        ?int $year = null,
+        CatalogTitlesCriteria $criteria,
+        ?User $user,
         ?string $exceptTaxonomyType = null,
-        bool $invalidYear = false,
-        ?int $titleContextId = null,
-        array $years = [],
-        array $selectedTaxonomyIds = [],
-        array $excludedTaxonomyIds = [],
-        array $advancedFilters = [],
     ): Builder {
-        $query = CatalogTitle::query()->published();
+        $query = $this->visibleTo($user);
 
-        if ($invalidFilterSlugs !== [] || $invalidYear) {
+        if ($criteria->invalidYear || $criteria->invalidTitleContext) {
             $query->whereRaw('1 = 0');
         }
 
-        if ($search->year !== null) {
-            if ($years !== [] && ! in_array($search->year, $years, true)) {
+        if ($criteria->search->year !== null) {
+            if ($criteria->years !== [] && ! in_array($criteria->search->year, $criteria->years, true)) {
                 $query->whereRaw('1 = 0');
             } else {
-                $query->where('year', $search->year);
+                $query->where('year', $criteria->search->year);
             }
-        } elseif ($years !== []) {
-            $query->whereIn('year', $years);
-        } elseif ($year !== null) {
-            $query->where('year', $year);
+        } elseif ($criteria->years !== []) {
+            $query->whereIn('year', $criteria->years);
         }
 
-        if ($titleContextId !== null) {
-            $query->whereKey($titleContextId);
+        if ($criteria->titleContextId !== null) {
+            $query->whereKey($criteria->titleContextId);
         }
 
-        $this->applySearchFilter($query, $search, $titleContextId);
-        $this->applyRelationFilters($query, $activeTaxonomies, $exceptTaxonomyType, $selectedTaxonomyIds, $excludedTaxonomyIds);
-        $this->applyAdvancedFilters($query, $advancedFilters);
+        $this->applySearchFilter($query, $criteria->search, $criteria->titleContextId, $user);
+        $this->applyRelationFilters(
+            $query,
+            $exceptTaxonomyType,
+            $criteria->selectedTaxonomyIds,
+            $criteria->excludedTaxonomyIds,
+        );
+        $this->applyAdvancedFilters($query, $criteria->queryFilters(), $user);
 
         return $query;
     }
 
     /**
+     * @param  Builder<CatalogTitle>  $query
+     * @return Builder<CatalogTitle>
+     */
+    public function sorted(Builder $query, CatalogSort $sort): Builder
+    {
+        return match ($sort) {
+            CatalogSort::YearDesc => $query->orderByDesc('year')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+            CatalogSort::YearAsc => $query->orderBy('year')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+            CatalogSort::EpisodesDesc => $query->orderByDesc('episodes_count')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+            CatalogSort::SeasonsDesc => $query->orderByDesc('seasons_count')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+            CatalogSort::TitleAsc => $query->orderBy('title')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+            CatalogSort::TitleDesc => $query->orderByDesc('title')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+            CatalogSort::VideoDesc => $query->orderByDesc('published_media_count')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+            CatalogSort::KinopoiskRating => $query->orderByDesc('kinopoisk_rating')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+            CatalogSort::ImdbRating => $query->orderByDesc('imdb_rating')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+            CatalogSort::Popularity => $query->orderByDesc('published_media_count')->orderByDesc('episodes_count')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+            CatalogSort::Updated => $query->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+        };
+    }
+
+    /**
+     * @return array<int|string, string|\Closure(Builder): Builder>
+     */
+    public function publicCardCounts(?User $user): array
+    {
+        return [
+            'seasons' => fn (Builder $query): Builder => $query->availableTo($user),
+            'episodes' => fn (Builder $query): Builder => $query
+                ->availableTo($user)
+                ->whereHas('season', fn (Builder $query): Builder => $query->availableTo($user)),
+            'licensedMedia as published_media_count' => fn (Builder $query): Builder => $query
+                ->availableTo($user)
+                ->forAvailableReleases($user),
+        ];
+    }
+
+    /** @return array<string, \Closure(Builder): Builder> */
+    public function ratingAggregates(): array
+    {
+        return [
+            'ratings as kinopoisk_rating' => fn (Builder $query): Builder => $query->where('provider', 'kinopoisk'),
+            'ratings as imdb_rating' => fn (Builder $query): Builder => $query->where('provider', 'imdb'),
+        ];
+    }
+
+    /**
      * @param  Collection<string, Collection<int, Model>>  $filterTaxonomies
-     * @param  Collection<string, Model>  $activeTaxonomies
-     * @param  array<string, string>  $invalidFilterSlugs
      * @return Collection<string, int>
      */
     public function relationContextCounts(
         Collection $filterTaxonomies,
-        Collection $activeTaxonomies,
-        array $invalidFilterSlugs,
-        CatalogSearchQuery $search,
-        ?int $year,
-        bool $invalidYear,
-        ?int $titleContextId = null,
-        array $years = [],
-        array $selectedTaxonomyIds = [],
-        array $excludedTaxonomyIds = [],
-        array $advancedFilters = [],
+        CatalogTitlesCriteria $criteria,
+        ?User $user,
     ): Collection {
-        if (! $this->hasRelationContextConstraints(
-            $activeTaxonomies,
-            $invalidFilterSlugs,
-            $search,
-            $year,
-            $years,
-            $titleContextId,
-            $selectedTaxonomyIds,
-            $excludedTaxonomyIds,
-            $advancedFilters,
-        )) {
+        if (! $this->hasRelationContextConstraints($criteria)) {
             return $filterTaxonomies
                 ->flatMap(fn (Collection $items, string $filterType): Collection => $items->mapWithKeys(
                     fn (Model $record): array => [$filterType.'|'.$record->id => (int) ($record->catalog_titles_count ?? 0)],
@@ -127,14 +162,14 @@ class CatalogTitleQuery
 
         $catalogTitleTable = (new CatalogTitle)->getTable();
         $contextQueries = $visibleIdsByType
-            ->map(function (Collection $recordIds, string $filterType) use ($activeTaxonomies, $invalidFilterSlugs, $search, $year, $invalidYear, $titleContextId, $years, $selectedTaxonomyIds, $excludedTaxonomyIds, $advancedFilters, $catalogTitleTable) {
+            ->map(function (Collection $recordIds, string $filterType) use ($criteria, $user, $catalogTitleTable) {
                 $relationName = $this->taxonomies->relationName($filterType);
                 $catalogTitleRelation = (new CatalogTitle)->{$relationName}();
                 $pivotTable = $catalogTitleRelation->getTable();
                 $titlePivotKey = $catalogTitleRelation->getForeignPivotKeyName();
                 $relatedPivotKey = $catalogTitleRelation->getRelatedPivotKeyName();
                 $filteredTitlesQuery = $this
-                    ->filteredTitles($activeTaxonomies, $invalidFilterSlugs, $search, $year, $filterType, $invalidYear, $titleContextId, $years, $selectedTaxonomyIds, $excludedTaxonomyIds, $advancedFilters)
+                    ->filteredTitles($criteria->withoutRelation($filterType), $user)
                     ->select($catalogTitleTable.'.id');
                 $alias = 'filtered_titles_'.preg_replace('/[^a-z0-9_]+/i', '_', $filterType);
 
@@ -159,35 +194,19 @@ class CatalogTitleQuery
             ->mapWithKeys(fn (object $row): array => [$row->filter_type.'|'.$row->relation_id => (int) $row->context_titles_count]);
     }
 
-    /**
-     * @param  Collection<string, Model>  $activeTaxonomies
-     * @param  array<string, list<int>>  $selectedTaxonomyIds
-     * @param  array<string, list<int>>  $excludedTaxonomyIds
-     * @param  array<string, mixed>  $advancedFilters
-     */
-    private function hasRelationContextConstraints(
-        Collection $activeTaxonomies,
-        array $invalidFilterSlugs,
-        CatalogSearchQuery $search,
-        ?int $year,
-        array $years,
-        ?int $titleContextId,
-        array $selectedTaxonomyIds,
-        array $excludedTaxonomyIds,
-        array $advancedFilters,
-    ): bool {
-        $hasAdvancedFilters = collect($advancedFilters)->contains(
+    private function hasRelationContextConstraints(CatalogTitlesCriteria $criteria): bool
+    {
+        $hasAdvancedFilters = collect($criteria->queryFilters())->contains(
             fn (mixed $value): bool => $value !== null && $value !== [],
         );
 
-        return $activeTaxonomies->isNotEmpty()
-            || $invalidFilterSlugs !== []
-            || $search->state !== CatalogSearchState::Empty
-            || $year !== null
-            || $years !== []
-            || $titleContextId !== null
-            || $selectedTaxonomyIds !== []
-            || $excludedTaxonomyIds !== []
+        return $criteria->search->state !== CatalogSearchState::Empty
+            || $criteria->years !== []
+            || $criteria->titleContextId !== null
+            || $criteria->invalidTitleContext
+            || $criteria->invalidYear
+            || $criteria->selectedTaxonomyIds !== []
+            || $criteria->excludedTaxonomyIds !== []
             || $hasAdvancedFilters;
     }
 
@@ -208,7 +227,7 @@ class CatalogTitleQuery
     /**
      * @param  Builder<CatalogTitle>  $query
      */
-    private function applySearchFilter(Builder $query, CatalogSearchQuery $search, ?int $titleContextId): void
+    private function applySearchFilter(Builder $query, CatalogSearchQuery $search, ?int $titleContextId, ?User $user): void
     {
         if ($search->state === CatalogSearchState::Empty) {
             return;
@@ -226,28 +245,21 @@ class CatalogTitleQuery
             return;
         }
 
-        $query->whereKey($this->searchCandidateIds($search));
+        $query->whereIn('catalog_titles.id', $this->searchCandidateIdsQuery($search, $user));
     }
 
-    /** @return Collection<int, int> */
-    private function searchCandidateIds(CatalogSearchQuery $search): Collection
+    /** @return Builder<CatalogTitle> */
+    private function searchCandidateIdsQuery(CatalogSearchQuery $search, ?User $user): Builder
     {
-        if (array_key_exists($search->normalized, $this->searchCandidateIdsCache)) {
-            return $this->searchCandidateIdsCache[$search->normalized];
+        $exactMatches = $this->exactTitleSearchQuery($search, $user);
+        if ($this->exactMatchExists($search, $user, $exactMatches)) {
+            return $exactMatches;
         }
 
-        $exactTitleIds = $this->exactTitleSearchIds($search);
-        if ($exactTitleIds->isNotEmpty()) {
-            return $this->searchCandidateIdsCache[$search->normalized] = $exactTitleIds;
-        }
-
-        $query = CatalogTitle::query()->published()->select('catalog_titles.id');
+        $query = $this->visibleTo($user)->select('catalog_titles.id');
         $this->applyLegacySearchTerms($query, $search);
 
-        return $this->searchCandidateIdsCache[$search->normalized] = $query
-            ->orderBy('catalog_titles.id')
-            ->pluck('catalog_titles.id')
-            ->values();
+        return $query;
     }
 
     /**
@@ -277,29 +289,22 @@ class CatalogTitleQuery
         }
     }
 
-    /**
-     * @return Collection<int, int>
-     */
-    private function exactTitleSearchIds(CatalogSearchQuery $search): Collection
+    /** @return Builder<CatalogTitle> */
+    private function exactTitleSearchQuery(CatalogSearchQuery $search, ?User $user): Builder
     {
-        if (array_key_exists($search->normalized, $this->exactTitleIdsCache)) {
-            return $this->exactTitleIdsCache[$search->normalized];
-        }
-
         $variants = $this->legacyVariants($search->phrase())
             ->flatMap(fn (string $variant): array => [$variant, Str::ucfirst($variant)])
             ->unique()
             ->values();
+        $query = $this->visibleTo($user)->select('catalog_titles.id');
 
         if ($variants->isEmpty()) {
-            return $this->exactTitleIdsCache[$search->normalized] = collect();
+            return $query->whereRaw('1 = 0');
         }
 
         $catalogTitleTable = (new CatalogTitle)->getTable();
 
-        return $this->exactTitleIdsCache[$search->normalized] = CatalogTitle::query()
-            ->published()
-            ->select($catalogTitleTable.'.id')
+        return $query
             ->where(function (Builder $query) use ($catalogTitleTable, $search, $variants): void {
                 $query->whereIn('title', $variants)
                     ->orWhereIn('original_title', $variants)
@@ -309,10 +314,24 @@ class CatalogTitleQuery
                             ->select('catalog_title_id')
                             ->whereIn('name_hash', $search->exactNameHashes),
                     );
-            })
-            ->orderBy($catalogTitleTable.'.id')
-            ->pluck($catalogTitleTable.'.id')
-            ->values();
+            });
+    }
+
+    /** @param Builder<CatalogTitle> $exactMatches */
+    private function exactMatchExists(
+        CatalogSearchQuery $search,
+        ?User $user,
+        Builder $exactMatches,
+    ): bool {
+        $cacheKey = $this->searchCacheKey($search, $user);
+
+        return $this->exactMatchExistsCache[$cacheKey]
+            ??= (clone $exactMatches)->exists();
+    }
+
+    private function searchCacheKey(CatalogSearchQuery $search, ?User $user): string
+    {
+        return ($user === null ? 'guest' : 'authenticated').'|'.$search->normalized;
     }
 
     /** @return Collection<int, string> */
@@ -373,13 +392,11 @@ class CatalogTitleQuery
 
     /**
      * @param  Builder<CatalogTitle>  $query
-     * @param  Collection<string, Model>  $activeTaxonomies
      * @param  array<string, list<int>>  $selectedTaxonomyIds
      * @param  array<string, list<int>>  $excludedTaxonomyIds
      */
     private function applyRelationFilters(
         Builder $query,
-        Collection $activeTaxonomies,
         ?string $exceptTaxonomyType = null,
         array $selectedTaxonomyIds = [],
         array $excludedTaxonomyIds = [],
@@ -388,7 +405,6 @@ class CatalogTitleQuery
 
         $filterTypes = collect(array_keys($selectedTaxonomyIds))
             ->merge(array_keys($excludedTaxonomyIds))
-            ->merge($activeTaxonomies->keys())
             ->unique()
             ->values();
 
@@ -443,7 +459,7 @@ class CatalogTitleQuery
     /**
      * @param  array<string, mixed>  $filters
      */
-    private function applyAdvancedFilters(Builder $query, array $filters): void
+    private function applyAdvancedFilters(Builder $query, array $filters, ?User $user): void
     {
         $catalogTitleTable = (new CatalogTitle)->getTable();
         $yearFrom = $filters['year_from'] ?? null;
@@ -462,31 +478,31 @@ class CatalogTitleQuery
             $maximum = $filters[$maximumKey] ?? null;
 
             if ($minimum !== null && (int) $minimum > 0) {
-                $query->whereIn($catalogTitleTable.'.id', $this->{$subqueryMethod}('>=', (int) $minimum));
+                $query->whereIn($catalogTitleTable.'.id', $this->{$subqueryMethod}('>=', (int) $minimum, $user));
             }
 
             if ($maximum !== null) {
-                $query->whereNotIn($catalogTitleTable.'.id', $this->{$subqueryMethod}('>', (int) $maximum));
+                $query->whereNotIn($catalogTitleTable.'.id', $this->{$subqueryMethod}('>', (int) $maximum, $user));
             }
         }
 
         $videoAvailability = $filters['video'] ?? null;
         if ($videoAvailability === 'available') {
-            $query->whereIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds());
+            $query->whereIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds($user));
         } elseif ($videoAvailability === 'missing') {
-            $query->whereNotIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds());
+            $query->whereNotIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds($user));
         }
 
         $subtitleAvailability = $filters['subtitles'] ?? null;
         if ($subtitleAvailability === 'available') {
-            $query->whereIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds(true));
+            $query->whereIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds($user, true));
         } elseif ($subtitleAvailability === 'missing') {
-            $query->whereNotIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds(true));
+            $query->whereNotIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds($user, true));
         }
 
         $qualities = $filters['quality'] ?? [];
         if ($qualities !== []) {
-            $query->whereIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds(null, $qualities));
+            $query->whereIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds($user, null, $qualities));
         }
 
         $updatedAfter = $filters['updated_after'] ?? null;
@@ -537,41 +553,50 @@ class CatalogTitleQuery
         return $query;
     }
 
-    private function seasonTitleIdsByCount(string $operator, int $count): QueryBuilder
+    private function seasonTitleIdsByCount(string $operator, int $count, ?User $user): Builder
     {
         $seasonTable = (new Season)->getTable();
 
-        return DB::table($seasonTable)
+        return Season::query()
+            ->availableTo($user)
             ->select($seasonTable.'.catalog_title_id')
             ->whereNotNull($seasonTable.'.catalog_title_id')
             ->groupBy($seasonTable.'.catalog_title_id')
             ->havingRaw('count(*) '.$operator.' ?', [$count]);
     }
 
-    private function episodeTitleIdsByCount(string $operator, int $count): QueryBuilder
+    private function episodeTitleIdsByCount(string $operator, int $count, ?User $user): Builder
     {
         $episodeTable = (new Episode)->getTable();
         $seasonTable = (new Season)->getTable();
+        $episodeCounts = Episode::query()
+            ->availableTo($user)
+            ->select($episodeTable.'.season_id')
+            ->selectRaw('count(*) as visible_episode_count')
+            ->groupBy($episodeTable.'.season_id');
 
-        return DB::table($episodeTable)
-            ->join($seasonTable, $seasonTable.'.id', '=', $episodeTable.'.season_id')
+        return Season::query()
+            ->availableTo($user)
+            ->joinSub($episodeCounts, 'visible_episode_counts', function ($join) use ($seasonTable): void {
+                $join->on('visible_episode_counts.season_id', '=', $seasonTable.'.id');
+            })
             ->select($seasonTable.'.catalog_title_id')
             ->whereNotNull($seasonTable.'.catalog_title_id')
             ->groupBy($seasonTable.'.catalog_title_id')
-            ->havingRaw('count(*) '.$operator.' ?', [$count]);
+            ->havingRaw('sum(visible_episode_counts.visible_episode_count) '.$operator.' ?', [$count]);
     }
 
     /**
      * @param  list<string>  $qualities
      * @return Builder<LicensedMedia>
      */
-    private function publishedMediaTitleIds(?bool $requiresSubtitles = null, array $qualities = []): Builder
+    private function publishedMediaTitleIds(?User $user, ?bool $requiresSubtitles = null, array $qualities = []): Builder
     {
         $query = LicensedMedia::query()
             ->select('catalog_title_id')
             ->whereNotNull('catalog_title_id')
-            ->published()
-            ->forAvailableReleases(null);
+            ->availableTo($user)
+            ->forAvailableReleases($user);
 
         if ($requiresSubtitles !== null) {
             $query->where('has_subtitles', $requiresSubtitles);

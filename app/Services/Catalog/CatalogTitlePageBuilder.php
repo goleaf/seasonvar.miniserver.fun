@@ -7,6 +7,7 @@ use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
+use App\Models\User;
 use App\Services\Media\ExternalMediaMetadata;
 use App\View\ViewModels\CatalogShowViewModel;
 use Illuminate\Database\Eloquent\Builder;
@@ -114,14 +115,14 @@ class CatalogTitlePageBuilder
         $parsedSeasonCount = $seasons->filter(fn ($season): bool => $season->episodes->isNotEmpty())->count();
         $mediaCount = $mediaItems->count();
         $genreIds = $taxonomiesByType->get('genre', collect())->pluck('id')->unique()->values();
-        $genreRecommendations = $this->relatedTitleSummaryQuery($catalogTitle)
+        $genreRecommendations = $this->relatedTitleSummaryQuery($catalogTitle, $request->user())
             ->when($genreIds->isNotEmpty(), fn (Builder $query): Builder => $query->whereHas('genres', fn (Builder $query): Builder => $query->whereKey($genreIds)))
             ->when($genreIds->isEmpty(), fn (Builder $query): Builder => $query->whereRaw('1 = 0'))
             ->latest('indexed_at')
             ->limit(8)
             ->get();
         $yearRecommendations = $catalogTitle->year
-            ? $this->relatedTitleSummaryQuery($catalogTitle)
+            ? $this->relatedTitleSummaryQuery($catalogTitle, $request->user())
                 ->where('year', $catalogTitle->year)
                 ->latest('indexed_at')
                 ->limit(8)
@@ -141,7 +142,7 @@ class CatalogTitlePageBuilder
             parsedSeasonCount: $parsedSeasonCount,
             mediaCount: $mediaCount,
         );
-        $recommendedTitleRecommendations = $this->recommendedTitleRecommendations($catalogTitle);
+        $recommendedTitleRecommendations = $this->recommendedTitleRecommendations($catalogTitle, $request->user());
 
         return [
             'title' => $catalogTitle,
@@ -184,16 +185,16 @@ class CatalogTitlePageBuilder
     /**
      * @return Builder<CatalogTitle>
      */
-    private function relatedTitleSummaryQuery(CatalogTitle $catalogTitle): Builder
+    private function relatedTitleSummaryQuery(CatalogTitle $catalogTitle, ?User $user): Builder
     {
-        return $this->titleSummaryQuery(CatalogTitle::query())
+        return $this->titleSummaryQuery(CatalogTitle::query(), $user)
             ->whereKeyNot($catalogTitle->id);
     }
 
     /**
      * @return Collection<int, CatalogTitleRecommendation>
      */
-    private function recommendedTitleRecommendations(CatalogTitle $catalogTitle): Collection
+    private function recommendedTitleRecommendations(CatalogTitle $catalogTitle, ?User $user): Collection
     {
         if (! $this->hasRecommendationsTable()) {
             return collect();
@@ -204,8 +205,8 @@ class CatalogTitlePageBuilder
             ->orderByDesc('score')
             ->limit($this->recommendationDisplayLimit())
             ->with([
-                'recommendedTitle' => function ($query): void {
-                    $this->titleSummaryQuery($query->getQuery());
+                'recommendedTitle' => function ($query) use ($user): void {
+                    $this->titleSummaryQuery($query->getQuery(), $user);
                 },
             ])
             ->get()
@@ -227,29 +228,13 @@ class CatalogTitlePageBuilder
      * @param  Builder<CatalogTitle>  $query
      * @return Builder<CatalogTitle>
      */
-    private function titleSummaryQuery(Builder $query): Builder
+    private function titleSummaryQuery(Builder $query, ?User $user): Builder
     {
-        return $query
-            ->published()
+        return $this->query
+            ->constrainVisible($query, $user)
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url', 'indexed_at'])
             ->with($this->taxonomies->cardRelations())
-            ->withCount($this->cardCounts());
-    }
-
-    /**
-     * @return array<int|string, string|\Closure(Builder): Builder>
-     */
-    private function cardCounts(): array
-    {
-        return [
-            'seasons' => fn (Builder $query): Builder => $query->published(),
-            'episodes' => fn (Builder $query): Builder => $query
-                ->published()
-                ->whereHas('season', fn (Builder $query): Builder => $query->published()),
-            'licensedMedia as published_media_count' => fn (Builder $query): Builder => $query
-                ->published()
-                ->forAvailableReleases(null),
-        ];
+            ->withCount($this->query->publicCardCounts($user));
     }
 
     /**

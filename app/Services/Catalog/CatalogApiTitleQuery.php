@@ -3,6 +3,7 @@
 namespace App\Services\Catalog;
 
 use App\Models\CatalogTitle;
+use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -22,42 +23,40 @@ class CatalogApiTitleQuery
         'year',
         'description',
         'poster_url',
-        'is_published',
         'indexed_at',
     ];
 
     public function __construct(
         private readonly CatalogTaxonomyRegistry $taxonomies,
+        private readonly CatalogTitleQuery $titles,
     ) {}
 
     /**
      * @return LengthAwarePaginator<int, CatalogTitle>
      */
-    public function paginatePublished(int $perPage): LengthAwarePaginator
+    public function paginateVisible(int $perPage, ?User $user = null): LengthAwarePaginator
     {
-        return CatalogTitle::query()
+        return $this->titles->visibleTo($user)
             ->select(self::TITLE_COLUMNS)
-            ->published()
             ->with($this->publicTaxonomyRelations())
-            ->withCount($this->publicCounts())
+            ->withCount($this->publicCounts($user))
             ->orderByDesc('indexed_at')
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
     }
 
-    public function findPublishedForApi(CatalogTitle $catalogTitle): CatalogTitle
+    public function findVisibleForApi(CatalogTitle $catalogTitle, ?User $user = null): CatalogTitle
     {
-        return CatalogTitle::query()
+        return $this->titles->visibleTo($user)
             ->select(self::TITLE_COLUMNS)
             ->whereKey($catalogTitle->getKey())
-            ->published()
             ->with(array_merge(
                 $this->publicTaxonomyRelations(),
                 [
-                    'seasons' => function (HasMany $query): void {
+                    'seasons' => function (HasMany $query) use ($user): void {
                         $query
-                            ->published()
+                            ->availableTo($user)
                             ->select([
                                 'id',
                                 'catalog_title_id',
@@ -71,16 +70,16 @@ class CatalogApiTitleQuery
                                 'translation_name',
                             ])
                             ->with([
-                                'episodes' => function (HasMany $query): void {
+                                'episodes' => function (HasMany $query) use ($user): void {
                                     $query
-                                        ->published()
+                                        ->availableTo($user)
                                         ->select(['id', 'season_id', 'number', 'kind', 'sort_order', 'title', 'released_at', 'summary']);
                                 },
                             ]);
                     },
                 ],
             ))
-            ->withCount($this->publicCounts())
+            ->withCount($this->publicCounts($user))
             ->firstOrFail();
     }
 
@@ -111,14 +110,13 @@ class CatalogApiTitleQuery
     /**
      * @return array<int|string, string|\Closure(Builder): Builder>
      */
-    private function publicCounts(): array
+    private function publicCounts(?User $user): array
     {
-        return [
-            'seasons' => fn (Builder $query): Builder => $query->published(),
-            'episodes' => fn (Builder $query): Builder => $query
-                ->published()
-                ->whereHas('season', fn (Builder $query): Builder => $query->published()),
-            'publishedLicensedMedia',
-        ];
+        $counts = $this->titles->publicCardCounts($user);
+        $mediaCount = $counts['licensedMedia as published_media_count'];
+        unset($counts['licensedMedia as published_media_count']);
+        $counts['licensedMedia as published_licensed_media_count'] = $mediaCount;
+
+        return $counts;
     }
 }
