@@ -57,5 +57,10 @@ class ExternalMediaMetadataTest extends TestCase
         foreach (['Трейлеры', 'HDТрейлер', 'SDСубтитры', 'FullHD subtitles'] as $rawName) {
             $this->assertNull($metadata->translationName($rawName), $rawName);
         }
+
+        $original = $metadata->playbackVariant('HDOriginal', null, 'https://media.example.com/show/s01e01.mp4');
+
+        $this->assertSame('original', $original['variant_type']);
+        $this->assertSame('Оригинал', $original['variant_name']);
     }
 }

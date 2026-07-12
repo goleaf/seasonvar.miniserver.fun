@@ -57,7 +57,7 @@ class SeasonvarRelationMetadataNormalizer
         $quality = '(?:4320p|2160p|1440p|1080p|720p|576p|540p|480p|360p|240p|full[\s._-]*hd|fhd|uhd|4k|hd|sd)';
         $value = preg_replace('/^(?:'.$quality.'\s*[\/|]\s*)+/iu', '', $value) ?? $value;
         $value = preg_replace('/^'.$quality.'(?=[\pL\pN])/iu', '', $value, 1) ?? $value;
-        $value = Str::squish(trim($value, " \t\n\r\0\x0B/|_-.") );
+        $value = Str::squish(trim($value, " \t\n\r\0\x0B/|_-."));
 
         if ($value === '' || $this->isMetadataPlaceholder($value) || $this->isTranslationNoise($value)) {
             return null;
@@ -133,15 +133,15 @@ class SeasonvarRelationMetadataNormalizer
         $normalized = Str::lower(Str::squish($value));
 
         return in_array($normalized, [
-                '-',
-                'нет',
-                'не указано',
-                'неизвестно',
-                'ничего не найдено',
-                'отсутствует',
-                'рекомендовано',
-                'рекомендовано!',
-            ], true);
+            '-',
+            'нет',
+            'не указано',
+            'неизвестно',
+            'ничего не найдено',
+            'отсутствует',
+            'рекомендовано',
+            'рекомендовано!',
+        ], true);
     }
 
     private function isTranslationNoise(string $value): bool

@@ -167,6 +167,10 @@ class ExternalMediaMetadata
             return 'subtitles';
         }
 
+        if ($this->translationName($title, $sourceUrl) === 'Оригинал') {
+            return 'original';
+        }
+
         $value = $this->normalizedValue(implode(' ', array_filter([
             $title,
             $sourceUrl ? urldecode($sourceUrl) : null,

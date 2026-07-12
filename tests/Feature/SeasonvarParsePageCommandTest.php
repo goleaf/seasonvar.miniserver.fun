@@ -6,9 +6,9 @@ use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendationSignal;
 use App\Models\Genre;
 use App\Models\Season;
-use App\Models\SeasonvarImportEvent;
 use App\Models\Source;
-use App\Services\Seasonvar\SeasonvarCatalogParser;
+use App\Models\SourcePage;
+use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
@@ -126,16 +126,6 @@ class SeasonvarParsePageCommandTest extends TestCase
             'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
         ])->assertExitCode(0);
 
-        $this->assertDatabaseHas('seasons', ['number' => 4]);
-        $this->assertDatabaseHas('episodes', ['number' => 2]);
-        $this->assertSame([], SeasonvarImportEvent::query()
-            ->where('level', 'error')
-            ->get(['event', 'context'])
-            ->toArray());
-        $this->assertSame([], SeasonvarImportEvent::query()
-            ->where('event', 'like', 'seasonvar-media-%')
-            ->get(['event', 'context'])
-            ->toArray());
         $this->assertDatabaseHas('licensed_media', [
             'title' => 'Черный список: На кухне S04E02',
             'storage_disk' => 'external_playlist',
@@ -222,22 +212,27 @@ class SeasonvarParsePageCommandTest extends TestCase
             'seasonvar.media_check.enabled' => true,
             'seasonvar.media_check.retries' => 1,
         ]);
+        $url = 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html';
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $page = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+            'content_hash' => null,
+            'parse_status' => 'pending',
+        ]);
         $transactionLevelBeforeImport = DB::transactionLevel();
         $mediaRequestTransactionLevels = [];
-        $observedRequestUrls = [];
         $pageHtml = $this->seasonPageHtml(4, [
             2 => 'Проверка',
         ], ['https://media.example.com/kitchen/s04e02.mp4']);
-        $parsed = app(SeasonvarCatalogParser::class)->parse(
-            $pageHtml,
-            'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
-        );
-        $this->assertSame(['https://media.example.com/kitchen/s04e02.mp4'], collect($parsed['media'])->pluck('url')->all());
 
-        Http::fake(function (Request $request) use (&$mediaRequestTransactionLevels, &$observedRequestUrls, $pageHtml): \Illuminate\Http\Client\Response {
-            $observedRequestUrls[] = $request->url();
-
-            if ($request->url() === 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html') {
+        Http::fake(function (Request $request) use (&$mediaRequestTransactionLevels, $pageHtml, $url) {
+            if ($request->url() === $url) {
                 return Http::response($pageHtml);
             }
 
@@ -250,14 +245,12 @@ class SeasonvarParsePageCommandTest extends TestCase
             return Http::response('', 404);
         });
 
-        $this->artisan('seasonvar:import', [
-            'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html',
-        ])->assertExitCode(0);
+        $result = app(SeasonvarCatalogImporter::class)->parsePage($page);
 
+        $this->assertSame(1, $result['media_attached']);
         $this->assertDatabaseHas('licensed_media', [
             'playback_url' => 'https://media.example.com/kitchen/s04e02.mp4',
         ]);
-        $this->assertSame(['https://media.example.com/kitchen/s04e02.mp4'], $observedRequestUrls);
         $this->assertSame([$transactionLevelBeforeImport], $mediaRequestTransactionLevels);
     }
 

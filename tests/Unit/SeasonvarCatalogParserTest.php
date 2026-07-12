@@ -180,19 +180,19 @@ class SeasonvarCatalogParserTest extends TestCase
                 <body>
                     <h1>Доверенный сериал</h1>
                     <div class="pgs-sinfo_list">
-                        Страна: Тайвань, Армения, Исландия, Чехословакия, Филиппины
+                        Страна: Тайвань, Армения, Исландия, Чехословакия, Филиппины, Голландия
                         Статус: идет
                         Телеканал: Пятница
                         Студии: A-1 Pictures
                     </div>
                     <div class="pgs-sinfo_list">Статус: Рекомендовано!</div>
+                    <div class="pgs-sinfo_list">Статус: анонс</div>
                     <ul class="pgs-trans">
                         <li data-click="translate">HDRuDub</li>
                         <li data-click="translate">NewStudio</li>
                         <li data-click="translate">LostFilm</li>
                     </ul>
-                    <p itemprop="description">Официальное описание.
-                    Студия: J.C.Staff</p>
+                    <p itemprop="description">Официальное описание.<br>Студия: J.C.Staff</p>
                     <div class="b-taglist"><a href="/tag/netflix">Netflix</a></div>
                     <div class="svc_comment">Канал: TV Tokyo</div>
                     <div class="pgs-review-post">Статус: завершен. Этот отзыв достаточно длинный, но не является метаданными.</div>
@@ -204,9 +204,9 @@ class SeasonvarCatalogParserTest extends TestCase
 
         $taxonomies = collect($data['taxonomies'])->groupBy('type');
 
-        $this->assertSame(['Тайвань', 'Армения', 'Исландия', 'Чехословакия', 'Филиппины'], $taxonomies->get('country')->pluck('name')->values()->all());
+        $this->assertSame(['Тайвань', 'Армения', 'Исландия', 'Чехословакия', 'Филиппины', 'Нидерланды'], $taxonomies->get('country')->pluck('name')->values()->all());
         $this->assertSame(['RuDub', 'NewStudio', 'LostFilm'], $taxonomies->get('translation')->pluck('name')->values()->all());
-        $this->assertSame(['Выходит'], $taxonomies->get('status')->pluck('name')->values()->all());
+        $this->assertSame(['Выходит', 'Анонсирован'], $taxonomies->get('status')->pluck('name')->values()->all());
         $this->assertSame(['Пятница', 'Netflix'], $taxonomies->get('network')->pluck('name')->values()->all());
         $this->assertSame(['Bones', 'A-1 Pictures', 'J.C.Staff'], $taxonomies->get('studio')->pluck('name')->values()->all());
         $this->assertFalse($taxonomies->get('network')->contains('name', 'TV Tokyo'));
