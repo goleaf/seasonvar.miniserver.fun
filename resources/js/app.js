@@ -151,12 +151,56 @@ const loadCatalogSeasonAnchors = () => {
     });
 };
 
+const normalizeCatalogFilterText = (value) => value
+    .toLocaleLowerCase('ru-RU')
+    .replace(/ё/g, 'е')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const loadCatalogFilterSearch = () => {
+    document.querySelectorAll('[data-catalog-filter-group]').forEach((group) => {
+        const input = group.querySelector('[data-catalog-filter-search]');
+
+        if (!(input instanceof HTMLInputElement)) {
+            return;
+        }
+
+        const options = [...group.querySelectorAll('[data-catalog-filter-option]')];
+        const emptyState = group.querySelector('[data-catalog-filter-empty]');
+
+        const updateOptions = () => {
+            const search = normalizeCatalogFilterText(input.value);
+            let visibleOptions = 0;
+
+            options.forEach((option) => {
+                const filterText = normalizeCatalogFilterText(
+                    option.getAttribute('data-catalog-filter-text') || option.textContent || '',
+                );
+                const isVisible = search === '' || filterText.includes(search);
+
+                option.classList.toggle('hidden', !isVisible);
+
+                if (isVisible) {
+                    visibleOptions += 1;
+                }
+            });
+
+            emptyState?.classList.toggle('hidden', visibleOptions > 0 || search === '');
+        };
+
+        input.addEventListener('input', updateOptions);
+        updateOptions();
+    });
+};
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         void loadCatalogPlayers();
         loadCatalogSeasonAnchors();
+        loadCatalogFilterSearch();
     });
 } else {
     void loadCatalogPlayers();
     loadCatalogSeasonAnchors();
+    loadCatalogFilterSearch();
 }

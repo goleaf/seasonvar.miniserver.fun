@@ -44,14 +44,28 @@
                     </div>
 
                     @foreach ($filterView->typeLabels as $filterType => $label)
-                        <div>
+                        <div data-catalog-filter-group>
                             <div class="mb-2 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
                                 <i class="{{ $filterView->icon($filterType) }} text-slate-400" aria-hidden="true"></i>
                                 <span>{{ $label }}</span>
                             </div>
-                            <div class="space-y-1">
+                            @if ($filterTaxonomies->get($filterType, collect())->count() > 8)
+                                <label class="sr-only" for="catalog-filter-search-{{ $filterType }}">Найти в группе {{ $label }}</label>
+                                <div class="mb-2 flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                                    <i class="fa-solid fa-magnifying-glass shrink-0 text-slate-400" aria-hidden="true"></i>
+                                    <input
+                                        id="catalog-filter-search-{{ $filterType }}"
+                                        type="search"
+                                        autocomplete="off"
+                                        placeholder="Найти в группе"
+                                        class="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 placeholder:text-slate-400 focus:outline-none"
+                                        data-catalog-filter-search
+                                    >
+                                </div>
+                            @endif
+                            <div class="space-y-1" data-catalog-filter-options>
                                 @forelse ($filterTaxonomies->get($filterType, collect()) as $taxonomy)
-                                    <label @class([
+                                    <label data-catalog-filter-option data-catalog-filter-text="{{ mb_strtolower($taxonomy->name.' '.$taxonomy->slug, 'UTF-8') }}" @class([
                                         'flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm transition',
                                         'bg-emerald-50 font-bold text-emerald-700' => $filterView->isActiveTaxonomy($filterType, $taxonomy),
                                         'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveTaxonomy($filterType, $taxonomy),
@@ -70,6 +84,7 @@
                                     <p class="text-sm text-slate-500">Нет данных.</p>
                                 @endforelse
                             </div>
+                            <p class="hidden px-3 py-2 text-sm text-slate-500" data-catalog-filter-empty>В этой группе ничего не найдено.</p>
                         </div>
                     @endforeach
 

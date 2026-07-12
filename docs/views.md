@@ -17,6 +17,7 @@
 - `App\View\ViewModels\CatalogTitlesViewModel` готовит подписи фильтров и параметры ссылок каталога.
 - `App\View\ViewModels\CatalogTitlesViewModel` нормализует scalar/list query-state через `scalarState()` и `listState()`, чтобы шаблоны не читали raw query-параметры напрямую.
 - `App\View\ViewModels\CatalogTitlesViewModel` готовит состояние multi-select формы фильтров: скрытые поля для поиска/сортировки/расширенных параметров, выбранные годы и активные relation-значения.
+- Шаблон `resources/views/catalog/titles.blade.php` может добавлять `data-catalog-filter-*` атрибуты для локального client-side поиска внутри уже отрендеренных групп фильтров; база данных из Blade не запрашивается.
 - `App\View\ViewModels\CatalogShowViewModel` готовит состояние страницы тайтла: группы таксономий, выбранную серию, варианты медиа, MIME-тип видео и бейджи сезонов.
 - Layout использует `x-layout.site-header` и `x-layout.site-footer`, один `<main>` и skip-link к основному содержимому.
 

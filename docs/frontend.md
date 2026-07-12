@@ -28,6 +28,7 @@ composer dev
 - Основная точка входа Vite одна: `resources/js/app.js`.
 - `resources/js/app.js` импортирует `resources/css/app.css` и глобальные стили FontAwesome.
 - Player-код для Plyr/HLS находится в `resources/js/player.js` и загружается dynamic import только на страницах с `video.js-catalog-player`.
+- Локальный поиск внутри длинных групп фильтров `/titles` находится в `resources/js/app.js` и работает только как progressive enhancement: серверная GET-форма остается рабочей без JavaScript.
 - Для HLS используется `hls.js/light`: он сохраняет воспроизведение HLS-плейлистов и не тянет модули субтитров, DRM и расширенной аналитики, которые сейчас не используются интерфейсом.
 - Layout подключает ассеты через `@vite('resources/js/app.js')`; не добавлять raw `<script>`/`<style>` для обычных assets.
 - Layout также содержит `@livewireStyles` и `@livewireScripts`; не дублировать Livewire/Alpine через CDN или отдельный npm-bundle.
