@@ -408,7 +408,7 @@ git commit -m "docs: explain Seasonvar page state reconciliation"
 git push origin main
 ```
 
-- [ ] **Step 4: Restart long-lived workers and verify status**
+- [x] **Step 4: Restart long-lived workers and verify status**
 
 Run:
 
