@@ -21,8 +21,8 @@ class CatalogFacetQuery
         $relation = $model->catalogTitles();
         $pivotTable = $relation->getTable();
         $catalogTitleTable = (new CatalogTitle)->getTable();
-        $titlePivotKey = $relation->getForeignPivotKeyName();
-        $relatedPivotKey = $relation->getRelatedPivotKeyName();
+        $titlePivotKey = $relation->getRelatedPivotKeyName();
+        $relatedPivotKey = $relation->getForeignPivotKeyName();
         $countAlias = 'published_facet_counts';
         $counts = DB::table($pivotTable)
             ->join($catalogTitleTable, $catalogTitleTable.'.id', '=', $pivotTable.'.'.$titlePivotKey)

@@ -19,6 +19,14 @@ class TitleListRow extends Component
 
     public ?Season $latestSeason;
 
+    public ?string $latestSeasonLabel;
+
+    public string $seasonsLabel;
+
+    public string $episodesLabel;
+
+    public string $mediaLabel;
+
     public string $posterClass;
 
     public string $baseClass;
@@ -38,6 +46,10 @@ class TitleListRow extends Component
         $this->episodesCount = (int) ($title->episodes_count ?? 0);
         $this->mediaCount = (int) ($title->published_media_count ?? $title->licensed_media_count ?? 0);
         $this->latestSeason = $title->relationLoaded('latestSeason') ? $title->latestSeason : null;
+        $this->latestSeasonLabel = $this->latestSeason ? $this->latestSeason->number.' сезон' : null;
+        $this->seasonsLabel = $this->plural($this->seasonsCount, ['сезон', 'сезона', 'сезонов']);
+        $this->episodesLabel = $this->plural($this->episodesCount, ['серия', 'серии', 'серий']);
+        $this->mediaLabel = $this->plural($this->mediaCount, ['видео', 'видео', 'видео']);
         $this->posterClass = match (true) {
             $readable => 'aspect-[2/3] w-20 sm:w-24',
             $compact => 'h-24 w-16',
@@ -60,5 +72,23 @@ class TitleListRow extends Component
     public function render(): View
     {
         return view('components.title-list-row');
+    }
+
+    /**
+     * @param  array{0: string, 1: string, 2: string}  $forms
+     */
+    private function plural(int $count, array $forms): string
+    {
+        $absolute = abs($count) % 100;
+        $last = $absolute % 10;
+
+        $form = match (true) {
+            $absolute > 10 && $absolute < 20 => $forms[2],
+            $last === 1 => $forms[0],
+            $last >= 2 && $last <= 4 => $forms[1],
+            default => $forms[2],
+        };
+
+        return $count.' '.$form;
     }
 }

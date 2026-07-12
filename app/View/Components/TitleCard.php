@@ -16,6 +16,12 @@ class TitleCard extends Component
 
     public int $mediaCount;
 
+    public string $seasonsLabel;
+
+    public string $episodesLabel;
+
+    public string $mediaLabel;
+
     /**
      * @var Collection<int, Model>
      */
@@ -26,6 +32,9 @@ class TitleCard extends Component
         $this->seasonsCount = (int) ($title->seasons_count ?? ($title->relationLoaded('seasons') ? $title->seasons->count() : 0));
         $this->episodesCount = (int) ($title->episodes_count ?? 0);
         $this->mediaCount = (int) ($title->published_media_count ?? $title->licensed_media_count ?? 0);
+        $this->seasonsLabel = $this->plural($this->seasonsCount, ['сезон', 'сезона', 'сезонов']);
+        $this->episodesLabel = $this->plural($this->episodesCount, ['серия', 'серии', 'серий']);
+        $this->mediaLabel = $this->plural($this->mediaCount, ['видео', 'видео', 'видео']);
         $this->cardRelations = collect()
             ->merge($title->relationLoaded('genres') ? $title->genres : collect())
             ->merge($title->relationLoaded('countries') ? $title->countries : collect())
@@ -38,5 +47,23 @@ class TitleCard extends Component
     public function render(): View
     {
         return view('components.title-card');
+    }
+
+    /**
+     * @param  array{0: string, 1: string, 2: string}  $forms
+     */
+    private function plural(int $count, array $forms): string
+    {
+        $absolute = abs($count) % 100;
+        $last = $absolute % 10;
+
+        $form = match (true) {
+            $absolute > 10 && $absolute < 20 => $forms[2],
+            $last === 1 => $forms[0],
+            $last >= 2 && $last <= 4 => $forms[1],
+            default => $forms[2],
+        };
+
+        return $count.' '.$form;
     }
 }

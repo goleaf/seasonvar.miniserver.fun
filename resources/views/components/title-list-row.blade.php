@@ -21,20 +21,20 @@
                                 <span>{{ $title->year }}</span>
                             </span>
                         @endif
-                        @if ($latestSeason)
+                        @if ($latestSeasonLabel)
                             <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 ring-1 ring-emerald-100">
                                 <i class="fa-solid fa-layer-group text-[0.85em]" aria-hidden="true"></i>
-                                <span>{{ $latestSeason->number }} сезон</span>
+                                <span>{{ $latestSeasonLabel }}</span>
                             </span>
                         @endif
                         <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700 ring-1 ring-sky-100">
                             <i class="fa-solid fa-circle-play text-[0.85em]" aria-hidden="true"></i>
-                            <span>{{ $episodesCount }} серий</span>
+                            <span>{{ $episodesLabel }}</span>
                         </span>
                         @if ($mediaCount > 0)
                             <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700 ring-1 ring-amber-100">
                                 <i class="fa-solid fa-file-video text-[0.85em]" aria-hidden="true"></i>
-                                <span>{{ $mediaCount }} видео</span>
+                                <span>{{ $mediaLabel }}</span>
                             </span>
                         @endif
                     </div>
@@ -66,10 +66,10 @@
                         @if ($title->original_title)
                             <span class="block break-words text-sm leading-5 text-slate-500">{{ $title->original_title }}</span>
                         @endif
-                        @if ($latestSeason)
+                        @if ($latestSeasonLabel)
                             <span class="inline-flex min-w-0 items-center gap-1 text-sm text-slate-500">
                                 <i class="fa-solid fa-layer-group shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
-                                <span>Сезон {{ $latestSeason->number }}</span>
+                                <span>{{ $latestSeasonLabel }}</span>
                             </span>
                         @else
                             <span class="inline-flex min-w-0 items-center gap-1 text-sm text-slate-500">
@@ -89,17 +89,17 @@
                         @unless ($compact)
                             <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 ring-1 ring-emerald-100">
                                 <i class="fa-solid fa-layer-group text-[0.85em]" aria-hidden="true"></i>
-                                <span>{{ $seasonsCount }} сезон(ов)</span>
+                                <span>{{ $seasonsLabel }}</span>
                             </span>
                         @endunless
                         <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700 ring-1 ring-sky-100">
                             <i class="fa-solid fa-circle-play text-[0.85em]" aria-hidden="true"></i>
-                            <span>{{ $episodesCount }} серий</span>
+                            <span>{{ $episodesLabel }}</span>
                         </span>
                         @if ($mediaCount > 0)
                             <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700 ring-1 ring-amber-100">
                                 <i class="fa-solid fa-file-video text-[0.85em]" aria-hidden="true"></i>
-                                <span>{{ $mediaCount }} видео</span>
+                                <span>{{ $mediaLabel }}</span>
                             </span>
                         @endif
                     </div>

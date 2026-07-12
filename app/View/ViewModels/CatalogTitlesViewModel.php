@@ -10,6 +10,18 @@ use Illuminate\Support\Collection;
 class CatalogTitlesViewModel
 {
     /**
+     * @var list<string>
+     */
+    private const PUBLIC_SORT_KEYS = [
+        'updated',
+        'with_video',
+        'episodes_desc',
+        'year_desc',
+        'year_asc',
+        'title_asc',
+    ];
+
+    /**
      * @var array<string, string>
      */
     public array $typeLabels = [
@@ -56,6 +68,9 @@ class CatalogTitlesViewModel
     /** @var array<string, list<string>> */
     public array $selectedFilterSlugs;
 
+    /** @var Collection<string, Collection<int, Model>> */
+    public readonly Collection $selectedTaxonomies;
+
     /** @var array<string, mixed> */
     public array $catalogQueryState;
 
@@ -101,19 +116,22 @@ class CatalogTitlesViewModel
         public readonly string $requestedYear,
         public readonly bool $invalidYear,
         public readonly Collection $activeTaxonomies,
-        public readonly Collection $selectedTaxonomies,
         public readonly array $activeFilterSlugs,
         public readonly array $invalidFilterSlugs,
         public readonly ?CatalogTitle $titleContext,
+        ?Collection $selectedTaxonomies = null,
         array $selectedFilterSlugs = [],
         public readonly string $view = 'grid',
         public readonly int $perPage = 24,
         array $catalogQueryState = [],
         ?Collection $excludedTaxonomies = null,
     ) {
-        $sorts = collect(CatalogSort::cases())->mapWithKeys(fn (CatalogSort $option): array => [$option->value => $option]);
+        $sorts = collect(self::PUBLIC_SORT_KEYS)
+            ->mapWithKeys(fn (string $sort): array => [$sort => CatalogSort::from($sort)]);
         $this->sortLabels = $sorts->mapWithKeys(fn (CatalogSort $option): array => [$option->value => $option->label()])->all();
         $this->sortIcons = $sorts->mapWithKeys(fn (CatalogSort $option): array => [$option->value => $option->icon()])->all();
+        $this->selectedTaxonomies = $selectedTaxonomies ?? collect();
+        $selectedFilterSlugs = $selectedFilterSlugs === [] ? $this->selectedSlugsFromActiveFilters($activeFilterSlugs) : $selectedFilterSlugs;
         $this->selectedFilterSlugs = $selectedFilterSlugs;
         $this->catalogQueryState = $catalogQueryState;
         $this->excludedTaxonomies = $excludedTaxonomies ?? collect();
@@ -148,12 +166,12 @@ class CatalogTitlesViewModel
 
     public function sortIcon(string $sort): string
     {
-        return $this->sortIcons[$sort] ?? 'fa-solid fa-arrow-down-wide-short';
+        return $this->sortIcons[$sort] ?? (CatalogSort::tryFrom($sort)?->icon() ?? 'fa-solid fa-arrow-down-wide-short');
     }
 
     public function sortLabel(string $sort): string
     {
-        return $this->sortLabels[$sort] ?? $this->sortLabels['updated'];
+        return $this->sortLabels[$sort] ?? (CatalogSort::tryFrom($sort)?->label() ?? $this->sortLabels['updated']);
     }
 
     public function isActiveSort(string $sort): bool
@@ -343,7 +361,8 @@ class CatalogTitlesViewModel
         if ($slug === null) {
             unset($query[$filterType]);
         } else {
-            $values = is_array($query[$filterType] ?? null) ? $query[$filterType] : [];
+            $currentValue = $query[$filterType] ?? [];
+            $values = is_array($currentValue) ? $currentValue : [$currentValue];
 
             if (in_array($slug, $values, true)) {
                 $values = array_values(array_diff($values, [$slug]));
@@ -366,7 +385,8 @@ class CatalogTitlesViewModel
     {
         $key = 'exclude_'.$filterType;
         $query = $this->sortQuery($this->sort);
-        $values = is_array($query[$key] ?? null) ? $query[$key] : [];
+        $currentValue = $query[$key] ?? [];
+        $values = is_array($currentValue) ? $currentValue : [$currentValue];
         $values = array_values(array_diff($values, [$slug]));
 
         if ($values === []) {
@@ -431,6 +451,12 @@ class CatalogTitlesViewModel
 
     public function isActiveTaxonomy(string $filterType, Model $taxonomy): bool
     {
+        $selected = $this->selectedTaxonomies->get($filterType);
+
+        if ($selected instanceof Collection) {
+            return $selected->contains(fn (Model $selectedTaxonomy): bool => $selectedTaxonomy->getKey() === $taxonomy->getKey());
+        }
+
         return $this->currentTaxonomy($filterType)?->getKey() === $taxonomy->getKey();
     }
 
@@ -545,6 +571,46 @@ class CatalogTitlesViewModel
     /** @param array<string, mixed> $query @return array<string, mixed> */
     private function withCatalogState(array $query): array
     {
-        return array_merge($this->catalogQueryState, $query);
+        return $this->cleanQuery(array_merge($this->catalogQueryState, $query));
+    }
+
+    /** @param array<string, mixed> $query @return array<string, mixed> */
+    private function cleanQuery(array $query): array
+    {
+        $clean = [];
+
+        foreach ($query as $key => $value) {
+            if (is_array($value)) {
+                $value = array_values(array_filter($value, fn (mixed $item): bool => $item !== null && $item !== ''));
+
+                if ($value === []) {
+                    continue;
+                }
+
+                $clean[$key] = count($value) === 1 ? $value[0] : $value;
+
+                continue;
+            }
+
+            if ($value === null || $value === '') {
+                continue;
+            }
+
+            $clean[$key] = $value;
+        }
+
+        return $clean;
+    }
+
+    /**
+     * @param  array<string, string>  $activeFilterSlugs
+     * @return array<string, list<string>>
+     */
+    private function selectedSlugsFromActiveFilters(array $activeFilterSlugs): array
+    {
+        return collect($activeFilterSlugs)
+            ->filter(fn (string $slug): bool => $slug !== '')
+            ->map(fn (string $slug): array => [$slug])
+            ->all();
     }
 }

@@ -166,7 +166,7 @@ class CatalogTitlesRequest extends FormRequest
 
     public function titleContextSlug(): ?string
     {
-        return $this->filterSlug($this->query('title', ''));
+        return $this->filledFilterSlug($this->query('title', ''));
     }
 
     public function sort(): CatalogSort
@@ -334,12 +334,19 @@ class CatalogTitlesRequest extends FormRequest
 
     public function legacyTaxonomy(): ?string
     {
-        return $this->filterSlug($this->query('taxonomy', ''));
+        return $this->filledFilterSlug($this->query('taxonomy', ''));
     }
 
     public function filterSlug(mixed $value): ?string
     {
         return CatalogFilterSlug::normalize($value);
+    }
+
+    private function filledFilterSlug(mixed $value): ?string
+    {
+        $slug = $this->filterSlug($value);
+
+        return $slug === '' ? null : $slug;
     }
 
     /**

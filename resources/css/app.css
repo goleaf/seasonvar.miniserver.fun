@@ -9,10 +9,10 @@
     --color-aurora-50: oklch(0.98 0.02 183);
     --color-aurora-100: oklch(0.95 0.045 183);
     --color-aurora-600: oklch(0.55 0.13 183);
-    --radius-control: 0.875rem;
-    --radius-panel: 1.25rem;
-    --shadow-panel: 0 18px 45px -34px oklch(0.42 0.08 183 / 0.45), 0 1px 2px oklch(0.2 0.02 250 / 0.06);
-    --shadow-panel-hover: 0 24px 55px -34px oklch(0.5 0.13 183 / 0.55), 0 8px 20px -16px oklch(0.2 0.02 250 / 0.18);
+    --radius-control: 0.75rem;
+    --radius-panel: 1rem;
+    --shadow-panel: 0 16px 38px -30px oklch(0.42 0.08 183 / 0.42), 0 1px 2px oklch(0.2 0.02 250 / 0.06);
+    --shadow-panel-hover: 0 22px 48px -32px oklch(0.5 0.13 183 / 0.48), 0 8px 18px -16px oklch(0.2 0.02 250 / 0.16);
 }
 
 @layer base {
@@ -36,6 +36,11 @@
     .catalog-card {
         content-visibility: auto;
         contain-intrinsic-size: 24rem;
+    }
+
+    .catalog-chip {
+        max-width: 100%;
+        min-width: 0;
     }
 }
 
