@@ -8,7 +8,7 @@ Production data confirms that this is not an isolated display issue: 391 linked 
 
 ## Chosen approach
 
-After every successful parse, calculate the title-level flags once from a freshly loaded title and synchronize them to every already parsed source page linked to that title. Linked page ids come from the current page, the title's canonical `source_page_id`, and source pages whose `url_hash` matches a season's `source_url_hash`.
+After every successful parse, and after a safe unchanged-page skip, calculate the title-level flags once from a freshly loaded title and synchronize them to every already parsed source page linked to that title. Linked page ids come from the current page, the title's canonical `source_page_id`, and source pages whose `url_hash` matches a season's `source_url_hash`.
 
 Season `source_page_id` cannot identify every linked page because the existing season upsert associates all season rows with the page currently supplying their metadata. The stable cross-page identity is the normalized season URL hash.
 
@@ -18,7 +18,7 @@ The current page continues to receive its own `last_imported_at`, `last_import_r
 
 ## Data flow
 
-1. Parse and persist the current page, seasons, episodes, and external media as today.
+1. Parse and persist the current page, seasons, episodes, and external media as today, or confirm that an unchanged page's existing title does not require media recovery.
 2. Reload the `CatalogTitle` with seasons, episodes, season media, and title media.
 3. Calculate the final title-level missing-data flags once.
 4. Collect the current and canonical page ids, then resolve every stored season URL hash to a source page from the same source.
