@@ -36,15 +36,100 @@ npm run build
 
 Команда защищена от параллельного запуска, постепенно проверяет старые видео-ссылки без статуса доступности, дополняет старые медиа качеством/форматом/стабильным ключом, нормализует статусы уже разобранных страниц и отключает некорректные склеенные ссылки источника.
 
-Для параллельного production-импорта используется `php artisan seasonvar:import --queued`. Диспетчер закрепляет только подходящие страницы, Redis-очередь распределяет их между workers, а lease и блокировка тайтла исключают повторное скачивание одной страницы и конкурентное изменение сезонов одного сериала. Свежая успешно импортированная страница проверяется повторно через 24 часа, а изменившийся `content_hash` запускает повторный разбор постера и остальных данных.
+Видео-файлы на сервер не скачиваются. Импортер хранит внешние URL воспроизведения, качество, формат, перевод, субтитры и состояние доступности.
+
+### Обычный запуск
+
+Полный последовательный импорт в текущем терминале:
 
 ```bash
+cd /www/wwwroot/seasonvar.miniserver.fun
+php artisan seasonvar:import
+```
+
+Обновление одной страницы, даже если сохраненный HTML hash не изменился:
+
+```bash
+php artisan seasonvar:import "https://seasonvar.ru/serial-615--Bez_sleda_pssmtlk-1-season.html" --force
+```
+
+Режим `--forever` предназначен для одного долгоживущего процесса и не нужен при production-запуске через десять Redis workers:
+
+```bash
+php artisan seasonvar:import --forever
+```
+
+### Параллельный импорт в 10 потоков
+
+Для production используется `php artisan seasonvar:import --queued`. Команда только находит и закрепляет подходящие страницы и ставит jobs в Redis. Десять фоновых workers разбирают эти страницы параллельно.
+
+Первичная подготовка:
+
+```bash
+cd /www/wwwroot/seasonvar.miniserver.fun
 redis-cli ping
 php artisan migrate --force
+sudo cp deploy/systemd/seasonvar-import-worker@.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now seasonvar-import-worker@{1..10}.service
+```
+
+`redis-cli ping` должен вернуть `PONG`. После запуска workers поставить подходящие страницы в очередь:
+
+```bash
 php artisan seasonvar:import --queued
 ```
 
-`redis-cli ping` должен вернуть `PONG`. Надёжная установка десяти workers и точная cron-строка приведены в `docs/deployment.md`.
+Проверка workers, очереди, ошибок и журнала:
+
+```bash
+systemctl --no-pager --type=service 'seasonvar-import-worker@*'
+php artisan queue:monitor redis:seasonvar-import --max=1000000
+php artisan queue:failed
+journalctl -u 'seasonvar-import-worker@*' -f
+```
+
+Остановить workers без удаления очереди и claims:
+
+```bash
+sudo systemctl stop seasonvar-import-worker@{1..10}.service
+```
+
+Продолжить обработку сохраненной очереди:
+
+```bash
+sudo systemctl start seasonvar-import-worker@{1..10}.service
+```
+
+После обновления PHP-кода workers необходимо перезапустить, потому что `queue:work` является долгоживущим процессом:
+
+```bash
+php artisan queue:restart
+```
+
+Systemd автоматически поднимет завершившиеся процессы. Полная диагностика и ручной foreground-вариант приведены в `docs/deployment.md`.
+
+### Cron: 10 запусков в сутки
+
+Workers должны постоянно работать под systemd, а cron только добавляет в Redis страницы, которые уже разрешено обновить. Откройте crontab пользователя `www`:
+
+```bash
+sudo crontab -u www -e
+```
+
+Добавьте одну строку:
+
+```cron
+0 0,2,5,7,10,12,14,17,19,22 * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan seasonvar:import --queued >> storage/logs/seasonvar-cron.log 2>&1
+```
+
+Проверить установленное расписание:
+
+```bash
+sudo crontab -u www -l
+```
+
+Частый cron не означает повторное скачивание страницы десять раз. Атомарный lease не позволяет поставить уже закрепленную страницу второй раз, Redis lock не дает разным сезонным URL одновременно изменять один тайтл, а успешно импортированная страница становится подходящей для новой проверки только после настроенного freshness interval — по умолчанию через 24 часа. При изменении `content_hash` повторно разбираются название, описание, постер, сезоны, серии, связи и внешние видео. Неизмененная страница безопасно пропускается, кроме случаев, когда требуется дозаполнить или перепроверить отсутствующие медиа-данные.
 
 После завершения импорта команда обновляет серверный снимок статистики, который использует live-страница `/stats`.
 
