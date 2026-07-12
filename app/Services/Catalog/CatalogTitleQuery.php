@@ -4,6 +4,7 @@ namespace App\Services\Catalog;
 
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
+use App\Services\Catalog\Search\CatalogSearchQueryParser;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -13,19 +14,10 @@ use Illuminate\Support\Str;
 
 class CatalogTitleQuery
 {
-    private const SEARCH_STOP_WORDS = [
-        'a', 'an', 'and', 'by', 'for', 'from', 'in', 'of', 'on', 'or', 'the', 'to', 'with',
-        'актеры', 'альтернативы', 'без', 'в', 'веб', 'все', 'выхода', 'где', 'год', 'года',
-        'дат', 'дата', 'для', 'жанр', 'жанры', 'и', 'какая', 'какие', 'календарь',
-        'каталог', 'когда', 'качество', 'качестве', 'лучшие', 'мобильный', 'на', 'новая',
-        'новые', 'онлайн', 'описание', 'плеер', 'по',
-        'подборка', 'подряд', 'после', 'последняя', 'похожие', 'про', 'расписание', 'роли',
-        'русском', 'с', 'сезон', 'сезона', 'сезоны', 'серии', 'серий', 'сериал',
-        'сериала', 'сериалы', 'сколько', 'смотреть', 'страна', 'страны', 'тема',
-        'темы', 'телефоне', 'хорошем', 'что',
-    ];
-
-    public function __construct(private readonly CatalogTaxonomyRegistry $taxonomies) {}
+    public function __construct(
+        private readonly CatalogTaxonomyRegistry $taxonomies,
+        private readonly CatalogSearchQueryParser $searchParser,
+    ) {}
 
     /**
      * @param  Collection<string, Model>  $activeTaxonomies
@@ -352,7 +344,7 @@ class CatalogTitleQuery
         return collect(explode(' ', $normalized))
             ->map(fn (string $term): string => trim($term))
             ->filter()
-            ->reject(fn (string $term): bool => in_array(mb_strtolower($term), self::SEARCH_STOP_WORDS, true))
+            ->reject(fn (string $term): bool => $this->searchParser->isStopWord(mb_strtolower($term)))
             ->filter(fn (string $term): bool => preg_match('/^\d{4}$/', $term) === 1 || mb_strlen($term) >= 3)
             ->unique(fn (string $term): string => mb_strtolower($term))
             ->take(8)
