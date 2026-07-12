@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Mockery;
+use RuntimeException;
 use Tests\TestCase;
 
 class SeasonvarParallelImportTest extends TestCase
@@ -128,21 +129,26 @@ class SeasonvarParallelImportTest extends TestCase
         $claims = app(SeasonvarPageClaimManager::class);
         $token = $claims->claim($page, $run->id, 3600);
         $importer = Mockery::mock(SeasonvarCatalogImporter::class);
+        $receivedRetryTransient = null;
         $importer->shouldReceive('parsePages')
             ->once()
-            ->withArgs(fn ($pages, $progress, $force, $runId): bool => $pages->pluck('id')->all() === [$page->id]
-                && $progress === null
-                && $force === false
-                && $runId === $run->id)
-            ->andReturn([
-                'parsed' => 1,
-                'failed' => 0,
-                'media_attached' => 2,
-                'media_updated' => 1,
-                'media_skipped' => 0,
-                'media_failed' => 0,
-                'failures' => [],
-            ]);
+            ->andReturnUsing(function (...$arguments) use (&$receivedRetryTransient, $page, $run): array {
+                $this->assertSame([$page->id], $arguments[0]->pluck('id')->all());
+                $this->assertNull($arguments[1]);
+                $this->assertFalse($arguments[2]);
+                $this->assertSame($run->id, $arguments[3]);
+                $receivedRetryTransient = $arguments[4] ?? null;
+
+                return [
+                    'parsed' => 1,
+                    'failed' => 0,
+                    'media_attached' => 2,
+                    'media_updated' => 1,
+                    'media_skipped' => 0,
+                    'media_failed' => 0,
+                    'failures' => [],
+                ];
+            });
 
         (new ImportSeasonvarSourcePage(
             sourcePageId: $page->id,
@@ -162,8 +168,29 @@ class SeasonvarParallelImportTest extends TestCase
         $this->assertSame(1, $freshRun->parsed);
         $this->assertSame(2, $freshRun->media_attached);
         $this->assertSame(1, $freshRun->media_updated);
+        $this->assertTrue($receivedRetryTransient);
         $this->assertNull($freshPage->import_claim_token);
         $this->assertNull($freshPage->import_claim_run_id);
+    }
+
+    public function test_failed_worker_releases_its_claim_and_counts_failure_once(): void
+    {
+        $run = $this->queuedRun();
+        $page = SourcePage::factory()->create();
+        $claims = app(SeasonvarPageClaimManager::class);
+        $token = $claims->claim($page, $run->id, 3600);
+        $job = new ImportSeasonvarSourcePage(
+            sourcePageId: $page->id,
+            importRunId: $run->id,
+            claimToken: (string) $token,
+            groupKey: 'seasonvar-title:1',
+        );
+
+        $job->failed(new RuntimeException('Retry window exhausted.'));
+        $job->failed(new RuntimeException('Duplicate failure callback.'));
+
+        $this->assertFalse($claims->owns($page->id, $run->id, (string) $token));
+        $this->assertSame(1, $run->fresh()->failed);
     }
 
     public function test_worker_releases_itself_when_title_lock_is_held(): void
@@ -209,8 +236,15 @@ class SeasonvarParallelImportTest extends TestCase
         $secondRun = app(SeasonvarQueuedImportDispatcher::class)->dispatch(discover: false);
 
         Queue::assertPushedOn('seasonvar-import', ImportSeasonvarSourcePage::class);
+        Queue::assertPushed(
+            ImportSeasonvarSourcePage::class,
+            fn (ImportSeasonvarSourcePage $job): bool => $job->afterCommit === true,
+        );
         Queue::assertPushedTimes(ImportSeasonvarSourcePage::class, 2);
-        Queue::assertPushed(FinalizeSeasonvarQueuedImport::class, 1);
+        Queue::assertPushed(
+            FinalizeSeasonvarQueuedImport::class,
+            fn (FinalizeSeasonvarQueuedImport $job): bool => $job->afterCommit === true,
+        );
         $this->assertSame(2, $run->fresh()->selected);
         $this->assertSame(2, SourcePage::query()->where('import_claim_run_id', $run->id)->count());
         $this->assertSame('completed', $secondRun->fresh()->status);

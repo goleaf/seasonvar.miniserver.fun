@@ -6,6 +6,7 @@ use App\View\ViewData\AppLayoutData;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View as ViewFacade;
@@ -43,8 +44,8 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('catalog-api', fn (Request $request): Limit => Limit::perMinute(60)->by($request->ip()));
 
-        Model::preventLazyLoading(! $this->app->isProduction());
-        Model::preventSilentlyDiscardingAttributes(! $this->app->isProduction());
+        Model::shouldBeStrict(! $this->app->isProduction());
+        DB::prohibitDestructiveCommands($this->app->isProduction());
 
         ViewFacade::composer('layouts.app', function (View $view): void {
             $view->with(app(AppLayoutData::class)->from($view->getData()));

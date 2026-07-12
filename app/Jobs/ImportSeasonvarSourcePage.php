@@ -85,7 +85,13 @@ class ImportSeasonvarSourcePage implements ShouldQueue
                 return;
             }
 
-            $result = $importer->parsePages(collect([$page]), null, $this->force, $this->importRunId);
+            $result = $importer->parsePages(
+                collect([$page]),
+                null,
+                $this->force,
+                $this->importRunId,
+                true,
+            );
             $runs->addCounters($this->importRunId, [
                 'parsed' => $result['parsed'],
                 'failed' => $result['failed'],
@@ -119,11 +125,15 @@ class ImportSeasonvarSourcePage implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        app(SeasonvarPageClaimManager::class)->release(
+        $released = app(SeasonvarPageClaimManager::class)->release(
             $this->sourcePageId,
             $this->importRunId,
             $this->claimToken,
         );
+
+        if ($released) {
+            app(SeasonvarImportRunRecorder::class)->addCounters($this->importRunId, ['failed' => 1]);
+        }
 
         Log::error('Страница Seasonvar не обработана queue worker.', [
             'source_page_id' => $this->sourcePageId,

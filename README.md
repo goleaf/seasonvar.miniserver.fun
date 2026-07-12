@@ -20,6 +20,7 @@ php artisan seasonvar:import
 php artisan seasonvar:import "https://seasonvar.ru/serial-615--Bez_sleda_pssmtlk-1-season.html" --force
 php artisan seasonvar:import --forever
 php artisan seasonvar:import --queued
+php artisan seasonvar:import --status
 php artisan integrations:doctor
 php artisan project:docs-refresh
 php artisan test --compact
@@ -84,7 +85,7 @@ php artisan seasonvar:import --queued
 
 ```bash
 systemctl --no-pager --type=service 'seasonvar-import-worker@*'
-php artisan queue:monitor redis:seasonvar-import --max=1000000
+php artisan seasonvar:import --status
 php artisan queue:failed
 journalctl -u 'seasonvar-import-worker@*' -f
 ```
@@ -92,7 +93,7 @@ journalctl -u 'seasonvar-import-worker@*' -f
 Остановить workers без удаления очереди и claims:
 
 ```bash
-sudo systemctl stop seasonvar-import-worker@{1..10}.service
+sudo systemctl stop 'seasonvar-import-worker@*.service'
 ```
 
 Продолжить обработку сохраненной очереди:
@@ -117,10 +118,11 @@ Workers должны постоянно работать под systemd, а cron
 sudo crontab -u www -e
 ```
 
-Добавьте одну строку:
+Добавьте две строки: первая запускает dispatcher десять раз в сутки, вторая каждые пять минут проверяет backlog и создаёт throttled warning при превышении порога:
 
 ```cron
 0 0,2,5,7,10,12,14,17,19,22 * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan seasonvar:import --queued >> storage/logs/seasonvar-cron.log 2>&1
+*/5 * * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan queue:monitor redis:seasonvar-import --max=5000 >> storage/logs/seasonvar-queue-monitor.log 2>&1
 ```
 
 Проверить установленное расписание:

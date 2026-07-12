@@ -43,6 +43,9 @@
 - `seasonvar:import` обновляет счетчики активного запуска после каждого обработанного chunk страницы или отдельного URL.
 - Queued-режим пишет задания в Redis-очередь `seasonvar-import`; десять workers не резервируют jobs в SQLite и выполняют внешние HTTP-запросы вне catalog transactions.
 - Диспетчер может запускаться десять раз в сутки, но живые lease и 24-часовой freshness interval не позволяют повторно ставить или скачивать свежую страницу при каждом cron tick.
+- Connection failures, HTTP 408/425/429/5xx и исчерпанная SQLite lock transaction повторяются Laravel worker с экспоненциальным backoff в ограниченном retry window. HTTP 404 и ошибки содержимого записываются как permanent result и не создают бессмысленный немедленный повтор.
+- Queue jobs отправляются только after commit. Worker имеет явные `--memory=256`, `--max-time=3600` и `--max-jobs=1000`, поэтому долгоживущий PHP-процесс регулярно освобождает накопленные ресурсы.
+- `seasonvar:import --status` использует Laravel 13 queue inspection methods и одним чтением показывает pending, delayed, reserved, oldest pending job, живые claims и последний queued run.
 - Страница состояния не должна ждать завершения длинного цикла, чтобы показать выбранные, обработанные, ошибочные и добавленные видео.
 - После завершения `seasonvar:import` команда принудительно обновляет stats snapshot, чтобы следующий Livewire poll показывал финальные счетчики запуска.
 - Регрессия закрыта тестом `SeasonvarImportMaintenanceTest::test_it_updates_import_run_counters_after_each_processed_page_chunk`.

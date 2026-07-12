@@ -68,7 +68,8 @@ class SeasonvarQueuedImportDispatcher
             FinalizeSeasonvarQueuedImport::dispatch($run->id)
                 ->onConnection((string) config('seasonvar.queue.connection', 'redis'))
                 ->onQueue((string) config('seasonvar.queue.queue', 'seasonvar-import'))
-                ->delay(now()->addSeconds(max(1, (int) config('seasonvar.queue.finalizer_delay_seconds', 60))));
+                ->delay(now()->addSeconds(max(1, (int) config('seasonvar.queue.finalizer_delay_seconds', 60))))
+                ->afterCommit();
 
             return $run->refresh();
         } catch (Throwable $exception) {
@@ -108,7 +109,8 @@ class SeasonvarQueuedImportDispatcher
                         force: $force,
                     )
                         ->onConnection((string) config('seasonvar.queue.connection', 'redis'))
-                        ->onQueue((string) config('seasonvar.queue.queue', 'seasonvar-import'));
+                        ->onQueue((string) config('seasonvar.queue.queue', 'seasonvar-import'))
+                        ->afterCommit();
                     $selected++;
                 } catch (Throwable) {
                     $this->claims->release((int) $page->id, (int) $run->id, $token);

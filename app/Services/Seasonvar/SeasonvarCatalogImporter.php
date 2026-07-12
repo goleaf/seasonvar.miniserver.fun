@@ -2,9 +2,12 @@
 
 namespace App\Services\Seasonvar;
 
+use App\Actions\Seasonvar\RecordSeasonvarPageFailure;
 use App\Enums\ContentAudience;
 use App\Enums\PublicationStatus;
 use App\Enums\ReleaseKind;
+use App\Enums\SeasonvarImportFailureType;
+use App\Exceptions\Seasonvar\SeasonvarSourceRequestException;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
 use App\Models\CatalogTitleRating;
@@ -40,6 +43,7 @@ class SeasonvarCatalogImporter
         private readonly SeasonvarCatalogRelationSyncer $relationSyncer,
         private readonly SeasonvarRelationMetadataNormalizer $relationMetadata,
         private readonly SeasonvarDatabaseTransaction $databaseTransaction,
+        private readonly RecordSeasonvarPageFailure $recordPageFailure,
     ) {}
 
     /**
@@ -264,8 +268,13 @@ class SeasonvarCatalogImporter
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return array{parsed: int, failed: int, media_attached: int, media_updated: int, media_skipped: int, media_failed: int, failures: list<string>}
      */
-    public function parsePages(Collection $pages, ?callable $progress = null, bool $force = false, ?int $importRunId = null): array
-    {
+    public function parsePages(
+        Collection $pages,
+        ?callable $progress = null,
+        bool $force = false,
+        ?int $importRunId = null,
+        bool $retryTransient = false,
+    ): array {
         $parsed = 0;
         $failed = 0;
         $mediaAttached = 0;
@@ -309,15 +318,7 @@ class SeasonvarCatalogImporter
                     'media_updated' => $mediaUpdated,
                 ]);
             } catch (Throwable $exception) {
-                $page->update([
-                    'parse_status' => 'failed',
-                    'import_status' => 'failed',
-                    'error_message' => $exception->getMessage(),
-                    'last_crawled_at' => now(),
-                    'retry_after_at' => now()->addMinutes($this->retryDelayMinutes($page)),
-                    'failure_count' => ((int) $page->failure_count) + 1,
-                    'last_import_run_id' => $importRunId,
-                ]);
+                $failureType = $this->recordPageFailure->handle($page, $exception, $importRunId);
                 $failed++;
                 $failures[] = "{$page->url} ({$exception->getMessage()})";
 
@@ -331,6 +332,10 @@ class SeasonvarCatalogImporter
                     'failed' => $failed,
                     'url' => $page->url,
                 ]);
+
+                if ($retryTransient && $failureType === SeasonvarImportFailureType::Transient) {
+                    throw $exception;
+                }
             }
         }
 
@@ -410,23 +415,13 @@ class SeasonvarCatalogImporter
         ]);
 
         if (! $response->successful()) {
-            $status = $response->status() === 404 ? 'gone' : 'failed';
-
-            $page->update([
-                'parse_status' => 'failed',
-                'import_status' => $status,
-                'error_message' => 'HTTP '.$response->status(),
-                'retry_after_at' => $response->status() === 404 ? now()->addDays(7) : now()->addMinutes($this->retryDelayMinutes($page)),
-                'failure_count' => ((int) $page->failure_count) + 1,
-            ]);
-
             $this->report($progress, 'page-parse-failed', [
                 'source_page_id' => $page->id,
                 'http_status' => $response->status(),
                 'url' => $page->url,
             ]);
 
-            throw new RuntimeException('HTTP '.$response->status());
+            throw SeasonvarSourceRequestException::forStatus($response->status());
         }
 
         $existingCatalogTitle = $this->findCatalogTitleBySourceUrlHash($page, $this->seasonvarUrl->hash($page->url));
@@ -1786,13 +1781,6 @@ class SeasonvarCatalogImporter
     private function parsedMediaExtension(string $url): string
     {
         return Str::lower(pathinfo((string) parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION));
-    }
-
-    private function retryDelayMinutes(SourcePage $page): int
-    {
-        $failures = max(0, (int) $page->failure_count);
-
-        return min(1440, 15 * (2 ** min($failures, 6)));
     }
 
     private function missingDataRetryAfter(): Carbon

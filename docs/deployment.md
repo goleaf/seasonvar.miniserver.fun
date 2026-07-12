@@ -61,6 +61,7 @@ Google-интеграции по умолчанию выключены. Если
 - `SEASONVAR_IMPORT_FAILURE_MAIL_TO` и `SEASONVAR_IMPORT_FAILURE_MAIL_TO_NAME` — optional получатель письма об ошибке queued import; пустое значение отключает отправку.
 - `SEASONVAR_QUEUE_CONNECTION=redis`, `SEASONVAR_QUEUE_NAME=seasonvar-import` и `SEASONVAR_QUEUE_LOCK_STORE=redis` — отдельная очередь и locks параллельного импортера.
 - `SEASONVAR_QUEUE_CLAIM_SECONDS=86400`, `SEASONVAR_QUEUE_WORKER_TIMEOUT=900` и `SEASONVAR_IMPORT_REFRESH_AFTER_HOURS=24` — lease, timeout и период повторной проверки источника.
+- `SEASONVAR_QUEUE_BUSY_THRESHOLD=5000` и `SEASONVAR_QUEUE_BUSY_LOG_SECONDS=3600` — порог backlog и минимальный интервал повторного warning в журнале.
 
 В коде приложения эти значения читаются через `config('seasonvar.*')`, `config('queue.*')`, `config('database.*')` и другие config-файлы, а не через прямой `env()`.
 
@@ -80,7 +81,7 @@ php artisan seasonvar:import --queued
 ```bash
 cd /www/wwwroot/seasonvar.miniserver.fun
 for worker in $(seq 1 10); do
-  nohup /usr/bin/php artisan queue:work redis --queue=seasonvar-import --sleep=1 --tries=0 --timeout=900 --max-time=3600 \
+  nohup /usr/bin/php artisan queue:work redis --queue=seasonvar-import --sleep=1 --tries=0 --timeout=900 --memory=256 --max-time=3600 \
     >> "storage/logs/seasonvar-worker-${worker}.log" 2>&1 &
 done
 ```
@@ -97,16 +98,19 @@ systemctl --no-pager --type=service 'seasonvar-import-worker@*'
 Управление и диагностика:
 
 ```bash
+sudo systemctl stop 'seasonvar-import-worker@*.service'
 sudo systemctl restart 'seasonvar-import-worker@*.service'
 journalctl -u 'seasonvar-import-worker@*' -f
+php artisan seasonvar:import --status
 php artisan queue:failed
 php artisan queue:retry all
 ```
 
-Добавьте в crontab пользователя `www` ровно одну строку с десятью запусками в сутки:
+Добавьте в crontab пользователя `www` dispatcher с десятью запусками в сутки и read-only монитор очереди каждые пять минут:
 
 ```cron
 0 0,2,5,7,10,12,14,17,19,22 * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan seasonvar:import --queued >> storage/logs/seasonvar-cron.log 2>&1
+*/5 * * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan queue:monitor redis:seasonvar-import --max=5000 >> storage/logs/seasonvar-queue-monitor.log 2>&1
 ```
 
 Повторный cron не дублирует живые jobs: coordinator lock сериализует постановку, page lease защищает конкретный URL, а Redis title lock сериализует сезоны одного сериала. Каждая просроченная страница запрашивается заново и сравнивается по `content_hash`; видео не скачивается.

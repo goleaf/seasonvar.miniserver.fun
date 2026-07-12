@@ -8,6 +8,7 @@ use App\Services\Catalog\CatalogStatsSnapshotCache;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use App\Services\Seasonvar\SeasonvarImportProcessInspector;
 use App\Services\Seasonvar\SeasonvarQueuedImportDispatcher;
+use App\Services\Seasonvar\SeasonvarQueueStatus;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -15,7 +16,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Throwable;
 
-#[Signature('seasonvar:import {url? : Ссылка страницы seasonvar.ru для обновления одного сериала} {--force : Обновить данные даже если страница не изменилась} {--forever : Работать циклами без остановки} {--sleep= : Пауза между циклами в секундах} {--no-discovery : Не обновлять карту сайта в этом запуске} {--queued : Поставить подходящие страницы в Redis-очередь для параллельной обработки}')]
+#[Signature('seasonvar:import {url? : Ссылка страницы seasonvar.ru для обновления одного сериала} {--force : Обновить данные даже если страница не изменилась} {--forever : Работать циклами без остановки} {--sleep= : Пауза между циклами в секундах} {--no-discovery : Не обновлять карту сайта в этом запуске} {--queued : Поставить подходящие страницы в Redis-очередь для параллельной обработки} {--status : Показать состояние Redis-очереди и последнего запуска без импорта}')]
 #[Description('Находит страницы seasonvar.ru, обновляет каталог, сезоны, серии и видео одной командой')]
 class ImportSeasonvar extends Command
 {
@@ -34,8 +35,13 @@ class ImportSeasonvar extends Command
         SeasonvarImportPipeline $pipeline,
         SeasonvarImportProcessInspector $processInspector,
         SeasonvarQueuedImportDispatcher $queuedDispatcher,
+        SeasonvarQueueStatus $queueStatus,
         CatalogStatsSnapshotCache $statsSnapshots,
     ): int {
+        if ((bool) $this->option('status')) {
+            return $this->handleStatus($queueStatus);
+        }
+
         if ((bool) $this->option('queued')) {
             return $this->handleQueued($queuedDispatcher);
         }
@@ -241,6 +247,30 @@ class ImportSeasonvar extends Command
         } finally {
             $lock->release();
         }
+    }
+
+    private function handleStatus(SeasonvarQueueStatus $queueStatus): int
+    {
+        $status = $queueStatus->read();
+        $oldestAge = $status->oldestPendingAgeSeconds();
+
+        $this->components->info('Очередь Seasonvar');
+        $this->table(['Показатель', 'Значение'], [
+            ['Подключение', $status->connection],
+            ['Очередь', $status->queue],
+            ['Ожидают обработки', $status->pending],
+            ['Отложены', $status->delayed],
+            ['Зарезервированы', $status->reserved],
+            ['Возраст старейшей job', $oldestAge === null ? 'нет' : $oldestAge.' сек.'],
+            ['Живые claims', $status->liveClaims],
+            ['Последний queued run', $status->runId === null ? 'нет' : '#'.$status->runId],
+            ['Статус run', $status->runStatus ?? 'нет'],
+            ['Выбрано страниц', $status->selected],
+            ['Обработано страниц', $status->parsed],
+            ['Ошибок страниц', $status->failed],
+        ]);
+
+        return self::SUCCESS;
     }
 
     private function registerSignalHandlers(): void

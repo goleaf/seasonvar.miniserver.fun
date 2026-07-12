@@ -26,6 +26,8 @@ return [
         'worker_timeout' => (int) env('SEASONVAR_QUEUE_WORKER_TIMEOUT', 900),
         'retry_window_seconds' => (int) env('SEASONVAR_QUEUE_RETRY_WINDOW_SECONDS', 21600),
         'finalizer_delay_seconds' => (int) env('SEASONVAR_QUEUE_FINALIZER_DELAY_SECONDS', 60),
+        'busy_threshold' => (int) env('SEASONVAR_QUEUE_BUSY_THRESHOLD', 5000),
+        'busy_log_seconds' => (int) env('SEASONVAR_QUEUE_BUSY_LOG_SECONDS', 3600),
     ],
     'media_check' => [
         'enabled' => filter_var(env('SEASONVAR_MEDIA_CHECK_ENABLED', true), FILTER_VALIDATE_BOOL),
