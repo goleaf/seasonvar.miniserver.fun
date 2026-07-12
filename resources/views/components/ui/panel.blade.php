@@ -10,7 +10,7 @@
             ])>
                 @if ($icon)
                     <span @class([
-                        'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100',
+                        'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-emerald-50 text-emerald-700',
                         'mt-0.5' => $subtitle,
                     ])>
                         <i class="{{ $icon }}" aria-hidden="true"></i>

@@ -19,7 +19,7 @@
     @if ($variantBadges->isNotEmpty())
         <div class="mt-2 flex flex-wrap gap-1">
             @foreach ($variantBadges as $badge)
-                <span class="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-500 ring-1 ring-slate-200">
+                <span class="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-500">
                     {{ $badge }}
                 </span>
             @endforeach

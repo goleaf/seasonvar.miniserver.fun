@@ -48,10 +48,10 @@ class EpisodeLink extends Component
     public function classes(): string
     {
         $stateClasses = $this->selected
-            ? 'bg-emerald-50 ring-emerald-200'
-            : 'bg-white ring-slate-200 hover:bg-emerald-50 hover:ring-emerald-200';
+            ? 'bg-emerald-50'
+            : 'bg-white hover:bg-emerald-50';
 
-        return 'block min-h-16 rounded-lg px-3 py-3 text-sm ring-1 transition '.$stateClasses;
+        return 'block min-h-16 rounded-lg px-3 py-3 text-sm transition '.$stateClasses;
     }
 
     /**

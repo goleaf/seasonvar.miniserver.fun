@@ -195,7 +195,7 @@
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($seoSections as $section)
                             @continue(($section['id'] ?? null) === 'discovery-signals' && ! request()->routeIs('stats'))
-                            <a href="#{{ $section['id'] }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                            <a href="#{{ $section['id'] }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
                                 <i class="fa-solid fa-bookmark text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                 <span itemprop="name">{{ $section['name'] }}</span>
                             </a>
@@ -219,7 +219,7 @@
                     @if (! empty($seo['related_links']))
                         <div class="mt-4 flex flex-wrap gap-2">
                             @foreach (collect($seo['related_links'])->filter()->take(14) as $link)
-                                <a href="{{ $link['url'] }}" class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-100">
+                                <a href="{{ $link['url'] }}" class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100">
                                     <i class="fa-solid fa-link text-[0.8em]" aria-hidden="true"></i>
                                     <span>{{ $link['name'] }}</span>
                                 </a>
@@ -236,7 +236,7 @@
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($topicTerms as $term)
-                            <a href="{{ $seoSearchUrl($term) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-100 hover:bg-emerald-50 hover:text-emerald-700 hover:ring-emerald-100">
+                            <a href="{{ $seoSearchUrl($term) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 hover:bg-emerald-50 hover:text-emerald-700">
                                 <i class="fa-solid fa-hashtag text-[0.8em] text-amber-500" aria-hidden="true"></i>
                                 <span itemprop="name">{{ $term }}</span>
                             </a>
@@ -270,7 +270,7 @@
                     </div>
                     <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                         @foreach ($seoIntents->take(16) as $intent)
-                            <a href="{{ $seoSearchUrl($intent) }}" itemprop="url" class="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700">
+                            <a href="{{ $seoSearchUrl($intent) }}" itemprop="url" class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
                                 <i class="fa-solid fa-arrow-up-right-from-square text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                 <span itemprop="name">{{ $intent }}</span>
                             </a>
@@ -286,7 +286,7 @@
                     </div>
                     <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                         @foreach ($longTailQueries->take(24) as $query)
-                            <a href="{{ $seoSearchUrl($query) }}" itemprop="url" class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700">
+                            <a href="{{ $seoSearchUrl($query) }}" itemprop="url" class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
                                 <i class="fa-solid fa-magnifying-glass text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                 <span itemprop="name">{{ $query }}</span>
                             </a>
@@ -302,7 +302,7 @@
                     </div>
                     <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         @foreach ($relatedCollections->take(18) as $collection)
-                            <a href="{{ $seoSearchUrl($collection['query']) }}" class="block rounded-lg border border-slate-200 bg-slate-50 p-3 hover:border-emerald-100 hover:bg-emerald-50" itemprop="hasPart" itemscope itemtype="https://schema.org/CollectionPage">
+                            <a href="{{ $seoSearchUrl($collection['query']) }}" class="block rounded-lg bg-slate-50 p-3 hover:bg-emerald-50" itemprop="hasPart" itemscope itemtype="https://schema.org/CollectionPage">
                                 <span class="flex items-center gap-2 text-sm font-bold text-slate-800" itemprop="name">
                                     <i class="fa-solid fa-folder-open text-[0.85em] text-emerald-700" aria-hidden="true"></i>
                                     {{ $collection['name'] }}
@@ -327,7 +327,7 @@
                                 <p class="mt-1 text-xs leading-5 text-slate-600">{{ $hub['description'] }}</p>
                                 <div class="mt-3 flex flex-wrap gap-2">
                                     @foreach ($hub['items'] as $item)
-                                        <a href="{{ $seoSearchUrl($item['query']) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                                        <a href="{{ $seoSearchUrl($item['query']) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
                                             <i class="fa-solid fa-link text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                             <span>{{ $item['name'] }}</span>
                                         </a>
@@ -346,7 +346,7 @@
                     </div>
                     <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                         @foreach ($seoActions->take(16) as $action)
-                            <a href="{{ $action['url'] }}" itemprop="url" class="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-emerald-100 hover:bg-emerald-50 hover:text-emerald-700">
+                            <a href="{{ $action['url'] }}" itemprop="url" class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
                                 <i class="fa-solid fa-circle-arrow-right text-[0.85em] text-emerald-700" aria-hidden="true"></i>
                                 <span itemprop="name">{{ $action['label'] ?? $action['name'] }}</span>
                             </a>
@@ -385,7 +385,7 @@
                             <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                 <div class="flex items-start justify-between gap-3">
                                     <h2 class="text-sm font-bold text-slate-800">{{ $signal['name'] }}</h2>
-                                    <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100">{{ $signal['value'] }}</span>
+                                    <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">{{ $signal['value'] }}</span>
                                 </div>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $signal['description'] }}</p>
                                 <a href="{{ $seoSearchUrl($signal['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
@@ -411,13 +411,13 @@
                                         <h2 class="text-sm font-bold text-slate-800">{{ $path['name'] }}</h2>
                                         <p class="mt-1 text-xs leading-5 text-slate-600">{{ $path['description'] }}</p>
                                     </div>
-                                    <a href="{{ $seoSearchUrl($path['query']) }}" class="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-100">
+                                    <a href="{{ $seoSearchUrl($path['query']) }}" class="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
                                         Открыть
                                     </a>
                                 </div>
                                 <div class="mt-3 flex flex-wrap gap-2">
                                     @foreach ($path['items'] as $item)
-                                        <a href="{{ $seoSearchUrl($item) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                                        <a href="{{ $seoSearchUrl($item) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
                                             <i class="fa-solid fa-compass text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                             <span>{{ $item }}</span>
                                         </a>
@@ -436,7 +436,7 @@
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($alsoSearches->take(36) as $query)
-                            <a href="{{ $seoSearchUrl($query) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                            <a href="{{ $seoSearchUrl($query) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
                                 <i class="fa-solid fa-magnifying-glass-plus text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                 <span itemprop="name">{{ $query }}</span>
                             </a>
@@ -478,7 +478,7 @@
                                 <p class="mt-1 text-xs leading-5 text-slate-600">{{ $group['description'] }}</p>
                                 <div class="mt-3 flex flex-wrap gap-2">
                                     @foreach ($group['items'] as $query)
-                                        <a href="{{ $seoSearchUrl($query) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                                        <a href="{{ $seoSearchUrl($query) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
                                             <i class="fa-solid fa-table-cells text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                             <span>{{ $query }}</span>
                                         </a>
@@ -558,7 +558,7 @@
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($russianQueryVariants->take(42) as $query)
-                            <a href="{{ $seoSearchUrl($query) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                            <a href="{{ $seoSearchUrl($query) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
                                 <i class="fa-solid fa-spell-check text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                 <span itemprop="name">{{ $query }}</span>
                             </a>
@@ -750,11 +750,11 @@
                     </div>
                     <div class="mt-3 grid gap-3 md:grid-cols-3">
                         @foreach (collect($seo['keyword_clusters'])->filter()->take(6) as $cluster)
-                            <div class="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
+                            <div class="rounded-lg bg-slate-50 p-3">
                                 <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ $cluster['title'] }}</div>
                                 <div class="mt-2 flex flex-wrap gap-1.5">
                                     @foreach (collect($cluster['items'] ?? [])->filter()->unique()->take(8) as $item)
-                                        <a href="{{ $seoSearchUrl($item) }}" class="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">{{ $item }}</a>
+                                        <a href="{{ $seoSearchUrl($item) }}" class="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">{{ $item }}</a>
                                     @endforeach
                                 </div>
                             </div>
@@ -770,7 +770,7 @@
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach (collect($seo['search_phrases'])->filter()->unique()->take(18) as $phrase)
-                            <a href="{{ $seoSearchUrl($phrase) }}" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                            <a href="{{ $seoSearchUrl($phrase) }}" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                                 <i class="fa-solid fa-key text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                 <span>{{ $phrase }}</span>
                             </a>

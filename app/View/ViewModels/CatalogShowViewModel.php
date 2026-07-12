@@ -145,6 +145,8 @@ class CatalogShowViewModel
 
     public ?int $selectedSeasonId;
 
+    public ?Season $selectedSeason;
+
     public int $episodeCount;
 
     public int $taxonomyCount;
@@ -208,6 +210,9 @@ class CatalogShowViewModel
         $this->selectedMediaBadges = $this->buildSelectedMediaBadges();
         $this->playbackOptionGroups = $this->buildPlaybackOptionGroups();
         $this->selectedSeasonId = $this->selectedEpisode?->season_id ?? $this->selectedMedia?->season_id;
+        $this->selectedSeason = $this->selectedSeasonId !== null
+            ? $this->seasons->firstWhere('id', $this->selectedSeasonId)
+            : null;
         $this->episodeCount = $episodeCount ?? $this->seasons->sum(fn (Season $season): int => $this->seasonEpisodeCount($season));
         $this->taxonomyCount = $taxonomyCount ?? $this->taxonomiesByType->sum(fn (Collection $items): int => $items->count());
         $this->mediaCount = $mediaCount ?? $this->mediaItems->count();

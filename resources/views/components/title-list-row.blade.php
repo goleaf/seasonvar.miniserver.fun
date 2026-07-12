@@ -16,23 +16,23 @@
 
                     <div class="flex shrink-0 flex-wrap gap-1.5 text-xs font-semibold lg:justify-end">
                         @if ($title->year)
-                            <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-500 ring-1 ring-slate-200">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-500">
                                 <i class="fa-solid fa-calendar-days text-[0.85em]" aria-hidden="true"></i>
                                 <span>{{ $title->year }}</span>
                             </span>
                         @endif
                         @if ($latestSeason)
-                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 ring-1 ring-emerald-100">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
                                 <i class="fa-solid fa-layer-group text-[0.85em]" aria-hidden="true"></i>
                                 <span>{{ $latestSeason->number }} сезон</span>
                             </span>
                         @endif
-                        <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700 ring-1 ring-sky-100">
+                        <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700">
                             <i class="fa-solid fa-circle-play text-[0.85em]" aria-hidden="true"></i>
                             <span>{{ $episodesCount }} серий</span>
                         </span>
                         @if ($mediaCount > 0)
-                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700 ring-1 ring-amber-100">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700">
                                 <i class="fa-solid fa-file-video text-[0.85em]" aria-hidden="true"></i>
                                 <span>{{ $mediaCount }} видео</span>
                             </span>
@@ -81,23 +81,23 @@
 
                     <div class="flex shrink-0 flex-wrap gap-2 text-xs font-semibold">
                         @if ($title->year)
-                            <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-500 ring-1 ring-slate-200">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-500">
                                 <i class="fa-solid fa-calendar-days text-[0.85em]" aria-hidden="true"></i>
                                 <span>{{ $title->year }}</span>
                             </span>
                         @endif
                         @unless ($compact)
-                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 ring-1 ring-emerald-100">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
                                 <i class="fa-solid fa-layer-group text-[0.85em]" aria-hidden="true"></i>
                                 <span>{{ $seasonsCount }} сезон(ов)</span>
                             </span>
                         @endunless
-                        <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700 ring-1 ring-sky-100">
+                        <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700">
                             <i class="fa-solid fa-circle-play text-[0.85em]" aria-hidden="true"></i>
                             <span>{{ $episodesCount }} серий</span>
                         </span>
                         @if ($mediaCount > 0)
-                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700 ring-1 ring-amber-100">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700">
                                 <i class="fa-solid fa-file-video text-[0.85em]" aria-hidden="true"></i>
                                 <span>{{ $mediaCount }} видео</span>
                             </span>

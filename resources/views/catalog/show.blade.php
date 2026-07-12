@@ -1,24 +1,105 @@
 @extends('layouts.app', ['title' => $seo['title'] ?? $title->title, 'seo' => $seo ?? []])
 
 @section('content')
-    <section class="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_300px]">
-        <div class="min-w-0 space-y-5">
-            <x-ui.panel data-title-hero :pad="false" class="overflow-hidden border-emerald-100">
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
-                    <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
-                        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
-                        <span>К каталогу</span>
-                    </a>
-                    <nav aria-label="Навигация по сериалу" class="flex flex-wrap gap-2">
-                        <a href="#player" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600">
+    <section class="grid min-w-0 gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
+        <aside class="space-y-4">
+            <x-ui.panel title="Быстрый доступ" icon="fa-solid fa-compass" :pad="false" class="h-full overflow-hidden border-emerald-100">
+                <div class="space-y-4 p-4">
+                    <nav aria-label="Быстрые переходы по сериалу" class="grid gap-2">
+                        <a href="#player" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-700 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-600">
                             <i class="fa-solid fa-circle-play" aria-hidden="true"></i>
                             <span>Смотреть</span>
                         </a>
-                        <a href="#seasons" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+
+                        <a href="#seasons" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                             <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
                             <span>Сезоны</span>
                         </a>
+
+                        @if ($showView->selectedSeason)
+                            <a href="#season-{{ $showView->selectedSeason->number }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
+                                <i class="fa-solid fa-flag-checkered" aria-hidden="true"></i>
+                                <span>Сезон {{ $showView->selectedSeason->number }}</span>
+                            </a>
+                        @endif
+
+                        <a href="#data-title-reference" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
+                            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                            <span>О сериале</span>
+                        </a>
                     </nav>
+
+                    <div class="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                            <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Сезонов</div>
+                            <div class="mt-1 text-lg font-black text-slate-800">{{ $showView->parsedSeasonCount }}</div>
+                        </div>
+
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                            <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Серий</div>
+                            <div class="mt-1 text-lg font-black text-slate-800">{{ $showView->episodeCount }}</div>
+                        </div>
+
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                            <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Видео</div>
+                            <div class="mt-1 text-lg font-black text-slate-800">{{ $showView->mediaCount }}</div>
+                        </div>
+                    </div>
+
+                    <div class="rounded-lg border border-slate-200 bg-white p-3">
+                        <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                            <i class="fa-solid fa-bolt text-emerald-700" aria-hidden="true"></i>
+                            <span>Сейчас открыто</span>
+                        </div>
+
+                        <div class="mt-3 space-y-2">
+                            @if ($selectedEpisode)
+                                <div class="text-sm font-semibold text-slate-700">
+                                    <span class="text-slate-500">Серия:</span>
+                                    <span>{{ $selectedEpisode->number }}</span>
+                                    @if ($selectedEpisode->title)
+                                        <span class="block text-xs font-medium text-slate-500">{{ $selectedEpisode->title }}</span>
+                                    @endif
+                                </div>
+                            @else
+                                <div class="text-sm text-slate-500">Серия не выбрана.</div>
+                            @endif
+
+                            @if ($showView->selectedSeason)
+                                <div class="text-sm font-semibold text-slate-700">
+                                    <span class="text-slate-500">Сезон:</span>
+                                    <span>{{ $showView->selectedSeason->number }}</span>
+                                </div>
+                            @endif
+
+                            @if ($showView->selectedMedia)
+                                <div class="flex flex-wrap gap-1.5 pt-1">
+                                    <x-ui.status-pill icon="fa-solid fa-file-video" variant="success" size="xs">
+                                        {{ $showView->selectedPlaybackLabel }}
+                                    </x-ui.status-pill>
+
+                                    @foreach ($showView->selectedMediaBadges as $badge)
+                                        <x-ui.status-pill variant="muted" size="xs">
+                                            {{ $badge }}
+                                        </x-ui.status-pill>
+                                    @endforeach
+                                </div>
+                            @elseif ($selectedEpisode)
+                                <div class="text-xs text-slate-500">Видео для этой серии пока не выбрано.</div>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </x-ui.panel>
+        </aside>
+
+        <div class="min-w-0 space-y-5">
+            <x-ui.panel data-title-hero :pad="false" class="overflow-hidden border-emerald-100">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
+                    <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
+                        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                        <span>К каталогу</span>
+                    </a>
                 </div>
 
                 <article class="grid gap-5 bg-gradient-to-br from-white via-white to-emerald-50 p-4 md:grid-cols-[minmax(150px,220px)_minmax(0,1fr)] md:p-5">
@@ -57,9 +138,9 @@
                             <nav aria-label="Сезоны сериала" class="mt-5 flex flex-wrap gap-2">
                                 @foreach ($seasons as $season)
                                     <a href="#season-{{ $season->number }}" @class([
-                                        'inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-bold ring-1',
-                                        'bg-emerald-50 text-emerald-700 ring-emerald-100' => $showView->isSelectedSeason($season, $loop->first),
-                                        'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700' => ! $showView->isSelectedSeason($season, $loop->first),
+                                        'inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-bold',
+                                        'bg-emerald-50 text-emerald-700' => $showView->isSelectedSeason($season, $loop->first),
+                                        'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $showView->isSelectedSeason($season, $loop->first),
                                     ])>
                                         <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
                                         <span>{{ $season->number }} сезон</span>
@@ -148,9 +229,9 @@
                                         <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                                             @foreach ($group['options'] as $option)
                                                 <a href="{{ $option['url'] }}" @class([
-                                                    'min-h-14 rounded-lg px-3 py-2 text-sm ring-1 transition',
-                                                    'bg-emerald-50 text-emerald-800 ring-emerald-200' => $option['active'],
-                                                    'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:ring-emerald-200' => ! $option['active'],
+                                                    'min-h-14 rounded-lg px-3 py-2 text-sm transition',
+                                                    'bg-emerald-50 text-emerald-800' => $option['active'],
+                                                    'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $option['active'],
                                                 ])>
                                                     <span class="flex items-start gap-2 font-bold">
                                                         <i class="{{ $option['icon'] }} mt-0.5 shrink-0" aria-hidden="true"></i>
@@ -290,7 +371,7 @@
                                         @endforeach
                                     </div>
                                 @else
-                                    <div class="rounded-lg bg-slate-50 p-4 text-sm text-slate-500 ring-1 ring-slate-200">
+                                    <div class="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
                                         Для этого сезона пока нет серий.
                                     </div>
                                 @endif
@@ -312,7 +393,7 @@
                                 @if ($recommendedTitleRecommendations->first()->reasonLabels() !== [])
                                     <div class="mt-2 flex flex-wrap gap-1 text-xs font-bold">
                                         @foreach ($recommendedTitleRecommendations->first()->reasonLabels() as $reasonLabel)
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 ring-1 ring-emerald-100">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
                                                 <i class="fa-solid fa-check text-[0.8em]" aria-hidden="true"></i>
                                                 <span>{{ $reasonLabel }}</span>
                                             </span>
@@ -335,7 +416,7 @@
                                                 @if ($recommendation->reasonLabels() !== [])
                                                     <div class="flex flex-wrap gap-1 px-3 pb-3 text-xs font-bold">
                                                         @foreach ($recommendation->reasonLabels() as $reasonLabel)
-                                                            <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-600 ring-1 ring-slate-200">
+                                                            <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-600">
                                                                 <i class="fa-solid fa-check text-[0.8em] text-emerald-700" aria-hidden="true"></i>
                                                                 <span>{{ $reasonLabel }}</span>
                                                             </span>
@@ -358,7 +439,7 @@
                                         @if ($recommendation->reasonLabels() !== [])
                                             <div class="mt-2 flex flex-wrap gap-1 text-xs font-bold">
                                                 @foreach ($recommendation->reasonLabels() as $reasonLabel)
-                                                    <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-600 ring-1 ring-slate-200">
+                                                    <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-600">
                                                         <i class="fa-solid fa-check text-[0.8em] text-emerald-700" aria-hidden="true"></i>
                                                         <span>{{ $reasonLabel }}</span>
                                                     </span>
@@ -437,9 +518,6 @@
                 </x-ui.panel>
             @endif
 
-        </div>
-
-        <aside class="space-y-4">
             <x-ui.panel title="Связи каталога" icon="fa-solid fa-diagram-project">
                 <div class="space-y-3">
                     @forelse ($taxonomyGroups as $taxonomyType => $taxonomies)
@@ -449,7 +527,7 @@
                                     <i class="{{ $taxonomyIcons[$taxonomyType] ?? 'fa-solid fa-tag' }} text-slate-400" aria-hidden="true"></i>
                                     <span>{{ $taxonomyLabels[$taxonomyType] ?? $taxonomyType }}</span>
                                 </span>
-                                <span class="rounded-full bg-slate-50 px-2 py-0.5 text-slate-500 ring-1 ring-slate-200">{{ $taxonomies->count() }}</span>
+                                <span class="rounded-full bg-slate-50 px-2 py-0.5 text-slate-500">{{ $taxonomies->count() }}</span>
                             </div>
                             <div class="flex flex-wrap gap-2">
                                 @foreach ($taxonomies as $taxonomy)
@@ -462,6 +540,6 @@
                     @endforelse
                 </div>
             </x-ui.panel>
-        </aside>
+        </div>
     </section>
 @endsection

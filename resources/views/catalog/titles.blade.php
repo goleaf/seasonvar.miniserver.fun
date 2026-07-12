@@ -13,9 +13,9 @@
                         <div class="space-y-1">
                             @forelse ($yearBuckets as $bucket)
                                 <a href="{{ route('titles.index', $filterView->isActiveYear($bucket) ? $filterView->yearQuery(null) : $filterView->yearQuery($filterView->bucketYear($bucket))) }}" @class([
-                                    'flex items-center justify-between rounded-lg px-3 py-2 text-sm ring-1 transition',
-                                    'bg-emerald-50 font-bold text-emerald-700 ring-emerald-100' => $filterView->isActiveYear($bucket),
-                                    'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveYear($bucket),
+                                    'flex items-center justify-between rounded-lg px-3 py-2 text-sm transition',
+                                    'bg-emerald-50 font-bold text-emerald-700' => $filterView->isActiveYear($bucket),
+                                    'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveYear($bucket),
                                 ])>
                                     <span class="inline-flex min-w-0 items-center gap-2">
                                         <i class="fa-solid fa-calendar-days shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
@@ -41,9 +41,9 @@
                             <div class="space-y-1">
                                 @forelse ($filterTaxonomies->get($filterType, collect()) as $taxonomy)
                                     <a href="{{ route('titles.index', $filterView->filterQuery($filterType, $filterView->isActiveTaxonomy($filterType, $taxonomy) ? null : $taxonomy->slug)) }}" @class([
-                                        'flex items-center justify-between rounded-lg px-3 py-2 text-sm ring-1 transition',
-                                        'bg-emerald-50 font-bold text-emerald-700 ring-emerald-100' => $filterView->isActiveTaxonomy($filterType, $taxonomy),
-                                        'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveTaxonomy($filterType, $taxonomy),
+                                        'flex items-center justify-between rounded-lg px-3 py-2 text-sm transition',
+                                        'bg-emerald-50 font-bold text-emerald-700' => $filterView->isActiveTaxonomy($filterType, $taxonomy),
+                                        'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveTaxonomy($filterType, $taxonomy),
                                     ])>
                                         <span class="inline-flex min-w-0 items-center gap-2">
                                             <i class="{{ $filterView->icon($filterType) }} shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
@@ -74,7 +74,7 @@
                         </h1>
                         <p class="mt-2 text-sm text-slate-500">{{ $seo['lead'] ?? 'Поиск по названиям, описаниям, актерам, жанрам и связям каталога.' }}</p>
 
-                        <a href="#catalog-filters" class="mt-3 inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-50 lg:hidden">
+                        <a href="#catalog-filters" class="mt-3 inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 lg:hidden">
                             <i class="fa-solid fa-sliders" aria-hidden="true"></i>
                             <span>К фильтрам</span>
                         </a>
@@ -160,7 +160,7 @@
                             placeholder="Название, описание или тег"
                             container-class="min-w-0 flex-1"
                         />
-                        <button class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-100">
+                        <button class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100">
                             <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
                             <span>Найти</span>
                         </button>
@@ -194,9 +194,9 @@
                 <div class="mt-4 flex flex-wrap gap-2">
                     @foreach ($filterView->sortLabels as $sortKey => $sortLabel)
                         <a href="{{ route('titles.index', $filterView->sortQuery($sortKey)) }}" @class([
-                            'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ring-1',
-                            'bg-emerald-50 text-emerald-700 ring-emerald-100' => $filterView->isActiveSort($sortKey),
-                            'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveSort($sortKey),
+                            'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold',
+                            'bg-emerald-50 text-emerald-700' => $filterView->isActiveSort($sortKey),
+                            'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveSort($sortKey),
                         ])>
                             <i class="{{ $filterView->sortIcon($sortKey) }}" aria-hidden="true"></i>
                             <span>{{ $sortLabel }}</span>
@@ -208,17 +208,17 @@
                     <span class="text-slate-400">Вид:</span>
                     @foreach (['grid' => 'Карточки', 'list' => 'Список'] as $viewKey => $viewLabel)
                         <a href="{{ route('titles.index', $filterView->viewQuery($viewKey)) }}" @class([
-                            'rounded-full px-2.5 py-1 ring-1',
-                            'bg-emerald-50 text-emerald-700 ring-emerald-100' => $view === $viewKey,
-                            'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700' => $view !== $viewKey,
+                            'rounded-full px-2.5 py-1',
+                            'bg-emerald-50 text-emerald-700' => $view === $viewKey,
+                            'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $view !== $viewKey,
                         ])>{{ $viewLabel }}</a>
                     @endforeach
                     <span class="ml-2 text-slate-400">На странице:</span>
                     @foreach ([24, 48, 96] as $pageSize)
                         <a href="{{ route('titles.index', $filterView->perPageQuery($pageSize)) }}" @class([
-                            'rounded-full px-2.5 py-1 ring-1',
-                            'bg-emerald-50 text-emerald-700 ring-emerald-100' => $perPage === $pageSize,
-                            'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700' => $perPage !== $pageSize,
+                            'rounded-full px-2.5 py-1',
+                            'bg-emerald-50 text-emerald-700' => $perPage === $pageSize,
+                            'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $perPage !== $pageSize,
                         ])>{{ $pageSize }}</a>
                     @endforeach
                 </div>
@@ -227,9 +227,9 @@
                     <span class="mr-1 text-xs font-bold uppercase tracking-wide text-slate-400">Алфавит:</span>
                     @foreach ($filterView->alphabet as $letter)
                         <a href="{{ route('titles.index', $filterView->alphabetQuery($letter)) }}" @class([
-                            'inline-flex min-h-9 min-w-9 items-center justify-center rounded-full px-2 text-xs font-bold ring-1 transition',
-                            'bg-emerald-50 text-emerald-700 ring-emerald-100' => $filterView->isActiveLetter($letter),
-                            'bg-white text-slate-600 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveLetter($letter),
+                            'inline-flex min-h-9 min-w-9 items-center justify-center rounded-full px-2 text-xs font-bold transition',
+                            'bg-emerald-50 text-emerald-700' => $filterView->isActiveLetter($letter),
+                            'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveLetter($letter),
                         ])>{{ $letter === 'latin' ? 'A–Z' : $letter }}</a>
                     @endforeach
                 </nav>
@@ -393,18 +393,18 @@
                             </div>
                             <div class="flex flex-wrap gap-2">
                                 @if ($search !== '')
-                                    <a href="{{ route('titles.index', $filterView->withoutSearchQuery) }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-4 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                                    <a href="{{ route('titles.index', $filterView->withoutSearchQuery) }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                                         <i class="fa-solid fa-magnifying-glass-minus" aria-hidden="true"></i>
                                         <span>Очистить поиск</span>
                                     </a>
                                 @endif
                                 @if ($filterView->hasActiveFilters() || $titleContext !== null || $year !== null || $invalidYear)
-                                    <a href="{{ route('titles.index', $filterView->withoutFiltersQuery) }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-4 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                                    <a href="{{ route('titles.index', $filterView->withoutFiltersQuery) }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                                         <i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i>
                                         <span>Сбросить фильтры</span>
                                     </a>
                                 @endif
-                                <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-100">
+                                <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100">
                                     <i class="fa-solid fa-table-cells-large" aria-hidden="true"></i>
                                     <span>Показать весь каталог</span>
                                 </a>

@@ -6,7 +6,7 @@
             <div class="grid gap-5 bg-gradient-to-br from-white via-emerald-50 to-cyan-50 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
                 <div class="min-w-0">
                     <h1 class="flex items-start gap-3 text-3xl font-black tracking-tight text-slate-800 sm:text-4xl">
-                        <span class="grid h-11 w-11 shrink-0 place-items-center rounded-control bg-white text-lg text-emerald-700 shadow-sm ring-1 ring-emerald-100">
+                        <span class="grid h-11 w-11 shrink-0 place-items-center rounded-control bg-white text-lg text-emerald-700 shadow-sm">
                             <i class="fa-solid fa-clapperboard" aria-hidden="true"></i>
                         </span>
                         <span>Сериалы онлайн</span>
@@ -33,16 +33,16 @@
                 </div>
 
                 <nav aria-label="Быстрые переходы" class="flex flex-wrap gap-2 lg:max-w-sm lg:justify-end">
-                    <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 shadow-sm ring-1 ring-emerald-100 hover:bg-emerald-100">
+                    <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 shadow-sm hover:bg-emerald-50">
                         <i class="fa-solid fa-table-cells-large" aria-hidden="true"></i>
                         <span>Все сериалы</span>
                     </a>
-                    <a href="{{ route('titles.year', ['year' => now()->year]) }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-sky-700 shadow-sm ring-1 ring-sky-100 hover:bg-sky-50">
+                    <a href="{{ route('titles.year', ['year' => now()->year]) }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-sky-700 shadow-sm hover:bg-sky-50">
                         <i class="fa-solid fa-sparkles" aria-hidden="true"></i>
                         <span>Новинки</span>
                     </a>
                     @if (($subtitleTag?->catalog_titles_count ?? 0) > 0)
-                        <a href="{{ route('titles.index', ['tag' => 'subtitry']) }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-amber-700 shadow-sm ring-1 ring-amber-100 hover:bg-amber-50">
+                        <a href="{{ route('titles.index', ['tag' => 'subtitry']) }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-amber-700 shadow-sm hover:bg-amber-50">
                             <i class="fa-solid fa-closed-captioning" aria-hidden="true"></i>
                             <span>С субтитрами</span>
                         </a>
@@ -83,19 +83,19 @@
                                         <div class="font-bold leading-5 text-slate-700 group-hover:text-emerald-700">{{ $media->catalogTitle->title }}</div>
                                         <div class="mt-2 flex flex-wrap gap-1 text-xs font-semibold">
                                             @if ($media->season)
-                                                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700 ring-1 ring-emerald-100">
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
                                                     <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
                                                     <span>Сезон {{ $media->season->number }}</span>
                                                 </span>
                                             @endif
                                             @if ($media->episode)
-                                                <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700 ring-1 ring-sky-100">
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700">
                                                     <i class="fa-solid fa-list-ol" aria-hidden="true"></i>
                                                     <span>{{ $media->episode->number }} серия</span>
                                                 </span>
                                             @endif
                                             @if ($media->quality)
-                                                <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700 ring-1 ring-amber-100">
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700">
                                                     <i class="fa-solid fa-display" aria-hidden="true"></i>
                                                     <span>{{ strtoupper($media->quality) }}</span>
                                                 </span>
@@ -150,16 +150,16 @@
             <aside class="space-y-4 xl:order-1">
                 <x-ui.panel title="Навигация" icon="fa-solid fa-compass">
                     <nav class="space-y-2">
-                        <a href="{{ route('titles.index') }}" class="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-100">
+                        <a href="{{ route('titles.index') }}" class="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100">
                             <i class="fa-solid fa-list" aria-hidden="true"></i>
                             <span>Все сериалы</span>
                         </a>
-                        <a href="{{ route('titles.year', ['year' => now()->year]) }}" class="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                        <a href="{{ route('titles.year', ['year' => now()->year]) }}" class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                             <i class="fa-solid fa-star" aria-hidden="true"></i>
                             <span>Новинки</span>
                         </a>
                         @if (($subtitleTag?->catalog_titles_count ?? 0) > 0)
-                            <a href="{{ route('titles.index', ['tag' => 'subtitry']) }}" class="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                            <a href="{{ route('titles.index', ['tag' => 'subtitry']) }}" class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                                 <span class="inline-flex items-center gap-2">
                                     <i class="fa-solid fa-closed-captioning" aria-hidden="true"></i>
                                     <span>С субтитрами</span>
@@ -169,7 +169,7 @@
                         @else
                             <x-ui.taxonomy-chip muted count="0" icon="fa-solid fa-closed-captioning">С субтитрами</x-ui.taxonomy-chip>
                         @endif
-                        <a href="{{ route('titles.index', ['genre' => 'otecestvennye']) }}" class="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                        <a href="{{ route('titles.index', ['genre' => 'otecestvennye']) }}" class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                             <i class="fa-solid fa-flag" aria-hidden="true"></i>
                             <span>Отечественные</span>
                         </a>
@@ -179,7 +179,7 @@
                 <x-ui.panel title="Страны" icon="fa-solid fa-earth-europe">
                     <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
                         @forelse ($countries->take(12) as $country)
-                            <a href="{{ route('titles.taxonomy', ['type' => $country->filterType(), 'taxonomy' => $country->slug]) }}" class="flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-control bg-white px-3 py-2 text-sm text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                            <a href="{{ route('titles.taxonomy', ['type' => $country->filterType(), 'taxonomy' => $country->slug]) }}" class="flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                                 <span class="inline-flex min-w-0 items-center gap-2">
                                     <i class="fa-solid fa-earth-europe text-slate-400" aria-hidden="true"></i>
                                     <span class="min-w-0 break-words">{{ $country->name }}</span>
@@ -198,7 +198,7 @@
                             </summary>
                             <div class="grid gap-2 border-t border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-1">
                                 @foreach ($countries->skip(12) as $country)
-                                    <a href="{{ route('titles.taxonomy', ['type' => $country->filterType(), 'taxonomy' => $country->slug]) }}" class="flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-control bg-white px-3 py-2 text-sm text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                                    <a href="{{ route('titles.taxonomy', ['type' => $country->filterType(), 'taxonomy' => $country->slug]) }}" class="flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                                         <span class="inline-flex min-w-0 items-center gap-2">
                                             <i class="fa-solid fa-earth-europe text-slate-400" aria-hidden="true"></i>
                                             <span class="min-w-0 break-words">{{ $country->name }}</span>
@@ -224,7 +224,7 @@
                 <x-ui.panel title="Годы" icon="fa-solid fa-calendar-days">
                     <div class="flex flex-wrap gap-2">
                         @forelse ($yearBuckets as $bucket)
-                            <a href="{{ route('titles.year', ['year' => $bucket->year]) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                            <a href="{{ route('titles.year', ['year' => $bucket->year]) }}" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                                 <i class="fa-solid fa-calendar-days text-[0.8em] text-slate-400" aria-hidden="true"></i>
                                 <span>{{ $bucket->year }}</span>
                                 <span class="text-slate-400">{{ $bucket->titles_count }}</span>

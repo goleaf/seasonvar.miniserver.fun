@@ -8,7 +8,7 @@
         </div>
 
         @if ($icon)
-            <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100">
+            <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-emerald-50 text-emerald-700">
                 <i class="{{ $icon }}" aria-hidden="true"></i>
             </span>
         @endif

@@ -3,7 +3,7 @@
 <header data-site-header {{ $attributes->class(['border-b border-slate-200 bg-white shadow-panel lg:sticky lg:top-0 lg:z-50']) }}>
     <div class="mx-auto grid max-w-[1760px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-3 sm:px-6 lg:grid-cols-[auto_minmax(280px,1fr)_auto] lg:px-8">
         <a href="{{ route('home') }}" class="order-1 flex min-w-0 items-center gap-3 rounded-control">
-            <span class="grid h-11 w-11 shrink-0 place-items-center rounded-control bg-emerald-50 text-lg text-emerald-700 ring-1 ring-emerald-100">
+            <span class="grid h-11 w-11 shrink-0 place-items-center rounded-control bg-emerald-50 text-lg text-emerald-700">
                 <i class="fa-solid fa-film" aria-hidden="true"></i>
             </span>
             <span class="min-w-0 break-words text-lg font-black tracking-tight text-slate-800">{{ $siteName }}</span>
@@ -28,7 +28,7 @@
         <nav aria-label="Основная навигация" class="order-2 flex items-center gap-1.5 text-sm font-bold lg:order-3">
             <a href="{{ route('home') }}" @class([
                 'inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2',
-                'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100' => request()->routeIs('home'),
+                'bg-emerald-50 text-emerald-700' => request()->routeIs('home'),
                 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('home'),
             ]) @if (request()->routeIs('home')) aria-current="page" @endif>
                 <i class="fa-solid fa-house" aria-hidden="true"></i>
@@ -36,7 +36,7 @@
             </a>
             <a href="{{ route('titles.index') }}" @class([
                 'inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2',
-                'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100' => request()->routeIs('titles.*'),
+                'bg-emerald-50 text-emerald-700' => request()->routeIs('titles.*'),
                 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('titles.*'),
             ]) @if (request()->routeIs('titles.*')) aria-current="page" @endif>
                 <i class="fa-solid fa-table-cells-large" aria-hidden="true"></i>

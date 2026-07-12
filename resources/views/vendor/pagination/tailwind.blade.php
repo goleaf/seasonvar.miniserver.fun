@@ -8,12 +8,12 @@
 
         <div class="flex flex-wrap items-center gap-1.5">
             @if ($paginator->onFirstPage())
-                <span aria-disabled="true" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-400 ring-1 ring-slate-200">
+                <span aria-disabled="true" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-400">
                     <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
                     <span>{{ __('pagination.previous') }}</span>
                 </span>
             @else
-                <a href="{{ $paginator->previousPageUrl() }}" rel="prev" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                <a href="{{ $paginator->previousPageUrl() }}" rel="prev" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                     <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
                     <span>{{ __('pagination.previous') }}</span>
                 </a>
@@ -29,19 +29,19 @@
                         @if ($page === $paginator->currentPage())
                             <span aria-current="page" class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control bg-emerald-700 px-3 py-2 text-sm font-black text-white">{{ $page }}</span>
                         @else
-                            <a href="{{ $url }}" aria-label="Страница {{ $page }}" class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">{{ $page }}</a>
+                            <a href="{{ $url }}" aria-label="Страница {{ $page }}" class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">{{ $page }}</a>
                         @endif
                     @endforeach
                 @endif
             @endforeach
 
             @if ($paginator->hasMorePages())
-                <a href="{{ $paginator->nextPageUrl() }}" rel="next" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-emerald-50 hover:text-emerald-700">
+                <a href="{{ $paginator->nextPageUrl() }}" rel="next" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                     <span>{{ __('pagination.next') }}</span>
                     <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
                 </a>
             @else
-                <span aria-disabled="true" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-400 ring-1 ring-slate-200">
+                <span aria-disabled="true" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-400">
                     <span>{{ __('pagination.next') }}</span>
                     <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
                 </span>

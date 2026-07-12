@@ -2,6 +2,7 @@
 
 ## 2026-07-09
 
+- Убраны декоративные обводки у текстовых ссылок, taxonomy/status chips, боковых меню, фильтров, сортировок, пагинации, SEO-query links и `/stats` badges; правило закреплено в `docs/UI_STANDARDS.md`, структурные рамки панелей/карточек/форм сохранены.
 - Доведена нормализация query-state каталога: `/titles` больше не читает `$filterView->catalogQueryState[...]` из Blade, scalar-поля идут через `CatalogTitlesViewModel::scalarState()`, list-поля — через `listState()`.
 - Пустые display-значения расширенных фильтров `/titles` больше не создают активные chips, даже если raw query-key присутствует в URL.
 - Активные расширенные фильтры `/titles` теперь раскрывают блок `<details>` сразу, чтобы состояние URL было видно без дополнительного клика.
