@@ -3,6 +3,8 @@
 ## 13.07.2026 — Централизованная выдача playback source
 
 - Raw provider URLs удалены из HTML и Livewire payload; плеер использует короткоживущий signed endpoint с viewer binding и rate limit.
+- Plyr/HLS переведён на одну guarded browser-session для точного `title:episode:media`: AbortController освобождает listeners/timers/resources при Livewire morph и навигации, generation token отменяет stale async init, progress сохраняется bounded heartbeat/lifecycle flush-ами, а старый session key не может записать прогресс новой серии. При уничтожении lifecycle-маркеры очищаются и с восстановленного Plyr media node; это проверено повторной навигацией, Back/Forward, сменой серии и мобильной ориентацией без duplicate instance и stale progress event.
+- Добавлены безопасные русские loading/buffering/retry/expired/unavailable/fatal состояния и локальная retry-кнопка без provider URL или текста исключений.
 - Video sitemap переведен с raw `video:content_loc` на внутренний `video:player_loc`, который проходит ту же server-side playback boundary.
 - На resolve и direct access повторяются publication/audience/window и hierarchy checks; известные failures исключаются из публичных counts и автоматического выбора.
 - Проверка внешнего media URL использует общий HTTPS/DNS allowlist, запрещает redirects, работает в stream mode с Range/timeouts/size bound и не пишет полный URL или exception message в события.

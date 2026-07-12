@@ -42,6 +42,38 @@ class SeasonvarCatalogParserTest extends TestCase
         $this->assertSame('https://seasonvar.ru/serial-1276--6_kadrov-1-season.html', $data['seasons'][0]['source_url']);
     }
 
+    public function test_it_keeps_the_canonical_current_season_when_the_list_only_links_other_seasons(): void
+    {
+        $parser = app(SeasonvarCatalogParser::class);
+
+        $data = $parser->parse(
+            <<<'HTML'
+            <html>
+                <head><title>Цени каждый день смотреть онлайн</title></head>
+                <body>
+                    <h1>Цени каждый день/Cherish the Day</h1>
+                    <div class="pgs-seaslist">
+                        <a href="/serial-24914-TCeni_kazhdyj_den__psakpir-2-season.html">2 сезон</a>
+                    </div>
+                    <script>
+                        var arEpisodes = [{"1_seriya":{"n":"1","next":"2"},"2_seriya":{"n":"2"}}];
+                    </script>
+                </body>
+            </html>
+            HTML,
+            'https://seasonvar.ru/serial-24914-TCeni_kazhdyj_den__psakpir.html',
+        );
+
+        $this->assertSame(1, $data['current_season_number']);
+        $this->assertSame([1, 2], collect($data['seasons'])->pluck('number')->all());
+        $this->assertSame('Сезон 1', $data['seasons'][0]['title']);
+        $this->assertSame(
+            'https://seasonvar.ru/serial-24914-TCeni_kazhdyj_den__psakpir.html',
+            $data['seasons'][0]['source_url'],
+        );
+        $this->assertSame([1, 1], collect($data['episodes'])->pluck('season_number')->all());
+    }
+
     public function test_it_extracts_public_media_candidates_from_page_scripts(): void
     {
         $parser = app(SeasonvarCatalogParser::class);

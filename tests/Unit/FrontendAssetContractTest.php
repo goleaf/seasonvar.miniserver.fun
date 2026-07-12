@@ -30,4 +30,36 @@ class FrontendAssetContractTest extends TestCase
         $this->assertStringContainsString('registry=https://registry.npmjs.org/', $npmConfig);
         $this->assertStringNotContainsString('registry.npmmirror.com', $npmLock);
     }
+
+    public function test_player_assets_define_one_cleanup_safe_livewire_session_lifecycle(): void
+    {
+        $app = File::get(resource_path('js/app.js'));
+        $player = File::get(resource_path('js/player.js'));
+
+        $this->assertStringContainsString('class CatalogPlayerSession', $player);
+        $this->assertStringContainsString('const playerSessions = new WeakMap()', $player);
+        $this->assertStringContainsString('new AbortController()', $player);
+        $this->assertStringContainsString('PROGRESS_HEARTBEAT_MS = 30_000', $player);
+        $this->assertStringContainsString('STABLE_SEEK_DELAY_MS = 750', $player);
+        $this->assertStringContainsString("addEventListener('play'", $player);
+        $this->assertStringContainsString("addEventListener('pause'", $player);
+        $this->assertStringContainsString("addEventListener('seeking'", $player);
+        $this->assertStringContainsString("addEventListener('seeked'", $player);
+        $this->assertStringContainsString("addEventListener('timeupdate'", $player);
+        $this->assertStringContainsString("addEventListener('ended'", $player);
+        $this->assertStringContainsString("addEventListener('error'", $player);
+        $this->assertStringContainsString("addEventListener('visibilitychange'", $player);
+        $this->assertStringContainsString('setInterval(', $player);
+        $this->assertStringContainsString('destroyCatalogPlayersWithin', $player);
+        $this->assertStringContainsString('flushCatalogPlayersWithin', $player);
+        $this->assertStringContainsString('this.plyr.destroy(function ()', $player);
+        $this->assertStringContainsString('clearPlayerMarkers(this)', $player);
+        $this->assertStringContainsString("'Ссылка на просмотр устарела.'", $player);
+        $this->assertStringNotContainsString('._catalogHls', $app.$player);
+        $this->assertStringNotContainsString('._catalogPlyr', $app.$player);
+        $this->assertStringContainsString("'livewire:navigating'", $app);
+        $this->assertStringContainsString("'livewire:navigated'", $app);
+        $this->assertStringContainsString("'pagehide'", $app);
+        $this->assertStringContainsString("'pageshow'", $app);
+    }
 }

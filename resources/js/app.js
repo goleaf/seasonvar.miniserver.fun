@@ -3,29 +3,35 @@ import '@fortawesome/fontawesome-free/css/solid.min.css';
 import '@fortawesome/fontawesome-free/css/regular.min.css';
 import '../css/app.css';
 
-const loadCatalogPlayers = async () => {
-    if (!document.querySelector('video.js-catalog-player:not([data-player-ready])')) {
-        return;
-    }
+let catalogPlayerModule = null;
+let catalogPlayerModulePromise = null;
 
-    const { initializeCatalogPlayers } = await import('./player.js');
+const loadCatalogPlayerModule = async () => {
+    catalogPlayerModulePromise ??= import('./player.js').then((module) => {
+        catalogPlayerModule = module;
 
-    await initializeCatalogPlayers();
+        return module;
+    });
+
+    return catalogPlayerModulePromise;
 };
 
-const destroyCatalogPlayersWithin = (element) => {
-    if (!(element instanceof Element)) {
+const loadCatalogPlayers = async (root = document) => {
+    if (!root.querySelector?.('video.js-catalog-player:not([data-player-ready]):not([data-player-failed])')) {
         return;
     }
 
-    const videos = element.matches('video.js-catalog-player')
-        ? [element]
-        : [...element.querySelectorAll('video.js-catalog-player')];
+    const playerModule = await loadCatalogPlayerModule();
 
-    videos.forEach((video) => {
-        video._catalogHls?.destroy();
-        video._catalogPlyr?.destroy();
-    });
+    await playerModule.initializeCatalogPlayers(root);
+};
+
+const flushCatalogPlayersWithin = (root, reason) => {
+    catalogPlayerModule?.flushCatalogPlayersWithin(root, reason);
+};
+
+const destroyCatalogPlayersWithin = (root, options = {}) => {
+    catalogPlayerModule?.destroyCatalogPlayersWithin(root, options);
 };
 
 const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -227,4 +233,28 @@ document.addEventListener('livewire:init', () => {
     window.Livewire.hook('morph.removing', ({ el }) => {
         destroyCatalogPlayersWithin(el);
     });
+});
+
+document.addEventListener('livewire:navigating', () => {
+    flushCatalogPlayersWithin(document, 'navigation');
+    destroyCatalogPlayersWithin(document, { flush: false });
+});
+
+document.addEventListener('livewire:navigated', () => {
+    void loadCatalogPlayers();
+});
+
+window.addEventListener('pagehide', () => {
+    flushCatalogPlayersWithin(document, 'pagehide');
+    destroyCatalogPlayersWithin(document, { flush: false });
+});
+
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+        void loadCatalogPlayers();
+    }
+});
+
+window.addEventListener('beforeunload', () => {
+    flushCatalogPlayersWithin(document, 'beforeunload');
 });

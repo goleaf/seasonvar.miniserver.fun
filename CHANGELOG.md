@@ -2,6 +2,7 @@
 
 ## 2026-07-13
 
+- Rebuilt the Plyr/HLS browser lifecycle around one guarded session per signed source: async initialization is generation-safe, listeners/timers/resources share AbortController cleanup, progress uses a playing-only heartbeat plus bounded lifecycle flushes, stale Livewire session events are rejected, and fixed Russian loading/retry/error states reveal no provider details. Cleanup also clears markers from the original media node restored by Plyr so Livewire navigation and the browser back-forward cache can initialize it exactly once again.
 - Centralized playback authorization and source selection in `CatalogPlaybackSourceResolver`: Blade/Livewire now receive a short-lived signed, viewer-bound internal URL instead of the stored provider URL, direct access rechecks the complete publication hierarchy and source ownership, and video sitemaps publish only internal player locations.
 - Added provider/format/quality preference ranking, known-failure exclusion from public episode media/counts, explicit Russian playback availability states, an HTTPS/DNS provider allowlist, redirect-free streamed availability probes, bounded response metadata, redacted probe events, and playback endpoint throttling.
 - Added publication-aware previous/next episode navigation to the Livewire title player. Navigation stays inside the current regular/special release lane, crosses into the next or previous visible season, skips inaccessible or source-less episodes, and keeps season state shareable in the URL.

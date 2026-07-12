@@ -1,7 +1,12 @@
 <div
     id="player"
     class="scroll-mt-40 space-y-5 sm:scroll-mt-44 lg:scroll-mt-48"
-    x-on:catalog-progress="$wire.recordProgress($event.detail.episodeId, $event.detail.positionSeconds, $event.detail.durationSeconds, $event.detail.completed)"
+    data-active-player-session="{{ $playerSessionKey }}"
+    x-on:catalog-progress="
+        if ($event.detail.sessionKey === $el.dataset.activePlayerSession) {
+            $wire.recordProgress($event.detail.episodeId, $event.detail.positionSeconds, $event.detail.durationSeconds, $event.detail.completed);
+        }
+    "
     x-on:click.capture="if ($event.target.closest('[data-catalog-history]')) window.history.pushState({}, '', window.location.href)"
     x-on:popstate.window="
         const targetUrl = window.location.href;
@@ -54,14 +59,38 @@
                     <div
                         wire:key="catalog-player-media-shell-{{ $selectedMedia->id }}"
                         wire:ignore
+                        data-player-shell
+                        data-player-state="loading"
                         class="mt-3 overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50"
                     >
+                        <div
+                            id="catalog-player-status-{{ $selectedMedia->id }}"
+                            data-player-status
+                            hidden
+                            aria-live="polite"
+                            class="flex min-h-11 flex-wrap items-center justify-between gap-2 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800"
+                        >
+                            <span class="inline-flex items-center gap-2">
+                                <i data-player-status-icon class="fa-solid fa-circle-notch fa-spin text-emerald-700" aria-hidden="true"></i>
+                                <span data-player-status-text>Подготавливаем видео…</span>
+                            </span>
+                            <button
+                                type="button"
+                                data-player-retry
+                                hidden
+                                class="min-h-11 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+                            >
+                                Повторить
+                            </button>
+                        </div>
                         <video
                             controls
                             playsinline
                             preload="metadata"
                             poster="{{ $title->poster_url }}"
-                            class="js-catalog-player aspect-video w-full bg-black"
+                            aria-describedby="catalog-player-status-{{ $selectedMedia->id }}"
+                            class="js-catalog-player aspect-video w-full bg-slate-100"
+                            data-player-session="{{ $playerSessionKey }}"
                             data-progress-episode="{{ $selectedEpisode?->id }}"
                             data-progress-position="{{ $primaryAction->episodeId === $selectedEpisode?->id ? $primaryAction->positionSeconds : 0 }}"
                             data-progress-enabled="{{ $isAuthenticated ? '1' : '0' }}"

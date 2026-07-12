@@ -145,8 +145,8 @@ class SeasonvarCatalogParser
             Arr::get($structuredData, 'releasedEvent.startDate'),
         ]).' '.$title.' '.$description);
 
-        $seasons = $this->seasons($xpath, $url);
         $currentSeasonNumber = $this->seasonNumberFromUrl($url) ?? $this->seasonNumber($title) ?? 1;
+        $seasons = $this->seasons($xpath, $url, $currentSeasonNumber);
         $taxonomies = $this->taxonomies($xpath, $url, $structuredData, $infoFields);
         $ratings = $this->ratings($infoFields);
         $parseMeta = $this->parseMeta($xpath, $html, $infoFields);
@@ -704,7 +704,7 @@ class SeasonvarCatalogParser
     /**
      * @return list<array{number: int, title: string|null, source_url: string|null, latest_episode_released_at: string|null, episodes_released: int|null, episodes_total: int|null, translation_name: string|null, release_status_text: string|null}>
      */
-    private function seasons(DOMXPath $xpath, string $baseUrl): array
+    private function seasons(DOMXPath $xpath, string $baseUrl, int $currentSeasonNumber): array
     {
         $seasons = [];
 
@@ -741,12 +741,12 @@ class SeasonvarCatalogParser
             ];
         }
 
-        if ($seasons === []) {
+        if (! array_key_exists($currentSeasonNumber, $seasons)) {
             $releaseStatus = $this->emptySeasonReleaseStatus();
 
-            $seasons[1] = [
-                'number' => 1,
-                'title' => 'Сезон 1',
+            $seasons[$currentSeasonNumber] = [
+                'number' => $currentSeasonNumber,
+                'title' => "Сезон {$currentSeasonNumber}",
                 'source_url' => $baseUrl,
                 'latest_episode_released_at' => $releaseStatus['latest_episode_released_at'],
                 'episodes_released' => $releaseStatus['episodes_released'],

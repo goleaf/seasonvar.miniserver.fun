@@ -1544,6 +1544,13 @@ class CatalogPageTest extends TestCase
             ->assertDontSee('/playback/'.$lowerPriorityMedia->id.'?', false)
             ->assertSee('expires=', false)
             ->assertSee('signature=', false)
+            ->assertSee('wire:ignore', false)
+            ->assertSee('data-active-player-session="'.$catalogTitle->id.':'.$episode->id.':'.$media->id.'"', false)
+            ->assertSee('data-player-session="'.$catalogTitle->id.':'.$episode->id.':'.$media->id.'"', false)
+            ->assertSee('data-player-status', false)
+            ->assertSee('data-player-status-icon', false)
+            ->assertSee('data-player-status-text', false)
+            ->assertSee('data-player-retry', false)
             ->assertSee('type="application/x-mpegURL"', false);
 
         $this->get(route('titles.show', [

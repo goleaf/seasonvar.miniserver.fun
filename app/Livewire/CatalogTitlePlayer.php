@@ -278,6 +278,9 @@ class CatalogTitlePlayer extends Component
         $selectedMedia = $playbackSource->mediaId !== null
             ? ($mediaItems->firstWhere('id', $playbackSource->mediaId) ?? $selectedMedia)
             : $selectedMedia;
+        $playerSessionKey = $selectedMedia !== null && $playbackSource->isPlayable()
+            ? implode(':', [$title->id, $selectedEpisode?->id ?? 0, $selectedMedia->id])
+            : '';
 
         $showView = new CatalogShowViewModel(
             title: $title,
@@ -304,6 +307,7 @@ class CatalogTitlePlayer extends Component
             'episodeNavigation' => $episodeNavigation,
             'selectedMedia' => $selectedMedia,
             'playbackSource' => $playbackSource,
+            'playerSessionKey' => $playerSessionKey,
             'mediaItems' => $mediaItems,
             'showView' => $showView,
             'inWatchlist' => (bool) ($state?->in_watchlist ?? false),
