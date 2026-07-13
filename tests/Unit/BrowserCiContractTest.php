@@ -27,6 +27,10 @@ final class BrowserCiContractTest extends TestCase
 
         $this->assertStringContainsString('DB_DATABASE', $config);
         $this->assertStringContainsString('output/playwright/browser.sqlite', $config);
+        $this->assertStringContainsString('APP_CONFIG_CACHE', $config);
+        $this->assertStringContainsString('output/playwright/config.php', $config);
+        $this->assertStringContainsString('APP_ROUTES_CACHE', $config);
+        $this->assertStringContainsString('output/playwright/routes-v7.php', $config);
         $this->assertStringContainsString('CatalogTitle::factory()', $fixtures);
         $this->assertStringContainsString('LicensedMedia::factory()', $fixtures);
         $this->assertStringContainsString('AxeBuilder', $suite);

@@ -2,6 +2,8 @@ import { defineConfig } from '@playwright/test';
 import path from 'node:path';
 
 const databasePath = path.resolve('output/playwright/browser.sqlite');
+const configCachePath = path.resolve('output/playwright/config.php');
+const routesCachePath = path.resolve('output/playwright/routes-v7.php');
 const baseURL = 'http://127.0.0.1:8013';
 
 export default defineConfig({
@@ -36,6 +38,8 @@ export default defineConfig({
             APP_DEBUG: 'false',
             APP_KEY: 'base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
             APP_URL: baseURL,
+            APP_CONFIG_CACHE: configCachePath,
+            APP_ROUTES_CACHE: routesCachePath,
             CACHE_STORE: 'array',
             DB_CONNECTION: 'sqlite',
             DB_DATABASE: databasePath,
