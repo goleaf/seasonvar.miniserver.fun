@@ -31,28 +31,28 @@
                     </nav>
 
                     <div class="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
-                        <div class="rounded-lg bg-slate-50 px-3 py-2">
+                        <div class="grid min-h-16 content-center gap-1 rounded-lg bg-slate-50 px-3 py-3">
                             <div class="flex items-center justify-between gap-2">
-                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('catalog.title.seasons') }}</div>
+                                <div class="text-xs font-bold uppercase leading-none tracking-wide text-slate-500">{{ __('catalog.title.seasons') }}</div>
                                 <x-ui.icon name="fa-solid fa-layer-group text-slate-400" />
                             </div>
-                            <div class="mt-1 text-lg font-black tabular-nums text-slate-800">{{ $showView->parsedSeasonCount }}</div>
+                            <div class="text-lg font-black leading-none tabular-nums text-slate-800">{{ $showView->parsedSeasonCount }}</div>
                         </div>
 
-                        <div class="rounded-lg bg-slate-50 px-3 py-2">
+                        <div class="grid min-h-16 content-center gap-1 rounded-lg bg-slate-50 px-3 py-3">
                             <div class="flex items-center justify-between gap-2">
-                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('catalog.title.episodes') }}</div>
+                                <div class="text-xs font-bold uppercase leading-none tracking-wide text-slate-500">{{ __('catalog.title.episodes') }}</div>
                                 <x-ui.icon name="fa-solid fa-list-ol text-slate-400" />
                             </div>
-                            <div class="mt-1 text-lg font-black tabular-nums text-slate-800">{{ $showView->episodeCount }}</div>
+                            <div class="text-lg font-black leading-none tabular-nums text-slate-800">{{ $showView->episodeCount }}</div>
                         </div>
 
-                        <div class="rounded-lg bg-slate-50 px-3 py-2">
+                        <div class="grid min-h-16 content-center gap-1 rounded-lg bg-slate-50 px-3 py-3">
                             <div class="flex items-center justify-between gap-2">
-                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('catalog.title.video') }}</div>
+                                <div class="text-xs font-bold uppercase leading-none tracking-wide text-slate-500">{{ __('catalog.title.video') }}</div>
                                 <x-ui.icon name="fa-solid fa-file-video text-slate-400" />
                             </div>
-                            <div class="mt-1 text-lg font-black tabular-nums text-slate-800">{{ $showView->mediaCount }}</div>
+                            <div class="text-lg font-black leading-none tabular-nums text-slate-800">{{ $showView->mediaCount }}</div>
                         </div>
                     </div>
 

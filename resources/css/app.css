@@ -30,6 +30,32 @@
         background: var(--color-emerald-100);
         color: var(--color-slate-800);
     }
+
+    :where(
+        a[href],
+        button:not(:disabled),
+        summary,
+        label[for],
+        select:not(:disabled),
+        input[type='button']:not(:disabled),
+        input[type='checkbox']:not(:disabled),
+        input[type='file']:not(:disabled),
+        input[type='radio']:not(:disabled),
+        input[type='reset']:not(:disabled),
+        input[type='submit']:not(:disabled),
+        [role='button'],
+        [data-catalog-history]
+    ) {
+        cursor: pointer;
+    }
+
+    :where(button:disabled, input:disabled, select:disabled, textarea:disabled, [aria-disabled='true']) {
+        cursor: not-allowed;
+    }
+
+    :where([data-loading]) {
+        cursor: wait;
+    }
 }
 
 @layer components {

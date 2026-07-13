@@ -57,7 +57,7 @@
                         <x-ui.status-pill icon="fa-solid fa-circle-play" variant="success">
                             {{ $this->selectedEpisodeLabel($selectedEpisode) }}
                         </x-ui.status-pill>
-                        @if ($selectedEpisode->title)
+                        @if ($selectedEpisode->title && $selectedEpisode->title !== $this->episodeDisplayLabel($selectedEpisode))
                             <x-ui.status-pill icon="fa-solid fa-file-lines">{{ $selectedEpisode->title }}</x-ui.status-pill>
                         @endif
                     @else
@@ -262,7 +262,7 @@
                             data-catalog-history
                             @if ($selectedMedia?->id === $episodeMedia->id) aria-current="true" @endif
                             @class([
-                                'inline-flex min-h-11 items-center justify-between gap-2 rounded-control px-3 py-2 text-left text-sm font-bold transition data-loading:pointer-events-none data-loading:opacity-60',
+                                'grid min-h-12 grid-cols-[minmax(0,1fr)_auto] content-center items-center gap-2 rounded-control px-3 py-2 text-left text-sm font-bold leading-5 transition data-loading:pointer-events-none data-loading:opacity-60',
                                 'bg-emerald-50 text-emerald-700' => $selectedMedia?->id === $episodeMedia->id,
                                 'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $selectedMedia?->id !== $episodeMedia->id,
                             ])
@@ -306,7 +306,7 @@
                                 data-catalog-history
                                 @if ($activeSeason?->id === $seasonOption->id) aria-current="true" @endif
                                 @class([
-                                    'min-h-11 shrink-0 rounded-control px-3 py-2 text-sm font-bold',
+                                    'inline-flex min-h-11 shrink-0 items-center rounded-control px-3 py-2 text-sm font-bold',
                                     'bg-emerald-700 text-white' => $activeSeason?->id === $seasonOption->id,
                                     'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $activeSeason?->id !== $seasonOption->id,
                                 ])
@@ -342,25 +342,25 @@
                             data-catalog-history
                             @if ($selectedEpisode?->id === $episodeOption->id) aria-current="true" @endif
                             @class([
-                                'min-h-16 rounded-lg px-3 py-3 text-left text-sm transition',
+                                'grid min-h-20 content-center gap-1 rounded-lg px-3 py-3 text-left text-sm leading-5 transition',
                                 'bg-emerald-50 text-emerald-800' => $selectedEpisode?->id === $episodeOption->id,
                                 'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $selectedEpisode?->id !== $episodeOption->id,
                             ])
                         >
-                            <span class="flex items-start gap-2 font-bold">
-                                <x-ui.icon name="fa-solid fa-circle-play text-emerald-700" align="start" />
+                            <span class="flex items-center gap-2 font-bold">
+                                <x-ui.icon name="fa-solid fa-circle-play text-emerald-700" />
                                 <span>{{ $this->episodeDisplayLabel($episodeOption) }}</span>
                             </span>
-                            @if ($episodeOption->title)
-                                <span class="mt-1 block text-xs font-semibold text-slate-500">{{ $episodeOption->title }}</span>
+                            @if ($episodeOption->title && $episodeOption->title !== $this->episodeDisplayLabel($episodeOption))
+                                <span class="block text-xs font-semibold text-slate-500">{{ $episodeOption->title }}</span>
                             @endif
                             @if ($showView->episodeSelectedProfileLabel($episodeOption))
-                                <span class="mt-2 flex items-center gap-1 text-xs font-bold text-emerald-700">
+                                <span class="flex items-center gap-1 text-xs font-bold text-emerald-700">
                                     <x-ui.icon name="fa-solid fa-sliders" />
                                     <span>{{ $showView->episodeSelectedProfileLabel($episodeOption) }}</span>
                                 </span>
                             @endif
-                            <span class="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-slate-400">
+                            <span class="inline-flex items-center gap-1 text-xs font-semibold text-slate-400">
                                 <x-ui.icon name="fa-solid fa-file-video" />
                                 <span class="tabular-nums">{{ trans_choice('catalog.counts.videos', $showView->episodeMediaItems($episodeOption)->count()) }}</span>
                             </span>

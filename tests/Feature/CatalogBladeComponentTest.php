@@ -110,6 +110,7 @@ class CatalogBladeComponentTest extends TestCase
             ->assertSeeText('2 серия')
             ->assertSeeText('видео')
             ->assertSeeText('1 видео')
+            ->assertSee('grid min-h-16 content-center gap-1 rounded-lg bg-slate-50 px-3 py-3', false)
             ->assertDontSeeText('плеер готов');
     }
 
@@ -296,12 +297,12 @@ class CatalogBladeComponentTest extends TestCase
         $firstEpisode = Episode::factory()->create([
             'season_id' => $season->id,
             'number' => 1,
-            'title' => 'Первая серия',
+            'title' => '1 серия',
         ]);
         $secondEpisode = Episode::factory()->create([
             'season_id' => $season->id,
             'number' => 2,
-            'title' => 'Вторая серия',
+            'title' => '2 серия',
         ]);
         $selectedMedia = LicensedMedia::factory()->create([
             'catalog_title_id' => $catalogTitle->id,
@@ -375,9 +376,13 @@ class CatalogBladeComponentTest extends TestCase
             ->assertOk()
             ->assertSee('wire:loading.delay.flex', false)
             ->assertSee('wire:target="selectMedia"', false)
+            ->assertSee('grid min-h-12 grid-cols-[minmax(0,1fr)_auto] content-center items-center', false)
+            ->assertSee('grid min-h-20 content-center gap-1 rounded-lg', false)
             ->assertSeeText('Переключаем вариант…')
             ->assertSeeText('Обновляем серии под выбранный вариант…')
             ->assertSeeText('RuDub / 1080P / MP4')
+            ->assertDontSeeText('1 серия 1 серия')
+            ->assertDontSeeText('2 серия 2 серия')
             ->assertSee(e(route('titles.show', [
                 'catalogTitle' => $catalogTitle,
                 'episode' => $secondEpisode->id,

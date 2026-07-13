@@ -32,6 +32,12 @@ class FrontendAssetContractTest extends TestCase
         $this->assertStringContainsString('textarea,', $styles);
         $this->assertStringContainsString('outline: 2px solid var(--color-emerald-700)', $styles);
         $this->assertStringContainsString('[data-focus-frame]:focus-within', $styles);
+        $this->assertStringContainsString('a[href],', $styles);
+        $this->assertStringContainsString('cursor: pointer;', $styles);
+        $this->assertStringContainsString("[aria-disabled='true']", $styles);
+        $this->assertStringContainsString('cursor: not-allowed;', $styles);
+        $this->assertStringContainsString('[data-loading]', $styles);
+        $this->assertStringContainsString('cursor: wait;', $styles);
         $this->assertStringContainsString('.ui-icon {', $styles);
         $this->assertStringContainsString('inline-size: 1.25em', $styles);
         $this->assertStringContainsString('block-size: 1em', $styles);
