@@ -43,7 +43,9 @@ final class InfrastructureHealthCheck
         $degraded = collect(['redis_cache', 'memcached', 'queue_workers', 'cache_warming'])
             ->contains(fn (string $component): bool => in_array(
                 $components[$component]['status'],
-                ['degraded', 'failed'],
+                $component === 'queue_workers'
+                    ? ['unknown', 'degraded', 'failed']
+                    : ['degraded', 'failed'],
                 true,
             ));
 

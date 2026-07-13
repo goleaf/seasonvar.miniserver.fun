@@ -126,7 +126,7 @@ Deployment increments `CACHE_SCHEMA_VERSION` when key meaning changes and `CACHE
 - Redis queues unavailable: dispatch throws/fails visibly; jobs are not reported as accepted. DB remains authoritative and jobs remain idempotent.
 - Rebuild lock contention: safe stale is served; without stale, wait is bounded and raises `CacheRebuildTimeout` instead of issuing the same expensive query.
 
-`/health/ready` and `app:health` distinguish database, Redis cache/sessions/queues/locks/limiter, Memcached, queue heartbeat, Horizon state and last warming state. Redis cache status includes safe memory/eviction counters, while Memcached status aggregates hit/miss, eviction, item, byte and connection counters without server addresses. Cache/Memcached outages make readiness `degraded`; database/session/queue/lock/limiter failures make it `failed`. Endpoint is rate-limited, private/no-store, does not start a session and never returns hostnames or credentials.
+`/health/ready` and `app:health` distinguish database, Redis cache/sessions/queues/locks/limiter, Memcached, queue heartbeat, Horizon state and last warming state. Redis cache status includes safe memory/eviction counters, while Memcached status aggregates hit/miss, eviction, item, byte and connection counters without server addresses. Cache/Memcached outages and an absent worker heartbeat make the aggregate status `degraded`; database/session/queue/lock/limiter failures make it `failed`. A missing heartbeat does not make the transport itself unready, but it must never produce a false `ok`. Endpoint is rate-limited, private/no-store, does not start a session and never returns hostnames or credentials.
 
 ## Observability и alerts
 

@@ -9,6 +9,20 @@ use Tests\TestCase;
 
 final class InfrastructureHealthCheckTest extends TestCase
 {
+    public function test_missing_worker_heartbeat_marks_an_otherwise_ready_service_as_degraded(): void
+    {
+        config([
+            'cache-architecture.stores.domain' => 'array',
+            'cache-architecture.stores.versions' => 'array',
+        ]);
+
+        $result = app(InfrastructureHealthCheck::class)->run();
+
+        $this->assertSame('unknown', $result['components']['queue_workers']['status']);
+        $this->assertSame('degraded', $result['status']);
+        $this->assertTrue($result['ready']);
+    }
+
     public function test_unavailable_memcached_store_degrades_health_instead_of_crashing_the_check(): void
     {
         config([
