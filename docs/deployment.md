@@ -255,6 +255,12 @@ php artisan app:deployment-check --json
 
 Атомарный порядок maintenance: preflight → дождаться безопасной точки одного `seasonvar:import --forever` и остановить writers → backup SQLite → `migrate:status` и обычный `migrate --force` → при необходимости штатный FTS rebuild/cache warm → `config:cache` → перезапуск PHP-FPM и единственного importer process → повторный preflight, `app:health --json` и гостевой HTTP smoke. `queue:retry`/`queue:forget` остаются отдельным ручным решением после сверки run state и claims; preflight их не вызывает.
 
+### Владение retention и failed jobs
+
+- Владелец технического retention импортёра — production operator, выполняющий runbook Seasonvar. `SeasonvarImportStorageMaintenance` применяет только существующие окна: import events 7 дней, source snapshots 14 дней и terminal prepared groups 7 дней через `SEASONVAR_IMPORT_*_RETENTION_DAYS`; изменение окон требует capacity/privacy review и обновления `docs/importer.md`.
+- Владелец disposition `failed_jobs` — тот же production operator. `app:deployment-check` даёт только безопасную агрегатную сводку; retry/forget выполняются вручную после сверки import run и live claims. Автоматического удаления failed jobs нет.
+- User history/progress/watchlist/rating, admin audit и потенциально юридически значимые строки не имеют автоматического retention/delete job. Их нельзя включать в общий technical prune без утверждённой продуктовой/legal policy, отдельного owner и тестируемой процедуры удаления/экспорта.
+
 ### Production runtime и журналы
 
 Перед возвратом трафика установите versioned-профиль ротации, пересоберите config cache и выполните graceful reload PHP-FPM. `copytruncate` не требует остановки PHP-процессов и не удаляет текущий журнал:

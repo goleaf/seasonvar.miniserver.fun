@@ -23,3 +23,7 @@
 - Тесты `AuthorizationTest` покрывают гостевой доступ к основным страницам каталога и странице статистики.
 - Implicit binding `CatalogTitle` скрывает authenticated-audience карточку от гостя; Livewire дополнительно держит `catalogTitleId` locked и разрешает episode/media IDs только внутри доступной и playable иерархии выбранного тайтла.
 - Текущая схема поддерживает audience `public/authenticated`; текущий `User` является единственным активным профилем, поэтому все private actions используют его напрямую и не принимают profile ID. Отдельных profile ownership/age/PIN, role/admin preview, territory, subscription/purchase/trial и concurrent-stream сущностей пока нет. `CatalogEntitlementDecision` задаёт однозначные user-facing состояния для будущих отказов, но сервис не имитирует отсутствующие правила. Их нужно подключать к нему одновременно с появлением реальной доменной модели; PIN в таком расширении должен храниться только как hash.
+
+## Осознанные границы продукта
+
+Household/детские профили, PIN, billing, подписки/покупки/trial, territory и concurrent-stream enforcement отсутствуют как продуктовые возможности, а не являются скрытым implementation backlog. Их нельзя «включить» новым config flag: каждое расширение требует отдельного владельца продукта, политики хранения/legal review, additive schema, ownership constraints, backfill и тестов authorization boundary.
