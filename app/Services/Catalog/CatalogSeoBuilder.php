@@ -905,10 +905,14 @@ class CatalogSeoBuilder
     ): array {
         $genreText = $genres->take(5)->implode(', ');
         $countryText = $countries->take(3)->implode(', ');
+        $onlineWord = Str::lower(__('catalog.seo.faq.online_word'));
+        $watchQuestion = Str::endsWith(Str::lower($title), $onlineWord)
+            ? __('catalog.seo.faq.watch_question_without_suffix', ['title' => $title])
+            : __('catalog.seo.faq.watch_question', ['title' => $title]);
 
         return collect([
             [
-                'question' => __('catalog.seo.faq.watch_question', ['title' => $title]),
+                'question' => $watchQuestion,
                 'answer' => $mediaCount > 0
                     ? __('catalog.seo.faq.watch_available', ['title' => $title])
                     : __('catalog.seo.faq.watch_unavailable', ['title' => $title]),

@@ -49,7 +49,9 @@ return [
         'poster_alt' => ':title poster',
         'website_keywords' => 'online series, TV-series catalog, watch series online',
         'faq' => [
+            'online_word' => 'online',
             'watch_question' => 'Where can I watch :title online?',
+            'watch_question_without_suffix' => 'Where can I watch :title?',
             'watch_available' => ':title is available in the embedded player on this page. Select an episode to start playback.',
             'watch_unavailable' => 'No video is currently available for :title.',
             'counts_question' => 'How many seasons and episodes does :title have?',

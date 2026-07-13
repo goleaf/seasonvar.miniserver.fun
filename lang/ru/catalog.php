@@ -49,7 +49,9 @@ return [
         'poster_alt' => 'Постер :title',
         'website_keywords' => 'сериалы онлайн, каталог сериалов, смотреть сериалы онлайн',
         'faq' => [
+            'online_word' => 'онлайн',
             'watch_question' => 'Где смотреть сериал :title онлайн?',
+            'watch_question_without_suffix' => 'Где смотреть сериал :title?',
             'watch_available' => 'Сериал :title доступен на этой странице во встроенном плеере. Видео открывается через выбранную серию.',
             'watch_unavailable' => 'Для сериала :title сейчас нет доступного видео.',
             'counts_question' => 'Сколько сезонов и серий в сериале :title?',
