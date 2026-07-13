@@ -80,6 +80,14 @@ final class SeasonvarTitlePageStateSynchronizer
 
         SourcePage::query()
             ->whereKey($linkedPageIds)
+            ->where('id', '!=', $currentPage->id)
+            ->where('parse_status', 'parsed')
+            ->whereIn('import_status', ['parsed', 'missing_data'])
+            ->where(function (Builder $query): void {
+                $query->whereNull('import_claim_token')
+                    ->orWhereNull('import_claim_expires_at')
+                    ->orWhere('import_claim_expires_at', '<=', now());
+            })
             ->where('provider_availability_status', SeasonvarSourceAvailability::RegionBlocked->value)
             ->update([
                 'retry_after_at' => $providerRetryAfter,

@@ -402,30 +402,15 @@ class SeasonvarCatalogImporter
         ]);
 
         $fetched = $this->pageFetcher->fetch($page, $importRunId, $progress);
-
-        if ($fetched->notModified) {
-            $existingCatalogTitle = $this->findCatalogTitleBySourceUrlHash($page, $this->seasonvarUrl->hash($page->url));
-
-            if ($existingCatalogTitle === null) {
-                throw new RuntimeException('Seasonvar вернул 304 для страницы без ранее импортированного тайтла.');
-            }
-
-            $page->update([
-                'last_imported_at' => now(),
-            ]);
-            $this->report($progress, 'page-parse-skipped-not-modified', [
-                'source_page_id' => $page->id,
-                'page_type' => SeasonvarPageType::Serial->value,
-                'catalog_title_id' => $existingCatalogTitle->id,
-            ]);
-
-            return (new SeasonvarPageHandlerResult(catalogTitle: $existingCatalogTitle))->toLegacyResult();
-        }
-
         $contentHash = $fetched->contentHash;
         $contentChanged = $fetched->contentChanged;
 
         $existingCatalogTitle = $this->findCatalogTitleBySourceUrlHash($page, $this->seasonvarUrl->hash($page->url));
+
+        if ($fetched->notModified && $existingCatalogTitle === null) {
+            throw new RuntimeException('Seasonvar вернул 304 для страницы без ранее импортированного тайтла.');
+        }
+
         $needsMediaRefresh = $existingCatalogTitle !== null
             && $this->catalogTitleNeedsMediaRefresh($existingCatalogTitle);
 
@@ -437,13 +422,21 @@ class SeasonvarCatalogImporter
             && ! $needsMediaRefresh) {
             $this->titlePageStateSynchronizer->synchronize($existingCatalogTitle, $page, $importRunId);
 
-            $this->report($progress, 'page-parse-skipped-unchanged', [
-                'source_page_id' => $page->id,
-                'catalog_title_id' => $existingCatalogTitle->id,
-                'slug' => $existingCatalogTitle->slug,
-                'content_hash' => $contentHash,
-                'url' => $page->url,
-            ]);
+            if ($fetched->notModified) {
+                $this->report($progress, 'page-parse-skipped-not-modified', [
+                    'source_page_id' => $page->id,
+                    'page_type' => SeasonvarPageType::Serial->value,
+                    'catalog_title_id' => $existingCatalogTitle->id,
+                ]);
+            } else {
+                $this->report($progress, 'page-parse-skipped-unchanged', [
+                    'source_page_id' => $page->id,
+                    'catalog_title_id' => $existingCatalogTitle->id,
+                    'slug' => $existingCatalogTitle->slug,
+                    'content_hash' => $contentHash,
+                    'url' => $page->url,
+                ]);
+            }
 
             return [
                 'catalog_title' => $existingCatalogTitle,

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\SeasonvarSourceAvailability;
 use App\Models\CatalogTitle;
 use App\Models\Season;
 use App\Models\SeasonvarImportRun;
@@ -49,16 +50,22 @@ class SeasonvarTitlePageStateSynchronizerTest extends TestCase
             'parse_status' => 'pending',
             'import_status' => 'pending',
             'missing_data_flags' => ['pending-sentinel'],
+            'provider_availability_status' => SeasonvarSourceAvailability::RegionBlocked,
+            'retry_after_at' => now()->addDays(30),
         ]);
         $failedSibling = $makePage('https://seasonvar.ru/serial-42-title-4-season.html', [
             'parse_status' => 'failed',
             'import_status' => 'failed',
             'missing_data_flags' => ['failed-sentinel'],
+            'provider_availability_status' => SeasonvarSourceAvailability::RegionBlocked,
+            'retry_after_at' => now()->addDays(30),
         ]);
         $claimedSibling = $makePage('https://seasonvar.ru/serial-42-title-5-season.html', [
             'parse_status' => 'parsed',
             'import_status' => 'missing_data',
             'missing_data_flags' => ['claimed-sentinel'],
+            'provider_availability_status' => SeasonvarSourceAvailability::RegionBlocked,
+            'retry_after_at' => now()->addDays(30),
             'import_claim_token' => 'live-claim',
             'import_claimed_at' => now(),
             'import_claim_expires_at' => now()->addHour(),
@@ -98,6 +105,9 @@ class SeasonvarTitlePageStateSynchronizerTest extends TestCase
         $this->assertSame(['pending-sentinel'], $pendingSibling->fresh()->missing_data_flags);
         $this->assertSame(['failed-sentinel'], $failedSibling->fresh()->missing_data_flags);
         $this->assertSame(['claimed-sentinel'], $claimedSibling->fresh()->missing_data_flags);
+        $this->assertSame(now()->addDays(30)->toDateTimeString(), $pendingSibling->fresh()->retry_after_at?->toDateTimeString());
+        $this->assertSame(now()->addDays(30)->toDateTimeString(), $failedSibling->fresh()->retry_after_at?->toDateTimeString());
+        $this->assertSame(now()->addDays(30)->toDateTimeString(), $claimedSibling->fresh()->retry_after_at?->toDateTimeString());
         $this->assertSame($flags, $expiredClaimSibling->fresh()->missing_data_flags);
         $this->assertSame($currentRun->id, $currentPage->fresh()->last_import_run_id);
         $this->assertSame(now()->toDateTimeString(), $currentPage->fresh()->last_imported_at?->toDateTimeString());

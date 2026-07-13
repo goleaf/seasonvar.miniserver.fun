@@ -12,10 +12,13 @@ use App\Models\Genre;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\SeasonvarImportEvent;
+use App\Models\SeasonvarImportRun;
 use App\Models\Source;
 use App\Models\SourcePage;
+use App\Models\SourcePageSnapshot;
 use App\Models\Tag;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
+use App\Services\Seasonvar\SeasonvarCatalogParser;
 use App\Services\Seasonvar\SeasonvarDatabaseTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -75,6 +78,144 @@ class SeasonvarParsePageCommandTest extends TestCase
         $this->assertSame('2026-07-20 12:00:00', $page->retry_after_at?->toDateTimeString());
         $this->assertSame('missing_data', $page->import_status);
         $this->assertContains('no_video', $page->missing_data_flags);
+    }
+
+    public function test_serial_not_modified_skip_reconciles_linked_page_state(): void
+    {
+        $this->travelTo('2026-07-13 14:00:00');
+        Http::preventStrayRequests();
+
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $url = 'https://seasonvar.ru/serial-42-title-1-season.html';
+        $siblingUrl = 'https://seasonvar.ru/serial-42-title-2-season.html';
+        $html = '<html><body>Сохранённая страница</body></html>';
+        $contentHash = hash('sha256', $html);
+        $previousRun = SeasonvarImportRun::query()->create(['mode' => 'url']);
+        $currentRun = SeasonvarImportRun::query()->create(['mode' => 'url']);
+        $siblingImportedAt = now()->subDays(2);
+
+        $currentPage = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+            'content_hash' => $contentHash,
+            'etag' => '"serial-v1"',
+            'parse_status' => 'parsed',
+            'import_status' => 'missing_data',
+            'missing_data_flags' => ['stale-current'],
+            'metadata_parser_version' => SeasonvarCatalogParser::METADATA_VERSION,
+        ]);
+        $siblingPage = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $siblingUrl,
+            'url_hash' => hash('sha256', $siblingUrl),
+            'parse_status' => 'parsed',
+            'import_status' => 'missing_data',
+            'missing_data_flags' => ['stale-sibling'],
+            'last_imported_at' => $siblingImportedAt,
+            'last_import_run_id' => $previousRun->id,
+        ]);
+        SourcePageSnapshot::query()->create([
+            'source_page_id' => $currentPage->id,
+            'url' => $url,
+            'content_hash' => $contentHash,
+            'http_status' => 200,
+            'body_bytes' => mb_strlen($html, '8bit'),
+            'html' => $html,
+            'captured_at' => now()->subDay(),
+        ]);
+        $catalogTitle = CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $currentPage->id,
+            'source_url' => $url,
+            'source_url_hash' => $currentPage->url_hash,
+        ]);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 2,
+            'source_page_id' => $siblingPage->id,
+            'source_url' => $siblingUrl,
+            'source_url_hash' => $siblingPage->url_hash,
+        ]);
+        $episode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 1,
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'status' => 'published',
+            'playback_url' => 'https://media.example.com/title/s02e01.mp4',
+        ]);
+
+        Http::fake([$url => Http::response('', 304)]);
+
+        app(SeasonvarCatalogImporter::class)->parsePage(
+            $currentPage,
+            importRunId: $currentRun->id,
+        );
+
+        $this->assertSame([], $currentPage->fresh()->missing_data_flags);
+        $this->assertSame($currentRun->id, $currentPage->fresh()->last_import_run_id);
+        $this->assertSame([], $siblingPage->fresh()->missing_data_flags);
+        $this->assertSame('parsed', $siblingPage->fresh()->import_status);
+        $this->assertSame($previousRun->id, $siblingPage->fresh()->last_import_run_id);
+        $this->assertSame($siblingImportedAt->toDateTimeString(), $siblingPage->fresh()->last_imported_at?->toDateTimeString());
+    }
+
+    public function test_serial_not_modified_response_reuses_snapshot_when_media_recovery_is_needed(): void
+    {
+        Http::preventStrayRequests();
+
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $url = 'https://seasonvar.ru/serial-615--Bez_sleda_pssmtlk-1-season.html';
+        $html = $this->withoutTraceSeasonPageHtml();
+        $contentHash = hash('sha256', $html);
+        $page = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+            'content_hash' => $contentHash,
+            'etag' => '"serial-v1"',
+            'parse_status' => 'parsed',
+            'import_status' => 'missing_data',
+            'metadata_parser_version' => SeasonvarCatalogParser::METADATA_VERSION,
+        ]);
+        SourcePageSnapshot::query()->create([
+            'source_page_id' => $page->id,
+            'url' => $url,
+            'content_hash' => $contentHash,
+            'http_status' => 200,
+            'body_bytes' => mb_strlen($html, '8bit'),
+            'html' => $html,
+            'captured_at' => now()->subDay(),
+        ]);
+        CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $page->id,
+            'external_id' => '615',
+            'source_url' => $url,
+            'source_url_hash' => $page->url_hash,
+        ]);
+
+        Http::fake([$url => Http::response('', 304)]);
+
+        app(SeasonvarCatalogImporter::class)->parsePage($page);
+
+        $this->assertDatabaseHas('licensed_media', [
+            'playback_url' => 'https://media.example.com/without-a-trace/s01e01.mp4',
+            'status' => 'published',
+        ]);
+        $this->assertSame('parsed', $page->fresh()->parse_status);
     }
 
     public function test_it_parses_requested_page_and_all_detected_seasons_into_one_title(): void
