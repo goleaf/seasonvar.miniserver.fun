@@ -10,6 +10,10 @@
 - Livewire 4 используется для интерактивного каталога `/titles`, одиннадцати directory hubs, полной динамической оболочки и playback-island карточки `/titles/{slug}`, личной страницы `/watching` и live-страницы `/stats`; styles/scripts подключаются layout один раз на всех routes и не дублируются в компонентах.
 - Volt не установлен и не используется. Все Livewire-компоненты conventional class-based, а Blade остаётся presentation-only без PHP tags, database/cache/service calls.
 
+## Граница текущего продукта
+
+Локализованные записи контента и QoE telemetry отсутствуют как продуктовые возможности, а не являются незавершёнными frontend-задачами. Текущая locale переводит только UI/page metadata и не создаёт отдельные версии названий, описаний, аудио или субтитров; player показывает bounded локальные состояния без отправки пользовательской телеметрии качества воспроизведения. Добавление таких возможностей требует отдельных schema/privacy/retention contracts и измеримого rollout, а не скрытого JavaScript-сбора.
+
 ## Команды
 
 ```bash

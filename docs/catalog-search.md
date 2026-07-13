@@ -103,3 +103,7 @@ Importer индексирует только изменившийся тайтл
 ## Production rollout
 
 На SQLite создание индекса кратковременно блокирует schema writes. Deployment order: дождаться terminal состояния importer/finalizer, временно остановить queue workers, выполнить online backup, `PRAGMA quick_check`, согласованный WAL checkpoint и `PRAGMA optimize`, запустить `php artisan migrate --force`, затем `php artisan catalog:search-rebuild --chunk=200`, проверить state/counts/integrity и только после этого возвращать workers. Migration, optimize и rebuild не выполняются параллельно активному bulk import.
+
+## Граница текущего продукта
+
+Внешний поисковый сервис, переход с SQLite на PostgreSQL, персонализированное ранжирование и feature experiments отсутствуют как продуктовые возможности, а не являются скрытым implementation backlog. Текущий production-контракт — локальный SQLite FTS5 с детерминированным BM25/точным ранжированием и общими public visibility/filter boundaries. Любая смена движка или ранжирования требует отдельного измеренного design, миграции/rollback, privacy review и acceptance corpus; установка Scout, Meilisearch, Typesense или другого пакета сама по себе не считается реализацией.
