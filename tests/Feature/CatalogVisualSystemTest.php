@@ -198,9 +198,9 @@ class CatalogVisualSystemTest extends TestCase
         CatalogTitle::factory()->count(30)->create();
 
         $response = $this->get(route('titles.index'));
+        $content = $response->assertOk()->getContent();
 
         $response
-            ->assertOk()
             ->assertSeeText('Показано 1–24 из 30')
             ->assertSeeText('Назад')
             ->assertSeeText('Вперед')
@@ -208,6 +208,11 @@ class CatalogVisualSystemTest extends TestCase
             ->assertDontSeeText('pagination.previous')
             ->assertDontSeeText('pagination.next')
             ->assertDontSee('dark:', false);
+
+        $this->assertStringContainsString('data-catalog-results', $content);
+        $this->assertStringContainsString('data-catalog-pagination', $content);
+        $this->assertStringContainsString('data-catalog-pagination-control', $content);
+        $this->assertDoesNotMatchRegularExpression('/<div[^>]*uppercase[^>]*>Найдено<\/div>/', $content);
     }
 
     public function test_catalog_exposes_livewire_controls_loading_feedback_and_stable_rows(): void
@@ -223,12 +228,12 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('wire:submit="applyFilters"', $content);
         $this->assertStringContainsString('wire:loading.delay', $content);
         $this->assertStringNotContainsString('wire:loading.delay.flex', $content);
-        $this->assertStringContainsString('wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,clearSearch,resetAll,previousPage,nextPage,gotoPage"', $content);
+        $this->assertStringContainsString('wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll,previousPage,nextPage,gotoPage"', $content);
         $this->assertStringContainsString('wire:loading', $content);
         $this->assertStringContainsString('wire:key="catalog-title-', $content);
         $this->assertStringContainsString('wire:click="nextPage(\'page\')"', $content);
         $this->assertStringContainsString(
-            'wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,clearSearch,resetAll,previousPage,nextPage,gotoPage" class="hidden absolute',
+            'wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll,previousPage,nextPage,gotoPage" class="hidden absolute',
             $content,
         );
     }
@@ -258,6 +263,10 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('data-catalog-filter-dialog', $content);
         $this->assertStringContainsString('data-catalog-filter-dialog-open', $content);
         $this->assertStringContainsString('data-catalog-filter-dialog-close', $content);
+        $this->assertStringContainsString('data-catalog-mobile-view-controls', $content);
+        $this->assertStringContainsString('data-catalog-mobile-page-size-controls', $content);
+        $this->assertStringContainsString('wire:click.prevent="setView(\'grid\')"', $content);
+        $this->assertStringContainsString('wire:click.prevent="setPerPage(48)"', $content);
         $this->assertStringContainsString('Фильтры · 0', $content);
         $this->assertStringContainsString('Найти в группе', $content);
         $this->assertStringContainsString('data-catalog-filter-search', $content);
@@ -267,6 +276,41 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('aria-current="true"', $content);
         $this->assertStringContainsString('Применить выбранное', $content);
         $this->assertStringContainsString('Сбросить фильтры', $content);
+    }
+
+    public function test_advanced_catalog_filters_use_four_compact_explanatory_groups(): void
+    {
+        CatalogTitle::factory()->create();
+        $content = $this->get(route('titles.index'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('data-catalog-advanced-filters', $content);
+        $this->assertSame(4, substr_count($content, 'data-catalog-advanced-group='));
+        $this->assertStringContainsString('data-catalog-advanced-group="period"', $content);
+        $this->assertStringContainsString('data-catalog-advanced-group="volume"', $content);
+        $this->assertStringContainsString('data-catalog-advanced-group="rating"', $content);
+        $this->assertStringContainsString('data-catalog-advanced-group="video"', $content);
+        $this->assertStringContainsString('Точный подбор', $content);
+        $this->assertStringContainsString('Уточните период, объём сериала, рейтинг и доступность видео', $content);
+        $this->assertStringContainsString('Показать результаты', $content);
+        $this->assertStringContainsString('Сбросить точный подбор', $content);
+
+        foreach (['year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_min', 'votes_min'] as $name) {
+            $this->assertMatchesRegularExpression('/name="'.preg_quote($name, '/').'"[^>]*class="[^"]*w-full[^"]*sm:w-/s', $content);
+        }
+    }
+
+    public function test_advanced_filter_get_fallback_preserves_the_active_letter(): void
+    {
+        CatalogTitle::factory()->create();
+
+        $content = $this->get(route('titles.index', ['letter' => 'М']))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertMatchesRegularExpression(
+            '/data-catalog-advanced-filters.*<input type="hidden" name="letter" value="М">/s',
+            $content,
+        );
     }
 
     public function test_catalog_frontend_script_contract_cancels_stale_people_requests_and_restores_dialog_focus(): void
@@ -300,7 +344,7 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringNotContainsString('min-h-9 min-w-9', $content);
     }
 
-    public function test_title_poster_uses_non_cropping_fit_by_default(): void
+    public function test_title_poster_fills_its_frame_without_an_inner_ring(): void
     {
         $title = CatalogTitle::factory()->make([
             'poster_url' => 'https://media.example.com/poster.jpg',
@@ -308,7 +352,23 @@ class CatalogVisualSystemTest extends TestCase
 
         $html = Blade::render('<x-title-poster :title="$title" />', ['title' => $title]);
 
-        $this->assertStringContainsString('object-contain', $html);
-        $this->assertStringNotContainsString('object-cover', $html);
+        $this->assertStringContainsString('object-cover', $html);
+        $this->assertStringNotContainsString('object-contain', $html);
+        $this->assertStringNotContainsString('ring-1 ring-slate-200', $html);
+    }
+
+    public function test_title_player_keeps_personal_controls_below_the_full_width_player(): void
+    {
+        $view = file_get_contents(resource_path('views/livewire/catalog-title-player.blade.php'));
+
+        $this->assertIsString($view);
+        $this->assertStringContainsString('data-player-primary', $view);
+        $this->assertStringContainsString('data-player-personal', $view);
+        $this->assertStringContainsString('sm:grid-cols-2', $view);
+        $this->assertStringNotContainsString('lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.45fr)]', $view);
+        $this->assertLessThan(
+            strpos($view, 'data-player-personal'),
+            strpos($view, 'data-player-primary'),
+        );
     }
 }

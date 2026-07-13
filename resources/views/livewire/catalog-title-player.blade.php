@@ -46,8 +46,8 @@
             </button>
         </div>
 
-        <div class="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.45fr)]">
-            <div class="min-w-0">
+        <div class="mt-4 space-y-4">
+            <div data-player-primary class="min-w-0">
                 <h3 class="mb-2 flex items-center gap-2 text-sm font-bold text-slate-700">
                     <x-ui.icon name="fa-solid fa-circle-play" class="text-emerald-700" />
                     <span>{{ __('catalog.player.current') }}</span>
@@ -183,14 +183,14 @@
                 @endif
             </div>
 
-            <section class="rounded-lg bg-slate-50 p-4" aria-label="{{ __('catalog.player.personal_state') }}">
+            <section data-player-personal class="rounded-lg bg-slate-50 p-4" aria-label="{{ __('catalog.player.personal_state') }}">
                 <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
                     <x-ui.icon name="fa-solid fa-user-check text-emerald-700" />
                     <span>{{ __('catalog.player.your_series') }}</span>
                 </div>
 
                 @if ($isAuthenticated)
-                    <div class="mt-3 grid gap-3">
+                    <div class="mt-3 grid gap-3 sm:grid-cols-2 sm:items-end">
                         <button
                             type="button"
                             wire:click="setWatchlist({{ $inWatchlist ? 'false' : 'true' }})"
@@ -221,12 +221,12 @@
                     <p class="mt-3 text-sm leading-6 text-slate-500">{{ __('catalog.player.auth_hint') }}</p>
                 @endif
 
-                <dl class="mt-3 grid gap-1 text-sm text-slate-500">
-                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <dl class="mt-3 grid gap-2 text-sm text-slate-500 sm:grid-cols-2">
+                    <div class="flex flex-wrap items-baseline justify-between gap-2 rounded-control bg-white px-3 py-2">
                         <dt>{{ __('catalog.player.watchlist_total') }}</dt>
                         <dd class="font-bold text-slate-700">{{ $userStateSummary->watchlistCount }}</dd>
                     </div>
-                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                    <div class="flex flex-wrap items-baseline justify-between gap-2 rounded-control bg-white px-3 py-2">
                         <dt>{{ __('catalog.player.audience_rating') }}</dt>
                         <dd class="font-bold text-slate-700">
                             @if ($userStateSummary->ratingAverage !== null)

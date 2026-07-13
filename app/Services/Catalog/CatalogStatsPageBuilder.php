@@ -379,7 +379,7 @@ class CatalogStatsPageBuilder
     private function statsPosterRows(): Collection
     {
         return $this->titles->visibleTo(null)
-            ->select(['id', 'slug', 'title', 'year', 'poster_url', 'indexed_at'])
+            ->select(['id', 'slug', 'title', 'original_title', 'year', 'poster_url', 'indexed_at'])
             ->whereNotNull('poster_url')
             ->where('poster_url', '!=', '')
             ->latest('indexed_at')
@@ -404,7 +404,7 @@ class CatalogStatsPageBuilder
     private function statsIssueRows(): Collection
     {
         $withoutPublishedMedia = $this->titles->visibleTo(null)
-            ->select(['id', 'slug', 'title', 'year', 'poster_url', 'indexed_at'])
+            ->select(['id', 'slug', 'title', 'original_title', 'year', 'poster_url', 'indexed_at'])
             ->whereDoesntHave('licensedMedia', fn (EloquentBuilder $query): EloquentBuilder => $query->where('status', 'published'))
             ->latest('indexed_at')
             ->limit(4)
@@ -412,7 +412,7 @@ class CatalogStatsPageBuilder
             ->map(fn (CatalogTitle $title): array => $this->titlePreviewRow($title, 'Без видео', 'нет опубликованного видео', 'fa-solid fa-circle-play', 'danger'));
 
         $withoutPoster = $this->titles->visibleTo(null)
-            ->select(['id', 'slug', 'title', 'year', 'poster_url', 'indexed_at'])
+            ->select(['id', 'slug', 'title', 'original_title', 'year', 'poster_url', 'indexed_at'])
             ->where(function (EloquentBuilder $query): void {
                 $query->whereNull('poster_url')->orWhere('poster_url', '');
             })
@@ -422,7 +422,7 @@ class CatalogStatsPageBuilder
             ->map(fn (CatalogTitle $title): array => $this->titlePreviewRow($title, 'Без постера', 'картинка не найдена', 'fa-regular fa-image', 'warning'));
 
         $withoutDescription = $this->titles->visibleTo(null)
-            ->select(['id', 'slug', 'title', 'year', 'poster_url', 'indexed_at'])
+            ->select(['id', 'slug', 'title', 'original_title', 'year', 'poster_url', 'indexed_at'])
             ->where(function (EloquentBuilder $query): void {
                 $query->whereNull('description')->orWhere('description', '');
             })
@@ -441,7 +441,7 @@ class CatalogStatsPageBuilder
     }
 
     /**
-     * @return array{id: int, title: string, year: string, label: string, meta: string, href: string, poster_src: string|null, icon: string, tone: string}
+     * @return array{id: int, title: string, original_title: string|null, year: string, label: string, meta: string, href: string, poster_src: string|null, icon: string, tone: string}
      */
     private function titlePreviewRow(CatalogTitle $title, string $label, string $meta, string $icon, string $tone): array
     {
@@ -449,7 +449,8 @@ class CatalogStatsPageBuilder
 
         return [
             'id' => (int) $title->id,
-            'title' => $title->title,
+            'title' => $title->display_title,
+            'original_title' => $title->display_original_title,
             'year' => $title->year === null ? 'год не указан' : (string) $title->year,
             'label' => $label,
             'meta' => $meta,

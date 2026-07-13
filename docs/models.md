@@ -1,12 +1,13 @@
 # Eloquent-модели
 
-Обновлено: 09.07.2026
+Обновлено: 13.07.2026
 
 ## Правила связей
 
 - Для каталога используются явные Eloquent-связи и pivot-таблицы; morph-связи для метаданных не применяются.
 - Если в миграции есть внешний ключ или ссылочное поле, модель должна иметь читаемую связь в обе стороны, когда это используется импортом, статистикой, API или тестами.
 - `CatalogTitle` остается корневой моделью карточки: сезоны, серии через `hasManyThrough`, медиа, отзывы, рейтинги, алиасы, рекомендации и события импорта не создают отдельные карточки.
+- `CatalogTitle::display_title` и `display_original_title` являются presentation-only accessors: они разделяют совпадающий суффикс `/original_title`, не изменяя хранимые `title`, `original_title` и поисковый индекс.
 - Приватное пользовательское состояние хранится отдельно: `CatalogTitleUserState` принадлежит user/title, `EpisodeViewProgress` принадлежит user/title/episode; каталог и импортёр не дублируются в этих таблицах.
 - `SourcePage` хранит состояние обхода источника и связывается с карточкой, сезонами, сериями, отзывами, HTML-снимками, событиями импорта и последним запуском импорта.
 - `SeasonvarImportRun` владеет событиями запуска, HTML-снимками и страницами источника, где он записан как `last_import_run_id`.
@@ -19,6 +20,7 @@
 - Для гостевых карточек используйте `CatalogTitle::published()`, а при наличии текущего пользователя — `CatalogTitle::availableTo($user)`.
 - Для сезонов и серий действуют те же scopes. Публичные media query дополнительно вызывают `forAvailableReleases($user)`, чтобы hidden/draft дочерняя запись не раскрывалась через видео.
 - Playback query также вызывает `withPlaybackLocation()`, чтобы media без фактического URL не участвовала в выборе и counts.
+- Playback resolver обязан помечать `catalogTitle`, `season` и `episode` загруженными перед строгой проверкой иерархии; для title-level media гарантированное `episode_id = null` задаётся через `setRelation('episode', null)`, а не скрытый lazy load.
 - Relationship `seasons()` и `episodes()` уже содержит deterministic ordering `kind, sort_order, number, id`; Blade не должен сортировать эти коллекции повторно.
 
 ## Casts

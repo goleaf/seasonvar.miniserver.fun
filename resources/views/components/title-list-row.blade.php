@@ -2,15 +2,15 @@
     @if ($readable)
         <div class="flex min-w-0 gap-3 sm:gap-4">
             <div class="shrink-0">
-                <x-title-poster :title="$title" class="{{ $posterClass }}" image-class="h-full w-full object-contain" empty-class="grid h-full place-items-center px-2 text-center text-[10px] font-semibold text-slate-500" />
+                <x-title-poster :title="$title" class="{{ $posterClass }}" empty-class="grid h-full place-items-center px-2 text-center text-[10px] font-semibold text-slate-500" />
             </div>
 
             <div class="min-w-0 flex-1">
                 <div class="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                     <div class="min-w-0">
-                        <a href="{{ route('titles.show', $title) }}" class="block break-words text-base font-bold leading-6 text-slate-700 after:absolute after:inset-0 hover:text-emerald-700">{{ $title->title }}</a>
-                        @if ($title->original_title)
-                            <span class="mt-1 block break-words text-sm leading-5 text-slate-500">{{ $title->original_title }}</span>
+                        <a href="{{ route('titles.show', $title) }}" class="block break-words text-base font-bold leading-6 text-slate-700 after:absolute after:inset-0 hover:text-emerald-700">{{ $title->display_title }}</a>
+                        @if ($title->display_original_title)
+                            <span class="mt-1 block break-words text-sm leading-5 text-slate-500">{{ $title->display_original_title }}</span>
                         @endif
                     </div>
 
@@ -62,9 +62,9 @@
             <div class="min-w-0 flex-1">
                 <div class="flex min-w-0 flex-col gap-1 lg:flex-row lg:items-start lg:justify-between">
                     <div class="min-w-0">
-                        <a href="{{ route('titles.show', $title) }}" class="block break-words font-bold leading-5 text-slate-700 after:absolute after:inset-0 hover:text-emerald-700">{{ $title->title }}</a>
-                        @if ($title->original_title)
-                            <span class="block break-words text-sm leading-5 text-slate-500">{{ $title->original_title }}</span>
+                        <a href="{{ route('titles.show', $title) }}" class="block break-words font-bold leading-5 text-slate-700 after:absolute after:inset-0 hover:text-emerald-700">{{ $title->display_title }}</a>
+                        @if ($title->display_original_title)
+                            <span class="block break-words text-sm leading-5 text-slate-500">{{ $title->display_original_title }}</span>
                         @endif
                         @if ($latestSeason)
                             <span class="inline-flex min-w-0 items-center gap-1 text-sm text-slate-500">

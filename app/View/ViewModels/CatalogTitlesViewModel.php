@@ -4,6 +4,7 @@ namespace App\View\ViewModels;
 
 use App\Enums\CatalogPublicationType;
 use App\Enums\CatalogSort;
+use App\Livewire\Forms\CatalogSeriesFilters;
 use App\Models\CatalogTitle;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -265,7 +266,33 @@ class CatalogTitlesViewModel
 
     public function hasAdvancedFilters(): bool
     {
-        return $this->advancedFilterChips() !== [] || $this->listState('quality') !== [];
+        return $this->advancedFilterCount() > 0;
+    }
+
+    public function advancedFilterCount(): int
+    {
+        $scalarCount = collect(array_keys(CatalogSeriesFilters::ADVANCED_REQUEST_PROPERTIES))
+            ->filter(fn (string $key): bool => $this->scalarState($key) !== '')
+            ->count();
+
+        return $scalarCount + count($this->listState('quality'));
+    }
+
+    /** @return array<string, mixed> */
+    public function advancedFiltersResetQuery(): array
+    {
+        $query = $this->sortQuery($this->sort);
+
+        foreach ([...array_keys(CatalogSeriesFilters::ADVANCED_REQUEST_PROPERTIES), 'quality'] as $key) {
+            unset($query[$key]);
+        }
+
+        return $query;
+    }
+
+    public function maximumCatalogYear(): int
+    {
+        return (int) now()->format('Y') + 1;
     }
 
     public function activeFilterCount(): int

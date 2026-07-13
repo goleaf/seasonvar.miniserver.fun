@@ -77,7 +77,7 @@
                     <a wire:key="poster-{{ $title['id'] }}" href="{{ $title['href'] }}" class="group overflow-hidden rounded-lg border border-slate-200 bg-slate-50 transition hover:border-emerald-300 hover:bg-emerald-50">
                         <div class="aspect-[2/3] bg-white">
                             @if ($title['poster_src'])
-                                <img src="{{ $title['poster_src'] }}" alt="Постер {{ $title['title'] }}" loading="lazy" decoding="async" class="h-full w-full object-contain">
+                                <img src="{{ $title['poster_src'] }}" alt="Постер {{ $title['title'] }}" loading="lazy" decoding="async" class="h-full w-full object-cover">
                             @else
                                 <div class="grid h-full place-items-center px-3 text-center text-xs font-semibold text-slate-400">
                                     <span class="inline-flex flex-col items-center gap-2">
@@ -93,6 +93,9 @@
                                 <span>{{ $title['year'] }}</span>
                             </div>
                             <div class="mt-1 text-sm font-bold leading-5 text-slate-700 group-hover:text-emerald-700">{{ $title['title'] }}</div>
+                            @if ($title['original_title'] ?? null)
+                                <div class="mt-0.5 break-words text-xs font-semibold leading-5 text-slate-500">{{ $title['original_title'] }}</div>
+                            @endif
                             <div class="mt-2 text-xs font-semibold text-slate-400">{{ $title['meta'] }}</div>
                         </div>
                     </a>
@@ -110,7 +113,7 @@
                     <a wire:key="issue-{{ $title['label'] }}-{{ $title['id'] }}" href="{{ $title['href'] }}" class="flex min-w-0 gap-3 rounded-lg border border-slate-200 bg-white p-2 transition hover:border-emerald-300 hover:bg-emerald-50">
                         <div class="h-20 w-14 shrink-0 overflow-hidden rounded-md bg-slate-100">
                             @if ($title['poster_src'])
-                                <img src="{{ $title['poster_src'] }}" alt="Постер {{ $title['title'] }}" loading="lazy" decoding="async" class="h-full w-full object-contain">
+                                <img src="{{ $title['poster_src'] }}" alt="Постер {{ $title['title'] }}" loading="lazy" decoding="async" class="h-full w-full object-cover">
                             @else
                                 <div class="grid h-full place-items-center text-slate-300">
                                     <x-ui.icon name="fa-regular fa-image" />
@@ -134,6 +137,9 @@
                                 ])>{{ $title['label'] }}</span>
                             </div>
                             <div class="mt-1 text-sm font-bold leading-5 text-slate-700">{{ $title['title'] }}</div>
+                            @if ($title['original_title'] ?? null)
+                                <div class="mt-0.5 break-words text-xs font-semibold leading-5 text-slate-500">{{ $title['original_title'] }}</div>
+                            @endif
                             <div class="mt-1 text-xs font-semibold text-slate-400">{{ $title['year'] }} · {{ $title['meta'] }}</div>
                         </div>
                     </a>

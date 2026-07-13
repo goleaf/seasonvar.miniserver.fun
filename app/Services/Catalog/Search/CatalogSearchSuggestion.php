@@ -85,7 +85,7 @@ final readonly class CatalogSearchSuggestion
                     ->sortByDesc('similarity')
                     ->first() ?? ['name' => '', 'similarity' => 0.0];
 
-                $title->setAttribute('suggestion_name', $this->normalizer->display((string) $title->title));
+                $title->setAttribute('suggestion_name', $title->display_title);
                 $title->setAttribute('suggestion_similarity', $best['similarity']);
 
                 return $title;
@@ -95,7 +95,7 @@ final readonly class CatalogSearchSuggestion
             )
             ->sortBy([
                 [fn (CatalogTitle $title): float => (float) $title->suggestion_similarity, 'desc'],
-                [fn (CatalogTitle $title): string => $this->normalizer->key((string) $title->title), 'asc'],
+                [fn (CatalogTitle $title): string => $this->normalizer->key($title->display_title), 'asc'],
                 [fn (CatalogTitle $title): int => (int) $title->id, 'asc'],
             ])
             ->take(self::RESULT_LIMIT)

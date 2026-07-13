@@ -46,6 +46,38 @@ class CatalogBladeComponentTest extends TestCase
         }
     }
 
+    public function test_public_title_components_separate_matching_original_title_suffix(): void
+    {
+        $title = CatalogTitle::factory()->create([
+            'title' => "Королевские гонки РуПола/RuPaul's Drag Race",
+            'original_title' => "RuPaul's Drag Race",
+            'poster_url' => 'https://media.example.com/rupaul.jpg',
+        ]);
+
+        foreach ([
+            Blade::render('<x-title-card :title="$title" />', ['title' => $title]),
+            Blade::render('<x-title-list-row :title="$title" />', ['title' => $title]),
+        ] as $html) {
+            $this->assertStringContainsString('Королевские гонки РуПола', $html);
+            $this->assertStringContainsString(e("RuPaul's Drag Race"), $html);
+            $this->assertStringNotContainsString(e("Королевские гонки РуПола/RuPaul's Drag Race"), $html);
+        }
+
+        $showHtml = $this->get(route('titles.show', $title))->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression('/<h1[^>]*>.*Королевские гонки РуПола.*<\/h1>/s', $showHtml);
+        $this->assertDoesNotMatchRegularExpression('/<h1[^>]*>.*Королевские гонки РуПола\/RuPaul.*<\/h1>/s', $showHtml);
+        $this->assertStringContainsString(e("RuPaul's Drag Race"), $showHtml);
+
+        $slashTitle = CatalogTitle::factory()->make([
+            'title' => 'Мир/Дружба',
+            'original_title' => 'World Friendship',
+        ]);
+        $slashHtml = Blade::render('<x-title-card :title="$title" />', ['title' => $slashTitle]);
+
+        $this->assertStringContainsString('Мир/Дружба', $slashHtml);
+    }
+
     public function test_taxonomy_links_wrap_long_labels_without_losing_the_touch_target(): void
     {
         $html = Blade::render(

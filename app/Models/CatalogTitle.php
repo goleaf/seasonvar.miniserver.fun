@@ -6,9 +6,11 @@ use App\Enums\ContentAudience;
 use App\Enums\PublicationStatus;
 use App\Enums\ReleaseKind;
 use App\Models\Concerns\HasPublicationAvailability;
+use App\Support\CatalogTitleDisplayName;
 use Database\Factories\CatalogTitleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -54,6 +56,28 @@ class CatalogTitle extends Model
     public function getRouteKeyName(): string
     {
         return 'slug';
+    }
+
+    /** @return Attribute<string, never> */
+    protected function displayTitle(): Attribute
+    {
+        return Attribute::get(fn (): string => $this->displayName()->primary);
+    }
+
+    /** @return Attribute<string|null, never> */
+    protected function displayOriginalTitle(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->displayName()->original);
+    }
+
+    private function displayName(): CatalogTitleDisplayName
+    {
+        $attributes = $this->getAttributes();
+
+        return CatalogTitleDisplayName::from(
+            $attributes['title'] ?? '',
+            $attributes['original_title'] ?? null,
+        );
     }
 
     /**

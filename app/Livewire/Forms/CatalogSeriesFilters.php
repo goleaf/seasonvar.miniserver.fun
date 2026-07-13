@@ -22,6 +22,21 @@ class CatalogSeriesFilters extends Form
         'tag' => 'tag',
     ];
 
+    /** @var array<string, string> */
+    public const ADVANCED_REQUEST_PROPERTIES = [
+        'year_from' => 'yearFrom',
+        'year_to' => 'yearTo',
+        'seasons_min' => 'seasonsMin',
+        'seasons_max' => 'seasonsMax',
+        'episodes_min' => 'episodesMin',
+        'episodes_max' => 'episodesMax',
+        'rating_source' => 'ratingSource',
+        'rating_min' => 'ratingMin',
+        'votes_min' => 'votesMin',
+        'video' => 'video',
+        'updated' => 'updated',
+    ];
+
     #[Url(as: 'q', history: true, except: '')]
     public string|int|null $search = '';
 
@@ -213,18 +228,7 @@ class CatalogSeriesFilters extends Form
 
     public function resetAdvanced(string $key): bool
     {
-        $property = match ($key) {
-            'year_from' => 'yearFrom',
-            'year_to' => 'yearTo',
-            'seasons_min' => 'seasonsMin',
-            'seasons_max' => 'seasonsMax',
-            'episodes_min' => 'episodesMin',
-            'episodes_max' => 'episodesMax',
-            'rating_source' => 'ratingSource',
-            'rating_min' => 'ratingMin',
-            'votes_min' => 'votesMin',
-            'video' => 'video',
-            'updated' => 'updated',
+        $property = self::ADVANCED_REQUEST_PROPERTIES[$key] ?? match ($key) {
             'letter' => 'letter',
             default => null,
         };
@@ -236,6 +240,15 @@ class CatalogSeriesFilters extends Form
         $this->{$property} = '';
 
         return true;
+    }
+
+    public function resetAdvancedFilters(): void
+    {
+        foreach (self::ADVANCED_REQUEST_PROPERTIES as $property) {
+            $this->{$property} = '';
+        }
+
+        $this->qualities = [];
     }
 
     public function removeTaxonomy(string $type, string $slug): bool

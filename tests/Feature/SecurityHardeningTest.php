@@ -15,6 +15,7 @@ use App\Services\Catalog\CatalogPlaybackSourceResolver;
 use App\Services\Media\ExternalPlaylistImporter;
 use App\Services\Media\PlaybackSourceUrlGuard;
 use App\Services\Security\SensitiveActionRateLimiter;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -225,6 +226,48 @@ class SecurityHardeningTest extends TestCase
         $this->assertNull($guard->safeExternalUrl('https://user:secret@data00-cdn.11cdn.org/video.m3u8'));
         $this->assertNull($guard->safeExternalUrl('http://data00-cdn.11cdn.org/video.m3u8'));
         $this->assertNull($guard->safeExternalUrl('https://evil11cdn.org/video.m3u8'));
+    }
+
+    public function test_title_level_playback_resolution_does_not_lazy_load_episode_relation(): void
+    {
+        Model::preventLazyLoading();
+
+        $title = CatalogTitle::factory()->create();
+        $media = LicensedMedia::factory()->create([
+            'catalog_title_id' => $title->id,
+            'season_id' => null,
+            'episode_id' => null,
+            'storage_disk' => 'seasonvar_parsed',
+            'path' => 'https://data00-cdn.11cdn.org/title-level.m3u8',
+            'playback_url' => 'https://data00-cdn.11cdn.org/title-level.m3u8',
+            'format' => 'm3u8',
+            'status' => 'published',
+            'published_at' => now()->subMinute(),
+            'check_status' => 'available',
+        ]);
+        $newerMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $title->id,
+            'season_id' => null,
+            'episode_id' => null,
+            'storage_disk' => 'seasonvar_parsed',
+            'path' => 'https://data00-cdn.11cdn.org/title-level-newer.m3u8',
+            'playback_url' => 'https://data00-cdn.11cdn.org/title-level-newer.m3u8',
+            'format' => 'm3u8',
+            'status' => 'published',
+            'published_at' => now()->subMinute(),
+            'check_status' => 'available',
+        ]);
+
+        $resolved = app(CatalogPlaybackSourceResolver::class)->resolve(
+            $title,
+            null,
+            null,
+            null,
+            new PlaybackPreferencesData,
+        );
+
+        $this->assertSame(PlaybackAvailability::Ready, $resolved->status);
+        $this->assertStringContainsString('/playback/'.$newerMedia->id.'?', (string) $resolved->url);
     }
 
     public function test_playback_resolution_prefers_matching_available_sources_and_never_crosses_episode_boundaries(): void

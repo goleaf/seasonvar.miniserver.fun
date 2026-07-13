@@ -33,7 +33,10 @@
                                 <a href="{{ route('titles.show', ['catalogTitle' => $media->catalogTitle, 'episode' => $media->episode_id, 'media' => $media->id]) }}#player" class="group flex min-w-0 gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm shadow-slate-200/60 transition hover:border-emerald-300 hover:bg-emerald-50">
                                     <x-title-poster :title="$media->catalogTitle" class="h-24 w-16 shrink-0" empty-class="grid h-full place-items-center text-[10px] text-slate-400" />
                                     <div class="min-w-0 flex-1">
-                                        <div class="font-bold leading-5 text-slate-700 group-hover:text-emerald-700">{{ $media->catalogTitle->title }}</div>
+                                        <div class="font-bold leading-5 text-slate-700 group-hover:text-emerald-700">{{ $media->catalogTitle->display_title }}</div>
+                                        @if ($media->catalogTitle->display_original_title)
+                                            <div class="mt-0.5 break-words text-xs font-semibold text-slate-500">{{ $media->catalogTitle->display_original_title }}</div>
+                                        @endif
                                         <div class="mt-2 flex flex-wrap gap-1 text-xs font-semibold">
                                             @if ($media->season)
                                                 <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">

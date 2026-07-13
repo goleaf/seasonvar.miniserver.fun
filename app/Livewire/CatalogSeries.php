@@ -189,6 +189,18 @@ class CatalogSeries extends Component
         }
     }
 
+    public function resetAdvancedFilters(): void
+    {
+        $this->filters->resetAdvancedFilters();
+
+        foreach (array_keys(CatalogSeriesFilters::ADVANCED_REQUEST_PROPERTIES) as $key) {
+            $this->resetErrorBag($key);
+        }
+
+        $this->resetErrorBag('quality');
+        $this->resetPage();
+    }
+
     public function clearSearch(): void
     {
         $this->filters->search = '';

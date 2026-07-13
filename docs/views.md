@@ -19,7 +19,7 @@
 - `App\View\ViewModels\CatalogTitlesViewModel` готовит подписи фильтров и параметры ссылок каталога.
 - `App\Livewire\CatalogSeries` передаёт в Blade только render-local paginator/facet/view-model данные; Eloquent-коллекции не хранятся в публичных properties. Карточки и строки используют `catalog-title-{id}` как стабильный `wire:key`.
 - `App\View\ViewModels\CatalogTitlesViewModel` нормализует scalar/list query-state через `scalarState()` и `listState()`, чтобы шаблоны не читали raw query-параметры напрямую.
-- `App\View\ViewModels\CatalogTitlesViewModel` готовит состояние multi-select формы фильтров: скрытые поля для поиска/сортировки/расширенных параметров, выбранные годы и активные relation-значения.
+- `App\View\ViewModels\CatalogTitlesViewModel` готовит состояние multi-select формы фильтров: скрытые поля для поиска/сортировки/буквы, выбранные годы и активные relation-значения. Для блока «Точный подбор» ViewModel также готовит точный active count, GET reset query и максимальный календарный год; вычисления в Blade не дублируются.
 - Шаблон `resources/views/catalog/titles.blade.php` может добавлять `data-catalog-filter-*` атрибуты для локального client-side поиска внутри уже отрендеренных групп фильтров; база данных из Blade не запрашивается.
 - `App\View\ViewModels\CatalogShowViewModel` готовит состояние страницы тайтла: группы таксономий, выбранную серию, варианты медиа, MIME-тип видео, бейджи сезонов и подпись playback-профиля для каждой видимой серии.
 - `App\Livewire\CatalogTitlePlayer` передаёт в свой Blade только render-local summaries, серии одного сезона, media и `CatalogShowViewModel`; публичные properties ограничены locked title ID и небольшими URL-скалярами.
@@ -33,6 +33,7 @@
 - Компоненты получают готовые модели, коллекции или ViewModel-объекты и не выполняют запросы к базе.
 - В компонентных шаблонах используйте `$attributes->merge()` или `$attributes->class()` для расширяемых классов и атрибутов.
 - `x-title-card` и `x-title-list-row` дают тайтлу один основной tab-stop; ссылки справочников остаются отдельными доступными ссылками поверх stretched-link.
-- `x-title-poster` по умолчанию использует `object-contain`, чтобы постеры не обрезались на главной, в списках и на странице тайтла.
+- `x-title-poster` по умолчанию использует `object-cover`: изображение заполняет весь заданный frame, допускает небольшой боковой crop и не добавляет внутреннюю ring/border-рамку поверх структурной рамки карточки.
+- Публичное имя тайтла берётся из `CatalogTitle::display_title`: совпадающий суффикс `/original_title` не повторяется в основном заголовке, а `display_original_title` выводится отдельной вторичной строкой. Исходные поля базы и поисковый индекс не изменяются.
 - Стандартный вызов `$paginator->links()` использует русский светлый override `vendor.pagination.tailwind`.
 - Пустая выдача каталога показывает точный запрос; запрос только из стоп-слов получает отдельное сообщение «слишком общий». Пустое состояние не подменяется ближайшими карточками.

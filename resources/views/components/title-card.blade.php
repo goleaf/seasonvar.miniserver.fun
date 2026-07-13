@@ -1,6 +1,6 @@
 <article data-catalog-card {{ $attributes->merge(['class' => 'catalog-card group relative grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] overflow-hidden rounded-panel border border-slate-200 bg-white shadow-panel transition sm:flex sm:h-full sm:flex-col motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-panel-hover']) }}>
     <div class="relative bg-slate-50 sm:w-full">
-        <x-title-poster :title="$title" class="aspect-[2/3] w-full rounded-none border-0" image-class="h-full w-full object-contain" />
+        <x-title-poster :title="$title" class="aspect-[2/3] w-full rounded-none" />
     </div>
     <div class="flex min-w-0 flex-1 flex-col p-3 sm:p-4">
         <div class="flex min-w-0 flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
@@ -17,9 +17,12 @@
         </div>
         <h3 class="mt-2 text-base font-bold leading-6">
             <a href="{{ route('titles.show', $title) }}" class="break-words text-slate-800 after:absolute after:inset-0 hover:text-emerald-700">
-                {{ $title->title }}
+                {{ $title->display_title }}
             </a>
         </h3>
+        @if ($title->display_original_title)
+            <p class="mt-1 break-words text-sm font-semibold leading-5 text-slate-500">{{ $title->display_original_title }}</p>
+        @endif
         <div class="mt-3 flex flex-wrap gap-1.5 text-xs font-bold">
             <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
                 <x-ui.icon name="fa-solid fa-layer-group" />

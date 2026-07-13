@@ -468,10 +468,35 @@ const loadCatalogPeopleComboboxes = () => {
     });
 };
 
+let catalogPaginationScrollReady = false;
+
+const loadCatalogPaginationScroll = () => {
+    if (catalogPaginationScrollReady) {
+        return;
+    }
+
+    catalogPaginationScrollReady = true;
+
+    document.addEventListener('click', (event) => {
+        const eventTarget = event.target instanceof Element ? event.target : event.target?.parentElement;
+        const control = eventTarget?.closest('[data-catalog-pagination-control]');
+        const results = document.querySelector('[data-catalog-results]');
+
+        if (!control || !results) {
+            return;
+        }
+
+        window.requestAnimationFrame(() => {
+            smoothAnchorScroll(results, { animate: true });
+        });
+    });
+};
+
 const loadCatalogInterfaces = () => {
     loadCatalogFilterDialog();
     loadCatalogFilterSearch();
     loadCatalogPeopleComboboxes();
+    loadCatalogPaginationScroll();
 };
 
 if (document.readyState === 'loading') {

@@ -58,7 +58,7 @@ class CatalogTitlesPageBuilder
         $titleContext = $titleContextSlug === null || $titleContextSlug === ''
             ? null
             : $this->query->visibleTo($request->user())
-                ->select(['id', 'slug', 'title'])
+                ->select(['id', 'slug', 'title', 'original_title'])
                 ->where('slug', $titleContextSlug)
                 ->first();
         $criteria = CatalogTitlesCriteria::fromRequest(

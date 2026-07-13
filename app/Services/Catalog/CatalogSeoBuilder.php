@@ -103,12 +103,12 @@ class CatalogSeoBuilder
             ->values();
         $filterText = $activeLabels->implode(', ');
         $title = match (true) {
-            $search !== '' && $titleContext !== null => 'Поиск "'.$search.'" по сериалу '.$titleContext->title,
+            $search !== '' && $titleContext !== null => 'Поиск "'.$search.'" по сериалу '.$titleContext->display_title,
             $search !== '' => 'Поиск "'.$search.'" - сериалы онлайн',
             $filterText !== '' && $year !== null => 'Сериалы '.$year.' - '.$filterText,
             $filterText !== '' => 'Сериалы - '.$filterText,
             $year !== null => 'Сериалы '.$year.' года онлайн',
-            $titleContext !== null => 'Подборка по сериалу '.$titleContext->title,
+            $titleContext !== null => 'Подборка по сериалу '.$titleContext->display_title,
             default => 'Все сериалы онлайн',
         };
 
@@ -118,7 +118,7 @@ class CatalogSeoBuilder
 
         $descriptionParts = collect([
             $total.' сериалов найдено в каталоге.',
-            $titleContext !== null ? 'Показаны результаты по сериалу '.$titleContext->title.'.' : null,
+            $titleContext !== null ? 'Показаны результаты по сериалу '.$titleContext->display_title.'.' : null,
             $filterText !== '' ? 'Фильтры: '.$filterText.'.' : null,
             $year !== null ? 'Год выхода: '.$year.'.' : null,
             $search !== '' ? 'Поисковый запрос: '.$search.'.' : null,
@@ -130,7 +130,7 @@ class CatalogSeoBuilder
             ? $this->indexRobots()
             : 'noindex,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
         $keywords = collect(['сериалы онлайн', 'каталог сериалов', 'смотреть сериалы'])
-            ->when($titleContext !== null, fn (Collection $items): Collection => $items->push($titleContext->title))
+            ->when($titleContext !== null, fn (Collection $items): Collection => $items->push($titleContext->display_title))
             ->merge($activeTaxonomies->pluck('name'))
             ->when($year !== null, fn (Collection $items): Collection => $items->push('сериалы '.$year))
             ->filter()
@@ -159,7 +159,7 @@ class CatalogSeoBuilder
             'related_links' => $this->catalogRelatedLinks($search, $year, $activeTaxonomies),
             'search_context' => $titleContext === null ? null : [
                 'type' => 'title',
-                'title' => $titleContext->title,
+                'title' => $titleContext->display_title,
                 'slug' => $titleContext->slug,
             ],
             'breadcrumbs' => [
@@ -193,7 +193,7 @@ class CatalogSeoBuilder
         ?LicensedMedia $selectedMedia,
         ?string $selectedMediaUrl,
     ): array {
-        $displayTitle = PlainText::clean($catalogTitle->title) ?: __('catalog.navigation.all_titles');
+        $displayTitle = $catalogTitle->display_title ?: __('catalog.navigation.all_titles');
         $genres = $this->taxonomyNames($taxonomiesByType, 'genre');
         $countries = $this->taxonomyNames($taxonomiesByType, 'country');
         $actors = $this->taxonomyNames($taxonomiesByType, 'actor')->take(10);
@@ -586,7 +586,7 @@ class CatalogSeoBuilder
                     '@type' => 'ListItem',
                     'position' => $startPosition + $index,
                     'url' => route('titles.show', $title),
-                    'name' => $title->title,
+                    'name' => $title->display_title,
                     'image' => $title->poster_url,
                 ]))
                 ->all(),
@@ -666,7 +666,7 @@ class CatalogSeoBuilder
         ])->filter()->implode('; ');
 
         return [
-            'Страница сериала '.$catalogTitle->title.' автоматически собирает описание, постер, сезоны, серии, связи каталога и доступные видео для просмотра онлайн.',
+            'Страница сериала '.$catalogTitle->display_title.' автоматически собирает описание, постер, сезоны, серии, связи каталога и доступные видео для просмотра онлайн.',
             ($facts !== '' ? 'Основная информация: '.$facts.'. ' : '').'Сейчас в базе указано сезонов: '.$seasonCount.', серий: '.$episodeCount.', видео-файлов: '.$mediaCount.'.',
             'SEO-данные этой страницы обновляются из импортированной информации: алиасы, оригинальное название, рейтинги, актеры, жанры, страны, сезоны и серии используются для формирования поисковых фраз.',
         ];
@@ -791,26 +791,27 @@ class CatalogSeoBuilder
         int $episodeCount,
         int $mediaCount,
     ): Collection {
-        $baseNames = collect([$catalogTitle->title, $catalogTitle->original_title])
+        $displayTitle = $catalogTitle->display_title;
+        $baseNames = collect([$displayTitle, $catalogTitle->original_title])
             ->merge($alternateNames)
             ->filter()
             ->unique()
             ->values();
         $keywords = collect([
-            $catalogTitle->title,
+            $displayTitle,
             $catalogTitle->original_title,
-            'сериал '.$catalogTitle->title,
-            'сериал '.$catalogTitle->title.' смотреть онлайн',
-            $catalogTitle->title.' онлайн',
-            $catalogTitle->title.' все серии',
-            $catalogTitle->title.' все сезоны',
-            $catalogTitle->title.' в хорошем качестве',
-            $catalogTitle->title.' плеер',
-            $catalogTitle->year ? $catalogTitle->title.' '.$catalogTitle->year : null,
-            $catalogTitle->year ? 'сериал '.$catalogTitle->title.' '.$catalogTitle->year.' смотреть онлайн' : null,
-            $seasonCount > 0 ? $catalogTitle->title.' '.$seasonCount.' сезон' : null,
-            $episodeCount > 0 ? $catalogTitle->title.' '.$episodeCount.' серий' : null,
-            $mediaCount > 0 ? $catalogTitle->title.' смотреть в плеере' : null,
+            'сериал '.$displayTitle,
+            'сериал '.$displayTitle.' смотреть онлайн',
+            $displayTitle.' онлайн',
+            $displayTitle.' все серии',
+            $displayTitle.' все сезоны',
+            $displayTitle.' в хорошем качестве',
+            $displayTitle.' плеер',
+            $catalogTitle->year ? $displayTitle.' '.$catalogTitle->year : null,
+            $catalogTitle->year ? 'сериал '.$displayTitle.' '.$catalogTitle->year.' смотреть онлайн' : null,
+            $seasonCount > 0 ? $displayTitle.' '.$seasonCount.' сезон' : null,
+            $episodeCount > 0 ? $displayTitle.' '.$episodeCount.' серий' : null,
+            $mediaCount > 0 ? $displayTitle.' смотреть в плеере' : null,
         ])
             ->merge($baseNames)
             ->merge($genres)
@@ -828,20 +829,20 @@ class CatalogSeoBuilder
 
         foreach ($genres->take(5) as $genre) {
             $keywords = $keywords->merge([
-                $catalogTitle->title.' '.$genre,
+                $displayTitle.' '.$genre,
                 'сериалы '.$genre.' онлайн',
             ]);
         }
 
         foreach ($countries->take(3) as $country) {
             $keywords = $keywords->merge([
-                $catalogTitle->title.' '.$country,
+                $displayTitle.' '.$country,
                 'сериалы '.$country.' смотреть онлайн',
             ]);
         }
 
         foreach ($actors->take(5) as $actor) {
-            $keywords = $keywords->push($catalogTitle->title.' '.$actor);
+            $keywords = $keywords->push($displayTitle.' '.$actor);
         }
 
         return $keywords
@@ -864,21 +865,22 @@ class CatalogSeoBuilder
         int $episodeCount,
         int $mediaCount,
     ): array {
+        $displayTitle = $catalogTitle->display_title;
         $phrases = collect([
-            'смотреть '.$catalogTitle->title.' онлайн',
-            $catalogTitle->title.' все серии подряд',
-            $catalogTitle->title.' все сезоны онлайн',
-            $catalogTitle->title.' бесплатно в плеере',
-            $catalogTitle->title.' описание сериала',
-            $catalogTitle->title.' актеры и роли',
-            $catalogTitle->title.' жанр и страна',
-            $catalogTitle->year ? $catalogTitle->title.' '.$catalogTitle->year.' онлайн' : null,
-            $seasonCount > 0 ? $catalogTitle->title.' '.$seasonCount.' сезон смотреть' : null,
-            $episodeCount > 0 ? $catalogTitle->title.' '.$episodeCount.' серий смотреть' : null,
-            $mediaCount > 0 ? $catalogTitle->title.' видео онлайн' : null,
+            'смотреть '.$displayTitle.' онлайн',
+            $displayTitle.' все серии подряд',
+            $displayTitle.' все сезоны онлайн',
+            $displayTitle.' бесплатно в плеере',
+            $displayTitle.' описание сериала',
+            $displayTitle.' актеры и роли',
+            $displayTitle.' жанр и страна',
+            $catalogTitle->year ? $displayTitle.' '.$catalogTitle->year.' онлайн' : null,
+            $seasonCount > 0 ? $displayTitle.' '.$seasonCount.' сезон смотреть' : null,
+            $episodeCount > 0 ? $displayTitle.' '.$episodeCount.' серий смотреть' : null,
+            $mediaCount > 0 ? $displayTitle.' видео онлайн' : null,
         ])
-            ->merge($genres->take(3)->map(fn (string $genre): string => $catalogTitle->title.' '.$genre.' сериал'))
-            ->merge($countries->take(2)->map(fn (string $country): string => $catalogTitle->title.' '.$country.' сериал'))
+            ->merge($genres->take(3)->map(fn (string $genre): string => $displayTitle.' '.$genre.' сериал'))
+            ->merge($countries->take(2)->map(fn (string $country): string => $displayTitle.' '.$country.' сериал'))
             ->merge($keywords->take(8));
 
         return $phrases
@@ -1010,7 +1012,7 @@ class CatalogSeoBuilder
         return [
             '@context' => 'https://schema.org',
             '@type' => 'ItemList',
-            'name' => 'Серии '.$catalogTitle->title,
+            'name' => 'Серии '.$catalogTitle->display_title,
             'numberOfItems' => $episodes->count(),
             'itemListElement' => $episodes
                 ->values()
@@ -1029,7 +1031,7 @@ class CatalogSeoBuilder
                         ],
                         'partOfSeries' => [
                             '@type' => 'TVSeries',
-                            'name' => $catalogTitle->title,
+                            'name' => $catalogTitle->display_title,
                         ],
                         'url' => route('titles.show', ['catalogTitle' => $catalogTitle, 'episode' => $item['episode']->id]).'#player',
                     ]),
@@ -1113,31 +1115,33 @@ class CatalogSeoBuilder
         int $episodeCount,
         int $mediaCount,
     ): array {
+        $displayTitle = $catalogTitle->display_title;
+
         return [
             [
                 'title' => 'Смотреть онлайн',
                 'items' => collect([
-                    $catalogTitle->title.' смотреть онлайн',
-                    $catalogTitle->title.' все серии',
-                    $catalogTitle->title.' все сезоны',
-                    $mediaCount > 0 ? $catalogTitle->title.' смотреть в плеере' : $catalogTitle->title.' видео скоро появится',
+                    $displayTitle.' смотреть онлайн',
+                    $displayTitle.' все серии',
+                    $displayTitle.' все сезоны',
+                    $mediaCount > 0 ? $displayTitle.' смотреть в плеере' : $displayTitle.' видео скоро появится',
                 ])->filter()->values()->all(),
             ],
             [
                 'title' => 'Информация о сериале',
                 'items' => collect([
-                    $catalogTitle->year ? $catalogTitle->title.' '.$catalogTitle->year : null,
-                    $seasonCount > 0 ? $catalogTitle->title.' '.$seasonCount.' сезон' : null,
-                    $episodeCount > 0 ? $catalogTitle->title.' '.$episodeCount.' серий' : null,
-                    $genres->isNotEmpty() ? $catalogTitle->title.' '.$genres->first() : null,
-                    $countries->isNotEmpty() ? $catalogTitle->title.' '.$countries->first() : null,
+                    $catalogTitle->year ? $displayTitle.' '.$catalogTitle->year : null,
+                    $seasonCount > 0 ? $displayTitle.' '.$seasonCount.' сезон' : null,
+                    $episodeCount > 0 ? $displayTitle.' '.$episodeCount.' серий' : null,
+                    $genres->isNotEmpty() ? $displayTitle.' '.$genres->first() : null,
+                    $countries->isNotEmpty() ? $displayTitle.' '.$countries->first() : null,
                 ])->filter()->values()->all(),
             ],
             [
                 'title' => 'Люди и связи',
                 'items' => collect()
-                    ->merge($actors->take(5)->map(fn (string $actor): string => $catalogTitle->title.' '.$actor))
-                    ->merge($directors->take(3)->map(fn (string $director): string => $catalogTitle->title.' режиссер '.$director))
+                    ->merge($actors->take(5)->map(fn (string $actor): string => $displayTitle.' '.$actor))
+                    ->merge($directors->take(3)->map(fn (string $director): string => $displayTitle.' режиссер '.$director))
                     ->values()
                     ->all(),
             ],

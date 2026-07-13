@@ -89,7 +89,11 @@ class CatalogPlaybackSourceResolver
                     (int) $media->season_id === $episode->season?->id ? $episode->season : null,
                 );
                 $media->setRelation('episode', $episode);
+
+                return;
             }
+
+            $media->setRelation('episode', null);
         });
 
         if ($mediaItems->isEmpty()) {

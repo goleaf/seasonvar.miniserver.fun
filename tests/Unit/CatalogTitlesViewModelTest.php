@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Models\Genre;
 use App\View\ViewModels\CatalogTitlesViewModel;
+use Illuminate\Support\Facades\Date;
 use Tests\TestCase;
 
 class CatalogTitlesViewModelTest extends TestCase
@@ -99,5 +100,63 @@ class CatalogTitlesViewModelTest extends TestCase
         );
 
         $this->assertSame(9, $viewModel->activeFilterCount());
+    }
+
+    public function test_advanced_filter_count_and_reset_query_cover_only_exact_selection_state(): void
+    {
+        $viewModel = new CatalogTitlesViewModel(
+            search: 'Мамочка',
+            sort: 'year_desc',
+            year: null,
+            requestedYear: '',
+            invalidYear: false,
+            activeTaxonomies: collect(),
+            selectedTaxonomies: collect(),
+            activeFilterSlugs: [],
+            invalidFilterSlugs: [],
+            titleContext: null,
+            catalogQueryState: [
+                'q' => 'Мамочка',
+                'genre' => ['comedy'],
+                'year_from' => '2010',
+                'rating_min' => '7.5',
+                'quality' => ['1080p', '720p'],
+                'letter' => 'М',
+                'sort' => 'year_desc',
+            ],
+        );
+
+        $this->assertSame(4, $viewModel->advancedFilterCount());
+        $this->assertTrue($viewModel->hasAdvancedFilters());
+        $this->assertSame([
+            'q' => 'Мамочка',
+            'genre' => ['comedy'],
+            'letter' => 'М',
+            'sort' => 'year_desc',
+        ], $viewModel->advancedFiltersResetQuery());
+    }
+
+    public function test_maximum_catalog_year_is_prepared_outside_blade(): void
+    {
+        Date::setTestNow('2026-07-13 12:00:00');
+
+        try {
+            $viewModel = new CatalogTitlesViewModel(
+                search: '',
+                sort: 'updated',
+                year: null,
+                requestedYear: '',
+                invalidYear: false,
+                activeTaxonomies: collect(),
+                selectedTaxonomies: collect(),
+                activeFilterSlugs: [],
+                invalidFilterSlugs: [],
+                titleContext: null,
+            );
+
+            $this->assertSame(2027, $viewModel->maximumCatalogYear());
+        } finally {
+            Date::setTestNow();
+        }
     }
 }

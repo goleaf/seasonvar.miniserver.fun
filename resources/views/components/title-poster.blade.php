@@ -1,13 +1,13 @@
 @props([
     'title',
     'emptyLabel' => 'Нет постера',
-    'imageClass' => 'h-full w-full object-contain',
+    'imageClass' => 'h-full w-full object-cover',
     'emptyClass' => 'grid h-full place-items-center px-2 text-center text-xs font-semibold text-slate-500',
 ])
 
-<div {{ $attributes->merge(['class' => 'overflow-hidden rounded-control bg-slate-100 ring-1 ring-slate-200']) }}>
+<div {{ $attributes->merge(['class' => 'overflow-hidden rounded-control bg-slate-100']) }}>
     @if ($title->poster_url)
-        <img src="{{ $title->poster_url }}" alt="Постер {{ $title->title }}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="{{ $imageClass }}">
+        <img src="{{ $title->poster_url }}" alt="Постер {{ $title->display_title }}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="{{ $imageClass }}">
     @else
         <div class="{{ $emptyClass }}">
             <span class="inline-flex flex-col items-center gap-1">

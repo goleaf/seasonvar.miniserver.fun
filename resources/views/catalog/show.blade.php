@@ -1,4 +1,4 @@
-@extends('layouts.app', ['title' => $seo['title'] ?? $title->title, 'seo' => $seo ?? []])
+@extends('layouts.app', ['title' => $seo['title'] ?? $title->display_title, 'seo' => $seo ?? []])
 
 @section('content')
     <section class="grid min-w-0 gap-5 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]">
@@ -70,7 +70,7 @@
                 </div>
 
                 <article class="grid gap-5 bg-gradient-to-br from-white via-white to-emerald-50 p-4 md:grid-cols-[minmax(150px,220px)_minmax(0,1fr)] md:p-5">
-                    <x-title-poster :title="$title" class="mx-auto aspect-[2/3] w-44 max-w-full border border-slate-200 shadow-panel sm:w-52 md:w-full" empty-class="grid h-full place-items-center px-6 text-center text-sm text-slate-500" />
+                    <x-title-poster :title="$title" class="mx-auto aspect-[2/3] w-44 max-w-full shadow-panel sm:w-52 md:w-full" empty-class="grid h-full place-items-center px-6 text-center text-sm text-slate-500" />
 
                     <div class="min-w-0">
                         <h1 class="flex min-w-0 items-start gap-3 text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">

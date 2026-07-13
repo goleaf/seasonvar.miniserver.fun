@@ -184,8 +184,8 @@ class CatalogShowViewModel
             'tag' => __('catalog.taxonomy.tags'),
         ];
         $titleAttributes = $this->title->getAttributes();
-        $this->displayTitle = PlainText::clean($titleAttributes['title'] ?? '');
-        $this->displayOriginalTitle = PlainText::clean($titleAttributes['original_title'] ?? '');
+        $this->displayTitle = $this->title->display_title;
+        $this->displayOriginalTitle = $this->title->display_original_title ?? '';
         $this->displayDescription = PlainText::clean($titleAttributes['description'] ?? '', 20000);
         $this->genres = $this->taxonomies('genre');
         $this->countries = $this->taxonomies('country');

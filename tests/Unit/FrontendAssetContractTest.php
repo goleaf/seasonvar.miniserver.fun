@@ -46,6 +46,16 @@ class FrontendAssetContractTest extends TestCase
         $this->assertStringContainsString('margin-block-start: 0.125em', $styles);
     }
 
+    public function test_catalog_pagination_scrolls_smoothly_to_the_results_boundary(): void
+    {
+        $app = File::get(resource_path('js/app.js'));
+
+        $this->assertStringContainsString('data-catalog-pagination-control', $app);
+        $this->assertStringContainsString('[data-catalog-results]', $app);
+        $this->assertStringContainsString('smoothAnchorScroll', $app);
+        $this->assertStringContainsString('reducedMotionQuery.matches', $app);
+    }
+
     public function test_player_assets_define_one_cleanup_safe_livewire_session_lifecycle(): void
     {
         $app = File::get(resource_path('js/app.js'));

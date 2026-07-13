@@ -490,6 +490,42 @@ class CatalogPageTest extends TestCase
             ->assertSet('filters.perPage', 24);
     }
 
+    public function test_livewire_catalog_resets_only_exact_selection_filters(): void
+    {
+        CatalogTitle::factory()->create();
+        $genre = Genre::query()->create([
+            'name' => 'Комедия',
+            'slug' => 'comedy',
+        ]);
+
+        Livewire::test(CatalogSeries::class)
+            ->set('filters.search', 'Мамочка')
+            ->set('filters.genre', [$genre->slug])
+            ->set('filters.yearFrom', 2010)
+            ->set('filters.yearTo', 2024)
+            ->set('filters.seasonsMin', 2)
+            ->set('filters.episodesMax', 100)
+            ->set('filters.ratingSource', 'imdb')
+            ->set('filters.ratingMin', 7.5)
+            ->set('filters.votesMin', 1000)
+            ->set('filters.video', 'available')
+            ->set('filters.updated', 'month')
+            ->set('filters.qualities', ['1080p', '720p'])
+            ->call('resetAdvancedFilters')
+            ->assertSet('filters.search', 'Мамочка')
+            ->assertSet('filters.genre', [$genre->slug])
+            ->assertSet('filters.yearFrom', '')
+            ->assertSet('filters.yearTo', '')
+            ->assertSet('filters.seasonsMin', '')
+            ->assertSet('filters.episodesMax', '')
+            ->assertSet('filters.ratingSource', '')
+            ->assertSet('filters.ratingMin', '')
+            ->assertSet('filters.votesMin', '')
+            ->assertSet('filters.video', '')
+            ->assertSet('filters.updated', '')
+            ->assertSet('filters.qualities', []);
+    }
+
     public function test_livewire_catalog_removes_one_choice_and_resets_only_the_requested_group(): void
     {
         CatalogTitle::factory()->count(30)->create();
@@ -1142,7 +1178,7 @@ class CatalogPageTest extends TestCase
         $this->assertContains('Статистика без описания', $issueTitles);
     }
 
-    public function test_titles_page_shows_posters_without_cropping_in_equal_size_area(): void
+    public function test_titles_page_fills_equal_size_poster_areas_without_double_frames(): void
     {
         CatalogTitle::factory()->create([
             'title' => 'Тестовый сериал',
@@ -1155,8 +1191,9 @@ class CatalogPageTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('aspect-[2/3]', false)
-            ->assertSee('object-contain', false)
-            ->assertDontSee('object-cover transition group-hover:scale-[1.02]', false);
+            ->assertSee('object-cover', false)
+            ->assertDontSee('object-contain', false)
+            ->assertDontSee('ring-1 ring-slate-200', false);
     }
 
     public function test_title_page_server_renders_safe_localized_metadata_without_inferring_content_language(): void
