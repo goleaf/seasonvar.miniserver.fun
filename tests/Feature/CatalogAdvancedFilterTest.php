@@ -444,6 +444,35 @@ class CatalogAdvancedFilterTest extends TestCase
             ->assertDontSeeText('Не должен появиться');
     }
 
+    public function test_result_and_facet_data_are_built_through_separate_boundaries(): void
+    {
+        $lithuania = Country::query()->create([
+            'name' => 'Литва',
+            'slug' => 'litva',
+        ]);
+        $matching = CatalogTitle::factory()->create(['title' => 'Литовский сериал']);
+        $matching->countries()->attach($lithuania);
+        CatalogTitle::factory()->create(['title' => 'Сериал другой страны']);
+        $request = CatalogTitlesRequest::create(route('titles.index'), 'GET', [
+            'country' => ['litva'],
+        ]);
+        $request->setContainer(app())->setRedirector(app('redirect'));
+        $request->setUserResolver(fn (): null => null);
+        $request->validateResolved();
+        $builder = app(CatalogTitlesPageBuilder::class);
+
+        $page = $builder->data($request, includeFacets: false);
+        $facets = $builder->facets($request);
+
+        $this->assertSame([$matching->id], $page['titles']->pluck('id')->all());
+        $this->assertTrue($page['filterTaxonomies']->flatten()->isEmpty());
+        $this->assertTrue($facets['filterView']->isActiveTaxonomy('country', $lithuania));
+        $this->assertSame(
+            1,
+            $facets['filterTaxonomies']->get('country')->firstWhere('slug', 'litva')->context_titles_count,
+        );
+    }
+
     public function test_ready_fts_candidates_are_shared_by_results_and_contextual_facets(): void
     {
         $actor = Actor::query()->create(['name' => 'Поисковый Актер', 'slug' => 'poiskovyi-akter']);
@@ -471,7 +500,13 @@ class CatalogAdvancedFilterTest extends TestCase
         DB::enableQueryLog();
 
         try {
-            $data = $this->catalogData(['q' => 'Поисковый Актер']);
+            $request = CatalogTitlesRequest::create(route('titles.index'), 'GET', ['q' => 'Поисковый Актер']);
+            $request->setContainer(app())->setRedirector(app('redirect'));
+            $request->setUserResolver(fn (): null => null);
+            $request->validateResolved();
+            $builder = app(CatalogTitlesPageBuilder::class);
+            $data = $builder->data($request, includeFacets: false);
+            $facets = $builder->facets($request);
             $queries = collect(DB::getQueryLog())
                 ->pluck('query')
                 ->map(fn (string $sql): string => mb_strtolower($sql));
@@ -480,7 +515,7 @@ class CatalogAdvancedFilterTest extends TestCase
             DB::flushQueryLog();
         }
 
-        $genres = $data['filterTaxonomies']->get('genre')->keyBy('slug');
+        $genres = $facets['filterTaxonomies']->get('genre')->keyBy('slug');
 
         $this->assertSame(2, $data['titles']->total());
         $this->assertSame(1, $genres->get('poiskovaia-drama')->context_titles_count);
