@@ -9,7 +9,10 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use RuntimeException;
+use SplFileInfo;
 
 class ProjectDocumentationRefresher
 {
@@ -72,7 +75,11 @@ class ProjectDocumentationRefresher
             }
         }
 
-        return new ProjectDocumentationRefreshResult($changedFiles, $missingFiles);
+        return new ProjectDocumentationRefreshResult(
+            $changedFiles,
+            $missingFiles,
+            $this->brokenMarkdownLinks(),
+        );
     }
 
     public function refreshContents(string $relativePath, string $contents): string
@@ -177,12 +184,17 @@ class ProjectDocumentationRefresher
 
     private function maintenanceSection(): string
     {
-        return $this->section('Автоматически обновляемое состояние документации', [
+        $summary = $this->section('Автоматически обновляемое состояние документации', [
             'Последнее автоматическое обновление блоков документации: '.$this->today().'.',
             'Команда обновления: `php artisan project:docs-refresh`.',
             'Хук автокоммита: `.githooks/post-commit` через `scripts/docs-autocommit-push.sh`; отправка в Git включается только через `SEASONVAR_DOCS_AUTO_PUSH=1`.',
             'Основной sitemap для robots и поисковых систем: `https://seasonvar.miniserver.fun/sitemap-index.xml`.',
         ]);
+        $migrations = $this->migrationInventory();
+
+        return $summary."\n\n## Migration inventory\n\n".($migrations === []
+            ? '- Миграции не найдены.'
+            : collect($migrations)->map(fn (string $filename): string => '- `'.$filename.'`')->implode("\n"));
     }
 
     private function sourceParitySection(): string
@@ -348,6 +360,162 @@ class ProjectDocumentationRefresher
         }
 
         return '/'.ltrim($route->uri(), '/');
+    }
+
+    /** @return list<string> */
+    private function migrationInventory(): array
+    {
+        $paths = glob($this->path('database/migrations/*.php')) ?: [];
+        $filenames = array_map('basename', $paths);
+        sort($filenames, SORT_STRING);
+
+        return array_values($filenames);
+    }
+
+    /** @return list<string> */
+    private function brokenMarkdownLinks(): array
+    {
+        $issues = [];
+
+        foreach ($this->markdownFiles() as $relativePath) {
+            $contents = file_get_contents($this->path($relativePath));
+
+            if (! is_string($contents)) {
+                throw new RuntimeException('Не удалось прочитать Markdown-файл: '.$relativePath);
+            }
+
+            $insideFence = false;
+
+            foreach (preg_split('/\R/u', $contents) ?: [] as $index => $line) {
+                if (preg_match('/^\s{0,3}(`{3,}|~{3,})/', $line) === 1) {
+                    $insideFence = ! $insideFence;
+
+                    continue;
+                }
+
+                if ($insideFence) {
+                    continue;
+                }
+
+                preg_match_all('/!?\[[^\]]*\]\((?<target>[^)]+)\)/u', $line, $matches);
+
+                foreach ($matches['target'] ?? [] as $rawTarget) {
+                    $target = $this->markdownLinkTarget((string) $rawTarget);
+
+                    if ($target === null) {
+                        continue;
+                    }
+
+                    $resolved = $this->resolveRepositoryLink($relativePath, $target);
+
+                    if ($resolved !== null && (is_file($this->path($resolved)) || is_dir($this->path($resolved)))) {
+                        continue;
+                    }
+
+                    $issues[] = [
+                        'file' => $relativePath,
+                        'line' => $index + 1,
+                        'target' => $target,
+                    ];
+                }
+            }
+        }
+
+        usort($issues, fn (array $left, array $right): int => [
+            $left['file'],
+            $left['target'],
+            $left['line'],
+        ] <=> [
+            $right['file'],
+            $right['target'],
+            $right['line'],
+        ]);
+
+        return array_map(
+            fn (array $issue): string => $issue['file'].':'.$issue['line'].' -> '.$issue['target'],
+            $issues,
+        );
+    }
+
+    /** @return list<string> */
+    private function markdownFiles(): array
+    {
+        $files = [];
+
+        foreach (glob($this->path('*.md')) ?: [] as $path) {
+            $files[] = basename($path);
+        }
+
+        $docsPath = $this->path('docs');
+
+        if (is_dir($docsPath)) {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($docsPath, RecursiveDirectoryIterator::SKIP_DOTS),
+            );
+
+            /** @var SplFileInfo $file */
+            foreach ($iterator as $file) {
+                if (! $file->isFile() || strtolower($file->getExtension()) !== 'md') {
+                    continue;
+                }
+
+                $files[] = 'docs/'.str_replace('\\', '/', $iterator->getSubPathname());
+            }
+        }
+
+        sort($files, SORT_STRING);
+
+        return array_values(array_unique($files));
+    }
+
+    private function markdownLinkTarget(string $rawTarget): ?string
+    {
+        $target = trim(html_entity_decode($rawTarget, ENT_QUOTES | ENT_HTML5));
+
+        if (str_starts_with($target, '<') && str_contains($target, '>')) {
+            $target = (string) str($target)->betweenFirst('<', '>');
+        } else {
+            $target = (string) preg_split('/\s+["\']/', $target, 2)[0];
+        }
+
+        $target = str_replace(['\\(', '\\)'], ['(', ')'], trim($target));
+
+        if ($target === ''
+            || str_starts_with($target, '#')
+            || str_starts_with($target, '/')
+            || str_starts_with($target, '//')
+            || preg_match('/^[a-z][a-z0-9+.-]*:/i', $target) === 1) {
+            return null;
+        }
+
+        return $target;
+    }
+
+    private function resolveRepositoryLink(string $owner, string $target): ?string
+    {
+        $path = rawurldecode((string) preg_split('/[?#]/', $target, 2)[0]);
+        $segments = explode('/', str_replace('\\', '/', dirname($owner).'/'.$path));
+        $resolved = [];
+
+        foreach ($segments as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+
+            if ($segment === '..') {
+                if ($resolved === []) {
+                    return null;
+                }
+
+                array_pop($resolved);
+
+                continue;
+            }
+
+            $resolved[] = $segment;
+        }
+
+        return $resolved === [] ? null : implode('/', $resolved);
     }
 
     private function today(): string

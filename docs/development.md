@@ -72,16 +72,18 @@ bash -n .githooks/pre-commit .githooks/pre-push .githooks/post-commit .githooks/
 - `php artisan google:search-console:summary` — read-only сводка Search Console, если Google credentials настроены вне Git.
 - `php artisan google:analytics:summary` — read-only сводка GA4, если Google credentials настроены вне Git.
 - `php artisan project:docs-refresh` — обновляет управляемые блоки документации.
-- `php artisan project:docs-refresh --check` — проверяет документацию без записи изменений.
+- `php artisan project:docs-refresh --check` — проверяет документацию без записи изменений, включая repository-relative Markdown links и migration inventory.
+- `composer analyse` — запускает bounded Larastan/PHPStan по DTO, enums и критичным operational/admin boundaries без baseline и ignored errors.
 
 ## Проверки
 
 ```bash
 composer test
+composer analyse
 php artisan test --compact
 ./vendor/bin/pint --dirty --format agent
 npm run build
 php artisan project:docs-refresh --check
 ```
 
-Pest, PHPStan, Larastan, Rector и `npm run lint` сейчас не установлены.
+Pest, Rector и `npm run lint` сейчас не установлены. Larastan/PHPStan применяется как ограниченный high-value gate; расширять paths нужно постепенно и только с нулём ignored errors.

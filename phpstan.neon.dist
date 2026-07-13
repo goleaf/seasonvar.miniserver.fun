@@ -1,0 +1,13 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 6
+    paths:
+        - app/DTOs
+        - app/Enums
+        - app/Services/Operations
+        - app/Services/Admin/AdminAuditRecorder.php
+        - app/Console/Commands/CheckDeploymentReadiness.php
+        - app/Models/AdminAuditEvent.php
+    tmpDir: storage/framework/cache/phpstan

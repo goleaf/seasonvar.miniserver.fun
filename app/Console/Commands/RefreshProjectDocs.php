@@ -23,6 +23,14 @@ class RefreshProjectDocs extends Command
             $this->warn('Файл документации не найден: '.$relativePath);
         }
 
+        foreach ($result->brokenLinks as $brokenLink) {
+            $this->error('Некорректная ссылка Markdown: '.$brokenLink);
+        }
+
+        if ($result->hasBrokenLinks()) {
+            return self::FAILURE;
+        }
+
         if (! $result->hasChanges()) {
             $this->info('Документация уже актуальна.');
 

@@ -111,6 +111,9 @@ jobs:
       - name: Run PHP syntax lint
         run: find app bootstrap config database routes tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 
+      - name: Run bounded Larastan analysis
+        run: composer analyse
+
       - name: Validate Laravel caches
         run: |
           php artisan config:cache

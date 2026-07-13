@@ -222,4 +222,64 @@
 - Команда обновления: `php artisan project:docs-refresh`.
 - Хук автокоммита: `.githooks/post-commit` через `scripts/docs-autocommit-push.sh`; отправка в Git включается только через `SEASONVAR_DOCS_AUTO_PUSH=1`.
 - Основной sitemap для robots и поисковых систем: `https://seasonvar.miniserver.fun/sitemap-index.xml`.
+
+## Migration inventory
+
+- `0001_01_01_000000_create_users_table.php`
+- `0001_01_01_000001_create_cache_table.php`
+- `0001_01_01_000002_create_jobs_table.php`
+- `2026_07_09_062525_create_sources_table.php`
+- `2026_07_09_062526_create_source_pages_table.php`
+- `2026_07_09_062527_create_catalog_titles_table.php`
+- `2026_07_09_062528_create_seasons_table.php`
+- `2026_07_09_062529_create_episodes_table.php`
+- `2026_07_09_062530_create_taxonomies_table.php`
+- `2026_07_09_062532_create_licensed_media_table.php`
+- `2026_07_09_062533_create_catalog_title_taxonomy_table.php`
+- `2026_07_09_085643_add_catalog_query_indexes.php`
+- `2026_07_09_090220_add_release_status_fields_to_seasons_table.php`
+- `2026_07_09_090903_create_catalog_relation_tables.php`
+- `2026_07_09_091148_backfill_catalog_relation_tables_from_taxonomies.php`
+- `2026_07_09_110243_create_catalog_title_ratings_table.php`
+- `2026_07_09_110244_create_catalog_title_aliases_table.php`
+- `2026_07_09_121727_add_import_state_to_source_pages_table.php`
+- `2026_07_09_121727_add_seasonvar_fields_to_licensed_media_table.php`
+- `2026_07_09_121727_create_catalog_title_reviews_table.php`
+- `2026_07_09_121727_create_seasonvar_import_events_table.php`
+- `2026_07_09_121727_create_seasonvar_import_runs_table.php`
+- `2026_07_09_121727_create_source_page_snapshots_table.php`
+- `2026_07_09_153750_add_refresh_planner_indexes.php`
+- `2026_07_09_165442_add_stats_query_indexes.php`
+- `2026_07_09_185411_add_playback_variant_fields_to_licensed_media_table.php`
+- `2026_07_09_191236_create_catalog_title_recommendations_table.php`
+- `2026_07_09_193937_add_score_breakdown_to_catalog_title_recommendations_table.php`
+- `2026_07_09_193937_create_catalog_title_recommendation_signals_table.php`
+- `2026_07_09_204238_add_process_metadata_to_seasonvar_import_runs_table.php`
+- `2026_07_09_205915_add_feed_query_index_to_catalog_titles_table.php`
+- `2026_07_12_134630_add_catalog_filter_query_indexes.php`
+- `2026_07_12_174216_add_publication_integrity_columns_to_catalog_domain.php`
+- `2026_07_12_174218_backfill_catalog_domain_publication_integrity.php`
+- `2026_07_12_174219_enforce_catalog_domain_publication_integrity.php`
+- `2026_07_12_192823_add_parallel_import_claims_to_source_pages_table.php`
+- `2026_07_12_192824_add_execution_mode_to_seasonvar_import_runs_table.php`
+- `2026_07_12_230000_add_catalog_alias_search_index.php`
+- `2026_07_12_235500_create_catalog_user_state_tables.php`
+- `2026_07_12_235600_add_persistent_playback_fields_to_episode_view_progress_table.php`
+- `2026_07_12_235601_backfill_episode_view_progress_first_started_at.php`
+- `2026_07_13_021800_add_health_state_to_licensed_media_table.php`
+- `2026_07_13_051125_add_metadata_versions_to_catalog_import_tables.php`
+- `2026_07_13_120000_add_history_order_index_to_episode_view_progress_table.php`
+- `2026_07_13_130100_add_provider_field_values_to_catalog_titles_table.php`
+- `2026_07_13_130101_add_provider_identity_indexes_to_people_tables.php`
+- `2026_07_13_140000_add_administration_fields_to_seasonvar_import_runs.php`
+- `2026_07_13_150000_create_catalog_title_slugs_table.php`
+- `2026_07_13_161344_deduplicate_catalog_title_alias_names.php`
+- `2026_07_13_161345_enforce_unique_catalog_title_alias_names.php`
+- `2026_07_13_164039_add_provider_availability_to_source_pages_table.php`
+- `2026_07_13_170000_create_catalog_search_index.php`
+- `2026_07_13_171455_create_catalog_relation_source_identities_table.php`
+- `2026_07_13_180000_add_metadata_backfill_lookup_indexes.php`
+- `2026_07_13_190000_add_home_media_feed_index.php`
+- `2026_07_13_200000_create_seasonvar_import_title_groups.php`
+- `2026_07_13_210000_create_admin_audit_events_table.php`
 <!-- project-docs:end -->

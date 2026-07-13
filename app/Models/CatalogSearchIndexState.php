@@ -25,6 +25,15 @@ class CatalogSearchIndexState extends Model
 
     public $incrementing = false;
 
+    public function statusValue(): CatalogSearchIndexStatus
+    {
+        $status = $this->getAttribute('status');
+
+        return $status instanceof CatalogSearchIndexStatus
+            ? $status
+            : CatalogSearchIndexStatus::from((string) $status);
+    }
+
     /** @return array<string, string> */
     protected function casts(): array
     {

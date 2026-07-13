@@ -168,7 +168,7 @@ final class DeploymentReadinessChecker
             $ftsCount = (int) (DB::table('catalog_title_search_fts')->count());
             $state = CatalogSearchIndexState::query()->find(CatalogSearchIndexState::SINGLETON_ID);
             $readyState = $sourceCount === 0
-                || ($state?->status === CatalogSearchIndexStatus::Ready
+                || ($state?->statusValue() === CatalogSearchIndexStatus::Ready
                     && (int) $state->version === CatalogSearchIndexer::INDEX_VERSION);
             $safe = $sourceCount === $documentCount
                 && $documentCount === $ftsCount

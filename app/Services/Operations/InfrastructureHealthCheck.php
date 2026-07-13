@@ -7,10 +7,12 @@ namespace App\Services\Operations;
 use App\Services\Catalog\CacheWarmingState;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheKeyFactory;
+use Illuminate\Cache\MemcachedStore;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Laravel\Horizon\Horizon;
+use RuntimeException;
 use Throwable;
 
 final class InfrastructureHealthCheck
@@ -133,9 +135,15 @@ final class InfrastructureHealthCheck
                 );
 
                 $healthy = $store->get($key) === 'ok';
-                $statistics = $store->getStore()->getMemcached()->getStats();
+                $memcached = $store->getStore();
 
-                foreach (is_array($statistics) ? $statistics : [] as $server) {
+                if (! $memcached instanceof MemcachedStore) {
+                    throw new RuntimeException('Настроенный cache store не использует Memcached.');
+                }
+
+                $statistics = $memcached->getMemcached()->getStats();
+
+                foreach ($statistics as $server) {
                     if (! is_array($server)) {
                         continue;
                     }

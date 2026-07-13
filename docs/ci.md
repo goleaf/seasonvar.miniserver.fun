@@ -16,6 +16,7 @@ composer validate --strict
 composer audit
 ./vendor/bin/pint --test --format=github
 find app bootstrap config database routes tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+composer analyse
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
@@ -52,4 +53,4 @@ Browser job после backend/frontend gates устанавливает managed
 
 ## Static Analysis
 
-PHPStan, Larastan и Rector пока не установлены. CI выполняет доступную статическую проверку синтаксиса через `php -l` и форматирование через Pint.
+`composer analyse` запускает Larastan/PHPStan level 6 без baseline и `ignoreErrors`. Начальная область намеренно ограничена `app/DTOs`, `app/Enums`, operational diagnostics, `AdminAuditRecorder`, `CheckDeploymentReadiness` и `AdminAuditEvent`: это low-noise gate для security/operations boundaries, а не заявление о полном анализе всего legacy application. CI также сохраняет отдельные проверки синтаксиса через `php -l` и форматирования через Pint.
