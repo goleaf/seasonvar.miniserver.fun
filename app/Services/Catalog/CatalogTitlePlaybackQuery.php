@@ -198,26 +198,78 @@ class CatalogTitlePlaybackQuery
         return $this->adjacentEpisode($catalogTitle, $user, $current, true);
     }
 
+    /**
+     * @param  Collection<int, Episode>  $activeSeasonEpisodes
+     * @param  Collection<int, Season>  $seasonSummaries
+     */
     public function episodeNavigation(
         CatalogTitle $catalogTitle,
         Season $season,
         ?User $user,
         Episode $episode,
+        Collection $activeSeasonEpisodes,
+        Collection $seasonSummaries,
     ): CatalogEpisodeNavigation {
-        if ((int) $season->catalog_title_id !== $catalogTitle->id || (int) $episode->season_id !== $season->id) {
+        if ((int) $season->catalog_title_id !== $catalogTitle->id
+            || (int) $episode->season_id !== $season->id
+            || $activeSeasonEpisodes->contains(
+                fn (Episode $candidate): bool => (int) $candidate->season_id !== $season->id,
+            )) {
+            return new CatalogEpisodeNavigation;
+        }
+
+        $episodeKind = $this->releaseKindValue($episode->kind);
+        $seasonKind = $this->releaseKindValue($season->kind);
+
+        if ($episodeKind === null || $seasonKind === null) {
+            return new CatalogEpisodeNavigation;
+        }
+
+        $episodeLane = $activeSeasonEpisodes
+            ->filter(
+                fn (Episode $candidate): bool => $this->releaseKindValue($candidate->kind) === $episodeKind,
+            )
+            ->values();
+        $episodeIndex = $episodeLane->search(
+            fn (Episode $candidate): bool => $candidate->id === $episode->id,
+        );
+
+        if ($episodeIndex === false) {
+            return new CatalogEpisodeNavigation;
+        }
+
+        $previous = $episodeIndex > 0 ? $episodeLane->get($episodeIndex - 1) : null;
+        $next = $episodeIndex < $episodeLane->count() - 1 ? $episodeLane->get($episodeIndex + 1) : null;
+        $seasonLane = $seasonSummaries
+            ->filter(
+                fn (Season $candidate): bool => (int) $candidate->catalog_title_id === $catalogTitle->id
+                    && $this->releaseKindValue($candidate->kind) === $seasonKind
+                    && (int) $candidate->getAttribute('available_episodes_count') > 0,
+            )
+            ->values();
+        $seasonIndex = $seasonLane->search(
+            fn (Season $candidate): bool => $candidate->id === $season->id,
+        );
+
+        if ($seasonIndex === false) {
             return new CatalogEpisodeNavigation;
         }
 
         $current = clone $episode;
-        $current->setAttribute('season_order_kind', $this->releaseKindValue($season->kind));
+        $current->setAttribute('season_order_kind', $seasonKind);
         $current->setAttribute('season_order_sort', $season->sort_order);
         $current->setAttribute('season_order_number', $season->number);
         $current->setAttribute('season_order_id', $season->id);
 
-        return new CatalogEpisodeNavigation(
-            previous: $this->adjacentEpisode($catalogTitle, $user, $current, false),
-            next: $this->adjacentEpisode($catalogTitle, $user, $current, true),
-        );
+        if ($previous === null && $seasonIndex > 0) {
+            $previous = $this->adjacentEpisode($catalogTitle, $user, $current, false);
+        }
+
+        if ($next === null && $seasonIndex < $seasonLane->count() - 1) {
+            $next = $this->adjacentEpisode($catalogTitle, $user, $current, true);
+        }
+
+        return new CatalogEpisodeNavigation(previous: $previous, next: $next);
     }
 
     /** @return Collection<int, Episode> */

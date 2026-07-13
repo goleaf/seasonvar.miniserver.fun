@@ -316,7 +316,14 @@ class CatalogTitlePlayer extends Component
             : collect();
         $selectedEpisode = $this->selectedEpisode($episodes, $requestedEpisodeModel, $primaryAction, $activeSeason);
         $episodeNavigation = $selectedEpisode !== null && $activeSeason !== null
-            ? $this->playback->episodeNavigation($title, $activeSeason, $user, $selectedEpisode)
+            ? $this->playback->episodeNavigation(
+                $title,
+                $activeSeason,
+                $user,
+                $selectedEpisode,
+                $episodes,
+                $seasons,
+            )
             : new CatalogEpisodeNavigation;
         $mediaItems = $episodes
             ->flatMap(fn (Episode $episode): Collection => $episode->licensedMedia)
