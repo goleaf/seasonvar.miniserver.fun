@@ -7,6 +7,7 @@ namespace App\Policies;
 use App\Models\CatalogTitle;
 use App\Models\User;
 use App\Services\Catalog\CatalogEntitlementService;
+use Illuminate\Support\Facades\Gate;
 
 class CatalogTitlePolicy
 {
@@ -20,5 +21,20 @@ class CatalogTitlePolicy
             ->constrain(CatalogTitle::query(), $user)
             ->whereKey($catalogTitle->id)
             ->exists();
+    }
+
+    public function viewAdmin(User $user, CatalogTitle $catalogTitle): bool
+    {
+        return Gate::forUser($user)->allows('manage-catalog');
+    }
+
+    public function update(User $user, CatalogTitle $catalogTitle): bool
+    {
+        return $this->viewAdmin($user, $catalogTitle);
+    }
+
+    public function archive(User $user, CatalogTitle $catalogTitle): bool
+    {
+        return $this->viewAdmin($user, $catalogTitle);
     }
 }

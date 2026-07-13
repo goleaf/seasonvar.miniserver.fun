@@ -99,6 +99,7 @@ Google-интеграции по умолчанию выключены. Если
 - `SEASONVAR_IMPORT_FAILURE_MAIL_TO` и `SEASONVAR_IMPORT_FAILURE_MAIL_TO_NAME` — optional получатель письма об ошибке queued import; пустое значение отключает отправку.
 - `SEASONVAR_QUEUE_CONNECTION=redis`, `SEASONVAR_QUEUE_NAME=seasonvar-import` и `SEASONVAR_QUEUE_LOCK_STORE=redis` — отдельная очередь и locks параллельного импортера.
 - `SEASONVAR_IMPORT_ADMIN_EMAILS` — comma-separated email allowlist gate `/admin/imports`; пустое значение закрывает страницу для всех.
+- Тот же `SEASONVAR_IMPORT_ADMIN_EMAILS` защищает `/admin/catalog`; `RATE_LIMIT_CATALOG_ADMIN` задаёт независимый минутный лимит его write actions (по умолчанию 60).
 - `SEASONVAR_QUEUE_STALE_AFTER_MINUTES` — минимальный возраст stale running run для recovery, не меньше 5 минут в runtime.
 - `SEASONVAR_QUEUE_CLAIM_SECONDS=86400`, `SEASONVAR_QUEUE_WORKER_TIMEOUT=900` и `SEASONVAR_IMPORT_REFRESH_AFTER_HOURS=24` — lease, timeout и период повторной проверки источника.
 - `SEASONVAR_QUEUE_BUSY_THRESHOLD=5000` и `SEASONVAR_QUEUE_BUSY_LOG_SECONDS=3600` — порог backlog и минимальный интервал повторного warning в журнале.

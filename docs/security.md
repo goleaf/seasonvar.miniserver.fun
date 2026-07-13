@@ -25,6 +25,7 @@
 - Локальные temporary storage URLs отключены по умолчанию через `LOCAL_FILESYSTEM_SERVE=false`; включать их можно только для явной функции загрузки/выдачи файлов с отдельной авторизацией.
 - Пользовательские uploads по умолчанию сохраняются на приватный disk `uploads`; нельзя доверять клиентским именам файлов, делать upload-файлы публичными без отдельной авторизации или отдавать private paths наружу.
 - Operational logs/notifications не включают targeted importer URL, stack traces, raw HTML source snapshots, private media URLs, query tokens, секреты или credential paths; сохраняются режим, run/source IDs, класс исключения и очищенная категория/ошибка.
+- `/admin/catalog` закрыт тем же configured email allowlist, что importer admin, и дополнительно использует policy, hierarchy-scoped lookup, locked IDs/versions и отдельный sensitive-action rate limit. Stored playback URL не рендерится; новый URL проходит общий SSRF/provider allowlist.
 - Blade-шаблоны не содержат `@php`/`@endphp`; вывод экранируется через `{{ }}`, кроме JSON-LD с `JSON_HEX_*` флагами.
 
 ## HTTP

@@ -1,5 +1,6 @@
 # Журнал обслуживания
 
+- 13.07.2026: добавлен policy-backed Livewire workspace `/admin/catalog` с bounded queries, серверной валидацией, reversible publication actions и optimistic locking; существующие unique keys/import ownership переиспользованы без новой миграции, progress/history/watchlist/rating не удаляются.
 - 13.07.2026: relation-фасеты `/titles` объединены в один bounded UNION (20 → 11 page-builder queries), карточки/страницы загружают только отображаемые taxonomy columns, а playback resolve переиспользует уже авторизованную hierarchy (6 → 2 queries).
 - 13.07.2026: importer dashboard ограничен пятью запросами; health/due counters используют один covering UNION, backlog здоровья — индексируемый конечный список состояний. EXPLAIN подтвердил текущие catalog/release/history/health индексы, поэтому новые индексы не добавлялись.
 ## 13.07.2026 — безопасный health monitoring видеоисточников

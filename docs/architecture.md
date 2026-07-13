@@ -16,6 +16,7 @@
 - `/titles/{catalogTitle:slug}` сохраняет implicit route binding и статическую Blade-оболочку; `App\Livewire\CatalogTitlePlayer` отвечает только за URL-state активного сезона/серии/media и authenticated user actions. Locked `catalogTitleId` не принимается от browser updates, а Eloquent-коллекции существуют только как render data.
 - `/watching` обслуживает full-page `App\Livewire\ViewingActivity`: компонент хранит только paginator state, получает render-local данные из `CatalogViewingActivityQuery` и делегирует удаления в `CatalogViewingActivityService`.
 - `/admin/imports` обслуживает full-page `SeasonvarImportManager`: public state ограничен boolean options и notice, а authorization, duplicate lock, status transitions, retry/cancel/recovery и bounded run projection находятся в `SeasonvarImportAdminService`.
+- `/admin/catalog` обслуживает full-page `CatalogAdministrationManager`: public state ограничен поиском и малыми form arrays, critical hierarchy/version IDs имеют `#[Locked]`. Bounded чтение выполняет `CatalogAdministrationQuery`, транзакционные allowlisted writes и optimistic locking — `CatalogAdministrationService`; importer dashboard не дублируется.
 
 ## Actions и сервисы
 

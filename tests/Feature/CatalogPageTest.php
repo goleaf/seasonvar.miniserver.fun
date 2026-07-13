@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\DTOs\VerifiedExternalUrlData;
 use App\Enums\ReleaseKind;
 use App\Jobs\StartSeasonvarQueuedImport;
+use App\Livewire\CatalogAdministrationManager;
 use App\Livewire\CatalogSeries;
 use App\Livewire\CatalogTitlePlayer;
 use App\Livewire\SeasonvarImportManager;
@@ -31,8 +32,10 @@ use App\Services\Catalog\CatalogStatsPageBuilder;
 use App\Services\Catalog\CatalogStatsPosterUrlGuard;
 use App\Services\Catalog\CatalogUserStateService;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -104,6 +107,282 @@ class CatalogPageTest extends TestCase
             ->call('refreshRuns')
             ->assertSeeText('Завершён')
             ->assertDontSeeHtml('wire:poll.5s.visible="refreshRuns"');
+    }
+
+    public function test_catalog_admin_route_uses_the_existing_admin_allowlist(): void
+    {
+        config(['seasonvar.admin_emails' => ['admin@example.com']]);
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        $ordinaryUser = User::factory()->create(['email' => 'viewer@example.com']);
+
+        $this->get('/admin/catalog')->assertForbidden();
+        $this->actingAs($ordinaryUser)->get('/admin/catalog')->assertForbidden();
+        $this->actingAs($admin)
+            ->get('/admin/catalog')
+            ->assertOk()
+            ->assertSeeLivewire('catalog-administration-manager')
+            ->assertSeeText('Управление каталогом');
+
+        Livewire::actingAs($ordinaryUser)
+            ->test(CatalogAdministrationManager::class)
+            ->assertForbidden();
+    }
+
+    public function test_catalog_admin_updates_editorial_fields_relations_and_publication_without_deleting_user_state(): void
+    {
+        config(['seasonvar.admin_emails' => ['admin@example.com']]);
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        $viewer = User::factory()->create();
+        $title = CatalogTitle::factory()->create([
+            'provider_field_values' => ['title' => 'Название провайдера'],
+        ]);
+        $genre = Genre::query()->create(['name' => 'Драма', 'slug' => 'drama']);
+        CatalogTitleUserState::query()->create([
+            'user_id' => $viewer->id,
+            'catalog_title_id' => $title->id,
+            'in_watchlist' => true,
+            'rating' => 8,
+        ]);
+        Cache::put('catalog.stats.snapshot.fresh', ['private' => 'stale'], 60);
+
+        Livewire::actingAs($admin)
+            ->test(CatalogAdministrationManager::class)
+            ->call('selectTitle', $title->id)
+            ->set('titleForm.title', 'Редакторское название')
+            ->set('titleForm.original_title', 'Editorial title')
+            ->set('titleForm.slug', 'redaktorskoe-nazvanie')
+            ->set('titleForm.external_id', 'editorial-42')
+            ->set('titleForm.publication_status', 'hidden')
+            ->set('titleForm.available_from', '2026-08-01 10:00')
+            ->set('titleForm.available_until', '2026-09-01 10:00')
+            ->call('saveTitle')
+            ->assertHasNoErrors()
+            ->call('attachRelation', 'genre', $genre->id)
+            ->assertHasNoErrors()
+            ->call('archiveTitle')
+            ->assertHasNoErrors();
+
+        $title->refresh();
+        $this->assertSame('Редакторское название', $title->title);
+        $this->assertSame('Editorial title', $title->original_title);
+        $this->assertSame('redaktorskoe-nazvanie', $title->slug);
+        $this->assertSame('editorial-42', $title->external_id);
+        $this->assertSame('hidden', $title->publication_status->value);
+        $this->assertFalse($title->is_published);
+        $this->assertSame(['title' => 'Название провайдера'], $title->provider_field_values);
+        $this->assertTrue($title->genres()->whereKey($genre->id)->exists());
+        $this->assertModelExists(CatalogTitleUserState::query()->whereBelongsTo($viewer)->sole());
+        $this->assertFalse(Cache::has('catalog.stats.snapshot.fresh'));
+        $this->get('/titles/redaktorskoe-nazvanie')->assertNotFound();
+    }
+
+    public function test_catalog_admin_rejects_duplicate_identity_and_stale_concurrent_edits(): void
+    {
+        config(['seasonvar.admin_emails' => ['admin@example.com']]);
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        $title = CatalogTitle::factory()->create(['original_title' => 'Исходное название']);
+        $duplicate = CatalogTitle::factory()->create([
+            'source_id' => $title->source_id,
+            'slug' => 'already-used',
+            'external_id' => 'already-used-id',
+        ]);
+        $firstEditor = Livewire::actingAs($admin)
+            ->test(CatalogAdministrationManager::class)
+            ->call('selectTitle', $title->id)
+            ->assertSeeHtml('wire:confirm=');
+        $secondEditor = Livewire::actingAs($admin)
+            ->test(CatalogAdministrationManager::class)
+            ->call('selectTitle', $title->id);
+
+        $firstEditor
+            ->set('titleForm.title', 'Первая редакция')
+            ->call('saveTitle')
+            ->assertHasNoErrors();
+
+        $secondEditor
+            ->set('titleForm.original_title', 'Запоздалая редакция')
+            ->call('saveTitle')
+            ->assertHasErrors('titleForm');
+
+        $this->assertSame('Первая редакция', $title->fresh()->title);
+        $this->assertSame('Исходное название', $title->fresh()->original_title);
+
+        Livewire::actingAs($admin)
+            ->test(CatalogAdministrationManager::class)
+            ->call('selectTitle', $title->id)
+            ->set('titleForm.slug', $duplicate->slug)
+            ->set('titleForm.external_id', $duplicate->external_id)
+            ->call('saveTitle')
+            ->assertHasErrors(['titleForm.slug', 'titleForm.external_id']);
+
+        $season = Season::factory()->for($title)->create();
+        $firstSeasonEditor = Livewire::actingAs($admin)
+            ->test(CatalogAdministrationManager::class)
+            ->call('selectTitle', $title->id)
+            ->call('editSeason', $season->id);
+        $secondSeasonEditor = Livewire::actingAs($admin)
+            ->test(CatalogAdministrationManager::class)
+            ->call('selectTitle', $title->id)
+            ->call('editSeason', $season->id);
+
+        $firstSeasonEditor
+            ->set('seasonForm.title', 'Редакция сезона')
+            ->call('saveSeason')
+            ->assertHasNoErrors();
+        $secondSeasonEditor
+            ->set('seasonForm.title', 'Устаревшая редакция сезона')
+            ->call('saveSeason')
+            ->assertHasErrors('seasonForm');
+
+        $this->assertSame('Редакция сезона', $season->fresh()->title);
+    }
+
+    public function test_catalog_admin_scheduled_publication_and_hierarchy_binding_are_enforced_server_side(): void
+    {
+        config(['seasonvar.admin_emails' => ['admin@example.com']]);
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        $title = CatalogTitle::factory()->create(['slug' => 'scheduled-admin-title']);
+        $foreignEpisode = Episode::factory()->create();
+        $component = Livewire::actingAs($admin)
+            ->test(CatalogAdministrationManager::class)
+            ->call('selectTitle', $title->id)
+            ->set('titleForm.publication_status', 'published')
+            ->set('titleForm.available_from', now()->addDay()->format('Y-m-d H:i'))
+            ->call('saveTitle')
+            ->assertHasNoErrors();
+
+        $this->get(route('titles.show', $title))->assertNotFound();
+
+        $component
+            ->set('titleForm.available_from', now()->subMinute()->format('Y-m-d H:i'))
+            ->call('saveTitle')
+            ->assertHasNoErrors();
+
+        $this->get(route('titles.show', $title->fresh()))->assertOk();
+        $this->assertThrows(
+            fn () => $component->call('editEpisode', $foreignEpisode->id),
+            ModelNotFoundException::class,
+        );
+    }
+
+    public function test_catalog_admin_manages_release_hierarchy_and_video_sources_without_cascading_user_data_deletion(): void
+    {
+        config(['seasonvar.admin_emails' => ['admin@example.com']]);
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        $viewer = User::factory()->create();
+        $title = CatalogTitle::factory()->create();
+        $component = Livewire::actingAs($admin)
+            ->test(CatalogAdministrationManager::class)
+            ->call('selectTitle', $title->id)
+            ->call('newSeason')
+            ->set('seasonForm.number', 1)
+            ->set('seasonForm.title', 'Первый сезон')
+            ->call('saveSeason')
+            ->assertHasNoErrors();
+        $season = Season::query()->whereBelongsTo($title)->sole();
+
+        $component
+            ->call('newSeason')
+            ->set('seasonForm.number', 1)
+            ->call('saveSeason')
+            ->assertHasErrors('seasonForm.number')
+            ->call('selectSeason', $season->id)
+            ->call('newEpisode')
+            ->set('episodeForm.number', 1)
+            ->set('episodeForm.title', 'Первая серия')
+            ->call('saveEpisode')
+            ->assertHasNoErrors();
+        $episode = Episode::query()->whereBelongsTo($season)->sole();
+
+        $component
+            ->call('newMedia')
+            ->set('mediaForm.title', 'Административный источник')
+            ->set('mediaForm.playback_url', 'https://media.example.com/admin/episode-1.m3u8')
+            ->set('mediaForm.quality', '1080p')
+            ->set('mediaForm.format', 'm3u8')
+            ->set('mediaForm.status', 'published')
+            ->call('saveMedia')
+            ->assertHasNoErrors();
+        $media = LicensedMedia::query()->whereBelongsTo($episode)->sole();
+
+        $component
+            ->call('newMedia')
+            ->set('mediaForm.title', 'Дубликат')
+            ->set('mediaForm.playback_url', 'https://media.example.com/admin/episode-1.m3u8')
+            ->set('mediaForm.quality', '1080p')
+            ->set('mediaForm.format', 'm3u8')
+            ->call('saveMedia')
+            ->assertHasErrors('mediaForm.playback_url');
+
+        EpisodeViewProgress::query()->create([
+            'user_id' => $viewer->id,
+            'catalog_title_id' => $title->id,
+            'episode_id' => $episode->id,
+            'position_seconds' => 120,
+            'duration_seconds' => 600,
+            'first_started_at' => now(),
+            'last_watched_at' => now(),
+        ]);
+
+        $component
+            ->call('editEpisode', $episode->id)
+            ->call('archiveEpisode')
+            ->assertHasNoErrors()
+            ->call('editMedia', $media->id)
+            ->assertDontSee('https://media.example.com/admin/episode-1.m3u8')
+            ->call('archiveMedia')
+            ->assertHasNoErrors();
+
+        $this->assertSame('hidden', $episode->fresh()->publication_status->value);
+        $this->assertSame('draft', $media->fresh()->status);
+        $this->assertModelExists(EpisodeViewProgress::query()->whereBelongsTo($viewer)->sole());
+        $this->get(route('titles.show', $title).'?episode='.$episode->id)->assertOk()->assertDontSeeText('Первая серия');
+    }
+
+    public function test_catalog_admin_creates_and_attaches_existing_lookup_types_without_duplicate_pivots(): void
+    {
+        config(['seasonvar.admin_emails' => ['admin@example.com']]);
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        $title = CatalogTitle::factory()->create();
+        $component = Livewire::actingAs($admin)
+            ->test(CatalogAdministrationManager::class)
+            ->call('selectTitle', $title->id);
+        $lookups = [
+            'actor' => ['name' => 'Актёр редакции', 'slug' => 'akter-redakcii'],
+            'director' => ['name' => 'Режиссёр редакции', 'slug' => 'rezhisser-redakcii'],
+            'genre' => ['name' => 'Жанр редакции', 'slug' => 'zhanr-redakcii'],
+            'country' => ['name' => 'Страна редакции', 'slug' => 'strana-redakcii'],
+            'translation' => ['name' => 'Русская дорожка', 'slug' => 'russkaia-dorozhka'],
+        ];
+
+        foreach ($lookups as $type => $lookup) {
+            $component
+                ->call('newLookup', $type)
+                ->set('lookupForm.name', $lookup['name'])
+                ->set('lookupForm.slug', $lookup['slug'])
+                ->call('saveLookup')
+                ->assertHasNoErrors();
+        }
+
+        $title->refresh();
+        $this->assertTrue($title->actors()->where('slug', 'akter-redakcii')->exists());
+        $this->assertTrue($title->directors()->where('slug', 'rezhisser-redakcii')->exists());
+        $this->assertTrue($title->genres()->where('slug', 'zhanr-redakcii')->exists());
+        $this->assertTrue($title->countries()->where('slug', 'strana-redakcii')->exists());
+        $this->assertTrue($title->translations()->where('slug', 'russkaia-dorozhka')->exists());
+
+        $actor = $title->actors()->sole();
+        $this->assertNull($actor->source_url);
+        $component
+            ->call('attachRelation', 'actor', $actor->id)
+            ->assertHasNoErrors()
+            ->call('newLookup', 'actor')
+            ->set('lookupForm.name', 'Другой актёр')
+            ->set('lookupForm.slug', 'akter-redakcii')
+            ->call('saveLookup')
+            ->assertHasErrors('lookupForm.slug');
+
+        $this->assertSame(1, DB::table('catalog_title_actor')->where('catalog_title_id', $title->id)->where('actor_id', $actor->id)->count());
     }
 
     public function test_import_admin_hides_provider_urls_credentials_and_stack_details(): void

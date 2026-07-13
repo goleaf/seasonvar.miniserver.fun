@@ -2,6 +2,9 @@
 
 ## 2026-07-13
 
+- Added the authorized `/admin/catalog` Livewire 4 workspace for bounded title lookup, editorial metadata, publication windows, actor/director/genre/country/translation relations, regular/special seasons and episodes, and allowlisted external video sources; existing importer runs remain in the linked `/admin/imports` workflow.
+- Added policy-backed explicit field allowlists, hierarchy-scoped model resolution, per-action throttling, reversible hide/unpublish actions, short row-locking transactions, and version fingerprints that reject stale concurrent edits while preserving progress, history, ratings and watchlists.
+- Reused existing database unique keys and importer ownership rules instead of adding schema: pivot attachment is idempotent, provider baselines remain intact, publication changes refresh SQL visibility/index timestamps and precisely invalidate stats/recommendations without exposing stored source URLs.
 - Hardened sensitive Livewire actions with independent user/resource rate-limit buckets for catalog search, playback-session issuance, progress, ratings, watchlist, history and import administration; source-health probes now stop locally without recording a provider failure when their host budget is exhausted.
 - Closed SSRF and credential-leak boundaries by pinning verified public DNS for stats posters and external playlists, refusing unsafe redirects/credentialed URLs, restricting Google service-account JWT exchange to the canonical token endpoint, and redacting targeted importer URLs from logs and queued mail notifications.
 - Strengthened media-profile allowlists and private-upload path normalization, including absolute, drive, backslash, dot-segment and null-byte rejection, and added malformed/direct-access regression coverage in existing security, importer and storage tests.

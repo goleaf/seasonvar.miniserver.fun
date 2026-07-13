@@ -4,6 +4,7 @@ use App\Enums\CatalogFilterType;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogSitemapController;
 use App\Http\Controllers\PlaybackSourceController;
+use App\Livewire\CatalogAdministrationManager;
 use App\Livewire\CatalogSeries;
 use App\Livewire\SeasonvarImportManager;
 use App\Livewire\ViewingActivity;
@@ -40,6 +41,9 @@ Route::get('/watching', ViewingActivity::class)->name('viewing-activity');
 Route::get('/admin/imports', SeasonvarImportManager::class)
     ->middleware('can:manage-seasonvar-imports')
     ->name('admin.imports');
+Route::get('/admin/catalog', CatalogAdministrationManager::class)
+    ->middleware('can:manage-catalog')
+    ->name('admin.catalog');
 Route::get('/titles/year/{year}', CatalogSeries::class)
     ->where('year', '(?:19|20)\d{2}')
     ->name('titles.year');

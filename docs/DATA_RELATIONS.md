@@ -65,6 +65,7 @@
 - `CatalogTitle`, `Season`, `Episode` и `LicensedMedia` используют soft delete; merge импортёра применяет физическое удаление только к уже объединённым дублям, чтобы не оставлять конфликтующие provider keys.
 - `CatalogTitle.provider_field_values` хранит только последний baseline импортируемых `title`, `original_title`, `description` и `poster_url`; это не публичная metadata и не источник отображения. Импорт меняет текущее поле лишь пока оно совпадает с предыдущим baseline, поэтому локальное редакционное значение не затирается.
 - Автоматическая identity тайтла — `(source_id, external_id)`, при отсутствии provider ID — точный canonical URL hash/source page. Актёры и режиссёры используют пригодный provider person URL; одинаковое имя с разными стабильными URL создаёт разные строки со стабильными slug suffix. Fallback по имени применяется только при отсутствии пригодного provider URL.
+- Admin attaches metadata через `syncWithoutDetaching`, а importer relation sync использует ту же idempotent семантику: локально добавленные pivot rows не отсоединяются частичным или повторным provider import. Concurrent admin writes проверяют fingerprints редактируемых полей и relation IDs под row lock.
 - Публичные медиа проверяют собственный status/window/audience и доступность связанных сезона и серии.
 - Playback дополнительно требует непустой `playback_url` или `path`; пустая опубликованная media row не делает серию доступной и не попадает в counts/primary action.
 

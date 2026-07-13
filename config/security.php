@@ -10,6 +10,7 @@ return [
         'watchlist' => (int) env('RATE_LIMIT_WATCHLIST', 30),
         'history' => (int) env('RATE_LIMIT_HISTORY', 30),
         'import_admin' => (int) env('RATE_LIMIT_IMPORT_ADMIN', 10),
+        'catalog_admin' => (int) env('RATE_LIMIT_CATALOG_ADMIN', 60),
         'source_health' => (int) env('RATE_LIMIT_SOURCE_HEALTH', 120),
     ],
 ];

@@ -32,13 +32,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Gate::define('manage-seasonvar-imports', function (User $user): bool {
+        $catalogAdministrator = function (User $user): bool {
             return in_array(
                 Str::lower($user->email),
                 config('seasonvar.admin_emails', []),
                 true,
             );
-        });
+        };
+
+        Gate::define('manage-seasonvar-imports', $catalogAdministrator);
+        Gate::define('manage-catalog', $catalogAdministrator);
 
         RateLimiter::for('catalog-stats', function (Request $request): Limit {
             $userId = $request->user()?->getAuthIdentifier();

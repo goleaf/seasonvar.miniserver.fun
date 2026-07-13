@@ -19,6 +19,13 @@
 - Обычные GET-формы используют `old()` после redirect; full-page каталог показывает Livewire error bag на той же странице и не выполняет запрос выдачи по невалидному состоянию.
 - Для selected/checked/error/old-состояний нельзя добавлять `@php`; используйте props, `old()`, `@error`, `@selected`, `@checked` и Form Request/ViewModel-данные.
 
+## Административные формы
+
+- `/admin/catalog` валидирует каждую nested form на сервере перед передачей explicit allowlist в `CatalogAdministrationService`; русские ошибки остаются в стандартном Livewire error bag.
+- Title/season/episode/media IDs и version fingerprints заблокированы через Livewire `#[Locked]`, но сервис всё равно повторно проверяет ownership hierarchy и policy. Browser-supplied user/source/parent IDs не используются.
+- Поиск сериалов ограничен 80 символами и 20 строками на страницу; actor/director/genre/country/translation options запрашиваются только после двух символов и ограничены 20 строками.
+- Hide/unpublish actions имеют typed `wire:confirm`, а stale fingerprint возвращает ошибку формы и требует заново открыть актуальную запись.
+
 ## Проверки
 
 - Ошибки публичных форм должны быть на русском языке.
