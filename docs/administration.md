@@ -7,7 +7,7 @@
 - Full-page Livewire 4 компонент `App\Livewire\CatalogAdministrationManager` доступен по `/admin/catalog` только authenticated user из `SEASONVAR_IMPORT_ADMIN_EMAILS`.
 - Route middleware проверяет gate `manage-catalog`, компонент повторяет gate на `mount()` и `render()`, а каждую запись сервис авторизует через `CatalogTitlePolicy`. Browser не передаёт user ID, source ID или родительские IDs для записи.
 - `/admin/imports` остаётся отдельным существующим экраном запусков импортёра. Из каталога на него ведёт служебная ссылка; новый importer workflow не создавался.
-- Write actions имеют отдельный лимит `RATE_LIMIT_CATALOG_ADMIN` и не расходуют buckets playback, progress или import start.
+- Write actions проходят gate, policy, server-side validation и optimistic version checks без локального request budget.
 
 ## Возможности
 
@@ -33,6 +33,6 @@
 
 ## Деплой
 
-Новая миграция не требуется: admin использует уже развернутые publication/integrity constraints. Сначала должны быть применены все существующие migrations проекта, затем разворачивается код и перезапускаются долгоживущие queue workers через `php artisan queue:restart`. После деплоя проверяются `SEASONVAR_IMPORT_ADMIN_EMAILS`, `PLAYBACK_ALLOWED_HOSTS` и при необходимости `RATE_LIMIT_CATALOG_ADMIN`; secrets в репозиторий не записываются.
+Новая миграция не требуется: admin использует уже развернутые publication/integrity constraints. Сначала должны быть применены все существующие migrations проекта, затем разворачивается код и перезапускаются долгоживущие queue workers через `php artisan queue:restart`. После деплоя проверяются `SEASONVAR_IMPORT_ADMIN_EMAILS` и `PLAYBACK_ALLOWED_HOSTS`; secrets в репозиторий не записываются.
 
 Текущие ограничения: нет отдельной RBAC/role модели, workflow approval, audit-log административных field diffs, restore-кнопки и нормализованной сущности языка. До появления этих доменных моделей email allowlist и `Translation` остаются осознанными границами продукта.

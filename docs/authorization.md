@@ -18,8 +18,8 @@
 
 ## Реализация
 
-- Route `/stats` применяет только rate limiter `catalog-stats`, поэтому страница доступна без авторизации.
-- Livewire update route для stats-polling также проходит через `throttle:catalog-stats`; авторизация не добавляется, потому что компонент только читает уже очищенный snapshot.
+- Route `/stats` доступен без авторизации, потому что отдаёт только очищенную read-only сводку.
+- Livewire update route для stats-polling использует стандартный `web` middleware stack; отдельная авторизация не добавляется, потому что компонент только читает уже очищенный snapshot.
 - Тесты `AuthorizationTest` покрывают гостевой доступ к основным страницам каталога и странице статистики.
 - Implicit binding `CatalogTitle` скрывает authenticated-audience карточку от гостя; Livewire дополнительно держит `catalogTitleId` locked и разрешает episode/media IDs только внутри доступной и playable иерархии выбранного тайтла.
 - Текущая схема поддерживает audience `public/authenticated`; текущий `User` является единственным активным профилем, поэтому все private actions используют его напрямую и не принимают profile ID. Отдельных profile ownership/age/PIN, role/admin preview, territory, subscription/purchase/trial и concurrent-stream сущностей пока нет. `CatalogEntitlementDecision` задаёт однозначные user-facing состояния для будущих отказов, но сервис не имитирует отсутствующие правила. Их нужно подключать к нему одновременно с появлением реальной доменной модели; PIN в таком расширении должен храниться только как hash.

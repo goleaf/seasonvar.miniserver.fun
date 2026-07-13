@@ -111,4 +111,29 @@ final class LocalRateLimitRemovalTest extends TestCase
 
         $this->assertNotContains(429, $statuses);
     }
+
+    public function test_current_documentation_does_not_advertise_local_rate_limits(): void
+    {
+        foreach ([
+            base_path('docs/security.md'),
+            base_path('docs/architecture.md'),
+            base_path('docs/administration.md'),
+            base_path('docs/deployment.md'),
+            base_path('docs/authorization.md'),
+            base_path('docs/api.md'),
+            base_path('docs/catalog-search.md'),
+            base_path('docs/caching.md'),
+            base_path('docs/environment.md'),
+            base_path('docs/performance.md'),
+            base_path('docs/testing.md'),
+            base_path('docs/audit.md'),
+        ] as $path) {
+            $contents = (string) file_get_contents($path);
+
+            $this->assertStringNotContainsString('RATE_LIMIT_', $contents, $path);
+            $this->assertStringNotContainsString('throttle:', $contents, $path);
+            $this->assertStringNotContainsString('redis-limiter', $contents, $path);
+            $this->assertStringNotContainsString('redis_limiter', $contents, $path);
+        }
+    }
 }

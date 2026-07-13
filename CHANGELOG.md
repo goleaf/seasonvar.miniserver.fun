@@ -2,6 +2,7 @@
 
 ## 2026-07-13
 
+- Removed all application-generated HTTP 429 responses: web/API/Livewire transport throttles, action buckets, playback concurrency status, source-health budget and the dedicated Redis limiter workload. Authentication, authorization, CSRF, signed playback URLs, validation and bounded handling of remote Seasonvar/CDN 429 responses remain unchanged.
 - Closed the `/titles` crawl trap with `noindex,nofollow`, nofollow UI-state links, ClaudeBot/query robots rules and a Redis-backed query limiter while leaving canonical catalog and card links crawlable.
 - Reversed ranked SQLite search to start from materialized FTS candidates and paginated IDs before hydrating only visible cards. Contextual facets now load automatically in a deferred Livewire island, reuse one integer-only `json_each` match set and update linked results live without a «Показать фильтры» step. No search package or database replacement was added.
 - Reduced the production SQLite host from 43 queue workers to a persistent 4 import + 8 title-refresh baseline, repaired Blade/cache ownership, stopped the runaway actor aggregate and completed an online backup, two successful integrity checks, WAL checkpoint and `PRAGMA optimize`.

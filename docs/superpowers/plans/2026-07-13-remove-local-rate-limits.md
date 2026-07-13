@@ -466,7 +466,7 @@ git commit -m "refactor: remove rate limit infrastructure"
 - Consumes: documentation ownership map in `docs/README.md` and the behavior implemented in Tasks 1-3.
 - Produces: current documentation that states local rate limits are absent and distinguishes them from remote provider `429` retry behavior.
 
-- [ ] **Step 1: Write documentation acceptance assertions**
+- [x] **Step 1: Write documentation acceptance assertions**
 
 Extend `LocalRateLimitRemovalTest` with:
 
@@ -497,7 +497,7 @@ public function test_current_documentation_does_not_advertise_local_rate_limits(
 }
 ```
 
-- [ ] **Step 2: Run documentation assertion and verify RED**
+- [x] **Step 2: Run documentation assertion and verify RED**
 
 Run:
 
@@ -507,7 +507,7 @@ php artisan test tests/Feature/LocalRateLimitRemovalTest.php --filter=current_do
 
 Expected: current security, architecture, administration, or deployment docs still contain old limiter contracts.
 
-- [ ] **Step 3: Update owned documentation**
+- [x] **Step 3: Update owned documentation**
 
 In current thematic docs, remove local budget variables and middleware claims. Add one explicit statement to `docs/security.md`:
 
@@ -519,7 +519,7 @@ Update `docs/architecture.md` so `/stats`, Livewire, API, catalog query, health,
 
 Do not edit historical files under `docs/superpowers/specs` or `docs/superpowers/plans` other than checkbox progress in this plan.
 
-- [ ] **Step 4: Run documentation, focused, broad, and build checks**
+- [x] **Step 4: Run documentation, focused, broad, and build checks**
 
 Run:
 
@@ -533,7 +533,7 @@ php artisan test
 
 Expected: docs check, focused tests, Pint, build, and full PHPUnit suite pass. The running importer remains untouched. If the full suite exposes a shared-runtime conflict, preserve its output and rerun the smallest failing tests without clearing shared state.
 
-- [ ] **Step 5: Perform the final no-429 audit and commit**
+- [x] **Step 5: Perform the final no-429 audit and commit**
 
 Run:
 

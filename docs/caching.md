@@ -5,7 +5,7 @@
 ## Неподвижные границы
 
 - База данных остаётся единственным источником истины. Redis и Memcached содержат только производные или операционные данные.
-- Redis и Memcached решают разные задачи: Redis domain хранит shared snapshots/stale-копии/метрики, critical locks workload хранит locks и version registry, остальные изолированные connections — sessions, limiter counters и queue payloads; Memcached хранит короткоживущую disposable hot-копию небольших публичных DTO.
+- Redis и Memcached решают разные задачи: Redis domain хранит shared snapshots/stale-копии/метрики, critical locks workload хранит locks и version registry, остальные изолированные connections — sessions и queue payloads; Memcached хранит короткоживущую disposable hot-копию небольших публичных DTO.
 - Queue work выполняется через Redis. Memcached не используется для очередей, sessions, idempotency или критических locks.
 - `Cache::flush()` запрещён в application lifecycle и deployment. Инвалидация выполняется bump версии домена/объекта; старые ключи истекают по TTL.
 - Каждый private cache обязан включать identity, tenant/profile, permission/subscription version, locale и audience. В текущей реализации shared tier используется только для гостевых публичных данных; private watchlist, history, notifications, permissions, admin state и signed playback URL не кэшируются.
@@ -30,13 +30,12 @@
 | `redis-domain` | Redis connection `cache` | shared domain cache, stale snapshots, metrics и default application cache |
 | `memcached-hot` | один или несколько Memcached servers | disposable short-lived hot DTO/ID snapshots |
 | `redis-locks` | Redis connection `locks` | rebuild/import/warming locks, unique-job locks и authoritative cache version registry |
-| `redis-limiter` | Redis connection `limiter` | atomic HTTP/Livewire/action limiter counters |
 | `recomputable-failover` | `redis-domain` → `file` | только явно выбранные recomputable данные; не sessions, queues, locks или authorization |
 | Redis `sessions` | отдельный connection | session payloads |
 | Redis `queues` | отдельный connection | queue payloads и reservations |
 | Redis `broadcasting` | отдельный reserved connection | только при появлении реального broadcasting use case |
 
-На одном standalone Redis используются DB 1–6 и разные prefixes. Это не HA и не переносится буквально в Redis Cluster, где database-number separation недоступна. На production scale предпочтительны отдельные managed deployments/endpoints как минимум для disposable cache, queues, sessions и critical locks/limiters. Horizon не установлен: отдельная Horizon-compatible non-cluster queue topology и авторизованный operational UI пока не согласованы. Connection с зарезервированным Horizon именем не создаётся.
+На одном standalone Redis используются отдельные DB/prefixes для cache, queues, sessions, locks и зарезервированного broadcasting. Это не HA и не переносится буквально в Redis Cluster, где database-number separation недоступна. На production scale предпочтительны отдельные managed deployments/endpoints как минимум для disposable cache, queues, sessions и critical locks. Horizon не установлен: отдельная Horizon-compatible non-cluster queue topology и авторизованный operational UI пока не согласованы. Connection с зарезервированным Horizon именем не создаётся.
 
 PhpRedis является default client. Поддерживаются workload-specific URL/TLS, username/password, timeout/read timeout, retry interval, max retries, decorrelated-jitter backoff, client name, persistent ID и TCP keepalive через environment. Serializer/compression не переключались: локально доступны PHP/JSON serializers, но igbinary/MessagePack/LZ4/Zstandard отсутствуют, а rolling compatibility и CPU/payload benchmark не выполнены. Любая будущая смена serializer/compression требует `CACHE_FORMAT_VERSION` bump.
 
@@ -126,7 +125,7 @@ Deployment increments `CACHE_SCHEMA_VERSION` when key meaning changes and `CACHE
 - Redis queues unavailable: dispatch throws/fails visibly; jobs are not reported as accepted. DB remains authoritative and jobs remain idempotent.
 - Rebuild lock contention: safe stale is served; without stale, wait is bounded and raises `CacheRebuildTimeout` instead of issuing the same expensive query.
 
-`/health/ready` and `app:health` distinguish database, Redis cache/sessions/queues/locks/limiter, Memcached, queue heartbeat, Horizon state and last warming state. Redis cache status includes safe memory/eviction counters, while Memcached status aggregates hit/miss, eviction, item, byte and connection counters without server addresses. Cache/Memcached outages and an absent worker heartbeat make the aggregate status `degraded`; database/session/queue/lock/limiter failures make it `failed`. A missing heartbeat does not make the transport itself unready, but it must never produce a false `ok`. Endpoint is rate-limited, private/no-store, does not start a session and never returns hostnames or credentials.
+`/health/ready` and `app:health` distinguish database, Redis cache/sessions/queues/locks, Memcached, queue heartbeat, Horizon state and last warming state. Redis cache status includes safe memory/eviction counters, while Memcached status aggregates hit/miss, eviction, item, byte and connection counters without server addresses. Cache/Memcached outages and an absent worker heartbeat make the aggregate status `degraded`; database/session/queue/lock failures make it `failed`. A missing heartbeat does not make the transport itself unready, but it must never produce a false `ok`. Endpoint is private/no-store, does not start a session and never returns hostnames or credentials.
 
 ## Observability и alerts
 

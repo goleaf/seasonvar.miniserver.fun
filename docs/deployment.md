@@ -4,7 +4,7 @@
 
 ## Cache/queue rollout от 13.07.2026
 
-Production environment должен соответствовать `docs/environment.md`: default domain cache — `redis-domain`, hot cache — `memcached-hot`, sessions — Redis `sessions`, queues — Redis `queues`, limiter — `redis-limiter`, critical locks — `redis-locks`. Реальный `.env` не изменяется репозиторием. На одном standalone Redis DB/prefix separation допустима как начальная topology; managed production предпочтительно разделяет cache, queues, sessions и critical locks. Redis Cluster не поддерживает ту же DB-number стратегию. Horizon и Octane не устанавливались.
+Production environment должен соответствовать `docs/environment.md`: default domain cache — `redis-domain`, hot cache — `memcached-hot`, sessions — Redis `sessions`, queues — Redis `queues`, critical locks — `redis-locks`. Реальный `.env` не изменяется репозиторием. На одном standalone Redis DB/prefix separation допустима как начальная topology; managed production предпочтительно разделяет cache, queues, sessions и critical locks. Redis Cluster не поддерживает ту же DB-number стратегию. Horizon и Octane не устанавливались.
 
 Безопасный rolling/maintenance порядок:
 
@@ -26,7 +26,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now seasonvar-cache-warm-worker.service
 ```
 
-`/health/ready` разрешается только monitoring/load-balancer boundary; публичный route rate-limited и не раскрывает topology. Failed Redis sessions/queues/locks/limiter делает readiness failed; Redis cache/Memcached outage — degraded и требует снижения traffic/устранения причины до исчерпания cold-path capacity.
+`/health/ready` разрешается только monitoring/load-balancer boundary и не раскрывает topology. Failed Redis sessions/queues/locks делает readiness failed; Redis cache/Memcached outage — degraded и требует снижения traffic/устранения причины до исчерпания cold-path capacity.
 
 ## Индекс ленты media и runtime safety от 13.07.2026
 
@@ -104,7 +104,7 @@ Production-значения должны задаваться сервером, 
 - `APP_KEY` с сгенерированным Laravel key
 - `APP_URL` с публичным HTTPS URL
 - `DB_CONNECTION` и `DB_DATABASE` для SQLite или соответствующие host/database/user/password ключи для другого драйвера
-- `CACHE_STORE=redis-domain`, `CACHE_LIMITER_STORE=redis-limiter`
+- `CACHE_STORE=redis-domain`
 - `CACHE_HOT_STORE=memcached-hot`, `CACHE_DOMAIN_STORE=redis-domain`, `CACHE_LOCK_STORE=redis-locks`
 - `QUEUE_CONNECTION=redis`
 - `SESSION_DRIVER=redis`, `SESSION_CONNECTION=sessions`
@@ -142,7 +142,7 @@ Google-интеграции по умолчанию выключены. Если
 - `SEASONVAR_QUEUE_CONNECTION=redis`, `SEASONVAR_QUEUE_NAME=seasonvar-import` и `SEASONVAR_QUEUE_LOCK_STORE=redis-locks` — отдельная очередь и critical-lock store параллельного импортера; domain cache для блокировок не используется.
 - `SEASONVAR_TITLE_REFRESH_QUEUE=seasonvar-title-refresh` — отдельная очередь browser-triggered групп; `SEASONVAR_TITLE_REFRESH_FINALIZER_DELAY_SECONDS` задаёт задержку fan-in retry, но не ограничивает число page jobs. `SEASONVAR_IMPORT_PREPARED_RETENTION_DAYS` задаёт bounded очистку terminal staging groups.
 - `SEASONVAR_IMPORT_ADMIN_EMAILS` — comma-separated email allowlist gate `/admin/imports`; пустое значение закрывает страницу для всех.
-- Тот же `SEASONVAR_IMPORT_ADMIN_EMAILS` защищает `/admin/catalog`; `RATE_LIMIT_CATALOG_ADMIN` задаёт независимый минутный лимит его write actions (по умолчанию 60).
+- Тот же `SEASONVAR_IMPORT_ADMIN_EMAILS` защищает `/admin/catalog`; write actions дополнительно проходят policy, validation и optimistic version checks.
 - `SEASONVAR_QUEUE_STALE_AFTER_MINUTES` — минимальный возраст stale running run для recovery, не меньше 5 минут в runtime.
 - `SEASONVAR_QUEUE_CLAIM_SECONDS=86400`, `SEASONVAR_QUEUE_WORKER_TIMEOUT=900` и `SEASONVAR_IMPORT_REFRESH_AFTER_HOURS=24` — lease, timeout и период повторной проверки источника.
 - `SEASONVAR_QUEUE_BUSY_THRESHOLD=5000` и `SEASONVAR_QUEUE_BUSY_LOG_SECONDS=3600` — порог backlog и минимальный интервал повторного warning в журнале.

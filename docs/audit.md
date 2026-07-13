@@ -150,7 +150,7 @@
 
 ### AUD-107 — Browser matrix в CI после Redis/Memcached integration
 
-- **Проблема:** backend CI уже поднимает реальные Redis/Memcached с run-specific prefixes и проверяет stores, tags, versions, locks, sessions, limiter, queue и outages; responsive browser journeys пока не являются автоматическим merge gate.
+- **Проблема:** backend CI уже поднимает реальные Redis/Memcached с run-specific prefixes и проверяет stores, tags, versions, locks, sessions, queue и outages; responsive browser journeys пока не являются автоматическим merge gate.
 - **Влияние:** lifecycle, focus, history и responsive overflow defects могут обнаруживаться только при ручном browser QA.
 - **Предлагаемое решение:** добавить компактную Playwright matrix после production build, не дублируя уже работающий Redis/Memcached service stack.
 - **Зависимости:** стабильный container/service setup и bounded fixture dataset.
