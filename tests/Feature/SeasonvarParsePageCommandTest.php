@@ -868,7 +868,7 @@ class SeasonvarParsePageCommandTest extends TestCase
         $this->assertSame('pending', $page->fresh()->parse_status);
     }
 
-    public function test_stable_person_urls_keep_people_with_the_same_name_distinct(): void
+    public function test_equivalent_person_names_share_canonical_identity_across_provider_urls(): void
     {
         Http::preventStrayRequests();
         $source = Source::factory()->create([
@@ -912,11 +912,13 @@ class SeasonvarParsePageCommandTest extends TestCase
         $importer->parsePage($secondPage);
 
         $this->assertSame(2, CatalogTitle::query()->count());
-        $this->assertSame(2, Actor::query()->where('name', 'Александр Иванов')->count(), Actor::query()->get()->toJson());
-        $this->assertSame([
-            'https://seasonvar.ru/actor/1001-aleksandr-ivanov',
-            'https://seasonvar.ru/actor/2002-aleksandr-ivanov',
-        ], Actor::query()->where('name', 'Александр Иванов')->orderBy('source_url')->pluck('source_url')->all());
+        $actor = Actor::query()->where('name', 'Александр Иванов')->sole();
+
+        $this->assertSame('https://seasonvar.ru/actor/1001-aleksandr-ivanov', $actor->source_url);
+        $this->assertEqualsCanonicalizing(
+            CatalogTitle::query()->pluck('id')->all(),
+            $actor->catalogTitles()->pluck('catalog_titles.id')->all(),
+        );
     }
 
     public function test_importer_uses_retrying_transaction_for_catalog_writes(): void
@@ -1005,10 +1007,10 @@ class SeasonvarParsePageCommandTest extends TestCase
         $importer = app(SeasonvarCatalogImporter::class);
         $first = $importer->parsePage($page);
         $this->assertNull($first['catalog_title']);
-        $this->assertSame(2, Actor::query()->where('name', 'Александр Иванов')->count());
+        $this->assertDatabaseCount('actors', 1);
         $this->assertDatabaseHas('actors', [
             'name' => 'Александр Иванов',
-            'source_url' => $url,
+            'source_url' => $otherPersonUrl,
         ]);
         $this->assertSame(2, SourcePage::query()->where('page_type', 'serial')->count());
         $this->assertDatabaseHas('source_pages', [
@@ -1026,7 +1028,7 @@ class SeasonvarParsePageCommandTest extends TestCase
         Http::fake([$url => Http::response($html, 200, ['ETag' => '"actor-v1"'])]);
         $importer->parsePage($page->fresh(), force: true);
 
-        $this->assertSame(2, Actor::query()->where('name', 'Александр Иванов')->count());
+        $this->assertDatabaseCount('actors', 1);
         $this->assertSame(2, SourcePage::query()->where('page_type', 'serial')->count());
         $this->assertDatabaseHas('source_pages', [
             'id' => $page->id,
@@ -1036,7 +1038,7 @@ class SeasonvarParsePageCommandTest extends TestCase
         ]);
         $this->assertTrue(SeasonvarImportEvent::query()
             ->where('source_page_id', $page->id)
-            ->where('event', 'seasonvar-taxonomy-created')
+            ->where('event', 'seasonvar-taxonomy-duplicate-prevented')
             ->exists());
     }
 

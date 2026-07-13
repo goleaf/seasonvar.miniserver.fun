@@ -6,18 +6,17 @@ namespace App\Services\Seasonvar;
 
 use App\DTOs\Seasonvar\SeasonvarMetadataPageData;
 use App\DTOs\Seasonvar\SeasonvarPageHandlerResult;
-use App\Enums\SeasonvarPageType;
 use App\Models\SeasonvarImportEvent;
 use App\Models\SourcePage;
+use App\Services\Catalog\CatalogRelationNameSanitizer;
 use App\Services\Catalog\CatalogTaxonomyRegistry;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
 
 final readonly class SeasonvarTaxonomyPageImporter
 {
     public function __construct(
         private CatalogTaxonomyRegistry $taxonomies,
-        private SeasonvarTaxonomyIdentity $identity,
+        private CatalogRelationNameSanitizer $relationNames,
         private SeasonvarDiscoveredPageStore $pages,
         private SeasonvarDatabaseTransaction $transactions,
     ) {}
@@ -34,11 +33,14 @@ final readonly class SeasonvarTaxonomyPageImporter
             $created = ! $taxonomy->exists;
             $before = $taxonomy->exists ? $taxonomy->only(['name', 'slug', 'source_url']) : [];
             $sourceUrl = $this->preservedSourceUrl($taxonomy, $data->canonicalSourceUrl);
-            $slug = $taxonomy->slug ?: $this->uniqueSlug($modelClass, $data, $sourceUrl);
+            $type = $data->pageType->value;
+            $name = $taxonomy->exists
+                ? $this->relationNames->preferredName($type, (string) $taxonomy->name, $data->displayName)
+                : $this->relationNames->normalize($data->displayName);
 
             $taxonomy->fill([
-                'name' => $data->displayName,
-                'slug' => $slug,
+                'name' => $name,
+                'slug' => $this->relationNames->canonicalKey($type, $name),
                 'source_url' => $sourceUrl,
             ])->save();
 
@@ -87,30 +89,10 @@ final readonly class SeasonvarTaxonomyPageImporter
             return $bySourceUrl;
         }
 
-        $baseSlug = $this->identity->slug($data->pageType, $data->displayName, $data->canonicalSourceUrl);
+        $baseSlug = $this->relationNames->canonicalKey($data->pageType->value, $data->displayName);
         $bySlug = $modelClass::query()->where('slug', $baseSlug)->first();
 
-        if ($bySlug === null) {
-            return new $modelClass;
-        }
-
-        if ($data->pageType !== SeasonvarPageType::Actor || $bySlug->source_url === null || $bySlug->source_url === '') {
-            return $bySlug;
-        }
-
-        return new $modelClass;
-    }
-
-    /** @param class-string<Model> $modelClass */
-    private function uniqueSlug(string $modelClass, SeasonvarMetadataPageData $data, string $sourceUrl): string
-    {
-        $base = $this->identity->slug($data->pageType, $data->displayName, $sourceUrl);
-
-        if (! $modelClass::query()->where('slug', $base)->exists()) {
-            return $base;
-        }
-
-        return Str::limit($base, 235, '').'-'.substr($this->identity->stableHash($data->pageType, $sourceUrl), 0, 12);
+        return $bySlug ?? new $modelClass;
     }
 
     private function preservedSourceUrl(Model $taxonomy, string $canonicalSourceUrl): string

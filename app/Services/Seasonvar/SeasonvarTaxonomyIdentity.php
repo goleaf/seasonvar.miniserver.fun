@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Seasonvar;
 
-use App\Enums\SeasonvarPageType;
 use Illuminate\Support\Str;
 use Normalizer;
 
@@ -29,18 +28,6 @@ final class SeasonvarTaxonomyIdentity
         $value = preg_replace('/[\pP\pS]+/u', ' ', $value) ?? $value;
 
         return Str::squish($value);
-    }
-
-    public function slug(SeasonvarPageType $type, string $name, string $sourceUrl): string
-    {
-        $base = Str::slug($this->comparisonKey($name));
-
-        return $base !== '' ? $base : $type->value.'-'.substr($this->stableHash($type, $sourceUrl), 0, 16);
-    }
-
-    public function stableHash(SeasonvarPageType $type, string $identity): string
-    {
-        return hash('sha256', $type->value.'|'.$this->comparisonKey($identity));
     }
 
     /** @return list<string> */
