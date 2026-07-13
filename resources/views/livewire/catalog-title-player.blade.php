@@ -297,7 +297,7 @@
 
             @if ($seasons->isNotEmpty())
                 <div class="border-b border-slate-200 p-3">
-                    <nav class="flex gap-2 overflow-x-auto overscroll-x-contain pb-1" aria-label="{{ __('catalog.player.available_seasons') }}">
+                    <nav class="flex flex-wrap gap-2 pb-1" aria-label="{{ __('catalog.player.available_seasons') }}">
                         @foreach ($seasons as $seasonOption)
                             <a
                                 href="{{ route('titles.show', ['catalogTitle' => $title, 'season' => $seasonOption->id]).'#seasons' }}"
@@ -306,7 +306,7 @@
                                 data-catalog-history
                                 @if ($activeSeason?->id === $seasonOption->id) aria-current="true" @endif
                                 @class([
-                                    'inline-flex min-h-11 shrink-0 items-center rounded-control px-3 py-2 text-sm font-bold',
+                                    'inline-flex min-h-11 max-w-full items-center rounded-control px-3 py-2 text-left text-sm font-bold leading-5',
                                     'bg-emerald-700 text-white' => $activeSeason?->id === $seasonOption->id,
                                     'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $activeSeason?->id !== $seasonOption->id,
                                 ])

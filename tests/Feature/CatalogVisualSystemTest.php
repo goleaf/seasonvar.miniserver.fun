@@ -6,6 +6,7 @@ use App\Models\CatalogTitle;
 use App\Models\Genre;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
 class CatalogVisualSystemTest extends TestCase
@@ -162,6 +163,42 @@ class CatalogVisualSystemTest extends TestCase
             'home' => substr_count($homeResponse->getContent(), '<main'),
             'title' => substr_count($titleResponse->getContent(), '<main'),
         ], 'Catalog pages should rely on the single main landmark from the layout shell.');
+    }
+
+    public function test_public_views_do_not_define_internal_scroll_containers(): void
+    {
+        $forbiddenClasses = [
+            'overflow-auto',
+            'overflow-scroll',
+            'overflow-x-auto',
+            'overflow-x-scroll',
+            'overflow-y-auto',
+            'overflow-y-scroll',
+            'overscroll-x-contain',
+            'overscroll-y-contain',
+        ];
+
+        $violations = [];
+
+        foreach (File::allFiles(resource_path('views')) as $file) {
+            if (! str_ends_with($file->getFilename(), '.blade.php')) {
+                continue;
+            }
+
+            $content = file_get_contents($file->getPathname());
+
+            if (! is_string($content)) {
+                continue;
+            }
+
+            foreach ($forbiddenClasses as $class) {
+                if (str_contains($content, $class)) {
+                    $violations[] = $file->getRelativePathname().': '.$class;
+                }
+            }
+        }
+
+        $this->assertSame([], $violations, 'Публичный интерфейс не должен создавать прокрутку внутри блоков; контент должен переноситься и раскрывать страницу.');
     }
 
     public function test_title_surfaces_use_one_title_link_and_keep_relation_links_accessible(): void

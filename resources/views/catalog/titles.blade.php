@@ -19,7 +19,7 @@
             aria-labelledby="catalog-filter-dialog-title"
             data-catalog-filter-dialog
             wire:ignore.self
-            class="fixed inset-0 m-0 h-dvh max-h-dvh w-full max-w-none overflow-y-auto border-0 bg-slate-50 p-3 backdrop:bg-slate-900/40 lg:sticky lg:inset-auto lg:top-24 lg:order-1 lg:block lg:h-auto lg:max-h-[calc(100vh-7rem)] lg:w-auto lg:self-start lg:bg-transparent lg:p-0 lg:pr-1"
+            class="fixed inset-x-0 top-0 m-0 min-h-dvh w-full max-w-none max-h-none border-0 bg-slate-50 p-3 backdrop:bg-slate-900/40 lg:sticky lg:inset-auto lg:top-24 lg:order-1 lg:block lg:min-h-0 lg:w-auto lg:self-start lg:bg-transparent lg:p-0 lg:pr-1"
         >
             <div class="sticky top-0 z-20 mb-3 flex items-center justify-between gap-3 rounded-control bg-white p-2 shadow-panel lg:hidden">
                 <h2 id="catalog-filter-dialog-title" class="flex min-w-0 items-center gap-2 break-words text-base font-bold text-slate-800">
@@ -170,7 +170,7 @@
                                         >
                                         <x-ui.icon name="fa-solid fa-spinner fa-spin hidden text-emerald-700" data-catalog-people-loading />
                                     </div>
-                                    <div id="catalog-people-options-{{ $filterType }}" role="listbox" data-catalog-people-options class="absolute inset-x-0 top-full z-30 mt-1 hidden max-h-72 overflow-y-auto rounded-control border border-slate-200 bg-white p-1 shadow-panel"></div>
+                                    <div id="catalog-people-options-{{ $filterType }}" role="listbox" data-catalog-people-options class="absolute inset-x-0 top-full z-30 mt-1 hidden rounded-control border border-slate-200 bg-white p-1 shadow-panel"></div>
                                     <p data-catalog-people-status class="sr-only" aria-live="polite"></p>
                                 </div>
                             @elseif ($filterTaxonomies->get($filterType, collect())->count() > 8)
