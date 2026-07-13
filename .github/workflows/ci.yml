@@ -49,7 +49,6 @@ jobs:
       APP_URL: http://localhost
       BROADCAST_CONNECTION: "null"
       CACHE_STORE: array
-      CACHE_LIMITER_STORE: redis-limiter
       CACHE_DOMAIN_STORE: redis-domain
       CACHE_HOT_STORE: memcached-hot
       CACHE_LOCK_STORE: redis-locks
@@ -64,12 +63,10 @@ jobs:
       REDIS_CACHE_DB: 1
       REDIS_QUEUE_DB: 2
       REDIS_SESSION_DB: 3
-      REDIS_LIMITER_DB: 4
       REDIS_LOCK_DB: 5
       REDIS_CACHE_PREFIX: "seasonvar-ci-${{ github.run_id }}-cache-"
       REDIS_QUEUE_PREFIX: "seasonvar-ci-${{ github.run_id }}-queue-"
       REDIS_SESSION_PREFIX: "seasonvar-ci-${{ github.run_id }}-session-"
-      REDIS_LIMITER_PREFIX: "seasonvar-ci-${{ github.run_id }}-limiter-"
       REDIS_LOCK_PREFIX: "seasonvar-ci-${{ github.run_id }}-lock-"
       RUN_CACHE_INFRASTRUCTURE_TESTS: "true"
       MAIL_MAILER: array

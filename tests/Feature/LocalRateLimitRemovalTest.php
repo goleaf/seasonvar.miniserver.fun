@@ -112,6 +112,20 @@ final class LocalRateLimitRemovalTest extends TestCase
         $this->assertNotContains(429, $statuses);
     }
 
+    public function test_environment_and_ci_configuration_have_no_limiter_workload(): void
+    {
+        foreach ([
+            base_path('.env.example'),
+            base_path('.github/workflows/ci.yml'),
+        ] as $path) {
+            $contents = (string) file_get_contents($path);
+
+            foreach (['RATE_LIMIT_', 'CACHE_LIMITER_', 'REDIS_LIMITER_', 'redis-limiter', 'redis_limiter'] as $marker) {
+                $this->assertStringNotContainsString($marker, $contents, $path);
+            }
+        }
+    }
+
     public function test_current_documentation_does_not_advertise_local_rate_limits(): void
     {
         foreach ([
