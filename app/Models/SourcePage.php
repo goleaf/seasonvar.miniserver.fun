@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\SeasonvarSourceAvailability;
 use Database\Factories\SourcePageFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -25,6 +26,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'error_message',
     'discovered_from_url',
     'import_status',
+    'provider_availability_status',
+    'provider_availability_checked_at',
     'missing_data_flags',
     'retry_after_at',
     'failure_count',
@@ -152,6 +155,8 @@ class SourcePage extends Model
             'last_crawled_at' => 'datetime',
             'last_changed_at' => 'datetime',
             'missing_data_flags' => 'array',
+            'provider_availability_status' => SeasonvarSourceAvailability::class,
+            'provider_availability_checked_at' => 'datetime',
             'retry_after_at' => 'datetime',
             'failure_count' => 'integer',
             'last_imported_at' => 'datetime',

@@ -35,6 +35,7 @@ class SeasonvarImportPipeline
         private readonly CatalogTitleRecommendationBuilder $recommendations,
         private readonly CatalogMetadataDeduplicator $metadataDeduplicator,
         private readonly SeasonvarImportStorageMaintenance $storageMaintenance,
+        private readonly SeasonvarSourceAvailabilityBackfill $sourceAvailabilityBackfill,
         private readonly SeasonvarCatalogMetadataBackfill $metadataBackfill,
         private readonly SeasonvarImportErrorSanitizer $errors,
     ) {}
@@ -149,6 +150,7 @@ class SeasonvarImportPipeline
 
         try {
             $storageMaintenanceResult = $this->storageMaintenance->prune();
+            $sourceAvailabilityBackfillResult = $this->sourceAvailabilityBackfill->run($loggedProgress);
             $metadataBackfillResult = $this->metadataBackfill->run($loggedProgress);
             $sourceStatusBackfillResult = $this->backfillParsedSourcePageStatuses($loggedProgress);
             $mediaMetadataResult = $this->refreshMediaMetadataBacklog($loggedProgress);
@@ -164,6 +166,7 @@ class SeasonvarImportPipeline
                 'media_failed' => $mediaBacklogResult['media_failed'],
             ], [
                 'last_storage_maintenance' => $storageMaintenanceResult,
+                'last_provider_availability_backfill' => $sourceAvailabilityBackfillResult,
                 'last_metadata_backfill' => $metadataBackfillResult,
                 'last_source_status_backfill' => $sourceStatusBackfillResult,
                 'last_media_metadata_backlog' => $mediaMetadataResult,
@@ -230,6 +233,7 @@ class SeasonvarImportPipeline
 
         $storageMaintenanceResult = $this->storageMaintenance->prune();
         $progress('seasonvar-import-storage-pruned', $storageMaintenanceResult);
+        $sourceAvailabilityBackfillResult = $this->sourceAvailabilityBackfill->run($progress);
         $metadataBackfillResult = $this->metadataBackfill->run($progress);
 
         $earlyRelationCleanupResult = $this->metadataDeduplicator->run($progress);
@@ -249,6 +253,7 @@ class SeasonvarImportPipeline
             'media_failed' => $mediaBacklogResult['media_failed'],
         ], [
             'last_storage_maintenance' => $storageMaintenanceResult,
+            'last_provider_availability_backfill' => $sourceAvailabilityBackfillResult,
             'last_metadata_backfill' => $metadataBackfillResult,
             'last_merge' => $mergeResult,
             'last_source_status_backfill' => $sourceStatusBackfillResult,
@@ -264,6 +269,9 @@ class SeasonvarImportPipeline
             ...$cycleResult,
             'storage_events_deleted' => $storageMaintenanceResult['events_deleted'],
             'storage_snapshots_deleted' => $storageMaintenanceResult['snapshots_deleted'],
+            'provider_availability_pages_checked' => $sourceAvailabilityBackfillResult['pages_checked'],
+            'provider_availability_pages_updated' => $sourceAvailabilityBackfillResult['pages_updated'],
+            'provider_availability_region_blocked' => $sourceAvailabilityBackfillResult['region_blocked'],
             'metadata_pages_checked' => $metadataBackfillResult['pages_checked'],
             'metadata_pages_updated' => $metadataBackfillResult['pages_updated'],
             'metadata_titles_checked' => $metadataBackfillResult['titles_checked'],

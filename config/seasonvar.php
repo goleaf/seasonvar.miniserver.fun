@@ -116,6 +116,11 @@ return [
         'title_chunk_size' => (int) env('SEASONVAR_METADATA_BACKFILL_TITLE_CHUNK_SIZE', 50),
         'title_limit' => (int) env('SEASONVAR_METADATA_BACKFILL_TITLE_LIMIT', 200),
     ],
+    'provider_availability' => [
+        'retry_hours' => (int) env('SEASONVAR_PROVIDER_AVAILABILITY_RETRY_HOURS', 168),
+        'backfill_chunk_size' => (int) env('SEASONVAR_PROVIDER_AVAILABILITY_BACKFILL_CHUNK_SIZE', 250),
+        'backfill_page_limit' => (int) env('SEASONVAR_PROVIDER_AVAILABILITY_BACKFILL_PAGE_LIMIT', 2000),
+    ],
     'recommendations' => [
         'chunk_size' => (int) env('SEASONVAR_RECOMMENDATION_CHUNK_SIZE', 100),
         'min_score' => (int) env('SEASONVAR_RECOMMENDATION_MIN_SCORE', 600),

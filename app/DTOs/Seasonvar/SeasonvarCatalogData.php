@@ -164,6 +164,7 @@ final readonly class SeasonvarCatalogData
             'parse_meta.has_info_list' => ['required', 'boolean'],
             'parse_meta.has_season_list' => ['required', 'boolean'],
             'parse_meta.has_episode_script' => ['required', 'boolean'],
+            'parse_meta.provider_availability_status' => ['nullable', 'string', 'in:region_blocked'],
         ];
     }
 

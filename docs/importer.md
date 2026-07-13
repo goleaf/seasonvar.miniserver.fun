@@ -35,6 +35,8 @@ Taxonomy parser сохраняет только каноническое имя,
 
 `PoliteHttpClient` принимает только allowlisted conditional headers; `SeasonvarSourcePageFetcher` отправляет ETag/Last-Modified для уже parsed pages и обрабатывает 304 без повторного импорта. Связанные serial URLs ограничены `SEASONVAR_IMPORT_MAX_LINKED_SERIAL_URLS` и получают defer из `SEASONVAR_IMPORT_LINKED_SERIAL_DEFER_MINUTES`, чтобы не создавать рекурсивный crawl в текущем цикле.
 
+Serial fetcher и parser распознают точное provider-сообщение «По просьбе правообладателя, сезон заблокирован для вашей страны» как `provider_availability_status=region_blocked`. `SourcePage` хранит нормализованный статус и время проверки отдельно от локального playback entitlement; raw provider message не копируется в отдельное поле. Полный sync/queued finalizer ограниченно разбирает уже сохранённые latest snapshots без HTTP, а due-страницы повторно выбираются штатным planner после `SEASONVAR_PROVIDER_AVAILABILITY_RETRY_HOURS` (default `168`). Proxy/Tor и подмена региона не являются частью importer boundary.
+
 Для controlled rollout задаются `SEASONVAR_PAGE_<TYPE>_ENABLED`, `..._AUTOMATIC`, `..._REFRESH_HOURS`, `..._CHUNK_SIZE` и для публикуемых типов `..._PUBLICATION_AUTHORIZED`. После изменения environment нужно пересобрать config cache и перезапустить workers. Пример ручной проверки уже разрешённого типа: `php artisan seasonvar:import --no-discovery --page-type=actor`.
 
 ## Режимы длительного запуска

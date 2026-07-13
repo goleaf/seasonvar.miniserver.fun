@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\SeasonvarSourceAvailability;
 use App\Models\Actor;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendationSignal;
@@ -35,7 +36,45 @@ class SeasonvarParsePageCommandTest extends TestCase
         config([
             'seasonvar.crawl_delay_seconds' => 0,
             'seasonvar.media_check.enabled' => false,
+            'seasonvar.provider_availability.retry_hours' => 168,
         ]);
+    }
+
+    public function test_it_persists_rights_holder_region_blocking_for_a_targeted_import(): void
+    {
+        $this->travelTo('2026-07-13 12:00:00');
+        Http::preventStrayRequests();
+        $url = 'https://seasonvar.ru/serial-24845-Imenno_tak_psvtbam.html';
+
+        Http::fake([
+            $url => Http::response(<<<'HTML'
+                <html>
+                    <head><title>Именно так 1 сезон смотреть онлайн</title></head>
+                    <body>
+                        <h1>Именно так/Aynen Aynen</h1>
+                        <div class="pgs-seaslist">
+                            <a href="/serial-24845-Imenno_tak_psvtbam.html">1 сезон</a>
+                        </div>
+                        <div class="pgs-player-block">
+                            По просьбе правообладателя, сезон заблокирован для вашей страны.
+                        </div>
+                    </body>
+                </html>
+                HTML),
+        ]);
+
+        $this->artisan('seasonvar:import', ['url' => $url])->assertExitCode(0);
+
+        $page = SourcePage::query()->where('url', $url)->sole();
+
+        $this->assertSame(
+            SeasonvarSourceAvailability::RegionBlocked,
+            $page->provider_availability_status,
+        );
+        $this->assertNotNull($page->provider_availability_checked_at);
+        $this->assertSame('2026-07-20 12:00:00', $page->retry_after_at?->toDateTimeString());
+        $this->assertSame('missing_data', $page->import_status);
+        $this->assertContains('no_video', $page->missing_data_flags);
     }
 
     public function test_it_parses_requested_page_and_all_detected_seasons_into_one_title(): void

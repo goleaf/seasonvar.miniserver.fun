@@ -46,6 +46,8 @@ Production обязан использовать `APP_ENV=production`, `APP_DEBU
 
 ## Health monitoring видеоисточников от 13.07.2026
 
+Миграция `2026_07_13_164039_add_provider_availability_to_source_pages_table` additive: добавляет nullable provider availability status/check timestamp и индекс `source_pages_provider_availability_retry_idx` без удаления или переписывания каталога. После deploy первый полный `seasonvar:import` постепенно классифицирует сохранённые serial snapshots без HTTP. Настройки `SEASONVAR_PROVIDER_AVAILABILITY_RETRY_HOURS`, `SEASONVAR_PROVIDER_AVAILABILITY_BACKFILL_CHUNK_SIZE` и `SEASONVAR_PROVIDER_AVAILABILITY_BACKFILL_PAGE_LIMIT` применяются после пересборки config cache и перезапуска workers.
+
 Миграция `2026_07_13_021800_add_health_state_to_licensed_media_table` additive: добавляет health status, success/error/failure/latency/retry timestamps и индекс `licensed_media_health_due_idx`. Existing `available` backfill-ится как `active`; legacy `status=unavailable` и `check_failed/unavailable/invalid_url` — как `unavailable` с одной failure и немедленным `next_check_at`. Строки не удаляются, URL не изменяются, unique constraints не перестраиваются.
 
 Порядок production rollout для SQLite: дождаться finalizer/page jobs → остановить workers → сделать backup → развернуть код → `php artisan migrate --force` → задать/проверить `SEASONVAR_MEDIA_CHECK_FAILURE_THRESHOLD`, retry intervals и официальный `PLAYBACK_ALLOWED_HOSTS` → `php artisan config:cache` → `php artisan queue:restart` и запустить workers. Web/worker код не должен обслуживать запросы между deploy и migration, потому что новый resolver читает `health_status`.

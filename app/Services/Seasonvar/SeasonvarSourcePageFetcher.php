@@ -18,6 +18,7 @@ final class SeasonvarSourcePageFetcher
     public function __construct(
         private readonly PoliteHttpClient $httpClient,
         private readonly SeasonvarUrl $seasonvarUrl,
+        private readonly SeasonvarSourceAvailabilityDetector $sourceAvailability,
     ) {}
 
     /**
@@ -66,6 +67,8 @@ final class SeasonvarSourcePageFetcher
                 'last_import_run_id' => $importRunId,
                 'failure_count' => 0,
                 'error_message' => null,
+                'provider_availability_status' => $this->sourceAvailability->detect($snapshot->html)?->value,
+                'provider_availability_checked_at' => now(),
             ]);
 
             return new SeasonvarFetchedPage(
@@ -102,6 +105,8 @@ final class SeasonvarSourcePageFetcher
             'last_crawled_at' => now(),
             'last_changed_at' => $contentChanged ? now() : $page->last_changed_at,
             'last_import_run_id' => $importRunId,
+            'provider_availability_status' => $this->sourceAvailability->detect($body)?->value,
+            'provider_availability_checked_at' => now(),
         ]);
         $snapshot = $this->storeSnapshot($page, $body, $contentHash, $response->status(), $importRunId);
 

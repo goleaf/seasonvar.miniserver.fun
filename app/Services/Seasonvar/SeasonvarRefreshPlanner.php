@@ -3,6 +3,7 @@
 namespace App\Services\Seasonvar;
 
 use App\Enums\SeasonvarPageType;
+use App\Enums\SeasonvarSourceAvailability;
 use App\Models\LicensedMedia;
 use App\Models\SourcePage;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,8 +24,7 @@ class SeasonvarRefreshPlanner
         ?int $importRunId = null,
         ?callable $progress = null,
         ?array $pageTypes = null,
-    ): iterable
-    {
+    ): iterable {
         $chunkSize = max(1, $chunkSize);
         $totalSelected = 0;
         $selectedIds = [];
@@ -107,8 +107,7 @@ class SeasonvarRefreshPlanner
         ?int $importRunId = null,
         ?callable $progress = null,
         ?array $pageTypes = null,
-    ): iterable
-    {
+    ): iterable {
         $chunkSize = max(1, $chunkSize);
         $totalSelected = 0;
         $processingTypes = $this->handlers->processingTypes($pageTypes);
@@ -298,6 +297,11 @@ class SeasonvarRefreshPlanner
 
             'missing_data' => fn (Builder $query): Builder => $query
                 ->where('import_status', 'missing_data')
+                ->where(fn (Builder $query): Builder => $this->dueForMissingDataRetry($query)),
+
+            'provider_region_blocked' => fn (Builder $query): Builder => $query
+                ->where('parse_status', 'parsed')
+                ->where('provider_availability_status', SeasonvarSourceAvailability::RegionBlocked->value)
                 ->where(fn (Builder $query): Builder => $this->dueForMissingDataRetry($query)),
 
             'pending' => fn (Builder $query): Builder => $query

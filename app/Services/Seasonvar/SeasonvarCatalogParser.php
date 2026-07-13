@@ -74,6 +74,7 @@ class SeasonvarCatalogParser
         private readonly SeasonvarUrl $seasonvarUrl,
         private readonly CatalogRelationNameSanitizer $relationNames,
         private readonly SeasonvarRelationMetadataNormalizer $relationMetadata,
+        private readonly SeasonvarSourceAvailabilityDetector $sourceAvailability,
     ) {}
 
     /**
@@ -94,7 +95,7 @@ class SeasonvarCatalogParser
      *     recommendation_signals: list<array{source: string, signal_type: string, signal_key: string, signal_value: string|null, weight: int}>,
      *     aliases: list<array{name: string, type: string, source: string}>,
      *     reviews: list<array{author: string|null, body: string, published_at: string|null}>,
-     *     parse_meta: array{info_labels: list<string>, has_info_list: bool, has_season_list: bool, has_episode_script: bool}
+     *     parse_meta: array{info_labels: list<string>, has_info_list: bool, has_season_list: bool, has_episode_script: bool, provider_availability_status: string|null}
      * }
      */
     public function parse(string $html, string $url): array
@@ -386,7 +387,7 @@ class SeasonvarCatalogParser
 
     /**
      * @param  array<string, list<string>>  $infoFields
-     * @return array{info_labels: list<string>, has_info_list: bool, has_season_list: bool, has_episode_script: bool}
+     * @return array{info_labels: list<string>, has_info_list: bool, has_season_list: bool, has_episode_script: bool, provider_availability_status: string|null}
      */
     private function parseMeta(DOMXPath $xpath, string $html, array $infoFields): array
     {
@@ -395,6 +396,7 @@ class SeasonvarCatalogParser
             'has_info_list' => ($xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " pgs-sinfo_list ")]')?->length ?? 0) > 0,
             'has_season_list' => ($xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " pgs-seaslist ")]')?->length ?? 0) > 0,
             'has_episode_script' => Str::contains($html, 'arEpisodes'),
+            'provider_availability_status' => $this->sourceAvailability->detect($html)?->value,
         ];
     }
 
@@ -590,7 +592,7 @@ class SeasonvarCatalogParser
     /**
      * @param  list<array{type: string, name: string, source_url: string|null}>  $taxonomies
      * @param  list<array{provider: string, rating: float|null, votes: int|null, raw_value: string}>  $ratings
-     * @param  array{info_labels: list<string>, has_info_list: bool, has_season_list: bool, has_episode_script: bool}  $parseMeta
+     * @param  array{info_labels: list<string>, has_info_list: bool, has_season_list: bool, has_episode_script: bool, provider_availability_status: string|null}  $parseMeta
      * @return list<array{source: string, signal_type: string, signal_key: string, signal_value: string|null, weight: int}>
      */
     private function recommendationSignals(array $taxonomies, array $ratings, ?int $year, array $parseMeta): array

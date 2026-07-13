@@ -9,6 +9,34 @@ use Tests\TestCase;
 
 class SeasonvarCatalogParserTest extends TestCase
 {
+    public function test_it_recognizes_rights_holder_region_blocking_from_the_player_message(): void
+    {
+        $parser = app(SeasonvarCatalogParser::class);
+
+        $data = $parser->parse(
+            <<<'HTML'
+            <html>
+                <head><title>Именно так 1 сезон смотреть онлайн</title></head>
+                <body>
+                    <h1>Именно так/Aynen Aynen</h1>
+                    <div class="pgs-seaslist">
+                        <a href="/serial-24845-Imenno_tak_psvtbam.html">1 сезон</a>
+                    </div>
+                    <div class="pgs-player-block">
+                        По просьбе правообладателя, сезон заблокирован для вашей страны.
+                    </div>
+                </body>
+            </html>
+            HTML,
+            'https://seasonvar.ru/serial-24845-Imenno_tak_psvtbam.html',
+        );
+
+        $this->assertSame(
+            'region_blocked',
+            $data['parse_meta']['provider_availability_status'] ?? null,
+        );
+    }
+
     public function test_it_extracts_episodes_from_seasonvar_page_script(): void
     {
         $parser = app(SeasonvarCatalogParser::class);

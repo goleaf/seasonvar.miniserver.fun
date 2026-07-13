@@ -510,6 +510,7 @@ class SeasonvarCatalogImporter
                 'seasons' => $data->hasCompleteSeasonSnapshot(),
                 'episodes' => $data->hasCompleteEpisodeSnapshot(),
             ],
+            'provider_availability_status' => $data->parseMeta['provider_availability_status'] ?? null,
         ]);
 
         $transactionResult = $this->databaseTransaction->run(function () use ($page, $data, $prepared, $progress, $preferredCatalogTitle): array {
@@ -534,6 +535,8 @@ class SeasonvarCatalogImporter
                 'metadata_attempted_version' => $prepared->parserVersion,
                 'metadata_parsed_at' => now(),
                 'metadata_presence' => $this->parser->metadataPresence($data->taxonomies, $data->parseMeta),
+                'provider_availability_status' => $data->parseMeta['provider_availability_status'] ?? null,
+                'provider_availability_checked_at' => now(),
             ]);
 
             return [

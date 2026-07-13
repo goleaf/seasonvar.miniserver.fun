@@ -52,6 +52,7 @@
 - `SourcePage hasMany SeasonvarImportEvent`
 - `SourcePage belongsTo SeasonvarImportRun` через `last_import_run_id`
 - `SourcePage.page_type` хранит строковое значение `SeasonvarPageType`; inventory может добавить разрешённый неизвестный или ещё не разбираемый URL, но никогда не меняет `parse_status`/`import_status` уже существующей строки. Sitemap-документы также хранятся как source pages для полного audit trail и не попадают в serial parser queue.
+- `SourcePage.provider_availability_status=region_blocked` означает, что Seasonvar сам вернул сообщение о блокировке сезона правообладателем для региона исходящего сервера. `provider_availability_checked_at` фиксирует время нормализованной проверки; это page-specific provider observation, а не пользовательский `PlaybackAvailability::RegionBlocked` и не доказательство доступности в других странах.
 - Metadata taxonomy provenance не дублируется отдельной таблицей: нормализованный `source_url` справочника однозначно связывается с `SourcePage.url_hash`, а `SourcePage` хранит ETag/Last-Modified, content hash, crawl/import/parse timestamps, missing flags и import events. `SourcePageSnapshot` для non-serial не хранит исходную страницу или описательный текст, а только безопасную hash-сводку; serial snapshot остаётся полным из-за существующего локального metadata-backfill.
 - `SeasonvarImportRun hasMany SeasonvarImportEvent`
 - `SeasonvarImportRun hasMany SourcePageSnapshot`
@@ -118,6 +119,7 @@
 - `catalog_titles_year_indexed_idx` по `year, indexed_at` нужен для списков с фильтром года.
 - `source_pages_status_type_id_idx` по `parse_status, page_type, id` нужен для выбора страниц источника из очереди.
 - `source_pages_type_status_crawled_id_idx` по `page_type, parse_status, last_crawled_at, id` нужен для циклов обновления.
+- `source_pages_provider_availability_retry_idx` по `provider_availability_status, retry_after_at, id` нужен для bounded повторной проверки provider-region блокировок.
 - `licensed_media_title_status_published_idx` по `catalog_title_id, status, published_at` нужен для списков медиа карточки.
 - `licensed_media_episode_status_quality_idx` по `episode_id, status, quality` нужен для выбора медиа серии.
 - `licensed_media_health_due_idx` по `health_status, next_check_at, id` нужен для bounded due backlog без полного сканирования media.
@@ -184,6 +186,7 @@
 - Один запуск импорта держит cache lock, чтобы две копии `seasonvar:import` не обновляли одну очередь одновременно.
 - Если частый cron стартует новую копию во время активного импорта, команда пропускает этот запуск с успешным кодом выхода.
 - Каждый цикл импорта помечает неправильные вложенные ссылки Seasonvar как недоступные и проверяет ограниченный backlog старых медиа с пустым или устаревшим статусом доступности.
+- Каждый обычный или queued full cycle локально классифицирует bounded backlog serial snapshots без `provider_availability_checked_at`; сетевые запросы для этого backfill не выполняются. Новые/повторные fetch сразу обновляют provider availability, а `region_blocked` возвращается в planner после configured retry interval.
 - При старте каждого обычного или queued цикла один ограниченный chunk страниц `missing_data` повторяется раньше общего `retry_after_at`; страницы с живыми claims отбрасываются до limit, выборка ротируется по времени попытки и не отменяет backoff для HTTP/connection failures.
 - Каждый цикл импорта нормализует старые состояния разобранных страниц источника и дозаполняет отсутствующие ключи медиа, качество, формат и перевод.
 

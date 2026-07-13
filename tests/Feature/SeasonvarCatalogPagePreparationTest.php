@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\DTOs\Seasonvar\SeasonvarPreparedCatalogPage;
+use App\Enums\SeasonvarSourceAvailability;
 use App\Models\SeasonvarImportRun;
 use App\Models\Source;
 use App\Models\SourcePage;
@@ -77,6 +78,38 @@ class SeasonvarCatalogPagePreparationTest extends TestCase
         $this->assertDatabaseCount('catalog_titles', 0);
         $this->assertDatabaseCount('seasons', 0);
         $this->assertDatabaseCount('episodes', 0);
+    }
+
+    public function test_fetcher_records_provider_region_blocking_before_catalog_application(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake([
+            'https://seasonvar.ru/*' => Http::response(
+                '<html><div class="pgs-player-block">По просьбе правообладателя, сезон заблокирован для вашей страны.</div></html>',
+            ),
+        ]);
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $url = 'https://seasonvar.ru/serial-24845-Imenno_tak_psvtbam.html';
+        $page = SourcePage::factory()->for($source)->create([
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+            'page_type' => 'serial',
+            'provider_availability_status' => null,
+            'provider_availability_checked_at' => null,
+        ]);
+
+        app(SeasonvarSourcePageFetcher::class)->fetch($page);
+
+        $this->assertSame(
+            SeasonvarSourceAvailability::RegionBlocked,
+            $page->fresh()->provider_availability_status,
+        );
+        $this->assertNotNull($page->fresh()->provider_availability_checked_at);
+        $this->assertDatabaseCount('catalog_titles', 0);
     }
 
     public function test_preparer_round_trips_every_discovered_season_without_catalog_writes(): void

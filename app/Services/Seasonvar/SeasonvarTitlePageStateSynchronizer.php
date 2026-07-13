@@ -2,6 +2,7 @@
 
 namespace App\Services\Seasonvar;
 
+use App\Enums\SeasonvarSourceAvailability;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
 use App\Models\Season;
@@ -25,11 +26,16 @@ final class SeasonvarTitlePageStateSynchronizer
         $retryAfter = $flags === [] ? null : now()->addHours(
             max(1, (int) config('seasonvar.import.missing_data_retry_hours', 24)),
         );
+        $providerRetryAfter = now()->addHours(
+            max(1, (int) config('seasonvar.provider_availability.retry_hours', 168)),
+        );
 
         $currentPage->update([
             'import_status' => $flags === [] ? 'parsed' : 'missing_data',
             'missing_data_flags' => $flags,
-            'retry_after_at' => $retryAfter,
+            'retry_after_at' => $currentPage->provider_availability_status === SeasonvarSourceAvailability::RegionBlocked
+                ? $providerRetryAfter
+                : $retryAfter,
             'failure_count' => 0,
             'last_imported_at' => now(),
             'last_import_run_id' => $importRunId,
@@ -70,6 +76,13 @@ final class SeasonvarTitlePageStateSynchronizer
                 'import_status' => $flags === [] ? 'parsed' : 'missing_data',
                 'missing_data_flags' => json_encode($flags, JSON_THROW_ON_ERROR),
                 'retry_after_at' => $retryAfter,
+            ]);
+
+        SourcePage::query()
+            ->whereKey($linkedPageIds)
+            ->where('provider_availability_status', SeasonvarSourceAvailability::RegionBlocked->value)
+            ->update([
+                'retry_after_at' => $providerRetryAfter,
             ]);
 
         return $flags;
