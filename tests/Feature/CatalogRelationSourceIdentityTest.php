@@ -13,7 +13,9 @@ use App\Services\Catalog\CatalogRelationSourceIdentityRegistry;
 use App\Services\Catalog\CatalogRelationSyncer;
 use App\Services\Catalog\CatalogTaxonomyRegistry;
 use Illuminate\Database\QueryException;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class CatalogRelationSourceIdentityTest extends TestCase
@@ -92,6 +94,41 @@ class CatalogRelationSourceIdentityTest extends TestCase
         );
 
         $this->assertDatabaseCount('catalog_relation_source_identities', 0);
+    }
+
+    public function test_registry_fails_open_while_the_additive_migration_is_pending(): void
+    {
+        $source = Source::factory()->create();
+        Schema::drop('catalog_relation_source_identities');
+
+        try {
+            $registry = app(CatalogRelationSourceIdentityRegistry::class);
+
+            $this->assertSame(
+                'john-smith',
+                $registry->resolve($source->id, 'actor', 'person-42', null, 'john-smith'),
+            );
+            $this->assertSame(0, $registry->rebind('actor', ['john-smith'], 'johnathan-smith'));
+            $this->assertSame(0, $registry->pruneMissing('actor', 'actors'));
+            $this->assertSame(0, $registry->pruneUnsupported());
+        } finally {
+            Schema::create('catalog_relation_source_identities', function (Blueprint $table): void {
+                $table->id();
+                $table->foreignId('source_id')->constrained()->cascadeOnDelete();
+                $table->string('relation_type', 32);
+                $table->string('source_key_hash', 64);
+                $table->string('canonical_key');
+                $table->timestamps();
+                $table->unique(
+                    ['source_id', 'relation_type', 'source_key_hash'],
+                    'catalog_relation_source_identity_unique',
+                );
+                $table->index(
+                    ['relation_type', 'canonical_key'],
+                    'catalog_relation_source_identity_canonical_idx',
+                );
+            });
+        }
     }
 
     public function test_stable_external_identity_prevents_renamed_duplicates_for_every_relation_type(): void

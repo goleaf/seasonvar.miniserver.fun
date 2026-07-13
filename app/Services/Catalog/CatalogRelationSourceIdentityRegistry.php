@@ -7,6 +7,7 @@ namespace App\Services\Catalog;
 use App\Models\CatalogRelationSourceIdentity;
 use App\Models\Source;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Normalizer;
 
@@ -14,6 +15,8 @@ class CatalogRelationSourceIdentityRegistry
 {
     /** @var array<int, true> */
     private array $existingSourceIds = [];
+
+    private ?bool $identityTableAvailable = null;
 
     public function __construct(
         private readonly CatalogTaxonomyRegistry $taxonomies,
@@ -33,6 +36,7 @@ class CatalogRelationSourceIdentityRegistry
             || $sourceId < 1
             || $canonicalKey === ''
             || $sourceKeyHash === null
+            || ! $this->identityTableAvailable()
             || ! $this->sourceExists($sourceId)) {
             return $canonicalKey;
         }
@@ -75,7 +79,7 @@ class CatalogRelationSourceIdentityRegistry
     /** @param list<string> $previousCanonicalKeys */
     public function rebind(string $type, array $previousCanonicalKeys, string $canonicalKey): int
     {
-        if (! $this->taxonomies->supports($type)) {
+        if (! $this->taxonomies->supports($type) || ! $this->identityTableAvailable()) {
             return 0;
         }
 
@@ -102,7 +106,7 @@ class CatalogRelationSourceIdentityRegistry
 
     public function pruneMissing(string $type, string $relationTable): int
     {
-        if (! $this->taxonomies->supports($type)) {
+        if (! $this->taxonomies->supports($type) || ! $this->identityTableAvailable()) {
             return 0;
         }
 
@@ -127,6 +131,10 @@ class CatalogRelationSourceIdentityRegistry
 
     public function pruneUnsupported(): int
     {
+        if (! $this->identityTableAvailable()) {
+            return 0;
+        }
+
         return DB::table($this->table())
             ->whereNotIn('relation_type', array_keys($this->taxonomies->relations()))
             ->delete();
@@ -206,5 +214,10 @@ class CatalogRelationSourceIdentityRegistry
     private function table(): string
     {
         return (new CatalogRelationSourceIdentity)->getTable();
+    }
+
+    private function identityTableAvailable(): bool
+    {
+        return $this->identityTableAvailable ??= Schema::hasTable($this->table());
     }
 }
