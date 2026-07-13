@@ -1179,10 +1179,17 @@ class SeasonvarParsePageCommandTest extends TestCase
                     <a href="/serial-300-Tretij-1-season.html">Третий сверх лимита</a>
                     <a href="https://example.test/serial-400.html">Чужой хост</a>
                     <a href="/player.php?token=secret">Player</a>
-                </body>
+            </body>
             </html>
             HTML;
-        Http::fake([$url => Http::response($html, 200, ['ETag' => '"actor-v1"'])]);
+        $renamedHtml = str_replace(
+            '<h1>Александр Иванов</h1>',
+            '<h1>Александр Иваныч</h1>',
+            $html,
+        );
+        Http::fake([$url => Http::sequence()
+            ->push($html, 200, ['ETag' => '"actor-v1"'])
+            ->push($renamedHtml, 200, ['ETag' => '"actor-v2"'])]);
 
         $importer = app(SeasonvarCatalogImporter::class);
         $first = $importer->parsePage($page);
@@ -1191,6 +1198,11 @@ class SeasonvarParsePageCommandTest extends TestCase
         $this->assertDatabaseHas('actors', [
             'name' => 'Александр Иванов',
             'source_url' => $otherPersonUrl,
+        ]);
+        $this->assertDatabaseHas('catalog_relation_source_identities', [
+            'source_id' => $source->id,
+            'relation_type' => 'actor',
+            'canonical_key' => 'aleksandr-ivanov',
         ]);
         $this->assertSame(2, SourcePage::query()->where('page_type', 'serial')->count());
         $this->assertDatabaseHas('source_pages', [
@@ -1205,16 +1217,17 @@ class SeasonvarParsePageCommandTest extends TestCase
             'url' => 'https://seasonvar.ru/serial-300-Tretij-1-season.html',
         ]);
 
-        Http::fake([$url => Http::response($html, 200, ['ETag' => '"actor-v1"'])]);
         $importer->parsePage($page->fresh(), force: true);
 
         $this->assertDatabaseCount('actors', 1);
+        $this->assertDatabaseCount('catalog_relation_source_identities', 1);
+        $this->assertSame('Александр Иванов', Actor::query()->sole()->name);
         $this->assertSame(2, SourcePage::query()->where('page_type', 'serial')->count());
         $this->assertDatabaseHas('source_pages', [
             'id' => $page->id,
             'parse_status' => 'parsed',
             'import_status' => 'parsed',
-            'etag' => '"actor-v1"',
+            'etag' => '"actor-v2"',
         ]);
         $this->assertTrue(SeasonvarImportEvent::query()
             ->where('source_page_id', $page->id)

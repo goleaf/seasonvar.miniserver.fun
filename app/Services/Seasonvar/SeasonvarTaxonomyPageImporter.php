@@ -9,6 +9,7 @@ use App\DTOs\Seasonvar\SeasonvarPageHandlerResult;
 use App\Models\SeasonvarImportEvent;
 use App\Models\SourcePage;
 use App\Services\Catalog\CatalogRelationNameSanitizer;
+use App\Services\Catalog\CatalogRelationSourceIdentityRegistry;
 use App\Services\Catalog\CatalogTaxonomyRegistry;
 use Illuminate\Database\Eloquent\Model;
 
@@ -17,6 +18,7 @@ final readonly class SeasonvarTaxonomyPageImporter
     public function __construct(
         private CatalogTaxonomyRegistry $taxonomies,
         private CatalogRelationNameSanitizer $relationNames,
+        private CatalogRelationSourceIdentityRegistry $sourceIdentities,
         private SeasonvarDiscoveredPageStore $pages,
         private SeasonvarDatabaseTransaction $transactions,
     ) {}
@@ -28,8 +30,9 @@ final readonly class SeasonvarTaxonomyPageImporter
     {
         $filterType = $data->pageType->value;
         $modelClass = $this->taxonomies->modelClass($filterType);
-        $result = $this->transactions->run(function () use ($data, $modelClass): array {
-            $taxonomy = $this->resolve($modelClass, $data);
+        $result = $this->transactions->run(function () use ($data, $modelClass, $page): array {
+            $resolved = $this->resolve($modelClass, $data, $page->source_id);
+            $taxonomy = $resolved['taxonomy'];
             $created = ! $taxonomy->exists;
             $before = $taxonomy->exists ? $taxonomy->only(['name', 'slug', 'source_url']) : [];
             $sourceUrl = $this->preservedSourceUrl($taxonomy, $data->canonicalSourceUrl);
@@ -40,7 +43,7 @@ final readonly class SeasonvarTaxonomyPageImporter
 
             $taxonomy->fill([
                 'name' => $name,
-                'slug' => $this->relationNames->canonicalKey($type, $name),
+                'slug' => $resolved['canonical_key'],
                 'source_url' => $sourceUrl,
             ])->save();
 
@@ -80,19 +83,29 @@ final readonly class SeasonvarTaxonomyPageImporter
 
     /**
      * @param  class-string<Model>  $modelClass
+     * @return array{taxonomy: Model, canonical_key: string}
      */
-    private function resolve(string $modelClass, SeasonvarMetadataPageData $data): Model
+    private function resolve(string $modelClass, SeasonvarMetadataPageData $data, int $sourceId): array
     {
         $bySourceUrl = $modelClass::query()->where('source_url', $data->canonicalSourceUrl)->first();
+        $fallbackKey = $this->relationNames->canonicalKey($data->pageType->value, $data->displayName);
+        $candidateKey = $bySourceUrl?->slug ?: $fallbackKey;
+        $canonicalKey = $this->sourceIdentities->resolve(
+            $sourceId,
+            $data->pageType->value,
+            null,
+            $data->canonicalSourceUrl,
+            $candidateKey,
+        );
+        $byCanonicalKey = $modelClass::query()->where('slug', $canonicalKey)->first();
+        $taxonomy = $byCanonicalKey
+            ?? ($bySourceUrl?->slug === $canonicalKey ? $bySourceUrl : null)
+            ?? new $modelClass;
 
-        if ($bySourceUrl !== null) {
-            return $bySourceUrl;
-        }
-
-        $baseSlug = $this->relationNames->canonicalKey($data->pageType->value, $data->displayName);
-        $bySlug = $modelClass::query()->where('slug', $baseSlug)->first();
-
-        return $bySlug ?? new $modelClass;
+        return [
+            'taxonomy' => $taxonomy,
+            'canonical_key' => $canonicalKey,
+        ];
     }
 
     private function preservedSourceUrl(Model $taxonomy, string $canonicalSourceUrl): string
