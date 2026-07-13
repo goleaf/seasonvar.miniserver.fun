@@ -49,7 +49,7 @@ Coordinator не держит group lock во время сетевых запр
 Для безопасного fan-in требуется явное состояние группы одного тайтла. Additive migration вводит внутреннюю таблицу `seasonvar_import_title_groups` с:
 
 - import run ID;
-- canonical catalog title ID;
+- nullable canonical catalog title ID: visitor refresh задаёт его сразу, а global group нового сериала заполняет после первого deterministic apply;
 - необратимо хешированным canonical group key;
 - статусом `discovering/running/finalizing/completed/partial/failed`;
 - counters expected/prepared/failed/applied;
