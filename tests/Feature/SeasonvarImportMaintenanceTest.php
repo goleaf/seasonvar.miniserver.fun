@@ -586,6 +586,12 @@ class SeasonvarImportMaintenanceTest extends TestCase
             'source_key_hash' => hash('sha256', 'invalid-actor'),
             'canonical_key' => $invalidActor->slug,
         ]);
+        CatalogRelationSourceIdentity::query()->create([
+            'source_id' => $firstTitle->source_id,
+            'relation_type' => 'unsupported',
+            'source_key_hash' => hash('sha256', 'unsupported-relation'),
+            'canonical_key' => 'unsupported-relation',
+        ]);
 
         $firstTitle->actors()->attach([$latinActor->id, $cyrillicActor->id, $invalidActor->id]);
         $secondTitle->actors()->attach($cyrillicActor->id);

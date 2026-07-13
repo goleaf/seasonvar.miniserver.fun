@@ -31,6 +31,7 @@ class CatalogMetadataDeduplicator
         $chunkSize = $this->chunkSize();
         $result = $this->emptyResult();
         $affectedTitleIds = [];
+        $this->sourceIdentities->pruneUnsupported();
 
         $progress('catalog-relations-cleanup-started', [
             'chunk_size' => $chunkSize,

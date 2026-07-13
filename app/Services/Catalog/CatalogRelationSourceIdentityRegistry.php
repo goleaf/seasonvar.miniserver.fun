@@ -125,6 +125,13 @@ class CatalogRelationSourceIdentityRegistry
             ->delete();
     }
 
+    public function pruneUnsupported(): int
+    {
+        return DB::table($this->table())
+            ->whereNotIn('relation_type', array_keys($this->taxonomies->relations()))
+            ->delete();
+    }
+
     private function externalId(string|int|null $sourceExternalId): ?string
     {
         if ($sourceExternalId === null) {
