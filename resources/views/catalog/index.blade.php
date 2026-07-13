@@ -2,54 +2,7 @@
 
 @section('content')
     <div class="space-y-5">
-        <x-ui.panel data-home-hero :pad="false" class="overflow-hidden border-emerald-100">
-            <div class="grid gap-5 bg-gradient-to-br from-white via-emerald-50 to-cyan-50 p-4 sm:p-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-                <div class="min-w-0">
-                    <h1 class="flex items-start gap-3 text-3xl font-black tracking-tight text-slate-800 sm:text-4xl">
-                        <span class="grid h-11 w-11 shrink-0 place-items-center rounded-control bg-white text-lg text-emerald-700 shadow-sm">
-                            <i class="fa-solid fa-clapperboard" aria-hidden="true"></i>
-                        </span>
-                        <span>Сериалы онлайн</span>
-                    </h1>
-                    <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
-                        Поиск по названиям, актерам, жанрам, странам и другим связям каталога.
-                    </p>
-
-                    <form action="{{ route('titles.index') }}" method="GET" role="search" aria-label="Поиск на главной" class="mt-5 flex max-w-3xl items-start gap-2">
-                        <x-form.search-field
-                            id="home-search"
-                            name="q"
-                            value=""
-                            label="Поиск на главной"
-                            placeholder="Название, актер или жанр"
-                            container-class="min-w-0 flex-1"
-                            input-class="min-h-12 min-w-0 flex-1 border-0 bg-transparent px-4 py-3 text-base text-slate-700 outline-none placeholder:text-slate-500"
-                        />
-                        <button type="submit" class="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-3 font-bold text-white hover:bg-emerald-600 sm:px-6">
-                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-                            <span class="sr-only sm:not-sr-only">Найти</span>
-                        </button>
-                    </form>
-                </div>
-
-                <nav aria-label="Быстрые переходы" class="flex flex-wrap gap-2 lg:max-w-sm lg:justify-end">
-                    <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 shadow-sm hover:bg-emerald-50">
-                        <i class="fa-solid fa-table-cells-large" aria-hidden="true"></i>
-                        <span>Все сериалы</span>
-                    </a>
-                    <a href="{{ route('titles.year', ['year' => now()->year]) }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-sky-700 shadow-sm hover:bg-sky-50">
-                        <i class="fa-solid fa-sparkles" aria-hidden="true"></i>
-                        <span>Новинки</span>
-                    </a>
-                    @if (($subtitleTag?->catalog_titles_count ?? 0) > 0)
-                        <a href="{{ route('titles.index', ['tag' => 'subtitry']) }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-amber-700 shadow-sm hover:bg-amber-50">
-                            <i class="fa-solid fa-closed-captioning" aria-hidden="true"></i>
-                            <span>С субтитрами</span>
-                        </a>
-                    @endif
-                </nav>
-            </div>
-        </x-ui.panel>
+        <h1 class="sr-only">Сериалы онлайн</h1>
 
         <div data-home-metrics class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <x-stat label="Сериалов" :value="$stats['titles']" icon="fa-solid fa-clapperboard" />

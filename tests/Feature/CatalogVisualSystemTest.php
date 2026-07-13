@@ -27,16 +27,16 @@ class CatalogVisualSystemTest extends TestCase
             ->assertSee('<main id="main-content"', false);
     }
 
-    public function test_home_starts_with_search_hero_before_metrics(): void
+    public function test_home_starts_with_metrics_without_hero(): void
     {
         $response = $this->get(route('home'));
 
         $response
             ->assertOk()
-            ->assertSee('data-home-hero', false)
-            ->assertSee('aria-label="Поиск на главной"', false)
-            ->assertSee('data-home-metrics', false)
-            ->assertSeeInOrder(['data-home-hero', 'data-home-metrics'], false);
+            ->assertDontSee('data-home-hero', false)
+            ->assertDontSee('aria-label="Поиск на главной"', false)
+            ->assertSee('<h1 class="sr-only">Сериалы онлайн</h1>', false)
+            ->assertSee('data-home-metrics', false);
     }
 
     public function test_title_page_places_player_before_secondary_reference_metadata(): void
