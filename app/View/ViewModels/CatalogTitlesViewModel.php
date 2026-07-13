@@ -245,10 +245,18 @@ class CatalogTitlesViewModel
     public function filterFormState(): array
     {
         $query = $this->withCatalogState($this->baseQuery);
-        unset($query['page'], $query['year']);
+        unset($query['page']);
 
-        foreach (array_keys($this->typeLabels) as $filterType) {
-            unset($query[$filterType]);
+        $visibleFilterKeys = [
+            'year',
+            'publication_type',
+            'subtitles',
+            'quality',
+            ...array_keys(CatalogSeriesFilters::ADVANCED_REQUEST_PROPERTIES),
+        ];
+
+        foreach ([...array_keys($this->typeLabels), ...$visibleFilterKeys] as $filterKey) {
+            unset($query[$filterKey]);
         }
 
         if ($this->search !== '') {

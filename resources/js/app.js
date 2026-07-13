@@ -214,40 +214,6 @@ const loadCatalogFilterSearch = () => {
     });
 };
 
-let returnFocus = null;
-const initializedCatalogDialogs = new WeakSet();
-
-const loadCatalogFilterDialog = () => {
-    const dialog = document.querySelector('[data-catalog-filter-dialog]');
-
-    if (!(dialog instanceof HTMLDialogElement) || initializedCatalogDialogs.has(dialog)) {
-        return;
-    }
-
-    initializedCatalogDialogs.add(dialog);
-
-    document.querySelectorAll('[data-catalog-filter-dialog-open]').forEach((trigger) => {
-        trigger.addEventListener('click', (event) => {
-            if (window.matchMedia('(min-width: 1024px)').matches || dialog.open) {
-                return;
-            }
-
-            event.preventDefault();
-            returnFocus = trigger;
-            dialog.showModal();
-        });
-    });
-
-    dialog.querySelectorAll('[data-catalog-filter-dialog-close]').forEach((button) => {
-        button.addEventListener('click', () => dialog.close());
-    });
-
-    dialog.addEventListener('close', () => {
-        returnFocus?.focus();
-        returnFocus = null;
-    });
-};
-
 const initializedPeopleComboboxes = new WeakSet();
 
 const peopleFilterUrl = (type, slug) => {
@@ -493,7 +459,6 @@ const loadCatalogPaginationScroll = () => {
 };
 
 const loadCatalogInterfaces = () => {
-    loadCatalogFilterDialog();
     loadCatalogFilterSearch();
     loadCatalogPeopleComboboxes();
     loadCatalogPaginationScroll();

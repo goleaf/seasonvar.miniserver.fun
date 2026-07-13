@@ -22,6 +22,7 @@
 - Desktop grid с колонкой `260/280px`, sticky sidebar, native mobile dialog и кнопка открытия dialog удаляются.
 - Основная выдача становится единственной полноширинной колонкой.
 - Deferred Livewire island фасетов сохраняется: первый ответ не должен вычислять и отправлять все справочники, годы и счётчики.
+- Единый блок фильтров и выдача используют одноимённые sibling islands `catalog-live`; deferred island нельзя вкладывать в eager island с тем же именем.
 - Все видимые controls объединяются в одну GET/Livewire-форму. Скрытые поля сохраняют только состояние вне формы, чтобы query keys не дублировались.
 - Существующие query-параметры, route-scoped фильтры, `wire:model.live`, GET fallback и поведение browser history не меняются.
 - JavaScript диалога удаляется как неиспользуемый. Progressive enhancement поиска по группам и people-combobox остаётся.

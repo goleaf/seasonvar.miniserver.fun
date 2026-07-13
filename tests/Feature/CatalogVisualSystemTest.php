@@ -167,10 +167,6 @@ class CatalogVisualSystemTest extends TestCase
 
     public function test_public_views_do_not_define_internal_scroll_containers(): void
     {
-        $allowedClasses = [
-            'catalog/titles.blade.php' => ['overflow-y-auto'],
-        ];
-
         $forbiddenClasses = [
             'overflow-auto',
             'overflow-scroll',
@@ -198,14 +194,13 @@ class CatalogVisualSystemTest extends TestCase
             $relativePath = str_replace('\\', '/', $file->getRelativePathname());
 
             foreach ($forbiddenClasses as $class) {
-                if (str_contains($content, $class)
-                    && ! in_array($class, $allowedClasses[$relativePath] ?? [], true)) {
+                if (str_contains($content, $class)) {
                     $violations[] = $file->getRelativePathname().': '.$class;
                 }
             }
         }
 
-        $this->assertSame([], $violations, 'Публичный интерфейс не должен создавать прокрутку внутри блоков, кроме явно разрешённого viewport-sized native dialog.');
+        $this->assertSame([], $violations, 'Публичный интерфейс не должен создавать прокрутку внутри блоков.');
     }
 
     public function test_title_surfaces_use_one_title_link_and_keep_relation_links_accessible(): void
@@ -284,7 +279,7 @@ class CatalogVisualSystemTest extends TestCase
         );
     }
 
-    public function test_catalog_search_ui_automatically_loads_linked_filter_island(): void
+    public function test_catalog_search_ui_automatically_loads_unified_filter_island(): void
     {
         $title = CatalogTitle::factory()->create();
 
@@ -304,18 +299,20 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('aria-label="Поиск по всему каталогу"', $content);
         $this->assertStringContainsString('id="site-search"', $content);
         $this->assertStringContainsString('id="catalog-search"', $content);
-        $this->assertStringContainsString('<dialog', $content);
+        $this->assertStringNotContainsString('<dialog', $content);
+        $this->assertSame(1, substr_count($content, 'id="catalog-filters"'));
         $this->assertStringContainsString('id="catalog-filters"', $content);
-        $this->assertStringContainsString('data-catalog-filter-dialog', $content);
-        $this->assertStringContainsString('data-catalog-filter-dialog-open', $content);
-        $this->assertStringContainsString('data-catalog-filter-dialog-close', $content);
-        $this->assertStringContainsString('max-h-dvh', $content);
-        $this->assertStringContainsString('overflow-y-auto', $content);
+        $this->assertStringContainsString('data-catalog-unified-filters', $content);
+        $this->assertStringNotContainsString('data-catalog-filter-dialog', $content);
+        $this->assertStringNotContainsString('data-catalog-filter-dialog-open', $content);
+        $this->assertStringNotContainsString('data-catalog-filter-dialog-close', $content);
+        $this->assertStringNotContainsString('max-h-dvh', $content);
+        $this->assertStringNotContainsString('overflow-y-auto', $content);
+        $this->assertStringNotContainsString('lg:grid-cols-[260px_minmax(0,1fr)]', $content);
         $this->assertStringContainsString('data-catalog-mobile-view-controls', $content);
         $this->assertStringContainsString('data-catalog-mobile-page-size-controls', $content);
         $this->assertStringContainsString('wire:click.prevent="setView(\'grid\')"', $content);
         $this->assertStringContainsString('wire:click.prevent="setPerPage(48)"', $content);
-        $this->assertStringContainsString('Фильтры · 0', $content);
         $this->assertStringContainsString('wire:init="__lazyLoadIsland"', $content);
         $this->assertStringContainsString('name=catalog-live', $content);
         $this->assertStringContainsString('data-catalog-facets-loading', $content);
@@ -335,12 +332,60 @@ class CatalogVisualSystemTest extends TestCase
         $filterTemplate = file_get_contents(resource_path('views/components/catalog/title-filters.blade.php'));
 
         $this->assertIsString($filterTemplate);
+        $this->assertStringContainsString('data-catalog-filter-groups', $filterTemplate);
+        $this->assertStringContainsString('columns-1', $filterTemplate);
+        $this->assertStringContainsString('break-inside-avoid rounded-control border border-slate-200 bg-white p-3', $filterTemplate);
+        $this->assertStringContainsString('<span>Годы</span>', $filterTemplate);
+        $this->assertStringContainsString('<span>Тип публикации</span>', $filterTemplate);
+        $this->assertStringContainsString('<span>Субтитры</span>', $filterTemplate);
+        $this->assertStringContainsString('@foreach ($filterView->typeLabels as $filterType => $label)', $filterTemplate);
+        $this->assertStringNotContainsString('<form', $filterTemplate);
         $this->assertStringContainsString('wire:model.live="filters.{{ $filterType }}"', $filterTemplate);
         $this->assertStringContainsString('wire:loading.delay', $filterTemplate);
         $this->assertStringNotContainsString('wire:loading.delay.flex', $filterTemplate);
         $this->assertDoesNotMatchRegularExpression('/wire:model\.live=.*@checked/m', $filterTemplate);
         $this->assertSame(4, substr_count($filterTemplate, 'wire:replace.self'));
         $this->assertStringContainsString('Обновляем подборку', $filterTemplate);
+
+        $catalogTemplate = file_get_contents(resource_path('views/catalog/titles.blade.php'));
+
+        $this->assertIsString($catalogTemplate);
+        $this->assertSame(3, substr_count($catalogTemplate, "@island(name: 'catalog-live', with: \$this->catalogPage)"));
+
+        $unifiedFilterTemplate = file_get_contents(resource_path('views/components/catalog/unified-title-filters.blade.php'));
+
+        $this->assertIsString($unifiedFilterTemplate);
+        $this->assertStringContainsString('wire:island="catalog-live"', $unifiedFilterTemplate);
+
+        $deferredIslandPosition = strpos($catalogTemplate, "@island(name: 'catalog-live', defer: true)");
+
+        $this->assertIsInt($deferredIslandPosition);
+
+        $templateBeforeDeferredIsland = substr($catalogTemplate, 0, $deferredIslandPosition);
+
+        $this->assertSame(
+            substr_count($templateBeforeDeferredIsland, '@island('),
+            substr_count($templateBeforeDeferredIsland, '@endisland'),
+            'Отложенный island фасетов не должен быть вложен в другой island с тем же именем.',
+        );
+        $this->assertSame(4, substr_count($catalogTemplate, "@island(name: 'catalog-live'"));
+    }
+
+    public function test_catalog_unified_filters_open_for_any_active_filter(): void
+    {
+        $genre = Genre::query()->create([
+            'name' => 'Драма',
+            'slug' => 'drama',
+        ]);
+        $title = CatalogTitle::factory()->create();
+        $title->genres()->attach($genre);
+
+        $content = $this->get(route('titles.index', ['genre' => ['drama']]))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertMatchesRegularExpression('/<details[^>]*id="catalog-filters"[^>]*open/s', $content);
+        $this->assertStringContainsString('data-catalog-filter-count', $content);
     }
 
     public function test_advanced_catalog_filters_use_four_compact_explanatory_groups(): void
@@ -355,15 +400,15 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('data-catalog-advanced-group="rating"', $content);
         $this->assertStringContainsString('data-catalog-advanced-group="video"', $content);
         $this->assertStringContainsString('Точный подбор', $content);
-        $this->assertStringContainsString('Уточните период, объём сериала, рейтинг и доступность видео', $content);
+        $this->assertStringContainsString('Уточните годы, тип, жанры, страны, актёров, рейтинг и доступность видео', $content);
         $this->assertStringContainsString('Показать результаты', $content);
-        $this->assertStringContainsString('Сбросить точный подбор', $content);
+        $this->assertStringContainsString('Сбросить фильтры', $content);
         $this->assertStringContainsString('wire:model.live="filters.updated"', $content);
         $this->assertStringContainsString('wire:model.live="filters.ratingSource"', $content);
         $this->assertStringContainsString('wire:model.live="filters.video"', $content);
         $this->assertStringContainsString('wire:model.live="filters.qualities"', $content);
 
-        $template = file_get_contents(resource_path('views/catalog/titles.blade.php'));
+        $template = file_get_contents(resource_path('views/components/catalog/unified-title-filters.blade.php'));
 
         $this->assertIsString($template);
         $this->assertDoesNotMatchRegularExpression('/wire:model\.live=.*@checked/m', $template);
@@ -388,18 +433,32 @@ class CatalogVisualSystemTest extends TestCase
         );
     }
 
-    public function test_catalog_frontend_script_contract_cancels_stale_people_requests_and_restores_dialog_focus(): void
+    public function test_unified_filter_form_does_not_duplicate_visible_query_keys(): void
+    {
+        CatalogTitle::factory()->create();
+
+        $content = $this->get(route('titles.index', ['year_from' => 2020]))
+            ->assertOk()
+            ->getContent();
+
+        $matched = preg_match('/<details[^>]*id="catalog-filters"[^>]*>.*?<\/details>/s', $content, $filters);
+
+        $this->assertSame(1, $matched);
+        $this->assertSame(1, substr_count($filters[0], 'name="year_from"'));
+    }
+
+    public function test_catalog_frontend_script_contract_keeps_people_keyboard_support_without_dialog_code(): void
     {
         $script = file_get_contents(resource_path('js/app.js'));
 
         $this->assertIsString($script);
         $this->assertStringContainsString('AbortController', $script);
-        $this->assertStringContainsString('showModal()', $script);
+        $this->assertStringNotContainsString('showModal()', $script);
         $this->assertStringContainsString("case 'ArrowDown'", $script);
         $this->assertStringContainsString("case 'ArrowUp'", $script);
         $this->assertStringContainsString("case 'Enter'", $script);
         $this->assertStringContainsString("case 'Escape'", $script);
-        $this->assertStringContainsString('returnFocus?.focus()', $script);
+        $this->assertStringNotContainsString('returnFocus', $script);
     }
 
     public function test_catalog_sort_and_alphabet_links_keep_touch_sized_flat_controls(): void

@@ -58,8 +58,7 @@ const assertPageGeometry = async (page) => {
 
 const assertTouchTargets = async (page) => {
     const undersized = await page.locator([
-        '[data-catalog-filter-dialog-open]',
-        '[data-catalog-filter-dialog-close]',
+        '[data-catalog-unified-filters] > summary',
         '[data-catalog-sort-option]',
         '[data-catalog-view-option]',
         '[data-catalog-page-size-option]',
@@ -87,7 +86,7 @@ const assertAccessibility = async (page) => {
     expect(blockingViolations).toEqual([]);
 };
 
-test('catalog keeps URL state, reachable filters and responsive geometry', async ({ page, baseURL }, testInfo) => {
+test('catalog keeps URL state, unified filters and responsive geometry', async ({ page, baseURL }) => {
     const browserErrors = await installNetworkGuard(page, baseURL);
 
     await page.goto('/titles?q=Browser%20Smoke&sort=title_asc');
@@ -97,15 +96,12 @@ test('catalog keeps URL state, reachable filters and responsive geometry', async
     await expect(page).toHaveURL(/q=Browser(?:%20|\+)Smoke/);
     await expect(page.locator('[data-catalog-card]')).toHaveCount(1);
 
-    if (testInfo.project.name === 'Mobile Chromium') {
-        const trigger = page.locator('[data-catalog-filter-dialog-open]');
+    const filters = page.locator('#catalog-filters');
 
-        await trigger.click();
-        await expect(page.locator('[data-catalog-filter-dialog]')).toHaveAttribute('open', '');
-        await expect(page.locator('[data-catalog-filter-dialog-close]')).toBeFocused();
-        await page.locator('[data-catalog-filter-dialog-close]').click();
-        await expect(trigger).toBeFocused();
-    }
+    await filters.locator(':scope > summary').click();
+    await expect(filters).toHaveAttribute('open', '');
+    await expect(page.locator('[data-catalog-filter-groups]')).toBeVisible();
+    await expect(page.getByText('Актеры', { exact: true }).first()).toBeVisible();
 
     await assertPageGeometry(page);
     await assertTouchTargets(page);

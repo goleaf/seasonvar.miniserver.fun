@@ -81,7 +81,7 @@ return [
         'view_list' => 'List',
         'exact_filters' => [
             'title' => 'Exact selection',
-            'description' => 'Refine the period, series length, rating, and video availability.',
+            'description' => 'Refine years, type, genres, countries, cast, rating, and video availability.',
             'period' => 'Period',
             'period_description' => 'Limit release years and choose how recent the catalog update should be.',
             'year_from' => 'Year from',
@@ -112,7 +112,7 @@ return [
             'video_missing' => 'No video',
             'quality' => 'Quality',
             'show_results' => 'Show results',
-            'reset' => 'Reset exact selection',
+            'reset' => 'Reset filters',
         ],
     ],
 
