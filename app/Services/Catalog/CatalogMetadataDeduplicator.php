@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\DB;
 
 class CatalogMetadataDeduplicator
 {
+    private const IDENTITY_TABLE = 'catalog_metadata_identity_map';
+
     public function __construct(
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogRelationNameSanitizer $names,
@@ -33,25 +35,29 @@ class CatalogMetadataDeduplicator
             'chunk_size' => $chunkSize,
         ]);
 
-        foreach ($this->taxonomies->relations() as $type => $config) {
-            $typeResult = $this->deduplicateRelation(
-                $type,
-                $config['model'],
-                $config['relation'],
-                $chunkSize,
-                $affectedTitleIds,
-            );
+        try {
+            foreach ($this->taxonomies->relations() as $type => $config) {
+                $typeResult = $this->deduplicateRelation(
+                    $type,
+                    $config['model'],
+                    $config['relation'],
+                    $chunkSize,
+                    $affectedTitleIds,
+                );
 
-            foreach (array_keys($typeResult) as $key) {
-                $result[$key] += $typeResult[$key];
-            }
+                foreach (array_keys($typeResult) as $key) {
+                    $result[$key] += $typeResult[$key];
+                }
 
-            if ($this->changed($typeResult)) {
-                $progress('catalog-relations-cleanup-type-complete', [
-                    'type' => $type,
-                    ...$typeResult,
-                ]);
+                if ($this->changed($typeResult)) {
+                    $progress('catalog-relations-cleanup-type-complete', [
+                        'type' => $type,
+                        ...$typeResult,
+                    ]);
+                }
             }
+        } finally {
+            $this->dropIdentityTable();
         }
 
         $legacyResult = $this->cleanupLegacyTaxonomies($chunkSize, $affectedTitleIds);
@@ -83,126 +89,216 @@ class CatalogMetadataDeduplicator
         array &$affectedTitleIds,
     ): array {
         $result = $this->emptyTypeResult();
-        $canonicalByKey = [];
-        $duplicates = [];
-        $invalidIds = [];
-
-        foreach ($modelClass::query()->select(['id', 'name', 'slug', 'source_url'])->lazyById($chunkSize) as $record) {
-            $result['checked']++;
-            $recordId = (int) $record->getKey();
-            $name = $this->names->normalize((string) $record->name);
-
-            if (! $this->names->isValid($type, $name)) {
-                $invalidIds[] = $recordId;
-
-                continue;
-            }
-
-            $key = $this->names->canonicalKey($type, $name);
-
-            if (! isset($canonicalByKey[$key])) {
-                $canonicalByKey[$key] = [
-                    'id' => $recordId,
-                    'name' => $name,
-                    'slug' => (string) $record->slug,
-                    'source_url' => $record->source_url,
-                ];
-
-                continue;
-            }
-
-            $canonicalId = $canonicalByKey[$key]['id'];
-            $duplicates[$recordId] = $canonicalId;
-            $canonicalByKey[$key]['name'] = $this->names->preferredName(
-                $type,
-                $canonicalByKey[$key]['name'],
-                $name,
-            );
-            $canonicalByKey[$key]['source_url'] ??= $record->source_url;
-        }
-
         /** @var BelongsToMany<Model, CatalogTitle, Pivot, 'pivot'> $relation */
         $relation = (new CatalogTitle)->{$relationName}();
         $pivotTable = $relation->getTable();
         $titleKey = $relation->getForeignPivotKeyName();
         $relatedKey = $relation->getRelatedPivotKeyName();
+        $modelTable = (new $modelClass)->getTable();
+        $this->resetIdentityTable();
 
-        foreach (array_chunk($invalidIds, $chunkSize) as $ids) {
-            DB::transaction(function () use ($modelClass, $pivotTable, $titleKey, $relatedKey, $ids, &$result, &$affectedTitleIds): void {
-                $titleIds = DB::table($pivotTable)
-                    ->whereIn($relatedKey, $ids)
-                    ->pluck($titleKey)
-                    ->map(fn (mixed $id): int => (int) $id)
-                    ->all();
+        $modelClass::query()
+            ->select(['id', 'name', 'source_url'])
+            ->chunkById($chunkSize, function ($records) use ($type, $modelClass, $pivotTable, $titleKey, $relatedKey, &$result, &$affectedTitleIds): void {
+                $identityRows = [];
+                $invalidIds = [];
+                $result['checked'] += $records->count();
 
-                foreach ($titleIds as $titleId) {
-                    $affectedTitleIds[$titleId] = true;
-                }
+                foreach ($records as $record) {
+                    $recordId = (int) $record->getKey();
+                    $name = $this->names->normalize((string) $record->name);
 
-                $result['links_removed'] += DB::table($pivotTable)->whereIn($relatedKey, $ids)->delete();
-                $result['records_removed'] += $modelClass::query()->whereKey($ids)->delete();
-            });
-        }
+                    if (! $this->names->isValid($type, $name)) {
+                        $invalidIds[] = $recordId;
 
-        foreach (array_chunk($duplicates, $chunkSize, true) as $duplicateMap) {
-            DB::transaction(function () use ($modelClass, $pivotTable, $titleKey, $relatedKey, $duplicateMap, &$result, &$affectedTitleIds): void {
-                $duplicateIds = array_keys($duplicateMap);
-                $links = DB::table($pivotTable)
-                    ->whereIn($relatedKey, $duplicateIds)
-                    ->get([$titleKey, $relatedKey]);
-                $targetLinks = [];
-
-                foreach ($links as $link) {
-                    $titleId = (int) $link->{$titleKey};
-                    $targetLinks[$titleId.'|'.$duplicateMap[(int) $link->{$relatedKey}]] = [
-                        $titleKey => $titleId,
-                        $relatedKey => $duplicateMap[(int) $link->{$relatedKey}],
-                    ];
-                    $affectedTitleIds[$titleId] = true;
-                }
-
-                $inserted = $targetLinks === []
-                    ? 0
-                    : DB::table($pivotTable)->insertOrIgnore(array_values($targetLinks));
-
-                $result['links_moved'] += $inserted;
-                $result['duplicate_links_removed'] += $links->count() - $inserted;
-                DB::table($pivotTable)->whereIn($relatedKey, $duplicateIds)->delete();
-                $result['records_merged'] += $modelClass::query()->whereKey($duplicateIds)->delete();
-            });
-        }
-
-        foreach ($canonicalByKey as $key => $canonical) {
-            $changes = [];
-
-            if ($canonical['name'] !== '' && $canonical['name'] !== null) {
-                $changes['name'] = $canonical['name'];
-            }
-
-            if ($canonical['slug'] !== $key) {
-                $changes['slug'] = $key;
-            }
-
-            if ($canonical['source_url'] !== null) {
-                $changes['source_url'] = $canonical['source_url'];
-            }
-
-            if ($changes === []) {
-                continue;
-            }
-
-            $changes['updated_at'] = now();
-            $result['records_canonicalized'] += $modelClass::query()
-                ->whereKey($canonical['id'])
-                ->where(function ($query) use ($changes): void {
-                    foreach (array_diff_key($changes, ['updated_at' => true]) as $column => $value) {
-                        $query->orWhere($column, '!=', $value)->orWhereNull($column);
+                        continue;
                     }
-                })
-                ->update($changes);
+
+                    $identityRows[] = [
+                        'relation_id' => $recordId,
+                        'canonical_key' => $this->names->canonicalKey($type, $name),
+                        'normalized_name' => $name,
+                        'source_url' => $record->source_url,
+                    ];
+                }
+
+                DB::transaction(function () use ($identityRows, $invalidIds, $modelClass, $pivotTable, $titleKey, $relatedKey, &$result, &$affectedTitleIds): void {
+                    if ($identityRows !== []) {
+                        DB::table(self::IDENTITY_TABLE)->insert($identityRows);
+                    }
+
+                    if ($invalidIds === []) {
+                        return;
+                    }
+
+                    $this->rememberAffectedTitles($pivotTable, $titleKey, $relatedKey, $invalidIds, $affectedTitleIds);
+                    $result['links_removed'] += DB::table($pivotTable)->whereIn($relatedKey, $invalidIds)->delete();
+                    $result['records_removed'] += $modelClass::query()->whereKey($invalidIds)->delete();
+                });
+            });
+
+        $duplicateGroups = DB::table(self::IDENTITY_TABLE)
+            ->selectRaw('canonical_key, MIN(relation_id) AS canonical_id, COUNT(*) AS records_count')
+            ->groupBy('canonical_key')
+            ->havingRaw('COUNT(*) > 1');
+
+        foreach ($duplicateGroups->lazyById($chunkSize, 'canonical_key', 'canonical_key') as $group) {
+            $identities = DB::table(self::IDENTITY_TABLE)
+                ->where('canonical_key', $group->canonical_key)
+                ->orderBy('relation_id')
+                ->get();
+            $canonicalId = (int) $group->canonical_id;
+            $duplicateIds = $identities
+                ->pluck('relation_id')
+                ->map(fn (mixed $id): int => (int) $id)
+                ->reject(fn (int $id): bool => $id === $canonicalId)
+                ->values()
+                ->all();
+            $preferredName = $identities->reduce(
+                fn (?string $current, object $identity): string => $this->names->preferredName(
+                    $type,
+                    $current ?? '',
+                    (string) $identity->normalized_name,
+                ),
+            );
+            $sourceUrl = $identities->firstWhere('relation_id', $canonicalId)?->source_url
+                ?? $identities->first(fn (object $identity): bool => $identity->source_url !== null)?->source_url;
+
+            foreach (array_chunk($duplicateIds, $chunkSize) as $ids) {
+                $duplicateMap = array_fill_keys($ids, $canonicalId);
+                $this->mergeDuplicateRecords(
+                    $modelClass,
+                    $pivotTable,
+                    $titleKey,
+                    $relatedKey,
+                    $duplicateMap,
+                    $result,
+                    $affectedTitleIds,
+                );
+            }
+
+            DB::table(self::IDENTITY_TABLE)->whereIn('relation_id', $duplicateIds)->delete();
+            DB::table(self::IDENTITY_TABLE)->where('relation_id', $canonicalId)->update([
+                'normalized_name' => $preferredName,
+                'source_url' => $sourceUrl,
+            ]);
         }
+
+        DB::table($modelTable.' as records')
+            ->join(self::IDENTITY_TABLE.' as identities', 'identities.relation_id', '=', 'records.id')
+            ->where(function ($query): void {
+                $query->whereColumn('records.name', '!=', 'identities.normalized_name')
+                    ->orWhereColumn('records.slug', '!=', 'identities.canonical_key')
+                    ->orWhere(function ($query): void {
+                        $query->whereNull('records.source_url')->whereNotNull('identities.source_url');
+                    });
+            })
+            ->select([
+                'records.id as record_id',
+                'records.source_url as current_source_url',
+                'identities.canonical_key',
+                'identities.normalized_name',
+                'identities.source_url as identity_source_url',
+            ])
+            ->chunkById($chunkSize, function ($records) use ($modelClass, $pivotTable, $titleKey, $relatedKey, &$result, &$affectedTitleIds): void {
+                $recordIds = $records->pluck('record_id')->map(fn (mixed $id): int => (int) $id)->all();
+                $this->rememberAffectedTitles($pivotTable, $titleKey, $relatedKey, $recordIds, $affectedTitleIds);
+
+                foreach ($records as $record) {
+                    $changes = [
+                        'name' => $record->normalized_name,
+                        'slug' => $record->canonical_key,
+                        'updated_at' => now(),
+                    ];
+
+                    if ($record->current_source_url === null && $record->identity_source_url !== null) {
+                        $changes['source_url'] = $record->identity_source_url;
+                    }
+
+                    $result['records_canonicalized'] += $modelClass::query()
+                        ->whereKey((int) $record->record_id)
+                        ->update($changes);
+                }
+            }, 'records.id', 'record_id');
 
         return $result;
+    }
+
+    /**
+     * @param  class-string<Model>  $modelClass
+     * @param  array<int, int>  $duplicateMap
+     * @param  array<string, int>  $result
+     * @param  array<int, true>  $affectedTitleIds
+     */
+    private function mergeDuplicateRecords(
+        string $modelClass,
+        string $pivotTable,
+        string $titleKey,
+        string $relatedKey,
+        array $duplicateMap,
+        array &$result,
+        array &$affectedTitleIds,
+    ): void {
+        DB::transaction(function () use ($modelClass, $pivotTable, $titleKey, $relatedKey, $duplicateMap, &$result, &$affectedTitleIds): void {
+            $duplicateIds = array_keys($duplicateMap);
+            $links = DB::table($pivotTable)
+                ->whereIn($relatedKey, $duplicateIds)
+                ->get([$titleKey, $relatedKey]);
+            $targetLinks = [];
+
+            foreach ($links as $link) {
+                $titleId = (int) $link->{$titleKey};
+                $targetLinks[$titleId.'|'.$duplicateMap[(int) $link->{$relatedKey}]] = [
+                    $titleKey => $titleId,
+                    $relatedKey => $duplicateMap[(int) $link->{$relatedKey}],
+                ];
+                $affectedTitleIds[$titleId] = true;
+            }
+
+            $inserted = $targetLinks === []
+                ? 0
+                : DB::table($pivotTable)->insertOrIgnore(array_values($targetLinks));
+
+            $result['links_moved'] += $inserted;
+            $result['duplicate_links_removed'] += $links->count() - $inserted;
+            DB::table($pivotTable)->whereIn($relatedKey, $duplicateIds)->delete();
+            $result['records_merged'] += $modelClass::query()->whereKey($duplicateIds)->delete();
+        });
+    }
+
+    /** @param array<int, true> $affectedTitleIds */
+    private function rememberAffectedTitles(
+        string $pivotTable,
+        string $titleKey,
+        string $relatedKey,
+        array $relationIds,
+        array &$affectedTitleIds,
+    ): void {
+        DB::table($pivotTable)
+            ->whereIn($relatedKey, $relationIds)
+            ->pluck($titleKey)
+            ->each(function (mixed $id) use (&$affectedTitleIds): void {
+                $affectedTitleIds[(int) $id] = true;
+            });
+    }
+
+    private function resetIdentityTable(): void
+    {
+        $this->dropIdentityTable();
+        DB::statement(<<<'SQL'
+            CREATE TEMPORARY TABLE catalog_metadata_identity_map (
+                relation_id INTEGER PRIMARY KEY,
+                canonical_key TEXT NOT NULL,
+                normalized_name TEXT NOT NULL,
+                source_url TEXT NULL
+            )
+            SQL);
+        DB::statement('CREATE INDEX catalog_metadata_identity_key_idx ON catalog_metadata_identity_map (canonical_key, relation_id)');
+    }
+
+    private function dropIdentityTable(): void
+    {
+        DB::statement('DROP TABLE IF EXISTS temp.catalog_metadata_identity_map');
     }
 
     /**
