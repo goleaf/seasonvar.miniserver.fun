@@ -2,6 +2,9 @@
 
 ## 2026-07-13
 
+- Hardened sensitive Livewire actions with independent user/resource rate-limit buckets for catalog search, playback-session issuance, progress, ratings, watchlist, history and import administration; source-health probes now stop locally without recording a provider failure when their host budget is exhausted.
+- Closed SSRF and credential-leak boundaries by pinning verified public DNS for stats posters and external playlists, refusing unsafe redirects/credentialed URLs, restricting Google service-account JWT exchange to the canonical token endpoint, and redacting targeted importer URLs from logs and queued mail notifications.
+- Strengthened media-profile allowlists and private-upload path normalization, including absolute, drive, backslash, dot-segment and null-byte rejection, and added malformed/direct-access regression coverage in existing security, importer and storage tests.
 - Reduced catalog page-builder queries from 20 to 11 by batching ten own-group-excluded relation facets into one bounded UNION, while keeping per-group limits, duplicate-free totals, fresh lifecycle semantics, and server-side actor/director search.
 - Constrained catalog/title/home taxonomy eager loads to rendered columns, reduced episode playback resolution from six queries to two by reusing the authorized hierarchy, and kept direct signed playback independently authorized.
 - Reduced importer dashboard polling to five bounded queries, combined health/due counters into one covering UNION round trip, and changed media-health backlog predicates so SQLite uses the existing health index instead of a full table scan; query plans did not justify new indexes.

@@ -52,7 +52,27 @@ class GoogleServiceAccountAccessTokenTest extends TestCase
             ->forScopes(['https://www.googleapis.com/auth/webmasters.readonly']);
     }
 
-    private function credentialFile(): string
+    public function test_it_rejects_a_non_google_token_endpoint_before_sending_the_signed_assertion(): void
+    {
+        Http::preventStrayRequests();
+        Cache::flush();
+
+        config([
+            'services.google.application_credentials' => $this->credentialFile('https://attacker.example/token'),
+        ]);
+
+        $this->expectException(GoogleIntegrationException::class);
+        $this->expectExceptionMessage('token_uri');
+
+        try {
+            app(GoogleServiceAccountAccessToken::class)
+                ->forScopes(['https://www.googleapis.com/auth/webmasters.readonly']);
+        } finally {
+            Http::assertNothingSent();
+        }
+    }
+
+    private function credentialFile(string $tokenUri = 'https://oauth2.googleapis.com/token'): string
     {
         Storage::fake('local');
         $key = openssl_pkey_new([
@@ -71,7 +91,7 @@ class GoogleServiceAccountAccessTokenTest extends TestCase
             'type' => 'service_account',
             'client_email' => 'seasonvar@example.iam.gserviceaccount.com',
             'private_key' => $privateKey,
-            'token_uri' => 'https://oauth2.googleapis.com/token',
+            'token_uri' => $tokenUri,
         ], JSON_THROW_ON_ERROR));
 
         return $path;

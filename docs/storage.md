@@ -15,6 +15,7 @@
 - Файл нужно проверять до сохранения: обязательность, тип, расширение, MIME, размер и доменное ограничение конкретной функции.
 - Для приватных изображений используйте `App\Support\Uploads\PrivateImageUploadRules`; SVG не разрешен.
 - Сохраняйте файлы через `App\Services\Storage\PrivateUploadStorage`, чтобы имя генерировал Laravel, а не клиент.
+- `PrivateUploadStorage` принимает только относительные slash-separated пути без NUL, backslash, drive prefix, абсолютного пути и сегментов `.`/`..`; те же правила применяются перед cleanup deletion.
 - Не используйте `getClientOriginalName()` или `getClientOriginalExtension()` для формирования пути хранения.
 - Не отдавайте private paths, абсолютные пути storage или raw upload metadata в публичный HTML/API.
 - Публичная выдача upload-файла должна быть отдельным signed/authorized endpoint с проверкой владельца или права доступа.

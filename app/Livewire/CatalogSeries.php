@@ -9,6 +9,7 @@ use App\Http\Requests\CatalogTitlesRequest;
 use App\Livewire\Forms\CatalogSeriesFilters;
 use App\Rules\CatalogFilterSlug;
 use App\Services\Catalog\CatalogTitlesPageBuilder;
+use App\Services\Security\SensitiveActionRateLimiter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -40,9 +41,12 @@ class CatalogSeries extends Component
 
     protected CatalogTitlesPageBuilder $pages;
 
-    public function boot(CatalogTitlesPageBuilder $pages): void
+    protected SensitiveActionRateLimiter $rateLimits;
+
+    public function boot(CatalogTitlesPageBuilder $pages, SensitiveActionRateLimiter $rateLimits): void
     {
         $this->pages = $pages;
+        $this->rateLimits = $rateLimits;
     }
 
     public function mount(?int $year = null, ?string $type = null, ?string $taxonomy = null): void
@@ -90,19 +94,21 @@ class CatalogSeries extends Component
 
     public function applySearch(): void
     {
+        $this->rateLimits->enforce('catalog_search', auth()->user());
         $this->validateAndNormalizeState();
         $this->resetPage();
     }
 
     public function applyFilters(): void
     {
+        $this->rateLimits->enforce('catalog_search', auth()->user());
         $this->validateAndNormalizeState();
         $this->resetPage();
     }
 
-    public function sortBy(string $sort): void
+    public function sortBy(mixed $sort): void
     {
-        $option = CatalogSort::tryFrom($sort);
+        $option = is_string($sort) ? CatalogSort::tryFrom($sort) : null;
 
         if ($option === null) {
             $this->addError('sort', 'Выбрана неподдерживаемая сортировка.');
@@ -115,7 +121,7 @@ class CatalogSeries extends Component
         $this->resetPage();
     }
 
-    public function setView(string $view): void
+    public function setView(mixed $view): void
     {
         if (! in_array($view, ['grid', 'list'], true)) {
             return;
@@ -125,8 +131,10 @@ class CatalogSeries extends Component
         $this->resetPage();
     }
 
-    public function setPerPage(int $perPage): void
+    public function setPerPage(mixed $perPage): void
     {
+        $perPage = filter_var($perPage, FILTER_VALIDATE_INT);
+
         if (! in_array($perPage, [24, 48, 96], true)) {
             return;
         }
@@ -135,9 +143,9 @@ class CatalogSeries extends Component
         $this->resetPage();
     }
 
-    public function setLetter(string $letter): void
+    public function setLetter(mixed $letter): void
     {
-        if (preg_match('/^(?:latin|[A-Za-zА-Яа-яЁё]|#)$/u', $letter) !== 1) {
+        if (! is_string($letter) || preg_match('/^(?:latin|[A-Za-zА-Яа-яЁё]|#)$/u', $letter) !== 1) {
             return;
         }
 
@@ -147,8 +155,12 @@ class CatalogSeries extends Component
         $this->resetPage();
     }
 
-    public function resetGroup(string $group): mixed
+    public function resetGroup(mixed $group): mixed
     {
+        if (! is_string($group)) {
+            return null;
+        }
+
         if ($group === 'year' && $this->routeYear !== null) {
             return $this->redirectRoute('titles.index', navigate: true);
         }
@@ -165,8 +177,12 @@ class CatalogSeries extends Component
         return null;
     }
 
-    public function resetAdvanced(string $key): void
+    public function resetAdvanced(mixed $key): void
     {
+        if (! is_string($key)) {
+            return;
+        }
+
         if ($this->filters->resetAdvanced($key)) {
             $this->resetErrorBag($key);
             $this->resetPage();
@@ -186,8 +202,14 @@ class CatalogSeries extends Component
         $this->resetPage();
     }
 
-    public function removeYear(int $year): mixed
+    public function removeYear(mixed $year): mixed
     {
+        $year = filter_var($year, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1900, 'max_range' => 2100]]);
+
+        if ($year === false) {
+            return null;
+        }
+
         if ($this->routeYear === $year) {
             return $this->redirectRoute('titles.index', navigate: true);
         }
@@ -198,9 +220,12 @@ class CatalogSeries extends Component
         return null;
     }
 
-    public function removeTaxonomy(string $type, string $slug): mixed
+    public function removeTaxonomy(mixed $type, mixed $slug): mixed
     {
-        if (CatalogFilterType::tryFrom($type) === null || CatalogFilterSlug::normalize($slug) === null) {
+        if (! is_string($type)
+            || ! is_string($slug)
+            || CatalogFilterType::tryFrom($type) === null
+            || CatalogFilterSlug::normalize($slug) === null) {
             return null;
         }
 
@@ -215,9 +240,9 @@ class CatalogSeries extends Component
         return null;
     }
 
-    public function removeExcluded(string $type, string $slug): void
+    public function removeExcluded(mixed $type, mixed $slug): void
     {
-        if (CatalogFilterSlug::normalize($slug) === null) {
+        if (! is_string($type) || ! is_string($slug) || CatalogFilterSlug::normalize($slug) === null) {
             return;
         }
 
@@ -226,8 +251,12 @@ class CatalogSeries extends Component
         }
     }
 
-    public function removeChoice(string $group, string $value): void
+    public function removeChoice(mixed $group, mixed $value): void
     {
+        if (! is_string($group) || ! is_string($value)) {
+            return;
+        }
+
         $valid = match ($group) {
             'publication_type' => CatalogPublicationType::tryFrom($value) !== null,
             'subtitles' => in_array($value, ['available', 'missing'], true),

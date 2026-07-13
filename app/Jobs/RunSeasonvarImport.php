@@ -84,7 +84,7 @@ class RunSeasonvarImport implements ShouldBeUnique, ShouldQueue
     public function failed(?Throwable $exception): void
     {
         Log::error('Очередной импорт Seasonvar завершился ошибкой.', [
-            'argument' => $this->argument,
+            'mode' => $this->argument === null ? 'sitemap' : 'url',
             'force' => $this->force,
             'discover' => $this->discover,
             'exception' => $exception ? get_class($exception) : null,

@@ -10,6 +10,7 @@ final readonly class VerifiedExternalUrlData
         public string $url,
         public string $host,
         public ?string $pinnedAddress,
+        public int $port = 443,
     ) {}
 
     /** @return array<string, mixed> */
@@ -25,7 +26,7 @@ final readonly class VerifiedExternalUrlData
 
         return [
             'stream' => true,
-            'curl' => [CURLOPT_RESOLVE => ["{$this->host}:443:{$address}"]],
+            'curl' => [CURLOPT_RESOLVE => ["{$this->host}:{$this->port}:{$address}"]],
         ];
     }
 }

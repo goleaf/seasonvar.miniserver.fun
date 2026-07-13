@@ -14,7 +14,7 @@ class SeasonvarImportFailedNotificationTest extends TestCase
         config(['notifications.mail_queue' => 'mail']);
 
         $notification = new SeasonvarImportFailed(
-            argument: null,
+            targeted: false,
             force: false,
             discover: true,
             exceptionClass: null,
@@ -30,7 +30,7 @@ class SeasonvarImportFailedNotificationTest extends TestCase
     public function test_mail_message_contains_safe_import_failure_context(): void
     {
         $notification = new SeasonvarImportFailed(
-            argument: 'https://seasonvar.ru/serial-1-Test-1-season.html',
+            targeted: true,
             force: true,
             discover: false,
             exceptionClass: 'RuntimeException',
@@ -48,7 +48,7 @@ class SeasonvarImportFailedNotificationTest extends TestCase
         $this->assertStringContainsString('Режим: одна страница', $lines);
         $this->assertStringContainsString('Force: да', $lines);
         $this->assertStringContainsString('Discovery: нет', $lines);
-        $this->assertStringContainsString('URL: https://seasonvar.ru/serial-1-Test-1-season.html', $lines);
+        $this->assertStringNotContainsString('URL:', $lines);
         $this->assertStringContainsString('Исключение: RuntimeException', $lines);
         $this->assertStringNotContainsString('network failed', $lines);
     }

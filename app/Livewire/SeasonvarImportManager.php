@@ -6,6 +6,7 @@ namespace App\Livewire;
 
 use App\Models\User;
 use App\Services\Seasonvar\SeasonvarImportAdminService;
+use App\Services\Security\SensitiveActionRateLimiter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
@@ -20,9 +21,12 @@ final class SeasonvarImportManager extends Component
 
     protected SeasonvarImportAdminService $imports;
 
-    public function boot(SeasonvarImportAdminService $imports): void
+    protected SensitiveActionRateLimiter $rateLimits;
+
+    public function boot(SeasonvarImportAdminService $imports, SensitiveActionRateLimiter $rateLimits): void
     {
         $this->imports = $imports;
+        $this->rateLimits = $rateLimits;
     }
 
     public function mount(): void
@@ -32,6 +36,7 @@ final class SeasonvarImportManager extends Component
 
     public function startImport(): void
     {
+        $this->rateLimits->enforce('import_admin', $this->user());
         $validated = $this->validate([
             'force' => ['required', 'boolean'],
             'discover' => ['required', 'boolean'],
@@ -46,16 +51,30 @@ final class SeasonvarImportManager extends Component
             : 'Активный запуск #'.$result->run->id.' уже существует.';
     }
 
-    public function retryImport(int $runId): void
+    public function retryImport(mixed $runId): void
     {
+        $runId = $this->positiveId($runId);
+
+        if ($runId === null) {
+            return;
+        }
+
+        $this->rateLimits->enforce('import_admin', $this->user(), $runId);
         $result = $this->imports->retry($this->user(), $runId);
         $this->notice = $result->created
             ? 'Повторный запуск #'.$result->run->id.' поставлен в очередь.'
             : 'Активный запуск #'.$result->run->id.' уже существует.';
     }
 
-    public function cancelImport(int $runId): void
+    public function cancelImport(mixed $runId): void
     {
+        $runId = $this->positiveId($runId);
+
+        if ($runId === null) {
+            return;
+        }
+
+        $this->rateLimits->enforce('import_admin', $this->user(), $runId);
         $run = $this->imports->cancel($this->user(), $runId);
         $this->notice = $run->status === 'cancelled'
             ? 'Запуск #'.$run->id.' отменён.'
@@ -64,6 +83,7 @@ final class SeasonvarImportManager extends Component
 
     public function recoverStaleImports(): void
     {
+        $this->rateLimits->enforce('import_admin', $this->user());
         Gate::forUser($this->user())->authorize('manage-seasonvar-imports');
         $count = $this->imports->recoverStale();
         $this->notice = $count > 0
@@ -104,5 +124,16 @@ final class SeasonvarImportManager extends Component
         abort_unless($user instanceof User, 403);
 
         return $user;
+    }
+
+    private function positiveId(mixed $value): ?int
+    {
+        if (! is_int($value) && (! is_string($value) || ! ctype_digit($value))) {
+            return null;
+        }
+
+        $value = (int) $value;
+
+        return $value > 0 ? $value : null;
     }
 }

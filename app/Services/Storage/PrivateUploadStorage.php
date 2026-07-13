@@ -44,8 +44,9 @@ final class PrivateUploadStorage
             : (string) config('uploads.disk', 'uploads');
 
         $path = $upload instanceof StoredPrivateUpload ? $upload->path : $upload;
+        $path = $this->safeRelativePath($path);
 
-        if ($path === '' || str_contains($path, '..')) {
+        if ($path === null) {
             return false;
         }
 
@@ -54,12 +55,31 @@ final class PrivateUploadStorage
 
     private function normalizeDirectory(string $directory): string
     {
-        $directory = trim(str_replace('\\', '/', $directory), '/');
+        $directory = $this->safeRelativePath($directory);
 
-        if ($directory === '' || str_contains($directory, '..')) {
+        if ($directory === null) {
             throw new InvalidArgumentException('Некорректный каталог загрузки.');
         }
 
         return $directory;
+    }
+
+    private function safeRelativePath(string $path): ?string
+    {
+        if ($path === ''
+            || str_contains($path, "\0")
+            || str_contains($path, '\\')
+            || str_starts_with($path, '/')
+            || preg_match('/^[A-Za-z]:/', $path) === 1) {
+            return null;
+        }
+
+        $segments = explode('/', trim($path, '/'));
+
+        if ($segments === [] || in_array('', $segments, true) || in_array('.', $segments, true) || in_array('..', $segments, true)) {
+            return null;
+        }
+
+        return implode('/', $segments);
     }
 }

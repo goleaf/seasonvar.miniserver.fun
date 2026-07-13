@@ -23,7 +23,7 @@ class SeasonvarImportFailureNotifier
 
         Notification::route('mail', $mailTo)
             ->notify((new SeasonvarImportFailed(
-                argument: $argument,
+                targeted: $argument !== null && $argument !== '',
                 force: $force,
                 discover: $discover,
                 exceptionClass: $exception ? get_class($exception) : null,

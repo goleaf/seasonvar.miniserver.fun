@@ -14,6 +14,7 @@ abstract class TestCase extends BaseTestCase
         config([
             'playback.allowed_hosts' => ['11cdn.org', 'media.example.com'],
             'playback.enforce_public_dns' => false,
+            'security.external_playlist_enforce_public_dns' => false,
         ]);
     }
 }

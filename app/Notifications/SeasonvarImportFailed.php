@@ -19,7 +19,7 @@ class SeasonvarImportFailed extends Notification implements ShouldQueue
     public array $backoff = [60, 300, 900];
 
     public function __construct(
-        public readonly ?string $argument,
+        public readonly bool $targeted,
         public readonly bool $force,
         public readonly bool $discover,
         public readonly ?string $exceptionClass,
@@ -49,13 +49,9 @@ class SeasonvarImportFailed extends Notification implements ShouldQueue
             ->subject('Ошибка импорта Seasonvar')
             ->greeting('Импорт Seasonvar завершился ошибкой')
             ->line('Очередной запуск импорта не был завершен успешно.')
-            ->line('Режим: '.($this->argument ? 'одна страница' : 'обычный запуск'))
+            ->line('Режим: '.($this->targeted ? 'одна страница' : 'обычный запуск'))
             ->line('Force: '.($this->force ? 'да' : 'нет'))
             ->line('Discovery: '.($this->discover ? 'да' : 'нет'));
-
-        if ($this->argument !== null && $this->argument !== '') {
-            $mail->line('URL: '.$this->argument);
-        }
 
         if ($this->exceptionClass !== null && $this->exceptionClass !== '') {
             $mail->line('Исключение: '.$this->exceptionClass);

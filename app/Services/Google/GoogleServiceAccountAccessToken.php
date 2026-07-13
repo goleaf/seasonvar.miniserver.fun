@@ -21,6 +21,11 @@ class GoogleServiceAccountAccessToken
         $clientEmail = $this->requiredCredential($credentials, 'client_email');
         $privateKey = $this->requiredCredential($credentials, 'private_key');
         $tokenUri = (string) ($credentials['token_uri'] ?? self::DEFAULT_TOKEN_URI);
+
+        if (! hash_equals(self::DEFAULT_TOKEN_URI, $tokenUri)) {
+            throw new GoogleIntegrationException('GOOGLE_APPLICATION_CREDENTIALS содержит неподдерживаемый token_uri.');
+        }
+
         $scopes = array_values(array_unique(array_filter($scopes)));
 
         if ($scopes === []) {

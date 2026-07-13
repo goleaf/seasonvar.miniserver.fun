@@ -14,6 +14,7 @@ use App\Services\Catalog\CatalogEntitlementService;
 use App\Services\Catalog\CatalogPlaybackSourceResolver;
 use App\Services\Media\ExternalPlaylistImporter;
 use App\Services\Media\PlaybackSourceUrlGuard;
+use App\Services\Security\SensitiveActionRateLimiter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
@@ -52,6 +53,21 @@ class SecurityHardeningTest extends TestCase
             ->assertTooManyRequests();
     }
 
+    public function test_sensitive_action_limits_are_independent_and_resource_scoped(): void
+    {
+        config([
+            'security.rate_limits.rating' => 1,
+            'security.rate_limits.watchlist' => 1,
+        ]);
+        $user = User::factory()->create();
+        $limits = app(SensitiveActionRateLimiter::class);
+
+        $this->assertTrue($limits->attempt('rating', $user, 10));
+        $this->assertFalse($limits->attempt('rating', $user, 10));
+        $this->assertTrue($limits->attempt('rating', $user, 11));
+        $this->assertTrue($limits->attempt('watchlist', $user, 10));
+    }
+
     public function test_local_filesystem_serving_routes_are_disabled_by_default(): void
     {
         $this->assertFalse(Route::has('storage.local'));
@@ -60,6 +76,7 @@ class SecurityHardeningTest extends TestCase
 
     public function test_external_playlist_urls_must_not_target_local_or_private_hosts(): void
     {
+        config(['security.external_playlist_enforce_public_dns' => true]);
         $importer = app(ExternalPlaylistImporter::class);
 
         foreach (['http://localhost/list.m3u', 'http://127.0.0.1/list.m3u', 'http://10.0.0.5/list.m3u'] as $url) {
@@ -70,6 +87,9 @@ class SecurityHardeningTest extends TestCase
                 $this->assertSame('Этот хост заблокирован.', $exception->getMessage());
             }
         }
+
+        $this->expectException(InvalidArgumentException::class);
+        $importer->safeExternalUrl('https://user:secret@example.com/list.m3u');
     }
 
     public function test_playback_source_requires_a_valid_signature_bound_to_the_current_viewer(): void

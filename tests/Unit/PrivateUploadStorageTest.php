@@ -54,4 +54,26 @@ class PrivateUploadStorageTest extends TestCase
 
         Storage::disk('uploads')->assertMissing($upload->path);
     }
+
+    public function test_it_rejects_absolute_windows_and_null_byte_paths_for_storage_and_deletion(): void
+    {
+        Storage::fake('uploads');
+        $storage = app(PrivateUploadStorage::class);
+
+        foreach (['/etc', 'C:\\temp', "catalog\0posters"] as $directory) {
+            try {
+                $storage->store(
+                    UploadedFile::fake()->image('poster.jpg')->size(128),
+                    $directory,
+                );
+                $this->fail("Directory [{$directory}] was not rejected.");
+            } catch (InvalidArgumentException) {
+                $this->assertTrue(true);
+            }
+        }
+
+        foreach (['/etc/passwd', 'C:\\private.txt', "catalog\0private.txt", 'catalog/../private.txt'] as $path) {
+            $this->assertFalse($storage->delete($path));
+        }
+    }
 }

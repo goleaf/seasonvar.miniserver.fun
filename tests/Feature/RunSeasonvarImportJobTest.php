@@ -113,14 +113,15 @@ class RunSeasonvarImportJobTest extends TestCase
         Log::shouldReceive('error')
             ->once()
             ->with('Очередной импорт Seasonvar завершился ошибкой.', Mockery::on(function (array $context): bool {
-                return $context['argument'] === 'https://seasonvar.ru/serial-1-Test-1-season.html'
+                return ! array_key_exists('argument', $context)
+                    && $context['mode'] === 'url'
                     && $context['force'] === true
                     && $context['discover'] === false
                     && $context['exception'] === RuntimeException::class
                     && $context['error'] === 'network failed';
             }));
 
-        (new RunSeasonvarImport(argument: 'https://seasonvar.ru/serial-1-Test-1-season.html', force: true, discover: false))
+        (new RunSeasonvarImport(argument: 'https://seasonvar.ru/serial-1-Test-1-season.html?token=private', force: true, discover: false))
             ->failed(new RuntimeException('network failed'));
     }
 
@@ -141,7 +142,7 @@ class RunSeasonvarImportJobTest extends TestCase
             function (SeasonvarImportFailed $notification, array $channels, object $notifiable): bool {
                 return $channels === ['mail']
                     && $notifiable->routes['mail'] === ['ops@example.com' => 'Ops']
-                    && $notification->argument === 'https://seasonvar.ru/serial-1-Test-1-season.html'
+                    && $notification->targeted === true
                     && $notification->force === true
                     && $notification->discover === false
                     && $notification->exceptionClass === RuntimeException::class;

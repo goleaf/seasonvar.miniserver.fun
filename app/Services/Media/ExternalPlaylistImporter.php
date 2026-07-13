@@ -2,6 +2,7 @@
 
 namespace App\Services\Media;
 
+use App\DTOs\VerifiedExternalUrlData;
 use App\Enums\ReleaseKind;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
@@ -15,6 +16,9 @@ use RuntimeException;
 
 class ExternalPlaylistImporter
 {
+    /** @var array<string, list<string>> */
+    private array $publicHosts = [];
+
     /**
      * @var list<string>
      */
@@ -34,9 +38,12 @@ class ExternalPlaylistImporter
      */
     public function importFromUrl(string $playlistUrl, ?CatalogTitle $forcedTitle = null, bool $dryRun = false): array
     {
-        $safePlaylistUrl = $this->safeExternalUrl($playlistUrl);
+        $target = $this->verifiedExternalUrl($playlistUrl);
+        $safePlaylistUrl = $target->url;
         $response = Http::timeout(10)
             ->connectTimeout(5)
+            ->withoutRedirecting()
+            ->withOptions($target->httpOptions())
             ->retry([100, 300, 700])
             ->get($safePlaylistUrl);
 
@@ -463,40 +470,78 @@ class ExternalPlaylistImporter
 
     public function safeExternalUrl(string $url): string
     {
+        return $this->verifiedExternalUrl($url)->url;
+    }
+
+    private function verifiedExternalUrl(string $url): VerifiedExternalUrlData
+    {
         if (filter_var($url, FILTER_VALIDATE_URL) === false) {
             throw new InvalidArgumentException('Неверная ссылка.');
         }
 
-        $scheme = Str::lower((string) parse_url($url, PHP_URL_SCHEME));
-        $host = Str::lower((string) parse_url($url, PHP_URL_HOST));
+        $parts = parse_url($url);
 
-        if (! in_array($scheme, ['http', 'https'], true) || $host === '') {
+        if (! is_array($parts) || isset($parts['user'], $parts['pass'])) {
+            throw new InvalidArgumentException('Ссылка с учётными данными запрещена.');
+        }
+
+        $scheme = Str::lower((string) ($parts['scheme'] ?? ''));
+        $host = Str::lower(rtrim((string) ($parts['host'] ?? ''), '.'));
+        $port = (int) ($parts['port'] ?? ($scheme === 'https' ? 443 : 80));
+
+        if (! in_array($scheme, ['http', 'https'], true)
+            || $host === ''
+            || ! in_array($port, [80, 443], true)) {
             throw new InvalidArgumentException('Разрешены только http/https ссылки.');
         }
 
-        if ($this->isBlockedHost($host)) {
+        $addresses = $this->publicAddresses($host);
+
+        if ($addresses === null) {
             throw new InvalidArgumentException('Этот хост заблокирован.');
         }
 
-        return $url;
+        return new VerifiedExternalUrlData($url, $host, $addresses[0] ?? null, $port);
     }
 
-    private function isBlockedHost(string $host): bool
+    /** @return list<string>|null */
+    private function publicAddresses(string $host): ?array
     {
+        if (! (bool) config('security.external_playlist_enforce_public_dns', true)) {
+            return [];
+        }
+
+        if (array_key_exists($host, $this->publicHosts)) {
+            return $this->publicHosts[$host];
+        }
+
         if ($host === 'localhost' || Str::endsWith($host, '.local')) {
-            return true;
+            return null;
         }
 
         $addresses = filter_var($host, FILTER_VALIDATE_IP) !== false
             ? [$host]
             : (gethostbynamel($host) ?: []);
+        $ipv6Records = dns_get_record($host, DNS_AAAA);
 
-        foreach ($addresses as $address) {
-            if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-                return true;
+        if (is_array($ipv6Records)) {
+            foreach ($ipv6Records as $record) {
+                if (is_string($record['ipv6'] ?? null)) {
+                    $addresses[] = $record['ipv6'];
+                }
             }
         }
 
-        return false;
+        if ($addresses === []) {
+            return null;
+        }
+
+        foreach (array_unique($addresses) as $address) {
+            if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+                return null;
+            }
+        }
+
+        return $this->publicHosts[$host] = array_values(array_unique($addresses));
     }
 }

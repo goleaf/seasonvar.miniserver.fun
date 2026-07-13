@@ -28,9 +28,9 @@ class CatalogStatsPosterResponder
 
     public function response(CatalogTitle $catalogTitle): Response
     {
-        $url = $this->posterUrls->safeUrl($catalogTitle->poster_url);
+        $target = $this->posterUrls->verifiedUrl($catalogTitle->poster_url);
 
-        if ($url === null) {
+        if ($target === null) {
             abort(404);
         }
 
@@ -38,8 +38,9 @@ class CatalogStatsPosterResponder
             $remote = Http::timeout(4)
                 ->connectTimeout(2)
                 ->withoutRedirecting()
+                ->withOptions($target->httpOptions())
                 ->accept('image/*')
-                ->get($url);
+                ->get($target->url);
         } catch (Throwable) {
             abort(404);
         }

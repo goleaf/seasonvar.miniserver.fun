@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class CatalogShowRequest extends FormRequest
 {
@@ -21,9 +22,9 @@ class CatalogShowRequest extends FormRequest
             'season' => ['nullable', 'integer', 'min:1'],
             'episode' => ['nullable', 'integer', 'min:1'],
             'media' => ['nullable', 'integer', 'min:1'],
-            'variant' => ['nullable', 'string', 'max:160'],
-            'quality' => ['nullable', 'string', 'max:32'],
-            'format' => ['nullable', 'string', 'max:32'],
+            'variant' => ['nullable', 'string', 'max:160', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/'],
+            'quality' => ['nullable', 'string', Rule::in((array) config('playback.supported_qualities', []))],
+            'format' => ['nullable', 'string', Rule::in((array) config('playback.allowed_formats', []))],
         ];
     }
 
@@ -41,10 +42,13 @@ class CatalogShowRequest extends FormRequest
             'media.min' => 'Номер выбранного видео должен быть больше нуля.',
             'variant.string' => 'Вариант просмотра должен быть строкой.',
             'variant.max' => 'Вариант просмотра слишком длинный.',
+            'variant.regex' => 'Вариант просмотра имеет неверный формат.',
             'quality.string' => 'Качество должно быть строкой.',
             'quality.max' => 'Качество слишком длинное.',
+            'quality.in' => 'Выбрано неподдерживаемое качество.',
             'format.string' => 'Формат должен быть строкой.',
             'format.max' => 'Формат слишком длинный.',
+            'format.in' => 'Выбран неподдерживаемый формат.',
         ];
     }
 

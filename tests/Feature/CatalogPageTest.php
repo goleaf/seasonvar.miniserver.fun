@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\DTOs\VerifiedExternalUrlData;
 use App\Enums\ReleaseKind;
 use App\Jobs\StartSeasonvarQueuedImport;
 use App\Livewire\CatalogSeries;
@@ -566,10 +567,10 @@ class CatalogPageTest extends TestCase
             $posterUrl => Http::response('fake-image-body', 200, ['Content-Type' => 'image/jpeg']),
         ]);
         $this->mock(CatalogStatsPosterUrlGuard::class)
-            ->shouldReceive('safeUrl')
+            ->shouldReceive('verifiedUrl')
             ->once()
             ->with($posterUrl)
-            ->andReturn($posterUrl);
+            ->andReturn(new VerifiedExternalUrlData($posterUrl, 'media.example.com', '93.184.216.34'));
 
         $response = $this->get(route('stats.poster', $catalogTitle));
 
@@ -619,6 +620,55 @@ class CatalogPageTest extends TestCase
             ->get(route('titles.show', $catalogTitle))
             ->assertOk()
             ->assertSeeText('Сериал после входа');
+    }
+
+    public function test_title_route_rejects_malformed_ids_and_non_allowlisted_media_profile_values(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create();
+        $route = route('titles.show', $catalogTitle);
+
+        $this->from($route)
+            ->get($route.'?'.Arr::query([
+                'season' => ['1'],
+                'episode' => '-1',
+                'media' => 'not-an-id',
+                'variant' => '../../private',
+                'quality' => 'ultra',
+                'format' => 'php',
+            ]))
+            ->assertRedirect($route)
+            ->assertSessionHasErrors(['season', 'episode', 'media', 'variant', 'quality', 'format']);
+    }
+
+    public function test_livewire_actions_reject_non_scalar_arguments_without_changing_private_state(): void
+    {
+        $user = User::factory()->create();
+        $catalogTitle = CatalogTitle::factory()->create();
+
+        Livewire::actingAs($user)
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->call('selectSeason', ['1'])
+            ->call('selectEpisode', ['1'])
+            ->call('selectMedia', ['1'])
+            ->call('setWatchlist', ['true'])
+            ->call('setRating', ['8'])
+            ->call('recordProgress', ['1'], ['token'], ['1'], ['0'], ['0'], ['false'])
+            ->assertSet('season', '')
+            ->assertSet('episode', '')
+            ->assertSet('media', '');
+
+        Livewire::test(CatalogSeries::class)
+            ->call('sortBy', ['title_asc'])
+            ->call('setView', ['list'])
+            ->call('setPerPage', ['96'])
+            ->call('setLetter', ['A'])
+            ->call('removeYear', ['2026'])
+            ->call('removeTaxonomy', ['genre'], ['drama'])
+            ->call('removeExcluded', ['genre'], ['drama'])
+            ->call('removeChoice', ['quality'], ['1080p']);
+
+        $this->assertFalse(CatalogTitleUserState::query()->whereBelongsTo($user)->exists());
+        $this->assertFalse(EpisodeViewProgress::query()->whereBelongsTo($user)->exists());
     }
 
     public function test_stats_issue_rows_merge_multiple_issue_categories(): void

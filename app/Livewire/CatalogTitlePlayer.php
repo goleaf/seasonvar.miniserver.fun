@@ -19,6 +19,7 @@ use App\Services\Catalog\CatalogPrimaryActionResolver;
 use App\Services\Catalog\CatalogTitlePlaybackQuery;
 use App\Services\Catalog\CatalogUserStateService;
 use App\Services\Media\ExternalMediaMetadata;
+use App\Services\Security\SensitiveActionRateLimiter;
 use App\View\ViewModels\CatalogShowViewModel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -63,6 +64,8 @@ class CatalogTitlePlayer extends Component
 
     protected ExternalMediaMetadata $mediaMetadata;
 
+    protected SensitiveActionRateLimiter $rateLimits;
+
     protected ?CatalogTitle $resolvedTitle = null;
 
     protected ?Episode $resolvedEpisode = null;
@@ -77,6 +80,7 @@ class CatalogTitlePlayer extends Component
         CatalogPlaybackProgressSession $progressSessions,
         CatalogUserStateService $userState,
         ExternalMediaMetadata $mediaMetadata,
+        SensitiveActionRateLimiter $rateLimits,
     ): void {
         $this->playback = $playback;
         $this->primaryActions = $primaryActions;
@@ -84,6 +88,7 @@ class CatalogTitlePlayer extends Component
         $this->progressSessions = $progressSessions;
         $this->userState = $userState;
         $this->mediaMetadata = $mediaMetadata;
+        $this->rateLimits = $rateLimits;
     }
 
     public function mount(int $catalogTitleId): void
@@ -103,8 +108,16 @@ class CatalogTitlePlayer extends Component
         $this->applyPrimaryAction($action);
     }
 
-    public function selectSeason(int $seasonId): void
+    public function selectSeason(mixed $seasonId): void
     {
+        $seasonId = $this->positiveId($seasonId);
+
+        if ($seasonId === null) {
+            $this->resetSelection();
+
+            return;
+        }
+
         $title = $this->title();
         $season = $this->seasonSummaries($title, $this->user())->firstWhere('id', $seasonId);
 
@@ -120,8 +133,18 @@ class CatalogTitlePlayer extends Component
         $this->resolvedEpisode = null;
     }
 
-    public function selectEpisode(int $episodeId): void
+    public function selectEpisode(mixed $episodeId): void
     {
+        $episodeId = $this->positiveId($episodeId);
+
+        if ($episodeId === null) {
+            $this->episode = '';
+            $this->media = '';
+            $this->resolvedEpisode = null;
+
+            return;
+        }
+
         $title = $this->title();
         $episode = $this->playback->watchableEpisode($title, $this->user(), $episodeId);
 
@@ -137,9 +160,9 @@ class CatalogTitlePlayer extends Component
             $title,
             $this->user(),
             $episode,
-            $this->normalizedProfileValue($this->variant, 160),
-            $this->normalizedProfileValue($this->quality, 32),
-            $this->normalizedProfileValue($this->format, 32),
+            $this->normalizedVariant(),
+            $this->normalizedQuality(),
+            $this->normalizedFormat(),
         );
         $this->season = (string) $episode->season_id;
         $this->episode = (string) $episode->id;
@@ -151,8 +174,16 @@ class CatalogTitlePlayer extends Component
         }
     }
 
-    public function selectMedia(int $mediaId): void
+    public function selectMedia(mixed $mediaId): void
     {
+        $mediaId = $this->positiveId($mediaId);
+
+        if ($mediaId === null) {
+            $this->media = '';
+
+            return;
+        }
+
         $title = $this->title();
         $media = $this->playback->findAvailableMedia($title, $this->user(), $mediaId);
 
@@ -168,15 +199,23 @@ class CatalogTitlePlayer extends Component
         $this->syncMediaProfile($media);
     }
 
-    public function setWatchlist(bool $inWatchlist): void
+    public function setWatchlist(mixed $inWatchlist): void
     {
         $user = $this->authenticatedUser();
+        $inWatchlist = filter_var($inWatchlist, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
+
+        if ($inWatchlist === null) {
+            return;
+        }
+
+        $this->rateLimits->enforce('watchlist', $user, $this->catalogTitleId);
         $this->userState->setWatchlist($user, $this->title(), $inWatchlist);
     }
 
-    public function setRating(int|string|null $rating): void
+    public function setRating(mixed $rating): void
     {
         $user = $this->authenticatedUser();
+        $this->rateLimits->enforce('rating', $user, $this->catalogTitleId);
 
         if ($rating === null || $rating === '') {
             $this->resetErrorBag('rating');
@@ -199,14 +238,31 @@ class CatalogTitlePlayer extends Component
 
     #[Renderless]
     public function recordProgress(
-        int $episodeId,
-        string $playbackSessionToken,
-        int $eventSequence,
-        int $positionSeconds,
-        int $reportedDurationSeconds,
-        bool $ended = false,
+        mixed $episodeId,
+        mixed $playbackSessionToken,
+        mixed $eventSequence,
+        mixed $positionSeconds,
+        mixed $reportedDurationSeconds,
+        mixed $ended = false,
     ): void {
         $user = $this->authenticatedUser();
+        $episodeId = $this->positiveId($episodeId);
+        $eventSequence = $this->nonNegativeInteger($eventSequence, minimum: 1);
+        $positionSeconds = $this->nonNegativeInteger($positionSeconds);
+        $reportedDurationSeconds = $this->nonNegativeInteger($reportedDurationSeconds);
+        $ended = filter_var($ended, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
+
+        if ($episodeId === null
+            || ! is_string($playbackSessionToken)
+            || mb_strlen($playbackSessionToken) > 2048
+            || $eventSequence === null
+            || $positionSeconds === null
+            || $reportedDurationSeconds === null
+            || $ended === null) {
+            return;
+        }
+
+        $this->rateLimits->enforce('progress', $user, $episodeId);
 
         $this->userState->recordProgress(
             $user,
@@ -274,9 +330,9 @@ class CatalogTitlePlayer extends Component
             $selectedEpisode,
             $exactMediaId,
             new PlaybackPreferencesData(
-                variant: $this->normalizedProfileValue($this->variant, 160),
-                quality: $this->normalizedProfileValue($this->quality, 32),
-                format: $this->normalizedProfileValue($this->format, 32),
+                variant: $this->normalizedVariant(),
+                quality: $this->normalizedQuality(),
+                format: $this->normalizedFormat(),
             ),
         );
         $selectedMedia = $playbackSource->mediaId !== null
@@ -289,6 +345,7 @@ class CatalogTitlePlayer extends Component
             && $selectedEpisode !== null
             && $selectedMedia !== null
             && $playbackSource->isPlayable()
+            && $this->rateLimits->attempt('playback_session', $user, $selectedEpisode->id)
                 ? $this->progressSessions->issue($user, $title, $selectedEpisode, $selectedMedia)
                 : '';
 
@@ -418,9 +475,9 @@ class CatalogTitlePlayer extends Component
         if ($selectedEpisode !== null) {
             $requestedProfileMedia = $this->playback->preferredMedia(
                 $selectedEpisode->licensedMedia,
-                $this->normalizedProfileValue($this->variant, 160),
-                $this->normalizedProfileValue($this->quality, 32),
-                $this->normalizedProfileValue($this->format, 32),
+                $this->normalizedVariant(),
+                $this->normalizedQuality(),
+                $this->normalizedFormat(),
             );
 
             return $selectedEpisode->licensedMedia->firstWhere('id', $requestedProfileMedia?->id)
@@ -455,6 +512,33 @@ class CatalogTitlePlayer extends Component
         $value = trim((string) $value);
 
         return $value !== '' && mb_strlen($value) <= $maxLength ? $value : null;
+    }
+
+    private function normalizedVariant(): ?string
+    {
+        $value = $this->normalizedProfileValue($this->variant, 160);
+
+        return $value !== null && preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $value) === 1
+            ? $value
+            : null;
+    }
+
+    private function normalizedQuality(): ?string
+    {
+        $value = $this->normalizedProfileValue($this->quality, 32);
+
+        return $value !== null && in_array($value, (array) config('playback.supported_qualities', []), true)
+            ? $value
+            : null;
+    }
+
+    private function normalizedFormat(): ?string
+    {
+        $value = $this->normalizedProfileValue($this->format, 32);
+
+        return $value !== null && in_array($value, (array) config('playback.allowed_formats', []), true)
+            ? $value
+            : null;
     }
 
     private function resetSelection(): void
@@ -537,13 +621,24 @@ class CatalogTitlePlayer extends Component
         return $user instanceof User ? $user : null;
     }
 
-    private function positiveId(string|int|null $value): ?int
+    private function positiveId(mixed $value): ?int
     {
         if (is_int($value)) {
             return $value > 0 ? $value : null;
         }
 
         return is_string($value) && ctype_digit($value) && (int) $value > 0 ? (int) $value : null;
+    }
+
+    private function nonNegativeInteger(mixed $value, int $minimum = 0): ?int
+    {
+        if (! is_int($value) && (! is_string($value) || ! ctype_digit($value))) {
+            return null;
+        }
+
+        $value = (int) $value;
+
+        return $value >= $minimum ? $value : null;
     }
 
     private function hasUrlValue(string|int|null $value): bool

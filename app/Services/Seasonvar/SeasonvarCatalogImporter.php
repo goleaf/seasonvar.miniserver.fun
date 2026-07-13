@@ -1209,7 +1209,7 @@ class SeasonvarCatalogImporter
                 $this->report($progress, 'seasonvar-media-skipped', [
                     'catalog_title_id' => $catalogTitle->id,
                     'url' => '[redacted-url]',
-                    'reason' => $exception->getMessage(),
+                    'reason' => app(SeasonvarImportErrorSanitizer::class)->fromException($exception),
                 ]);
 
                 continue;

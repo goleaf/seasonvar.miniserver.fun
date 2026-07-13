@@ -130,6 +130,21 @@ class ExternalPlaylistImportTest extends TestCase
         ]);
     }
 
+    public function test_it_does_not_follow_playlist_redirects_to_an_unverified_target(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake([
+            'playlist.example.com/*' => Http::response('', 302, [
+                'Location' => 'http://127.0.0.1/private.m3u',
+            ]),
+        ]);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('HTTP 302');
+
+        app(ExternalPlaylistImporter::class)->importFromUrl('https://playlist.example.com/list.m3u');
+    }
+
     public function test_it_imports_all_playlist_entries_by_default(): void
     {
         $catalogTitle = CatalogTitle::factory()->create([
