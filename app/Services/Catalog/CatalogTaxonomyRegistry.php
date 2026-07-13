@@ -14,6 +14,7 @@ use App\Models\Studio;
 use App\Models\Tag;
 use App\Models\Translation;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class CatalogTaxonomyRegistry
 {
@@ -74,6 +75,36 @@ class CatalogTaxonomyRegistry
             'latestSeason',
             ...$this->cardRelations(),
         ]));
+    }
+
+    /**
+     * @return array<string, \Closure(BelongsToMany): BelongsToMany>
+     */
+    public function relationSummaryLoads(): array
+    {
+        return collect(self::FILTER_RELATIONS)
+            ->mapWithKeys(function (array $config): array {
+                $modelClass = $config['model'];
+                $table = (new $modelClass)->getTable();
+
+                return [
+                    $config['relation'] => fn (BelongsToMany $query): BelongsToMany => $query
+                        ->select([$table.'.id', $table.'.name', $table.'.slug'])
+                        ->orderBy($table.'.name')
+                        ->orderBy($table.'.id'),
+                ];
+            })
+            ->all();
+    }
+
+    /**
+     * @return array<string, \Closure(BelongsToMany): BelongsToMany>
+     */
+    public function cardSummaryLoads(): array
+    {
+        return collect($this->relationSummaryLoads())
+            ->only($this->cardRelations())
+            ->all();
     }
 
     public function relationName(string $filterType): string

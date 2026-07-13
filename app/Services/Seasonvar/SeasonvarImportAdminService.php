@@ -7,10 +7,10 @@ namespace App\Services\Seasonvar;
 use App\DTOs\Seasonvar\SeasonvarImportStartResultData;
 use App\Enums\SeasonvarImportStatus;
 use App\Jobs\StartSeasonvarQueuedImport;
-use App\Models\LicensedMedia;
 use App\Models\SeasonvarImportRun;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -150,35 +150,63 @@ final class SeasonvarImportAdminService
     public function dashboard(): array
     {
         $runs = SeasonvarImportRun::query()
+            ->select([
+                'id',
+                'status',
+                'force',
+                'selected',
+                'parsed',
+                'failed',
+                'stored',
+                'media_attached',
+                'media_updated',
+                'media_skipped',
+                'media_failed',
+                'summary',
+                'last_error',
+                'requested_by_user_id',
+                'retry_of_run_id',
+                'last_heartbeat_at',
+                'started_at',
+                'finished_at',
+                'updated_at',
+            ])
             ->with('requestedBy:id,name')
             ->latest('id')
             ->limit(20)
             ->get();
-        $healthCounts = LicensedMedia::query()
-            ->selectRaw('health_status, COUNT(*) AS aggregate')
-            ->groupBy('health_status')
-            ->pluck('aggregate', 'health_status');
+        $healthCounts = DB::table('licensed_media')
+            ->selectRaw("'health' AS metric, health_status AS value, COUNT(*) AS aggregate")
+            ->groupBy('health_status');
+        $dueCount = DB::table('licensed_media')
+            ->selectRaw("'due' AS metric, NULL AS value, COUNT(*) AS aggregate")
+            ->whereIn('health_status', ['active', 'degraded', 'unavailable'])
+            ->where(function (QueryBuilder $query): void {
+                $query->whereNull('next_check_at')->orWhere('next_check_at', '<=', now());
+            });
+        $healthMetrics = $healthCounts
+            ->unionAll($dueCount)
+            ->get();
+        $healthByStatus = $healthMetrics
+            ->where('metric', 'health')
+            ->mapWithKeys(fn (object $row): array => [(string) $row->value => (int) $row->aggregate]);
+        $mediaDueCount = (int) ($healthMetrics->firstWhere('metric', 'due')?->aggregate ?? 0);
 
         return [
             'runs' => $runs->map(fn (SeasonvarImportRun $run): array => $this->present($run))->all(),
-            'has_active_run' => $this->activeRun() !== null,
+            'has_active_run' => $this->hasActiveRun(),
             'stale_count' => $this->staleRunsQuery()->count(),
             'media_health' => collect([
                 ['status' => 'active', 'label' => 'Активно', 'icon' => 'fa-solid fa-circle-check', 'tone' => 'text-emerald-700'],
                 ['status' => 'degraded', 'label' => 'Нестабильно', 'icon' => 'fa-solid fa-triangle-exclamation', 'tone' => 'text-amber-700'],
                 ['status' => 'unavailable', 'label' => 'Недоступно', 'icon' => 'fa-solid fa-circle-xmark', 'tone' => 'text-rose-700'],
                 ['status' => 'disabled', 'label' => 'Отключено', 'icon' => 'fa-solid fa-ban', 'tone' => 'text-slate-500'],
-            ])->map(function (array $item) use ($healthCounts): array {
-                $item['count'] = (int) ($healthCounts[$item['status']] ?? 0);
+            ])->map(function (array $item) use ($healthByStatus): array {
+                $item['count'] = (int) ($healthByStatus[$item['status']] ?? 0);
 
                 return $item;
             })->all(),
-            'media_due_count' => LicensedMedia::query()
-                ->where('health_status', '!=', 'disabled')
-                ->where(function (Builder $query): void {
-                    $query->whereNull('next_check_at')->orWhere('next_check_at', '<=', now());
-                })
-                ->count(),
+            'media_due_count' => $mediaDueCount,
         ];
     }
 
@@ -209,6 +237,14 @@ final class SeasonvarImportAdminService
             ->whereIn('status', [SeasonvarImportStatus::Queued->value, SeasonvarImportStatus::Running->value])
             ->latest('id')
             ->first();
+    }
+
+    private function hasActiveRun(): bool
+    {
+        return SeasonvarImportRun::query()
+            ->where('execution_mode', 'queue')
+            ->whereIn('status', [SeasonvarImportStatus::Queued->value, SeasonvarImportStatus::Running->value])
+            ->exists();
     }
 
     private function effectiveStatus(SeasonvarImportRun $run): SeasonvarImportStatus

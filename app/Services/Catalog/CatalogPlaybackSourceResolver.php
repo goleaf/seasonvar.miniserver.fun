@@ -15,6 +15,7 @@ use App\Models\Season;
 use App\Models\User;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\PlaybackSourceUrlGuard;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -43,7 +44,9 @@ class CatalogPlaybackSourceResolver
         }
 
         if ($episode !== null) {
-            $episode->loadMissing('season');
+            $episode->loadMissing([
+                'season' => fn (BelongsTo $query): BelongsTo => $query->select($this->seasonColumns()),
+            ]);
 
             if (! $episode->season instanceof Season || (int) $episode->season->catalog_title_id !== $catalogTitle->id) {
                 return PlaybackSourceData::blocked(PlaybackAvailability::NotFound);
@@ -59,12 +62,16 @@ class CatalogPlaybackSourceResolver
         }
 
         $query = LicensedMedia::query()
-            ->with(['catalogTitle', 'season', 'episode.season'])
+            ->select($this->mediaColumns())
             ->where('catalog_title_id', $catalogTitle->id)
             ->when(
                 $episode !== null,
                 fn ($query) => $query->where('episode_id', $episode->id),
-                fn ($query) => $query->whereNull('episode_id'),
+                fn ($query) => $query
+                    ->whereNull('episode_id')
+                    ->with([
+                        'season' => fn (BelongsTo $query): BelongsTo => $query->select($this->seasonColumns()),
+                    ]),
             );
 
         if ($requestedMediaId !== null) {
@@ -72,6 +79,18 @@ class CatalogPlaybackSourceResolver
         }
 
         $mediaItems = $query->limit(100)->get();
+
+        $mediaItems->each(function (LicensedMedia $media) use ($catalogTitle, $episode): void {
+            $media->setRelation('catalogTitle', $catalogTitle);
+
+            if ($episode !== null) {
+                $media->setRelation(
+                    'season',
+                    (int) $media->season_id === $episode->season?->id ? $episode->season : null,
+                );
+                $media->setRelation('episode', $episode);
+            }
+        });
 
         if ($mediaItems->isEmpty()) {
             return PlaybackSourceData::blocked(PlaybackAvailability::NotFound);
@@ -110,7 +129,12 @@ class CatalogPlaybackSourceResolver
 
     public function response(LicensedMedia $media, ?User $user): Response
     {
-        $media->loadMissing(['catalogTitle', 'season', 'episode.season']);
+        $media->loadMissing([
+            'catalogTitle' => fn (BelongsTo $query): BelongsTo => $query->select($this->catalogTitleColumns()),
+            'season' => fn (BelongsTo $query): BelongsTo => $query->select($this->seasonColumns()),
+            'episode' => fn (BelongsTo $query): BelongsTo => $query->select($this->episodeColumns()),
+            'episode.season' => fn (BelongsTo $query): BelongsTo => $query->select($this->seasonColumns()),
+        ]);
         $source = $this->source($media, $user);
 
         if ($source['status'] !== PlaybackAvailability::Ready) {
@@ -336,6 +360,74 @@ class CatalogPlaybackSourceResolver
             'Referrer-Policy' => 'no-referrer',
             'X-Content-Type-Options' => 'nosniff',
             'X-Robots-Tag' => 'noindex, nofollow',
+        ];
+    }
+
+    /** @return list<string> */
+    private function mediaColumns(): array
+    {
+        return [
+            'id',
+            'catalog_title_id',
+            'season_id',
+            'episode_id',
+            'storage_disk',
+            'path',
+            'playback_url',
+            'status',
+            'published_at',
+            'audience',
+            'available_from',
+            'available_until',
+            'quality',
+            'translation_name',
+            'variant_name',
+            'variant_key',
+            'format',
+            'health_status',
+            'deleted_at',
+        ];
+    }
+
+    /** @return list<string> */
+    private function catalogTitleColumns(): array
+    {
+        return [
+            'id',
+            'is_published',
+            'publication_status',
+            'audience',
+            'available_from',
+            'available_until',
+            'deleted_at',
+        ];
+    }
+
+    /** @return list<string> */
+    private function seasonColumns(): array
+    {
+        return [
+            'id',
+            'catalog_title_id',
+            'publication_status',
+            'audience',
+            'available_from',
+            'available_until',
+            'deleted_at',
+        ];
+    }
+
+    /** @return list<string> */
+    private function episodeColumns(): array
+    {
+        return [
+            'id',
+            'season_id',
+            'publication_status',
+            'audience',
+            'available_from',
+            'available_until',
+            'deleted_at',
         ];
     }
 }

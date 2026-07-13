@@ -44,18 +44,20 @@ class CatalogHomePageBuilder
                 ->count(),
         ];
         $latestTitles = $this->titleSummaryQuery()
-            ->with($this->taxonomies->listRowRelations())
+            ->with(array_merge([
+                'latestSeason' => fn ($query) => $query->select(['seasons.id', 'seasons.catalog_title_id', 'seasons.number']),
+            ], $this->taxonomies->cardSummaryLoads()))
             ->latest('indexed_at')
             ->limit(48)
             ->get();
         $featuredTitles = $this->titleSummaryQuery()
-            ->with($this->taxonomies->cardRelations())
+            ->with($this->taxonomies->cardSummaryLoads())
             ->whereNotNull('poster_url')
             ->latest('indexed_at')
             ->limit(12)
             ->get();
         $videoTitles = $this->titleSummaryQuery()
-            ->with($this->taxonomies->cardRelations())
+            ->with($this->taxonomies->cardSummaryLoads())
             ->whereIn('id', LicensedMedia::query()
                 ->published()
                 ->forAvailableReleases(null)

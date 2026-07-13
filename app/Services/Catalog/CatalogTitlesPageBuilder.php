@@ -103,6 +103,7 @@ class CatalogTitlesPageBuilder
 
             $modelClass = $this->taxonomies->modelClass($filterType);
             $records = $modelClass::query()
+                ->select(['id', 'name', 'slug'])
                 ->whereIn('slug', $slugs)
                 ->get()
                 ->keyBy('slug');
@@ -134,7 +135,10 @@ class CatalogTitlesPageBuilder
             }
 
             $modelClass = $this->taxonomies->modelClass($filterType);
-            $records = $modelClass::query()->whereIn('slug', $slugs)->get();
+            $records = $modelClass::query()
+                ->select(['id', 'name', 'slug'])
+                ->whereIn('slug', $slugs)
+                ->get();
 
             if ($records->isEmpty()) {
                 continue;
@@ -162,11 +166,14 @@ class CatalogTitlesPageBuilder
         $catalogQueryState = $this->sanitizedCatalogQueryState($request->catalogQueryState(), $filterTypes, $selectedFilterSlugs, $selectedExcludedFilterSlugs, $years, $invalidYear);
         $paginationQuery = $this->paginationQuery($catalogQueryState, $search, $sort, $titleContext);
 
+        $cardLoads = $this->taxonomies->cardSummaryLoads();
         $catalogTitles = $this->query->filteredTitles($criteria, $request->user())
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'])
             ->with($view === 'list'
-                ? array_merge(['latestSeason'], $this->taxonomies->cardRelations())
-                : $this->taxonomies->cardRelations())
+                ? array_merge([
+                    'latestSeason' => fn ($query) => $query->select(['seasons.id', 'seasons.catalog_title_id', 'seasons.number']),
+                ], $cardLoads)
+                : $cardLoads)
             ->withCount($this->query->publicCardCounts($request->user()));
 
         if (in_array($sortOption, [CatalogSort::KinopoiskRating, CatalogSort::ImdbRating], true)) {
@@ -176,19 +183,21 @@ class CatalogTitlesPageBuilder
         $catalogTitles = $catalogTitles->paginate($perPage)->appends($paginationQuery);
         $seoRequest = $this->sanitizedSeoRequest($request, $paginationQuery, (int) $catalogTitles->currentPage());
 
-        $filterTaxonomies = collect($filterTypes)->mapWithKeys(function (string $filterType) use ($request, $facetSearch, $criteria): array {
-            $search = in_array($filterType, ['actor', 'director'], true)
-                ? ($facetSearch[$filterType] ?? null)
-                : null;
-
-            return [$filterType => $this->facets->taxonomies(
-                $filterType,
-                $this->filterLimit($filterType),
-                $request->user(),
-                is_string($search) ? $search : null,
-                $criteria,
-            )];
-        });
+        $filterLimits = collect($filterTypes)
+            ->mapWithKeys(fn (string $filterType): array => [$filterType => $this->filterLimit($filterType)])
+            ->all();
+        $facetSearches = collect($facetSearch)
+            ->only(['actor', 'director'])
+            ->filter(fn (mixed $search): bool => is_string($search))
+            ->map(fn (string $search): string => $search)
+            ->all();
+        $filterTaxonomies = $this->facets->taxonomyGroups(
+            $filterTypes,
+            $filterLimits,
+            $request->user(),
+            $facetSearches,
+            $criteria,
+        );
 
         $missingSelectedTaxonomies = collect();
         $filterTaxonomies = $filterTaxonomies->map(function (Collection $items, string $filterType) use ($selectedTaxonomies, $missingSelectedTaxonomies): Collection {

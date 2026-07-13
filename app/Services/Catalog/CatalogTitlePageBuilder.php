@@ -29,7 +29,10 @@ class CatalogTitlePageBuilder
      */
     public function data(CatalogShowRequest $request, CatalogTitle $catalogTitle): array
     {
-        $catalogTitle->load(array_merge(['aliases', 'ratings'], $this->taxonomies->relationNames()));
+        $catalogTitle->load(array_merge([
+            'aliases:id,catalog_title_id,name',
+            'ratings:id,catalog_title_id,provider,rating,votes',
+        ], $this->taxonomies->relationSummaryLoads()));
         $taxonomiesByType = collect($this->taxonomies->relations())
             ->mapWithKeys(fn (array $config, string $filterType): array => [$filterType => $catalogTitle->{$config['relation']}->values()]);
         $seasons = $this->playback->seasonSummaries($catalogTitle, $request->user());
@@ -152,7 +155,7 @@ class CatalogTitlePageBuilder
         return $this->query
             ->constrainVisible($query, $user)
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url', 'indexed_at'])
-            ->with($this->taxonomies->cardRelations())
+            ->with($this->taxonomies->cardSummaryLoads())
             ->withCount($this->query->publicCardCounts($user));
     }
 }

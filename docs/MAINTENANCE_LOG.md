@@ -1,5 +1,7 @@
 # Журнал обслуживания
 
+- 13.07.2026: relation-фасеты `/titles` объединены в один bounded UNION (20 → 11 page-builder queries), карточки/страницы загружают только отображаемые taxonomy columns, а playback resolve переиспользует уже авторизованную hierarchy (6 → 2 queries).
+- 13.07.2026: importer dashboard ограничен пятью запросами; health/due counters используют один covering UNION, backlog здоровья — индексируемый конечный список состояний. EXPLAIN подтвердил текущие catalog/release/history/health индексы, поэтому новые индексы не добавлялись.
 ## 13.07.2026 — безопасный health monitoring видеоисточников
 
 - Добавлена единая state machine `active/degraded/unavailable/disabled` с configurable threshold, exponential retry и recovery; transient timeout больше не отключает источник после одной проверки.

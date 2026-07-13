@@ -2,6 +2,9 @@
 
 ## 2026-07-13
 
+- Reduced catalog page-builder queries from 20 to 11 by batching ten own-group-excluded relation facets into one bounded UNION, while keeping per-group limits, duplicate-free totals, fresh lifecycle semantics, and server-side actor/director search.
+- Constrained catalog/title/home taxonomy eager loads to rendered columns, reduced episode playback resolution from six queries to two by reusing the authorized hierarchy, and kept direct signed playback independently authorized.
+- Reduced importer dashboard polling to five bounded queries, combined health/due counters into one covering UNION round trip, and changed media-health backlog predicates so SQLite uses the existing health index instead of a full table scan; query plans did not justify new indexes.
 - Added centralized licensed-media health states (`active`, `degraded`, `unavailable`, `disabled`) with atomic failure counters, last-success/error/latency metadata, bounded exponential retries, configurable failure thresholds, and automatic recovery into playback eligibility.
 - Hardened source probes with HTTPS/provider allowlists, public-DNS validation and per-request DNS pinning, blocked credentials/private/link-local/metadata targets and redirects, strict connect/total timeouts, bounded streamed Range/manifest reads, safe error categories, and fully redacted operational events.
 - Integrated health state into playback fallback, public episode/media counts, refresh planning, queued-import finalization, stats cache refresh, and an aggregate-only `/admin/imports` health panel; added an additive migration with safe legacy-state backfill and a due-check index.

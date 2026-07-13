@@ -722,7 +722,11 @@ class SeasonvarImportPipeline
 
         $chunkSize = $this->mediaCheckChunkSize();
         $mediaQuery = LicensedMedia::query()
-            ->where('health_status', '!=', 'disabled')
+            ->whereIn('health_status', [
+                MediaHealthStatus::Active->value,
+                MediaHealthStatus::Degraded->value,
+                MediaHealthStatus::Unavailable->value,
+            ])
             ->where(function ($query): void {
                 $query->whereNull('next_check_at')
                     ->orWhere('next_check_at', '<=', now());

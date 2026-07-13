@@ -303,6 +303,8 @@ class CatalogAdvancedFilterTest extends TestCase
 
         $queriesWithoutOptions = $this->catalogQueryCount();
 
+        $this->assertSame(11, $queriesWithoutOptions);
+
         foreach (range(2, 20) as $number) {
             $actor = Actor::query()->create([
                 'name' => 'Счетчик '.$number,

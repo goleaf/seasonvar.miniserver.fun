@@ -6,6 +6,7 @@ use App\Exceptions\Seasonvar\SeasonvarSourceRequestException;
 use App\Jobs\FinalizeSeasonvarQueuedImport;
 use App\Jobs\ImportSeasonvarSourcePage;
 use App\Jobs\StartSeasonvarQueuedImport;
+use App\Models\LicensedMedia;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use App\Models\User;
@@ -20,6 +21,7 @@ use App\Services\Seasonvar\SeasonvarPageClaimManager;
 use App\Services\Seasonvar\SeasonvarQueuedImportDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Mockery;
@@ -95,6 +97,34 @@ class SeasonvarParallelImportTest extends TestCase
                 && ! str_contains(serialize($job), 'admin@example.com')
                 && ! str_contains(serialize($job), 'seasonvar.ru/');
         });
+    }
+
+    public function test_import_dashboard_uses_bounded_aggregate_queries(): void
+    {
+        $requester = User::factory()->create();
+        SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'queued',
+            'requested_by_user_id' => $requester->id,
+            'last_heartbeat_at' => now(),
+        ]);
+        LicensedMedia::factory()->create([
+            'health_status' => 'degraded',
+            'next_check_at' => now()->subMinute(),
+        ]);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $dashboard = app(SeasonvarImportAdminService::class)->dashboard();
+        $queryCount = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertLessThanOrEqual(5, $queryCount);
+        $this->assertTrue($dashboard['has_active_run']);
+        $this->assertSame(1, $dashboard['media_due_count']);
+        $this->assertSame(1, collect($dashboard['media_health'])->firstWhere('status', 'degraded')['count']);
+        $this->assertSame($requester->name, $dashboard['runs'][0]['requested_by']);
     }
 
     public function test_admin_can_retry_terminal_run_cancel_active_run_and_recover_stale_run(): void

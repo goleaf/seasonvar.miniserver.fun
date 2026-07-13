@@ -15,6 +15,7 @@ use App\Services\Catalog\CatalogPlaybackSourceResolver;
 use App\Services\Media\ExternalPlaylistImporter;
 use App\Services\Media\PlaybackSourceUrlGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
@@ -243,6 +244,8 @@ class SecurityHardeningTest extends TestCase
         $title = CatalogTitle::query()->findOrFail($failedPreferred->catalog_title_id);
         $resolver = app(CatalogPlaybackSourceResolver::class);
 
+        DB::flushQueryLog();
+        DB::enableQueryLog();
         $resolved = $resolver->resolve(
             $title,
             null,
@@ -250,8 +253,11 @@ class SecurityHardeningTest extends TestCase
             null,
             new PlaybackPreferencesData(audioLanguage: 'Русский', quality: '720p'),
         );
+        $resolutionQueryCount = count(DB::getQueryLog());
+        DB::disableQueryLog();
 
         $this->assertSame(PlaybackAvailability::Ready, $resolved->status);
+        $this->assertLessThanOrEqual(2, $resolutionQueryCount);
         $this->assertStringContainsString('/playback/'.$matching->id.'?', (string) $resolved->url);
         $this->assertStringNotContainsString('/playback/'.$fallback->id.'?', (string) $resolved->url);
 
@@ -290,6 +296,31 @@ class SecurityHardeningTest extends TestCase
         );
 
         $this->assertSame(PlaybackAvailability::NotFound, $crossEpisode->status);
+
+        $mismatchedSeason = Season::factory()->for(CatalogTitle::factory()->create())->create();
+        $mismatchedHierarchy = LicensedMedia::factory()->create([
+            'catalog_title_id' => $title->id,
+            'season_id' => $mismatchedSeason->id,
+            'episode_id' => $episode->id,
+            'storage_disk' => 'seasonvar_parsed',
+            'path' => 'https://data00-cdn.11cdn.org/mismatched.m3u8',
+            'playback_url' => 'https://data00-cdn.11cdn.org/mismatched.m3u8',
+            'format' => 'm3u8',
+            'status' => 'published',
+            'published_at' => now()->subMinute(),
+            'check_status' => 'available',
+        ]);
+
+        $this->assertSame(
+            PlaybackAvailability::NotFound,
+            $resolver->resolve(
+                $title,
+                null,
+                $episode,
+                $mismatchedHierarchy->id,
+                new PlaybackPreferencesData,
+            )->status,
+        );
     }
 
     private function playableMedia(): LicensedMedia
