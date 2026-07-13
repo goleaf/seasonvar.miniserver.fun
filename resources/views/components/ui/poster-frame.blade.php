@@ -10,7 +10,7 @@
             class="absolute inset-0 h-full w-full{{ $overscan ? ' scale-[1.02]' : '' }} object-cover object-center"
         >
     @else
-        <span class="grid h-full min-h-20 w-full place-items-center px-2 text-center text-xs font-semibold text-slate-500">
+        <span class="grid h-full min-h-20 w-full place-items-center px-2 text-center text-xs font-semibold text-slate-600">
             <span class="inline-flex min-w-0 flex-col items-center gap-1">
                 <x-ui.icon name="fa-regular fa-image text-lg text-slate-300" />
                 @if ($emptyLabel !== '')

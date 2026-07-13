@@ -165,7 +165,7 @@
                 </div>
 
                 <div class="mt-3 hidden flex-wrap items-center gap-2 text-xs font-bold lg:flex">
-                    <span class="text-slate-400">Вид:</span>
+                    <span class="text-slate-600">Вид:</span>
                     @foreach (['grid' => 'Сетка', 'list' => 'Список'] as $viewKey => $viewLabel)
                         <a data-catalog-view-option href="{{ route('titles.index', $filterView->viewQuery($viewKey)) }}" rel="nofollow" wire:click.prevent="setView('{{ $viewKey }}')" @class([
                             'inline-flex min-h-11 items-center rounded-full px-3 py-2',
@@ -173,7 +173,7 @@
                             'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $view !== $viewKey,
                         ])>{{ $viewLabel }}</a>
                     @endforeach
-                    <span class="ml-2 text-slate-400">На странице:</span>
+                    <span class="ml-2 text-slate-600">На странице:</span>
                     @foreach ([24, 48, 96] as $pageSize)
                         <a data-catalog-page-size-option href="{{ route('titles.index', $filterView->perPageQuery($pageSize)) }}" rel="nofollow" wire:click.prevent="setPerPage({{ $pageSize }})" @class([
                             'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 py-2 tabular-nums',
@@ -184,7 +184,7 @@
                 </div>
 
                 <nav class="mt-4 hidden flex-wrap items-center gap-1.5 lg:flex" aria-label="Алфавитный переход по названиям">
-                    <span class="mr-1 text-xs font-bold uppercase tracking-wide text-slate-400">Алфавит:</span>
+                    <span class="mr-1 text-xs font-bold uppercase tracking-wide text-slate-600">Алфавит:</span>
                     @foreach ($filterView->alphabet as $letter)
                         <a data-catalog-alphabet-option href="{{ route('titles.index', $filterView->alphabetQuery($letter)) }}" rel="nofollow" wire:click.prevent="setLetter('{{ $letter }}')" @class([
                             'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-2 text-xs font-bold transition',

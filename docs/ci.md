@@ -39,6 +39,10 @@ npm run build
 
 `NPM_CONFIG_REGISTRY` явно задан как `https://registry.npmjs.org/`, чтобы security audit работал через официальный npm registry.
 
+## Browser
+
+Browser job после backend/frontend gates устанавливает managed Chromium, создаёт отдельную временную SQLite-базу `output/playwright/browser.sqlite` и запускает `npm run test:browser`. Playwright проверяет mobile `390×844` и desktop `1440×1200`: URL state каталога, открытие/возврат focus mobile-фильтров, title/player shell, отсутствие horizontal overflow и failed local assets. Внешние media requests блокируются. Axe допускает запуск только при отсутствии critical/serious WCAG 2 A/AA violations. Trace, screenshot, video и HTML-report сохраняются в ignored `output/playwright/` и загружаются как CI artifact только для диагностики.
+
 ## Caching
 
 - Composer кеширует только download-cache Composer, ключ зависит от `composer.lock`.

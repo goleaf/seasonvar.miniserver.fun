@@ -16,6 +16,7 @@
 - Production-данные не сидируются; seeders не являются частью обычного тестового сценария.
 - Cache architecture tests фиксируют canonical key hashing/bounds, TTL+jitter, negative lookup, payload limit, version invalidation, stale fallback, bounded lock timeout, warming uniqueness/overlap/after-commit, private shared-cache bypass и public HTTP validators.
 - Blade audit должен отвергать `@php`, `@endphp`, PHP tags, cache/database calls и Volt. Livewire security tests продолжают фиксировать URL state, locked tamper protection, Form Objects, renderless actions, visible-only polling и отсутствие больших public model collections; намеренно неиспользуемые Livewire features не симулируются искусственными компонентами.
+- Browser regression suite использует отдельный ignored `output/playwright/browser.sqlite`, локальный PHP server и Playwright Chromium на `390×844` и `1440×1200`. Внешние requests блокируются; axe gate отклоняет critical/serious WCAG 2 A/AA violations, а geometry checks фиксируют horizontal overflow и 44-pixel control contract.
 
 ## Паттерны
 
@@ -43,8 +44,10 @@ php artisan test
 ./vendor/bin/pint path/to/ChangedFile.php --format agent
 composer test
 php artisan project:docs-refresh --check
+npm run test:browser:install
+npm run test:browser
 ```
 
-`npm run build` нужен только при изменениях Vite, JS/CSS, Blade-разметки с asset assumptions или frontend assets. `vendor/bin/pest`, `npm run lint`, PHPStan и Rector сейчас не установлены.
+`npm run build` нужен только при изменениях Vite, JS/CSS, Blade-разметки с asset assumptions или frontend assets. Browser artifacts сохраняются только в ignored `output/playwright/`. `vendor/bin/pest`, `npm run lint`, PHPStan и Rector сейчас не установлены.
 
 Датированный baseline, исправленные regressions, browser smoke и финальные exact counts записываются в `docs/audits/verification-report.md`. Production Livewire может выдавать как `livewire.js`, так и `livewire.min.js`; asset tests обязаны проверять официальный URL/id и singleton, а не жёстко фиксировать build mode.

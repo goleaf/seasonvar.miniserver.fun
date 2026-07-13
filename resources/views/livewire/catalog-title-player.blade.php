@@ -360,7 +360,7 @@
                                     <span>{{ $showView->episodeSelectedProfileLabel($episodeOption) }}</span>
                                 </span>
                             @endif
-                            <span class="inline-flex items-center gap-1 text-xs font-semibold text-slate-400">
+                            <span class="inline-flex items-center gap-1 text-xs font-semibold text-slate-600">
                                 <x-ui.icon name="fa-solid fa-file-video" />
                                 <span class="tabular-nums">{{ trans_choice('catalog.counts.videos', $showView->episodeMediaItems($episodeOption)->count()) }}</span>
                             </span>
