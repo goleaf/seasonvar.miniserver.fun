@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - Work only on the existing `main` branch; do not create a branch or worktree.
-- Preserve all pre-existing uncommitted work with a named stash before implementation and restore it after feature commits.
+- Verify the worktree is clean before implementation and stop if unrelated changes appear during execution.
 - `php artisan seasonvar:import` remains the only public Seasonvar import command.
 - The public request accepts only a server-bound catalog title id; it never accepts a source URL or import option from the browser.
 - Normalize and allow only `https://seasonvar.ru/` or `https://www.seasonvar.ru/` catalog URLs through `SeasonvarUrl`.
@@ -41,17 +41,15 @@
 - Consumes: `CatalogTitle`, `SeasonvarImportStatus`, `CacheKeyFactory`, the configured domain/lock stores, and Laravel's `Illuminate\Contracts\Bus\Dispatcher`.
 - Produces: `CatalogTitleRefreshState::fromArray(array $state): self`, `CatalogTitleRefreshState::toArray(): array`, `CatalogTitleRefreshStateStore::read(int $catalogTitleId): CatalogTitleRefreshState`, state transition methods, and `CatalogTitleRefreshCoordinator::request(CatalogTitle $catalogTitle): CatalogTitleRefreshState`.
 
-- [ ] **Step 1: Preserve the current user work before touching production files**
+- [ ] **Step 1: Verify the clean main worktree before touching production files**
 
 Run:
 
 ```bash
 git status --short --branch
-git stash push --include-untracked -m "user-work-before-livewire-title-background-refresh-2026-07-13"
-git status --short --branch
 ```
 
-Expected: the first command reports `main` and the known modified/untracked files; the final command reports a clean `main` worktree. Run `git rev-parse stash@{0}` to record the created stash object and do not drop it until Task 5.
+Expected: the command reports `main`, ahead of `origin/main`, with only this implementation plan untracked before its plan commit. After the plan commit, the worktree must be clean. If unrelated changes appear, stop and identify their owner before editing overlapping files.
 
 - [ ] **Step 2: Write failing state/coordinator tests**
 
@@ -991,15 +989,14 @@ Before committing, inspect `git diff --cached --name-only` and unstage any test 
 
 ---
 
-### Task 5: Full verification, browser QA, and user-work restoration
+### Task 5: Full verification, browser QA, and final Git audit
 
 **Files:**
 - Verify all files changed in Tasks 1-4.
-- Restore: the exact stash object recorded in Task 1.
 
 **Interfaces:**
-- Consumes: the completed feature commits and the preserved pre-existing work stash.
-- Produces: verified feature behavior on `main` with the original user work restored on top and no lost content.
+- Consumes: the completed feature commits.
+- Produces: verified feature behavior on `main`, stopped temporary sessions, and a clean final Git state.
 
 - [ ] **Step 1: Run the complete automated verification on the committed feature**
 
@@ -1050,26 +1047,7 @@ Capture desktop and mobile screenshots for inspection but do not commit generate
 
 Send normal interrupt signals and wait for both processes to exit. Do not leave required sessions running at task completion.
 
-- [ ] **Step 5: Restore the original user work**
-
-Resolve the exact named stash without dropping it first:
-
-```bash
-refresh_stash_ref="$(git stash list --format='%gd %s' | awk '/user-work-before-livewire-title-background-refresh-2026-07-13/ {print $1; exit}')"
-test -n "$refresh_stash_ref"
-git stash apply "$refresh_stash_ref"
-git status --short --branch
-```
-
-Resolve any overlap by preserving both the committed background-refresh behavior and the stashed user changes. Never choose one side wholesale. Rerun Pint, the three focused feature tests, affected pre-existing catalog tests, and `npm run build` after conflict resolution.
-
-Only after content and tests confirm restoration, drop the exact stash:
-
-```bash
-git stash drop "$refresh_stash_ref"
-```
-
-- [ ] **Step 6: Verify Git state and report the pre-existing-work boundary**
+- [ ] **Step 5: Verify Git state and feature commit boundary**
 
 Run:
 
@@ -1079,13 +1057,13 @@ git log -5 --oneline --decorate
 git diff --check
 ```
 
-Expected: feature commits are on `main`; no conflict markers or whitespace errors exist. If restored pre-existing changes remain uncommitted, do not commit them as part of this feature and report them as the project-mandated dirty-worktree blocker with the exact paths. If the restored changes were explicitly authorized and independently verified during this task, commit them separately only after confirming their scope with the user.
+Expected: feature commits are on `main`, no conflict markers or whitespace errors exist, and `git status --short --branch` contains no modified or untracked files.
 
 ---
 
 ## Plan Self-Review
 
-- Every design requirement maps to a task: 15-minute freshness and deduplication in Task 1; per-title queue execution, URL validation, retries, and title-group locking in Task 2; complete three-second Livewire refresh and player preservation in Task 3; source-of-truth documentation in Task 4; full/browser verification and user-work restoration in Task 5.
+- Every design requirement maps to a task: 15-minute freshness and deduplication in Task 1; per-title queue execution, URL validation, retries, and title-group locking in Task 2; complete three-second Livewire refresh and player preservation in Task 3; source-of-truth documentation in Task 4; full/browser verification and final Git audit in Task 5.
 - All public inputs are scalar title ids resolved again through the visibility boundary; no client-provided URL reaches the importer.
 - Cache values are scalar arrays, compatible with Laravel 13's disabled arbitrary class unserialization.
 - Queue `retry_after` remains greater than the 900-second job timeout, and time-bounded retries use `$tries = 0`.
