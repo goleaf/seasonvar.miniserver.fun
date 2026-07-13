@@ -1,6 +1,6 @@
 # Laravel video portal modernization
 
-Дата аудита: 13.07.2026. Этот план ограничен доказанными gaps текущего продукта. Долгосрочный repository backlog остаётся в `docs/audit.md`; здесь фиксируется выполнение запроса Laravel/Livewire/video/MCP audit без создания недоказанных features.
+Дата аудита: 13.07.2026. Этот исторический план ограничен доказанными gaps текущего продукта. Подтверждённый bounded backlog закрыт 13.07.2026; актуальные контракты и дальнейшие решения принадлежат тематическим документам из `docs/README.md`, а не этому снимку.
 
 ## P0
 
@@ -98,16 +98,16 @@
 
 ## P3
 
-### P3-1 — CSP enforcement and browser CI
+### P3-1 — CSP observation and browser CI
 
-- **Проблема:** no stored CSP violation telemetry and no repository Playwright/axe test runner.
-- **Affected files:** future CSP collector/monitoring config or `tests/browser`; existing `docs/audit.md` owns the broader backlog.
-- **Solution:** first observe exact origins; separately add deterministic temporary-DB browser CI only with approved dev dependencies.
-- **Risk / migration:** enforcement can break media; adding dependencies requires explicit project approval. No current migration.
-- **Test:** CSP clean report window, mobile/desktop accessibility and network-blocked fixture suite.
-- **Rollback:** disable enforcement/remove dev-only runner.
+- **Проблема:** CSP violation telemetry по-прежнему не собирается; repository browser runner на момент исходного аудита отсутствовал.
+- **Affected files:** `config/security.php`, security middleware и `tests/browser`; будущий collector требует отдельного privacy/operations решения.
+- **Solution:** report-only CSP и deterministic temporary-DB Playwright/axe CI реализованы; enforcement остаётся выключенным до чистого наблюдаемого окна.
+- **Risk / migration:** enforcement может нарушить media; текущий report-only режим schema impact не имеет.
+- **Test:** mobile/desktop accessibility, network-blocked fixture suite и HTML/API header tests.
+- **Rollback:** выключить report-only header или удалить dev-only runner; functional delivery не зависит от collector.
 - **Source:** MDN/OWASP CSP, Playwright testing docs.
-- **Статус:** deferred, not a completion blocker.
+- **Статус:** observation boundary и browser CI implemented; enforcement/collector остаются отдельным неподтверждённым расширением, не backlog текущего продукта.
 
 ### P3-2 — Product capabilities without a model
 

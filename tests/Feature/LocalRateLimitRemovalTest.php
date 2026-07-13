@@ -128,6 +128,8 @@ final class LocalRateLimitRemovalTest extends TestCase
 
     public function test_current_documentation_does_not_advertise_local_rate_limits(): void
     {
+        $this->assertFileDoesNotExist(base_path('docs/audit.md'));
+
         foreach ([
             base_path('docs/security.md'),
             base_path('docs/architecture.md'),
@@ -140,7 +142,6 @@ final class LocalRateLimitRemovalTest extends TestCase
             base_path('docs/environment.md'),
             base_path('docs/performance.md'),
             base_path('docs/testing.md'),
-            base_path('docs/audit.md'),
         ] as $path) {
             $contents = (string) file_get_contents($path);
 

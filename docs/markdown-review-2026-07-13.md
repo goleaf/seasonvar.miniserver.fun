@@ -12,7 +12,6 @@
 - `docs/UI_STANDARDS.md`
 - `docs/api.md`
 - `docs/architecture.md`
-- `docs/audit.md`
 - `docs/caching.md`
 - `docs/catalog-search.md`
 - `docs/ci.md`

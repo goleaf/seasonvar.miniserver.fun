@@ -16,6 +16,12 @@
 8. Полный sync/queued finalizer пересобирает рекомендации и обновляет stats cache; targeted URL run обновляет stats cache, но намеренно не запускает глобальное обслуживание каталога.
 9. Новый тайтл получает `published/public`, но повторный import не меняет локальные publication status, audience, availability window, soft delete или slug. Публичный интерфейс всё равно повторно применяет `CatalogEntitlementService`.
 
+## Retention и секреты
+
+Владелец технического retention — production operator runbook Seasonvar. `SeasonvarImportStorageMaintenance` применяет только существующие bounded окна: import events — 7 дней, source snapshots — 14 дней, terminal prepared groups — 7 дней через `SEASONVAR_IMPORT_*_RETENTION_DAYS`; при очистке snapshots всегда сохраняется детерминированная последняя копия. Failed jobs автоматически не удаляются, а пользовательская история, legal/admin audit и другие продуктовые данные не входят в importer prune без отдельной policy.
+
+Provider credentials, DRM/license secrets и их browser delivery в importer не реализованы и не являются скрытым backlog. Queue/staging сохраняют только IDs, allowlisted hashes/status и bounded подготовленные данные; credentials, raw provider payload и URL в job diagnostics не кладутся.
+
 ## Инвентаризация source parity
 
 `php artisan seasonvar:import --inventory-only` использует тот же configured sitemap, один экземпляр `PoliteHttpClient`, правила `robots.txt`, максимальный из configured/robots crawl delay, HTTPS/host/path allowlist и `SourcePage` bulk-upsert, но останавливается до catalog parser. Индекс и дочерние sitemap читаются рекурсивно, включая gzip XML; child failure делает run `failed`, поэтому частичный обход не выдаётся за успешный снимок. Player, playlist, media и страницы сериалов не запрашиваются. PHPUnit задаёт отдельный `seasonvar.sitemap_storage_directory`, поэтому очистка тестового XML-зеркала не затрагивает рабочий inventory.
