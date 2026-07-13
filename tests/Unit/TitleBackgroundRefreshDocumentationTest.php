@@ -31,9 +31,13 @@ class TitleBackgroundRefreshDocumentationTest extends TestCase
 
     public function test_project_docs_describe_the_title_background_refresh_contract(): void
     {
+        $architecture = File::get(base_path('docs/architecture.md'));
+
         $this->assertStringContainsString('15 минут', File::get(base_path('docs/importer.md')));
         $this->assertStringContainsString('wire:poll.3s.visible', File::get(base_path('docs/frontend.md')));
         $this->assertStringContainsString('RefreshSeasonvarCatalogTitle', File::get(base_path('docs/queues.md')));
+        $this->assertStringContainsString('Livewire владеет полной динамической оболочкой', $architecture);
+        $this->assertStringNotContainsString('Livewire отвечает только за интерактивный player/user state', $architecture);
         $this->assertStringContainsString(
             '--queue=seasonvar-import',
             File::get(base_path('deploy/systemd/seasonvar-import-worker@.service')),
