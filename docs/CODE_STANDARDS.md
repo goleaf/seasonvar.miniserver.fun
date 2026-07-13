@@ -18,7 +18,10 @@
 - Предпочитать Eloquent-связи сырым запросам.
 - Загружать заранее все связи, которые используются Blade-страницами.
 - Не выполнять запросы к базе внутри Blade-шаблонов.
-- Не использовать `@php` или `@endphp` в Blade; вычисления переносить в контроллеры, view-model, view-data классы или классы компонентов.
+- Не использовать `@php`, `@endphp`, `<?php` или `<?=` в Blade; вычисления переносить в контроллеры, view-model, view-data классы или классы компонентов.
+- Blade и Blade component classes не выполняют database/Eloquent, Cache, Redis, Memcached, service resolution, filesystem или environment calls. Они получают готовые presentation data; raw `{!! !!}` допустим только после документированного strict sanitizer review.
+- Livewire использует только отдельные class-based компоненты `app/Livewire` + `resources/views/livewire`. Laravel Volt, `livewire/volt`, anonymous component classes и смешивание PHP-класса с Blade не допускаются.
+- Cache keys/TTL/invalidation не пишутся строками в controllers/Livewire. Используются `App\Support\Cache`, cache-aware query/page services и after-commit `CatalogCacheInvalidator`; `Cache::flush()` в application code запрещён.
 - Использовать `withCount()` для счетчиков связей в списках.
 - Считать количества пакетно, когда это возможно, а не отдельным запросом на каждый видимый фильтр.
 - Фильтры маршрутов должны оставаться локальными: `/titles/{type}/{taxonomy}` и `/titles?...` всегда ведут на страницы местного каталога.

@@ -35,7 +35,7 @@ final class SeasonvarImportAdminService
         Gate::forUser($user)->authorize('manage-seasonvar-imports');
         $this->recoverStale();
 
-        $lock = Cache::store((string) config('seasonvar.queue.lock_store', 'redis'))
+        $lock = Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'))
             ->lock(self::START_LOCK, 15);
 
         return $lock->block(5, function () use ($user, $force, $discover, $retryOf): SeasonvarImportStartResultData {

@@ -5,6 +5,7 @@ namespace App\Services\Catalog;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -13,6 +14,8 @@ class CatalogTitleRecommendationBuilder
     private const ALGORITHM_VERSION = 'v2';
 
     private const DEFAULT_MIN_SCORE = 600;
+
+    private const MAX_PROFILE_CHUNK_SIZE = 100;
 
     /**
      * Broad attributes remain part of exact scoring, but they are too common to
@@ -92,7 +95,10 @@ class CatalogTitleRecommendationBuilder
     private function performRebuild(?callable $progress): array
     {
         $startedAt = microtime(true);
-        $chunkSize = max(10, (int) config('seasonvar.recommendations.chunk_size', 100));
+        $chunkSize = min(
+            self::MAX_PROFILE_CHUNK_SIZE,
+            max(10, (int) config('seasonvar.recommendations.chunk_size', self::MAX_PROFILE_CHUNK_SIZE)),
+        );
         $minScore = max(1, (int) config('seasonvar.recommendations.min_score', self::DEFAULT_MIN_SCORE));
         $maxPerTitle = max(1, (int) config('seasonvar.recommendations.max_per_title', 12));
         $computedAt = now();
@@ -168,7 +174,7 @@ class CatalogTitleRecommendationBuilder
     private function compactProfileIndex(int $chunkSize): array
     {
         $profiles = [];
-        $featureMap = [];
+        $featureMap = $this->sharedCandidateFeatureMap();
         $publicCounts = $this->titles->publicCardCounts(null);
         $this->profileRelationTypes = array_keys($this->taxonomies->relations());
 
@@ -203,28 +209,51 @@ class CatalogTitleRecommendationBuilder
                     }
 
                     foreach ($ids as $id) {
-                        $featureMap[$filterType][$id] = ($featureMap[$filterType][$id] ?? '')
-                            .pack('V', $profile['id']);
+                        if (isset($featureMap[$filterType][$id])) {
+                            $featureMap[$filterType][$id] .= pack('V', $profile['id']);
+                        }
                     }
                 }
             });
 
-        foreach ($featureMap as $filterType => &$features) {
-            foreach ($features as $featureId => $packedTitleIds) {
-                if (strlen($packedTitleIds) === 4) {
-                    unset($features[$featureId]);
-                }
-            }
-
-            if ($features === []) {
-                unset($featureMap[$filterType]);
-            }
-        }
-        unset($features);
-
         $this->candidateFeatureMap = $featureMap;
 
         return $profiles;
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function sharedCandidateFeatureMap(): array
+    {
+        $featureMap = [];
+        $title = new CatalogTitle;
+
+        foreach (self::CANDIDATE_FEATURE_TYPES as $filterType) {
+            $relationName = $this->taxonomies->relationName($filterType);
+            $relation = $title->{$relationName}();
+
+            if (! $relation instanceof BelongsToMany) {
+                continue;
+            }
+
+            $foreignKey = $relation->getQualifiedForeignPivotKeyName();
+            $relatedKey = $relation->getQualifiedRelatedPivotKeyName();
+            $featureIds = DB::table($relation->getTable())
+                ->select($relatedKey)
+                ->whereIn($foreignKey, $this->titles->visibleTo(null)->select('id'))
+                ->groupBy($relatedKey)
+                ->havingRaw('count(distinct '.$foreignKey.') > 1')
+                ->pluck($relatedKey)
+                ->map(fn (mixed $id): int => (int) $id)
+                ->all();
+
+            if ($featureIds !== []) {
+                $featureMap[$filterType] = array_fill_keys($featureIds, '');
+            }
+        }
+
+        return $featureMap;
     }
 
     /**

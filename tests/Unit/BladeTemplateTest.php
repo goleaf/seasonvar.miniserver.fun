@@ -49,6 +49,36 @@ class BladeTemplateTest extends TestCase
         $this->assertSame([], $offendingFiles, 'Blade templates must move PHP logic into controllers, view-models, or component classes.');
     }
 
+    public function test_blade_templates_do_not_contain_php_tags_or_infrastructure_calls(): void
+    {
+        $offendingFiles = collect(File::allFiles(resource_path('views')))
+            ->filter(fn (SplFileInfo $file): bool => str_ends_with($file->getFilename(), '.blade.php'))
+            ->filter(function (SplFileInfo $file): bool {
+                $contents = (string) file_get_contents($file->getPathname());
+
+                return preg_match('/<\?(?:php|=)/i', $contents) === 1
+                    || preg_match('/\b(?:Cache|Redis|DB)::|\b(?:cache|resolve|app)\s*\(|::query\s*\(/', $contents) === 1;
+            })
+            ->map(fn (SplFileInfo $file): string => str_replace(base_path().'/', '', $file->getPathname()))
+            ->values()
+            ->all();
+
+        $this->assertSame([], $offendingFiles, 'Blade templates must not contain PHP tags, service resolution, database, Redis, or cache calls.');
+    }
+
+    public function test_volt_is_not_installed_or_used(): void
+    {
+        $composer = strtolower((string) file_get_contents(base_path('composer.json')).(string) file_get_contents(base_path('composer.lock')));
+        $viewFiles = collect(File::allFiles(resource_path('views')))
+            ->filter(fn (SplFileInfo $file): bool => str_ends_with($file->getFilename(), '.blade.php'))
+            ->map(fn (SplFileInfo $file): string => strtolower((string) file_get_contents($file->getPathname())))
+            ->implode("\n");
+
+        $this->assertStringNotContainsString('livewire/volt', $composer);
+        $this->assertStringNotContainsString('@volt', $viewFiles);
+        $this->assertDirectoryDoesNotExist(resource_path('views/livewire/volt'));
+    }
+
     public function test_blade_templates_do_not_truncate_visible_interface_text(): void
     {
         $offendingFiles = collect(File::allFiles(resource_path('views')))

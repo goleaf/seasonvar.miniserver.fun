@@ -376,8 +376,13 @@ class SeasonvarCatalogImporter
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return array{catalog_title: CatalogTitle|null, media_attached: int, media_updated: int, media_skipped: int, media_failed: int}
      */
-    public function parsePage(SourcePage $page, ?callable $progress = null, bool $force = false, ?int $importRunId = null): array
-    {
+    public function parsePage(
+        SourcePage $page,
+        ?callable $progress = null,
+        bool $force = false,
+        ?int $importRunId = null,
+        ?CatalogTitle $preferredCatalogTitle = null,
+    ): array {
         $source = $page->source;
         $crawlDelaySeconds = (int) $source->crawl_delay_seconds;
 
@@ -495,8 +500,8 @@ class SeasonvarCatalogImporter
             ],
         ]);
 
-        $transactionResult = $this->databaseTransaction->run(function () use ($page, $data, $contentHash, $progress): array {
-            $catalogTitle = $this->upsertCatalogTitle($page, $data, $contentHash, $progress);
+        $transactionResult = $this->databaseTransaction->run(function () use ($page, $data, $contentHash, $progress, $preferredCatalogTitle): array {
+            $catalogTitle = $this->upsertCatalogTitle($page, $data, $contentHash, $progress, $preferredCatalogTitle);
             $this->relationSyncer->sync($catalogTitle, $data->taxonomies, $progress);
             $this->syncCatalogAliases($catalogTitle, $data->aliases, $progress);
             $this->syncCatalogRatings($catalogTitle, $data->ratings, $progress);
@@ -565,10 +570,15 @@ class SeasonvarCatalogImporter
     /**
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      */
-    private function upsertCatalogTitle(SourcePage $page, SeasonvarCatalogData $data, string $contentHash, ?callable $progress = null): CatalogTitle
-    {
+    private function upsertCatalogTitle(
+        SourcePage $page,
+        SeasonvarCatalogData $data,
+        string $contentHash,
+        ?callable $progress = null,
+        ?CatalogTitle $preferredCatalogTitle = null,
+    ): CatalogTitle {
         $sourceUrlHash = $this->seasonvarUrl->hash($page->url);
-        $catalogTitle = $this->identityResolver->resolve($page, $data, $sourceUrlHash)
+        $catalogTitle = $this->identityResolver->resolve($page, $data, $sourceUrlHash, $preferredCatalogTitle)
             ?? new CatalogTitle([
                 'source_id' => $page->source_id,
                 'source_url_hash' => $sourceUrlHash,

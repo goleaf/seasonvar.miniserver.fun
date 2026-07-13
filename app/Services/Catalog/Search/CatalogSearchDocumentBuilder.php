@@ -48,13 +48,13 @@ final readonly class CatalogSearchDocumentBuilder
         ])->map(fn (string $value): string => $this->normalizer->transliterate($value)));
         $document = [
             'catalog_title_id' => (int) $title->id,
-            'title' => $titleText,
-            'original_title' => $originalTitle,
-            'aliases' => $aliases->implode("\n"),
+            'title' => $this->withYoVariant($titleText),
+            'original_title' => $this->withYoVariant($originalTitle),
+            'aliases' => $this->withYoVariants($aliases)->implode("\n"),
             'transliteration' => $transliteration->implode("\n"),
-            'people' => $people->implode("\n"),
-            'taxonomies' => $taxonomies->implode("\n"),
-            'description' => $description,
+            'people' => $this->withYoVariants($people)->implode("\n"),
+            'taxonomies' => $this->withYoVariants($taxonomies)->implode("\n"),
+            'description' => $this->withYoVariant($description),
             'suggestion_names' => $suggestionNames->implode("\n"),
             'normalized_title_key' => $this->normalizer->key($titleText),
             'normalized_original_title_key' => $this->normalizer->key($originalTitle),
@@ -89,6 +89,22 @@ final readonly class CatalogSearchDocumentBuilder
             ->filter()
             ->unique(fn (string $value): string => $this->normalizer->key($value))
             ->sortBy(fn (string $value): string => $this->normalizer->key($value))
+            ->values();
+    }
+
+    private function withYoVariant(string $value): string
+    {
+        $variant = str_replace(['ё', 'Ё'], ['е', 'Е'], $value);
+
+        return $variant === $value ? $value : $value."\n".$variant;
+    }
+
+    /** @param Collection<int, string> $values */
+    private function withYoVariants(Collection $values): Collection
+    {
+        return $values
+            ->flatMap(fn (string $value): array => explode("\n", $this->withYoVariant($value)))
+            ->unique()
             ->values();
     }
 }

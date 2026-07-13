@@ -1,17 +1,20 @@
 # Тестирование
 
-Обновлено: 12.07.2026
+Обновлено: 13.07.2026
 
 ## Стек
 
 - Тесты пишутся как PHPUnit-классы в `tests/Feature` и `tests/Unit`; Pest в проекте не установлен.
 - PHPUnit использует SQLite в памяти через `phpunit.xml`; обычный cache и отдельный rate-limiter store используют `array`, поэтому counters браузерной QA или другого test-процесса не протекают между запусками.
+- `RUN_CACHE_INFRASTRUCTURE_TESTS=true` включает реальные Redis/Memcached tests: domain read/write, tags, critical version bump, distributed lock, queue workload, session isolation, connection isolation, readiness, Memcached outage и Redis-cache/version-registry outage. Они используют случайные exact keys/run prefixes и не выполняют full-store flush.
 - Параллельный importer проверяется в `SeasonvarParallelImportTest`: тесты используют array lock store и `Queue::fake()`, поэтому не требуют живого Redis. HTTP-поведение остается закрыто `Http::fake()` и `Http::preventStrayRequests()`.
 - Для тестов, которые пишут в базу, использовать `RefreshDatabase`.
 - Базовый `Tests\TestCase` вызывает `withoutVite()`, поэтому feature-тесты не зависят от собранного Vite manifest.
 - Для данных каталога использовать существующие фабрики: `CatalogTitle`, `Season`, `Episode`, `LicensedMedia`, `Source`, `SourcePage`, `User`.
 - Livewire-каталог проверяется через `Livewire::withQueryParams(...)->test(CatalogSeries::class)`: URL hydration, нормализация, server-side выдача, reset paginator и групповые/полные сбросы должны оставаться покрыты существующими feature-тестами.
 - Production-данные не сидируются; seeders не являются частью обычного тестового сценария.
+- Cache architecture tests фиксируют canonical key hashing/bounds, TTL+jitter, negative lookup, payload limit, version invalidation, stale fallback, bounded lock timeout, warming uniqueness/overlap/after-commit, private shared-cache bypass и public HTTP validators.
+- Blade audit должен отвергать `@php`, `@endphp`, PHP tags, cache/database calls и Volt. Livewire security tests продолжают фиксировать URL state, locked tamper protection, Form Objects, renderless actions, visible-only polling и отсутствие больших public model collections; намеренно неиспользуемые Livewire features не симулируются искусственными компонентами.
 
 ## Паттерны
 
@@ -22,6 +25,7 @@
 - JSON API покрывается feature-тестами через `getJson()` и fluent JSON assertions; тесты ресурсов должны проверять отсутствие приватных source/media/importer полей.
 - Operational notifications тестируются через `Notification::fake()` и direct content tests на `toMail()`; реальные письма в тестах не отправляются.
 - `CatalogSearchPageTest` фиксирует hard-year, short-token, AND-person, exact external ID, duplicate-free totals, unpublished, true-zero и insufficient состояния поиска.
+- `CatalogSearchAcceptanceTest` фиксирует ранжирование полного поискового корпуса: top-1/top-3 для названий, original title, aliases и года, precision@10 для людей, минимум 95% для категорий/жанров/стран и готовый FTS-поиск имён через взаимозаменяемые `е/ё`.
 - `CatalogVisualSystemTest` фиксирует shell, 650 ms search debounce, порядок страниц, один title tab-stop, non-cropping poster и русскую светлую pagination.
 - `CatalogPageTest` фиксирует Livewire URL hydration, malformed и out-of-range page recovery, сохранение search/filter state при сортировке, reverse-pivot facet aggregation, единый запрет public binding неопубликованных тайтлов, отсутствие HTTP-запроса для их poster proxy и поддержку image-ответов без `Content-Length`.
 - `CatalogPageTest` также фиксирует карточку тайтла: один active-season episode set, exact playable counts, guest/authenticated audience boundary, continue/next/replay action, idempotent desired-state список просмотра, configurable user-rating range, multi-user isolation, create/change/remove aggregates без provider-rating примеси и canonical progress. Progress contract покрывает first play, duplicate heartbeat, source-trusted duration, configurable completion, replay без снятия completion, stale/expired/tampered sessions, concurrent user isolation, revoked episode access и missing duration с `ended`.

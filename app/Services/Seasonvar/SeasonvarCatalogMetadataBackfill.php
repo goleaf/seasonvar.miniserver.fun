@@ -5,6 +5,7 @@ namespace App\Services\Seasonvar;
 use App\DTOs\Seasonvar\SeasonvarCatalogData;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
+use App\Models\Season;
 use App\Models\SourcePage;
 use App\Services\Catalog\Search\CatalogSearchIndexer;
 use Illuminate\Support\Str;
@@ -53,8 +54,15 @@ class SeasonvarCatalogMetadataBackfill
             ->where('metadata_attempted_version', '<', SeasonvarCatalogParser::METADATA_VERSION)
             ->whereHas('latestSnapshot')
             ->where(function ($query): void {
-                $query->whereHas('catalogTitle')
-                    ->orWhereHas('linkedSeasons');
+                $query
+                    ->whereIn(
+                        'id',
+                        CatalogTitle::query()->select('source_page_id')->whereNotNull('source_page_id'),
+                    )
+                    ->orWhereIn(
+                        'url_hash',
+                        Season::query()->select('source_url_hash')->whereNotNull('source_url_hash'),
+                    );
             })
             ->with([
                 'latestSnapshot' => fn ($query) => $query->select([

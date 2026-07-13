@@ -15,7 +15,7 @@ return [
     |
     */
 
-    'default' => env('CACHE_STORE', 'database'),
+    'default' => env('CACHE_STORE', 'redis-domain'),
 
     /*
     |--------------------------------------------------------------------------
@@ -28,7 +28,7 @@ return [
     |
     */
 
-    'limiter' => env('CACHE_LIMITER_STORE', 'file'),
+    'limiter' => env('CACHE_LIMITER_STORE', 'redis-limiter'),
 
     /*
     |--------------------------------------------------------------------------
@@ -91,10 +91,74 @@ return [
             ],
         ],
 
+        'memcached-hot' => [
+            'driver' => 'memcached',
+            'persistent_id' => env('MEMCACHED_HOT_PERSISTENT_ID', 'seasonvar-hot'),
+            'sasl' => [
+                env('MEMCACHED_USERNAME'),
+                env('MEMCACHED_PASSWORD'),
+            ],
+            'options' => extension_loaded('memcached') ? array_filter([
+                Memcached::OPT_CONNECT_TIMEOUT => (int) env('MEMCACHED_CONNECT_TIMEOUT_MS', 250),
+                Memcached::OPT_RETRY_TIMEOUT => (int) env('MEMCACHED_RETRY_TIMEOUT_SECONDS', 2),
+                Memcached::OPT_SERVER_FAILURE_LIMIT => (int) env('MEMCACHED_SERVER_FAILURE_LIMIT', 2),
+                Memcached::OPT_REMOVE_FAILED_SERVERS => env('MEMCACHED_REMOVE_FAILED_SERVERS', true),
+                Memcached::OPT_BINARY_PROTOCOL => env('MEMCACHED_BINARY_PROTOCOL', true),
+                Memcached::OPT_LIBKETAMA_COMPATIBLE => env('MEMCACHED_CONSISTENT_DISTRIBUTION', true),
+            ], fn (mixed $value): bool => $value !== null) : [],
+            'servers' => array_values(array_filter([
+                [
+                    'host' => env('MEMCACHED_HOST', '127.0.0.1'),
+                    'port' => (int) env('MEMCACHED_PORT', 11211),
+                    'weight' => (int) env('MEMCACHED_WEIGHT', 100),
+                ],
+                [
+                    'host' => env('MEMCACHED_HOST_2'),
+                    'port' => (int) env('MEMCACHED_PORT_2', 11211),
+                    'weight' => (int) env('MEMCACHED_WEIGHT_2', 100),
+                ],
+                [
+                    'host' => env('MEMCACHED_HOST_3'),
+                    'port' => (int) env('MEMCACHED_PORT_3', 11211),
+                    'weight' => (int) env('MEMCACHED_WEIGHT_3', 100),
+                ],
+            ], fn (array $server): bool => is_string($server['host']) && $server['host'] !== '')),
+            'prefix' => env('MEMCACHED_HOT_PREFIX', Str::slug((string) env('APP_NAME', 'seasonvar')).'-'.env('APP_ENV', 'production').'-hot-'),
+        ],
+
         'redis' => [
             'driver' => 'redis',
             'connection' => env('REDIS_CACHE_CONNECTION', 'cache'),
             'lock_connection' => env('REDIS_CACHE_LOCK_CONNECTION', 'default'),
+        ],
+
+        'redis-domain' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_CACHE_CONNECTION', 'cache'),
+            'lock_connection' => env('REDIS_CACHE_LOCK_CONNECTION', 'locks'),
+            'prefix' => env('REDIS_DOMAIN_CACHE_PREFIX', ''),
+        ],
+
+        'redis-locks' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_LOCK_CONNECTION', 'locks'),
+            'lock_connection' => env('REDIS_LOCK_CONNECTION', 'locks'),
+            'prefix' => env('REDIS_LOCK_CACHE_PREFIX', ''),
+        ],
+
+        'redis-limiter' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_LIMITER_CONNECTION', 'limiter'),
+            'lock_connection' => env('REDIS_LOCK_CONNECTION', 'locks'),
+            'prefix' => env('REDIS_LIMITER_CACHE_PREFIX', ''),
+        ],
+
+        'recomputable-failover' => [
+            'driver' => 'failover',
+            'stores' => [
+                'redis-domain',
+                'file',
+            ],
         ],
 
         'dynamodb' => [

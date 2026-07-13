@@ -3,29 +3,51 @@
 use App\Enums\CatalogFilterType;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogSitemapController;
+use App\Http\Controllers\InfrastructureHealthController;
 use App\Http\Controllers\PlaybackSourceController;
 use App\Livewire\CatalogAdministrationManager;
 use App\Livewire\CatalogSeries;
 use App\Livewire\SeasonvarImportManager;
 use App\Livewire\ViewingActivity;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\Request;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 Route::get('/', [CatalogController::class, 'index'])->name('home');
-Route::get('/sitemap.xml', [CatalogSitemapController::class, 'sitemap'])->name('sitemap');
-Route::get('/sitemap-index.xml', [CatalogSitemapController::class, 'sitemapIndex'])->name('sitemap.index');
-Route::get('/sitemap-static.xml', [CatalogSitemapController::class, 'sitemapStatic'])->name('sitemap.static');
-Route::get('/sitemap-taxonomies.xml', [CatalogSitemapController::class, 'sitemapTaxonomies'])->name('sitemap.taxonomies');
-Route::get('/sitemap-landings.xml', [CatalogSitemapController::class, 'sitemapLandings'])->name('sitemap.landings');
-Route::get('/sitemap-titles-{page}.xml', [CatalogSitemapController::class, 'sitemapTitles'])
-    ->whereNumber('page')
-    ->name('sitemap.titles');
-Route::get('/sitemap-videos-{page}.xml', [CatalogSitemapController::class, 'sitemapVideos'])
-    ->whereNumber('page')
-    ->name('sitemap.videos');
-Route::get('/feed.xml', [CatalogSitemapController::class, 'feed'])->name('feed');
-Route::get('/opensearch.xml', [CatalogSitemapController::class, 'openSearch'])->name('opensearch');
-Route::get('/llms.txt', [CatalogSitemapController::class, 'llms'])->name('llms');
+$publicDocumentMiddleware = [
+    EncryptCookies::class,
+    AddQueuedCookiesToResponse::class,
+    StartSession::class,
+    ShareErrorsFromSession::class,
+    PreventRequestForgery::class,
+];
+
+Route::middleware('public.cache:documents')
+    ->withoutMiddleware($publicDocumentMiddleware)
+    ->group(function (): void {
+        Route::get('/sitemap.xml', [CatalogSitemapController::class, 'sitemap'])->name('sitemap');
+        Route::get('/sitemap-index.xml', [CatalogSitemapController::class, 'sitemapIndex'])->name('sitemap.index');
+        Route::get('/sitemap-static.xml', [CatalogSitemapController::class, 'sitemapStatic'])->name('sitemap.static');
+        Route::get('/sitemap-taxonomies.xml', [CatalogSitemapController::class, 'sitemapTaxonomies'])->name('sitemap.taxonomies');
+        Route::get('/sitemap-landings.xml', [CatalogSitemapController::class, 'sitemapLandings'])->name('sitemap.landings');
+        Route::get('/sitemap-titles-{page}.xml', [CatalogSitemapController::class, 'sitemapTitles'])
+            ->whereNumber('page')
+            ->name('sitemap.titles');
+        Route::get('/sitemap-videos-{page}.xml', [CatalogSitemapController::class, 'sitemapVideos'])
+            ->whereNumber('page')
+            ->name('sitemap.videos');
+        Route::get('/feed.xml', [CatalogSitemapController::class, 'feed'])->name('feed');
+        Route::get('/opensearch.xml', [CatalogSitemapController::class, 'openSearch'])->name('opensearch');
+        Route::get('/llms.txt', [CatalogSitemapController::class, 'llms'])->name('llms');
+    });
+Route::get('/health/ready', InfrastructureHealthController::class)
+    ->withoutMiddleware($publicDocumentMiddleware)
+    ->middleware('throttle:infrastructure-health')
+    ->name('health.ready');
 Route::get('/stats', [CatalogController::class, 'stats'])
     ->middleware('throttle:catalog-stats')
     ->name('stats');

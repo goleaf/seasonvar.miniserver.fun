@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AddSecurityHeaders;
+use App\Http\Middleware\PublicHttpCacheHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -14,6 +15,17 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->trustHosts(
+            at: fn (): array => array_filter([
+                is_string($host = parse_url((string) config('app.url'), PHP_URL_HOST)) && $host !== ''
+                    ? '^'.preg_quote($host, '/').'$'
+                    : null,
+            ]),
+            subdomains: false,
+        );
+        $middleware->alias([
+            'public.cache' => PublicHttpCacheHeaders::class,
+        ]);
         $middleware->web(append: [
             AddSecurityHeaders::class,
         ]);

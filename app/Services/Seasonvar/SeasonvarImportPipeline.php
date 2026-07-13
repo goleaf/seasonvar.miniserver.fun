@@ -1040,8 +1040,14 @@ class SeasonvarImportPipeline
      * @param  callable(string, array<string, mixed>): void  $progress
      * @param  Collection<int, array<string, mixed>>  $parsedUrls
      */
-    private function parseUrl(SeasonvarImportRun $run, string $url, bool $force, callable $progress, Collection $parsedUrls): ?CatalogTitle
-    {
+    private function parseUrl(
+        SeasonvarImportRun $run,
+        string $url,
+        bool $force,
+        callable $progress,
+        Collection $parsedUrls,
+        ?CatalogTitle $preferredCatalogTitle = null,
+    ): ?CatalogTitle {
         $pages = $this->importer->pagesForArgument($url, $progress);
         $page = $pages->first();
 
@@ -1053,7 +1059,7 @@ class SeasonvarImportPipeline
             return $this->catalogTitleForPage($page);
         }
 
-        $result = $this->importer->parsePage($page, $progress, $force, $run->id);
+        $result = $this->importer->parsePage($page, $progress, $force, $run->id, $preferredCatalogTitle);
         $page->refresh();
 
         $parsedUrls->push([
@@ -1091,7 +1097,7 @@ class SeasonvarImportPipeline
 
         foreach ($seasonUrls as $seasonUrl) {
             try {
-                $this->parseUrl($run, (string) $seasonUrl, $force, $progress, $parsedUrls);
+                $this->parseUrl($run, (string) $seasonUrl, $force, $progress, $parsedUrls, $catalogTitle);
             } catch (Throwable $exception) {
                 $parsedUrls->push([
                     'url' => (string) $seasonUrl,
@@ -1150,7 +1156,7 @@ class SeasonvarImportPipeline
         $path = $parts['path'] ?? '';
 
         return in_array($host, ['seasonvar.ru', 'www.seasonvar.ru'], true)
-            && preg_match('~^/serial-\d+-[^/]+-0*\d{1,4}-+(?:season|sezon)\.html$~iu', $path) === 1;
+            && preg_match('~^/serial-\d+-[^/]+(?:-0*\d{1,4}-+(?:season|sezon))?\.html$~iu', $path) === 1;
     }
 
     private function catalogTitleForPage(SourcePage $page): ?CatalogTitle

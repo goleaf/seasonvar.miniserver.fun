@@ -25,7 +25,7 @@ return [
     'queue' => [
         'connection' => env('SEASONVAR_QUEUE_CONNECTION', 'redis'),
         'queue' => env('SEASONVAR_QUEUE_NAME', 'seasonvar-import'),
-        'lock_store' => env('SEASONVAR_QUEUE_LOCK_STORE', 'redis'),
+        'lock_store' => env('SEASONVAR_QUEUE_LOCK_STORE', 'redis-locks'),
         'claim_seconds' => (int) env('SEASONVAR_QUEUE_CLAIM_SECONDS', 86400),
         'worker_timeout' => (int) env('SEASONVAR_QUEUE_WORKER_TIMEOUT', 900),
         'retry_window_seconds' => (int) env('SEASONVAR_QUEUE_RETRY_WINDOW_SECONDS', 21600),

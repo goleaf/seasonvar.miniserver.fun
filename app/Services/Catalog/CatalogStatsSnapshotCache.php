@@ -2,25 +2,21 @@
 
 namespace App\Services\Catalog;
 
-use Illuminate\Support\Facades\Cache;
+use App\Support\Cache\CacheDomain;
+use App\Support\Cache\CacheTtlPolicy;
+use App\Support\Cache\CacheVersionRegistry;
+use App\Support\Cache\TieredCache;
 use Throwable;
 
 class CatalogStatsSnapshotCache
 {
-    private const FRESH_KEY = 'catalog.stats.snapshot.fresh';
-
-    private const STALE_KEY = 'catalog.stats.snapshot.last_successful';
-
-    private const LOCK_KEY = 'catalog.stats.snapshot.rebuild';
-
-    private const FRESH_SECONDS = 15;
-
-    private const FRESH_MESSAGE = 'Данные обновляются примерно раз в 15 секунд.';
-
-    private const STALE_SECONDS = 900;
+    private const FRESH_MESSAGE = 'Снимок обновляется после изменений каталога и в плановом прогреве.';
 
     public function __construct(
         private readonly CatalogStatsSnapshotBuilder $builder,
+        private readonly TieredCache $cache,
+        private readonly CacheTtlPolicy $ttl,
+        private readonly CacheVersionRegistry $versions,
     ) {}
 
     /**
@@ -28,23 +24,7 @@ class CatalogStatsSnapshotCache
      */
     public function snapshot(): array
     {
-        $cached = Cache::get(self::FRESH_KEY);
-
-        if (is_array($cached)) {
-            return $this->withServedAt($cached);
-        }
-
-        $lock = Cache::lock(self::LOCK_KEY, 5);
-
-        if ($lock->get()) {
-            try {
-                return $this->refresh();
-            } finally {
-                $lock->release();
-            }
-        }
-
-        return $this->staleSnapshot('Снимок обновляется, показаны последние сохраненные данные.');
+        return $this->read(refresh: false);
     }
 
     /**
@@ -52,23 +32,48 @@ class CatalogStatsSnapshotCache
      */
     public function refresh(): array
     {
-        try {
-            $snapshot = $this->buildSnapshot($this->builder->build());
+        return $this->read(refresh: true);
+    }
 
-            Cache::put(self::FRESH_KEY, $snapshot, now()->addSeconds(self::FRESH_SECONDS));
-            Cache::put(self::STALE_KEY, $snapshot, now()->addSeconds(self::STALE_SECONDS));
+    /**
+     * @return array{data: array<string, mixed>, meta: array<string, mixed>}
+     */
+    private function read(bool $refresh): array
+    {
+        try {
+            $arguments = [
+                CacheDomain::CatalogStats,
+                'dashboard',
+                ['audience' => 'public', 'locale' => app()->getLocale()],
+                $this->ttl->for(CacheDomain::CatalogStats),
+                fn (): array => $this->buildSnapshot($this->builder->build()),
+            ];
+            $result = $refresh
+                ? $this->cache->refresh(...$arguments)
+                : $this->cache->remember(...$arguments);
+            $snapshot = is_array($result->value) ? $result->value : $this->buildSnapshot($this->fallbackData());
+            $snapshot['meta']['cache_source'] = $result->source;
+            $snapshot['meta']['is_stale'] = $result->stale;
+            $snapshot['meta']['message'] = $result->stale
+                ? 'Не удалось собрать свежую статистику, показаны последние сохраненные данные.'
+                : self::FRESH_MESSAGE;
 
             return $this->withServedAt($snapshot);
         } catch (Throwable $exception) {
             report($exception);
 
-            return $this->staleSnapshot('Не удалось собрать свежую статистику, показаны последние сохраненные данные.');
+            $snapshot = $this->buildSnapshot($this->fallbackData());
+            $snapshot['meta']['cache_source'] = 'fallback';
+            $snapshot['meta']['is_stale'] = true;
+            $snapshot['meta']['message'] = 'Статистика временно недоступна, показан безопасный пустой снимок.';
+
+            return $this->withServedAt($snapshot);
         }
     }
 
     public function forget(): void
     {
-        Cache::forget(self::FRESH_KEY);
+        $this->versions->bump(CacheDomain::CatalogStats);
     }
 
     /**
@@ -89,23 +94,6 @@ class CatalogStatsSnapshotCache
                 'message' => self::FRESH_MESSAGE,
             ],
         ];
-    }
-
-    /**
-     * @return array{data: array<string, mixed>, meta: array<string, mixed>}
-     */
-    private function staleSnapshot(string $message): array
-    {
-        $snapshot = Cache::get(self::STALE_KEY);
-
-        if (! is_array($snapshot)) {
-            $snapshot = $this->buildSnapshot($this->fallbackData());
-        }
-
-        $snapshot['meta']['is_stale'] = true;
-        $snapshot['meta']['message'] = $message;
-
-        return $this->withServedAt($snapshot);
     }
 
     /**

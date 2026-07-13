@@ -6,10 +6,11 @@
 
 Требования для разработки:
 
-- PHP 8.5 с `pdo_sqlite`, `sqlite3`, `mbstring`, `dom` и `fileinfo`.
+- PHP 8.5 с `pdo_sqlite`, `sqlite3`, `mbstring`, `dom`, `fileinfo`, `redis` и `memcached`.
 - Composer 2.
 - Node 26 и npm 11.
 - SQLite для локальной базы и тестов.
+- Redis и Memcached для production-like integration tests, health и cache benchmarks; обычный PHPUnit остаётся воспроизводимым с array store.
 
 Базовая ручная установка:
 
@@ -65,6 +66,9 @@ bash -n .githooks/pre-commit .githooks/pre-push .githooks/post-commit .githooks/
 - `php artisan seasonvar:import --forever --sleep=60` — непрерывный локальный цикл импорта.
 - `php artisan seasonvar:import "https://seasonvar.ru/..." --force` — принудительное обновление одной страницы.
 - `php artisan integrations:doctor` — read-only диагностика MCP, Google, CLI tools и проектных skills без вывода секретов.
+- `php artisan app:health` — readiness по DB, Redis workloads, Memcached, workers и прогреву.
+- `php artisan cache:warm-catalog` — синхронный bounded warm; `--queue` ставит unique job в `cache-warm`, а `--refresh` планово пересобирает текущие warmable keys под lock, не удаляя читаемый snapshot до успеха.
+- `php artisan cache:metrics` — low-cardinality hit/miss/rebuild/failure snapshot без raw keys.
 - `php artisan google:search-console:summary` — read-only сводка Search Console, если Google credentials настроены вне Git.
 - `php artisan google:analytics:summary` — read-only сводка GA4, если Google credentials настроены вне Git.
 - `php artisan project:docs-refresh` — обновляет управляемые блоки документации.

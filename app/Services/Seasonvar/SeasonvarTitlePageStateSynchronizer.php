@@ -61,7 +61,11 @@ final class SeasonvarTitlePageStateSynchronizer
             ->where('id', '!=', $currentPage->id)
             ->where('parse_status', 'parsed')
             ->whereIn('import_status', ['parsed', 'missing_data'])
-            ->whereNull('import_claim_token')
+            ->where(function (Builder $query): void {
+                $query->whereNull('import_claim_token')
+                    ->orWhereNull('import_claim_expires_at')
+                    ->orWhere('import_claim_expires_at', '<=', now());
+            })
             ->update([
                 'import_status' => $flags === [] ? 'parsed' : 'missing_data',
                 'missing_data_flags' => json_encode($flags, JSON_THROW_ON_ERROR),

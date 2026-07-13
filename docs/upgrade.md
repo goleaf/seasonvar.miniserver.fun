@@ -1,6 +1,6 @@
 # Обновление Laravel 13
 
-Обновлено: 09.07.2026
+Обновлено: 13.07.2026
 
 ## Состояние Laravel 13
 
@@ -8,13 +8,16 @@
 
 Проверенные локальные версии:
 
-- PHP 8.5.7
+- PHP 8.5.8
 - Laravel Framework 13.19.0
+- Livewire 4.3.3
 - Laravel Boost 2.4.12
 - Laravel MCP 0.8.2
 - Laravel Pint 1.29.3
 - PHPUnit 12.5.31
 - Tailwind CSS 4.3.2
+
+13.07.2026 повторно проверены официальные Laravel 13 cache/session/queue/deployment и Livewire 4 Forms/Locked/URL/Computed/Lazy/Defer/Isolate/Islands/Async/Renderless/navigation материалы. `composer outdated --direct` не показал совместимых patch/minor обновлений Laravel или Livewire; доступный PHPUnit 13 является unrelated major и намеренно не устанавливался. Composer/frontend lockfiles поэтому не менялись.
 
 ## Требования зависимостей
 

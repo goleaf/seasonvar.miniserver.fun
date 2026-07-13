@@ -4,7 +4,9 @@
 
 ## Правило без inline PHP
 
-- В файлах `resources/views/**/*.blade.php` нельзя использовать `@php` и `@endphp`.
+- В файлах `resources/views/**/*.blade.php` нельзя использовать `@php`, `@endphp`, `<?php` и `<?=`.
+- Blade не вызывает Eloquent/database, Cache/Redis/Memcached, service container, `env()`, filesystem и не готовит переменные closure/collection transformations. Это относится и к Livewire Blade views.
+- Volt и anonymous Livewire PHP внутри Blade запрещены; component class и view всегда находятся в отдельных файлах.
 - Blade-шаблоны должны оставаться декларативными: обычные директивы `@if`, `@foreach`, `@class`, `@isset`, компоненты и безопасный вывод `{{ }}`.
 - Request-specific данные готовятся в контроллере или action-классе.
 - Данные представления, SEO-переменные, подписи, query-string для ссылок, MIME-типы и активные состояния готовятся в `app/View/ViewData`, `app/View/ViewModels` или классах Blade-компонентов.

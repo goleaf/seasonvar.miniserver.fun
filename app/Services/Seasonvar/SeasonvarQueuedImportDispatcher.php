@@ -6,7 +6,7 @@ use App\Enums\SeasonvarImportStatus;
 use App\Jobs\FinalizeSeasonvarQueuedImport;
 use App\Jobs\ImportSeasonvarSourcePage;
 use App\Models\SeasonvarImportRun;
-use App\Services\Catalog\CatalogStatsSnapshotCache;
+use App\Services\Catalog\CatalogCacheInvalidator;
 use Throwable;
 
 class SeasonvarQueuedImportDispatcher
@@ -19,7 +19,7 @@ class SeasonvarQueuedImportDispatcher
         private readonly SeasonvarImportRunRecorder $runs,
         private readonly SeasonvarImportGroupKey $groupKeys,
         private readonly SeasonvarImportErrorSanitizer $errors,
-        private readonly CatalogStatsSnapshotCache $statsSnapshots,
+        private readonly CatalogCacheInvalidator $cacheInvalidator,
     ) {}
 
     public function dispatch(bool $force = false, bool $discover = true): SeasonvarImportRun
@@ -124,7 +124,7 @@ class SeasonvarQueuedImportDispatcher
                 'finished_at' => now(),
                 'last_heartbeat_at' => now(),
             ])->save();
-            $this->statsSnapshots->forget();
+            $this->cacheInvalidator->catalogChanged();
 
             return $run->refresh();
         }

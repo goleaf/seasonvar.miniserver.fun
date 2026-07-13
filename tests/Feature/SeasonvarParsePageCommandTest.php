@@ -178,6 +178,142 @@ class SeasonvarParsePageCommandTest extends TestCase
         ]);
     }
 
+    public function test_it_keeps_distinct_season_provider_ids_inside_one_catalog_title(): void
+    {
+        Http::preventStrayRequests();
+
+        $seasonOneUrl = 'https://seasonvar.ru/serial-7780-Mamochka_psxtsdh.html';
+        $seasonTwoUrl = 'https://seasonvar.ru/serial-10781-Mamochka_pszlnxu-2-season.html';
+        $seasonSixUrl = 'https://seasonvar.ru/serial-20002-Mamochka_psgyjds-6-season.html';
+        $seasonUrls = [
+            1 => $seasonOneUrl,
+            2 => $seasonTwoUrl,
+            6 => $seasonSixUrl,
+        ];
+
+        Http::fake([
+            $seasonSixUrl => Http::response($this->seasonvarFamilyPageHtml(6, $seasonUrls, [
+                1 => 'Шестой сезон',
+            ])),
+            $seasonOneUrl => Http::response($this->seasonvarFamilyPageHtml(1, $seasonUrls, [
+                1 => 'Первый сезон',
+            ])),
+            $seasonTwoUrl => Http::response($this->seasonvarFamilyPageHtml(2, $seasonUrls, [
+                1 => 'Второй сезон',
+            ])),
+        ]);
+
+        $this->artisan('seasonvar:import', [
+            'url' => $seasonSixUrl,
+        ])->assertExitCode(0);
+
+        $this->assertSame(1, CatalogTitle::query()->where('title', 'Мамочка/Mom')->count());
+
+        $catalogTitle = CatalogTitle::query()->where('title', 'Мамочка/Mom')->firstOrFail();
+        $catalogTitle->load('seasons.episodes');
+
+        $this->assertSame([1, 2, 6], $catalogTitle->seasons->sortBy('number')->pluck('number')->values()->all());
+        $this->assertSame(
+            [1 => 1, 2 => 1, 6 => 1],
+            $catalogTitle->seasons
+                ->sortBy('number')
+                ->mapWithKeys(fn (Season $season): array => [$season->number => $season->episodes->count()])
+                ->all(),
+        );
+    }
+
+    public function test_it_prefers_the_single_most_complete_existing_title_when_duplicate_season_urls_exist(): void
+    {
+        Http::preventStrayRequests();
+
+        $seasonOneUrl = 'https://seasonvar.ru/serial-7780-Mamochka_psxtsdh.html';
+        $seasonSixUrl = 'https://seasonvar.ru/serial-20002-Mamochka_psgyjds-6-season.html';
+        $seasonSevenUrl = 'https://seasonvar.ru/serial-23554-Mamochka_pshevik-7-season.html';
+        $seasonUrls = [
+            1 => $seasonOneUrl,
+            6 => $seasonSixUrl,
+            7 => $seasonSevenUrl,
+        ];
+
+        $source = Source::factory()->create(['code' => 'seasonvar']);
+
+        $pages = collect($seasonUrls)
+            ->mapWithKeys(fn (string $url, int $number): array => [
+                $number => SourcePage::factory()->create([
+                    'source_id' => $source->id,
+                    'url' => $url,
+                    'url_hash' => hash('sha256', $url),
+                ]),
+            ]);
+
+        $completeTitle = CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $pages[6]->id,
+            'external_id' => '20002',
+            'slug' => 'mamockamom-complete',
+            'title' => 'Мамочка/Mom',
+            'source_url' => $seasonSixUrl,
+            'source_url_hash' => hash('sha256', $seasonSixUrl),
+        ]);
+        $duplicateTitle = CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $pages[7]->id,
+            'external_id' => '23554',
+            'slug' => 'mamockamom-duplicate',
+            'title' => 'Мамочка/Mom',
+            'source_url' => $seasonSevenUrl,
+            'source_url_hash' => hash('sha256', $seasonSevenUrl),
+        ]);
+
+        foreach ($seasonUrls as $number => $url) {
+            Season::factory()->create([
+                'catalog_title_id' => $completeTitle->id,
+                'source_page_id' => $pages[$number]->id,
+                'number' => $number,
+                'source_url' => $url,
+                'source_url_hash' => hash('sha256', $url),
+            ]);
+        }
+
+        Season::factory()->create([
+            'catalog_title_id' => $duplicateTitle->id,
+            'source_page_id' => $pages[7]->id,
+            'number' => 7,
+            'source_url' => $seasonSevenUrl,
+            'source_url_hash' => hash('sha256', $seasonSevenUrl),
+        ]);
+
+        Http::fake([
+            $seasonSevenUrl => Http::response($this->seasonvarFamilyPageHtml(7, $seasonUrls, [
+                1 => 'Седьмой сезон',
+            ])),
+            $seasonOneUrl => Http::response($this->seasonvarFamilyPageHtml(1, $seasonUrls, [
+                1 => 'Первый сезон',
+            ])),
+            $seasonSixUrl => Http::response($this->seasonvarFamilyPageHtml(6, $seasonUrls, [
+                1 => 'Шестой сезон',
+            ])),
+        ]);
+
+        $this->artisan('seasonvar:import', [
+            'url' => $seasonSevenUrl,
+            '--force' => true,
+        ])->assertExitCode(0);
+
+        $completeTitle->refresh()->load('seasons.episodes');
+        $duplicateTitle->refresh()->load('seasons.episodes');
+
+        $this->assertSame(3, $completeTitle->seasons->count());
+        $this->assertSame(
+            [1 => 1, 6 => 1, 7 => 1],
+            $completeTitle->seasons
+                ->sortBy('number')
+                ->mapWithKeys(fn (Season $season): array => [$season->number => $season->episodes->count()])
+                ->all(),
+        );
+        $this->assertSame(0, $duplicateTitle->seasons->sum(fn (Season $season): int => $season->episodes->count()));
+    }
+
     public function test_it_imports_m3u_playlist_discovered_in_page_html(): void
     {
         Http::preventStrayRequests();
@@ -895,6 +1031,47 @@ class SeasonvarParsePageCommandTest extends TestCase
                     <script>
                         var arEpisodes = [{"1_seriya":{"n":"1","title":"Пилот"}}];
                         var parsedMedia = ["https://media.example.com/without-a-trace/s01e01.mp4"];
+                    </script>
+                </body>
+            </html>
+            HTML;
+    }
+
+    /**
+     * @param  array<int, string>  $seasonUrls
+     * @param  array<int, string>  $episodes
+     */
+    private function seasonvarFamilyPageHtml(int $seasonNumber, array $seasonUrls, array $episodes): string
+    {
+        $seasonLinks = collect($seasonUrls)
+            ->map(fn (string $url, int $number): string => '<h2><a href="'.parse_url($url, PHP_URL_PATH).'">Сериал Мамочка/Mom '.$number.' сезон </a></h2>')
+            ->implode("\n");
+        $episodeItems = collect($episodes)
+            ->mapWithKeys(fn (string $title, int $number): array => [
+                "{$number}_seriya" => ['n' => (string) $number, 'title' => $title],
+            ])
+            ->all();
+        $episodesJson = json_encode(['0' => $episodeItems], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+
+        return <<<HTML
+            <html>
+                <head>
+                    <title>Сериал Мамочка {$seasonNumber} сезон Mom смотреть онлайн бесплатно!</title>
+                    <meta name="description" content="Описание сезона {$seasonNumber}">
+                </head>
+                <body>
+                    <h1 class="pgs-sinfo-title">Сериал Мамочка/Mom {$seasonNumber} сезон онлайн</h1>
+                    <div class="pgs-sinfo_list">
+                        Жанр: Комедия
+                        Страна: США
+                        Вышел: 2017
+                    </div>
+                    <div class="pgs-seaslist">
+                        {$seasonLinks}
+                    </div>
+                    <script>
+                        var pl = {'0': "/playls2/hash/trans/20002/plist.txt?time=1783917461"};
+                        var arEpisodes = {$episodesJson};
                     </script>
                 </body>
             </html>

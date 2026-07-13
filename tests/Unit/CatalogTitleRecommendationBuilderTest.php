@@ -18,6 +18,23 @@ class CatalogTitleRecommendationBuilderTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_rebuild_caps_profile_hydration_chunk_size_to_the_measured_memory_budget(): void
+    {
+        config(['seasonvar.recommendations.chunk_size' => 500]);
+        $started = null;
+
+        app(CatalogTitleRecommendationBuilder::class)->rebuild(
+            function (string $event, array $context) use (&$started): void {
+                if ($event === 'catalog-title-recommendations-started') {
+                    $started = $context;
+                }
+            },
+        );
+
+        $this->assertIsArray($started);
+        $this->assertSame(100, $started['chunk_size']);
+    }
+
     public function test_rebuild_scores_shared_metadata_and_filters_weak_candidates(): void
     {
         config([

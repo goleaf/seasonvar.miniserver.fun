@@ -59,8 +59,8 @@ class CatalogSeries extends Component
         $this->routeTaxonomy = $taxonomy;
         $this->validateAndNormalizeState(Arr::except(request()->query->all(), ['page']));
 
-        if ($this->initialPageNeedsCanonicalization()) {
-            $this->redirect($this->catalogUrl(), navigate: true);
+        if ($this->initialPageNeedsCanonicalization() || $this->initialQueryUsesUnsupportedArraySyntax()) {
+            $this->redirect($this->catalogUrl($this->initialPage()), navigate: true);
         }
     }
 
@@ -324,6 +324,31 @@ class CatalogSeries extends Component
         return ! is_scalar($page)
             || filter_var($page, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) === false
             || (int) $page === 1;
+    }
+
+    private function initialQueryUsesUnsupportedArraySyntax(): bool
+    {
+        $queryString = (string) request()->server('QUERY_STRING', '');
+
+        foreach (explode('&', $queryString) as $part) {
+            $key = rawurldecode(explode('=', $part, 2)[0]);
+
+            if (str_ends_with($key, '[]') || str_ends_with($key, '.')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function initialPage(): int
+    {
+        $page = request()->query('page');
+
+        return is_scalar($page)
+            && filter_var($page, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) !== false
+                ? (int) $page
+                : 1;
     }
 
     private function catalogUrl(int $page = 1): string

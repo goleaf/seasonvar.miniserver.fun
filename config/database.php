@@ -3,6 +3,33 @@
 use Illuminate\Support\Str;
 use Pdo\Mysql;
 
+$redisConnection = static function (string $workload, string $environmentPrefix, string $databaseVariable, int $database): array {
+    $prefix = Str::slug((string) env('APP_NAME', 'seasonvar'))
+        .'-'.Str::slug((string) env('APP_ENV', 'production'))
+        .'-'.Str::slug($workload).'-';
+
+    return [
+        'url' => env("REDIS_{$environmentPrefix}_URL", env('REDIS_URL')),
+        'host' => env("REDIS_{$environmentPrefix}_HOST", env('REDIS_HOST', '127.0.0.1')),
+        'username' => env("REDIS_{$environmentPrefix}_USERNAME", env('REDIS_USERNAME')),
+        'password' => env("REDIS_{$environmentPrefix}_PASSWORD", env('REDIS_PASSWORD')),
+        'port' => env("REDIS_{$environmentPrefix}_PORT", env('REDIS_PORT', '6379')),
+        'database' => env($databaseVariable, (string) $database),
+        'prefix' => env("REDIS_{$environmentPrefix}_PREFIX", $prefix),
+        'name' => env("REDIS_{$environmentPrefix}_CLIENT_NAME", Str::slug((string) env('APP_NAME', 'seasonvar')).'-'.$workload),
+        'timeout' => (float) env("REDIS_{$environmentPrefix}_TIMEOUT", env('REDIS_TIMEOUT', 2.0)),
+        'read_timeout' => (float) env("REDIS_{$environmentPrefix}_READ_TIMEOUT", env('REDIS_READ_TIMEOUT', 2.0)),
+        'retry_interval' => (int) env("REDIS_{$environmentPrefix}_RETRY_INTERVAL", env('REDIS_RETRY_INTERVAL', 100)),
+        'max_retries' => (int) env("REDIS_{$environmentPrefix}_MAX_RETRIES", env('REDIS_MAX_RETRIES', 3)),
+        'backoff_algorithm' => env("REDIS_{$environmentPrefix}_BACKOFF_ALGORITHM", env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter')),
+        'backoff_base' => (int) env("REDIS_{$environmentPrefix}_BACKOFF_BASE", env('REDIS_BACKOFF_BASE', 100)),
+        'backoff_cap' => (int) env("REDIS_{$environmentPrefix}_BACKOFF_CAP", env('REDIS_BACKOFF_CAP', 1000)),
+        'persistent' => env("REDIS_{$environmentPrefix}_PERSISTENT", env('REDIS_PERSISTENT', false)),
+        'persistent_id' => env("REDIS_{$environmentPrefix}_PERSISTENT_ID", Str::slug((string) env('APP_NAME', 'seasonvar')).'-'.$workload),
+        'tcp_keepalive' => (int) env("REDIS_{$environmentPrefix}_TCP_KEEPALIVE", env('REDIS_TCP_KEEPALIVE', 60)),
+    ];
+};
+
 return [
 
     /*
@@ -153,31 +180,13 @@ return [
             'persistent' => env('REDIS_PERSISTENT', false),
         ],
 
-        'default' => [
-            'url' => env('REDIS_URL'),
-            'host' => env('REDIS_HOST', '127.0.0.1'),
-            'username' => env('REDIS_USERNAME'),
-            'password' => env('REDIS_PASSWORD'),
-            'port' => env('REDIS_PORT', '6379'),
-            'database' => env('REDIS_DB', '0'),
-            'max_retries' => env('REDIS_MAX_RETRIES', 3),
-            'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
-            'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
-            'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
-        ],
-
-        'cache' => [
-            'url' => env('REDIS_URL'),
-            'host' => env('REDIS_HOST', '127.0.0.1'),
-            'username' => env('REDIS_USERNAME'),
-            'password' => env('REDIS_PASSWORD'),
-            'port' => env('REDIS_PORT', '6379'),
-            'database' => env('REDIS_CACHE_DB', '1'),
-            'max_retries' => env('REDIS_MAX_RETRIES', 3),
-            'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'decorrelated_jitter'),
-            'backoff_base' => env('REDIS_BACKOFF_BASE', 100),
-            'backoff_cap' => env('REDIS_BACKOFF_CAP', 1000),
-        ],
+        'default' => $redisConnection('default', 'DEFAULT', 'REDIS_DB', 0),
+        'cache' => $redisConnection('cache', 'CACHE', 'REDIS_CACHE_DB', 1),
+        'queues' => $redisConnection('queues', 'QUEUE', 'REDIS_QUEUE_DB', 2),
+        'sessions' => $redisConnection('sessions', 'SESSION', 'REDIS_SESSION_DB', 3),
+        'limiter' => $redisConnection('limiter', 'LIMITER', 'REDIS_LIMITER_DB', 4),
+        'locks' => $redisConnection('locks', 'LOCK', 'REDIS_LOCK_DB', 5),
+        'broadcasting' => $redisConnection('broadcasting', 'BROADCAST', 'REDIS_BROADCAST_DB', 6),
 
     ],
 

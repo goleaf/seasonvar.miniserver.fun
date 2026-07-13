@@ -4,7 +4,6 @@ namespace Tests\Unit;
 
 use App\Services\Google\GoogleIntegrationException;
 use App\Services\Google\GoogleServiceAccountAccessToken;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -14,7 +13,6 @@ class GoogleServiceAccountAccessTokenTest extends TestCase
     public function test_it_exchanges_service_account_credentials_for_an_access_token(): void
     {
         Http::preventStrayRequests();
-        Cache::flush();
 
         config([
             'services.google.application_credentials' => $this->credentialFile(),
@@ -32,6 +30,13 @@ class GoogleServiceAccountAccessTokenTest extends TestCase
             ->forScopes(['https://www.googleapis.com/auth/webmasters.readonly']);
 
         $this->assertSame('test-google-token', $token);
+
+        $this->assertSame(
+            'test-google-token',
+            app(GoogleServiceAccountAccessToken::class)
+                ->forScopes(['https://www.googleapis.com/auth/webmasters.readonly']),
+        );
+        Http::assertSentCount(2);
 
         Http::assertSent(fn ($request): bool => $request->url() === 'https://oauth2.googleapis.com/token'
             && $request['grant_type'] === 'urn:ietf:params:oauth:grant-type:jwt-bearer'
@@ -55,7 +60,6 @@ class GoogleServiceAccountAccessTokenTest extends TestCase
     public function test_it_rejects_a_non_google_token_endpoint_before_sending_the_signed_assertion(): void
     {
         Http::preventStrayRequests();
-        Cache::flush();
 
         config([
             'services.google.application_credentials' => $this->credentialFile('https://attacker.example/token'),

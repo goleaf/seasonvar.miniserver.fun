@@ -19,9 +19,16 @@ class RunSeasonvarImportJobTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['seasonvar.queue.lock_store' => 'array']);
+    }
+
     protected function tearDown(): void
     {
-        Cache::lock('seasonvar-import', 60)->forceRelease();
+        Cache::store((string) config('seasonvar.queue.lock_store'))->lock('seasonvar-import', 60)->forceRelease();
 
         parent::tearDown();
     }
@@ -35,6 +42,10 @@ class RunSeasonvarImportJobTest extends TestCase
         $this->assertSame(3600, $job->uniqueFor);
         $this->assertSame([60, 300, 900], $job->backoff());
         $this->assertSame('seasonvar-import', $job->uniqueId());
+        $this->assertSame(
+            Cache::store((string) config('seasonvar.queue.lock_store')),
+            $job->uniqueVia(),
+        );
     }
 
     public function test_job_can_be_dispatched_with_scalar_import_options(): void
@@ -85,14 +96,14 @@ class RunSeasonvarImportJobTest extends TestCase
         $job = new RunSeasonvarImport(argument: 'https://seasonvar.ru/serial-1-Test-1-season.html', force: true, discover: false);
         $job->handle($pipeline);
 
-        $lock = Cache::lock('seasonvar-import', 60);
+        $lock = Cache::store((string) config('seasonvar.queue.lock_store'))->lock('seasonvar-import', 60);
         $this->assertTrue($lock->get());
         $lock->release();
     }
 
     public function test_job_releases_itself_when_an_import_lock_is_already_held(): void
     {
-        $lock = Cache::lock('seasonvar-import', 60);
+        $lock = Cache::store((string) config('seasonvar.queue.lock_store'))->lock('seasonvar-import', 60);
         $this->assertTrue($lock->get());
 
         try {

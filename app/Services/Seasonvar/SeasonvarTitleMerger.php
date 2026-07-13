@@ -89,6 +89,76 @@ class SeasonvarTitleMerger
     }
 
     /**
+     * Merge already-imported season-page duplicates into a chosen canonical public title.
+     *
+     * This is intentionally stricter than title matching: a duplicate must belong to the same
+     * source/type/title family and share at least one concrete season source URL hash.
+     *
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @return array{groups: int, titles: int, seasons: int, episodes: int}
+     */
+    public function mergeForCanonicalSlug(string $slug, ?callable $progress = null): array
+    {
+        $canonical = CatalogTitle::query()
+            ->where('slug', $slug)
+            ->firstOrFail();
+        $duplicates = $this->seasonFamilyDuplicatesFor($canonical);
+        $result = [
+            'groups' => $duplicates->isEmpty() ? 0 : 1,
+            'titles' => 0,
+            'seasons' => 0,
+            'episodes' => 0,
+        ];
+
+        if ($duplicates->isEmpty()) {
+            $this->report($progress, 'seasonvar-title-merge-complete', $result);
+
+            return $result;
+        }
+
+        $orderedIds = collect([$canonical->id])
+            ->merge($duplicates->modelKeys())
+            ->values();
+        $titlesById = CatalogTitle::query()
+            ->with([...self::CATALOG_RELATIONS, 'aliases', 'ratings', 'reviews', 'seasons.episodes'])
+            ->whereKey($orderedIds)
+            ->get()
+            ->keyBy('id');
+        $titles = new EloquentCollection($orderedIds
+            ->map(fn (int $id): ?CatalogTitle => $titlesById->get($id))
+            ->filter()
+            ->values()
+            ->all());
+
+        if ($titles->count() < 2) {
+            $this->report($progress, 'seasonvar-title-merge-complete', $result);
+
+            return $result;
+        }
+
+        $groupResult = DB::transaction(fn (): array => $this->mergeGroup($titles));
+
+        $result['titles'] = $groupResult['titles'];
+        $result['seasons'] = $groupResult['seasons'];
+        $result['episodes'] = $groupResult['episodes'];
+
+        $this->searchIndexer->synchronizeTitleIds($orderedIds);
+        $canonical->refresh();
+
+        $this->report($progress, 'seasonvar-title-merged', [
+            'catalog_title_id' => $canonical->id,
+            'title' => $canonical->title,
+            'slug' => $canonical->slug,
+            'merged_titles' => $groupResult['titles'],
+            'merged_seasons' => $groupResult['seasons'],
+            'merged_episodes' => $groupResult['episodes'],
+        ]);
+        $this->report($progress, 'seasonvar-title-merge-complete', $result);
+
+        return $result;
+    }
+
+    /**
      * @return Collection<int, Collection<int, CatalogTitle>>
      */
     private function duplicateTitleGroups(): Collection
@@ -106,6 +176,37 @@ class SeasonvarTitleMerger
             ->filter(fn (Collection $titles): bool => $titles->count() > 1)
             ->sortByDesc(fn (Collection $titles): int => $titles->count())
             ->values();
+    }
+
+    /**
+     * @return EloquentCollection<int, CatalogTitle>
+     */
+    private function seasonFamilyDuplicatesFor(CatalogTitle $canonical): EloquentCollection
+    {
+        $seasonHashes = Season::query()
+            ->where('catalog_title_id', $canonical->id)
+            ->whereNotNull('source_url_hash')
+            ->pluck('source_url_hash')
+            ->unique()
+            ->values();
+
+        if ($seasonHashes->isEmpty()) {
+            return new EloquentCollection;
+        }
+
+        $canonicalTitleKey = $this->normalizedSeriesTitleKey($canonical->title);
+
+        $duplicates = CatalogTitle::query()
+            ->where('source_id', $canonical->source_id)
+            ->where('type', $canonical->type)
+            ->where('id', '!=', $canonical->id)
+            ->whereHas('seasons', fn ($query) => $query->whereIn('source_url_hash', $seasonHashes))
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (CatalogTitle $title): bool => $this->normalizedSeriesTitleKey($title->title) === $canonicalTitleKey)
+            ->values();
+
+        return new EloquentCollection($duplicates->all());
     }
 
     /**

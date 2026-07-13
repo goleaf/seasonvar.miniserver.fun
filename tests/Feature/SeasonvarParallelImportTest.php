@@ -10,7 +10,7 @@ use App\Models\LicensedMedia;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use App\Models\User;
-use App\Services\Catalog\CatalogStatsSnapshotCache;
+use App\Services\Catalog\CatalogCacheInvalidator;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarImportAdminService;
 use App\Services\Seasonvar\SeasonvarImportFailureClassifier;
@@ -64,7 +64,7 @@ class SeasonvarParallelImportTest extends TestCase
         $this->assertSame('queue', $run->fresh()->execution_mode);
         $this->assertSame('redis', config('seasonvar.queue.connection'));
         $this->assertSame('seasonvar-import', config('seasonvar.queue.queue'));
-        $this->assertSame('redis', config('seasonvar.queue.lock_store'));
+        $this->assertSame('redis-locks', config('seasonvar.queue.lock_store'));
         $this->assertSame(86400, config('seasonvar.queue.claim_seconds'));
         $this->assertSame(24, config('seasonvar.import.refresh_after_hours'));
         $this->assertSame('IMMEDIATE', config('database.connections.sqlite.transaction_mode'));
@@ -577,11 +577,14 @@ class SeasonvarParallelImportTest extends TestCase
         $this->assertNotNull($claims->claim($page, $run->id, 3600));
         $pipeline = Mockery::mock(SeasonvarImportPipeline::class);
         $pipeline->shouldNotReceive('finalizeQueuedRun');
-        $stats = Mockery::mock(CatalogStatsSnapshotCache::class);
-        $stats->shouldNotReceive('refresh');
         $job = (new FinalizeSeasonvarQueuedImport($run->id))->withFakeQueueInteractions();
 
-        $job->handle($claims, $pipeline, $stats, app(SeasonvarImportRunRecorder::class));
+        $job->handle(
+            $claims,
+            $pipeline,
+            app(SeasonvarImportRunRecorder::class),
+            app(CatalogCacheInvalidator::class),
+        );
 
         $job->assertReleased(delay: 60);
     }
@@ -594,16 +597,14 @@ class SeasonvarParallelImportTest extends TestCase
         $this->assertTrue($lock->get());
         $pipeline = Mockery::mock(SeasonvarImportPipeline::class);
         $pipeline->shouldNotReceive('finalizeQueuedRun');
-        $stats = Mockery::mock(CatalogStatsSnapshotCache::class);
-        $stats->shouldNotReceive('refresh');
         $job = (new FinalizeSeasonvarQueuedImport($run->id))->withFakeQueueInteractions();
 
         try {
             $job->handle(
                 app(SeasonvarPageClaimManager::class),
                 $pipeline,
-                $stats,
                 app(SeasonvarImportRunRecorder::class),
+                app(CatalogCacheInvalidator::class),
             );
 
             $job->assertReleased(delay: 60);
@@ -624,14 +625,11 @@ class SeasonvarParallelImportTest extends TestCase
         $pipeline->shouldReceive('finalizeQueuedRun')->once()->withArgs(
             fn (SeasonvarImportRun $candidate): bool => $candidate->is($run),
         )->andReturn($completed);
-        $stats = Mockery::mock(CatalogStatsSnapshotCache::class);
-        $stats->shouldReceive('refresh')->once();
-
         (new FinalizeSeasonvarQueuedImport($run->id))->handle(
             app(SeasonvarPageClaimManager::class),
             $pipeline,
-            $stats,
             app(SeasonvarImportRunRecorder::class),
+            app(CatalogCacheInvalidator::class),
         );
 
         $releasedLock = Cache::store('array')->lock(FinalizeSeasonvarQueuedImport::GLOBAL_LOCK_KEY, 1200);
@@ -697,6 +695,19 @@ class SeasonvarParallelImportTest extends TestCase
         } finally {
             $lock->release();
         }
+    }
+
+    public function test_systemd_worker_has_php_memory_headroom_and_restarts_after_lifecycle_exit(): void
+    {
+        $unit = file_get_contents(base_path('deploy/systemd/seasonvar-import-worker@.service'));
+
+        $this->assertIsString($unit);
+        $this->assertStringContainsString(
+            'ExecStart=/usr/bin/php -d memory_limit=256M artisan queue:work redis',
+            $unit,
+        );
+        $this->assertStringContainsString('--memory=192', $unit);
+        $this->assertStringContainsString('Restart=always', $unit);
     }
 
     private function queuedRun(): SeasonvarImportRun

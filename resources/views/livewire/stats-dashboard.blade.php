@@ -22,7 +22,7 @@
                         'fa-triangle-exclamation' => $snapshotMeta['is_stale'] ?? false,
                         'fa-arrows-rotate' => ! ($snapshotMeta['is_stale'] ?? false),
                     ]) />
-                    <span>{{ $snapshotMeta['message'] ?? 'Данные обновляются примерно раз в 15 секунд.' }}</span>
+                    <span>{{ $snapshotMeta['message'] ?? 'Снимок обновляется после изменений каталога и в плановом прогреве.' }}</span>
                 </span>
                 <span class="inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-slate-500">
                     <x-ui.icon name="fa-regular fa-clock" />

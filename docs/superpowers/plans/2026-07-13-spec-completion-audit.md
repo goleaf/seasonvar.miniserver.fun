@@ -29,7 +29,8 @@
 
 ## Audit Baseline
 
-- Текущий инвентарь после появления дополнительных требований во время аудита: 17 файлов `docs/superpowers/specs/*.md` и 29 файлов `docs/superpowers/plans/*.md`.
+- Текущий инвентарь после появления дополнительных требований во время аудита: 18 файлов `docs/superpowers/specs/*.md` и 30 файлов `docs/superpowers/plans/*.md`.
+- Во время closure параллельная задача создала отдельный активный `docs/plans/2026-07-13-cache-performance-architecture.md`. Он не подменяет исторический formal inventory выше; его код, инфраструктурные tests, документация, commit и clean-tree acceptance проверяются дополнительно перед закрытием этого аудита.
 - `php artisan test`: 312 tests, 2184 assertions, zero failures.
 - `npm run build`: production build successful; emitted local Plyr SVG and only solid/regular FontAwesome fonts.
 - `php artisan migrate:status`: все существующие migrations применены; pending migrations отсутствуют.
@@ -52,6 +53,7 @@
 | `2026-07-12-seasonvar-title-group-lock-design.md` | Реализована | Canonical group key, runtime recompute, SQLite IMMEDIATE, focused tests | Нет |
 | `2026-07-13-home-latest-updates-grid-design.md` | Реализована | Главная без hero, адаптивная сетка последних обновлений и `CatalogVisualSystemTest` | Нет; более новое прямое требование пользователя об удалении hero имеет приоритет над ранней visual-system spec |
 | `2026-07-13-remove-catalog-relations-panel-design.md` | Реализована | Дублирующая панель, panel-only payload и orphaned translations удалены; contextual taxonomy и feature regression сохранены | Нет |
+| `2026-07-13-responsive-icon-system-design.md` | Реализована | Все интерфейсные иконки проходят через `x-ui.icon`, геометрия задаётся единым `.ui-icon`, raw `<i>` разрешён только внутри компонента; responsive feature/browser checks выполнены | Нет |
 | `2026-07-13-seasonvar-current-season-gap-design.md` | Реализована | Parser regression и importer test | Нет |
 | `2026-07-13-seasonvar-large-episode-batch-design.md` | Реализована | 50-row upsert chunks, 2600-episode regression | Нет |
 | `2026-07-13-seasonvar-nested-playlist-recovery-design.md` | Реализована, plan checkboxes stale | Recursive `folder` flattening, bounded attention batch, two regressions | Обновить audit status, не переписывая историю RED/GREEN |
@@ -85,6 +87,7 @@
 | `2026-07-13-livewire-player-lifecycle.md` | Complete |
 | `2026-07-13-playback-authorization.md` | Complete |
 | `2026-07-13-remove-catalog-relations-panel.md` | Complete; checklist synchronized during this audit |
+| `2026-07-13-responsive-icon-system.md` | Complete; component/CSS contract, feature tests and responsive browser matrix implemented in `f9cbd5a` |
 | `2026-07-13-seasonvar-current-season-gap.md` | Complete |
 | `2026-07-13-seasonvar-large-episode-batch.md` | Complete |
 | `2026-07-13-seasonvar-nested-playlist-recovery.md` | Complete in code/tests; checklist stale |
@@ -125,6 +128,7 @@
 - Modify: `tests/Feature/SeasonvarParallelImportTest.php`
 - Modify: `app/Jobs/FinalizeSeasonvarQueuedImport.php`
 - Modify: `config/seasonvar.php`
+- Modify: `deploy/systemd/seasonvar-import-worker@.service`
 - Modify: `.env.example`
 - Modify: `docs/architecture.md`
 - Modify: `docs/queues.md`
@@ -146,6 +150,7 @@
 - [x] Run `SeasonvarParallelImportTest` and `SeasonvarImportMaintenanceTest`: 54 tests, 298 assertions, GREEN; full suite: 314 tests, 2194 assertions, GREEN.
 - [x] Update queue/architecture/importer/performance documentation.
 - [x] Commit Tasks 1-2 as one operational reliability change on `main` after all checks pass (`0451f2c`).
+- [x] Runtime-аудит выявил, что spec-compatible worker `--memory=256` не повышал PHP `memory_limit=128M`: добавить RED/GREEN infrastructure regression, PHP hard limit `384M`, сохранить recycle threshold `256` и добавить `Restart=always`; установить синхронизированный systemd template.
 - [ ] Restart long-lived workers through `php artisan queue:restart`, verify exactly ten active units, zero repeated 900-second finalizer kills, decreasing reserved jobs and terminal completion of runs with zero claims.
 
 ### Task 3: Add Versioned Metadata Schema and Model Contracts
@@ -357,7 +362,7 @@
 - Modify: `docs/MAINTENANCE_LOG.md`
 - Modify: this plan
 
-- [ ] Re-run a requirement-by-requirement audit of all 17 design specs and 29 implementation plans; every remaining item must be marked complete, superseded with an explicit newer source, advisory roadmap, or blocked by an external operational prerequisite.
+- [ ] Re-run a requirement-by-requirement audit of all 18 design specs and 30 implementation plans; every remaining item must be marked complete, superseded with an explicit newer source, advisory roadmap, or blocked by an external operational prerequisite.
 - [ ] Run `./vendor/bin/pint --dirty --format agent`.
 - [ ] Run every focused suite named in Tasks 1-9.
 - [ ] Run `php artisan test` and `./vendor/bin/phpunit`; both must report zero failures.

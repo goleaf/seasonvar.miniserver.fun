@@ -32,7 +32,7 @@ class CatalogSearchDocumentBuilderTest extends TestCase
             'type' => 'alternative',
             'source' => 'seasonvar',
         ]);
-        $actor = Actor::query()->create(['name' => 'Иван Петров', 'slug' => 'ivan-petrov']);
+        $actor = Actor::query()->create(['name' => 'Фёдор Лавров', 'slug' => 'fedor-lavrov']);
         $director = Director::query()->create(['name' => 'Анна Волкова', 'slug' => 'anna-volkova']);
         $genre = Genre::query()->create(['name' => 'Драма', 'slug' => 'drama']);
         $title->actors()->attach($actor);
@@ -47,7 +47,8 @@ class CatalogSearchDocumentBuilderTest extends TestCase
         $this->assertSame('Знахарь', $document['title']);
         $this->assertSame('Znachor', $document['original_title']);
         $this->assertStringContainsString('Лекарь', $document['aliases']);
-        $this->assertStringContainsString('Иван Петров', $document['people']);
+        $this->assertStringContainsString('Фёдор Лавров', $document['people']);
+        $this->assertStringContainsString('Федор Лавров', $document['people']);
         $this->assertStringContainsString('Анна Волкова', $document['people']);
         $this->assertStringContainsString('Драма', $document['taxonomies']);
         $this->assertStringContainsString('znakhar', $document['transliteration']);

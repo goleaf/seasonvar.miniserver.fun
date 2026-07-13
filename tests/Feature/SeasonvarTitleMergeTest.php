@@ -204,4 +204,119 @@ class SeasonvarTitleMergeTest extends TestCase
             ->assertMovedPermanently()
             ->assertRedirect(route('titles.show', $canonical));
     }
+
+    public function test_it_merges_requested_season_family_even_when_provider_ids_differ(): void
+    {
+        $source = Source::factory()->create(['code' => 'seasonvar']);
+        $seasonOneUrl = 'https://seasonvar.ru/serial-7780-Mamochka_psxtsdh.html';
+        $seasonTwoUrl = 'https://seasonvar.ru/serial-10781-Mamochka_pszlnxu-2-season.html';
+        $seasonThreeUrl = 'https://seasonvar.ru/serial-12712-Mamochka_psphzei-3-sezon.html';
+
+        $seasonOnePage = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $seasonOneUrl,
+            'url_hash' => hash('sha256', $seasonOneUrl),
+        ]);
+        $seasonTwoPage = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $seasonTwoUrl,
+            'url_hash' => hash('sha256', $seasonTwoUrl),
+        ]);
+        $seasonThreePage = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $seasonThreeUrl,
+            'url_hash' => hash('sha256', $seasonThreeUrl),
+        ]);
+
+        $duplicate = CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $seasonThreePage->id,
+            'external_id' => '12712',
+            'slug' => 'mamockamom',
+            'title' => 'Мамочка/Mom',
+            'source_url' => $seasonThreeUrl,
+            'source_url_hash' => hash('sha256', $seasonThreeUrl),
+        ]);
+        $canonical = CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $seasonOnePage->id,
+            'external_id' => '20002',
+            'slug' => 'mamockamom-5',
+            'title' => 'Мамочка/Mom',
+            'source_url' => $seasonOneUrl,
+            'source_url_hash' => hash('sha256', $seasonOneUrl),
+        ]);
+
+        $duplicateSeason = Season::factory()->create([
+            'catalog_title_id' => $duplicate->id,
+            'source_page_id' => $seasonTwoPage->id,
+            'number' => 2,
+            'source_url' => $seasonTwoUrl,
+            'source_url_hash' => hash('sha256', $seasonTwoUrl),
+        ]);
+        $duplicateEpisode = Episode::factory()->create([
+            'season_id' => $duplicateSeason->id,
+            'source_page_id' => $seasonTwoPage->id,
+            'number' => 1,
+            'title' => 'Дубль второй серии',
+        ]);
+        $duplicateMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $duplicate->id,
+            'season_id' => $duplicateSeason->id,
+            'episode_id' => $duplicateEpisode->id,
+            'source_media_key' => 'mamochka-s02e01-duplicate',
+        ]);
+
+        foreach ([
+            1 => [$seasonOnePage, $seasonOneUrl],
+            2 => [$seasonTwoPage, $seasonTwoUrl],
+            3 => [$seasonThreePage, $seasonThreeUrl],
+        ] as $number => [$page, $url]) {
+            $season = Season::factory()->create([
+                'catalog_title_id' => $canonical->id,
+                'source_page_id' => $page->id,
+                'number' => $number,
+                'source_url' => $url,
+                'source_url_hash' => hash('sha256', $url),
+            ]);
+            Episode::factory()->create([
+                'season_id' => $season->id,
+                'source_page_id' => $page->id,
+                'number' => 1,
+                'title' => $number.' серия',
+            ]);
+        }
+
+        $result = app(SeasonvarTitleMerger::class)->mergeForCanonicalSlug('mamockamom-5');
+
+        $this->assertSame([
+            'groups' => 1,
+            'titles' => 1,
+            'seasons' => 1,
+            'episodes' => 1,
+        ], $result);
+        $this->assertDatabaseMissing('catalog_titles', ['id' => $duplicate->id]);
+        $this->assertDatabaseHas('catalog_titles', ['id' => $canonical->id, 'slug' => 'mamockamom-5']);
+        $this->assertDatabaseHas('catalog_title_slugs', [
+            'catalog_title_id' => $canonical->id,
+            'slug' => 'mamockamom',
+        ]);
+
+        $canonical->refresh()->load('seasons.episodes');
+
+        $this->assertSame([1, 2, 3], $canonical->seasons->sortBy('number')->pluck('number')->values()->all());
+        $this->assertSame(3, CatalogTitle::query()->where('title', 'Мамочка/Mom')->sole()->episodes()->count());
+
+        $canonicalSeasonTwo = $canonical->seasons->firstWhere('number', 2);
+        $canonicalEpisodeTwo = $canonicalSeasonTwo?->episodes->firstWhere('number', 1);
+        $duplicateMedia->refresh();
+
+        $this->assertSame($canonical->id, $duplicateMedia->catalog_title_id);
+        $this->assertSame($canonicalSeasonTwo?->id, $duplicateMedia->season_id);
+        $this->assertSame($canonicalEpisodeTwo?->id, $duplicateMedia->episode_id);
+
+        $this->get('/titles/mamockamom')
+            ->assertMovedPermanently()
+            ->assertRedirect(route('titles.show', $canonical));
+    }
 }

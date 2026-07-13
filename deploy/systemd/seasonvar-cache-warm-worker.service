@@ -1,0 +1,18 @@
+[Unit]
+Description=Seasonvar cache warming queue worker
+After=network.target redis.service memcached.service
+
+[Service]
+Type=simple
+User=www
+Group=www
+WorkingDirectory=/www/wwwroot/seasonvar.miniserver.fun
+ExecStart=/usr/bin/php -d memory_limit=256M artisan queue:work redis --queue=critical,cache-warm,default --sleep=1 --tries=3 --timeout=300 --backoff=10 --memory=192 --max-time=3600 --max-jobs=1000
+ExecReload=/usr/bin/php artisan queue:restart
+Restart=always
+RestartSec=5
+TimeoutStopSec=360
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

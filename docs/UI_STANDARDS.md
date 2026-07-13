@@ -37,6 +37,8 @@
 
 ## Общие компоненты
 
+Blade и Livewire Blade являются только presentation layer: запрещены `@php`/PHP tags, database/cache/service calls и Volt. Данные и вычисления готовят отдельные PHP-классы компонентов, page builders, query services или view models.
+
 Перед повторной версткой использовать общие Blade-компоненты:
 
 - `x-ui.panel` для всех секций с рамкой и боковых блоков.

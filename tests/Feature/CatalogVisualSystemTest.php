@@ -215,21 +215,37 @@ class CatalogVisualSystemTest extends TestCase
         CatalogTitle::factory()->create();
         CatalogTitle::factory()->count(24)->create();
 
-        $this->get(route('titles.index'))
+        $content = $this->get(route('titles.index'))
             ->assertOk()
-            ->assertSee('wire:model.live.debounce.650ms="filters.search"', false)
-            ->assertSee('wire:submit="applyFilters"', false)
-            ->assertSee('wire:loading.delay', false)
-            ->assertDontSee('wire:loading.delay.flex', false)
-            ->assertSee('wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,clearSearch,resetAll,previousPage,nextPage,gotoPage"', false)
-            ->assertSee('wire:loading', false)
-            ->assertSee('wire:key="catalog-title-', false)
-            ->assertSee('wire:click="nextPage(\'page\')"', false);
+            ->getContent();
+
+        $this->assertStringContainsString('wire:model.live.debounce.650ms="filters.search"', $content);
+        $this->assertStringContainsString('wire:submit="applyFilters"', $content);
+        $this->assertStringContainsString('wire:loading.delay', $content);
+        $this->assertStringNotContainsString('wire:loading.delay.flex', $content);
+        $this->assertStringContainsString('wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,clearSearch,resetAll,previousPage,nextPage,gotoPage"', $content);
+        $this->assertStringContainsString('wire:loading', $content);
+        $this->assertStringContainsString('wire:key="catalog-title-', $content);
+        $this->assertStringContainsString('wire:click="nextPage(\'page\')"', $content);
+        $this->assertStringContainsString(
+            'wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,clearSearch,resetAll,previousPage,nextPage,gotoPage" class="hidden absolute',
+            $content,
+        );
     }
 
     public function test_catalog_search_ui_uses_one_landmark_native_mobile_dialog_and_people_comboboxes(): void
     {
-        CatalogTitle::factory()->create();
+        $title = CatalogTitle::factory()->create();
+
+        foreach (range(1, 9) as $number) {
+            $genre = Genre::query()->create([
+                'name' => 'Жанр '.$number,
+                'slug' => 'genre-'.$number,
+            ]);
+
+            $title->genres()->attach($genre);
+        }
+
         $content = $this->get(route('titles.index'))->assertOk()->getContent();
 
         $this->assertSame(1, substr_count($content, 'role="search"'));
@@ -241,10 +257,14 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('data-catalog-filter-dialog-open', $content);
         $this->assertStringContainsString('data-catalog-filter-dialog-close', $content);
         $this->assertStringContainsString('Фильтры · 0', $content);
+        $this->assertStringContainsString('Найти в группе', $content);
+        $this->assertStringContainsString('data-catalog-filter-search', $content);
         $this->assertSame(2, substr_count($content, 'data-catalog-people-combobox'));
         $this->assertSame(2, substr_count($content, 'role="combobox"'));
         $this->assertSame(2, substr_count($content, 'role="listbox"'));
         $this->assertStringContainsString('aria-current="true"', $content);
+        $this->assertStringContainsString('Применить выбранное', $content);
+        $this->assertStringContainsString('Сбросить фильтры', $content);
     }
 
     public function test_catalog_frontend_script_contract_cancels_stale_people_requests_and_restores_dialog_focus(): void

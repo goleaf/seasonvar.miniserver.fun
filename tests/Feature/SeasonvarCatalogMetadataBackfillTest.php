@@ -14,6 +14,7 @@ use App\Services\Seasonvar\SeasonvarCatalogMetadataBackfill;
 use App\Services\Seasonvar\SeasonvarCatalogParser;
 use App\Services\Seasonvar\SeasonvarCatalogRelationSyncer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Mockery;
@@ -74,6 +75,14 @@ class SeasonvarCatalogMetadataBackfillTest extends TestCase
             ['source_page_id', 'captured_at', 'id'],
             $this->indexColumns('source_page_snapshots', 'source_page_snapshots_latest_idx'),
         );
+        $this->assertSame(
+            ['source_page_id', 'deleted_at'],
+            $this->indexColumns('catalog_titles', 'catalog_titles_source_page_lookup_idx'),
+        );
+        $this->assertSame(
+            ['source_url_hash', 'deleted_at', 'catalog_title_id'],
+            $this->indexColumns('seasons', 'seasons_source_url_hash_lookup_idx'),
+        );
 
         foreach (['page_chunk_size', 'page_limit', 'title_chunk_size', 'title_limit'] as $key) {
             $this->assertGreaterThan(0, config("seasonvar.metadata_backfill.{$key}"));
@@ -116,6 +125,29 @@ class SeasonvarCatalogMetadataBackfillTest extends TestCase
         ]);
 
         $this->assertTrue($page->latestSnapshot()->first()?->is($latestByTimeAndId));
+    }
+
+    public function test_metadata_eligibility_uses_indexable_relation_subqueries_instead_of_correlated_scans(): void
+    {
+        Http::preventStrayRequests();
+        $this->pageWithSnapshot($this->trustedMetadataHtml(), 51999);
+        $queries = collect();
+        DB::listen(fn ($query) => $queries->push($query->sql));
+
+        app(SeasonvarCatalogMetadataBackfill::class)->run();
+
+        $selection = $queries->first(
+            fn (string $sql): bool => str_contains($sql, 'from "source_pages"')
+                && str_contains($sql, '"metadata_parser_version" < ?')
+                && str_contains($sql, 'order by "id" asc'),
+        );
+
+        $this->assertIsString($selection);
+        $this->assertStringContainsString('in (select "source_page_id" from "catalog_titles"', $selection);
+        $this->assertStringContainsString('in (select "source_url_hash" from "seasons"', $selection);
+        $this->assertStringNotContainsString('exists (select * from "catalog_titles"', $selection);
+        $this->assertStringNotContainsString('exists (select * from "seasons"', $selection);
+        Http::assertNothingSent();
     }
 
     public function test_local_snapshot_backfill_is_versioned_idempotent_and_never_sends_http(): void

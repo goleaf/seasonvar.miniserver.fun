@@ -96,7 +96,7 @@ class ImportSeasonvarSourcePage implements ShouldQueue
         }
 
         $groupKey = $groupKeys->forUrl($page->url, $page->url_hash);
-        $lock = Cache::store((string) config('seasonvar.queue.lock_store', 'redis'))
+        $lock = Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'))
             ->lock($groupKey, $this->timeout + 300);
 
         if (! $lock->get()) {

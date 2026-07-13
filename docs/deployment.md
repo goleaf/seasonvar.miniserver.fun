@@ -2,6 +2,40 @@
 
 Обновлено: 13.07.2026
 
+## Cache/queue rollout от 13.07.2026
+
+Production environment должен соответствовать `docs/environment.md`: default domain cache — `redis-domain`, hot cache — `memcached-hot`, sessions — Redis `sessions`, queues — Redis `queues`, limiter — `redis-limiter`, critical locks — `redis-locks`. Реальный `.env` не изменяется репозиторием. На одном standalone Redis DB/prefix separation допустима как начальная topology; managed production предпочтительно разделяет cache, queues, sessions и critical locks. Redis Cluster не поддерживает ту же DB-number стратегию. Horizon и Octane не устанавливались.
+
+Безопасный rolling/maintenance порядок:
+
+1. Проверить `git status`, backup SQLite и отсутствие активной catalog transaction; временно остановить writers, если pending migration добавляет SQLite index/table.
+2. `composer install --no-dev --classmap-authoritative --no-interaction` и `npm ci && npm run build` на release artifact.
+3. `php artisan migrate --force` только после read-only `migrate:status`/backup; текущие `180000` и `190000` migrations additive/reversible.
+4. При несовместимой семантике ключа увеличить `CACHE_SCHEMA_VERSION`, при payload/serializer change — `CACHE_FORMAT_VERSION`. Не выполнять scan/flush.
+5. `php artisan optimize` для config/events/routes/views. Не использовать обычный `optimize:clear`, потому что default application store shared.
+6. `php artisan cache:warm-catalog --queue --refresh`, дождаться job и проверить `php artisan cache:metrics --json`.
+7. `php artisan queue:restart`; перезапустить systemd import/cache-warm workers. Reverb/Horizon/Octane отсутствуют и не требуют reload.
+8. `php artisan app:health --json`, public API conditional GET, sitemap GET/HEAD и три warm smoke requests.
+9. Вернуть traffic/writers и наблюдать queue wait, cache failure/lock timeout, Redis memory, Memcached evictions и warm p95.
+
+Установить cache-warm worker:
+
+```bash
+sudo cp deploy/systemd/seasonvar-cache-warm-worker.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now seasonvar-cache-warm-worker.service
+```
+
+`/health/ready` разрешается только monitoring/load-balancer boundary; публичный route rate-limited и не раскрывает topology. Failed Redis sessions/queues/locks/limiter делает readiness failed; Redis cache/Memcached outage — degraded и требует снижения traffic/устранения причины до исчерпания cold-path capacity.
+
+## Индекс ленты media и runtime safety от 13.07.2026
+
+Миграция `2026_07_13_190000_add_home_media_feed_index` additive и обратима: она добавляет к `licensed_media` индекс `licensed_media_home_feed_idx (status, published_at, id)` для глобальной ленты новых видео. К финальной read-only проверке migration уже была `Ran` в batch 7 после внешнего concurrent rollout; EXPLAIN выбрал этот индекс, `PRAGMA quick_check` вернул `ok`. Для любой следующей SQLite migration всё равно нужно дождаться активных jobs, остановить writers, сделать backup и только затем выполнить `php artisan migrate --force`.
+
+`SESSION_CONNECTION=sessions` допустим только при `SESSION_DRIVER=redis`. При database sessions переменная `SESSION_CONNECTION` должна быть пустой/отсутствовать, чтобы Laravel использовал default SQL connection. После любого изменения driver/connection нужно пересобрать config cache и проверить гостевой GET до возврата трафика.
+
+Production обязан использовать `APP_ENV=production`, `APP_DEBUG=false`, `LOG_STACK=daily`, `LOG_LEVEL=warning` и bounded `LOG_DAILY_DAYS`. Репозиторий не изменяет реальный `.env`; эти значения задаются secret/process manager перед `php artisan config:cache`.
+
 ## История публичных slug и локализованные metadata от 13.07.2026
 
 Миграция `2026_07_13_150000_create_catalog_title_slugs_table` additive: создаёт пустую таблицу прежних slug с unique `slug`, foreign key на `catalog_titles` и cascade delete. Источника для достоверного backfill прошлых адресов в базе нет, поэтому существующие slug не копируются: история начинает фиксироваться при следующем редакционном изменении или importer merge.
@@ -70,16 +104,16 @@ Production-значения должны задаваться сервером, 
 - `APP_KEY` с сгенерированным Laravel key
 - `APP_URL` с публичным HTTPS URL
 - `DB_CONNECTION` и `DB_DATABASE` для SQLite или соответствующие host/database/user/password ключи для другого драйвера
-- `CACHE_STORE=database`
-- `CACHE_LIMITER_STORE=file` — отдельное хранилище счетчиков throttle, чтобы публичные rate limiters не писали каждый запрос в SQLite cache table
-- `QUEUE_CONNECTION=database`
-- `SESSION_DRIVER=database`
+- `CACHE_STORE=redis-domain`, `CACHE_LIMITER_STORE=redis-limiter`
+- `CACHE_HOT_STORE=memcached-hot`, `CACHE_DOMAIN_STORE=redis-domain`, `CACHE_LOCK_STORE=redis-locks`
+- `QUEUE_CONNECTION=redis`
+- `SESSION_DRIVER=redis`, `SESSION_CONNECTION=sessions`
 - `FILESYSTEM_DISK=local`
 - `LOCAL_FILESYSTEM_SERVE=false`
 - `UPLOADS_DISK=uploads`
 - `UPLOADS_MAX_IMAGE_KILOBYTES=2048`
 - `NOTIFICATIONS_MAIL_QUEUE=default`
-- `LOG_CHANNEL`, `LOG_STACK` и `LOG_LEVEL`
+- `LOG_CHANNEL=stack`, `LOG_STACK=daily`, `LOG_LEVEL=warning` и bounded `LOG_DAILY_DAYS`
 
 Проектные ключи Seasonvar описаны в `.env.example`. Значения по умолчанию консервативные: `SEASONVAR_BASE_URL=https://seasonvar.ru`, `SEASONVAR_IMPORT_CHUNK_SIZE=100`, `SEASONVAR_CRAWL_DELAY=3`, а проверки медиа включены с ограниченными тайм-аутами.
 
@@ -105,7 +139,7 @@ Google-интеграции по умолчанию выключены. Если
 - `UPLOADS_MAX_IMAGE_KILOBYTES` — максимальный размер изображения для reusable upload-валидации.
 - `NOTIFICATIONS_MAIL_QUEUE` — queue для email notification jobs.
 - `SEASONVAR_IMPORT_FAILURE_MAIL_TO` и `SEASONVAR_IMPORT_FAILURE_MAIL_TO_NAME` — optional получатель письма об ошибке queued import; пустое значение отключает отправку.
-- `SEASONVAR_QUEUE_CONNECTION=redis`, `SEASONVAR_QUEUE_NAME=seasonvar-import` и `SEASONVAR_QUEUE_LOCK_STORE=redis` — отдельная очередь и locks параллельного импортера.
+- `SEASONVAR_QUEUE_CONNECTION=redis`, `SEASONVAR_QUEUE_NAME=seasonvar-import` и `SEASONVAR_QUEUE_LOCK_STORE=redis-locks` — отдельная очередь и critical-lock store параллельного импортера; domain cache для блокировок не используется.
 - `SEASONVAR_IMPORT_ADMIN_EMAILS` — comma-separated email allowlist gate `/admin/imports`; пустое значение закрывает страницу для всех.
 - Тот же `SEASONVAR_IMPORT_ADMIN_EMAILS` защищает `/admin/catalog`; `RATE_LIMIT_CATALOG_ADMIN` задаёт независимый минутный лимит его write actions (по умолчанию 60).
 - `SEASONVAR_QUEUE_STALE_AFTER_MINUTES` — минимальный возраст stale running run для recovery, не меньше 5 минут в runtime.
@@ -130,12 +164,14 @@ php artisan seasonvar:import --queued
 ```bash
 cd /www/wwwroot/seasonvar.miniserver.fun
 for worker in $(seq 1 10); do
-  nohup /usr/bin/php artisan queue:work redis --queue=seasonvar-import --sleep=1 --tries=0 --timeout=900 --memory=256 --max-time=3600 \
+  nohup /usr/bin/php -d memory_limit=256M artisan queue:work redis --queue=seasonvar-import --sleep=1 --tries=0 --timeout=900 --memory=192 --max-time=3600 \
     >> "storage/logs/seasonvar-worker-${worker}.log" 2>&1 &
 done
 ```
 
 `nohup` подходит для немедленного ручного запуска. Для постоянной работы после перезагрузки установите версионируемый systemd template:
+
+PHP hard limit `256M` даёт rebuild рекомендаций запас над измеренным пиком, а Laravel `--memory=192` завершает worker после job до исчерпания hard limit. Systemd template использует `Restart=always`, поэтому штатные exits по `--memory`, `--max-time`, `--max-jobs` и `queue:restart` автоматически возвращают ровно десять процессов.
 
 ```bash
 sudo cp deploy/systemd/seasonvar-import-worker@.service /etc/systemd/system/

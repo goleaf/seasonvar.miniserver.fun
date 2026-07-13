@@ -6,6 +6,7 @@ use App\Services\Notifications\SeasonvarImportFailureNotifier;
 use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -42,7 +43,7 @@ class RunSeasonvarImport implements ShouldBeUnique, ShouldQueue
     public function handle(SeasonvarImportPipeline $pipeline): void
     {
         $lockSeconds = (int) config('seasonvar.import.lock_seconds', 604800);
-        $lock = Cache::lock(self::LOCK_KEY, $lockSeconds);
+        $lock = $this->uniqueVia()->lock(self::LOCK_KEY, $lockSeconds);
 
         if (! $lock->get()) {
             $this->release(self::LOCK_RELEASE_DELAY);
@@ -79,6 +80,11 @@ class RunSeasonvarImport implements ShouldBeUnique, ShouldQueue
     public function uniqueId(): string
     {
         return self::LOCK_KEY;
+    }
+
+    public function uniqueVia(): Repository
+    {
+        return Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'));
     }
 
     public function failed(?Throwable $exception): void

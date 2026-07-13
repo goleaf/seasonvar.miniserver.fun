@@ -26,16 +26,20 @@ use App\Models\Season;
 use App\Models\SeasonvarImportEvent;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
+use App\Models\Tag;
 use App\Models\User;
+use App\Services\Catalog\CatalogHomeMetricsCache;
+use App\Services\Catalog\CatalogHomeSnapshotCache;
 use App\Services\Catalog\CatalogPlaybackProgressSession;
 use App\Services\Catalog\CatalogStatsPageBuilder;
 use App\Services\Catalog\CatalogStatsPosterUrlGuard;
 use App\Services\Catalog\CatalogUserStateService;
+use App\Support\Cache\CacheDomain;
+use App\Support\Cache\CacheVersionRegistry;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -143,7 +147,9 @@ class CatalogPageTest extends TestCase
             'in_watchlist' => true,
             'rating' => 8,
         ]);
-        Cache::put('catalog.stats.snapshot.fresh', ['private' => 'stale'], 60);
+        $versions = app(CacheVersionRegistry::class);
+        $statsVersion = $versions->version(CacheDomain::CatalogStats);
+        $homeVersion = $versions->version(CacheDomain::Homepage);
 
         Livewire::actingAs($admin)
             ->test(CatalogAdministrationManager::class)
@@ -172,7 +178,8 @@ class CatalogPageTest extends TestCase
         $this->assertSame(['title' => 'Название провайдера'], $title->provider_field_values);
         $this->assertTrue($title->genres()->whereKey($genre->id)->exists());
         $this->assertModelExists(CatalogTitleUserState::query()->whereBelongsTo($viewer)->sole());
-        $this->assertFalse(Cache::has('catalog.stats.snapshot.fresh'));
+        $this->assertGreaterThan($statsVersion, $versions->version(CacheDomain::CatalogStats));
+        $this->assertGreaterThan($homeVersion, $versions->version(CacheDomain::Homepage));
         $this->get('/titles/redaktorskoe-nazvanie')->assertNotFound();
     }
 
@@ -555,6 +562,20 @@ class CatalogPageTest extends TestCase
             ->assertRedirect(route('titles.index'));
     }
 
+    public function test_catalog_canonicalizes_unindexed_multi_value_query_keys_before_livewire_hydration(): void
+    {
+        $genre = Genre::query()->create(['name' => 'Драма', 'slug' => 'drama']);
+        CatalogTitle::factory()->count(25)->create(['year' => 2024])
+            ->each(fn (CatalogTitle $title) => $title->genres()->attach($genre));
+        $url = route('titles.index').'?year[]=2024&year[]=2025&genre[]=drama&page=2';
+
+        $this->get($url)->assertRedirect(route('titles.index', [
+            'year' => [2024, 2025],
+            'genre' => ['drama'],
+            'page' => 2,
+        ]));
+    }
+
     public function test_livewire_catalog_recovers_to_the_last_page_when_result_count_shrinks(): void
     {
         CatalogTitle::factory()->count(25)->create();
@@ -672,6 +693,79 @@ class CatalogPageTest extends TestCase
             strpos($section, $olderTitle->title),
             strpos($section, $newerTitle->title),
         );
+    }
+
+    public function test_home_reuses_and_explicitly_invalidates_public_metrics(): void
+    {
+        CatalogTitle::factory()->create();
+
+        $this->assertSame(1, app(CatalogHomeMetricsCache::class)->metrics()['titles']);
+
+        CatalogTitle::factory()->create();
+
+        $this->assertSame(1, app(CatalogHomeMetricsCache::class)->metrics()['titles']);
+
+        app(CatalogHomeMetricsCache::class)->forget();
+
+        $this->assertSame(2, app(CatalogHomeMetricsCache::class)->metrics()['titles']);
+    }
+
+    public function test_home_rehydrates_cached_subtitle_tag_without_mass_assignment(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $tag = Tag::query()->create([
+            'name' => 'Субтитры',
+            'slug' => 'subtitry',
+            'source_url' => 'https://seasonvar.ru/tag/subtitry',
+        ]);
+        $title->tags()->attach($tag);
+
+        $subtitleTag = app(CatalogHomeSnapshotCache::class)->snapshot()['subtitle_tag'];
+
+        $this->assertIsArray($subtitleTag);
+        $this->assertSame(
+            ['id', 'name', 'slug', 'catalog_titles_count'],
+            array_keys($subtitleTag),
+        );
+        $this->assertArrayNotHasKey('source_url', $subtitleTag);
+
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSeeText('Субтитры');
+    }
+
+    public function test_catalog_year_filter_accepts_cached_plain_year_bucket_rows(): void
+    {
+        CatalogTitle::factory()->create(['year' => 2020]);
+
+        $this->get(route('titles.index'))->assertOk();
+        $this->get(route('titles.index', ['year' => [2020]]))->assertOk();
+    }
+
+    public function test_home_media_feed_has_a_status_and_publication_order_index(): void
+    {
+        $index = collect(Schema::getIndexes('licensed_media'))
+            ->firstWhere('name', 'licensed_media_home_feed_idx');
+
+        $this->assertIsArray($index);
+        $this->assertSame(['status', 'published_at', 'id'], $index['columns']);
+    }
+
+    public function test_home_media_feed_query_uses_the_indexed_id_tie_breaker(): void
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        app(CatalogHomeSnapshotCache::class)->snapshot();
+
+        $query = collect(DB::getQueryLog())
+            ->pluck('query')
+            ->first(fn (string $sql): bool => str_contains($sql, 'from "licensed_media"')
+                && str_contains($sql, 'order by "published_at" desc'));
+
+        $this->assertIsString($query);
+        $this->assertStringContainsString('order by "published_at" desc, "id" desc', $query);
+        $this->assertStringNotContainsString('"created_at" desc', $query);
     }
 
     public function test_stats_page_shows_database_statistics_without_raw_source_urls(): void
@@ -821,7 +915,7 @@ class CatalogPageTest extends TestCase
             ->assertSee('wire:poll.15s.visible="refreshStats"', false)
             ->assertSee('/vendor/livewire/livewire.js?id=', false)
             ->assertSeeText('Сводка каталога')
-            ->assertSeeText('Данные обновляются примерно раз в 15 секунд')
+            ->assertSeeText('Снимок обновляется после изменений каталога и в плановом прогреве')
             ->assertSeeText('Показано:')
             ->assertSeeText('Сериалов каталога')
             ->assertSeeText('Сезоны и серии')

@@ -1,6 +1,6 @@
 # API
 
-Обновлено: 09.07.2026
+Обновлено: 13.07.2026
 
 ## Маршруты
 
@@ -9,6 +9,7 @@
 - API-маршруты подключены через `routes/api.php`, получают стандартный префикс `/api` и ограничены rate limiter `catalog-api` до 60 запросов в минуту на IP.
 - `GET /api/titles` принимает `page` и `per_page`; `per_page` ограничен диапазоном 1-50 и по умолчанию равен 15.
 - `/api/*` ошибки должны оставаться JSON-friendly благодаря `shouldRenderJsonWhen()` в `bootstrap/app.php`.
+- Anonymous `200` GET/HEAD получает public `Cache-Control`, `ETag`, `Last-Modified`, `Vary: Accept, Accept-Encoding`, SWR/stale-if-error и поддерживает `304`. Ответ с user, cookie, error или unsafe method не становится shared-cacheable; API Resource/database остаётся корректным cold path.
 
 ## Формат ответов
 

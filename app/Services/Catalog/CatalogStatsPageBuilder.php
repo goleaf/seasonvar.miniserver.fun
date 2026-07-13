@@ -1103,6 +1103,7 @@ class CatalogStatsPageBuilder
             ['label' => 'Страницы для обновления', 'table' => 'source_pages', 'columns' => ['parse_status', 'page_type', 'id']],
             ['label' => 'Свежесть страниц источника', 'table' => 'source_pages', 'columns' => ['page_type', 'parse_status', 'last_crawled_at', 'id']],
             ['label' => 'Видео сериала по готовности', 'table' => 'licensed_media', 'columns' => ['catalog_title_id', 'status', 'published_at']],
+            ['label' => 'Лента новых видео', 'table' => 'licensed_media', 'columns' => ['status', 'published_at', 'id']],
             ['label' => 'Видео серии по качеству', 'table' => 'licensed_media', 'columns' => ['episode_id', 'status', 'quality']],
             ['label' => 'Постоянный ключ видео', 'table' => 'licensed_media', 'columns' => ['catalog_title_id', 'source_media_key']],
         ];

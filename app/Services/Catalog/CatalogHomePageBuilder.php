@@ -3,11 +3,10 @@
 namespace App\Services\Catalog;
 
 use App\Models\CatalogTitle;
-use App\Models\Episode;
 use App\Models\LicensedMedia;
-use App\Models\Season;
 use App\Models\Tag;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 class CatalogHomePageBuilder
 {
@@ -16,6 +15,8 @@ class CatalogHomePageBuilder
         private readonly CatalogFacetQuery $facets,
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogTitleQuery $titles,
+        private readonly CatalogHomeMetricsCache $metrics,
+        private readonly CatalogHomeSnapshotCache $snapshot,
     ) {}
 
     /**
@@ -25,49 +26,27 @@ class CatalogHomePageBuilder
     {
         $genres = $this->facets->taxonomies('genre');
         $countries = $this->facets->taxonomies('country');
+        $snapshot = $this->snapshot->snapshot();
         $stats = [
-            'titles' => $this->titles->visibleTo(null)->count(),
-            'episodes' => Episode::query()
-                ->published()
-                ->whereHas('season', fn (Builder $query): Builder => $query->published())
-                ->whereIn('season_id', Season::query()
-                    ->published()
-                    ->select('id')
-                    ->whereIn('catalog_title_id', $this->titles->visibleTo(null)->select('id')))
-                ->count(),
+            ...$this->metrics->metrics(),
             'genres' => $genres->count(),
             'countries' => $countries->count(),
-            'videos' => LicensedMedia::query()
-                ->published()
-                ->forAvailableReleases(null)
-                ->whereIn('catalog_title_id', $this->titles->visibleTo(null)->select('id'))
-                ->count(),
         ];
-        $latestTitles = $this->titleSummaryQuery()
+        $latestTitles = $this->orderedTitles($snapshot['latest_title_ids'] ?? [], $this->titleSummaryQuery()
             ->with(array_merge([
                 'latestSeason' => fn ($query) => $query->select(['seasons.id', 'seasons.catalog_title_id', 'seasons.number']),
-            ], $this->taxonomies->cardSummaryLoads()))
-            ->latest('indexed_at')
-            ->limit(48)
-            ->get();
-        $featuredTitles = $this->titleSummaryQuery()
-            ->with($this->taxonomies->cardSummaryLoads())
-            ->whereNotNull('poster_url')
-            ->latest('indexed_at')
-            ->limit(12)
-            ->get();
-        $videoTitles = $this->titleSummaryQuery()
-            ->with($this->taxonomies->cardSummaryLoads())
-            ->whereHas('licensedMedia', fn (Builder $query): Builder => $query
-                ->published()
-                ->forAvailableReleases(null))
-            ->latest('indexed_at')
-            ->limit(8)
-            ->get();
-        $latestMedia = LicensedMedia::query()
+            ], $this->taxonomies->cardSummaryLoads())));
+        $featuredTitles = $this->orderedTitles(
+            $snapshot['featured_title_ids'] ?? [],
+            $this->titleSummaryQuery()->with($this->taxonomies->cardSummaryLoads()),
+        );
+        $videoTitles = $this->orderedTitles(
+            $snapshot['video_title_ids'] ?? [],
+            $this->titleSummaryQuery()->with($this->taxonomies->cardSummaryLoads()),
+        );
+        $latestMedia = $this->orderedModels(LicensedMedia::query()
             ->published()
             ->forAvailableReleases(null)
-            ->whereIn('catalog_title_id', $this->titles->visibleTo(null)->select('id'))
             ->select(['id', 'catalog_title_id', 'season_id', 'episode_id', 'title', 'quality', 'translation_name', 'format', 'published_at'])
             ->with([
                 'catalogTitle' => fn ($query) => $query
@@ -81,21 +60,14 @@ class CatalogHomePageBuilder
                     ]),
                 'season:id,catalog_title_id,number,kind,sort_order,title',
                 'episode:id,season_id,number,kind,sort_order,title,released_at',
-            ])
-            ->latest('published_at')
-            ->latest()
-            ->limit(12)
-            ->get();
-        $yearBuckets = $this->titles->visibleTo(null)
-            ->select('year')
-            ->selectRaw('count(*) as titles_count')
-            ->whereNotNull('year')
-            ->where('year', '>=', 1900)
-            ->where('year', '<=', (int) now()->format('Y') + 1)
-            ->groupBy('year')
-            ->orderByDesc('year')
-            ->limit(12)
-            ->get();
+            ]), $snapshot['latest_media_ids'] ?? []);
+        $yearBuckets = collect($snapshot['year_buckets'] ?? [])->map(fn (array $attributes): object => (object) $attributes);
+        $subtitleTag = null;
+
+        if (is_array($snapshot['subtitle_tag'] ?? null)) {
+            $subtitleTag = (new Tag)->newInstance([], true);
+            $subtitleTag->setRawAttributes($snapshot['subtitle_tag'], true);
+        }
 
         return [
             'stats' => $stats,
@@ -107,10 +79,7 @@ class CatalogHomePageBuilder
             'yearBuckets' => $yearBuckets,
             'genres' => $genres->take(18)->values(),
             'countries' => $countries,
-            'subtitleTag' => Tag::query()
-                ->where('slug', 'subtitry')
-                ->withCount(['catalogTitles' => fn (Builder $query): Builder => $this->titles->constrainVisible($query, null)])
-                ->first(),
+            'subtitleTag' => $subtitleTag,
             'seo' => $this->seo->home($stats, $latestTitles),
         ];
     }
@@ -123,5 +92,37 @@ class CatalogHomePageBuilder
         return $this->titles->visibleTo(null)
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url', 'indexed_at'])
             ->withCount($this->titles->publicCardCounts(null));
+    }
+
+    /**
+     * @param  list<int>  $ids
+     * @param  Builder<CatalogTitle>  $query
+     * @return Collection<int, CatalogTitle>
+     */
+    private function orderedTitles(array $ids, Builder $query): Collection
+    {
+        return $this->orderedModels($query, $ids);
+    }
+
+    /**
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  Builder<TModel>  $query
+     * @param  list<int>  $ids
+     * @return Collection<int, TModel>
+     */
+    private function orderedModels(Builder $query, array $ids): Collection
+    {
+        if ($ids === []) {
+            return collect();
+        }
+
+        $positions = array_flip($ids);
+
+        return $query
+            ->whereKey($ids)
+            ->get()
+            ->sortBy(fn ($model): int => (int) ($positions[(int) $model->getKey()] ?? PHP_INT_MAX))
+            ->values();
     }
 }

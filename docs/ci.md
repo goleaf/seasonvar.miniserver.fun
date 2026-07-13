@@ -1,6 +1,6 @@
 # CI
 
-Обновлено: 09.07.2026
+Обновлено: 13.07.2026
 
 ## Workflow
 
@@ -25,7 +25,7 @@ php artisan view:clear
 php artisan test
 ```
 
-Тесты используют SQLite в памяти через `phpunit.xml`; workflow не требует отдельного database service.
+Тесты используют SQLite в памяти через `phpunit.xml`. Backend job поднимает один Redis 7 и один Memcached 1.6 service, устанавливает PhpRedis/Memcached extensions и задаёт run-specific prefixes/Redis DBs. Обычные тесты остаются на array cache; `RUN_CACHE_INFRASTRUCTURE_TESTS=true` включает exact-key integration tests реальных Redis cache/tags/locks/workload isolation, Memcached read/write и контролируемых outage fallbacks. Shared store никогда не flush-ится.
 
 ## Frontend
 
@@ -44,6 +44,7 @@ npm run build
 - Composer кеширует только download-cache Composer, ключ зависит от `composer.lock`.
 - npm кешируется через `actions/setup-node`, ключ зависит от `package-lock.json`.
 - `vendor` и `node_modules` не кешируются и не коммитятся.
+- Redis/Memcached CI services являются application test infrastructure, а не GitHub dependency download cache. Их health checks должны пройти до PHPUnit.
 
 ## Static Analysis
 

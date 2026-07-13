@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -23,7 +22,6 @@ class GoogleSearchConsoleSummaryCommandTest extends TestCase
     public function test_it_prints_top_pages_from_search_console(): void
     {
         Http::preventStrayRequests();
-        Cache::flush();
 
         config([
             'services.google.application_credentials' => $this->credentialFile(),

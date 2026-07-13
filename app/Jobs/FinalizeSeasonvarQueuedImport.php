@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\SeasonvarImportRun;
-use App\Services\Catalog\CatalogStatsSnapshotCache;
+use App\Services\Catalog\CatalogCacheInvalidator;
 use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use App\Services\Seasonvar\SeasonvarImportRunRecorder;
@@ -47,8 +47,8 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
     public function handle(
         SeasonvarPageClaimManager $claims,
         SeasonvarImportPipeline $pipeline,
-        CatalogStatsSnapshotCache $statsSnapshots,
         SeasonvarImportRunRecorder $runs,
+        CatalogCacheInvalidator $cacheInvalidator,
     ): void {
         $run = SeasonvarImportRun::query()->find($this->importRunId);
 
@@ -87,7 +87,7 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
             }
 
             $pipeline->finalizeQueuedRun($run);
-            $statsSnapshots->refresh();
+            $cacheInvalidator->catalogChanged();
         } finally {
             $lock->release();
         }
@@ -113,7 +113,7 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
 
     public function uniqueVia(): Repository
     {
-        return Cache::store((string) config('seasonvar.queue.lock_store', 'redis'));
+        return Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'));
     }
 
     private function releaseDelay(): int

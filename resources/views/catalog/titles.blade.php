@@ -549,7 +549,7 @@
             </x-ui.panel>
 
             <div class="relative">
-                <div wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,clearSearch,resetAll,previousPage,nextPage,gotoPage" class="absolute inset-x-0 top-0 z-20 rounded-panel bg-white text-sm font-bold text-emerald-700" role="status" aria-live="polite">
+                <div wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,clearSearch,resetAll,previousPage,nextPage,gotoPage" class="hidden absolute inset-x-0 top-0 z-20 rounded-panel bg-white text-sm font-bold text-emerald-700" role="status" aria-live="polite">
                     <div class="flex min-h-24 items-center justify-center">
                         <x-ui.icon name="fa-solid fa-spinner fa-spin" />
                         <span class="ml-2">Обновляем каталог…</span>

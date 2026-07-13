@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use App\Console\Commands\Concerns\OutputsSeasonvarProgress;
 use App\Models\SeasonvarImportRun;
-use App\Services\Catalog\CatalogStatsSnapshotCache;
+use App\Services\Catalog\CatalogCacheInvalidator;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use App\Services\Seasonvar\SeasonvarImportProcessInspector;
 use App\Services\Seasonvar\SeasonvarQueuedImportDispatcher;
@@ -12,6 +12,7 @@ use App\Services\Seasonvar\SeasonvarQueueStatus;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Throwable;
@@ -36,7 +37,7 @@ class ImportSeasonvar extends Command
         SeasonvarImportProcessInspector $processInspector,
         SeasonvarQueuedImportDispatcher $queuedDispatcher,
         SeasonvarQueueStatus $queueStatus,
-        CatalogStatsSnapshotCache $statsSnapshots,
+        CatalogCacheInvalidator $cacheInvalidator,
     ): int {
         if ((bool) $this->option('status')) {
             return $this->handleStatus($queueStatus);
@@ -50,11 +51,12 @@ class ImportSeasonvar extends Command
         $this->registerSignalHandlers();
         $lockSeconds = (int) config('seasonvar.import.lock_seconds', 604800);
         $process = $processInspector->currentProcess();
-        $lock = Cache::lock(self::LOCK_KEY, $lockSeconds);
+        $lockStore = $this->lockStore();
+        $lock = $lockStore->lock(self::LOCK_KEY, $lockSeconds);
 
         if (! $lock->get()) {
-            if ($this->recoverUnconfirmedLock($processInspector, $lockSeconds)) {
-                $lock = Cache::lock(self::LOCK_KEY, $lockSeconds);
+            if ($this->recoverUnconfirmedLock($processInspector, $lockStore, $lockSeconds)) {
+                $lock = $lockStore->lock(self::LOCK_KEY, $lockSeconds);
             }
 
             if (! $lock->get()) {
@@ -65,7 +67,7 @@ class ImportSeasonvar extends Command
         }
 
         try {
-            Cache::put(self::LOCK_PROCESS_KEY, $process, $lockSeconds);
+            $lockStore->put(self::LOCK_PROCESS_KEY, $process, $lockSeconds);
 
             $run = $pipeline->run(
                 argument: $this->argument('url') ? trim((string) $this->argument('url')) : null,
@@ -79,7 +81,7 @@ class ImportSeasonvar extends Command
                 progress: $this->seasonvarProgress(),
             );
 
-            $statsSnapshots->refresh();
+            $cacheInvalidator->catalogChanged();
 
             $this->info(sprintf(
                 'Готово: запуск #%d, циклов %d, страниц выбрано %d, обновлено %d, ошибок %d, видео добавлено %d, видео обновлено %d.',
@@ -94,24 +96,27 @@ class ImportSeasonvar extends Command
 
             return in_array($run->status, ['completed', 'partial'], true) ? self::SUCCESS : self::FAILURE;
         } catch (Throwable $exception) {
-            $statsSnapshots->refresh();
+            $cacheInvalidator->catalogChanged();
             $this->error($exception->getMessage());
 
             return self::FAILURE;
         } finally {
-            Cache::forget(self::LOCK_PROCESS_KEY);
+            $lockStore->forget(self::LOCK_PROCESS_KEY);
             $lock->release();
         }
     }
 
-    private function recoverUnconfirmedLock(SeasonvarImportProcessInspector $processInspector, int $lockSeconds): bool
-    {
+    private function recoverUnconfirmedLock(
+        SeasonvarImportProcessInspector $processInspector,
+        Repository $lockStore,
+        int $lockSeconds,
+    ): bool {
         $runningRuns = SeasonvarImportRun::query()
             ->where('status', 'running')
             ->where('execution_mode', 'sync')
             ->latest('updated_at')
             ->get();
-        $lockProcess = Cache::get(self::LOCK_PROCESS_KEY);
+        $lockProcess = $lockStore->get(self::LOCK_PROCESS_KEY);
         $inspection = $processInspector->inspect(is_array($lockProcess) ? $lockProcess : null, $runningRuns);
 
         if ($inspection['running']) {
@@ -120,8 +125,8 @@ class ImportSeasonvar extends Command
             return false;
         }
 
-        Cache::lock(self::LOCK_KEY, $lockSeconds)->forceRelease();
-        Cache::forget(self::LOCK_PROCESS_KEY);
+        $lockStore->lock(self::LOCK_KEY, $lockSeconds)->forceRelease();
+        $lockStore->forget(self::LOCK_PROCESS_KEY);
 
         $this->markUnconfirmedRunsFailed($runningRuns);
 
@@ -218,7 +223,7 @@ class ImportSeasonvar extends Command
             return self::FAILURE;
         }
 
-        $lock = Cache::store((string) config('seasonvar.queue.lock_store', 'redis'))
+        $lock = $this->lockStore()
             ->lock('seasonvar-import-coordinator', 300);
 
         if (! $lock->get()) {
@@ -247,6 +252,11 @@ class ImportSeasonvar extends Command
         } finally {
             $lock->release();
         }
+    }
+
+    private function lockStore(): Repository
+    {
+        return Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'));
     }
 
     private function handleStatus(SeasonvarQueueStatus $queueStatus): int

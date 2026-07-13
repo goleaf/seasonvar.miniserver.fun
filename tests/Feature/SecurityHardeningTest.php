@@ -16,6 +16,7 @@ use App\Services\Media\ExternalPlaylistImporter;
 use App\Services\Media\PlaybackSourceUrlGuard;
 use App\Services\Security\SensitiveActionRateLimiter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
@@ -41,7 +42,10 @@ class SecurityHardeningTest extends TestCase
     public function test_catalog_stats_route_is_rate_limited(): void
     {
         $user = User::factory()->create();
-        $limiterKey = md5('catalog-statsuser:'.$user->id);
+        $request = Request::create(route('stats'));
+        $request->setUserResolver(fn (): User => $user);
+        $limit = RateLimiter::limiter('catalog-stats')($request);
+        $limiterKey = md5('catalog-stats'.$limit->key);
 
         foreach (range(1, 180) as $attempt) {
             RateLimiter::hit($limiterKey, 60);

@@ -30,6 +30,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
 class SeasonvarImportMaintenanceTest extends TestCase
@@ -43,6 +44,7 @@ class SeasonvarImportMaintenanceTest extends TestCase
         config([
             'seasonvar.crawl_delay_seconds' => 0,
             'seasonvar.import.chunk_size' => 5,
+            'seasonvar.queue.lock_store' => 'array',
             'seasonvar.media_check.chunk_size' => 5,
             'seasonvar.media_identity.chunk_size' => 5,
         ]);
@@ -51,7 +53,7 @@ class SeasonvarImportMaintenanceTest extends TestCase
     public function test_it_skips_successfully_when_import_lock_is_held(): void
     {
         $this->fakeImportProcessInspector(running: true, checks: ['fake-posix:alive', 'fake-ps:match']);
-        $lock = Cache::lock('seasonvar-import', 60);
+        $lock = Cache::store((string) config('seasonvar.queue.lock_store'))->lock('seasonvar-import', 60);
         $this->assertTrue($lock->get());
 
         try {
@@ -68,7 +70,7 @@ class SeasonvarImportMaintenanceTest extends TestCase
     {
         Http::preventStrayRequests();
         $this->fakeImportProcessInspector(running: false, checks: ['fake-posix:missing', 'fake-ps:no-match']);
-        $lock = Cache::lock('seasonvar-import', 60);
+        $lock = Cache::store((string) config('seasonvar.queue.lock_store'))->lock('seasonvar-import', 60);
         $this->assertTrue($lock->get());
 
         try {
@@ -92,7 +94,7 @@ class SeasonvarImportMaintenanceTest extends TestCase
     {
         Http::preventStrayRequests();
         $this->fakeImportProcessInspector(running: false, checks: ['fake-proc:missing', 'fake-pgrep:no-match']);
-        $lock = Cache::lock('seasonvar-import', 60);
+        $lock = Cache::store((string) config('seasonvar.queue.lock_store'))->lock('seasonvar-import', 60);
         $this->assertTrue($lock->get());
         $unconfirmedRun = SeasonvarImportRun::query()->create([
             'mode' => 'sitemap',
@@ -367,6 +369,8 @@ class SeasonvarImportMaintenanceTest extends TestCase
 
     public function test_media_health_rate_limit_stops_additional_provider_requests_without_marking_failure(): void
     {
+        $limiterKey = 'sensitive-action:source_health:system:'.hash('sha256', 'media.example.com');
+        RateLimiter::clear($limiterKey);
         Http::preventStrayRequests();
         config([
             'security.rate_limits.source_health' => 1,
@@ -377,14 +381,18 @@ class SeasonvarImportMaintenanceTest extends TestCase
         ]);
         $checker = app(SeasonvarMediaAvailabilityChecker::class);
 
-        $first = $checker->check('https://media.example.com/first.mp4');
-        $second = $checker->check('https://media.example.com/second.mp4');
+        try {
+            $first = $checker->check('https://media.example.com/first.mp4');
+            $second = $checker->check('https://media.example.com/second.mp4');
 
-        $this->assertTrue($first->available);
-        $this->assertTrue($second->available);
-        $this->assertSame('not_checked', $second->checkStatus);
-        $this->assertSame('rate_limited', $second->errorCategory?->value);
-        Http::assertSentCount(1);
+            $this->assertTrue($first->available);
+            $this->assertTrue($second->available);
+            $this->assertSame('not_checked', $second->checkStatus);
+            $this->assertSame('rate_limited', $second->errorCategory?->value);
+            Http::assertSentCount(1);
+        } finally {
+            RateLimiter::clear($limiterKey);
+        }
     }
 
     public function test_it_marks_legacy_parsed_source_pages_as_imported(): void

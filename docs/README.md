@@ -15,15 +15,19 @@
 | Авторизация и playback access | [`authorization.md`](authorization.md) | Public/profile boundary, policies/gates, entitlement decisions, signed playback route и ограничения отсутствующих product-моделей. |
 | Импорт Seasonvar | [`importer.md`](importer.md) | Response → DTO → identity → transaction/upsert → relation sync → counters/cache/index/UI, идемпотентность и владение полями. |
 | Очереди | [`queues.md`](queues.md) | Queue driver, coordinator/page/finalizer jobs, locks, attempts/backoff/timeout, run states, retry и recovery. |
-| Производительность и кеш | [`performance.md`](performance.md) | Query budgets, duplicate-free counts, eager loading, cache boundaries и точная lifecycle-инвалидация. |
+| Производительность БД | [`performance.md`](performance.md) | Query budgets, plans/indexes, duplicate-free counts, eager loading и cold-path измерения. |
+| Redis/Memcached и cache lifecycle | [`caching.md`](caching.md) | Stores/connections, keys, TTL, stale, locks, invalidation, warming, health, metrics и failure recovery. |
+| Environment reference | [`environment.md`](environment.md) | Production baseline и безопасные Redis/Memcached/cache переменные без секретов. |
 | Security controls | [`security.md`](security.md) | Валидация, IDOR/XSS/SSRF, secrets/log redaction, signed URLs, rate limits и dependency audits. |
 | Browser/player lifecycle | [`frontend.md`](frontend.md) | Livewire/Alpine/Plyr/HLS responsibilities, `wire:ignore`, progress heartbeat, cleanup и frontend build. |
 | Код и интерфейс | [`CODE_STANDARDS.md`](CODE_STANDARDS.md), [`UI_STANDARDS.md`](UI_STANDARDS.md) | Правила PHP/Laravel и визуальные/a11y соглашения без смешивания доменных контрактов. |
 | Локальная разработка и Git | [`development.md`](development.md) | Установка, единственная ветка `main`, versioned hooks и локальные команды проверки. |
 | Тесты и CI | [`testing.md`](testing.md), [`ci.md`](ci.md) | PHPUnit-паттерны, доступные проверки и точный GitHub Actions pipeline. |
+| Живой аудит и backlog | [`audit.md`](audit.md) | Подтверждённая исходная точка и бессрочный P0–P4 план с acceptance criteria и методами проверки. |
 | Production rollout | [`deployment.md`](deployment.md) | Environment, additive migrations, backup/maintenance order, workers, cache warmup и post-deploy checks. |
 | История изменений | [`CHANGELOG.md`](../CHANGELOG.md) | Пользовательские и архитектурные изменения в установленном формате. |
 | Журнал обслуживания | [`MAINTENANCE_LOG.md`](MAINTENANCE_LOG.md) | Датированные эксплуатационные работы, замеры и диагностика; не заменяет release changelog. |
+| Реестр Markdown-аудита | [`markdown-review-2026-07-13.md`](markdown-review-2026-07-13.md) | Полный список 195 просмотренных project-owned Markdown-файлов: изменённые и неизменённые. |
 
 ## Как обновлять документацию
 

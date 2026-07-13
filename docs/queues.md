@@ -4,11 +4,15 @@
 
 ## Конфигурация
 
-- Основное подключение очереди по умолчанию: `QUEUE_CONNECTION=database`.
+- Основное production подключение очереди по умолчанию: `QUEUE_CONNECTION=redis`, Redis connection `queues`. Database queue остаётся framework fallback для локальной диагностики, но не является production default.
 - Таблицы `jobs`, `job_batches` и `failed_jobs` создаются миграцией `0001_01_01_000002_create_jobs_table.php`.
 - Для database, Redis и Beanstalkd `retry_after` по умолчанию равен 1200 секундам. Это больше тайм-аута долгого job импорта и защищает от повторного запуска той же работы, пока worker еще ее выполняет.
-- `composer dev` запускает локальный `queue:listen` с `--timeout=900 --tries=3`, чтобы jobs не выполнялись бесконечно и повторялись по той же политике, что production worker.
-- Для отдельного worker использовать: `php artisan queue:work database --timeout=900 --tries=3`.
+- `composer dev` запускает локальный `queue:listen` с `--timeout=900 --tries=3`; локальный environment должен иметь Redis либо явно выбрать безопасный test driver.
+- Основные очереди: `seasonvar-import`, `critical`, `cache-warm`, `default`; будущие `notifications`, `media-check`, `maintenance`, `low-priority` запускаются отдельными supervisors только когда появляются jobs и SLO.
+- Cache-warm worker устанавливается из `deploy/systemd/seasonvar-cache-warm-worker.service`; import workers — из `seasonvar-import-worker@.service`.
+- Scheduler mutex для `withoutOverlapping`/`onOneServer` явно использует `redis-locks`; default domain cache не участвует в координации schedule.
+- `WarmCatalogCaches` передаёт только boolean `refresh`, использует `ShouldBeUnique`, Redis unique store, overlap lock, timeout 300 s, tries 3 и backoff 30/120/300. Import/admin dispatch after commit прогревает уже изменённые versions; плановый job с `refresh=true` пересобирает текущие keys под Redis lock и заменяет их только после успешной сборки.
+- Horizon не установлен: текущая инфраструктура не подтверждает отдельный поддерживаемый non-cluster Redis deployment и авторизованный UI. При его добавлении нельзя использовать зарезервированный Horizon connection для cache/session/locks.
 
 ## Jobs
 
@@ -19,12 +23,13 @@
 - Queued finalizer выбирает `licensed_media` только по наступившему `next_check_at`, в стабильном `id`-порядке проверяет не более `SEASONVAR_MEDIA_CHECK_MAX_PER_CYCLE` строк и применяет health state вне catalog transaction. Default cap `20` совместим с worker timeout при трёх 10-секундных попытках; `SEASONVAR_MEDIA_CHECK_CHUNK_SIZE` ограничивает только размер чтения. После batch finalizer пересобирает рекомендации и stats snapshot; permanent source error не делает сам finalizer job failed.
 - Перед внешним выбором и catalog-wide derived work finalizer выполняет bounded local metadata-backfill из сохранённых snapshots. Page/title limits не дают накопившемуся version backlog вытеснить остальные стадии одного 900-секундного job.
 - Recommendation rebuild ограничивает предварительный candidate pool через `SEASONVAR_RECOMMENDATION_CANDIDATE_LIMIT` и `SEASONVAR_RECOMMENDATION_CANDIDATE_SCAN_PER_FEATURE`; широкие слабые признаки учитываются только после отбора. Это удерживает полный rebuild внутри worker memory/timeout boundary.
+- Production template запускает PHP с `memory_limit=256M`, но просит Laravel завершить worker при `--memory=192`; `Restart=always` сразу создаёт свежий процесс. `--memory` сам по себе не повышает PHP hard limit и не заменяет эту пару настроек.
 - Unique key finalizer остаётся привязан к run ID. Дополнительный Redis lock `seasonvar-import-finalizer` сериализует catalog-wide finalization между разными runs, имеет TTL `job timeout + 300`, освобождается в `finally` и заставляет конкурирующий job обновить heartbeat и release на `SEASONVAR_QUEUE_FINALIZER_DELAY_SECONDS`. Run state и claims проверяются повторно уже под lock.
 - Run states: `queued -> running -> completed|partial|failed`; admin cancel даёт `cancelled`. Heartbeat обновляется coordinator/page/finalizer шагами, а admin service может закрыть `running` run с просроченным heartbeat, если живых claims больше нет. Порог — `SEASONVAR_QUEUE_STALE_AFTER_MINUTES`.
 - Retry из admin UI разрешён только для `partial/failed` и создаёт новую audit-строку. Для старых Laravel failed jobs остаётся `php artisan queue:failed`/`queue:retry <id>`; перед retry нужно сверить run state и claims.
 - Job принимает только scalar-параметры: URL-аргумент, `force` и `discover`. Модели или большие структуры данных в очередь не передаются.
 - Job не поддерживает `forever`-режим: queued import всегда выполняет ограниченный запуск, чтобы worker не занимался бесконечным циклом.
-- Job реализует `ShouldBeUnique`, использует уникальный ключ `seasonvar-import` и дополнительно берет тот же cache lock, что CLI-команда. Если импорт уже идет, job освобождает себя обратно в очередь через 300 секунд.
+- Job реализует `ShouldBeUnique`, использует уникальный ключ `seasonvar-import` и дополнительно берет тот же lock из configured critical store `redis-locks`, что CLI-команда. Если импорт уже идет, job освобождает себя обратно в очередь через 300 секунд; domain cache в координации не участвует.
 - Политика выполнения job: `tries=3`, `timeout=900`, backoff `[60, 300, 900]`, `uniqueFor=3600`.
 - Ошибки job логируются через `failed()` с URL-аргументом и флагами запуска; сама pipeline уже помечает созданный `SeasonvarImportRun` как failed.
 - Если задан `SEASONVAR_IMPORT_FAILURE_MAIL_TO`, `RunSeasonvarImport::failed()` отправляет queued on-demand notification `SeasonvarImportFailed` на email получателя. Notification использует queue из `NOTIFICATIONS_MAIL_QUEUE`.

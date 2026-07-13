@@ -17,7 +17,7 @@ use Throwable;
 
 class CatalogSearchIndexer
 {
-    public const INDEX_VERSION = 1;
+    public const INDEX_VERSION = 2;
 
     public function __construct(
         private readonly CatalogSearchDocumentBuilder $documents,

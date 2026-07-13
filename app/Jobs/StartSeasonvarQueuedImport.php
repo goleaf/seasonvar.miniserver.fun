@@ -77,7 +77,7 @@ final class StartSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
 
     public function uniqueVia(): Repository
     {
-        return Cache::store((string) config('seasonvar.queue.lock_store', 'redis'));
+        return Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'));
     }
 
     public function failed(?Throwable $exception): void

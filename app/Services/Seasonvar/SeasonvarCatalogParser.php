@@ -12,7 +12,7 @@ use InvalidArgumentException;
 
 class SeasonvarCatalogParser
 {
-    public const METADATA_VERSION = 1;
+    public const METADATA_VERSION = 2;
 
     private const METADATA_PRESENCE_FIELDS = [
         'genres' => ['type' => 'genre', 'labels' => ['Жанр']],
@@ -832,7 +832,7 @@ class SeasonvarCatalogParser
         $path = $parts['path'] ?? '';
 
         return in_array($host, ['seasonvar.ru', 'www.seasonvar.ru'], true)
-            && preg_match('~^/serial-\d+-[^/]+-0*\d{1,4}-+(?:season|sezon)\.html$~iu', $path) === 1;
+            && preg_match('~^/serial-\d+-[^/]+(?:-0*\d{1,4}-+(?:season|sezon))?\.html$~iu', $path) === 1;
     }
 
     private function seasonNumber(string $value): ?int

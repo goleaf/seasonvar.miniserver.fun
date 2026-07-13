@@ -3,7 +3,6 @@
 namespace App\Services\Google;
 
 use Illuminate\Http\Client\Factory as HttpFactory;
-use Illuminate\Support\Facades\Cache;
 use JsonException;
 
 class GoogleServiceAccountAccessToken
@@ -32,13 +31,6 @@ class GoogleServiceAccountAccessToken
             throw new GoogleIntegrationException('Не заданы OAuth scopes для Google API.');
         }
 
-        $cacheKey = 'google:service-account-token:'.hash('sha256', $clientEmail.'|'.implode(' ', $scopes));
-        $cached = Cache::get($cacheKey);
-
-        if (is_string($cached) && $cached !== '') {
-            return $cached;
-        }
-
         $response = $this->http
             ->asForm()
             ->acceptJson()
@@ -55,9 +47,6 @@ class GoogleServiceAccountAccessToken
         if (! is_array($response) || ! isset($response['access_token']) || ! is_string($response['access_token'])) {
             throw new GoogleIntegrationException('Google token response не содержит access_token.');
         }
-
-        $ttl = max(60, ((int) ($response['expires_in'] ?? 3600)) - 60);
-        Cache::put($cacheKey, $response['access_token'], $ttl);
 
         return $response['access_token'];
     }

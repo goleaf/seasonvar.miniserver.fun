@@ -38,6 +38,7 @@ class RebuildCatalogSearchCommandTest extends TestCase
         $indexer = app(CatalogSearchIndexer::class);
         $indexer->indexTitleIds([$titles[0]->id]);
         $this->state()->update([
+            'version' => CatalogSearchIndexer::INDEX_VERSION,
             'status' => CatalogSearchIndexStatus::Building,
             'checkpoint_id' => $titles[0]->id,
             'source_count' => 3,

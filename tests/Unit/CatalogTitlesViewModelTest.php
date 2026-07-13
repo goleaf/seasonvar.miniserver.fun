@@ -24,6 +24,7 @@ class CatalogTitlesViewModelTest extends TestCase
         );
 
         $this->assertSame([
+            'relevance' => 'По релевантности',
             'updated' => 'Недавно обновленные',
             'year_desc' => 'Год: новые сначала',
             'year_asc' => 'Год: старые сначала',

@@ -22,6 +22,26 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      memcached:
+        image: memcached:1.6-alpine
+        ports:
+          - 11211:11211
+        options: >-
+          --health-cmd "timeout 2 sh -c 'printf version\\r\\n | nc 127.0.0.1 11211'"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
     env:
       APP_ENV: testing
       APP_DEBUG: "false"
@@ -29,6 +49,29 @@ jobs:
       APP_URL: http://localhost
       BROADCAST_CONNECTION: "null"
       CACHE_STORE: array
+      CACHE_LIMITER_STORE: redis-limiter
+      CACHE_DOMAIN_STORE: redis-domain
+      CACHE_HOT_STORE: memcached-hot
+      CACHE_LOCK_STORE: redis-locks
+      CACHE_METRICS_STORE: redis-domain
+      CACHE_APPLICATION: seasonvar-ci
+      CACHE_ENVIRONMENT: "run-${{ github.run_id }}"
+      CACHE_PREFIX: "seasonvar-ci-${{ github.run_id }}-"
+      MEMCACHED_HOT_PREFIX: "seasonvar-ci-${{ github.run_id }}-hot-"
+      REDIS_CLIENT: phpredis
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+      REDIS_CACHE_DB: 1
+      REDIS_QUEUE_DB: 2
+      REDIS_SESSION_DB: 3
+      REDIS_LIMITER_DB: 4
+      REDIS_LOCK_DB: 5
+      REDIS_CACHE_PREFIX: "seasonvar-ci-${{ github.run_id }}-cache-"
+      REDIS_QUEUE_PREFIX: "seasonvar-ci-${{ github.run_id }}-queue-"
+      REDIS_SESSION_PREFIX: "seasonvar-ci-${{ github.run_id }}-session-"
+      REDIS_LIMITER_PREFIX: "seasonvar-ci-${{ github.run_id }}-limiter-"
+      REDIS_LOCK_PREFIX: "seasonvar-ci-${{ github.run_id }}-lock-"
+      RUN_CACHE_INFRASTRUCTURE_TESTS: "true"
       MAIL_MAILER: array
       QUEUE_CONNECTION: sync
       SESSION_DRIVER: array
@@ -41,7 +84,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.5"
-          extensions: mbstring, dom, fileinfo, pdo_sqlite, sqlite3
+          extensions: mbstring, dom, fileinfo, pdo_sqlite, sqlite3, redis, memcached
           coverage: none
 
       - name: Get Composer cache directory

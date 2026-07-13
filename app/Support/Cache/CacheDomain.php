@@ -1,0 +1,18 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Support\Cache;
+
+enum CacheDomain: string
+{
+    case Homepage = 'homepage';
+    case CatalogFacets = 'catalog-facets';
+    case CatalogStats = 'catalog-stats';
+    case TitleDetail = 'title-detail';
+    case Recommendations = 'recommendations';
+    case SearchSuggestions = 'search-suggestions';
+    case Sitemap = 'sitemap';
+    case Api = 'api';
+    case Operational = 'operational';
+}

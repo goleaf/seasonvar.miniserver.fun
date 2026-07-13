@@ -3,11 +3,19 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Support\Cache\CacheEventReporter;
+use App\Support\RateLimiting\RequestRateLimitKey;
 use App\View\ViewData\AppLayoutData;
+use Illuminate\Cache\Events\CacheFailedOver;
+use Illuminate\Cache\Events\CacheHit;
+use Illuminate\Cache\Events\CacheMissed;
+use Illuminate\Cache\Events\KeyForgotten;
+use Illuminate\Cache\Events\KeyWritten;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
@@ -32,6 +40,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Event::listen(CacheHit::class, fn (CacheHit $event) => app(CacheEventReporter::class)->record($event, 'hit'));
+        Event::listen(CacheMissed::class, fn (CacheMissed $event) => app(CacheEventReporter::class)->record($event, 'miss'));
+        Event::listen(KeyWritten::class, fn (KeyWritten $event) => app(CacheEventReporter::class)->record($event, 'write'));
+        Event::listen(KeyForgotten::class, fn (KeyForgotten $event) => app(CacheEventReporter::class)->record($event, 'forget'));
+        Event::listen(CacheFailedOver::class, fn (CacheFailedOver $event) => app(CacheEventReporter::class)->failedOver($event));
+
         $catalogAdministrator = function (User $user): bool {
             return in_array(
                 Str::lower($user->email),
@@ -43,25 +57,29 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-seasonvar-imports', $catalogAdministrator);
         Gate::define('manage-catalog', $catalogAdministrator);
 
-        RateLimiter::for('catalog-stats', function (Request $request): Limit {
-            $userId = $request->user()?->getAuthIdentifier();
+        RateLimiter::for('catalog-stats', fn (Request $request): Limit => Limit::perMinute(180)
+            ->by(app(RequestRateLimitKey::class)->actor($request)));
+        RateLimiter::for('livewire-action', function (Request $request): array {
+            $keys = app(RequestRateLimitKey::class);
+            $actor = $keys->actor($request);
 
-            return Limit::perMinute(180)->by(
-                $userId === null ? 'ip:'.$request->ip() : 'user:'.$userId,
-            );
+            return [
+                Limit::perMinute(600)->by($actor.':transport'),
+                Limit::perMinute(180)->by($actor.':'.$keys->livewireFeature($request)),
+            ];
         });
 
         Livewire::setUpdateRoute(function ($handle, string $path) {
             return Route::post($path, $handle)
-                ->middleware(['web', 'throttle:catalog-stats']);
+                ->middleware(['web', 'throttle:livewire-action']);
         });
 
-        RateLimiter::for('catalog-api', fn (Request $request): Limit => Limit::perMinute(60)->by($request->ip()));
-        RateLimiter::for('playback-source', function (Request $request): Limit {
-            $viewer = $request->user()?->getAuthIdentifier();
-
-            return Limit::perMinute(120)->by($viewer === null ? 'ip:'.$request->ip() : 'user:'.$viewer);
-        });
+        RateLimiter::for('catalog-api', fn (Request $request): Limit => Limit::perMinute(60)
+            ->by(app(RequestRateLimitKey::class)->actor($request)));
+        RateLimiter::for('infrastructure-health', fn (Request $request): Limit => Limit::perMinute(30)
+            ->by(app(RequestRateLimitKey::class)->actor($request)));
+        RateLimiter::for('playback-source', fn (Request $request): Limit => Limit::perMinute(120)
+            ->by(app(RequestRateLimitKey::class)->actor($request)));
 
         Model::shouldBeStrict(! $this->app->isProduction());
         DB::prohibitDestructiveCommands($this->app->isProduction());

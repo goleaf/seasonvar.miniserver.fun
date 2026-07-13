@@ -61,7 +61,7 @@ final class CatalogAdministrationService
 
     public function __construct(
         private readonly CatalogTaxonomyRegistry $taxonomies,
-        private readonly CatalogStatsSnapshotCache $statsSnapshots,
+        private readonly CatalogCacheInvalidator $cacheInvalidator,
         private readonly PlaybackSourceUrlGuard $playbackUrls,
         private readonly CatalogSearchIndexer $searchIndexer,
     ) {}
@@ -445,7 +445,7 @@ final class CatalogAdministrationService
             ->orWhere('recommended_title_id', $title->id)
             ->delete();
         $this->searchIndexer->synchronizeTitleIds([$title->id]);
-        $this->statsSnapshots->forget();
+        $this->cacheInvalidator->catalogChanged([(int) $title->id]);
     }
 
     private function touchTitle(CatalogTitle $title): void

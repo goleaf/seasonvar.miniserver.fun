@@ -48,7 +48,7 @@ class SeasonvarQueueMonitor
         }
 
         $seconds = max(60, (int) config('seasonvar.queue.busy_log_seconds', 3600));
-        $logged = Cache::store((string) config('seasonvar.queue.lock_store', 'redis'))
+        $logged = Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'))
             ->add('seasonvar-queue-busy-log', true, $seconds);
 
         if (! $logged) {

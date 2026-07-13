@@ -63,6 +63,14 @@ class SeasonvarTitlePageStateSynchronizerTest extends TestCase
             'import_claimed_at' => now(),
             'import_claim_expires_at' => now()->addHour(),
         ]);
+        $expiredClaimSibling = $makePage('https://seasonvar.ru/serial-42-title-6-season.html', [
+            'parse_status' => 'parsed',
+            'import_status' => 'missing_data',
+            'missing_data_flags' => ['expired-claim-sentinel'],
+            'import_claim_token' => 'expired-claim',
+            'import_claimed_at' => now()->subHours(2),
+            'import_claim_expires_at' => now()->subHour(),
+        ]);
 
         $catalogTitle = CatalogTitle::factory()->create([
             'source_id' => $source->id,
@@ -71,7 +79,7 @@ class SeasonvarTitlePageStateSynchronizerTest extends TestCase
             'source_url_hash' => $currentPage->url_hash,
         ]);
 
-        foreach ([$eligibleSibling, $pendingSibling, $failedSibling, $claimedSibling] as $index => $page) {
+        foreach ([$eligibleSibling, $pendingSibling, $failedSibling, $claimedSibling, $expiredClaimSibling] as $index => $page) {
             Season::factory()->create([
                 'catalog_title_id' => $catalogTitle->id,
                 'number' => $index + 2,
@@ -90,6 +98,7 @@ class SeasonvarTitlePageStateSynchronizerTest extends TestCase
         $this->assertSame(['pending-sentinel'], $pendingSibling->fresh()->missing_data_flags);
         $this->assertSame(['failed-sentinel'], $failedSibling->fresh()->missing_data_flags);
         $this->assertSame(['claimed-sentinel'], $claimedSibling->fresh()->missing_data_flags);
+        $this->assertSame($flags, $expiredClaimSibling->fresh()->missing_data_flags);
         $this->assertSame($currentRun->id, $currentPage->fresh()->last_import_run_id);
         $this->assertSame(now()->toDateTimeString(), $currentPage->fresh()->last_imported_at?->toDateTimeString());
     }
