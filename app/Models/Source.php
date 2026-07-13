@@ -31,6 +31,14 @@ class Source extends Model
     }
 
     /**
+     * @return HasMany<CatalogRelationSourceIdentity, $this>
+     */
+    public function catalogRelationSourceIdentities(): HasMany
+    {
+        return $this->hasMany(CatalogRelationSourceIdentity::class);
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
