@@ -1,8 +1,8 @@
-@props(['siteName'])
+@props(['siteName', 'directories' => collect()])
 
 <footer data-site-footer {{ $attributes->class(['mt-10 border-t border-slate-200 bg-white']) }}>
     <div class="mx-auto max-w-[1760px] px-3 sm:px-6 lg:px-8">
-        <div class="grid gap-8 py-8 md:grid-cols-2 md:py-10 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,0.75fr)_minmax(0,0.75fr)] xl:gap-12">
+        <div class="grid gap-8 py-8 md:grid-cols-2 md:py-10 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,0.7fr)] xl:gap-10">
             <div data-site-footer-brand class="min-w-0 md:col-span-2 xl:col-span-1 xl:max-w-xl">
                 <a href="{{ route('home') }}" class="inline-flex min-w-0 items-center gap-3 rounded-control">
                     <span class="grid h-12 w-12 shrink-0 place-items-center rounded-control bg-emerald-50 text-lg text-emerald-700">
@@ -60,6 +60,27 @@
                             </a>
                         </li>
                     @endauth
+                </ul>
+            </nav>
+
+            <nav aria-labelledby="footer-directory-navigation" class="min-w-0">
+                <h2 id="footer-directory-navigation" class="flex items-center gap-2 text-sm font-bold text-slate-800">
+                    <x-ui.icon name="fa-solid fa-folder-tree" class="text-emerald-700" />
+                    <span>{{ __('catalog.directories.label') }}</span>
+                </h2>
+                <ul class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1">
+                    @foreach ($directories as $directory)
+                        <li>
+                            <a href="{{ route($directory->indexRouteName) }}" @class([
+                                'flex min-h-11 min-w-0 items-center gap-2 py-2 text-sm font-semibold transition hover:text-emerald-700 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200',
+                                'text-emerald-700' => request()->routeIs($directory->key.'.*'),
+                                'text-slate-600' => ! request()->routeIs($directory->key.'.*'),
+                            ]) @if (request()->routeIs($directory->key.'.*')) aria-current="page" @endif>
+                                <x-ui.icon :name="$directory->icon.' shrink-0 text-slate-400'" />
+                                <span class="min-w-0 break-words">{{ $directory->title }}</span>
+                            </a>
+                        </li>
+                    @endforeach
                 </ul>
             </nav>
 

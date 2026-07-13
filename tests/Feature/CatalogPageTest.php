@@ -6,6 +6,7 @@ use App\DTOs\VerifiedExternalUrlData;
 use App\Enums\ReleaseKind;
 use App\Jobs\StartSeasonvarQueuedImport;
 use App\Livewire\CatalogAdministrationManager;
+use App\Livewire\CatalogDirectoryBrowser;
 use App\Livewire\CatalogSeries;
 use App\Livewire\CatalogTitlePlayer;
 use App\Livewire\SeasonvarImportManager;
@@ -28,16 +29,19 @@ use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use App\Models\Tag;
 use App\Models\User;
+use App\Services\Catalog\CatalogDirectoryRegistry;
 use App\Services\Catalog\CatalogHomeMetricsCache;
 use App\Services\Catalog\CatalogHomeSnapshotCache;
 use App\Services\Catalog\CatalogPlaybackProgressSession;
 use App\Services\Catalog\CatalogStatsPageBuilder;
 use App\Services\Catalog\CatalogStatsPosterUrlGuard;
+use App\Services\Catalog\CatalogTaxonomyRegistry;
 use App\Services\Catalog\CatalogUserStateService;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheVersionRegistry;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -60,6 +64,179 @@ class CatalogPageTest extends TestCase
         $response->assertDontSeeText('Состояние базы');
         $response->assertSeeText('Сейчас можно смотреть');
         $response->assertDontSeeText('Быстрый выбор');
+    }
+
+    public function test_every_public_catalog_directory_hub_is_available(): void
+    {
+        foreach (app(CatalogDirectoryRegistry::class)->all() as $directory) {
+            $this->get(route($directory->indexRouteName))
+                ->assertOk()
+                ->assertSeeLivewire('catalog-directory-browser')
+                ->assertSeeText($directory->title)
+                ->assertSee('<link rel="canonical" href="'.route($directory->indexRouteName).'">', false);
+        }
+    }
+
+    public function test_directory_counts_and_rows_include_only_visible_published_titles(): void
+    {
+        $genre = Genre::query()->create(['name' => 'Научная фантастика', 'slug' => 'nauchnaia-fantastika']);
+        $published = CatalogTitle::factory()->create(['title' => 'Видимый сериал']);
+        $draft = CatalogTitle::factory()->create([
+            'title' => 'Скрытый черновик',
+            'is_published' => false,
+            'publication_status' => 'draft',
+        ]);
+        $published->genres()->attach($genre);
+        $draft->genres()->attach($genre);
+
+        $this->get(route('genres.index'))
+            ->assertOk()
+            ->assertSeeText('1 значение')
+            ->assertSeeText('1 сериал')
+            ->assertSeeText('Научная фантастика')
+            ->assertSee('href="'.route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => $genre->slug]).'"', false)
+            ->assertDontSeeText('Скрытый черновик');
+    }
+
+    public function test_friendly_directory_details_redirect_permanently_to_generic_canonical_pages(): void
+    {
+        $title = CatalogTitle::factory()->create(['year' => 2026]);
+        $taxonomies = app(CatalogTaxonomyRegistry::class);
+
+        foreach (app(CatalogDirectoryRegistry::class)->all()->whereNotNull('filterType')->values() as $index => $directory) {
+            $filterType = $directory->filterType->value;
+            $modelClass = $taxonomies->modelClass($filterType);
+            $taxonomy = $modelClass::query()->create([
+                'name' => 'Значение '.($index + 1),
+                'slug' => 'znachenie-'.($index + 1),
+            ]);
+            $title->{$taxonomies->relationName($filterType)}()->attach($taxonomy);
+
+            $this->get(route($directory->detailRouteName, $taxonomy->slug))
+                ->assertStatus(301)
+                ->assertRedirect(route('titles.taxonomy', ['type' => $filterType, 'taxonomy' => $taxonomy->slug]));
+        }
+
+        $this->get(route('years.show', 2026))
+            ->assertStatus(301)
+            ->assertRedirect(route('titles.year', ['year' => 2026]));
+
+        $this->get('/genres/neizvestnyi-zhanr')->assertNotFound();
+        $this->get('/genres/NEVALID')->assertNotFound();
+        $this->get('/years/1899')->assertNotFound();
+        $this->get('/directories-do-not-exist')->assertRedirect(route('home'));
+    }
+
+    public function test_directory_livewire_state_is_url_bound_normalized_and_resets_pagination(): void
+    {
+        foreach (range(1, 55) as $number) {
+            $actor = Actor::query()->create([
+                'name' => sprintf('Актёр %02d', $number),
+                'slug' => 'akter-'.$number,
+            ]);
+            $title = CatalogTitle::factory()->create();
+            $title->actors()->attach($actor);
+        }
+
+        Livewire::withQueryParams([
+            'q' => '  Актёр  ',
+            'letter' => 'А',
+            'sort' => 'count_desc',
+            'page' => 2,
+        ])->test(CatalogDirectoryBrowser::class, ['directory' => 'actors'])
+            ->assertSet('search', 'Актёр')
+            ->assertSet('letter', 'А')
+            ->assertSet('sort', 'count_desc')
+            ->set('search', 'Актёр 10')
+            ->assertSet('paginators.page', 1)
+            ->assertSeeText('Актёр 10')
+            ->assertSeeText('Найдено 1 значение')
+            ->assertDontSeeText('Актёр 05');
+
+        Livewire::withQueryParams([
+            'q' => ['unsafe'],
+            'letter' => ['А'],
+            'sort' => 'drop_table',
+            'decade' => 'not-a-decade',
+        ])->test(CatalogDirectoryBrowser::class, ['directory' => 'actors'])
+            ->assertSet('search', '')
+            ->assertSet('letter', '')
+            ->assertSet('sort', 'name_asc')
+            ->assertSet('decade', null)
+            ->assertHasNoErrors();
+    }
+
+    public function test_year_directory_has_only_valid_non_empty_years_and_decade_navigation(): void
+    {
+        config(['catalog.directories.maximum_year' => 2027]);
+        CatalogTitle::factory()->create(['title' => 'Сериал 1998', 'year' => 1998]);
+        CatalogTitle::factory()->create(['title' => 'Сериал 2027', 'year' => 2027]);
+        CatalogTitle::factory()->create(['title' => 'Сериал 2028', 'year' => 2028]);
+        CatalogTitle::factory()->create(['title' => 'Сериал 1899', 'year' => 1899]);
+
+        $this->get(route('years.index'))
+            ->assertOk()
+            ->assertSeeText('1990-е')
+            ->assertSeeText('2020-е')
+            ->assertSeeText('1998')
+            ->assertSeeText('2027')
+            ->assertDontSeeText('2028')
+            ->assertDontSeeText('1899');
+    }
+
+    public function test_directory_metadata_uses_one_canonical_and_valid_collection_json_ld(): void
+    {
+        $actor = Actor::query()->create(['name' => 'Иван Петров', 'slug' => 'ivan-petrov']);
+        $title = CatalogTitle::factory()->create();
+        $title->actors()->attach($actor);
+        $canonical = route('actors.index');
+
+        $response = $this->get(route('actors.index', ['q' => 'Иван', 'letter' => 'И']));
+
+        $response
+            ->assertOk()
+            ->assertSee('<link rel="canonical" href="'.$canonical.'">', false)
+            ->assertSee('<meta name="robots" content="noindex,nofollow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">', false)
+            ->assertSee('<meta property="og:url" content="'.$canonical.'">', false)
+            ->assertSee('"@type":"CollectionPage"', false)
+            ->assertSee('"@type":"ItemList"', false)
+            ->assertSeeText('Иван Петров');
+    }
+
+    public function test_directory_render_uses_a_bounded_number_of_grouped_queries(): void
+    {
+        foreach (range(1, 30) as $number) {
+            $actor = Actor::query()->create([
+                'name' => 'Исполнитель '.$number,
+                'slug' => 'ispolnitel-'.$number,
+            ]);
+            CatalogTitle::factory()->create()->actors()->attach($actor);
+        }
+
+        $queries = [];
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            if (str_contains($query->sql, 'actors') || str_contains($query->sql, 'catalog_title_actor')) {
+                $queries[] = $query->sql;
+            }
+        });
+
+        $this->get(route('actors.index'))->assertOk();
+
+        $this->assertLessThanOrEqual(7, count($queries));
+        $this->assertTrue(collect($queries)->contains(
+            fn (string $sql): bool => str_contains(strtolower($sql), 'count(distinct'),
+        ));
+    }
+
+    public function test_livewire_assets_are_loaded_once_on_ordinary_and_directory_pages(): void
+    {
+        foreach ([route('home'), route('genres.index')] as $url) {
+            Livewire::flushState();
+            $content = $this->get($url)->assertOk()->getContent();
+
+            $this->assertSame(1, substr_count($content, '/vendor/livewire/livewire.js'));
+            $this->assertSame(1, substr_count($content, 'data-csrf='));
+        }
     }
 
     public function test_import_admin_route_is_authorized_and_polls_only_while_a_run_is_active(): void
@@ -1297,7 +1474,23 @@ class CatalogPageTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('<link rel="canonical" href="'.route('titles.index').'">', false)
-            ->assertSee('<meta name="robots" content="noindex,follow', false);
+            ->assertSee('<meta name="robots" content="noindex,nofollow', false);
+    }
+
+    public function test_catalog_state_links_are_nofollow_while_title_cards_remain_followable(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Карточка без nofollow',
+            'slug' => 'kartochka-bez-nofollow',
+        ]);
+
+        $content = $this->get(route('titles.index'))->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression('/<a[^>]*data-catalog-sort-option[^>]*rel="nofollow"[^>]*>/', $content);
+        $this->assertMatchesRegularExpression('/<a[^>]*data-catalog-view-option[^>]*rel="nofollow"[^>]*>/', $content);
+        $this->assertMatchesRegularExpression('/<a[^>]*data-catalog-alphabet-option[^>]*rel="nofollow"[^>]*>/', $content);
+        $this->assertStringContainsString('href="'.route('titles.show', $catalogTitle).'"', $content);
+        $this->assertDoesNotMatchRegularExpression('/<a[^>]*href="'.preg_quote(route('titles.show', $catalogTitle), '/').'"[^>]*rel="nofollow"/', $content);
     }
 
     public function test_public_catalog_pages_do_not_render_decorative_panel_subtitles(): void

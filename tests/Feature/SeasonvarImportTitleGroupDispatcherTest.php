@@ -15,6 +15,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use RuntimeException;
 use Tests\TestCase;
 
 class SeasonvarImportTitleGroupDispatcherTest extends TestCase
@@ -112,6 +113,7 @@ class SeasonvarImportTitleGroupDispatcherTest extends TestCase
         $this->assertSame('prepared', $parent->fresh()->status->value);
         $this->assertSame(2, $group->fresh()->expected_pages);
         $this->assertSame(1, $group->fresh()->prepared_pages);
+        $this->assertSame(1, $group->run->fresh()->parsed);
         $this->assertDatabaseHas('seasonvar_import_prepared_pages', [
             'seasonvar_import_title_group_id' => $group->id,
             'source_page_id' => SeasonvarImportPreparedPage::query()
@@ -120,6 +122,21 @@ class SeasonvarImportTitleGroupDispatcherTest extends TestCase
             'status' => 'queued',
         ]);
         Queue::assertPushed(PrepareSeasonvarImportTitlePage::class, 2);
+    }
+
+    public function test_failed_preparation_counts_page_and_run_once(): void
+    {
+        Queue::fake();
+        $title = $this->titleWithSeasonUrls([1]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $job = new PrepareSeasonvarImportTitlePage($group->preparedPages()->value('id'));
+
+        $job->failed(new RuntimeException('HTTP 503'));
+        $job->failed(new RuntimeException('HTTP 503'));
+
+        $this->assertSame(1, $group->fresh()->failed_pages);
+        $this->assertSame(1, $group->run->fresh()->failed);
     }
 
     /** @param list<int> $seasonNumbers */

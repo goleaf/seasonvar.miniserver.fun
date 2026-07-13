@@ -68,15 +68,15 @@ php artisan seasonvar:import
 php artisan seasonvar:import "https://seasonvar.ru/serial-615--Bez_sleda_pssmtlk-1-season.html" --force
 ```
 
-Режим `--forever` предназначен для одного долгоживущего процесса и не нужен при production-запуске через десять Redis workers:
+Режим `--forever` предназначен для одного долгоживущего процесса и не нужен при production-запуске через Redis workers:
 
 ```bash
 php artisan seasonvar:import --forever
 ```
 
-### Параллельный импорт в 10 потоков
+### Параллельный импорт и обновление открытых тайтлов
 
-Для production используется `php artisan seasonvar:import --queued`. Команда только находит и закрепляет подходящие страницы и ставит jobs в Redis. Десять фоновых workers разбирают эти страницы параллельно.
+Для production используется `php artisan seasonvar:import --queued`. Команда находит и закрепляет подходящие страницы и ставит jobs в Redis. Десять workers обслуживают общий `seasonvar-import`, а отдельный IO-bound пул обслуживает browser-triggered `seasonvar-title-refresh`.
 
 Первичная подготовка:
 
@@ -85,9 +85,13 @@ cd /www/wwwroot/seasonvar.miniserver.fun
 redis-cli ping
 php artisan migrate --force
 sudo cp deploy/systemd/seasonvar-import-worker@.service /etc/systemd/system/
+sudo cp deploy/systemd/seasonvar-title-refresh-worker@.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now seasonvar-import-worker@{1..10}.service
+sudo systemctl enable --now seasonvar-title-refresh-worker@{1..32}.service
 ```
+
+Десять общих workers обслуживают catalog-wide очередь `seasonvar-import`, а отдельный IO-bound пул обслуживает только срочные обновления открытых карточек. Число `32` — стартовая process capacity, не лимит страниц: importer ставит отдельную preparation job для каждой известной или найденной страницы сезона и затем применяет их одним finalizer.
 
 `redis-cli ping` должен вернуть `PONG`. После запуска workers поставить подходящие страницы в очередь:
 
@@ -99,21 +103,25 @@ php artisan seasonvar:import --queued
 
 ```bash
 systemctl --no-pager --type=service 'seasonvar-import-worker@*'
+systemctl --no-pager --type=service 'seasonvar-title-refresh-worker@*'
 php artisan seasonvar:import --status
 php artisan queue:failed
 journalctl -u 'seasonvar-import-worker@*' -f
+journalctl -u 'seasonvar-title-refresh-worker@*' -f
 ```
 
 Остановить workers без удаления очереди и claims:
 
 ```bash
 sudo systemctl stop 'seasonvar-import-worker@*.service'
+sudo systemctl stop 'seasonvar-title-refresh-worker@*.service'
 ```
 
 Продолжить обработку сохраненной очереди:
 
 ```bash
 sudo systemctl start seasonvar-import-worker@{1..10}.service
+sudo systemctl start seasonvar-title-refresh-worker@{1..32}.service
 ```
 
 После обновления PHP-кода workers необходимо перезапустить, потому что `queue:work` является долгоживущим процессом:
@@ -167,6 +175,8 @@ sudo crontab -u www -l
 Frontend собирается через Vite 8 и Tailwind CSS 4. Основная точка входа — `resources/js/app.js`; подробности по командам и asset rules описаны в `docs/frontend.md`.
 
 Страница `/titles` — full-page Livewire-компонент. Поиск (`q`), multi-select фильтры, allowlisted `sort`, вид, размер и `page` синхронизируются с URL и browser history; malformed значения безопасно нормализуются, а страница за последней границей восстанавливается автоматически. Публичное состояние содержит только нормализованные скаляры и небольшие массивы, а duplicate-free выдача строится общим `CatalogTitleQuery` на каждом запросе. Значения внутри одной группы объединяются через OR, разные группы — через AND. Поддерживаются годы, типы публикации, актеры, режиссеры, жанры, страны, возрастные рейтинги, production statuses, озвучка/перевод, качество видео и наличие субтитров; актеры и режиссеры ищутся на сервере с ограниченной выдачей.
+
+Публичные справочники доступны по `/genres`, `/countries`, `/actors`, `/directors`, `/age-ratings`, `/translations`, `/statuses`, `/networks`, `/studios`, `/tags` и `/years`. Один `CatalogDirectoryRegistry` связывает эти URL с существующим `CatalogTaxonomyRegistry`, а `CatalogDirectoryQuery` считает только доступные гостю опубликованные тайтлы через grouped pivot queries и `count(distinct ...)`. Поиск, буква, сортировка, десятилетие и страница хранятся в URL Livewire 4; модели и коллекции в public state не сериализуются. Canonical detail URL остаётся `/titles/{type}/{taxonomy}` или `/titles/year/{year}`, а дружелюбные detail aliases дают постоянный redirect и не образуют SEO-дубликаты.
 
 Десять relation-фасетов `/titles` выполняются одним bounded `UNION ALL`, причем limit применяется внутри каждой группы. Карточки и title summaries выбирают только отображаемые поля связей. Приватные progress/history данные не помещаются в shared cache. Для гостевой выдачи tiered Redis/Memcached layer хранит только компактные ID/DTO snapshots главной, default facets и обезличенную статистику; Eloquent-графы, signed media URL и arbitrary search не кэшируются. Точная матрица находится в `docs/caching.md`.
 

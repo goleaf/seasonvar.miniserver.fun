@@ -1,5 +1,5 @@
 [Unit]
-Description=Seasonvar import queue worker %i
+Description=Seasonvar title refresh queue worker %i
 After=network.target redis.service
 
 [Service]
@@ -7,7 +7,7 @@ Type=simple
 User=www
 Group=www
 WorkingDirectory=/www/wwwroot/seasonvar.miniserver.fun
-ExecStart=/usr/bin/php -d memory_limit=256M artisan queue:work redis --queue=seasonvar-import --sleep=1 --tries=0 --timeout=900 --memory=192 --max-time=3600 --max-jobs=1000
+ExecStart=/usr/bin/php -d memory_limit=256M artisan queue:work redis --queue=seasonvar-title-refresh --sleep=1 --tries=0 --timeout=900 --memory=192 --max-time=3600 --max-jobs=1000
 ExecReload=/usr/bin/php artisan queue:restart
 Restart=always
 RestartSec=5

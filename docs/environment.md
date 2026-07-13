@@ -28,7 +28,7 @@ Shared defaults задают `REDIS_URL` либо `REDIS_HOST`, `REDIS_PORT`, `R
 
 Standalone default DBs: cache 1, queues 2, sessions 3, limiter 4, locks 5, broadcasting 6. При managed Redis/Cluster используйте отдельные endpoints и prefixes; DB numbers не считаются HA boundary.
 
-`SEASONVAR_TITLE_REFRESH_FRESH_MINUTES` задаёт успешное окно targeted refresh (по умолчанию 15 минут). `SEASONVAR_TITLE_REFRESH_QUEUE` выбирает его приоритетную очередь (по умолчанию `seasonvar-title-refresh`); worker должен слушать её перед общей `seasonvar-import`. `SEASONVAR_TITLE_REFRESH_STATE_TTL_SECONDS`, `SEASONVAR_TITLE_REFRESH_ACTIVE_SECONDS` и `SEASONVAR_TITLE_REFRESH_DISPATCH_LOCK_SECONDS` ограничивают operational state, stale-active recovery и atomic dispatch lock; connection и lock store остаются общими `SEASONVAR_QUEUE_*` настройками.
+`SEASONVAR_TITLE_REFRESH_FRESH_MINUTES` задаёт successful-only окно targeted refresh (по умолчанию 15 минут), а `SEASONVAR_TITLE_REFRESH_QUEUE` — отдельную приоритетную очередь `seasonvar-title-refresh`. `SEASONVAR_TITLE_REFRESH_FINALIZER_DELAY_SECONDS` задаёт короткую задержку повторной проверки незавершённой группы; `SEASONVAR_TITLE_REFRESH_STATE_TTL_SECONDS`, `SEASONVAR_TITLE_REFRESH_ACTIVE_SECONDS` и `SEASONVAR_TITLE_REFRESH_DISPATCH_LOCK_SECONDS` ограничивают operational state, stale-active recovery и atomic dispatch lock. `SEASONVAR_IMPORT_PREPARED_RETENTION_DAYS` управляет bounded очисткой старых terminal groups вместе с подготовленными payload. Connection и critical lock store остаются общими `SEASONVAR_QUEUE_*` настройками; лимита числа страниц или конкурентности в application config намеренно нет.
 
 ## Memcached и application cache
 

@@ -8,6 +8,7 @@ use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
 use App\Services\Seasonvar\SeasonvarImportGroupKey;
 use App\Services\Seasonvar\SeasonvarImportRunRecorder;
+use App\Services\Seasonvar\SeasonvarImportTitleGroupDispatcher;
 use App\Services\Seasonvar\SeasonvarPageClaimManager;
 use DateTimeInterface;
 use Illuminate\Bus\Queueable;
@@ -55,17 +56,18 @@ class ImportSeasonvarSourcePage implements ShouldQueue
 
     public function handle(
         SeasonvarPageClaimManager $claims,
-        SeasonvarCatalogImporter $importer,
-        SeasonvarImportRunRecorder $runs,
-        SeasonvarImportGroupKey $groupKeys,
+        SeasonvarImportTitleGroupDispatcher $groups,
+        ?SeasonvarCatalogImporter $importer = null,
+        ?SeasonvarImportRunRecorder $runs = null,
+        ?SeasonvarImportGroupKey $groupKeys = null,
     ): void {
-        $runIsActive = SeasonvarImportRun::query()
+        $run = SeasonvarImportRun::query()
             ->whereKey($this->importRunId)
             ->where('execution_mode', 'queue')
             ->where('status', 'running')
-            ->exists();
+            ->first();
 
-        if (! $runIsActive) {
+        if ($run === null) {
             $claims->release($this->sourcePageId, $this->importRunId, $this->claimToken);
 
             return;
@@ -75,8 +77,43 @@ class ImportSeasonvarSourcePage implements ShouldQueue
             return;
         }
 
+        $page = SourcePage::query()->with(['source', 'catalogTitle'])->find($this->sourcePageId);
+
+        if ($page === null) {
+            $claims->release($this->sourcePageId, $this->importRunId, $this->claimToken);
+
+            return;
+        }
+
+        if ($page->page_type !== 'serial') {
+            $this->handleNonSerialPage(
+                $page,
+                $claims,
+                $importer ?? app(SeasonvarCatalogImporter::class),
+                $runs ?? app(SeasonvarImportRunRecorder::class),
+                $groupKeys ?? app(SeasonvarImportGroupKey::class),
+            );
+
+            return;
+        }
+
+        $groups->adoptPage(
+            $run,
+            $page,
+            (string) config('seasonvar.queue.queue', 'seasonvar-import'),
+            $page->catalogTitle,
+        );
+    }
+
+    private function handleNonSerialPage(
+        SourcePage $page,
+        SeasonvarPageClaimManager $claims,
+        SeasonvarCatalogImporter $importer,
+        SeasonvarImportRunRecorder $runs,
+        SeasonvarImportGroupKey $groupKeys,
+    ): void {
         if (! $claims->extend(
-            $this->sourcePageId,
+            $page->id,
             $this->importRunId,
             $this->claimToken,
             $this->timeout + 300,
@@ -85,22 +122,11 @@ class ImportSeasonvarSourcePage implements ShouldQueue
         }
 
         $runs->heartbeat($this->importRunId);
-
-        $page = SourcePage::query()->with('source')->find($this->sourcePageId);
-
-        if ($page === null) {
-            $runs->addCounters($this->importRunId, ['failed' => 1]);
-            $claims->release($this->sourcePageId, $this->importRunId, $this->claimToken);
-
-            return;
-        }
-
-        $groupKey = $groupKeys->forUrl($page->url, $page->url_hash);
         $lock = Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'))
-            ->lock($groupKey, $this->timeout + 300);
+            ->lock($groupKeys->forUrl($page->url, $page->url_hash), $this->timeout + 300);
 
         if (! $lock->get()) {
-            $claims->extend($this->sourcePageId, $this->importRunId, $this->claimToken, 3600);
+            $claims->extend($page->id, $this->importRunId, $this->claimToken, 3600);
             $this->release(30);
 
             return;
@@ -127,7 +153,7 @@ class ImportSeasonvarSourcePage implements ShouldQueue
             $releaseClaim = true;
         } finally {
             if ($releaseClaim) {
-                $claims->release($this->sourcePageId, $this->importRunId, $this->claimToken);
+                $claims->release($page->id, $this->importRunId, $this->claimToken);
             }
 
             $lock->release();

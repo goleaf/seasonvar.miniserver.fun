@@ -16,6 +16,27 @@ class CatalogSearchPageTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_catalog_query_gets_are_rate_limited_for_crawlers_without_spending_canonical_budget(): void
+    {
+        config(['catalog.query_rate_limit.bot_per_minute' => 1]);
+        $crawler = $this
+            ->withServerVariables(['REMOTE_ADDR' => '203.0.113.21'])
+            ->withHeader('User-Agent', 'ClaudeBot/1.0');
+
+        $crawler->get(route('titles.index', ['q' => 'первый запрос']))->assertOk();
+        $crawler->get(route('titles.index', ['q' => 'второй запрос']))->assertTooManyRequests();
+        $crawler->get(route('titles.index'))->assertOk();
+    }
+
+    public function test_site_search_suggests_a_matching_local_directory_without_remote_requests(): void
+    {
+        $this->get(route('titles.index', ['q' => 'Жанры сериалов']))
+            ->assertOk()
+            ->assertSeeText('Открыть справочник')
+            ->assertSee('href="'.route('genres.index').'"', false)
+            ->assertSeeText('Жанры сериалов');
+    }
+
     public function test_year_inside_query_is_a_hard_constraint(): void
     {
         CatalogTitle::factory()->create(['title' => 'Знахарь', 'slug' => 'znaxar-2008', 'year' => 2008]);
@@ -201,6 +222,7 @@ class CatalogSearchPageTest extends TestCase
 
         $this->get(route('titles.index', ['q' => 'шерлокк']))
             ->assertOk()
+            ->assertSee('<meta name="robots" content="noindex,nofollow', false)
             ->assertSeeText('По запросу «шерлокк» ничего не найдено.')
             ->assertDontSeeText('Посторонний сериал')
             ->assertDontSeeText('ближайшие результаты');

@@ -23,6 +23,7 @@ return [
         'storage_maintenance_enabled' => filter_var(env('SEASONVAR_IMPORT_STORAGE_MAINTENANCE_ENABLED', true), FILTER_VALIDATE_BOOL),
         'event_retention_days' => (int) env('SEASONVAR_IMPORT_EVENT_RETENTION_DAYS', 7),
         'snapshot_retention_days' => (int) env('SEASONVAR_IMPORT_SNAPSHOT_RETENTION_DAYS', 14),
+        'prepared_retention_days' => (int) env('SEASONVAR_IMPORT_PREPARED_RETENTION_DAYS', 7),
         'maintenance_chunk_size' => (int) env('SEASONVAR_IMPORT_MAINTENANCE_CHUNK_SIZE', 500),
     ],
     'page_types' => [
@@ -84,6 +85,7 @@ return [
     'title_refresh' => [
         'fresh_minutes' => (int) env('SEASONVAR_TITLE_REFRESH_FRESH_MINUTES', 15),
         'queue' => env('SEASONVAR_TITLE_REFRESH_QUEUE', 'seasonvar-title-refresh'),
+        'finalizer_delay_seconds' => (int) env('SEASONVAR_TITLE_REFRESH_FINALIZER_DELAY_SECONDS', 5),
         'state_ttl_seconds' => (int) env('SEASONVAR_TITLE_REFRESH_STATE_TTL_SECONDS', 86400),
         'active_seconds' => (int) env('SEASONVAR_TITLE_REFRESH_ACTIVE_SECONDS', 21900),
         'dispatch_lock_seconds' => (int) env('SEASONVAR_TITLE_REFRESH_DISPATCH_LOCK_SECONDS', 10),

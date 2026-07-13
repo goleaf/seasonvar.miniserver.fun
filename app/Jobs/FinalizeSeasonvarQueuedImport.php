@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\SeasonvarImportRun;
+use App\Models\SeasonvarImportTitleGroup;
 use App\Services\Catalog\CatalogCacheInvalidator;
 use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
@@ -63,6 +64,13 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        if ($this->hasActiveTitleGroups($run->id)) {
+            $runs->heartbeat($run->id);
+            $this->release($this->releaseDelay());
+
+            return;
+        }
+
         $lock = $this->uniqueVia()->lock(self::GLOBAL_LOCK_KEY, $this->timeout + 300);
 
         if (! $lock->get()) {
@@ -84,6 +92,22 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
                 $this->release($this->releaseDelay());
 
                 return;
+            }
+
+            if ($this->hasActiveTitleGroups($run->id)) {
+                $runs->heartbeat($run->id);
+                $this->release($this->releaseDelay());
+
+                return;
+            }
+
+            $problemGroups = SeasonvarImportTitleGroup::query()
+                ->where('seasonvar_import_run_id', $run->id)
+                ->whereIn('status', ['partial', 'failed'])
+                ->count();
+
+            if ($problemGroups > 0 && (int) $run->failed === 0) {
+                $run->update(['failed' => $problemGroups]);
             }
 
             $pipeline->finalizeQueuedRun($run);
@@ -119,6 +143,14 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
     private function releaseDelay(): int
     {
         return max(1, (int) config('seasonvar.queue.finalizer_delay_seconds', 60));
+    }
+
+    private function hasActiveTitleGroups(int $runId): bool
+    {
+        return SeasonvarImportTitleGroup::query()
+            ->where('seasonvar_import_run_id', $runId)
+            ->whereIn('status', ['discovering', 'running', 'finalizing'])
+            ->exists();
     }
 
     public function failed(?Throwable $exception): void

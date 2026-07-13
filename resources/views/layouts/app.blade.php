@@ -152,9 +152,7 @@
         @foreach ($jsonLdItems as $jsonLd)
             <script type="application/ld+json">{!! json_encode($jsonLd, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!}</script>
         @endforeach
-        @if (request()->routeIs('stats', 'viewing-activity'))
-            @livewireStyles
-        @endif
+        @livewireStyles
         @stack('head')
         @vite('resources/js/app.js')
     </head>
@@ -780,9 +778,7 @@
             @endif
             @endif
         </main>
-        <x-layout.site-footer :site-name="$siteName" />
-        @if (request()->routeIs('stats', 'viewing-activity'))
-            @livewireScripts
-        @endif
+        <x-layout.site-footer :site-name="$siteName" :directories="$catalogDirectoryLinks" />
+        @livewireScripts
     </body>
 </html>

@@ -3,11 +3,15 @@
 namespace Tests\Feature;
 
 use App\Exceptions\Seasonvar\SeasonvarSourceRequestException;
+use App\Jobs\FinalizeSeasonvarImportTitleGroup;
 use App\Jobs\FinalizeSeasonvarQueuedImport;
 use App\Jobs\ImportSeasonvarSourcePage;
+use App\Jobs\PrepareSeasonvarImportTitlePage;
 use App\Jobs\StartSeasonvarQueuedImport;
 use App\Models\LicensedMedia;
+use App\Models\SeasonvarImportPreparedPage;
 use App\Models\SeasonvarImportRun;
+use App\Models\Source;
 use App\Models\SourcePage;
 use App\Models\User;
 use App\Services\Catalog\CatalogCacheInvalidator;
@@ -17,6 +21,7 @@ use App\Services\Seasonvar\SeasonvarImportFailureClassifier;
 use App\Services\Seasonvar\SeasonvarImportGroupKey;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use App\Services\Seasonvar\SeasonvarImportRunRecorder;
+use App\Services\Seasonvar\SeasonvarImportTitleGroupDispatcher;
 use App\Services\Seasonvar\SeasonvarPageClaimManager;
 use App\Services\Seasonvar\SeasonvarQueuedImportDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -241,9 +246,6 @@ class SeasonvarParallelImportTest extends TestCase
         $claims = app(SeasonvarPageClaimManager::class);
         $token = $claims->claim($page, $run->id, 3600);
         $run->update(['status' => 'cancelled', 'finished_at' => now()]);
-        $importer = Mockery::mock(SeasonvarCatalogImporter::class);
-        $importer->shouldNotReceive('parsePages');
-
         (new ImportSeasonvarSourcePage(
             sourcePageId: $page->id,
             importRunId: $run->id,
@@ -251,9 +253,7 @@ class SeasonvarParallelImportTest extends TestCase
             groupKey: 'seasonvar-title:cancelled',
         ))->handle(
             $claims,
-            $importer,
-            app(SeasonvarImportRunRecorder::class),
-            app(SeasonvarImportGroupKey::class),
+            app(SeasonvarImportTitleGroupDispatcher::class),
         );
 
         $this->assertFalse($claims->owns($page->id, $run->id, (string) $token));
@@ -356,9 +356,6 @@ class SeasonvarParallelImportTest extends TestCase
         Http::fake();
         $run = $this->queuedRun();
         $page = SourcePage::factory()->create();
-        $importer = Mockery::mock(SeasonvarCatalogImporter::class);
-        $importer->shouldNotReceive('parsePages');
-
         (new ImportSeasonvarSourcePage(
             sourcePageId: $page->id,
             importRunId: $run->id,
@@ -366,9 +363,7 @@ class SeasonvarParallelImportTest extends TestCase
             groupKey: 'seasonvar-title:1',
         ))->handle(
             app(SeasonvarPageClaimManager::class),
-            $importer,
-            app(SeasonvarImportRunRecorder::class),
-            app(SeasonvarImportGroupKey::class),
+            app(SeasonvarImportTitleGroupDispatcher::class),
         );
 
         Http::assertNothingSent();
@@ -378,31 +373,19 @@ class SeasonvarParallelImportTest extends TestCase
     public function test_worker_with_live_claim_processes_one_page_and_releases_it(): void
     {
         config(['seasonvar.queue.lock_store' => 'array']);
+        Queue::fake();
         $run = $this->queuedRun();
-        $page = SourcePage::factory()->create();
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+        ]);
+        $url = 'https://seasonvar.ru/serial-42-Test-1-season.html';
+        $page = SourcePage::factory()->for($source)->create([
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+        ]);
         $claims = app(SeasonvarPageClaimManager::class);
         $token = $claims->claim($page, $run->id, 3600);
-        $importer = Mockery::mock(SeasonvarCatalogImporter::class);
-        $receivedRetryTransient = null;
-        $importer->shouldReceive('parsePages')
-            ->once()
-            ->andReturnUsing(function (...$arguments) use (&$receivedRetryTransient, $page, $run): array {
-                $this->assertSame([$page->id], $arguments[0]->pluck('id')->all());
-                $this->assertNull($arguments[1]);
-                $this->assertFalse($arguments[2]);
-                $this->assertSame($run->id, $arguments[3]);
-                $receivedRetryTransient = $arguments[4] ?? null;
-
-                return [
-                    'parsed' => 1,
-                    'failed' => 0,
-                    'media_attached' => 2,
-                    'media_updated' => 1,
-                    'media_skipped' => 0,
-                    'media_failed' => 0,
-                    'failures' => [],
-                ];
-            });
 
         (new ImportSeasonvarSourcePage(
             sourcePageId: $page->id,
@@ -411,21 +394,19 @@ class SeasonvarParallelImportTest extends TestCase
             groupKey: 'seasonvar-title:1',
         ))->handle(
             $claims,
-            $importer,
-            app(SeasonvarImportRunRecorder::class),
-            app(SeasonvarImportGroupKey::class),
+            app(SeasonvarImportTitleGroupDispatcher::class),
         );
 
         $freshRun = $run->fresh();
         $freshPage = $page->fresh();
 
-        $this->assertSame(0, $freshRun->selected);
-        $this->assertSame(1, $freshRun->parsed);
-        $this->assertSame(2, $freshRun->media_attached);
-        $this->assertSame(1, $freshRun->media_updated);
-        $this->assertTrue($receivedRetryTransient);
-        $this->assertNull($freshPage->import_claim_token);
-        $this->assertNull($freshPage->import_claim_run_id);
+        $this->assertSame(1, $freshRun->selected);
+        $this->assertSame(0, $freshRun->parsed);
+        $this->assertSame(1, $run->preparedPages()->count());
+        $this->assertSame($token, $freshPage->import_claim_token);
+        $this->assertSame($run->id, $freshPage->import_claim_run_id);
+        Queue::assertPushed(PrepareSeasonvarImportTitlePage::class, 1);
+        Queue::assertPushed(FinalizeSeasonvarImportTitleGroup::class, 1);
     }
 
     public function test_failed_worker_releases_its_claim_and_counts_failure_once(): void
@@ -448,19 +429,22 @@ class SeasonvarParallelImportTest extends TestCase
         $this->assertSame(1, $run->fresh()->failed);
     }
 
-    public function test_worker_releases_itself_when_title_lock_is_held(): void
+    public function test_legacy_worker_delegates_even_when_the_old_title_lock_is_held(): void
     {
         config(['seasonvar.queue.lock_store' => 'array']);
+        Queue::fake();
         $run = $this->queuedRun();
-        $page = SourcePage::factory()->create();
+        $source = Source::factory()->create(['code' => 'seasonvar']);
+        $url = 'https://seasonvar.ru/serial-42-Test-1-season.html';
+        $page = SourcePage::factory()->for($source)->create([
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+        ]);
         $claims = app(SeasonvarPageClaimManager::class);
         $token = $claims->claim($page, $run->id, 3600);
         $groupKey = app(SeasonvarImportGroupKey::class)->forUrl($page->url, $page->url_hash);
         $lock = Cache::store('array')->lock($groupKey, 1200);
         $this->assertTrue($lock->get());
-        $importer = Mockery::mock(SeasonvarCatalogImporter::class);
-        $importer->shouldNotReceive('parsePages');
-
         try {
             $job = (new ImportSeasonvarSourcePage(
                 sourcePageId: $page->id,
@@ -471,13 +455,12 @@ class SeasonvarParallelImportTest extends TestCase
 
             $job->handle(
                 $claims,
-                $importer,
-                app(SeasonvarImportRunRecorder::class),
-                app(SeasonvarImportGroupKey::class),
+                app(SeasonvarImportTitleGroupDispatcher::class),
             );
 
-            $job->assertReleased(delay: 30);
+            $job->assertNotReleased();
             $this->assertTrue($claims->owns($page->id, $run->id, (string) $token));
+            $this->assertSame(1, $run->preparedPages()->count());
         } finally {
             $lock->release();
         }
@@ -486,66 +469,164 @@ class SeasonvarParallelImportTest extends TestCase
     public function test_worker_recomputes_group_key_from_source_page_for_queued_payloads(): void
     {
         config(['seasonvar.queue.lock_store' => 'array']);
+        Queue::fake();
         $run = $this->queuedRun();
-        $page = SourcePage::factory()->create([
+        $source = Source::factory()->create(['code' => 'seasonvar']);
+        $page = SourcePage::factory()->for($source)->create([
             'url' => 'https://seasonvar.ru/serial-42722-Sinij_ekzortcist_pslwzbv-5-season.html',
+            'url_hash' => hash('sha256', 'https://seasonvar.ru/serial-42722-Sinij_ekzortcist_pslwzbv-5-season.html'),
         ]);
         $claims = app(SeasonvarPageClaimManager::class);
         $token = $claims->claim($page, $run->id, 3600);
         $canonicalKey = app(SeasonvarImportGroupKey::class)->forUrl($page->url, $page->url_hash);
-        $lock = Cache::store('array')->lock($canonicalKey, 1200);
-        $this->assertTrue($lock->get());
-        $importer = Mockery::mock(SeasonvarCatalogImporter::class);
-        $importer->shouldNotReceive('parsePages');
-        $this->app->instance(SeasonvarCatalogImporter::class, $importer);
+        $job = (new ImportSeasonvarSourcePage(
+            sourcePageId: $page->id,
+            importRunId: $run->id,
+            claimToken: (string) $token,
+            groupKey: 'seasonvar-title:42722',
+        ))->withFakeQueueInteractions();
 
-        try {
-            $job = (new ImportSeasonvarSourcePage(
-                sourcePageId: $page->id,
-                importRunId: $run->id,
-                claimToken: (string) $token,
-                groupKey: 'seasonvar-title:42722',
-            ))->withFakeQueueInteractions();
+        $this->app->call([$job, 'handle']);
 
-            $this->app->call([$job, 'handle']);
-
-            $job->assertReleased(delay: 30);
-            $this->assertTrue($claims->owns($page->id, $run->id, (string) $token));
-        } finally {
-            $lock->release();
-        }
+        $job->assertNotReleased();
+        $this->assertDatabaseHas('seasonvar_import_title_groups', [
+            'seasonvar_import_run_id' => $run->id,
+            'group_key_hash' => hash('sha256', $canonicalKey),
+        ]);
+        $this->assertTrue($claims->owns($page->id, $run->id, (string) $token));
     }
 
     public function test_dispatcher_queues_each_eligible_page_once_across_repeated_runs(): void
     {
         config(['seasonvar.queue.lock_store' => 'array']);
         Queue::fake();
-        $pages = SourcePage::factory()->count(2)->create([
-            'page_type' => 'serial',
-            'parse_status' => 'pending',
-            'import_status' => 'pending',
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
         ]);
+        $pages = collect([1, 2])->map(function (int $season) use ($source): SourcePage {
+            $url = "https://seasonvar.ru/serial-24212-Ryzhaya_psbdtie-{$season}-season.html";
+
+            return SourcePage::factory()->for($source)->create([
+                'url' => $url,
+                'url_hash' => hash('sha256', $url),
+                'page_type' => 'serial',
+                'parse_status' => 'pending',
+                'import_status' => 'pending',
+            ]);
+        });
 
         $run = app(SeasonvarQueuedImportDispatcher::class)->dispatch(discover: false);
         $secondRun = app(SeasonvarQueuedImportDispatcher::class)->dispatch(discover: false);
 
-        Queue::assertPushedOn('seasonvar-import', ImportSeasonvarSourcePage::class);
+        Queue::assertPushedOn('seasonvar-import', PrepareSeasonvarImportTitlePage::class);
         Queue::assertPushed(
-            ImportSeasonvarSourcePage::class,
-            fn (ImportSeasonvarSourcePage $job): bool => $job->afterCommit === true,
+            PrepareSeasonvarImportTitlePage::class,
+            fn (PrepareSeasonvarImportTitlePage $job): bool => $job->afterCommit === true,
         );
-        Queue::assertPushedTimes(ImportSeasonvarSourcePage::class, 2);
+        Queue::assertPushedTimes(PrepareSeasonvarImportTitlePage::class, 2);
+        Queue::assertPushedTimes(FinalizeSeasonvarImportTitleGroup::class, 1);
+        Queue::assertNotPushed(ImportSeasonvarSourcePage::class);
         Queue::assertPushed(
             FinalizeSeasonvarQueuedImport::class,
             fn (FinalizeSeasonvarQueuedImport $job): bool => $job->afterCommit === true,
         );
         $this->assertSame(2, $run->fresh()->selected);
+        $this->assertSame(1, $run->titleGroups()->count());
+        $this->assertSame(2, $run->preparedPages()->count());
         $this->assertSame(2, SourcePage::query()->where('import_claim_run_id', $run->id)->count());
         $this->assertSame('completed', $secondRun->fresh()->status);
         $this->assertEqualsCanonicalizing(
-            $pages->modelKeys(),
+            $pages->pluck('id')->all(),
             SourcePage::query()->where('import_claim_run_id', $run->id)->pluck('id')->all(),
         );
+    }
+
+    public function test_dispatcher_keeps_non_serial_handlers_on_the_legacy_page_job(): void
+    {
+        config([
+            'seasonvar.queue.lock_store' => 'array',
+            'seasonvar.page_types.actor.enabled' => true,
+            'seasonvar.page_types.actor.automatic' => true,
+        ]);
+        Queue::fake();
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $url = 'https://seasonvar.ru/actor/1001-aleksandr-ivanov';
+        SourcePage::factory()->for($source)->create([
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+            'page_type' => 'actor',
+            'parse_status' => 'pending',
+            'import_status' => 'pending',
+        ]);
+
+        $run = app(SeasonvarQueuedImportDispatcher::class)->dispatch(
+            discover: false,
+            pageTypes: ['actor'],
+        );
+
+        Queue::assertPushedTimes(ImportSeasonvarSourcePage::class, 1);
+        Queue::assertNotPushed(PrepareSeasonvarImportTitlePage::class);
+        $this->assertSame(1, $run->fresh()->selected);
+        $this->assertSame(0, $run->titleGroups()->count());
+    }
+
+    public function test_legacy_page_job_processes_non_serial_handlers_without_a_title_group(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        $run = $this->queuedRun();
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+        ]);
+        $url = 'https://seasonvar.ru/actor/1001-aleksandr-ivanov';
+        $page = SourcePage::factory()->for($source)->create([
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+            'page_type' => 'actor',
+            'parse_status' => 'pending',
+        ]);
+        $claims = app(SeasonvarPageClaimManager::class);
+        $token = $claims->claim($page, $run->id, 3600);
+        $importer = Mockery::mock(SeasonvarCatalogImporter::class);
+        $importer->shouldReceive('parsePages')
+            ->once()
+            ->withArgs(fn ($pages, $unused, $force, $runId, $retryTransient): bool => $pages->pluck('id')->all() === [$page->id]
+                && $unused === null
+                && $force === false
+                && $runId === $run->id
+                && $retryTransient === true)
+            ->andReturn([
+                'parsed' => 1,
+                'failed' => 0,
+                'media_attached' => 0,
+                'media_updated' => 0,
+                'media_skipped' => 0,
+                'media_failed' => 0,
+                'failures' => [],
+            ]);
+
+        (new ImportSeasonvarSourcePage(
+            sourcePageId: $page->id,
+            importRunId: $run->id,
+            claimToken: (string) $token,
+            groupKey: 'untrusted-payload-key',
+        ))->handle(
+            $claims,
+            app(SeasonvarImportTitleGroupDispatcher::class),
+            $importer,
+            app(SeasonvarImportRunRecorder::class),
+            app(SeasonvarImportGroupKey::class),
+        );
+
+        $this->assertSame(1, $run->fresh()->parsed);
+        $this->assertFalse($claims->owns($page->id, $run->id, (string) $token));
+        $this->assertSame(0, $run->titleGroups()->count());
     }
 
     public function test_dispatcher_recovers_expired_claim_before_queuing_page(): void
@@ -553,7 +634,14 @@ class SeasonvarParallelImportTest extends TestCase
         config(['seasonvar.queue.lock_store' => 'array']);
         Queue::fake();
         $oldRun = $this->queuedRun();
-        $page = SourcePage::factory()->create([
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+        ]);
+        $url = 'https://seasonvar.ru/serial-24212-Ryzhaya_psbdtie-1-season.html';
+        $page = SourcePage::factory()->for($source)->create([
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
             'page_type' => 'serial',
             'parse_status' => 'pending',
         ]);
@@ -563,9 +651,34 @@ class SeasonvarParallelImportTest extends TestCase
 
         $run = app(SeasonvarQueuedImportDispatcher::class)->dispatch(discover: false);
 
-        Queue::assertPushed(ImportSeasonvarSourcePage::class, fn (ImportSeasonvarSourcePage $job): bool => $job->sourcePageId === $page->id
-            && $job->importRunId === $run->id);
+        Queue::assertPushed(PrepareSeasonvarImportTitlePage::class, function (PrepareSeasonvarImportTitlePage $job) use ($page): bool {
+            return SeasonvarImportPreparedPage::query()->find($job->preparedPageId)?->source_page_id === $page->id;
+        });
         $this->assertSame($run->id, $page->fresh()->import_claim_run_id);
+    }
+
+    public function test_global_finalizer_waits_while_a_title_group_is_nonterminal(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        $run = $this->queuedRun();
+        $run->titleGroups()->create([
+            'catalog_title_id' => null,
+            'group_key_hash' => hash('sha256', 'family'),
+            'queue_name' => 'seasonvar-import',
+            'status' => 'running',
+        ]);
+        $pipeline = Mockery::mock(SeasonvarImportPipeline::class);
+        $pipeline->shouldNotReceive('finalizeQueuedRun');
+        $job = (new FinalizeSeasonvarQueuedImport($run->id))->withFakeQueueInteractions();
+
+        $job->handle(
+            app(SeasonvarPageClaimManager::class),
+            $pipeline,
+            app(SeasonvarImportRunRecorder::class),
+            app(CatalogCacheInvalidator::class),
+        );
+
+        $job->assertReleased(delay: 60);
     }
 
     public function test_finalizer_waits_while_run_has_live_claims(): void

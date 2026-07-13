@@ -108,6 +108,23 @@ final class SeasonvarImportTitleGroupDispatcher
         string $queue,
         ?CatalogTitle $title = null,
     ): SeasonvarImportPreparedPage {
+        $normalizedUrl = $this->normalizedSerialUrl($page->url);
+
+        if ($normalizedUrl === null) {
+            throw new InvalidArgumentException('Страница не принадлежит сериалам Seasonvar.');
+        }
+
+        $normalizedHash = $this->seasonvarUrl->hash($normalizedUrl);
+
+        if ($page->url !== $normalizedUrl || $page->url_hash !== $normalizedHash) {
+            $page->update([
+                'url' => $normalizedUrl,
+                'url_hash' => $normalizedHash,
+                'page_type' => SeasonvarPageType::Serial->value,
+            ]);
+        }
+
+        $title ??= $this->catalogTitleForPage($page);
         $groupKeyHash = hash('sha256', $this->groupKeys->forUrl($page->url, $page->url_hash));
         $group = SeasonvarImportTitleGroup::query()->firstOrCreate(
             [
@@ -139,6 +156,19 @@ final class SeasonvarImportTitleGroupDispatcher
         return $group->preparedPages()->where('source_page_id', $page->id)->firstOrFail();
     }
 
+    private function catalogTitleForPage(SourcePage $page): ?CatalogTitle
+    {
+        return CatalogTitle::query()
+            ->where('source_id', $page->source_id)
+            ->where(function ($query) use ($page): void {
+                $query->where('source_page_id', $page->id)
+                    ->orWhere('source_url_hash', $page->url_hash)
+                    ->orWhereHas('seasons', fn ($query) => $query->where('source_url_hash', $page->url_hash));
+            })
+            ->orderBy('id')
+            ->first();
+    }
+
     private function attachUrl(SeasonvarImportTitleGroup $group, int $sourceId, string $url): bool
     {
         return DB::transaction(function () use ($group, $sourceId, $url): bool {
@@ -150,7 +180,7 @@ final class SeasonvarImportTitleGroupDispatcher
                 'url_hash' => $urlHash,
                 'page_type' => SeasonvarPageType::Serial->value,
                 'parse_status' => 'pending',
-                'discovered_from_url' => $group->catalogTitle?->source_url ?? $group->run?->argument,
+                'discovered_from_url' => $group->catalogTitle?->source_url ?? $url,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);

@@ -3,9 +3,12 @@
 namespace App\Services\Seasonvar;
 
 use App\Enums\SeasonvarImportStatus;
+use App\Enums\SeasonvarPageType;
 use App\Jobs\FinalizeSeasonvarQueuedImport;
 use App\Jobs\ImportSeasonvarSourcePage;
+use App\Models\CatalogTitle;
 use App\Models\SeasonvarImportRun;
+use App\Models\SourcePage;
 use App\Services\Catalog\CatalogCacheInvalidator;
 use Throwable;
 
@@ -17,6 +20,7 @@ class SeasonvarQueuedImportDispatcher
         private readonly SeasonvarRefreshPlanner $refreshPlanner,
         private readonly SeasonvarPageClaimManager $claims,
         private readonly SeasonvarImportRunRecorder $runs,
+        private readonly SeasonvarImportTitleGroupDispatcher $titleGroups,
         private readonly SeasonvarImportGroupKey $groupKeys,
         private readonly SeasonvarImportErrorSanitizer $errors,
         private readonly CatalogCacheInvalidator $cacheInvalidator,
@@ -108,7 +112,6 @@ class SeasonvarQueuedImportDispatcher
         $this->runs->addCounters($run->id, [
             'discovered' => $discovered,
             'stored' => $stored,
-            'selected' => $selected,
         ]);
 
         $run->refresh();
@@ -162,31 +165,63 @@ class SeasonvarQueuedImportDispatcher
                     break 2;
                 }
 
-                $token = $this->claims->claim($page, $run->id);
+                $claimToken = $this->claims->claim($page, $run->id);
 
-                if ($token === null) {
+                if ($claimToken === null) {
                     continue;
                 }
 
                 try {
-                    ImportSeasonvarSourcePage::dispatch(
-                        sourcePageId: (int) $page->id,
-                        importRunId: (int) $run->id,
-                        claimToken: $token,
-                        groupKey: $this->groupKeys->forUrl($page->url, $page->url_hash),
-                        force: $force,
-                    )
-                        ->onConnection((string) config('seasonvar.queue.connection', 'redis'))
-                        ->onQueue((string) config('seasonvar.queue.queue', 'seasonvar-import'))
-                        ->afterCommit();
-                    $selected++;
+                    if ($page->page_type !== SeasonvarPageType::Serial->value) {
+                        ImportSeasonvarSourcePage::dispatch(
+                            sourcePageId: (int) $page->id,
+                            importRunId: (int) $run->id,
+                            claimToken: $claimToken,
+                            groupKey: $this->groupKeys->forUrl($page->url, $page->url_hash),
+                            force: $force,
+                        )
+                            ->onConnection((string) config('seasonvar.queue.connection', 'redis'))
+                            ->onQueue((string) config('seasonvar.queue.queue', 'seasonvar-import'))
+                            ->afterCommit();
+                        SeasonvarImportRun::query()->whereKey($run->id)->increment('selected');
+                        $selected++;
+
+                        continue;
+                    }
+
+                    $alreadyAdopted = $run->preparedPages()
+                        ->where('source_page_id', $page->id)
+                        ->exists();
+                    $this->titleGroups->adoptPage(
+                        $run,
+                        $page,
+                        (string) config('seasonvar.queue.queue', 'seasonvar-import'),
+                        $this->catalogTitleFor($page),
+                    );
+
+                    if (! $alreadyAdopted) {
+                        $selected++;
+                    }
                 } catch (Throwable) {
-                    $this->claims->release((int) $page->id, (int) $run->id, $token);
+                    $this->claims->release($page->id, $run->id, $claimToken);
                     $this->runs->addCounters($run->id, ['failed' => 1]);
                 }
             }
         }
 
         return $selected;
+    }
+
+    private function catalogTitleFor(SourcePage $page): ?CatalogTitle
+    {
+        return CatalogTitle::query()
+            ->where('source_id', $page->source_id)
+            ->where(function ($query) use ($page): void {
+                $query->where('source_page_id', $page->id)
+                    ->orWhere('source_url_hash', $page->url_hash)
+                    ->orWhereHas('seasons', fn ($query) => $query->where('source_url_hash', $page->url_hash));
+            })
+            ->orderBy('id')
+            ->first();
     }
 }

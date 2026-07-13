@@ -61,6 +61,21 @@ class SitemapAndRobotsTest extends TestCase
         $this->assertStringNotContainsString('/titles/year/1999', $content);
     }
 
+    public function test_static_sitemap_contains_every_directory_hub_without_alias_duplicates(): void
+    {
+        $response = $this->get('/sitemap-static.xml');
+
+        $response->assertOk();
+        $content = $response->streamedContent();
+
+        foreach (['genres', 'countries', 'actors', 'directors', 'age-ratings', 'translations', 'statuses', 'networks', 'studios', 'tags', 'years'] as $path) {
+            $this->assertStringContainsString(url('/'.$path), $content);
+        }
+
+        $this->assertStringNotContainsString('/genres/drama', $content);
+        $this->assertStringNotContainsString('/years/2026', $content);
+    }
+
     public function test_title_sitemap_contains_published_titles_and_poster_images(): void
     {
         $title = CatalogTitle::factory()->create([
@@ -223,6 +238,9 @@ class SitemapAndRobotsTest extends TestCase
         $robots = file_get_contents(public_path('robots.txt'));
 
         $this->assertIsString($robots);
+        $this->assertStringContainsString("User-agent: ClaudeBot\n", $robots);
+        $this->assertStringContainsString("Disallow: /titles?\n", $robots);
+        $this->assertStringContainsString("Crawl-delay: 30\n", $robots);
         $this->assertStringContainsString('User-agent: *', $robots);
         $this->assertStringContainsString('Host: seasonvar.miniserver.fun', $robots);
         $this->assertStringContainsString('Sitemap: https://seasonvar.miniserver.fun/sitemap-index.xml', $robots);

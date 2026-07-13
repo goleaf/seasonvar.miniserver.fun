@@ -6,6 +6,10 @@
 
 - `SeasonvarImportRun belongsTo User` через nullable `requested_by_user_id`; CLI/cron runs остаются без requester, а удаление user обнуляет ссылку.
 - `SeasonvarImportRun belongsTo SeasonvarImportRun` через nullable `retry_of_run_id`; retry создаёт новую audit-строку. `last_heartbeat_at` и index `(execution_mode, status, last_heartbeat_at)` питают bounded stale recovery.
+- `SeasonvarImportRun hasMany SeasonvarImportTitleGroup`; одна группа соответствует одному каноническому сезонному семейству внутри конкретного запуска.
+- `SeasonvarImportTitleGroup belongsTo CatalogTitle` через nullable `catalog_title_id`, потому что первый подготовленный payload может создать тайтл только на стадии fan-in.
+- `SeasonvarImportTitleGroup hasMany SeasonvarImportPreparedPage`; unique `(seasonvar_import_title_group_id, source_page_id)` исключает повторную подготовку одной страницы в группе.
+- `SeasonvarImportPreparedPage belongsTo SourcePage` и хранит нормализованный parser payload, предупреждения, content hash и статусы `queued/preparing/prepared/applied/failed`, но не становится источником истины каталога.
 
 - `CatalogTitle belongsTo Source`
 - `CatalogTitle belongsTo SourcePage`
@@ -91,6 +95,9 @@
 ## Поведение фильтров
 
 - `/titles/{type}/{taxonomy}` должен показывать только карточки, связанные с точным значением справочника.
+- Directory index routes не создают новых taxonomy tables: десять relation-справочников используют модели/pivot из `CatalogTaxonomyRegistry`, а `/years` группирует валидные `catalog_titles.year` от `catalog.directories.minimum_year` до configured maximum. Активным считается только значение, связанное хотя бы с одним `CatalogTitleQuery::visibleTo(null)` тайтлом.
+- Counts directory cards выполняются на pivot, присоединённом к подзапросу видимых title IDs, и используют `count(distinct catalog_title_id)`. Общий title count использует visibility-first `whereHas`, поэтому несколько связей не размножают total или paginator. Existing reverse pivot indexes `(taxonomy_id, catalog_title_id)` и public title indexes покрывают join; отдельная миграция не потребовалась.
+- Canonical filmography/listing остаётся `/titles/{type}/{taxonomy}` и `/titles/year/{year}`. `/genres/{slug}`, `/countries/{slug}`, `/actors/{slug}`, `/directors/{slug}`, `/age-ratings/{slug}`, `/translations/{slug}`, `/statuses/{slug}`, `/networks/{slug}`, `/studios/{slug}`, `/tags/{slug}` и `/years/{year}` проверяют существование видимой связи и дают 301; неизвестное значение возвращает 404.
 - `/titles` принимает повторяемые параметры `year[]`, `genre[]`, `actor[]`, `director[]`, `country[]`, `translation[]`, `status[]`, `network[]`, `studio[]`, `tag[]` и остальные типы из `CatalogFilterType`.
 - Фиксированные multi-value группы передаются как `publication_type[]`, `quality[]` и `subtitles[]`; тип публикации не смешивается с `publication_status`, который остается границей публичной видимости.
 - Несколько годов объединяются как допустимый набор годов выпуска: тайтл может совпасть с любым выбранным годом.
@@ -166,8 +173,9 @@
 - `--page-type=<type>` допускает только тип с зарегистрированным parser/importer и `enabled=true`; без опции planner использует только `automatic=true`. Значения `refresh_after_hours` и `chunk_size` задаются отдельно для serial, actor, genre, country, tag и RSS.
 - Actor/genre/country/tag handlers записывают только каноническое имя/slug/source URL и bounded ссылки serial. Ссылки получают отложенную первую попытку, поэтому одна taxonomy page не запускает рекурсивный crawl в том же цикле. Stable person URL разделяет одноимённых актёров; справочные genre/country/tag дедуплицируются по Unicode/`е`-`ё`/punctuation-insensitive slug.
 - RSS не владеет данными тайтла: он нормализует только разрешённые serial URL и переводит существующие source pages в freshness queue. Static/search/sitemap/unknown не выбираются automatic planner и не создают локальные страницы.
-- Без аргументов команда читает sitemap Seasonvar, сохраняет все найденные ссылки страниц каталога, затем обрабатывает очередь по одному запросу.
-- С URL-аргументом команда обновляет эту карточку и найденные прямые страницы сезонов.
+- Без аргументов команда читает sitemap Seasonvar, сохраняет найденные ссылки и в queued-режиме группирует serial pages по тайтлу: известные и динамически найденные страницы сезона немедленно получают независимый preparation job.
+- С URL-аргументом команда обновляет эту карточку и все найденные прямые страницы сезонов; сезоны и серии применяются одним finalizer к одному `CatalogTitle`.
+- Source/local manifest хранит только агрегированные counts сезонов, серий и media. Отсутствующая в одном provider snapshot локальная строка не удаляется: importer остаётся additive.
 - Существующие связи, серии и медиа сохраняются, если они исчезли со страницы источника.
 - Импортируемые сезоны и серии всегда записываются как `regular`, получают `sort_order=number`, публичное состояние и восстанавливаются после soft delete по стабильному составному ключу.
 - Измененные название, описание, постер, рейтинг и поля видео-ссылок обновляются.

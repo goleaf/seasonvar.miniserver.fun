@@ -2,6 +2,7 @@
 
 namespace App\Services\Catalog;
 
+use App\DTOs\CatalogDirectoryDefinition;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
 use App\Support\PlainText;
@@ -175,6 +176,66 @@ class CatalogSeoBuilder
                     ['name' => 'Главная', 'url' => route('home')],
                     ['name' => 'Сериалы', 'url' => route('titles.index')],
                 ]),
+            ],
+        ];
+    }
+
+    /**
+     * @param  Collection<int, object>  $pageItems
+     * @return array<string, mixed>
+     */
+    public function directory(
+        CatalogDirectoryDefinition $directory,
+        int $totalValues,
+        int $totalTitles,
+        string $search,
+        string $letter,
+        string $sort,
+        ?int $decade,
+        int $currentPage,
+        ?string $previousPageUrl,
+        ?string $nextPageUrl,
+        Collection $pageItems,
+        int $firstItemPosition,
+    ): array {
+        $baseUrl = route($directory->indexRouteName);
+        $hasInteractiveFilters = $search !== '' || $letter !== '' || $decade !== null || $sort !== 'name_asc';
+        $canonical = ! $hasInteractiveFilters && $currentPage > 1
+            ? route($directory->indexRouteName, ['page' => $currentPage])
+            : $baseUrl;
+        $title = $directory->title.($currentPage > 1 ? ' — страница '.$currentPage : '');
+        $description = $directory->description.' В справочнике '.trans_choice('catalog.directories.counts.values', $totalValues)
+            .', связанных с '.trans_choice('catalog.counts.results', $totalTitles).'.';
+        $breadcrumbs = [
+            ['name' => __('catalog.navigation.home'), 'url' => route('home')],
+            ['name' => __('catalog.navigation.all_titles'), 'url' => route('titles.index')],
+            ['name' => $directory->title, 'url' => $baseUrl],
+        ];
+
+        return [
+            'title' => $title,
+            'h1' => $directory->title,
+            'lead' => $directory->description,
+            'description' => $this->seoDescription($description),
+            'canonical' => $canonical,
+            'robots' => $hasInteractiveFilters
+                ? 'noindex,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'
+                : $this->indexRobots(),
+            'prev' => $previousPageUrl,
+            'next' => $nextPageUrl,
+            'type' => 'website',
+            'updated_time' => now()->toAtomString(),
+            'section' => 'Справочники каталога',
+            'tags' => [$directory->title, 'каталог сериалов'],
+            'breadcrumbs' => $breadcrumbs,
+            'related_links' => [
+                ['name' => __('catalog.navigation.all_titles'), 'url' => route('titles.index')],
+            ],
+            'jsonLd' => [
+                $this->webPageJsonLd($title, $description, $canonical, 'CollectionPage', [$directory->title]),
+                $this->collectionPageJsonLd($title, $description, $canonical),
+                $this->directoryItemListJsonLd($pageItems, $firstItemPosition, $title),
+                $this->breadcrumbJsonLd($breadcrumbs),
             ],
         ];
     }
@@ -648,6 +709,29 @@ class CatalogSeoBuilder
                     'name' => $title->display_title,
                     'image' => $title->poster_url,
                 ]))
+                ->all(),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, object>  $items
+     * @return array<string, mixed>
+     */
+    private function directoryItemListJsonLd(Collection $items, int $startPosition, string $name): array
+    {
+        return [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            'name' => $name,
+            'numberOfItems' => $items->count(),
+            'itemListElement' => $items
+                ->values()
+                ->map(fn (object $item, int $index): array => [
+                    '@type' => 'ListItem',
+                    'position' => $startPosition + $index,
+                    'url' => (string) $item->detail_url,
+                    'name' => (string) $item->name,
+                ])
                 ->all(),
         ];
     }

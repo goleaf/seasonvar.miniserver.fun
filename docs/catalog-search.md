@@ -1,5 +1,11 @@
 # Поиск по каталогу
 
+## Public directory hubs
+
+Directory search полностью локален и не обращается к Seasonvar или другим providers. Registry фиксирует одиннадцать index routes; taxonomy identity берётся из `CatalogTaxonomyRegistry`. Для actors/directors доступны Cyrillic/Latin alphabet groups и bounded pagination, для years — непустые decades и диапазон 1900..configured maximum. Состояние URL: `q` — нормализованная строка до 80 символов, `letter` — одна Cyrillic/Latin буква или `#`, `sort` — только `name_asc|count_desc`, `decade` — валидное начало десятилетия, `page` — paginator Livewire. Filtered/sorted variants получают `noindex,follow` и canonical index hub; page-only pagination сохраняет собственный canonical page URL.
+
+Search suggestions общего `/titles` могут предложить подходящий локальный directory route по названию справочника. Это metadata-only registry lookup без внешнего HTTP и без загрузки taxonomy rows.
+
 ## Контракт запроса
 
 HTTP query-параметр `q` проходит через `CatalogTitlesRequest`: строка приводится к Unicode NFKC, пробелы по краям удаляются, а последовательности Unicode-пробелов схлопываются. Непустая строка должна содержать от 2 до 80 Unicode-символов (`min:2|max:80`). Запрос из одного символа отклоняется с ошибкой `Введите не менее 2 символов для поиска.`, а строка длиннее 80 символов — с ошибкой `Поисковый запрос слишком длинный.`. Значение не обрезается молча. Array/object-shaped `q` считается пустым безопасным состоянием и не попадает в SQL.

@@ -1,5 +1,9 @@
+User-agent: ClaudeBot
+Disallow: /titles?
+Crawl-delay: 30
+
 User-agent: *
-Disallow:
+Disallow: /titles?
 
 Host: seasonvar.miniserver.fun
 Sitemap: https://seasonvar.miniserver.fun/sitemap-index.xml

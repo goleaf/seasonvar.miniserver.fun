@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | Обзор и быстрый старт | [`README.md`](../README.md) | Назначение проекта, стек и основные команды. |
 | Границы Laravel/Livewire | [`architecture.md`](architecture.md) | Тонкие контроллеры, page builders, query/services/actions, locked Livewire state и server-rendered оболочки. |
-| Каталог, поиск и URL state | [`catalog-search.md`](catalog-search.md) | Формат query-параметров, нормализация, OR внутри группы и AND между группами, allowlisted sorting, pagination и browser history. |
+| Каталог, поиск, directory hubs и URL state | [`catalog-search.md`](catalog-search.md) | Формат query-параметров, нормализация, OR/AND filters, public directories, allowlisted sorting, pagination и browser history. |
 | Домен и пользовательское состояние | [`DATA_RELATIONS.md`](DATA_RELATIONS.md) | Видимость, связи, regular/special ordering, episode navigation, watchlist/rating, progress, Continue Watching и Viewing History. |
 | Авторизация и playback access | [`authorization.md`](authorization.md) | Public/profile boundary, policies/gates, entitlement decisions, signed playback route и ограничения отсутствующих product-моделей. |
 | Импорт Seasonvar | [`importer.md`](importer.md) | Response → DTO → identity → transaction/upsert → relation sync → counters/cache/index/UI, идемпотентность и владение полями. |

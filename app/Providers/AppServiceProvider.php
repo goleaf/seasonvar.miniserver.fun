@@ -59,6 +59,20 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('catalog-stats', fn (Request $request): Limit => Limit::perMinute(180)
             ->by(app(RequestRateLimitKey::class)->actor($request)));
+        RateLimiter::for('catalog-query', function (Request $request): Limit {
+            if ($request->query->count() === 0) {
+                return Limit::none();
+            }
+
+            $isCrawler = preg_match('/(?:bot|crawler|spider|slurp)/i', (string) $request->userAgent()) === 1;
+            $budget = (int) config($isCrawler
+                ? 'catalog.query_rate_limit.bot_per_minute'
+                : 'catalog.query_rate_limit.human_per_minute');
+            $actor = app(RequestRateLimitKey::class)->actor($request);
+
+            return Limit::perMinute(max(1, $budget))
+                ->by($actor.':catalog-query:'.($isCrawler ? 'crawler' : 'human'));
+        });
         RateLimiter::for('livewire-action', function (Request $request): array {
             $keys = app(RequestRateLimitKey::class);
             $actor = $keys->actor($request);

@@ -673,6 +673,22 @@
                                     </div>
                                 </div>
                             @endif
+                            @if ($directorySuggestions->isNotEmpty())
+                                <nav aria-labelledby="catalog-directory-suggestions-title" class="rounded-control bg-sky-50 p-3">
+                                    <div id="catalog-directory-suggestions-title" class="text-sm font-bold text-sky-900">{{ __('catalog.directories.search_suggestion') }}</div>
+                                    <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                                        @foreach ($directorySuggestions as $directorySuggestion)
+                                            <a
+                                                href="{{ route($directorySuggestion->indexRouteName) }}"
+                                                class="inline-flex min-h-11 items-center gap-2 py-2 text-sm font-bold text-sky-800 hover:text-emerald-700 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200"
+                                            >
+                                                <x-ui.icon :name="$directorySuggestion->icon" />
+                                                <span>{{ $directorySuggestion->title }}</span>
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                </nav>
+                            @endif
                             <div class="flex flex-wrap gap-2">
                                 @if ($search !== '')
                                     <a href="{{ route('titles.index', $filterView->withoutSearchQuery) }}" wire:click.prevent="clearSearch" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">

@@ -99,6 +99,30 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         );
     }
 
+    public function test_finalizer_counts_an_invalid_prepared_payload_once(): void
+    {
+        $title = $this->titleWithSeasonUrls([1, 2]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $rows = $group->preparedPages()->with('sourcePage')->get();
+        $this->prepareRow($rows->first(), 1, 2);
+        $invalid = $rows->last();
+        $invalid->markPrepared(
+            ['catalog_data' => ['title' => null]],
+            [],
+            hash('sha256', 'invalid-prepared-page'),
+            1,
+        );
+        $group->increment('prepared_pages');
+        $job = (new FinalizeSeasonvarImportTitleGroup($group->id))->withFakeQueueInteractions();
+
+        $this->app->call([$job, 'handle']);
+
+        $this->assertSame('partial', $group->fresh()->status->value);
+        $this->assertSame(1, $group->fresh()->failed_pages);
+        $this->assertSame(1, $group->fresh()->applied_pages);
+    }
+
     private function prepareAllRows($rows, array $episodesBySeason): void
     {
         foreach ($rows->shuffle() as $row) {

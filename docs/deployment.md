@@ -140,6 +140,7 @@ Google-интеграции по умолчанию выключены. Если
 - `NOTIFICATIONS_MAIL_QUEUE` — queue для email notification jobs.
 - `SEASONVAR_IMPORT_FAILURE_MAIL_TO` и `SEASONVAR_IMPORT_FAILURE_MAIL_TO_NAME` — optional получатель письма об ошибке queued import; пустое значение отключает отправку.
 - `SEASONVAR_QUEUE_CONNECTION=redis`, `SEASONVAR_QUEUE_NAME=seasonvar-import` и `SEASONVAR_QUEUE_LOCK_STORE=redis-locks` — отдельная очередь и critical-lock store параллельного импортера; domain cache для блокировок не используется.
+- `SEASONVAR_TITLE_REFRESH_QUEUE=seasonvar-title-refresh` — отдельная очередь browser-triggered групп; `SEASONVAR_TITLE_REFRESH_FINALIZER_DELAY_SECONDS` задаёт задержку fan-in retry, но не ограничивает число page jobs. `SEASONVAR_IMPORT_PREPARED_RETENTION_DAYS` задаёт bounded очистку terminal staging groups.
 - `SEASONVAR_IMPORT_ADMIN_EMAILS` — comma-separated email allowlist gate `/admin/imports`; пустое значение закрывает страницу для всех.
 - Тот же `SEASONVAR_IMPORT_ADMIN_EMAILS` защищает `/admin/catalog`; `RATE_LIMIT_CATALOG_ADMIN` задаёт независимый минутный лимит его write actions (по умолчанию 60).
 - `SEASONVAR_QUEUE_STALE_AFTER_MINUTES` — минимальный возраст stale running run для recovery, не меньше 5 минут в runtime.
@@ -148,7 +149,7 @@ Google-интеграции по умолчанию выключены. Если
 
 В коде приложения эти значения читаются через `config('seasonvar.*')`, `config('queue.*')`, `config('database.*')` и другие config-файлы, а не через прямой `env()`.
 
-## Десять workers импорта Seasonvar
+## Пулы workers импорта Seasonvar
 
 Перед запуском примените additive migrations и проверьте Redis:
 
@@ -169,23 +170,31 @@ for worker in $(seq 1 10); do
 done
 ```
 
-`nohup` подходит для немедленного ручного запуска. Для постоянной работы после перезагрузки установите версионируемый systemd template:
+`nohup` подходит для немедленного ручного запуска. Для постоянной работы после перезагрузки установите версионируемые systemd templates:
 
-PHP hard limit `256M` даёт rebuild рекомендаций запас над измеренным пиком, а Laravel `--memory=192` завершает worker после job до исчерпания hard limit. Systemd template использует `Restart=always`, поэтому штатные exits по `--memory`, `--max-time`, `--max-jobs` и `queue:restart` автоматически возвращают ровно десять процессов.
+PHP hard limit `256M` даёт rebuild рекомендаций запас над измеренным пиком, а Laravel `--memory=192` завершает worker после job до исчерпания hard limit. Systemd templates используют `Restart=always`, поэтому штатные exits по `--memory`, `--max-time`, `--max-jobs` и `queue:restart` автоматически возвращают настроенное число процессов.
 
 ```bash
 sudo cp deploy/systemd/seasonvar-import-worker@.service /etc/systemd/system/
+sudo cp deploy/systemd/seasonvar-title-refresh-worker@.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now seasonvar-import-worker@{1..10}.service
+sudo systemctl enable --now seasonvar-title-refresh-worker@{1..32}.service
 systemctl --no-pager --type=service 'seasonvar-import-worker@*'
+systemctl --no-pager --type=service 'seasonvar-title-refresh-worker@*'
 ```
+
+Import template слушает только `seasonvar-import`; title-refresh template — только `seasonvar-title-refresh`. Пул из 32 процессов является стартовой IO capacity, а не application-level limit: все известные и динамически найденные страницы получают jobs, поэтому capacity расширяется количеством systemd instances без изменения кода. После additive migration `seasonvar_import_title_groups` хранит fan-in состояние, а `seasonvar_import_prepared_pages` — bounded промежуточные payload; старые terminal groups удаляются по `SEASONVAR_IMPORT_PREPARED_RETENTION_DAYS`.
 
 Управление и диагностика:
 
 ```bash
 sudo systemctl stop 'seasonvar-import-worker@*.service'
+sudo systemctl stop 'seasonvar-title-refresh-worker@*.service'
 sudo systemctl restart 'seasonvar-import-worker@*.service'
+sudo systemctl restart 'seasonvar-title-refresh-worker@*.service'
 journalctl -u 'seasonvar-import-worker@*' -f
+journalctl -u 'seasonvar-title-refresh-worker@*' -f
 php artisan seasonvar:import --status
 php artisan queue:failed
 php artisan queue:retry all
@@ -195,10 +204,10 @@ php artisan queue:retry all
 
 ```cron
 0 0,2,5,7,10,12,14,17,19,22 * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan seasonvar:import --queued >> storage/logs/seasonvar-cron.log 2>&1
-*/5 * * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan queue:monitor redis:seasonvar-import --max=5000 >> storage/logs/seasonvar-queue-monitor.log 2>&1
+*/5 * * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan queue:monitor 'redis:seasonvar-title-refresh,redis:seasonvar-import' --max=5000 >> storage/logs/seasonvar-queue-monitor.log 2>&1
 ```
 
-Повторный cron не дублирует живые jobs: coordinator lock сериализует постановку, page lease защищает конкретный URL, а Redis title lock сериализует сезоны одного сериала. Каждая просроченная страница запрашивается заново и сравнивается по `content_hash`; видео не скачивается.
+Повторный cron не дублирует живые jobs: coordinator lock сериализует постановку, а page lease защищает конкретный URL. Все страницы title group готовятся параллельно; только короткий fan-in apply сериализован по каноническому тайтлу. Каждая просроченная страница запрашивается заново и сравнивается по `content_hash`; видео не скачивается.
 
 Sitemap-тесты используют отдельный каталог `storage/app/seasonvar/tests/*` и не очищают рабочее зеркало `storage/app/seasonvar/sitemaps`. Это устраняет файловую гонку между безопасными inventory-запусками и PHPUnit; полный тестовый набор всё равно не следует запускать на production во время ресурсоёмкого импорта.
 

@@ -7,6 +7,7 @@ namespace App\Jobs;
 use App\Enums\SeasonvarImportStatus;
 use App\Enums\SeasonvarPreparedPageStatus;
 use App\Models\SeasonvarImportPreparedPage;
+use App\Models\SeasonvarImportRun;
 use App\Models\SeasonvarImportTitleGroup;
 use App\Services\Seasonvar\SeasonvarCatalogPagePreparer;
 use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
@@ -71,7 +72,8 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
             return;
         }
 
-        $token = $claims->claim($preparedRow->sourcePage, $preparedRow->seasonvar_import_run_id);
+        $token = $this->existingClaimToken($preparedRow, $claims)
+            ?? $claims->claim($preparedRow->sourcePage, $preparedRow->seasonvar_import_run_id);
 
         if ($token === null) {
             $this->release(30);
@@ -95,6 +97,7 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
                     $prepared->parserVersion,
                 );
                 SeasonvarImportTitleGroup::query()->whereKey($preparedRow->group->id)->increment('prepared_pages');
+                SeasonvarImportRun::query()->whereKey($preparedRow->seasonvar_import_run_id)->increment('parsed');
             });
         } finally {
             $claims->release(
@@ -126,6 +129,28 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
         return Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'));
     }
 
+    private function existingClaimToken(
+        SeasonvarImportPreparedPage $preparedRow,
+        SeasonvarPageClaimManager $claims,
+    ): ?string {
+        $page = $preparedRow->sourcePage;
+        $token = is_string($page->import_claim_token) ? $page->import_claim_token : null;
+
+        if ($token === null
+            || (int) $page->import_claim_run_id !== (int) $preparedRow->seasonvar_import_run_id
+            || ! $claims->owns($page->id, $preparedRow->seasonvar_import_run_id, $token)
+        ) {
+            return null;
+        }
+
+        return $claims->extend(
+            $page->id,
+            $preparedRow->seasonvar_import_run_id,
+            $token,
+            $this->timeout + 300,
+        ) ? $token : null;
+    }
+
     public function failed(?Throwable $exception): void
     {
         $preparedRow = SeasonvarImportPreparedPage::query()->find($this->preparedPageId);
@@ -136,6 +161,7 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
 
         $preparedRow->markFailed(app(SeasonvarImportErrorSanitizer::class)->fromException($exception));
         SeasonvarImportTitleGroup::query()->whereKey($preparedRow->seasonvar_import_title_group_id)->increment('failed_pages');
+        SeasonvarImportRun::query()->whereKey($preparedRow->seasonvar_import_run_id)->increment('failed');
 
         Log::error('Страница Seasonvar не подготовлена для групповой финализации.', [
             'prepared_page_id' => $this->preparedPageId,

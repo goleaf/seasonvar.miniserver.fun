@@ -2,13 +2,16 @@
 
 use App\Enums\CatalogFilterType;
 use App\Http\Controllers\CatalogController;
+use App\Http\Controllers\CatalogDirectoryRedirectController;
 use App\Http\Controllers\CatalogSitemapController;
 use App\Http\Controllers\InfrastructureHealthController;
 use App\Http\Controllers\PlaybackSourceController;
 use App\Livewire\CatalogAdministrationManager;
+use App\Livewire\CatalogDirectoryBrowser;
 use App\Livewire\CatalogSeries;
 use App\Livewire\SeasonvarImportManager;
 use App\Livewire\ViewingActivity;
+use App\Services\Catalog\CatalogDirectoryRegistry;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -58,7 +61,19 @@ Route::get('/playback/{licensedMedia}', PlaybackSourceController::class)
     ->middleware(['signed', 'throttle:playback-source'])
     ->whereNumber('licensedMedia')
     ->name('playback.source');
-Route::get('/titles', CatalogSeries::class)->name('titles.index');
+
+foreach (CatalogDirectoryRegistry::routeMap() as $directory => $config) {
+    Route::get('/'.$config['path'], CatalogDirectoryBrowser::class)
+        ->defaults('directory', $directory)
+        ->name($directory.'.index');
+    Route::get('/'.$config['path'].'/{value}', CatalogDirectoryRedirectController::class)
+        ->defaults('directory', $directory)
+        ->name($directory.'.show');
+}
+
+Route::get('/titles', CatalogSeries::class)
+    ->middleware('throttle:catalog-query')
+    ->name('titles.index');
 Route::get('/watching', ViewingActivity::class)->name('viewing-activity');
 Route::get('/admin/imports', SeasonvarImportManager::class)
     ->middleware('can:manage-seasonvar-imports')
@@ -67,9 +82,11 @@ Route::get('/admin/catalog', CatalogAdministrationManager::class)
     ->middleware('can:manage-catalog')
     ->name('admin.catalog');
 Route::get('/titles/year/{year}', CatalogSeries::class)
+    ->middleware('throttle:catalog-query')
     ->where('year', '(?:19|20)\d{2}')
     ->name('titles.year');
 Route::get('/titles/{type}/{taxonomy}', CatalogSeries::class)
+    ->middleware('throttle:catalog-query')
     ->where('type', CatalogFilterType::routePattern())
     ->where('taxonomy', '[a-z0-9][a-z0-9-]*')
     ->name('titles.taxonomy');

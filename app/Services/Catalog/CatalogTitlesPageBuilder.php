@@ -35,6 +35,7 @@ class CatalogTitlesPageBuilder
         private readonly CatalogTitleQuery $query,
         private readonly CatalogFacetQuery $facets,
         private readonly CatalogTaxonomyRegistry $taxonomies,
+        private readonly CatalogDirectoryRegistry $directories,
         private readonly CatalogSearchQueryParser $searchParser,
         private readonly CatalogSearchSuggestion $searchSuggestions,
     ) {}
@@ -283,6 +284,7 @@ class CatalogTitlesPageBuilder
             'searchState' => $searchQuery->state->value,
             'insufficientSearch' => $searchQuery->state === CatalogSearchState::Insufficient && $titleContext === null,
             'searchSuggestions' => $suggestions,
+            'directorySuggestions' => $this->directories->suggestions($search),
             'titleContext' => $titleContext,
             'selectedTaxonomy' => $activeTaxonomies->first(),
             'activeTaxonomies' => $activeTaxonomies,

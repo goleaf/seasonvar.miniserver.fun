@@ -2,19 +2,9 @@
 
 namespace App\Services\Catalog;
 
-use App\Models\Actor;
-use App\Models\AgeRating;
-use App\Models\CatalogStatus;
 use App\Models\CatalogTitle;
-use App\Models\Country;
-use App\Models\Director;
 use App\Models\Episode;
-use App\Models\Genre;
 use App\Models\LicensedMedia;
-use App\Models\Network;
-use App\Models\Studio;
-use App\Models\Tag;
-use App\Models\Translation;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -27,25 +17,14 @@ use Throwable;
 
 class CatalogSitemapResponder
 {
-    private const FILTER_RELATIONS = [
-        'genre' => ['model' => Genre::class, 'relation' => 'genres'],
-        'country' => ['model' => Country::class, 'relation' => 'countries'],
-        'actor' => ['model' => Actor::class, 'relation' => 'actors'],
-        'director' => ['model' => Director::class, 'relation' => 'directors'],
-        'age_rating' => ['model' => AgeRating::class, 'relation' => 'ageRatings'],
-        'translation' => ['model' => Translation::class, 'relation' => 'translations'],
-        'status' => ['model' => CatalogStatus::class, 'relation' => 'statuses'],
-        'network' => ['model' => Network::class, 'relation' => 'networks'],
-        'studio' => ['model' => Studio::class, 'relation' => 'studios'],
-        'tag' => ['model' => Tag::class, 'relation' => 'tags'],
-    ];
-
     private const SITEMAP_PAGE_SIZE = 10000;
 
     private const VIDEO_SITEMAP_PAGE_SIZE = 5000;
 
     public function __construct(
         private readonly CatalogTitleQuery $titles,
+        private readonly CatalogTaxonomyRegistry $taxonomies,
+        private readonly CatalogDirectoryRegistry $directories,
     ) {}
 
     public function index(): StreamedResponse
@@ -82,11 +61,14 @@ class CatalogSitemapResponder
             $this->writeSitemapUrl(route('home'), now(), 'daily', '1.0');
             $this->writeSitemapUrl(route('titles.index'), now(), 'daily', '0.9');
 
+            foreach ($this->directories->all() as $directory) {
+                $this->writeSitemapUrl(route($directory->indexRouteName), now(), 'weekly', '0.8');
+            }
+
             $this->titles->visibleTo(null)
                 ->select('year')
                 ->whereNotNull('year')
-                ->where('year', '>=', 1900)
-                ->where('year', '<=', (int) now()->format('Y') + 1)
+                ->whereBetween('year', [$this->minimumYear(), $this->maximumYear()])
                 ->groupBy('year')
                 ->orderByDesc('year')
                 ->cursor()
@@ -104,7 +86,7 @@ class CatalogSitemapResponder
             echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
             echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
 
-            foreach (self::FILTER_RELATIONS as $filterType => $config) {
+            foreach ($this->taxonomies->relations() as $filterType => $config) {
                 $modelClass = $config['model'];
 
                 $modelClass::query()
@@ -131,7 +113,7 @@ class CatalogSitemapResponder
             echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
 
             foreach ($this->landingFilterTypes() as $filterType) {
-                $modelClass = self::FILTER_RELATIONS[$filterType]['model'];
+                $modelClass = $this->taxonomies->modelClass($filterType);
 
                 $taxonomies = $modelClass::query()
                     ->select(['id', 'slug'])
@@ -182,7 +164,7 @@ class CatalogSitemapResponder
             return collect();
         }
 
-        $catalogTitleRelation = (new CatalogTitle)->{self::FILTER_RELATIONS[$filterType]['relation']}();
+        $catalogTitleRelation = (new CatalogTitle)->{$this->taxonomies->relationName($filterType)}();
         $pivotTable = $catalogTitleRelation->getTable();
         $titlePivotKey = $catalogTitleRelation->getForeignPivotKeyName();
         $relatedPivotKey = $catalogTitleRelation->getRelatedPivotKeyName();
@@ -465,14 +447,27 @@ class CatalogSitemapResponder
         return $this->titles->visibleTo(null)
             ->select('year')
             ->whereNotNull('year')
-            ->where('year', '>=', 1900)
-            ->where('year', '<=', (int) now()->format('Y') + 1)
+            ->whereBetween('year', [$this->minimumYear(), $this->maximumYear()])
             ->groupBy('year')
             ->orderByDesc('year')
             ->limit(12)
             ->pluck('year')
             ->map(fn (mixed $year): int => (int) $year)
             ->values();
+    }
+
+    private function minimumYear(): int
+    {
+        return max(1900, (int) config('catalog.directories.minimum_year', 1900));
+    }
+
+    private function maximumYear(): int
+    {
+        $configured = config('catalog.directories.maximum_year');
+
+        return is_numeric($configured)
+            ? max($this->minimumYear(), (int) $configured)
+            : now()->year + 1;
     }
 
     private function siteName(): string

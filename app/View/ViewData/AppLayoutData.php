@@ -2,6 +2,7 @@
 
 namespace App\View\ViewData;
 
+use App\Services\Catalog\CatalogDirectoryRegistry;
 use App\Support\PlainText;
 use Illuminate\Support\Str;
 
@@ -15,6 +16,7 @@ class AppLayoutData
     {
         extract($viewData, EXTR_SKIP);
         $siteName = config('app.name', 'Каталог сериалов');
+        $catalogDirectoryLinks = app(CatalogDirectoryRegistry::class)->all();
         $seo = is_array($seo ?? null) ? $this->cleanGeneratedSeoPayload($seo) : [];
         $extendedSeo = ($seo['extended_seo'] ?? false) === true;
         $showPublicSeoBlocks = ($seo['show_public_seo_blocks'] ?? false) === true;

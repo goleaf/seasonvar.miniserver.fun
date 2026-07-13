@@ -3,6 +3,7 @@
 namespace App\Services\Seasonvar;
 
 use App\Models\SeasonvarImportEvent;
+use App\Models\SeasonvarImportTitleGroup;
 use App\Models\SourcePageSnapshot;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -21,13 +22,14 @@ class SeasonvarImportStorageMaintenance
     }
 
     /**
-     * @return array{enabled: bool, event_retention_days: int, snapshot_retention_days: int, chunk_size: int, events_deleted: int, snapshots_deleted: int}
+     * @return array{enabled: bool, event_retention_days: int, snapshot_retention_days: int, prepared_retention_days: int, chunk_size: int, events_deleted: int, snapshots_deleted: int, title_groups_deleted: int}
      */
     public function prune(): array
     {
         $enabled = filter_var(config('seasonvar.import.storage_maintenance_enabled', true), FILTER_VALIDATE_BOOL);
         $eventRetentionDays = max(0, (int) config('seasonvar.import.event_retention_days', 7));
         $snapshotRetentionDays = max(0, (int) config('seasonvar.import.snapshot_retention_days', 14));
+        $preparedRetentionDays = max(0, (int) config('seasonvar.import.prepared_retention_days', 7));
         $chunkSize = max(1, (int) config('seasonvar.import.maintenance_chunk_size', 500));
 
         if (! $enabled) {
@@ -35,9 +37,11 @@ class SeasonvarImportStorageMaintenance
                 'enabled' => false,
                 'event_retention_days' => $eventRetentionDays,
                 'snapshot_retention_days' => $snapshotRetentionDays,
+                'prepared_retention_days' => $preparedRetentionDays,
                 'chunk_size' => $chunkSize,
                 'events_deleted' => 0,
                 'snapshots_deleted' => 0,
+                'title_groups_deleted' => 0,
             ];
         }
 
@@ -45,12 +49,16 @@ class SeasonvarImportStorageMaintenance
             'enabled' => true,
             'event_retention_days' => $eventRetentionDays,
             'snapshot_retention_days' => $snapshotRetentionDays,
+            'prepared_retention_days' => $preparedRetentionDays,
             'chunk_size' => $chunkSize,
             'events_deleted' => $eventRetentionDays > 0
                 ? $this->pruneImportEvents(now()->subDays($eventRetentionDays), $chunkSize)
                 : 0,
             'snapshots_deleted' => $snapshotRetentionDays > 0
                 ? $this->pruneSourcePageSnapshots(now()->subDays($snapshotRetentionDays), $chunkSize)
+                : 0,
+            'title_groups_deleted' => $preparedRetentionDays > 0
+                ? $this->pruneTitleGroups(now()->subDays($preparedRetentionDays), $chunkSize)
                 : 0,
         ];
     }
@@ -141,6 +149,23 @@ class SeasonvarImportStorageMaintenance
             ->chunkById($chunkSize, function ($snapshots) use (&$deleted): void {
                 $deleted += SourcePageSnapshot::query()
                     ->whereKey($snapshots->modelKeys())
+                    ->delete();
+            });
+
+        return $deleted;
+    }
+
+    private function pruneTitleGroups(Carbon $cutoff, int $chunkSize): int
+    {
+        $deleted = 0;
+
+        SeasonvarImportTitleGroup::query()
+            ->where('finished_at', '<', $cutoff)
+            ->whereHas('run', fn ($query) => $query->whereNotIn('status', ['queued', 'running']))
+            ->select('id')
+            ->chunkById($chunkSize, function ($groups) use (&$deleted): void {
+                $deleted += SeasonvarImportTitleGroup::query()
+                    ->whereKey($groups->modelKeys())
                     ->delete();
             });
 

@@ -148,9 +148,9 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
             $warningCount = $validRows->sum(
                 fn (array $item): int => count($item['row']->warnings ?? []),
             );
-            $failedPages = $group->preparedPages
-                ->where('status', SeasonvarPreparedPageStatus::Failed)
-                ->count() + $invalidPages;
+            $failedPages = $group->preparedPages()
+                ->where('status', SeasonvarPreparedPageStatus::Failed->value)
+                ->count();
             $status = ($failedPages > 0 || $warningCount > 0 || $media['failed'] > 0)
                 ? SeasonvarImportTitleGroupStatus::Partial
                 : SeasonvarImportTitleGroupStatus::Completed;
@@ -166,10 +166,12 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
             );
             $cacheInvalidator->catalogChanged([$catalogTitle->id]);
 
-            if ($status === SeasonvarImportTitleGroupStatus::Completed) {
-                $refreshStates->completed($catalogTitle->id, $group->seasonvar_import_run_id);
-            } else {
-                $refreshStates->partial($catalogTitle->id, $group->seasonvar_import_run_id);
+            if ($this->isVisitorRun($group->run)) {
+                if ($status === SeasonvarImportTitleGroupStatus::Completed) {
+                    $refreshStates->completed($catalogTitle->id, $group->seasonvar_import_run_id);
+                } else {
+                    $refreshStates->partial($catalogTitle->id, $group->seasonvar_import_run_id);
+                }
             }
         } finally {
             $lock->release();
@@ -221,7 +223,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
             ]);
         }
 
-        if ($group->catalog_title_id !== null) {
+        if ($group->catalog_title_id !== null && $this->isVisitorRun($group->run)) {
             app(CatalogTitleRefreshStateStore::class)->failed($group->catalog_title_id);
         }
 
@@ -360,7 +362,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
             ]);
         }
 
-        if ($group->catalog_title_id !== null) {
+        if ($group->catalog_title_id !== null && $this->isVisitorRun($group->run)) {
             $refreshStates->failed($group->catalog_title_id);
         }
     }
