@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Actor;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendationSignal;
 use App\Models\Episode;
@@ -16,6 +17,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\ValidationException;
 use Mockery;
 use Tests\TestCase;
 
@@ -572,6 +574,206 @@ class SeasonvarParsePageCommandTest extends TestCase
         Http::assertSentCount(2);
         $this->assertTrue($freshPage->last_changed_at->greaterThan($firstChangedAt));
         $this->assertTrue($freshPage->last_imported_at->greaterThan($firstImportedAt));
+    }
+
+    public function test_repeat_import_is_idempotent_and_preserves_editorial_visibility_and_fields(): void
+    {
+        Http::preventStrayRequests();
+        $url = 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html';
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $page = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+            'page_type' => 'serial',
+            'parse_status' => 'pending',
+        ]);
+        $providerHtml = $this->seasonPageHtml(
+            4,
+            [1 => 'Пилот'],
+            ['https://media.example.com/kitchen/s04e01.mp4'],
+            posterUrl: 'https://img.example.com/provider.jpg',
+        );
+        Http::fake([
+            $url => Http::sequence()->push($providerHtml)->push($providerHtml),
+        ]);
+        $importer = app(SeasonvarCatalogImporter::class);
+
+        $importer->parsePage($page);
+
+        $title = CatalogTitle::query()->where('external_id', '47915')->firstOrFail();
+        $season = $title->seasons()->where('number', 4)->firstOrFail();
+        $episode = $season->episodes()->where('number', 1)->firstOrFail();
+        $media = LicensedMedia::query()->where('episode_id', $episode->id)->firstOrFail();
+        $title->update([
+            'title' => 'Редакционное название',
+            'description' => 'Редакционное описание',
+            'poster_url' => 'https://img.example.com/editorial.jpg',
+            'is_published' => false,
+            'publication_status' => 'hidden',
+            'audience' => 'authenticated',
+        ]);
+        $season->update([
+            'publication_status' => 'hidden',
+            'audience' => 'authenticated',
+        ]);
+        $episode->update([
+            'publication_status' => 'hidden',
+            'audience' => 'authenticated',
+        ]);
+        $media->delete();
+        $title->delete();
+
+        $importer->parsePage($page->fresh(), force: true);
+
+        $title = CatalogTitle::withTrashed()->findOrFail($title->id);
+        $this->assertTrue($title->trashed());
+        $this->assertSame('Редакционное название', $title->title);
+        $this->assertSame('Редакционное описание', $title->description);
+        $this->assertSame('https://img.example.com/editorial.jpg', $title->poster_url);
+        $this->assertFalse($title->is_published);
+        $this->assertSame('hidden', $title->publication_status->value);
+        $this->assertSame('authenticated', $title->audience->value);
+        $this->assertSame('hidden', $season->fresh()->publication_status->value);
+        $this->assertSame('authenticated', $season->fresh()->audience->value);
+        $this->assertSame('hidden', $episode->fresh()->publication_status->value);
+        $this->assertSame('authenticated', $episode->fresh()->audience->value);
+        $this->assertTrue(LicensedMedia::withTrashed()->findOrFail($media->id)->trashed());
+        $this->assertDatabaseCount('catalog_titles', 1);
+        $this->assertDatabaseCount('seasons', 2);
+        $this->assertDatabaseCount('episodes', 1);
+        $this->assertDatabaseCount('catalog_title_genre', 1);
+        $this->assertDatabaseCount('catalog_title_country', 1);
+        $this->assertDatabaseCount('licensed_media', 1);
+    }
+
+    public function test_partial_provider_page_does_not_remove_previous_recommendation_signals(): void
+    {
+        Http::preventStrayRequests();
+        $url = 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html';
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $page = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+            'page_type' => 'serial',
+            'parse_status' => 'pending',
+        ]);
+        $completeHtml = $this->seasonPageHtml(4, [1 => 'Пилот']);
+        $partialHtml = preg_replace(
+            '/<div class="pgs-sinfo_list">.*?<\/div>/s',
+            '',
+            $completeHtml,
+        );
+        $this->assertIsString($partialHtml);
+        Http::fake([
+            $url => Http::sequence()->push($completeHtml)->push($partialHtml),
+        ]);
+        $importer = app(SeasonvarCatalogImporter::class);
+
+        $importer->parsePage($page);
+        $title = CatalogTitle::query()->where('external_id', '47915')->firstOrFail();
+        $this->assertDatabaseHas('catalog_title_recommendation_signals', [
+            'catalog_title_id' => $title->id,
+            'signal_type' => 'taxonomy_genre',
+            'signal_value' => 'Кулинария',
+        ]);
+
+        $importer->parsePage($page->fresh(), force: true);
+
+        $this->assertDatabaseHas('catalog_title_recommendation_signals', [
+            'catalog_title_id' => $title->id,
+            'signal_type' => 'taxonomy_genre',
+            'signal_value' => 'Кулинария',
+        ]);
+    }
+
+    public function test_invalid_provider_payload_is_rejected_before_catalog_writes(): void
+    {
+        Http::preventStrayRequests();
+        $url = 'https://seasonvar.ru/serial-99999-empty-1-season.html';
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $page = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+            'page_type' => 'serial',
+            'parse_status' => 'pending',
+        ]);
+        Http::fake([$url => Http::response('<html><body></body></html>')]);
+
+        try {
+            app(SeasonvarCatalogImporter::class)->parsePage($page);
+            $this->fail('Некорректный provider payload должен быть отклонен.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('title', $exception->errors());
+        }
+
+        $this->assertDatabaseCount('catalog_titles', 0);
+        $this->assertSame('pending', $page->fresh()->parse_status);
+    }
+
+    public function test_stable_person_urls_keep_people_with_the_same_name_distinct(): void
+    {
+        Http::preventStrayRequests();
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $firstUrl = 'https://seasonvar.ru/serial-47915-first-1-season.html';
+        $secondUrl = 'https://seasonvar.ru/serial-77777-second-1-season.html';
+        $firstPage = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $firstUrl,
+            'url_hash' => hash('sha256', $firstUrl),
+            'page_type' => 'serial',
+            'parse_status' => 'pending',
+        ]);
+        $secondPage = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $secondUrl,
+            'url_hash' => hash('sha256', $secondUrl),
+            'page_type' => 'serial',
+            'parse_status' => 'pending',
+        ]);
+        $firstHtml = str_replace(
+            '</body>',
+            '<a href="/actor/1001-aleksandr-ivanov">Александр Иванов</a></body>',
+            $this->seasonPageHtml(1, [1 => 'Пилот']),
+        );
+        $secondHtml = str_replace(
+            '</body>',
+            '<a href="/actor/2002-aleksandr-ivanov">Александр Иванов</a></body>',
+            $this->seasonPageHtml(1, [1 => 'Пилот']),
+        );
+        Http::fake([
+            $firstUrl => Http::response($firstHtml),
+            $secondUrl => Http::response($secondHtml),
+        ]);
+        $importer = app(SeasonvarCatalogImporter::class);
+
+        $importer->parsePage($firstPage);
+        $importer->parsePage($secondPage);
+
+        $this->assertSame(2, CatalogTitle::query()->count());
+        $this->assertSame(2, Actor::query()->where('name', 'Александр Иванов')->count());
+        $this->assertSame([
+            'https://seasonvar.ru/actor/1001-aleksandr-ivanov',
+            'https://seasonvar.ru/actor/2002-aleksandr-ivanov',
+        ], Actor::query()->where('name', 'Александр Иванов')->orderBy('source_url')->pluck('source_url')->all());
     }
 
     public function test_importer_uses_retrying_transaction_for_catalog_writes(): void

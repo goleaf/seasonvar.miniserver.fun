@@ -18,7 +18,7 @@ class SeasonvarTitleMergeTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_it_merges_season_title_duplicates_into_one_catalog_title(): void
+    public function test_it_does_not_merge_distinct_provider_ids_only_because_titles_match(): void
     {
         $source = Source::factory()->create(['code' => 'seasonvar']);
         $firstUrl = 'https://seasonvar.ru/serial/odin-serial-1-season';
@@ -102,38 +102,37 @@ class SeasonvarTitleMergeTest extends TestCase
 
         app(SeasonvarTitleMerger::class)->merge();
 
-        $this->assertDatabaseMissing('catalog_titles', ['id' => $duplicate->id]);
+        $this->assertDatabaseHas('catalog_titles', ['id' => $duplicate->id]);
         $this->assertDatabaseHas('catalog_title_country', [
             'catalog_title_id' => $canonical->id,
             'country_id' => $country->id,
         ]);
         $this->assertDatabaseHas('catalog_title_genre', [
-            'catalog_title_id' => $canonical->id,
+            'catalog_title_id' => $duplicate->id,
             'genre_id' => $genre->id,
         ]);
 
         $canonical->refresh()->load(['seasons.episodes', 'countries', 'genres']);
-        $this->assertSame([1, 2], $canonical->seasons->sortBy('number')->pluck('number')->values()->all());
-        $this->assertSame(2, $canonical->episodes()->count());
+        $this->assertSame([1], $canonical->seasons->pluck('number')->all());
+        $this->assertSame(1, $canonical->episodes()->count());
 
-        $targetSecondSeason = $canonical->seasons->firstWhere('number', 2);
         $this->assertDatabaseHas('episodes', [
             'id' => $secondEpisode->id,
-            'season_id' => $targetSecondSeason->id,
+            'season_id' => $secondSeason->id,
         ]);
         $this->assertDatabaseHas('licensed_media', [
             'id' => $media->id,
-            'catalog_title_id' => $canonical->id,
-            'season_id' => $targetSecondSeason->id,
+            'catalog_title_id' => $duplicate->id,
+            'season_id' => $secondSeason->id,
             'episode_id' => $secondEpisode->id,
         ]);
 
         $this->get(route('titles.taxonomy', ['type' => 'country', 'taxonomy' => 'rossiia']))
             ->assertOk()
-            ->assertSeeText('Найдено сейчас: 1');
+            ->assertSeeText('Найдено сейчас: 2');
     }
 
-    public function test_it_merges_cyrillic_title_variants_after_slash(): void
+    public function test_it_uses_canonical_url_family_when_stable_provider_ids_are_missing(): void
     {
         $source = Source::factory()->create(['code' => 'seasonvar']);
         $firstUrl = 'https://seasonvar.ru/serial-1179--Bitva_ekstrasensov_psyegsq-1-season.html';
@@ -152,7 +151,7 @@ class SeasonvarTitleMergeTest extends TestCase
         $canonical = CatalogTitle::factory()->create([
             'source_id' => $source->id,
             'source_page_id' => $firstPage->id,
-            'external_id' => '1179',
+            'external_id' => null,
             'slug' => 'bitva-ekstrasensov',
             'title' => 'Битва экстрасенсов',
             'year' => 2007,
@@ -162,7 +161,7 @@ class SeasonvarTitleMergeTest extends TestCase
         $variant = CatalogTitle::factory()->create([
             'source_id' => $source->id,
             'source_page_id' => $secondPage->id,
-            'external_id' => '48017',
+            'external_id' => null,
             'slug' => 'bitva-ekstrasensovnovaia-bitva-ekstrasensov',
             'title' => 'Битва экстрасенсов/Новая битва экстрасенсов',
             'year' => 2022,

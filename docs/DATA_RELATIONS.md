@@ -60,6 +60,8 @@
 - Обычные сезоны и серии имеют `kind=regular`, спецвыпуски — `kind=special`. Unique-ключи `(catalog_title_id, kind, number)` и `(season_id, kind, number)` разрешают специальный и обычный выпуск с одним номером, но запрещают дубли внутри вида.
 - Порядок сезонов и серий детерминирован: `kind`, `sort_order`, `number`, `id`; обычные выпуски идут до специальных и не перенумеровываются из-за specials.
 - `CatalogTitle`, `Season`, `Episode` и `LicensedMedia` используют soft delete; merge импортёра применяет физическое удаление только к уже объединённым дублям, чтобы не оставлять конфликтующие provider keys.
+- `CatalogTitle.provider_field_values` хранит только последний baseline импортируемых `title`, `original_title`, `description` и `poster_url`; это не публичная metadata и не источник отображения. Импорт меняет текущее поле лишь пока оно совпадает с предыдущим baseline, поэтому локальное редакционное значение не затирается.
+- Автоматическая identity тайтла — `(source_id, external_id)`, при отсутствии provider ID — точный canonical URL hash/source page. Актёры и режиссёры используют пригодный provider person URL; одинаковое имя с разными стабильными URL создаёт разные строки со стабильными slug suffix. Fallback по имени применяется только при отсутствии пригодного provider URL.
 - Публичные медиа проверяют собственный status/window/audience и доступность связанных сезона и серии.
 - Playback дополнительно требует непустой `playback_url` или `path`; пустая опубликованная media row не делает серию доступной и не попадает в counts/primary action.
 

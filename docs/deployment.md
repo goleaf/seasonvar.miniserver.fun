@@ -2,6 +2,15 @@
 
 Обновлено: 09.07.2026
 
+## Import identity и editorial baseline от 13.07.2026
+
+После уже существующих migrations применяются по timestamp:
+
+1. `2026_07_13_130100_add_provider_field_values_to_catalog_titles_table` добавляет nullable JSON без backfill. Первый повторный import сохраняет заполненные существующие поля как потенциально редакционные и только фиксирует provider baseline.
+2. `2026_07_13_130101_add_provider_identity_indexes_to_people_tables` добавляет неуникальные indexes для bounded actor/director lookup по `source_url`. Unique constraint намеренно не добавляется: read-only аудит текущих данных обнаружил неоднозначный обрезанный person URL.
+
+Rollout: дождаться import jobs → backup SQLite → deploy → `php artisan migrate --force` → `php artisan queue:restart` → безопасный targeted repeat import. Обе migrations additive и обратимы, не удаляют и не объединяют строки. Подробный контракт находится в `docs/importer.md`.
+
 ## Миграции publication integrity от 12.07.2026
 
 Миграции выполняются только в порядке timestamp:

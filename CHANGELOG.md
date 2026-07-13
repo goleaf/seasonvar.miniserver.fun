@@ -2,6 +2,8 @@
 
 ## 2026-07-13
 
+- Added a validated normalized Seasonvar DTO boundary, provider-ID/canonical-URL title identity resolution, stable person-URL disambiguation, and additive lookup indexes without unsafe name-only merging.
+- Preserved editorial title/description/artwork through a three-way provider baseline, kept publication/audience/windows/soft deletes under local ownership, and prevented partial snapshots or repeat imports from restoring/deleting relationships and media.
 - Centralized catalog and playback access in `CatalogEntitlementService`, with one SQL visibility boundary and one structured loaded-release decision reused by search, route binding, recommendations, policies, progress/history, source resolution, and direct signed playback rechecks.
 - Added explicit authentication, plan, region, profile, and concurrency decision states without inventing profile, PIN, role, billing, territory, or stream-session storage; the authenticated `User` remains the only supported active profile.
 - Consolidated favorites into the existing watchlist concept and replaced toggle read-modify-write with authorized desired-state conditional writes protected by the existing user/title unique key; repeated Livewire requests do not change timestamps, no-op removals create no rows, and browser user/profile IDs are never accepted.

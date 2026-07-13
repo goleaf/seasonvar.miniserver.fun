@@ -32,6 +32,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'source_url',
     'source_url_hash',
     'content_hash',
+    'provider_field_values',
     'is_published',
     'publication_status',
     'audience',
@@ -289,6 +290,7 @@ class CatalogTitle extends Model
             'available_from' => 'datetime',
             'available_until' => 'datetime',
             'indexed_at' => 'datetime',
+            'provider_field_values' => 'array',
         ];
     }
 }

@@ -93,23 +93,82 @@ class SeasonvarCatalogRelationSyncer
         /** @var class-string<Model> $modelClass */
         $modelClass = $config['model'];
         $now = now();
-        $rowsBySlug = $items->reduce(function (Collection $rows, array $item) use ($type, $now): Collection {
+        $normalizedItems = $items->map(function (array $item) use ($type): ?array {
             $name = $this->relationNames->normalize($item['name']);
 
             if ($name === '') {
-                return $rows;
+                return null;
             }
 
-            $slug = $this->relationSlug($type, $name);
             $sourceUrl = $this->safeSourceUrl($item['source_url'] ?? null);
+
+            return [
+                'name' => $name,
+                'base_slug' => $this->relationSlug($type, $name),
+                'source_url' => $sourceUrl,
+                'identity_url' => $this->stableProviderIdentityUrl($type, $sourceUrl),
+            ];
+        })->filter()
+            ->unique(fn (array $item): string => $item['identity_url'] !== null
+                ? 'provider|'.$item['identity_url']
+                : 'fallback|'.$item['base_slug'])
+            ->values();
+
+        if ($normalizedItems->isEmpty()) {
+            return [];
+        }
+
+        $identityUrls = $normalizedItems->pluck('identity_url')->filter()->unique()->values();
+        $existingByIdentityUrl = $identityUrls->isEmpty()
+            ? collect()
+            : $modelClass::query()
+                ->whereIn('source_url', $identityUrls)
+                ->orderBy('id')
+                ->get()
+                ->groupBy('source_url')
+                ->map->first();
+        $existingBySlug = $modelClass::query()
+            ->whereIn('slug', $normalizedItems->pluck('base_slug')->unique())
+            ->get()
+            ->keyBy('slug');
+        $reservedSlugs = [];
+
+        $rowsBySlug = $normalizedItems->reduce(function (Collection $rows, array $item) use ($type, $existingByIdentityUrl, $existingBySlug, &$reservedSlugs, $now): Collection {
+            $identityUrl = $item['identity_url'];
+            $slug = $identityUrl !== null
+                ? $existingByIdentityUrl->get($identityUrl)?->slug
+                : null;
+
+            if ($slug === null) {
+                $slug = $item['base_slug'];
+                $baseRecord = $existingBySlug->get($slug);
+                $baseIdentityUrl = $baseRecord !== null
+                    ? $this->stableProviderIdentityUrl($type, $baseRecord->source_url)
+                    : null;
+                $reservedIdentityUrl = $reservedSlugs[$slug] ?? null;
+
+                if ($identityUrl !== null
+                    && (($baseIdentityUrl !== null && $baseIdentityUrl !== $identityUrl)
+                        || ($reservedIdentityUrl !== null && $reservedIdentityUrl !== $identityUrl))) {
+                    $slug .= '-'.substr(hash('sha256', $identityUrl), 0, 12);
+                }
+            }
+
             $existing = $rows->get($slug);
+            $sourceUrl = $item['source_url'];
 
             if (is_array($existing) && $existing['source_url'] !== null && $sourceUrl === null) {
                 $sourceUrl = $existing['source_url'];
             }
 
+            if ($identityUrl === null && ($existingBySlug->get($slug)?->source_url ?? null) !== null) {
+                $sourceUrl = $existingBySlug->get($slug)->source_url;
+            }
+
+            $reservedSlugs[$slug] = $identityUrl;
+
             $rows->put($slug, [
-                'name' => $name,
+                'name' => $item['name'],
                 'slug' => $slug,
                 'source_url' => $sourceUrl,
                 'created_at' => $now,
@@ -118,10 +177,6 @@ class SeasonvarCatalogRelationSyncer
 
             return $rows;
         }, collect());
-
-        if ($rowsBySlug->isEmpty()) {
-            return [];
-        }
 
         $rowsWithSourceUrl = $rowsBySlug->filter(fn (array $row): bool => $row['source_url'] !== null);
         $rowsWithoutSourceUrl = $rowsBySlug->filter(fn (array $row): bool => $row['source_url'] === null);
@@ -181,6 +236,25 @@ class SeasonvarCatalogRelationSyncer
         }
 
         return in_array(Str::lower((string) ($parts['host'] ?? '')), ['seasonvar.ru', 'www.seasonvar.ru'], true)
+            ? $sourceUrl
+            : null;
+    }
+
+    private function stableProviderIdentityUrl(string $type, ?string $sourceUrl): ?string
+    {
+        if (! in_array($type, ['actor', 'director'], true) || $sourceUrl === null) {
+            return null;
+        }
+
+        $path = (string) parse_url($sourceUrl, PHP_URL_PATH);
+
+        if (preg_match('~/(?:actor|akter|director|rezhisser)[/-](?<identity>[^/]+)$~iu', $path, $matches) !== 1) {
+            return null;
+        }
+
+        $identity = trim($matches['identity'], '-_');
+
+        return Str::length($identity) >= 6 && ! str_contains($identity, '&')
             ? $sourceUrl
             : null;
     }

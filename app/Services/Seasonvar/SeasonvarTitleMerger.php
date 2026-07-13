@@ -30,6 +30,8 @@ class SeasonvarTitleMerger
         'tags',
     ];
 
+    public function __construct(private readonly SeasonvarImportGroupKey $groupKeys) {}
+
     /**
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return array{groups: int, titles: int, seasons: int, episodes: int}
@@ -82,13 +84,14 @@ class SeasonvarTitleMerger
     private function duplicateTitleGroups(): Collection
     {
         return CatalogTitle::query()
+            ->whereNull('external_id')
             ->orderBy('source_id')
             ->orderBy('id')
             ->get()
             ->groupBy(fn (CatalogTitle $title): string => implode('|', [
                 $title->source_id,
                 $title->type,
-                $this->normalizedSeriesTitleKey($title->title),
+                $this->groupKeys->forUrl($title->source_url, $title->source_url_hash),
             ]))
             ->filter(fn (Collection $titles): bool => $titles->count() > 1)
             ->sortByDesc(fn (Collection $titles): int => $titles->count())

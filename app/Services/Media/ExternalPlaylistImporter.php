@@ -121,10 +121,6 @@ class ExternalPlaylistImporter
                 ]);
             $wasRecentlyCreated = ! $media->exists;
 
-            if ($media->trashed()) {
-                $media->restore();
-            }
-
             $variant = $this->mediaMetadata->playbackVariant($entry['title'], $baseUrl, $entry['url']);
 
             $media->fill([

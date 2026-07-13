@@ -3,6 +3,7 @@
 namespace App\Services\Seasonvar;
 
 use App\Actions\Seasonvar\RecordSeasonvarPageFailure;
+use App\DTOs\Seasonvar\SeasonvarCatalogData;
 use App\Enums\ContentAudience;
 use App\Enums\PublicationStatus;
 use App\Enums\ReleaseKind;
@@ -37,6 +38,8 @@ class SeasonvarCatalogImporter
         private readonly SeasonvarUrl $seasonvarUrl,
         private readonly PoliteHttpClient $httpClient,
         private readonly SeasonvarCatalogParser $parser,
+        private readonly SeasonvarCatalogIdentityResolver $identityResolver,
+        private readonly SeasonvarEditorialFieldResolver $editorialFields,
         private readonly ExternalPlaylistImporter $playlistImporter,
         private readonly SeasonvarMediaAvailabilityChecker $mediaAvailabilityChecker,
         private readonly ExternalMediaMetadata $mediaMetadata,
@@ -454,35 +457,44 @@ class SeasonvarCatalogImporter
             'url' => $page->url,
         ]);
 
-        $data = $this->parser->parse($body, $page->url);
+        $data = SeasonvarCatalogData::fromParsed($this->parser->parse($body, $page->url));
 
         $this->report($progress, 'html-parse-complete', [
             'source_page_id' => $page->id,
-            'title' => $data['title'],
-            'original_title' => $data['original_title'],
-            'type' => $data['type'],
-            'year' => $data['year'],
-            'external_id' => $data['external_id'],
-            'poster_url' => $data['poster_url'],
-            'seasons' => count($data['seasons']),
-            'episodes' => count($data['episodes']),
-            'media_candidates' => count($data['media']),
-            'taxonomies' => count($data['taxonomies']),
-            'ratings' => count($data['ratings']),
-            'aliases' => count($data['aliases']),
-            'reviews' => count($data['reviews']),
-            'info_labels' => $data['parse_meta']['info_labels'] ?? [],
+            'title' => $data->title,
+            'original_title' => $data->originalTitle,
+            'type' => $data->type,
+            'year' => $data->year,
+            'external_id' => $data->externalId,
+            'poster_url' => $data->posterUrl,
+            'seasons' => count($data->seasons),
+            'episodes' => count($data->episodes),
+            'media_candidates' => count($data->media),
+            'taxonomies' => count($data->taxonomies),
+            'ratings' => count($data->ratings),
+            'aliases' => count($data->aliases),
+            'reviews' => count($data->reviews),
+            'info_labels' => $data->parseMeta['info_labels'] ?? [],
+            'snapshot_complete' => [
+                'metadata' => $data->hasCompleteMetadataSnapshot(),
+                'seasons' => $data->hasCompleteSeasonSnapshot(),
+                'episodes' => $data->hasCompleteEpisodeSnapshot(),
+            ],
         ]);
 
         $transactionResult = $this->databaseTransaction->run(function () use ($page, $data, $contentHash, $progress): array {
             $catalogTitle = $this->upsertCatalogTitle($page, $data, $contentHash, $progress);
-            $this->relationSyncer->sync($catalogTitle, $data['taxonomies'], $progress);
-            $this->syncCatalogAliases($catalogTitle, $data['aliases'], $progress);
-            $this->syncCatalogRatings($catalogTitle, $data['ratings'], $progress);
-            $this->syncCatalogRecommendationSignals($catalogTitle, $data['recommendation_signals'], $progress);
-            $this->syncCatalogReviews($catalogTitle, $page, $data['reviews'], $progress);
-            $seasons = $this->syncSeasons($catalogTitle, $page, $data['seasons'], $progress);
-            $this->syncEpisodes($seasons, $page, $data['episodes'], $progress);
+            $this->relationSyncer->sync($catalogTitle, $data->taxonomies, $progress);
+            $this->syncCatalogAliases($catalogTitle, $data->aliases, $progress);
+            $this->syncCatalogRatings($catalogTitle, $data->ratings, $progress);
+
+            if ($data->hasCompleteMetadataSnapshot()) {
+                $this->syncCatalogRecommendationSignals($catalogTitle, $data->recommendationSignals, $progress);
+            }
+
+            $this->syncCatalogReviews($catalogTitle, $page, $data->reviews, $progress);
+            $seasons = $this->syncSeasons($catalogTitle, $page, $data->seasons, $progress);
+            $this->syncEpisodes($seasons, $page, $data->episodes, $progress);
 
             $page->update([
                 'parse_status' => 'parsed',
@@ -500,8 +512,8 @@ class SeasonvarCatalogImporter
         );
         $catalogTitle = $transactionResult['catalog_title'];
         $mediaResult = $this->mergeMediaResult(
-            $this->syncParsedMedia($catalogTitle, $transactionResult['seasons'], $data['media'], $progress),
-            $this->importParsedPlaylists($catalogTitle, $data['media'], $progress),
+            $this->syncParsedMedia($catalogTitle, $transactionResult['seasons'], $data->media, $progress),
+            $this->importParsedPlaylists($catalogTitle, $data->media, $progress),
         );
         $this->syncMediaTranslations($catalogTitle, $progress);
         $missingDataFlags = $this->titlePageStateSynchronizer
@@ -530,32 +542,12 @@ class SeasonvarCatalogImporter
     }
 
     /**
-     * @param array{
-     *     title: string,
-     *     original_title: string|null,
-     *     type: string,
-     *     year: int|null,
-     *     description: string|null,
-     *     poster_url: string|null,
-     *     external_id: string|null,
-     *     current_season_number: int,
-     *     seasons: list<array{number: int, title: string|null, source_url: string|null, latest_episode_released_at: string|null, episodes_released: int|null, episodes_total: int|null, translation_name: string|null, release_status_text: string|null}>,
-     *     episodes: list<array{season_number: int, number: int, title: string|null, source_url: string|null}>,
-     *     media: list<array{url: string, title: string|null, season_number: int|null, episode_number: int|null, source_url: string|null, kind: string}>,
-     *     taxonomies: list<array{type: string, name: string, source_url: string|null}>,
-     *     ratings: list<array{provider: string, rating: float|null, votes: int|null, raw_value: string}>,
-     *     recommendation_signals: list<array{source: string, signal_type: string, signal_key: string, signal_value: string|null, weight: int}>,
-     *     aliases: list<array{name: string, type: string, source: string}>,
-     *     reviews: list<array{author: string|null, body: string, published_at: string|null}>,
-     *     parse_meta: array<string, mixed>
-     * } $data
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      */
-    private function upsertCatalogTitle(SourcePage $page, array $data, string $contentHash, ?callable $progress = null): CatalogTitle
+    private function upsertCatalogTitle(SourcePage $page, SeasonvarCatalogData $data, string $contentHash, ?callable $progress = null): CatalogTitle
     {
         $sourceUrlHash = $this->seasonvarUrl->hash($page->url);
-        $catalogTitle = $this->findCatalogTitleBySourceUrlHash($page, $sourceUrlHash)
-            ?? $this->findExistingCatalogTitle($page, $data['type'], $data['title'])
+        $catalogTitle = $this->identityResolver->resolve($page, $data, $sourceUrlHash)
             ?? new CatalogTitle([
                 'source_id' => $page->source_id,
                 'source_url_hash' => $sourceUrlHash,
@@ -567,11 +559,11 @@ class SeasonvarCatalogImporter
             'source_id' => $page->source_id,
             'existing' => $wasExisting,
             'source_url_hash' => $sourceUrlHash,
-            'title' => $data['title'],
+            'title' => $data->title,
         ]);
 
-        if (! $catalogTitle->exists || Str::contains($catalogTitle->slug, ['seasonvar', 'smotret'])) {
-            $catalogTitle->slug = $this->uniqueSlug($data['title'], $data['external_id'], $sourceUrlHash, $catalogTitle->id);
+        if (! $catalogTitle->exists) {
+            $catalogTitle->slug = $this->uniqueSlug($data->title, $data->externalId, $sourceUrlHash, $catalogTitle->id);
 
             $this->report($progress, 'catalog-title-slug-prepared', [
                 'source_page_id' => $page->id,
@@ -584,29 +576,30 @@ class SeasonvarCatalogImporter
             || $catalogTitle->source_page_id === null
             || (int) $catalogTitle->source_page_id === (int) $page->id;
 
-        if ($catalogTitle->trashed()) {
-            $catalogTitle->restore();
-        }
+        $editorial = $this->editorialFields->resolve($catalogTitle, $data);
 
         $catalogTitle->fill([
             'source_page_id' => $catalogTitle->source_page_id ?? $page->id,
-            'external_id' => $catalogTitle->external_id ?? $data['external_id'],
-            'title' => $catalogTitle->exists
-                ? $this->preferredTitle($catalogTitle->title, $data['title'])
-                : $data['title'],
-            'original_title' => $this->normalizedOriginalTitle($data['original_title']) ?? $catalogTitle->original_title,
-            'type' => $data['type'],
-            'year' => $this->earliestYear($catalogTitle->year, $data['year']),
-            'description' => $data['description'] ?: $catalogTitle->description,
-            'poster_url' => $data['poster_url'] ?: $catalogTitle->poster_url,
+            'external_id' => $catalogTitle->external_id ?? $data->externalId,
+            ...$editorial['values'],
+            'original_title' => $editorial['values']['original_title'],
+            'type' => $catalogTitle->exists ? $catalogTitle->type : $data->type,
+            'year' => $this->earliestYear($catalogTitle->year, $data->year),
             'source_url' => $catalogTitle->source_url ?: $page->url,
             'source_url_hash' => $catalogTitle->source_url_hash ?: $sourceUrlHash,
             'content_hash' => $isCanonicalSourcePage ? $contentHash : $catalogTitle->content_hash,
-            'is_published' => true,
-            'publication_status' => PublicationStatus::Published,
-            'audience' => ContentAudience::Public,
+            'provider_field_values' => $editorial['provider_field_values'],
             'indexed_at' => now(),
         ]);
+
+        if (! $catalogTitle->exists) {
+            $catalogTitle->fill([
+                'is_published' => true,
+                'publication_status' => PublicationStatus::Published,
+                'audience' => ContentAudience::Public,
+            ]);
+        }
+
         $catalogTitle->save();
 
         $this->report($progress, $wasExisting ? 'catalog-title-updated' : 'catalog-title-created', [
@@ -630,71 +623,11 @@ class SeasonvarCatalogImporter
             ->first();
     }
 
-    private function findExistingCatalogTitle(SourcePage $page, string $type, string $title): ?CatalogTitle
-    {
-        $titleKey = $this->normalizedSeriesTitleKey($title);
-        $seriesTitle = $this->seriesTitleKey($title);
-
-        return CatalogTitle::withTrashed()
-            ->where('source_id', $page->source_id)
-            ->where('type', $type)
-            ->where(function ($query) use ($title, $seriesTitle): void {
-                $query->where('title', $title)
-                    ->orWhere('title', $seriesTitle)
-                    ->orWhere('title', 'like', $seriesTitle.'/%');
-            })
-            ->orderBy('id')
-            ->get()
-            ->first(fn (CatalogTitle $catalogTitle): bool => $this->normalizedSeriesTitleKey($catalogTitle->title) === $titleKey);
-    }
-
     private function earliestYear(?int $currentYear, ?int $incomingYear): ?int
     {
         return collect([$currentYear, $incomingYear])
             ->filter()
             ->min();
-    }
-
-    private function preferredTitle(string $currentTitle, string $incomingTitle): string
-    {
-        if ($this->normalizedSeriesTitleKey($currentTitle) !== $this->normalizedSeriesTitleKey($incomingTitle)) {
-            return $incomingTitle;
-        }
-
-        return Str::length($currentTitle) <= Str::length($incomingTitle)
-            ? $currentTitle
-            : $incomingTitle;
-    }
-
-    private function normalizedOriginalTitle(?string $originalTitle): ?string
-    {
-        if ($originalTitle === null || $this->containsCyrillic($originalTitle)) {
-            return null;
-        }
-
-        return $originalTitle;
-    }
-
-    private function normalizedSeriesTitleKey(string $title): string
-    {
-        return Str::lower($this->seriesTitleKey($title));
-    }
-
-    private function seriesTitleKey(string $title): string
-    {
-        $title = Str::squish($title);
-        $parts = explode('/', $title, 2);
-
-        if (count($parts) === 2 && $this->containsCyrillic($parts[0]) && $this->containsCyrillic($parts[1])) {
-            return Str::squish($parts[0]);
-        }
-
-        return $title;
-    }
-
-    private function containsCyrillic(string $value): bool
-    {
-        return preg_match('/\p{Cyrillic}/u', $value) === 1;
     }
 
     private function uniqueSlug(string $title, ?string $externalId, string $sourceUrlHash, ?int $ignoreId = null): string
@@ -951,6 +884,21 @@ class SeasonvarCatalogImporter
                 ->get()
                 ->keyBy(fn (Season $season): int => (int) $season->number)
             : collect();
+        $rowsByNumber = $rowsByNumber->map(function (array $row, int $number) use ($existingSeasons): array {
+            $existing = $existingSeasons->get($number);
+
+            if ($existing === null) {
+                return $row;
+            }
+
+            foreach (['title', 'source_url', 'source_url_hash', 'translation_name', 'release_status_text'] as $field) {
+                if ($row[$field] === null) {
+                    $row[$field] = $existing->{$field};
+                }
+            }
+
+            return $row;
+        });
         $rowsForUpsert = $rowsByNumber
             ->filter(fn (array $row, int $number): bool => $this->seasonRowChanged($existingSeasons->get($number), $row));
 
@@ -969,9 +917,6 @@ class SeasonvarCatalogImporter
                     'translation_name',
                     'release_status_text',
                     'sort_order',
-                    'publication_status',
-                    'audience',
-                    'deleted_at',
                     'updated_at',
                 ],
             );
@@ -1051,6 +996,21 @@ class SeasonvarCatalogImporter
                 ->get()
                 ->keyBy(fn (Episode $episode): string => $episode->season_id.'|'.$episode->number)
             : collect();
+        $rowsByKey = $rowsByKey->map(function (array $row, string $key) use ($existingEpisodes): array {
+            $existing = $existingEpisodes->get($key);
+
+            if ($existing === null) {
+                return $row;
+            }
+
+            foreach (['title', 'source_url', 'source_url_hash'] as $field) {
+                if ($row[$field] === null) {
+                    $row[$field] = $existing->{$field};
+                }
+            }
+
+            return $row;
+        });
         $rowsForUpsert = $rowsByKey
             ->filter(fn (array $row, string $key): bool => $this->episodeRowChanged($existingEpisodes->get($key), $row));
 
@@ -1064,9 +1024,6 @@ class SeasonvarCatalogImporter
                     'source_url',
                     'source_url_hash',
                     'sort_order',
-                    'publication_status',
-                    'audience',
-                    'deleted_at',
                     'updated_at',
                 ],
             );
@@ -1100,9 +1057,6 @@ class SeasonvarCatalogImporter
             'translation_name',
             'release_status_text',
             'sort_order',
-            'publication_status',
-            'audience',
-            'deleted_at',
         ] as $field) {
             if ($this->comparableImportValue($field, $season->{$field}) !== $this->comparableImportValue($field, $row[$field] ?? null)) {
                 return true;
@@ -1121,7 +1075,7 @@ class SeasonvarCatalogImporter
             return true;
         }
 
-        foreach (['source_page_id', 'title', 'source_url', 'source_url_hash', 'sort_order', 'publication_status', 'audience', 'deleted_at'] as $field) {
+        foreach (['source_page_id', 'title', 'source_url', 'source_url_hash', 'sort_order'] as $field) {
             if ($this->comparableImportValue($field, $episode->{$field}) !== $this->comparableImportValue($field, $row[$field] ?? null)) {
                 return true;
             }
@@ -1298,9 +1252,6 @@ class SeasonvarCatalogImporter
                 ]);
             $wasExisting = $media->exists;
 
-            if ($media->trashed()) {
-                $media->restore();
-            }
             $mediaUpdates = [
                 'catalog_title_id' => $catalogTitle->id,
                 'season_id' => $season?->id,
