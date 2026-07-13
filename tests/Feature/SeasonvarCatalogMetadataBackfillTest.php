@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Actor;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
 use App\Models\Network;
@@ -384,6 +385,53 @@ class SeasonvarCatalogMetadataBackfillTest extends TestCase
         $this->assertFalse($title->studios()->where('slug', 'budet-otmenena')->exists());
         $this->assertDatabaseMissing((new Studio)->getTable(), ['slug' => 'budet-otmenena']);
         Http::assertNothingSent();
+    }
+
+    public function test_relation_sync_reuses_one_actor_for_encoded_and_decoded_provider_urls(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $syncer = app(SeasonvarCatalogRelationSyncer::class);
+
+        $syncer->sync($title, [[
+            'type' => 'actor',
+            'name' => 'Adam Ian Cohen',
+            'source_url' => 'https://seasonvar.ru/actor/Adam Ian Cohen',
+        ]]);
+        $syncer->sync($title, [[
+            'type' => 'actor',
+            'name' => 'Adam Ian Cohen',
+            'source_url' => 'https://seasonvar.ru/actor/Adam%20Ian%20Cohen',
+        ]]);
+
+        $this->assertDatabaseCount('actors', 1);
+        $this->assertDatabaseCount('catalog_title_actor', 1);
+        $this->assertSame(
+            'https://seasonvar.ru/actor/Adam%20Ian%20Cohen',
+            Actor::query()->sole()->source_url,
+        );
+    }
+
+    public function test_relation_sync_reuses_one_actor_for_equivalent_latin_and_cyrillic_names(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $syncer = app(SeasonvarCatalogRelationSyncer::class);
+
+        $syncer->sync($title, [[
+            'type' => 'actor',
+            'name' => 'Atsuko Tanaka',
+            'source_url' => 'https://seasonvar.ru/actor/Atsuko%20Tanaka',
+        ]]);
+        $syncer->sync($title, [[
+            'type' => 'actor',
+            'name' => 'Ацуко Танака',
+            'source_url' => 'https://seasonvar.ru/actor/%D0%90%D1%86%D1%83%D0%BA%D0%BE%20%D0%A2%D0%B0%D0%BD%D0%B0%D0%BA%D0%B0',
+        ]]);
+
+        $actor = Actor::query()->sole();
+
+        $this->assertDatabaseCount('catalog_title_actor', 1);
+        $this->assertSame('atsuko-tanaka', $actor->slug);
+        $this->assertSame('Ацуко Танака', $actor->name);
     }
 
     private function pageWithSnapshot(string $html, int $externalId): SourcePage

@@ -8,12 +8,14 @@ use App\Services\Catalog\CatalogTaxonomyRegistry;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 
 class SeasonvarCatalogRelationSyncer
 {
     public function __construct(
         private readonly CatalogRelationNameSanitizer $relationNames,
         private readonly CatalogTaxonomyRegistry $taxonomies,
+        private readonly SeasonvarUrl $seasonvarUrl,
     ) {}
 
     /**
@@ -74,90 +76,58 @@ class SeasonvarCatalogRelationSyncer
         /** @var class-string<Model> $modelClass */
         $modelClass = $config['model'];
         $now = now();
-        $normalizedItems = $items->map(function (array $item) use ($type): ?array {
-            $name = $this->relationNames->normalize($item['name']);
+        $normalizedItems = $items
+            ->map(function (array $item) use ($type): ?array {
+                $name = $this->relationNames->normalize($item['name']);
 
-            if ($name === '') {
-                return null;
-            }
+                if ($name === '') {
+                    return null;
+                }
 
-            $sourceUrl = $this->safeSourceUrl($item['source_url'] ?? null);
+                return [
+                    'name' => $name,
+                    'slug' => $this->relationNames->canonicalKey($type, $name),
+                    'source_url' => $this->safeSourceUrl($item['source_url'] ?? null),
+                ];
+            })
+            ->filter()
+            ->reduce(function (Collection $normalized, array $item) use ($type): Collection {
+                $existing = $normalized->get($item['slug']);
 
-            return [
-                'name' => $name,
-                'base_slug' => $this->relationSlug($type, $name),
-                'source_url' => $sourceUrl,
-                'identity_url' => $this->stableProviderIdentityUrl($type, $sourceUrl),
-            ];
-        })->filter()
-            ->unique(fn (array $item): string => $item['identity_url'] !== null
-                ? 'provider|'.$item['identity_url']
-                : 'fallback|'.$item['base_slug'])
+                if (is_array($existing)) {
+                    $item['name'] = $this->relationNames->preferredName($type, $existing['name'], $item['name']);
+                    $item['source_url'] = $existing['source_url'] ?? $item['source_url'];
+                }
+
+                $normalized->put($item['slug'], $item);
+
+                return $normalized;
+            }, collect())
             ->values();
 
         if ($normalizedItems->isEmpty()) {
             return [];
         }
 
-        $identityUrls = $normalizedItems->pluck('identity_url')->filter()->unique()->values();
-        $existingByIdentityUrl = $identityUrls->isEmpty()
-            ? collect()
-            : $modelClass::query()
-                ->whereIn('source_url', $identityUrls)
-                ->orderBy('id')
-                ->get()
-                ->groupBy('source_url')
-                ->map->first();
         $existingBySlug = $modelClass::query()
-            ->whereIn('slug', $normalizedItems->pluck('base_slug')->unique())
+            ->whereIn('slug', $normalizedItems->pluck('slug'))
             ->get()
             ->keyBy('slug');
-        $reservedSlugs = [];
 
-        $rowsBySlug = $normalizedItems->reduce(function (Collection $rows, array $item) use ($type, $existingByIdentityUrl, $existingBySlug, &$reservedSlugs, $now): Collection {
-            $identityUrl = $item['identity_url'];
-            $slug = $identityUrl !== null
-                ? $existingByIdentityUrl->get($identityUrl)?->slug
-                : null;
+        $rowsBySlug = $normalizedItems->mapWithKeys(function (array $item) use ($type, $existingBySlug, $now): array {
+            $existing = $existingBySlug->get($item['slug']);
+            $name = $existing === null
+                ? $item['name']
+                : $this->relationNames->preferredName($type, $existing->name, $item['name']);
 
-            if ($slug === null) {
-                $slug = $item['base_slug'];
-                $baseRecord = $existingBySlug->get($slug);
-                $baseIdentityUrl = $baseRecord !== null
-                    ? $this->stableProviderIdentityUrl($type, $baseRecord->source_url)
-                    : null;
-                $reservedIdentityUrl = $reservedSlugs[$slug] ?? null;
-
-                if ($identityUrl !== null
-                    && (($baseIdentityUrl !== null && $baseIdentityUrl !== $identityUrl)
-                        || ($reservedIdentityUrl !== null && $reservedIdentityUrl !== $identityUrl))) {
-                    $slug .= '-'.substr(hash('sha256', $identityUrl), 0, 12);
-                }
-            }
-
-            $existing = $rows->get($slug);
-            $sourceUrl = $item['source_url'];
-
-            if (is_array($existing) && $existing['source_url'] !== null && $sourceUrl === null) {
-                $sourceUrl = $existing['source_url'];
-            }
-
-            if ($identityUrl === null && ($existingBySlug->get($slug)?->source_url ?? null) !== null) {
-                $sourceUrl = $existingBySlug->get($slug)->source_url;
-            }
-
-            $reservedSlugs[$slug] = $identityUrl;
-
-            $rows->put($slug, [
-                'name' => $item['name'],
-                'slug' => $slug,
-                'source_url' => $sourceUrl,
+            return [$item['slug'] => [
+                'name' => $name,
+                'slug' => $item['slug'],
+                'source_url' => $existing?->source_url ?: $item['source_url'],
                 'created_at' => $now,
                 'updated_at' => $now,
-            ]);
-
-            return $rows;
-        }, collect());
+            ]];
+        });
 
         $rowsWithSourceUrl = $rowsBySlug->filter(fn (array $row): bool => $row['source_url'] !== null);
         $rowsWithoutSourceUrl = $rowsBySlug->filter(fn (array $row): bool => $row['source_url'] === null);
@@ -197,16 +167,15 @@ class SeasonvarCatalogRelationSyncer
         return $relationIds;
     }
 
-    private function relationSlug(string $type, string $name): string
-    {
-        $name = $this->relationNames->normalize($name);
-
-        return Str::slug($name) ?: Str::substr(hash('sha256', $type.'|'.$name), 0, 16);
-    }
-
     private function safeSourceUrl(?string $sourceUrl): ?string
     {
         if ($sourceUrl === null || Str::length($sourceUrl) > 255) {
+            return null;
+        }
+
+        try {
+            $sourceUrl = $this->seasonvarUrl->normalize($sourceUrl);
+        } catch (InvalidArgumentException) {
             return null;
         }
 
@@ -217,25 +186,6 @@ class SeasonvarCatalogRelationSyncer
         }
 
         return in_array(Str::lower((string) ($parts['host'] ?? '')), ['seasonvar.ru', 'www.seasonvar.ru'], true)
-            ? $sourceUrl
-            : null;
-    }
-
-    private function stableProviderIdentityUrl(string $type, ?string $sourceUrl): ?string
-    {
-        if (! in_array($type, ['actor', 'director'], true) || $sourceUrl === null) {
-            return null;
-        }
-
-        $path = (string) parse_url($sourceUrl, PHP_URL_PATH);
-
-        if (preg_match('~/(?:actor|akter|director|rezhisser)[/-](?<identity>[^/]+)$~iu', $path, $matches) !== 1) {
-            return null;
-        }
-
-        $identity = trim($matches['identity'], '-_');
-
-        return Str::length($identity) >= 6 && ! str_contains($identity, '&')
             ? $sourceUrl
             : null;
     }
