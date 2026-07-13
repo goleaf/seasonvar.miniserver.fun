@@ -98,10 +98,10 @@ class CatalogTitlePlaybackQuery
         $season = new Season;
         $availableMedia = LicensedMedia::query()
             ->availableTo($user)
-            ->forAvailableReleases($user)
             ->withPlaybackLocation()
             ->withoutKnownFailures()
             ->whereColumn($media->qualifyColumn('episode_id'), $episode->qualifyColumn('id'))
+            ->whereColumn($media->qualifyColumn('season_id'), $episode->qualifyColumn('season_id'))
             ->whereColumn($media->qualifyColumn('catalog_title_id'), $season->qualifyColumn('catalog_title_id'))
             ->selectRaw('1');
 
