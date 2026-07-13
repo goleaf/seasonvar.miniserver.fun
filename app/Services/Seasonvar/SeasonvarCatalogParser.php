@@ -2,6 +2,7 @@
 
 namespace App\Services\Seasonvar;
 
+use App\Enums\CatalogPublicationType;
 use App\Services\Catalog\CatalogRelationNameSanitizer;
 use App\Support\CatalogTitleDisplayName;
 use DOMDocument;
@@ -13,7 +14,7 @@ use InvalidArgumentException;
 
 class SeasonvarCatalogParser
 {
-    public const METADATA_VERSION = 2;
+    public const METADATA_VERSION = 5;
 
     private const METADATA_PRESENCE_FIELDS = [
         'genres' => ['type' => 'genre', 'labels' => ['Жанр']],
@@ -171,7 +172,7 @@ class SeasonvarCatalogParser
         return [
             'title' => $title,
             'original_title' => $originalTitle,
-            'type' => 'serial',
+            'type' => $this->publicationType($taxonomies),
             'year' => $year,
             'description' => $description,
             'poster_url' => $posterUrl ? $this->normalizeRelative($posterUrl, $url) : null,
@@ -187,6 +188,35 @@ class SeasonvarCatalogParser
             'reviews' => $this->reviews($xpath),
             'parse_meta' => $parseMeta,
         ];
+    }
+
+    /** @param list<array<string, mixed>> $taxonomies */
+    private function publicationType(array $taxonomies): string
+    {
+        $genres = collect($taxonomies)
+            ->where('type', 'genre')
+            ->pluck('name')
+            ->filter(fn (mixed $name): bool => is_string($name))
+            ->map(fn (string $name): string => Str::of($name)
+                ->lower()
+                ->replace(['ё', '–', '—', '−'], ['е', '-', '-', '-'])
+                ->replaceMatches('/[\s_-]+/u', '-')
+                ->trim('-')
+                ->toString());
+
+        if ($genres->contains('аниме')) {
+            return CatalogPublicationType::Anime->value;
+        }
+
+        if ($genres->contains('реалити-шоу')) {
+            return CatalogPublicationType::Show->value;
+        }
+
+        if ($genres->contains('документальные')) {
+            return CatalogPublicationType::Documentary->value;
+        }
+
+        return CatalogPublicationType::Serial->value;
     }
 
     /**

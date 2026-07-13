@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\DTOs\Seasonvar;
 
+use App\Enums\CatalogPublicationType;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 final readonly class SeasonvarCatalogData
 {
@@ -89,6 +91,12 @@ final readonly class SeasonvarCatalogData
         return (bool) ($this->parseMeta['has_info_list'] ?? false);
     }
 
+    public function hasPublicationTypeEvidence(): bool
+    {
+        return collect($this->taxonomies)
+            ->contains(fn (array $taxonomy): bool => ($taxonomy['type'] ?? null) === 'genre');
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -131,9 +139,9 @@ final readonly class SeasonvarCatalogData
     private static function rules(): array
     {
         return [
-            'title' => ['required', 'string', 'max:255', 'not_in:Без названия'],
+            'title' => ['required', 'string', 'max:500', 'not_in:Без названия'],
             'original_title' => ['nullable', 'string', 'max:255'],
-            'type' => ['required', 'string', 'in:serial'],
+            'type' => ['required', 'string', Rule::enum(CatalogPublicationType::class)],
             'year' => ['nullable', 'integer', 'between:1800,2200'],
             'description' => ['nullable', 'string', 'max:200000'],
             'poster_url' => ['nullable', 'string', 'max:2048'],

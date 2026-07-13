@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\DTOs\Seasonvar\SeasonvarCatalogData;
 use App\Enums\SeasonvarPageType;
 use App\Services\Seasonvar\SeasonvarCatalogParser;
 use App\Services\Seasonvar\SeasonvarUrl;
@@ -9,6 +10,57 @@ use Tests\TestCase;
 
 class SeasonvarCatalogParserTest extends TestCase
 {
+    public function test_it_classifies_publication_type_from_explicit_source_genres(): void
+    {
+        $parser = app(SeasonvarCatalogParser::class);
+        $cases = [
+            'реалити-шоу, документальные' => 'show',
+            'аниме, реалити-шоу' => 'anime',
+            'документальные' => 'documentary',
+            'драмы' => 'serial',
+        ];
+
+        foreach ($cases as $genres => $expectedType) {
+            $parsed = $parser->parse(
+                <<<HTML
+                <html>
+                    <head><title>Проверка типа смотреть онлайн</title></head>
+                    <body>
+                        <h1>Проверка типа</h1>
+                        <div class="pgs-sinfo_list">Жанр: <span itemprop="genre">{$genres}</span></div>
+                    </body>
+                </html>
+                HTML,
+                'https://seasonvar.ru/serial-55000-Proverka-tipa.html',
+            );
+
+            $this->assertSame($expectedType, $parsed['type'], $genres);
+            $this->assertSame($expectedType, SeasonvarCatalogData::fromParsed($parsed)->type, $genres);
+        }
+    }
+
+    public function test_it_accepts_a_real_source_title_longer_than_255_characters(): void
+    {
+        $title = str_repeat('Очень длинное название аниме ', 12);
+        $parser = app(SeasonvarCatalogParser::class);
+
+        $parsed = $parser->parse(
+            <<<HTML
+            <html>
+                <head><title>{$title}</title></head>
+                <body>
+                    <h1>{$title}</h1>
+                    <div class="pgs-sinfo_list">Жанр: <span itemprop="genre">аниме</span></div>
+                </body>
+            </html>
+            HTML,
+            'https://seasonvar.ru/serial-55001-Dlinnoe-nazvanie.html',
+        );
+
+        $this->assertGreaterThan(255, mb_strlen($parsed['title']));
+        $this->assertSame('anime', SeasonvarCatalogData::fromParsed($parsed)->type);
+    }
+
     public function test_it_recognizes_rights_holder_region_blocking_from_the_player_message(): void
     {
         $parser = app(SeasonvarCatalogParser::class);

@@ -21,6 +21,7 @@ class SeasonvarCatalogMetadataBackfill
         private readonly SeasonvarRelationMetadataNormalizer $relationMetadata,
         private readonly SeasonvarDatabaseTransaction $databaseTransaction,
         private readonly CatalogSearchIndexer $searchIndexer,
+        private readonly SeasonvarEditorialFieldResolver $editorialFields,
     ) {}
 
     /**
@@ -71,9 +72,9 @@ class SeasonvarCatalogMetadataBackfill
                     'source_page_snapshots.html',
                     'source_page_snapshots.captured_at',
                 ]),
-                'catalogTitle:id,source_id,source_page_id,relation_metadata_version',
+                'catalogTitle:id,source_id,source_page_id,type,provider_field_values,relation_metadata_version',
                 'linkedSeasons:id,catalog_title_id,source_url_hash',
-                'linkedSeasons.catalogTitle:id,source_id,relation_metadata_version',
+                'linkedSeasons.catalogTitle:id,source_id,type,provider_field_values,relation_metadata_version',
             ])
             ->lazyById($this->pageChunkSize())
             ->take($this->pageLimit());
@@ -133,10 +134,14 @@ class SeasonvarCatalogMetadataBackfill
                 $titleWasStale = $title->relation_metadata_version < SeasonvarCatalogParser::METADATA_VERSION;
 
                 $attached = $this->databaseTransaction->run(
-                    function () use ($page, $title, $taxonomies, $presence, $progress): int {
+                    function () use ($page, $title, $taxonomies, $presence, $progress, $data): int {
                         $attached = $this->attachedCount(
                             $this->relationSyncer->sync($title, $taxonomies, $progress),
                         );
+                        $title->refresh();
+                        $publicationType = $data->hasPublicationTypeEvidence()
+                            ? $this->editorialFields->resolveType($title, $data->type)
+                            : null;
                         $page->update([
                             'metadata_parser_version' => SeasonvarCatalogParser::METADATA_VERSION,
                             'metadata_attempted_version' => SeasonvarCatalogParser::METADATA_VERSION,
@@ -144,6 +149,11 @@ class SeasonvarCatalogMetadataBackfill
                             'metadata_presence' => $presence,
                         ]);
                         $title->update([
+                            ...($publicationType === null ? [] : [
+                                'type' => $publicationType['value'],
+                                'provider_field_values' => $publicationType['provider_field_values'],
+                            ]),
+                            'indexed_at' => now(),
                             'relation_metadata_version' => SeasonvarCatalogParser::METADATA_VERSION,
                         ]);
 

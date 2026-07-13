@@ -626,7 +626,6 @@ class SeasonvarCatalogImporter
             'external_id' => $catalogTitle->external_id ?? $data->externalId,
             ...$editorial['values'],
             'original_title' => $editorial['values']['original_title'],
-            'type' => $catalogTitle->exists ? $catalogTitle->type : $data->type,
             'year' => $this->earliestYear($catalogTitle->year, $data->year),
             'source_url' => $catalogTitle->source_url ?: $page->url,
             'source_url_hash' => $catalogTitle->source_url_hash ?: $sourceUrlHash,

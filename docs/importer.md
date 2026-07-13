@@ -91,9 +91,11 @@ Full cycle и queued finalizer запускают `CatalogMetadataDeduplicator`:
 
 ## Владение полями
 
-Provider владеет external/source IDs, URL/hash, crawl/import metadata, импортными рейтингами/отзывами/связями, release metadata и технической доступностью источника. Локальная редакция владеет slug, publication status, audience, availability window и soft delete.
+Provider владеет external/source IDs, URL/hash, crawl/import metadata, импортными рейтингами/отзывами/связями, release metadata, технической доступностью источника и вычисленным типом публикации. Тип определяется только из явного source-жанра с приоритетом `аниме` → `реалити-шоу` → `документальные` → обычный сериал. Локальная редакция владеет slug, publication status, audience, availability window и soft delete.
 
-Для `title`, `original_title`, `description` и `poster_url` используется безопасное трёхстороннее сравнение. `provider_field_values` хранит последний вход provider. Новое значение принимается, только если текущее поле пусто или всё ещё равно предыдущему provider value; отличающееся локальное значение сохраняется. Null/пустой provider value не стирает заполненное поле. У уже существующей строки без baseline первый import сохраняет текущее значение и только фиксирует provider baseline.
+Parser boundary принимает реальные source-названия длиной до 500 Unicode-символов: это покрывает сохранённые в текущем каталоге названия длиной до 301 символа без молчаливого обрезания.
+
+Для `title`, `original_title`, `type`, `description` и `poster_url` используется безопасное трёхстороннее сравнение. `provider_field_values` хранит последний вход provider. Новое значение принимается, только если текущее поле пусто или всё ещё равно предыдущему provider value; отличающееся локальное значение сохраняется. Null/пустой provider value не стирает заполненное поле. У уже существующей строки без baseline первый import сохраняет текущее значение и только фиксирует provider baseline; исключение — прежний искусственный `type=serial`, который parser v5 один раз заменяет подтверждённым source-жанром. Snapshot без принятого genre taxonomy не меняет тип и его baseline.
 
 ## Полные и частичные ответы
 
@@ -101,7 +103,7 @@ Parser фиксирует признаки `has_info_list`, `has_season_list` и
 
 ## Версионированное восстановление metadata
 
-`SeasonvarCatalogParser::METADATA_VERSION` задаёт текущую версию разбора связей. `source_pages` отдельно хранят успешно применённую и уже предпринятую версии, время разбора и allowlisted `metadata_presence`; `catalog_titles.relation_metadata_version` показывает версию производных связей тайтла. Поэтому изменение parser не требует немедленно повторно скачивать весь источник.
+`SeasonvarCatalogParser::METADATA_VERSION` задаёт текущую версию разбора связей и производного типа публикации. Версия 5 исправляет legacy-классификацию `serial` локальным повторным разбором сохранённых HTML snapshots только при наличии принятого source-жанра и не понижает тип по частичной странице. `source_pages` отдельно хранят успешно применённую и уже предпринятую версии, время разбора и allowlisted `metadata_presence`; `catalog_titles.relation_metadata_version` показывает версию производных данных тайтла. Поэтому изменение parser не требует повторно скачивать весь источник.
 
 В начале полного цикла и queued finalizer `SeasonvarCatalogMetadataBackfill` разбирает только сохранённый `latestSnapshot` и не выполняет HTTP-запросов. Один запуск ограничен `SEASONVAR_METADATA_BACKFILL_PAGE_LIMIT` и `SEASONVAR_METADATA_BACKFILL_TITLE_LIMIT`; chunk-параметры управляют памятью. Валидный snapshot применяет связи и версии в одной transaction. Детерминированно невалидный snapshot продвигает только attempted version, чтобы одна строка не блокировала очередь; инфраструктурная ошибка не продвигает версии. Планировщик назначает `stale_metadata` только старой странице без пригодной ещё не предпринятой локальной копии и сохраняет обычную границу `refresh_after`.
 

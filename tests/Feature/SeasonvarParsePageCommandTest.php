@@ -43,6 +43,60 @@ class SeasonvarParsePageCommandTest extends TestCase
         ]);
     }
 
+    public function test_targeted_import_persists_publication_type_from_real_source_genre_taxonomy(): void
+    {
+        Http::preventStrayRequests();
+        $url = 'https://seasonvar.ru/serial-41642-YA_vizhu_tvoj_golos_SSHA_pssbthn-3-season.html';
+
+        $completeHtml = <<<'HTML'
+                <html>
+                    <head>
+                        <title>Сериал Я вижу твой голос (США) 3 сезон смотреть онлайн</title>
+                        <meta name="description" content="Американская версия музыкального шоу">
+                    </head>
+                    <body>
+                        <h1>Сериал Я вижу твой голос (США)/I Can See Your Voice 3 сезон</h1>
+                        <div class="pgs-sinfo_list">
+                            Оригинал: <span>I Can See Your Voice</span>
+                        </div>
+                        <div class="pgs-sinfo_list">
+                            Жанр: <span itemprop="genre">реалити-шоу</span>
+                            Страна: <span>США</span>
+                        </div>
+                    </body>
+                </html>
+            HTML;
+        $partialHtml = <<<'HTML'
+            <html>
+                <head><title>Сериал Я вижу твой голос (США) 3 сезон смотреть онлайн</title></head>
+                <body>
+                    <h1>Сериал Я вижу твой голос (США) 3 сезон</h1>
+                    <div class="pgs-sinfo_list">Страна: <span>США</span></div>
+                </body>
+            </html>
+            HTML;
+        Http::fake([
+            $url => Http::sequence()
+                ->push($completeHtml)
+                ->push($partialHtml),
+        ]);
+
+        $this->artisan('seasonvar:import', ['url' => $url])->assertExitCode(0);
+
+        $title = CatalogTitle::query()->sole();
+
+        $this->assertSame('show', $title->type);
+        $this->assertSame('show', $title->provider_field_values['type']);
+
+        app(SeasonvarCatalogImporter::class)->parsePage($title->sourcePage, force: true);
+
+        $title->refresh();
+
+        $this->assertSame('show', $title->type);
+        $this->assertSame('show', $title->provider_field_values['type']);
+        Http::assertSentCount(2);
+    }
+
     public function test_it_persists_rights_holder_region_blocking_for_a_targeted_import(): void
     {
         $this->travelTo('2026-07-13 12:00:00');

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Enums\CatalogPublicationType;
 use App\Enums\ContentAudience;
 use App\Enums\PublicationStatus;
 use App\Enums\ReleaseKind;
@@ -603,7 +604,7 @@ final class CatalogAdministrationManager extends Component
                 Rule::unique('catalog_title_slugs', 'slug')->where(fn ($query) => $query->where('catalog_title_id', '<>', $title->id)),
             ],
             'titleForm.external_id' => ['nullable', 'string', 'max:120', 'regex:/^[A-Za-z0-9._:-]+$/', Rule::unique('catalog_titles', 'external_id')->where('source_id', $title->source_id)->ignore($title->id)],
-            'titleForm.type' => ['required', 'string', Rule::in(['serial'])],
+            'titleForm.type' => ['required', 'string', Rule::enum(CatalogPublicationType::class)],
             'titleForm.year' => ['nullable', 'integer', 'between:1900,'.(now()->year + 5)],
             'titleForm.description' => ['nullable', 'string', 'max:20000'],
             'titleForm.poster_url' => ['nullable', 'url:http,https', 'max:2048'],

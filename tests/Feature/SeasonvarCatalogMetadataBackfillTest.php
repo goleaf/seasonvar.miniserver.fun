@@ -192,6 +192,8 @@ class SeasonvarCatalogMetadataBackfillTest extends TestCase
         $this->assertSame('present', $page->metadata_presence['translations']);
         $this->assertSame('rejected_invalid', $page->metadata_presence['statuses']);
         $this->assertNotContains('Рекомендовано!', $page->metadata_presence);
+        $this->assertSame('show', $title->type);
+        $this->assertSame('show', $title->provider_field_values['type']);
         $this->assertSame(SeasonvarCatalogParser::METADATA_VERSION, $title->relation_metadata_version);
         $this->assertDatabaseHas((new Studio)->getTable(), ['name' => 'A-1 Pictures']);
         $this->assertDatabaseHas((new Network)->getTable(), ['name' => 'Пятница']);
@@ -498,6 +500,7 @@ class SeasonvarCatalogMetadataBackfillTest extends TestCase
                 <body>
                     <h1>Доверенный сериал</h1>
                     <div class="pgs-sinfo_list">
+                        Жанр: реалити-шоу
                         Студии: A-1 Pictures
                         Телеканал: Пятница
                         Статус: Рекомендовано!
