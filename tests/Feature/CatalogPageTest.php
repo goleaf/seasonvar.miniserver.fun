@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\DTOs\VerifiedExternalUrlData;
+use App\Enums\AdminAuditAction;
 use App\Enums\ReleaseKind;
 use App\Jobs\StartSeasonvarQueuedImport;
 use App\Livewire\CatalogAdministrationManager;
@@ -13,6 +14,7 @@ use App\Livewire\SeasonvarImportManager;
 use App\Livewire\StatsDashboard;
 use App\Livewire\ViewingActivity;
 use App\Models\Actor;
+use App\Models\AdminAuditEvent;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
 use App\Models\CatalogTitleRating;
@@ -363,6 +365,19 @@ class CatalogPageTest extends TestCase
         $this->assertGreaterThan($statsVersion, $versions->version(CacheDomain::CatalogStats));
         $this->assertGreaterThan($homeVersion, $versions->version(CacheDomain::Homepage));
         $this->get('/titles/redaktorskoe-nazvanie')->assertNotFound();
+        $this->assertSame(
+            [
+                AdminAuditAction::TitleUpdated,
+                AdminAuditAction::RelationAttached,
+                AdminAuditAction::TitleArchived,
+            ],
+            AdminAuditEvent::query()->orderBy('id')->pluck('action')->all(),
+        );
+        $this->assertTrue(AdminAuditEvent::query()->get()->every(
+            fn (AdminAuditEvent $event): bool => $event->actor_id === $admin->id
+                && $event->resource_type === 'catalog_title'
+                && $event->resource_id === $title->id,
+        ));
     }
 
     public function test_catalog_admin_preserves_the_previous_public_slug_as_a_permanent_redirect(): void
@@ -451,6 +466,7 @@ class CatalogPageTest extends TestCase
             ->assertHasErrors('seasonForm');
 
         $this->assertSame('Редакция сезона', $season->fresh()->title);
+        $this->assertDatabaseCount('admin_audit_events', 2);
     }
 
     public function test_catalog_admin_scheduled_publication_and_hierarchy_binding_are_enforced_server_side(): void
@@ -553,6 +569,16 @@ class CatalogPageTest extends TestCase
         $this->assertSame('draft', $media->fresh()->status);
         $this->assertModelExists(EpisodeViewProgress::query()->whereBelongsTo($viewer)->sole());
         $this->get(route('titles.show', $title).'?episode='.$episode->id)->assertOk()->assertDontSeeText('Первая серия');
+        $this->assertSame(
+            [
+                AdminAuditAction::SeasonCreated,
+                AdminAuditAction::EpisodeCreated,
+                AdminAuditAction::MediaCreated,
+                AdminAuditAction::EpisodeArchived,
+                AdminAuditAction::MediaArchived,
+            ],
+            AdminAuditEvent::query()->orderBy('id')->pluck('action')->all(),
+        );
     }
 
     public function test_catalog_admin_creates_and_attaches_existing_lookup_types_without_duplicate_pivots(): void
@@ -599,6 +625,17 @@ class CatalogPageTest extends TestCase
             ->assertHasErrors('lookupForm.slug');
 
         $this->assertSame(1, DB::table('catalog_title_actor')->where('catalog_title_id', $title->id)->where('actor_id', $actor->id)->count());
+        $this->assertSame(
+            [
+                AdminAuditAction::LookupCreated,
+                AdminAuditAction::LookupCreated,
+                AdminAuditAction::LookupCreated,
+                AdminAuditAction::LookupCreated,
+                AdminAuditAction::LookupCreated,
+                AdminAuditAction::RelationAttached,
+            ],
+            AdminAuditEvent::query()->orderBy('id')->pluck('action')->all(),
+        );
     }
 
     public function test_import_admin_hides_provider_urls_credentials_and_stack_details(): void

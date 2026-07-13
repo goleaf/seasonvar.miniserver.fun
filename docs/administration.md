@@ -25,6 +25,13 @@
 - Новые справочники создаются как локальные строки без provider identity. `SeasonvarCatalogRelationSyncer` использует `syncWithoutDetaching`, поэтому повторный импорт не удаляет локальную связь. Provider baseline в `provider_field_values` продолжает защищать локальные title/description/artwork.
 - Исправление внешнего ID допустимо только как осознанная коррекция provider identity: следующий импорт будет искать тайтл по новому `(source_id, external_id)`.
 
+## Аудит административных изменений
+
+- Успешные изменения title metadata/publication, связей, lookup, сезонов, серий и media source metadata атомарно добавляют строку в `admin_audit_events` внутри той же database transaction.
+- Событие хранит actor ID, allowlisted action/resource type и resource ID, SHA-256 fingerprints до/после, отсортированные allowlisted имена изменённых полей и время. Значения полей, playback/source URL, provider payload, search text, tokens и stack traces не сохраняются.
+- `AdminAuditEvent` является append-only: application model запрещает update/delete, а admin route/service для изменения или удаления событий отсутствует. Неуспешная validation, optimistic lock или unique constraint не создаёт audit row.
+- Импортёр и публичные пользовательские действия не пишут в эту таблицу: recorder подключён только к `CatalogAdministrationService` и всегда получает authenticated actor из текущего admin action.
+
 ## Публикация и актуализация
 
 - Application timezone — UTC; значения `available_from`/`available_until` вводятся и сохраняются в UTC. Плановая публикация становится видимой только после начала окна.
@@ -33,6 +40,6 @@
 
 ## Деплой
 
-Новая миграция не требуется: admin использует уже развернутые publication/integrity constraints. Сначала должны быть применены все существующие migrations проекта, затем разворачивается код и перезапускаются долгоживущие queue workers через `php artisan queue:restart`. После деплоя проверяются `SEASONVAR_IMPORT_ADMIN_EMAILS` и `PLAYBACK_ALLOWED_HOSTS`; secrets в репозиторий не записываются.
+Перед развёртыванием admin audit нужно применить additive migration `2026_07_13_210000_create_admin_audit_events_table`. Затем разворачивается код и перезапускаются долгоживущие queue workers через `php artisan queue:restart`. После деплоя проверяются `SEASONVAR_IMPORT_ADMIN_EMAILS` и `PLAYBACK_ALLOWED_HOSTS`; secrets в репозиторий не записываются.
 
-Текущие ограничения: нет отдельной RBAC/role модели, workflow approval, audit-log административных field diffs, restore-кнопки и нормализованной сущности языка. До появления этих доменных моделей email allowlist и `Translation` остаются осознанными границами продукта.
+Текущие ограничения: нет отдельной RBAC/role модели, workflow approval, UI просмотра/экспорта audit trail, restore-кнопки и нормализованной сущности языка. До появления этих доменных моделей email allowlist и `Translation` остаются осознанными границами продукта.

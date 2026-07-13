@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Catalog;
 
+use App\Enums\AdminAuditAction;
 use App\Enums\PublicationStatus;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
@@ -12,6 +13,7 @@ use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\Admin\AdminAuditRecorder;
 use App\Services\Catalog\Search\CatalogSearchIndexer;
 use App\Services\Media\PlaybackSourceUrlGuard;
 use Closure;
@@ -59,11 +61,31 @@ final class CatalogAdministrationService
         'available_from', 'available_until', 'deleted_at', 'updated_at',
     ];
 
+    private const TITLE_AUDIT_FIELDS = [
+        'external_id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url',
+        'is_published', 'publication_status', 'audience', 'available_from', 'available_until',
+    ];
+
+    private const SEASON_AUDIT_FIELDS = [
+        'number', 'kind', 'sort_order', 'title', 'publication_status', 'audience', 'available_from', 'available_until',
+    ];
+
+    private const EPISODE_AUDIT_FIELDS = [
+        'number', 'kind', 'sort_order', 'title', 'released_at', 'summary', 'publication_status', 'audience',
+        'available_from', 'available_until',
+    ];
+
+    private const MEDIA_AUDIT_FIELDS = [
+        'title', 'quality', 'translation_name', 'format', 'has_subtitles', 'duration_seconds', 'status', 'audience',
+        'available_from', 'available_until',
+    ];
+
     public function __construct(
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogCacheInvalidator $cacheInvalidator,
         private readonly PlaybackSourceUrlGuard $playbackUrls,
         private readonly CatalogSearchIndexer $searchIndexer,
+        private readonly AdminAuditRecorder $auditRecorder,
     ) {}
 
     /** @param array<string, mixed> $attributes */
@@ -75,10 +97,43 @@ final class CatalogAdministrationService
     ): CatalogTitle {
         Gate::forUser($user)->authorize('update', $title);
 
-        $updated = $this->withUniqueConstraintMessage(function () use ($title, $attributes, $expectedVersion): CatalogTitle {
-            return DB::transaction(function () use ($title, $attributes, $expectedVersion): CatalogTitle {
+        return $this->persistTitle($user, $title, $attributes, $expectedVersion, AdminAuditAction::TitleUpdated);
+    }
+
+    public function archiveTitle(User $user, CatalogTitle $title, string $expectedVersion): CatalogTitle
+    {
+        Gate::forUser($user)->authorize('archive', $title);
+
+        return $this->persistTitle($user, $title, [
+            'external_id' => $title->external_id,
+            'slug' => $title->slug,
+            'title' => $title->title,
+            'original_title' => $title->original_title,
+            'type' => $title->type,
+            'year' => $title->year,
+            'description' => $title->description,
+            'poster_url' => $title->poster_url,
+            'publication_status' => PublicationStatus::Hidden->value,
+            'audience' => $title->audience->value,
+            'available_from' => $title->available_from,
+            'available_until' => $title->available_until,
+        ], $expectedVersion, AdminAuditAction::TitleArchived);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function persistTitle(
+        User $user,
+        CatalogTitle $title,
+        array $attributes,
+        string $expectedVersion,
+        AdminAuditAction $action,
+    ): CatalogTitle {
+        $updated = $this->withUniqueConstraintMessage(function () use ($user, $title, $attributes, $expectedVersion, $action): CatalogTitle {
+            return DB::transaction(function () use ($user, $title, $attributes, $expectedVersion, $action): CatalogTitle {
                 $current = CatalogTitle::query()->withTrashed()->lockForUpdate()->findOrFail($title->id);
-                $this->assertVersion($expectedVersion, $this->titleVersion($current));
+                $beforeVersion = $this->titleVersion($current);
+                $beforeAttributes = $this->auditAttributes($current, self::TITLE_AUDIT_FIELDS);
+                $this->assertVersion($expectedVersion, $beforeVersion);
                 $publicationStatus = PublicationStatus::from((string) $attributes['publication_status']);
                 $nextSlug = (string) $attributes['slug'];
 
@@ -113,33 +168,23 @@ final class CatalogAdministrationService
                     'indexed_at' => now(),
                 ])->save();
 
-                return $current->fresh();
+                $saved = $current->fresh();
+                $this->auditRecorder->record(
+                    $user,
+                    $action,
+                    $saved,
+                    $beforeVersion,
+                    $this->titleVersion($saved),
+                    $this->changedAuditFields($beforeAttributes, $saved, self::TITLE_AUDIT_FIELDS),
+                );
+
+                return $saved;
             }, attempts: 3);
         }, 'titleForm', 'Slug или внешний ID уже занят другой записью.');
 
         $this->invalidate($updated);
 
         return $updated;
-    }
-
-    public function archiveTitle(User $user, CatalogTitle $title, string $expectedVersion): CatalogTitle
-    {
-        Gate::forUser($user)->authorize('archive', $title);
-
-        return $this->updateTitle($user, $title, [
-            'external_id' => $title->external_id,
-            'slug' => $title->slug,
-            'title' => $title->title,
-            'original_title' => $title->original_title,
-            'type' => $title->type,
-            'year' => $title->year,
-            'description' => $title->description,
-            'poster_url' => $title->poster_url,
-            'publication_status' => PublicationStatus::Hidden->value,
-            'audience' => $title->audience->value,
-            'available_from' => $title->available_from,
-            'available_until' => $title->available_until,
-        ], $expectedVersion);
     }
 
     public function attachRelation(
@@ -151,9 +196,10 @@ final class CatalogAdministrationService
     ): CatalogTitle {
         Gate::forUser($user)->authorize('update', $title);
 
-        $updated = DB::transaction(function () use ($title, $type, $relationId, $expectedVersion): CatalogTitle {
+        $updated = DB::transaction(function () use ($user, $title, $type, $relationId, $expectedVersion): CatalogTitle {
             $current = CatalogTitle::query()->withTrashed()->lockForUpdate()->findOrFail($title->id);
-            $this->assertVersion($expectedVersion, $this->titleVersion($current));
+            $beforeVersion = $this->titleVersion($current);
+            $this->assertVersion($expectedVersion, $beforeVersion);
             $relation = $this->relation($type);
             $modelClass = $this->taxonomies->modelClass($type);
             $record = $modelClass::query()->findOrFail($relationId);
@@ -161,7 +207,17 @@ final class CatalogAdministrationService
             $current->{$relation}()->syncWithoutDetaching([$record->getKey()]);
             $current->forceFill(['indexed_at' => now()])->touch();
 
-            return $current->fresh();
+            $saved = $current->fresh();
+            $this->auditRecorder->record(
+                $user,
+                AdminAuditAction::RelationAttached,
+                $saved,
+                $beforeVersion,
+                $this->titleVersion($saved),
+                ['relations.'.$type],
+            );
+
+            return $saved;
         }, attempts: 3);
 
         $this->invalidate($updated);
@@ -178,14 +234,25 @@ final class CatalogAdministrationService
     ): CatalogTitle {
         Gate::forUser($user)->authorize('update', $title);
 
-        $updated = DB::transaction(function () use ($title, $type, $relationId, $expectedVersion): CatalogTitle {
+        $updated = DB::transaction(function () use ($user, $title, $type, $relationId, $expectedVersion): CatalogTitle {
             $current = CatalogTitle::query()->withTrashed()->lockForUpdate()->findOrFail($title->id);
-            $this->assertVersion($expectedVersion, $this->titleVersion($current), 'relation');
+            $beforeVersion = $this->titleVersion($current);
+            $this->assertVersion($expectedVersion, $beforeVersion, 'relation');
             $relation = $this->relation($type);
             $current->{$relation}()->detach($relationId);
             $current->forceFill(['indexed_at' => now()])->touch();
 
-            return $current->fresh();
+            $saved = $current->fresh();
+            $this->auditRecorder->record(
+                $user,
+                AdminAuditAction::RelationDetached,
+                $saved,
+                $beforeVersion,
+                $this->titleVersion($saved),
+                ['relations.'.$type],
+            );
+
+            return $saved;
         }, attempts: 3);
 
         $this->invalidate($updated);
@@ -198,10 +265,11 @@ final class CatalogAdministrationService
     {
         Gate::forUser($user)->authorize('update', $title);
 
-        $updated = $this->withUniqueConstraintMessage(function () use ($title, $type, $attributes, $expectedVersion): CatalogTitle {
-            return DB::transaction(function () use ($title, $type, $attributes, $expectedVersion): CatalogTitle {
+        $updated = $this->withUniqueConstraintMessage(function () use ($user, $title, $type, $attributes, $expectedVersion): CatalogTitle {
+            return DB::transaction(function () use ($user, $title, $type, $attributes, $expectedVersion): CatalogTitle {
                 $current = CatalogTitle::query()->withTrashed()->lockForUpdate()->findOrFail($title->id);
-                $this->assertVersion($expectedVersion, $this->titleVersion($current), 'lookupForm');
+                $beforeVersion = $this->titleVersion($current);
+                $this->assertVersion($expectedVersion, $beforeVersion, 'lookupForm');
                 $relation = $this->relation($type);
                 $modelClass = $this->taxonomies->modelClass($type);
                 $record = $modelClass::query()->create(Arr::only($attributes, ['name', 'slug']));
@@ -209,7 +277,17 @@ final class CatalogAdministrationService
                 $current->{$relation}()->syncWithoutDetaching([$record->getKey()]);
                 $current->forceFill(['indexed_at' => now()])->touch();
 
-                return $current->fresh();
+                $saved = $current->fresh();
+                $this->auditRecorder->record(
+                    $user,
+                    AdminAuditAction::LookupCreated,
+                    $saved,
+                    $beforeVersion,
+                    $this->titleVersion($saved),
+                    ['relations.'.$type],
+                );
+
+                return $saved;
             }, attempts: 3);
         }, 'lookupForm.slug', 'Такой slug справочника уже существует.');
 
@@ -228,15 +306,50 @@ final class CatalogAdministrationService
     ): Season {
         Gate::forUser($user)->authorize('update', $title);
 
-        $saved = $this->withUniqueConstraintMessage(function () use ($title, $attributes, $season, $expectedVersion): Season {
-            return DB::transaction(function () use ($title, $attributes, $season, $expectedVersion): Season {
+        return $this->persistSeason(
+            $user,
+            $title,
+            $attributes,
+            $season,
+            $expectedVersion,
+            $season === null ? AdminAuditAction::SeasonCreated : AdminAuditAction::SeasonUpdated,
+        );
+    }
+
+    public function archiveSeason(User $user, CatalogTitle $title, Season $season, string $expectedVersion): Season
+    {
+        Gate::forUser($user)->authorize('update', $title);
+
+        return $this->persistSeason($user, $title, [
+            ...Arr::only($season->getAttributes(), ['number', 'kind', 'sort_order', 'title', 'audience', 'available_from', 'available_until']),
+            'publication_status' => PublicationStatus::Hidden->value,
+        ], $season, $expectedVersion, AdminAuditAction::SeasonArchived);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function persistSeason(
+        User $user,
+        CatalogTitle $title,
+        array $attributes,
+        ?Season $season,
+        string $expectedVersion,
+        AdminAuditAction $action,
+    ): Season {
+        $saved = $this->withUniqueConstraintMessage(function () use ($user, $title, $attributes, $season, $expectedVersion, $action): Season {
+            return DB::transaction(function () use ($user, $title, $attributes, $season, $expectedVersion, $action): Season {
                 $currentTitle = CatalogTitle::query()->withTrashed()->lockForUpdate()->findOrFail($title->id);
                 $current = $season !== null
                     ? Season::query()->withTrashed()->whereBelongsTo($currentTitle)->lockForUpdate()->findOrFail($season->id)
                     : new Season(['catalog_title_id' => $currentTitle->id]);
+                $beforeVersion = $current->exists
+                    ? $this->seasonVersion($current)
+                    : AdminAuditRecorder::ABSENT_VERSION;
+                $beforeAttributes = $current->exists
+                    ? $this->auditAttributes($current, self::SEASON_AUDIT_FIELDS)
+                    : [];
 
                 if ($current->exists) {
-                    $this->assertVersion($expectedVersion, $this->seasonVersion($current), 'seasonForm');
+                    $this->assertVersion($expectedVersion, $beforeVersion, 'seasonForm');
                 }
 
                 $current->forceFill(Arr::only($attributes, [
@@ -244,21 +357,25 @@ final class CatalogAdministrationService
                 ]))->save();
                 $this->touchTitle($currentTitle);
 
-                return $current->fresh();
+                $savedSeason = $current->fresh();
+                $this->auditRecorder->record(
+                    $user,
+                    $action,
+                    $savedSeason,
+                    $beforeVersion,
+                    $this->seasonVersion($savedSeason),
+                    $beforeAttributes === []
+                        ? $this->createdAuditFields($attributes, self::SEASON_AUDIT_FIELDS)
+                        : $this->changedAuditFields($beforeAttributes, $savedSeason, self::SEASON_AUDIT_FIELDS),
+                );
+
+                return $savedSeason;
             }, attempts: 3);
         }, 'seasonForm.number', 'Сезон с таким номером и типом уже существует.');
 
         $this->invalidate($title);
 
         return $saved;
-    }
-
-    public function archiveSeason(User $user, CatalogTitle $title, Season $season, string $expectedVersion): Season
-    {
-        return $this->saveSeason($user, $title, [
-            ...Arr::only($season->getAttributes(), ['number', 'kind', 'sort_order', 'title', 'audience', 'available_from', 'available_until']),
-            'publication_status' => PublicationStatus::Hidden->value,
-        ], $season, $expectedVersion);
     }
 
     /** @param array<string, mixed> $attributes */
@@ -272,16 +389,53 @@ final class CatalogAdministrationService
     ): Episode {
         Gate::forUser($user)->authorize('update', $title);
 
-        $saved = $this->withUniqueConstraintMessage(function () use ($title, $season, $attributes, $episode, $expectedVersion): Episode {
-            return DB::transaction(function () use ($title, $season, $attributes, $episode, $expectedVersion): Episode {
+        return $this->persistEpisode(
+            $user,
+            $title,
+            $season,
+            $attributes,
+            $episode,
+            $expectedVersion,
+            $episode === null ? AdminAuditAction::EpisodeCreated : AdminAuditAction::EpisodeUpdated,
+        );
+    }
+
+    public function archiveEpisode(User $user, CatalogTitle $title, Season $season, Episode $episode, string $expectedVersion): Episode
+    {
+        Gate::forUser($user)->authorize('update', $title);
+
+        return $this->persistEpisode($user, $title, $season, [
+            ...Arr::only($episode->getAttributes(), ['number', 'kind', 'sort_order', 'title', 'released_at', 'summary', 'audience', 'available_from', 'available_until']),
+            'publication_status' => PublicationStatus::Hidden->value,
+        ], $episode, $expectedVersion, AdminAuditAction::EpisodeArchived);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function persistEpisode(
+        User $user,
+        CatalogTitle $title,
+        Season $season,
+        array $attributes,
+        ?Episode $episode,
+        string $expectedVersion,
+        AdminAuditAction $action,
+    ): Episode {
+        $saved = $this->withUniqueConstraintMessage(function () use ($user, $title, $season, $attributes, $episode, $expectedVersion, $action): Episode {
+            return DB::transaction(function () use ($user, $title, $season, $attributes, $episode, $expectedVersion, $action): Episode {
                 $currentTitle = CatalogTitle::query()->withTrashed()->lockForUpdate()->findOrFail($title->id);
                 $currentSeason = Season::query()->withTrashed()->whereBelongsTo($currentTitle)->lockForUpdate()->findOrFail($season->id);
                 $current = $episode !== null
                     ? Episode::query()->withTrashed()->whereBelongsTo($currentSeason)->lockForUpdate()->findOrFail($episode->id)
                     : new Episode(['season_id' => $currentSeason->id]);
+                $beforeVersion = $current->exists
+                    ? $this->episodeVersion($current)
+                    : AdminAuditRecorder::ABSENT_VERSION;
+                $beforeAttributes = $current->exists
+                    ? $this->auditAttributes($current, self::EPISODE_AUDIT_FIELDS)
+                    : [];
 
                 if ($current->exists) {
-                    $this->assertVersion($expectedVersion, $this->episodeVersion($current), 'episodeForm');
+                    $this->assertVersion($expectedVersion, $beforeVersion, 'episodeForm');
                 }
 
                 $current->forceFill(Arr::only($attributes, [
@@ -289,21 +443,25 @@ final class CatalogAdministrationService
                 ]))->save();
                 $this->touchTitle($currentTitle);
 
-                return $current->fresh();
+                $savedEpisode = $current->fresh();
+                $this->auditRecorder->record(
+                    $user,
+                    $action,
+                    $savedEpisode,
+                    $beforeVersion,
+                    $this->episodeVersion($savedEpisode),
+                    $beforeAttributes === []
+                        ? $this->createdAuditFields($attributes, self::EPISODE_AUDIT_FIELDS)
+                        : $this->changedAuditFields($beforeAttributes, $savedEpisode, self::EPISODE_AUDIT_FIELDS),
+                );
+
+                return $savedEpisode;
             }, attempts: 3);
         }, 'episodeForm.number', 'Серия с таким номером и типом уже существует.');
 
         $this->invalidate($title);
 
         return $saved;
-    }
-
-    public function archiveEpisode(User $user, CatalogTitle $title, Season $season, Episode $episode, string $expectedVersion): Episode
-    {
-        return $this->saveEpisode($user, $title, $season, [
-            ...Arr::only($episode->getAttributes(), ['number', 'kind', 'sort_order', 'title', 'released_at', 'summary', 'audience', 'available_from', 'available_until']),
-            'publication_status' => PublicationStatus::Hidden->value,
-        ], $episode, $expectedVersion);
     }
 
     /** @param array<string, mixed> $attributes */
@@ -317,6 +475,40 @@ final class CatalogAdministrationService
         string $expectedVersion,
     ): LicensedMedia {
         Gate::forUser($user)->authorize('update', $title);
+
+        return $this->persistMedia(
+            $user,
+            $title,
+            $season,
+            $episode,
+            $attributes,
+            $media,
+            $expectedVersion,
+            $media === null ? AdminAuditAction::MediaCreated : AdminAuditAction::MediaUpdated,
+        );
+    }
+
+    public function archiveMedia(User $user, CatalogTitle $title, Season $season, Episode $episode, LicensedMedia $media, string $expectedVersion): LicensedMedia
+    {
+        Gate::forUser($user)->authorize('update', $title);
+
+        return $this->persistMedia($user, $title, $season, $episode, [
+            ...Arr::only($media->getAttributes(), ['title', 'quality', 'translation_name', 'format', 'has_subtitles', 'duration_seconds', 'audience', 'available_from', 'available_until']),
+            'status' => 'draft',
+        ], $media, $expectedVersion, AdminAuditAction::MediaArchived);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function persistMedia(
+        User $user,
+        CatalogTitle $title,
+        Season $season,
+        Episode $episode,
+        array $attributes,
+        ?LicensedMedia $media,
+        string $expectedVersion,
+        AdminAuditAction $action,
+    ): LicensedMedia {
         $playbackUrl = $media === null
             ? $this->playbackUrls->safeExternalUrl($attributes['playback_url'] ?? null)
             : null;
@@ -327,8 +519,8 @@ final class CatalogAdministrationService
             ]);
         }
 
-        $saved = $this->withUniqueConstraintMessage(function () use ($title, $season, $episode, $attributes, $media, $expectedVersion, $playbackUrl): LicensedMedia {
-            return DB::transaction(function () use ($title, $season, $episode, $attributes, $media, $expectedVersion, $playbackUrl): LicensedMedia {
+        $saved = $this->withUniqueConstraintMessage(function () use ($user, $title, $season, $episode, $attributes, $media, $expectedVersion, $playbackUrl, $action): LicensedMedia {
+            return DB::transaction(function () use ($user, $title, $season, $episode, $attributes, $media, $expectedVersion, $playbackUrl, $action): LicensedMedia {
                 $currentTitle = CatalogTitle::query()->withTrashed()->lockForUpdate()->findOrFail($title->id);
                 $currentSeason = Season::query()->withTrashed()->whereBelongsTo($currentTitle)->lockForUpdate()->findOrFail($season->id);
                 $currentEpisode = Episode::query()->withTrashed()->whereBelongsTo($currentSeason)->lockForUpdate()->findOrFail($episode->id);
@@ -344,9 +536,15 @@ final class CatalogAdministrationService
                         'source_media_key' => hash('sha256', 'admin|'.$currentTitle->id.'|'.$currentEpisode->id.'|'.$playbackUrl),
                         'check_status' => 'not_checked',
                     ]);
+                $beforeVersion = $current->exists
+                    ? $this->mediaVersion($current)
+                    : AdminAuditRecorder::ABSENT_VERSION;
+                $beforeAttributes = $current->exists
+                    ? $this->auditAttributes($current, self::MEDIA_AUDIT_FIELDS)
+                    : [];
 
                 if ($current->exists) {
-                    $this->assertVersion($expectedVersion, $this->mediaVersion($current), 'mediaForm');
+                    $this->assertVersion($expectedVersion, $beforeVersion, 'mediaForm');
                 }
 
                 $current->forceFill(Arr::only($attributes, [
@@ -356,21 +554,31 @@ final class CatalogAdministrationService
                 $current->save();
                 $this->touchTitle($currentTitle);
 
-                return $current->fresh();
+                $savedMedia = $current->fresh();
+                $changedFields = $beforeAttributes === []
+                    ? $this->createdAuditFields($attributes, self::MEDIA_AUDIT_FIELDS)
+                    : $this->changedAuditFields($beforeAttributes, $savedMedia, self::MEDIA_AUDIT_FIELDS);
+
+                if ($media === null) {
+                    $changedFields[] = 'source';
+                }
+
+                $this->auditRecorder->record(
+                    $user,
+                    $action,
+                    $savedMedia,
+                    $beforeVersion,
+                    $this->mediaVersion($savedMedia),
+                    $changedFields,
+                );
+
+                return $savedMedia;
             }, attempts: 3);
         }, 'mediaForm.playback_url', 'Такой видеоисточник уже существует у сериала.');
 
         $this->invalidate($title);
 
         return $saved;
-    }
-
-    public function archiveMedia(User $user, CatalogTitle $title, Season $season, Episode $episode, LicensedMedia $media, string $expectedVersion): LicensedMedia
-    {
-        return $this->saveMedia($user, $title, $season, $episode, [
-            ...Arr::only($media->getAttributes(), ['title', 'quality', 'translation_name', 'format', 'has_subtitles', 'duration_seconds', 'audience', 'available_from', 'available_until']),
-            'status' => 'draft',
-        ], $media, $expectedVersion);
     }
 
     public function titleVersion(CatalogTitle $title): string
@@ -436,6 +644,40 @@ final class CatalogAdministrationService
             'attributes' => Arr::only($model->getRawOriginal(), $fields),
             'extra' => $extra,
         ], JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * @param  list<string>  $fields
+     * @return array<string, mixed>
+     */
+    private function auditAttributes(Model $model, array $fields): array
+    {
+        return Arr::only($model->getRawOriginal(), $fields);
+    }
+
+    /**
+     * @param  array<string, mixed>  $before
+     * @param  list<string>  $fields
+     * @return list<string>
+     */
+    private function changedAuditFields(array $before, Model $after, array $fields): array
+    {
+        $afterAttributes = $this->auditAttributes($after, $fields);
+
+        return array_values(array_filter(
+            $fields,
+            fn (string $field): bool => ($before[$field] ?? null) !== ($afterAttributes[$field] ?? null),
+        ));
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     * @param  list<string>  $fields
+     * @return list<string>
+     */
+    private function createdAuditFields(array $attributes, array $fields): array
+    {
+        return array_values(array_intersect($fields, array_keys($attributes)));
     }
 
     private function invalidate(CatalogTitle $title): void
