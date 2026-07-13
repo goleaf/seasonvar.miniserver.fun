@@ -25,6 +25,8 @@
 | Локальная разработка и Git | [`development.md`](development.md) | Установка, единственная ветка `main`, versioned hooks и локальные команды проверки. |
 | Тесты и CI | [`testing.md`](testing.md), [`ci.md`](ci.md) | PHPUnit-паттерны, доступные проверки и точный GitHub Actions pipeline. |
 | Живой аудит и backlog | [`audit.md`](audit.md) | Подтверждённая исходная точка и бессрочный P0–P4 план с acceptance criteria и методами проверки. |
+| Датированные аудиты и модернизация | [`audits/current-state-audit.md`](audits/current-state-audit.md), [`plans/laravel-video-portal-modernization.md`](plans/laravel-video-portal-modernization.md) | Environment, security/performance evidence, MCP/research decisions и статусы текущего прохода. |
+| MCP runbook | [`tooling/mcp-setup.md`](tooling/mcp-setup.md) | Project Boost/Context7/Playwright transport, verification, errors и restart requirement. |
 | Production rollout | [`deployment.md`](deployment.md) | Environment, additive migrations, backup/maintenance order, workers, cache warmup и post-deploy checks. |
 | История изменений | [`CHANGELOG.md`](../CHANGELOG.md) | Пользовательские и архитектурные изменения в установленном формате. |
 | Журнал обслуживания | [`MAINTENANCE_LOG.md`](MAINTENANCE_LOG.md) | Датированные эксплуатационные работы, замеры и диагностика; не заменяет release changelog. |

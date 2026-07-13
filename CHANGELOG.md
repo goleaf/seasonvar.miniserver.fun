@@ -2,6 +2,7 @@
 
 ## 2026-07-13
 
+- Completed the Laravel 13/Livewire 4/video-portal audit with dated environment, security, performance, research, MCP and verification records; configured project-scoped Boost, Context7 and isolated Playwright, fixed Redis-only session connection leakage and production Livewire asset assertions, and introduced a validated HTML-only report-only CSP without exposing provider URLs or changing media delivery.
 - Added explicit Seasonvar rights-holder region-block detection: serial fetch/parser now persist normalized provider availability status and check timestamps, full import locally backfills bounded latest snapshots without HTTP, and due blocked pages return through the normal retry planner without proxy/Tor region circumvention.
 - Removed duplicate alternate title names and canonicalized all ten catalog relation directories. Alias uniqueness is now independent of alias type; actor/director Cyrillic and Latin equivalents share one record, polluted serial links are rejected, existing pivots are merged by bounded maintenance, and future source adapters reuse the same catalog relation identity boundary.
 - Connected the official Playwright MCP as an optional project-scoped Codex server with isolated headless managed Chromium, prompt-approved browser actions, documented browser installation and a real local navigation smoke check.

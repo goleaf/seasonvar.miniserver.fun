@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Str;
 
+$sessionDriver = env('SESSION_DRIVER', 'redis');
+
 return [
 
     /*
@@ -18,7 +20,7 @@ return [
     |
     */
 
-    'driver' => env('SESSION_DRIVER', 'redis'),
+    'driver' => $sessionDriver,
 
     /*
     |--------------------------------------------------------------------------
@@ -73,10 +75,9 @@ return [
     |
     */
 
-    'connection' => env(
-        'SESSION_CONNECTION',
-        env('SESSION_DRIVER', 'redis') === 'redis' ? 'sessions' : null,
-    ),
+    'connection' => $sessionDriver === 'redis'
+        ? env('SESSION_CONNECTION', 'sessions')
+        : null,
 
     /*
     |--------------------------------------------------------------------------

@@ -2,7 +2,6 @@
 
 namespace App\Services\Seasonvar;
 
-use App\Enums\SeasonvarPageType;
 use App\Services\Crawler\PoliteHttpClient;
 use RuntimeException;
 use SimpleXMLElement;

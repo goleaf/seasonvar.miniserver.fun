@@ -39,6 +39,8 @@ npm run build
 
 Единая карта проектной документации находится в [`docs/README.md`](docs/README.md). Полная локальная установка, MCP и правила разработки описаны в [`docs/development.md`](docs/development.md) и [`docs/mcp.md`](docs/mcp.md). Cache topology и environment contract находятся в [`docs/caching.md`](docs/caching.md) и [`docs/environment.md`](docs/environment.md). Внешние интеграции документируются в [`docs/integrations/google.md`](docs/integrations/google.md) и [`docs/integrations/mcp-catalog.md`](docs/integrations/mcp-catalog.md).
 
+Датированный Laravel/Livewire/video audit, environment preflight, security/performance findings и MCP verification находятся в [`docs/audits/current-state-audit.md`](docs/audits/current-state-audit.md) и [`docs/tooling/mcp-setup.md`](docs/tooling/mcp-setup.md). Они дополняют, но не заменяют тематические документы-владельцы.
+
 ## Импорт
 
 `seasonvar:import` скачивает карту сайта Seasonvar, сохраняет найденные страницы, обновляет карточки, сезоны, серии, связи, рейтинги, отзывы и видео. Команда продолжает работу после ошибки отдельной страницы, пишет подробные события в базу и может работать постоянно через `--forever`.

@@ -1,11 +1,29 @@
 [mcp_servers.laravel-boost]
 command = "php"
 args = ["artisan", "boost:mcp", "--env=local"]
+env = { APP_ENV = "local" }
+cwd = "/www/wwwroot/seasonvar.miniserver.fun"
+default_tools_approval_mode = "writes"
+enabled = true
+required = false
+startup_timeout_sec = 30
+tool_timeout_sec = 120
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp"]
+cwd = "/www/wwwroot/seasonvar.miniserver.fun"
+enabled = true
+required = false
+startup_timeout_sec = 40
+tool_timeout_sec = 120
 
 [mcp_servers.playwright]
 command = "npx"
 args = ["-y", "@playwright/mcp@latest", "--headless", "--isolated", "--browser", "chromium", "--output-dir", "output/playwright"]
+cwd = "/www/wwwroot/seasonvar.miniserver.fun"
 default_tools_approval_mode = "prompt"
+enabled = true
 required = false
 startup_timeout_sec = 60
 tool_timeout_sec = 120

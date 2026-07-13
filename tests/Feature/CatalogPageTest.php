@@ -37,9 +37,9 @@ use App\Services\Catalog\CatalogStatsPageBuilder;
 use App\Services\Catalog\CatalogStatsPosterUrlGuard;
 use App\Services\Catalog\CatalogTaxonomyRegistry;
 use App\Services\Catalog\CatalogUserStateService;
-use App\Support\CatalogTitleDisplayName;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheVersionRegistry;
+use App\Support\CatalogTitleDisplayName;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Events\QueryExecuted;
@@ -236,7 +236,10 @@ class CatalogPageTest extends TestCase
             Livewire::flushState();
             $content = $this->get($url)->assertOk()->getContent();
 
-            $this->assertSame(1, substr_count($content, '/vendor/livewire/livewire.js'));
+            $this->assertSame(
+                1,
+                preg_match_all('~/vendor/livewire/livewire(?:\.min)?\.js\?id=~', $content),
+            );
             $this->assertSame(1, substr_count($content, 'data-csrf='));
         }
     }
@@ -1188,11 +1191,15 @@ class CatalogPageTest extends TestCase
 
         $response = $this->get(route('stats'));
 
+        $this->assertMatchesRegularExpression(
+            '~/vendor/livewire/livewire(?:\.min)?\.js\?id=~',
+            $response->getContent(),
+        );
+
         $response
             ->assertOk()
             ->assertSeeLivewire('stats-dashboard')
             ->assertSee('wire:poll.15s.visible="refreshStats"', false)
-            ->assertSee('/vendor/livewire/livewire.js?id=', false)
             ->assertSeeText('Сводка каталога')
             ->assertSeeText('Снимок обновляется после изменений каталога и в плановом прогреве')
             ->assertSeeText('Показано:')

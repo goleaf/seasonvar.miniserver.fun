@@ -35,12 +35,14 @@
 ## HTTP
 
 - Web-ответы добавляют защитные заголовки: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` и `X-Permitted-Cross-Domain-Policies`.
-- Строгий CSP пока не включен: страницы карточек используют внешние постеры и внешние media URLs, поэтому CSP нужно проектировать отдельно с учетом этих источников.
+- HTML-ответы дополнительно получают `Content-Security-Policy-Report-Only`. Fixed policy запрещает objects, ограничивает base/form/frame, не содержит `unsafe-eval`, а image/media/connect sources берёт только из очищенных `SECURITY_CSP_*_SOURCES`. JSON API не получает этот body-dependent header.
+- CSP пока не enforced: текущий каталог использует несколько external poster/media origins, а inline styles нужны существующему UI/framework. Сначала нужно наблюдать violations, сузить `https:` до подтверждённых origins и только затем включать enforcement; публичный report collector намеренно не добавлен.
 - Laravel web middleware сохраняет стандартные encrypted cookies и `PreventRequestForgery` для небезопасных HTTP-методов.
 
 ## Проверки
 
-- `SecurityHardeningTest`, `LocalRateLimitRemovalTest` и существующие importer maintenance tests проверяют security headers, отсутствие локального HTTP 429, отключенные storage routes, entitlement/source recheck, playback fallback, blocked private/local/metadata hosts, unsafe redirects, timeout classification, redacted logs, failure thresholds, permanent failures и recovery.
+- `SecurityHardeningTest`, `LocalRateLimitRemovalTest` и существующие importer maintenance tests проверяют security headers и CSP source normalization, отсутствие локального HTTP 429, отключенные storage routes, entitlement/source recheck, playback fallback, blocked private/local/metadata hosts, unsafe redirects, timeout classification, redacted logs, failure thresholds, permanent failures и recovery.
+- Датированный результат review, accepted/deferred risks и внешние источники находятся в `docs/audits/security-audit.md` и `docs/research/laravel-video-portal-sources.md`.
 - `PrivateImageUploadRulesTest` и `PrivateUploadStorageTest` проверяют upload-валидацию, private visibility, generated filenames и cleanup через fake storage.
 - `RunSeasonvarImportJobTest` и `SeasonvarImportFailedNotificationTest` проверяют dispatch/content operational notification без отправки реальных писем.
 - `CatalogPageTest` и `CatalogStatsSnapshotSanitizerTest` проверяют, что stats HTML/Livewire-рендер не раскрывает исходные source/media URL, stack traces и приватный event context.

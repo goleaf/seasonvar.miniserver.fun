@@ -44,6 +44,8 @@ class IntegrationDoctor
 
         return [
             $this->laravelBoostMcpCheck(),
+            $this->context7McpCheck(),
+            $this->playwrightMcpCheck(),
             $this->mcpExampleCheck(),
             $this->projectSkillsCheck(),
             $this->openAiDocsMcpCheck($globalMcpServers),
@@ -119,21 +121,81 @@ class IntegrationDoctor
             );
         }
 
-        $config = $this->files->get($path);
-
-        $hasBoostServer = str_contains($config, '[mcp_servers.laravel-boost]')
-            && str_contains($config, 'boost:mcp')
-            && str_contains($config, '--env=local');
+        $server = $this->projectMcpServer('laravel-boost');
+        $hasBoostServer = $server !== null
+            && str_contains($server, 'boost:mcp')
+            && str_contains($server, '--env=local')
+            && str_contains($server, 'env = { APP_ENV = "local" }')
+            && str_contains($server, 'cwd = "'.base_path().'"');
 
         return $this->check(
             'laravel_boost_mcp',
             'Laravel Boost MCP',
             $hasBoostServer ? self::STATUS_OK : self::STATUS_MISSING,
             $hasBoostServer
-                ? 'Проектный MCP Laravel Boost настроен безопасно.'
-                : 'В .codex/config.toml нет полного Laravel Boost MCP блока с --env=local.',
+                ? 'Проектный MCP Laravel Boost настроен с наследуемым APP_ENV=local.'
+                : 'Laravel Boost MCP должен использовать абсолютный cwd, --env=local и наследуемый APP_ENV=local.',
             required: true,
         );
+    }
+
+    private function context7McpCheck(): array
+    {
+        $server = $this->projectMcpServer('context7');
+        $configured = $server !== null
+            && str_contains($server, '@upstash/context7-mcp')
+            && str_contains($server, 'required = false')
+            && ! str_contains($server, '--api-key')
+            && ! str_contains($server, 'CONTEXT7_API_KEY');
+
+        return $this->check(
+            'context7_mcp',
+            'Context7 MCP',
+            $configured ? self::STATUS_OK : self::STATUS_MISSING,
+            $configured
+                ? 'Context7 настроен как необязательный project MCP без сохраненного API key.'
+                : 'Context7 MCP отсутствует или содержит небезопасную project-конфигурацию.',
+            required: true,
+        );
+    }
+
+    private function playwrightMcpCheck(): array
+    {
+        $server = $this->projectMcpServer('playwright');
+        $configured = $server !== null
+            && str_contains($server, '@playwright/mcp@latest')
+            && str_contains($server, '--headless')
+            && str_contains($server, '--isolated')
+            && str_contains($server, 'output/playwright')
+            && str_contains($server, 'cwd = "'.base_path().'"')
+            && str_contains($server, 'required = false');
+
+        return $this->check(
+            'playwright_mcp',
+            'Playwright MCP',
+            $configured ? self::STATUS_OK : self::STATUS_MISSING,
+            $configured
+                ? 'Playwright настроен как необязательный headless isolated project MCP.'
+                : 'Playwright MCP должен использовать абсолютный cwd, headless isolated режим и ignored output.',
+            required: true,
+        );
+    }
+
+    private function projectMcpServer(string $name): ?string
+    {
+        $path = base_path('.codex/config.toml');
+
+        if (! $this->files->isFile($path)) {
+            return null;
+        }
+
+        $pattern = '/^\[mcp_servers\.'.preg_quote($name, '/').'\]\R(?<server>.*?)(?=^\[|\z)/ms';
+
+        if (preg_match($pattern, $this->files->get($path), $matches) !== 1) {
+            return null;
+        }
+
+        return $matches['server'];
     }
 
     private function mcpExampleCheck(): array

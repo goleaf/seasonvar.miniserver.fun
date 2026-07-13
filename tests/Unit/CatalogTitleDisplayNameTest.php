@@ -37,14 +37,14 @@ class CatalogTitleDisplayNameTest extends TestCase
         );
 
         $this->assertSame(
-            CatalogTitleDisplayName::comparisonKey(" RuPaul’s   Drag Race "),
+            CatalogTitleDisplayName::comparisonKey(' RuPaul’s   Drag Race '),
             CatalogTitleDisplayName::comparisonKey("rupaul's drag race"),
         );
         $this->assertSame(
-            CatalogTitleDisplayName::nameHash(" RuPaul’s   Drag Race "),
+            CatalogTitleDisplayName::nameHash(' RuPaul’s   Drag Race '),
             CatalogTitleDisplayName::nameHash("rupaul's drag race"),
         );
-        $this->assertTrue($name->contains(" RuPaul’s   Drag Race "));
+        $this->assertTrue($name->contains(' RuPaul’s   Drag Race '));
         $this->assertTrue($name->contains('Королевские гонки РуПола'));
         $this->assertFalse($name->contains('Drag Race Untucked'));
     }

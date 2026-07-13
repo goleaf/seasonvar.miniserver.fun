@@ -37,6 +37,51 @@ class SecurityHardeningTest extends TestCase
             ->assertHeader('X-Permitted-Cross-Domain-Policies', 'none');
     }
 
+    public function test_public_html_receives_a_bounded_report_only_content_security_policy(): void
+    {
+        config([
+            'security.csp_report_only.enabled' => true,
+            'security.csp_report_only.image_sources' => ["'self'", 'data:', 'https:', 'https://images.example.test'],
+            'security.csp_report_only.media_sources' => ["'self'", 'blob:', 'https:', 'https://media.example.test'],
+            'security.csp_report_only.connect_sources' => ["'self'", 'https:', 'https://api.example.test'],
+        ]);
+
+        $response = $this->get(route('home'))->assertOk();
+        $policy = (string) $response->headers->get('Content-Security-Policy-Report-Only');
+
+        $this->assertStringContainsString("default-src 'self'", $policy);
+        $this->assertStringContainsString("script-src 'self'", $policy);
+        $this->assertStringContainsString("style-src 'self' 'unsafe-inline'", $policy);
+        $this->assertStringContainsString("font-src 'self' data:", $policy);
+        $this->assertStringContainsString('https://images.example.test', $policy);
+        $this->assertStringContainsString('https://media.example.test', $policy);
+        $this->assertStringContainsString('https://api.example.test', $policy);
+        $this->assertStringContainsString("object-src 'none'", $policy);
+        $this->assertStringContainsString("base-uri 'self'", $policy);
+        $this->assertStringContainsString("frame-ancestors 'self'", $policy);
+        $this->assertStringNotContainsString("'unsafe-eval'", $policy);
+    }
+
+    public function test_csp_rejects_invalid_sources_and_is_not_attached_to_api_json(): void
+    {
+        config([
+            'security.csp_report_only.enabled' => true,
+            'security.csp_report_only.image_sources' => ["'self'", 'https://safe.example.test', 'https://bad.example.test; script-src *', "https://bad.example.test\nobject-src *"],
+        ]);
+
+        $policy = (string) $this->get(route('home'))
+            ->assertOk()
+            ->headers
+            ->get('Content-Security-Policy-Report-Only');
+
+        $this->assertStringContainsString('https://safe.example.test', $policy);
+        $this->assertStringNotContainsString('bad.example.test', $policy);
+
+        $this->getJson('/api/titles')
+            ->assertOk()
+            ->assertHeaderMissing('Content-Security-Policy-Report-Only');
+    }
+
     public function test_local_filesystem_serving_routes_are_disabled_by_default(): void
     {
         $this->assertFalse(Route::has('storage.local'));

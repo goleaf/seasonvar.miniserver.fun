@@ -46,3 +46,5 @@ php artisan project:docs-refresh --check
 ```
 
 `npm run build` нужен только при изменениях Vite, JS/CSS, Blade-разметки с asset assumptions или frontend assets. `vendor/bin/pest`, `npm run lint`, PHPStan и Rector сейчас не установлены.
+
+Датированный baseline, исправленные regressions, browser smoke и финальные exact counts записываются в `docs/audits/verification-report.md`. Production Livewire может выдавать как `livewire.js`, так и `livewire.min.js`; asset tests обязаны проверять официальный URL/id и singleton, а не жёстко фиксировать build mode.
