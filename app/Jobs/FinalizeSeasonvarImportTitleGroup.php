@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\DTOs\Seasonvar\SeasonvarPreparedCatalogPage;
+use App\DTOs\Seasonvar\SeasonvarTitleManifest;
 use App\Enums\SeasonvarImportStatus;
 use App\Enums\SeasonvarImportTitleGroupStatus;
+use App\Enums\SeasonvarPageType;
 use App\Enums\SeasonvarPreparedPageStatus;
 use App\Models\CatalogTitle;
 use App\Models\SeasonvarImportPreparedPage;
@@ -15,10 +17,13 @@ use App\Models\SeasonvarImportTitleGroup;
 use App\Services\Catalog\CatalogCacheInvalidator;
 use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
+use App\Services\Seasonvar\SeasonvarCatalogParser;
 use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
+use App\Services\Seasonvar\SeasonvarImportGroupKey;
 use App\Services\Seasonvar\SeasonvarImportRunRecorder;
 use App\Services\Seasonvar\SeasonvarTitleManifestBuilder;
 use App\Services\Seasonvar\SeasonvarTitleMerger;
+use App\Services\Seasonvar\SeasonvarUrl;
 use DateTimeInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Cache\Repository;
@@ -31,6 +36,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Throwable;
 
 final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQueue
@@ -68,6 +74,8 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
         CatalogTitleRefreshStateStore $refreshStates,
         SeasonvarImportRunRecorder $runs,
         CatalogCacheInvalidator $cacheInvalidator,
+        SeasonvarImportGroupKey $groupKeys,
+        SeasonvarUrl $urls,
     ): void {
         $group = $this->group();
 
@@ -110,11 +118,14 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
             }
 
             [$validRows, $invalidPages] = $this->validatedRows(
+                $group,
                 $group->preparedPages->filter(fn (SeasonvarImportPreparedPage $row): bool => in_array(
                     $row->status,
                     [SeasonvarPreparedPageStatus::Prepared, SeasonvarPreparedPageStatus::Applied],
                     true,
                 )),
+                $groupKeys,
+                $urls,
             );
             $validRows = $this->sortRows($validRows, $group->catalogTitle);
 
@@ -126,6 +137,9 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
 
             $sourceManifest = $manifests->fromPrepared($validRows->pluck('prepared'));
             $catalogTitle = $group->catalogTitle;
+            $localManifestBefore = $catalogTitle !== null
+                ? $manifests->fromCatalog($catalogTitle)
+                : new SeasonvarTitleManifest([], [], []);
             $media = ['attached' => 0, 'updated' => 0, 'skipped' => 0, 'failed' => 0];
 
             foreach ($validRows as $item) {
@@ -148,7 +162,10 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
 
             $titleMerger->mergeForCanonicalSlug($catalogTitle->slug);
             $catalogTitle->refresh();
-            $comparison = $sourceManifest->comparison($manifests->fromCatalog($catalogTitle));
+            $comparison = $sourceManifest->comparison(
+                $manifests->fromCatalog($catalogTitle),
+                $localManifestBefore,
+            );
             $warningCount = $validRows->sum(
                 fn (array $item): int => count($item['row']->warnings ?? []),
             );
@@ -164,6 +181,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
                 $validRows,
                 $status,
                 $failedPages,
+                $invalidPages,
                 $comparison,
                 $warningCount,
                 $media,
@@ -247,6 +265,16 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
 
     private function allPagesTerminal(SeasonvarImportTitleGroup $group): bool
     {
+        $hasLiveClaim = $group->preparedPages->contains(
+            fn (SeasonvarImportPreparedPage $row): bool => $row->sourcePage->import_claim_token !== null
+                && $row->sourcePage->import_claim_expires_at !== null
+                && $row->sourcePage->import_claim_expires_at->greaterThan(now()),
+        );
+
+        if ($hasLiveClaim) {
+            return false;
+        }
+
         $terminal = $group->preparedPages->filter(
             fn (SeasonvarImportPreparedPage $row): bool => $row->status->isTerminal(),
         )->count();
@@ -260,16 +288,49 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
      * @param  Collection<int, SeasonvarImportPreparedPage>  $rows
      * @return array{Collection<int, array{row: SeasonvarImportPreparedPage, prepared: SeasonvarPreparedCatalogPage}>, int}
      */
-    private function validatedRows(Collection $rows): array
-    {
+    private function validatedRows(
+        SeasonvarImportTitleGroup $group,
+        Collection $rows,
+        SeasonvarImportGroupKey $groupKeys,
+        SeasonvarUrl $urls,
+    ): array {
         $valid = collect();
         $invalid = 0;
 
         foreach ($rows as $row) {
             try {
+                $prepared = SeasonvarPreparedCatalogPage::fromPayload($row->payload ?? []);
+
+                if ($prepared->parserVersion !== SeasonvarCatalogParser::METADATA_VERSION
+                    || $row->parser_version !== SeasonvarCatalogParser::METADATA_VERSION) {
+                    throw new RuntimeException('Версия подготовленного payload Seasonvar устарела.');
+                }
+
+                if (! is_string($row->content_hash)
+                    || ! hash_equals($row->content_hash, $prepared->contentHash)) {
+                    throw new RuntimeException('Хеш подготовленного payload Seasonvar не совпадает со staging row.');
+                }
+
+                if ($prepared->sourcePageId !== $row->source_page_id) {
+                    throw new RuntimeException('Подготовленный payload Seasonvar не соответствует source page.');
+                }
+
+                $sourceUrl = $urls->normalize($row->sourcePage->url);
+                $sourceUrlHash = $urls->hash($sourceUrl);
+                $groupKeyHash = hash('sha256', $groupKeys->forUrl($sourceUrl, $sourceUrlHash));
+
+                if (! $urls->isAllowed($sourceUrl)
+                    || $urls->pageType($sourceUrl) !== SeasonvarPageType::Serial
+                    || ! hash_equals($sourceUrlHash, $row->sourcePage->url_hash)
+                    || ! hash_equals($group->group_key_hash, $groupKeyHash)
+                    || ($group->catalogTitle !== null
+                        && (int) $group->catalogTitle->source_id !== (int) $row->sourcePage->source_id)) {
+                    throw new RuntimeException('Source page не соответствует канонической группе Seasonvar.');
+                }
+
                 $valid->push([
                     'row' => $row,
-                    'prepared' => SeasonvarPreparedCatalogPage::fromPayload($row->payload ?? []),
+                    'prepared' => $prepared,
                 ]);
             } catch (Throwable $exception) {
                 $invalid++;
@@ -303,11 +364,12 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
         Collection $validRows,
         SeasonvarImportTitleGroupStatus $status,
         int $failedPages,
+        int $invalidPages,
         array $comparison,
         int $warningCount,
         array $media,
     ): void {
-        DB::transaction(function () use ($group, $validRows, $status, $failedPages, $comparison, $warningCount, $media): void {
+        DB::transaction(function () use ($group, $validRows, $status, $failedPages, $invalidPages, $comparison, $warningCount, $media): void {
             foreach ($validRows as $item) {
                 $item['row']->markApplied();
             }
@@ -330,6 +392,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
             $run->media_updated += $media['updated'];
             $run->media_skipped += $media['skipped'];
             $run->media_failed += $media['failed'];
+            $run->failed += $invalidPages;
             $run->cycles = max(1, (int) $run->cycles);
             $run->last_heartbeat_at = now();
 

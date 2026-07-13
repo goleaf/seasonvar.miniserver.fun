@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Actions\Seasonvar\RecordSeasonvarPageFailure;
+use App\Enums\SeasonvarImportFailureType;
 use App\Enums\SeasonvarImportStatus;
 use App\Enums\SeasonvarPreparedPageStatus;
 use App\Models\SeasonvarImportPreparedPage;
@@ -58,6 +60,7 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
         SeasonvarCatalogPagePreparer $preparer,
         SeasonvarImportTitleGroupDispatcher $dispatcher,
         SeasonvarPageClaimManager $claims,
+        RecordSeasonvarPageFailure $pageFailures,
     ): void {
         $preparedRow = SeasonvarImportPreparedPage::query()
             ->with(['group.run', 'sourcePage.source'])
@@ -103,6 +106,20 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
                 SeasonvarImportTitleGroup::query()->whereKey($preparedRow->group->id)->increment('prepared_pages');
                 SeasonvarImportRun::query()->whereKey($preparedRow->seasonvar_import_run_id)->increment('parsed');
             });
+        } catch (Throwable $exception) {
+            $failureType = $pageFailures->handle(
+                $preparedRow->sourcePage,
+                $exception,
+                $preparedRow->seasonvar_import_run_id,
+            );
+
+            if ($failureType === SeasonvarImportFailureType::Permanent) {
+                $this->markTerminalFailure($preparedRow, $exception);
+
+                return;
+            }
+
+            throw $exception;
         } finally {
             $claims->release(
                 $preparedRow->source_page_id,
@@ -159,13 +176,11 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
     {
         $preparedRow = SeasonvarImportPreparedPage::query()->find($this->preparedPageId);
 
-        if ($preparedRow === null || $preparedRow->status?->isTerminal()) {
+        if ($preparedRow === null) {
             return;
         }
 
-        $preparedRow->markFailed(app(SeasonvarImportErrorSanitizer::class)->fromException($exception));
-        SeasonvarImportTitleGroup::query()->whereKey($preparedRow->seasonvar_import_title_group_id)->increment('failed_pages');
-        SeasonvarImportRun::query()->whereKey($preparedRow->seasonvar_import_run_id)->increment('failed');
+        $this->markTerminalFailure($preparedRow, $exception);
 
         Log::error('Страница Seasonvar не подготовлена для групповой финализации.', [
             'prepared_page_id' => $this->preparedPageId,
@@ -173,5 +188,22 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
             'import_run_id' => $preparedRow->seasonvar_import_run_id,
             'exception' => $exception !== null ? $exception::class : null,
         ]);
+    }
+
+    private function markTerminalFailure(SeasonvarImportPreparedPage $preparedRow, ?Throwable $exception): void
+    {
+        DB::transaction(function () use ($preparedRow, $exception): void {
+            $lockedRow = SeasonvarImportPreparedPage::query()
+                ->lockForUpdate()
+                ->find($preparedRow->id);
+
+            if ($lockedRow === null || $lockedRow->status?->isTerminal()) {
+                return;
+            }
+
+            $lockedRow->markFailed(app(SeasonvarImportErrorSanitizer::class)->fromException($exception));
+            SeasonvarImportTitleGroup::query()->whereKey($lockedRow->seasonvar_import_title_group_id)->increment('failed_pages');
+            SeasonvarImportRun::query()->whereKey($lockedRow->seasonvar_import_run_id)->increment('failed');
+        });
     }
 }

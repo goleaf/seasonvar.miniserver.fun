@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Exceptions\Seasonvar\SeasonvarSourceRequestException;
 use App\Jobs\FinalizeSeasonvarImportTitleGroup;
 use App\Jobs\PrepareSeasonvarImportTitlePage;
 use App\Models\CatalogTitle;
@@ -77,6 +78,23 @@ class SeasonvarImportTitleGroupDispatcherTest extends TestCase
         Queue::assertPushed(PrepareSeasonvarImportTitlePage::class, 1);
     }
 
+    public function test_discovered_url_from_another_title_family_is_not_attached_to_the_group(): void
+    {
+        Queue::fake();
+        $title = $this->titleWithSeasonUrls([1]);
+        $dispatcher = app(SeasonvarImportTitleGroupDispatcher::class);
+        $group = $dispatcher->start($title, 'seasonvar-title-refresh');
+
+        $created = $dispatcher->addUrls($group, [
+            'https://seasonvar.ru/serial-99999-Drugoj_serial_psother-2-season.html',
+        ]);
+
+        $this->assertSame(0, $created);
+        $this->assertSame(1, $group->fresh()->expected_pages);
+        $this->assertSame(1, $group->preparedPages()->count());
+        Queue::assertPushed(PrepareSeasonvarImportTitlePage::class, 1);
+    }
+
     public function test_preparation_job_dispatches_a_newly_discovered_season_before_releasing_parent(): void
     {
         Queue::fake();
@@ -137,6 +155,53 @@ class SeasonvarImportTitleGroupDispatcherTest extends TestCase
 
         $this->assertSame(1, $group->fresh()->failed_pages);
         $this->assertSame(1, $group->run->fresh()->failed);
+    }
+
+    public function test_permanent_preparation_failure_finishes_the_page_without_retrying(): void
+    {
+        Queue::fake();
+        Http::preventStrayRequests();
+        $title = $this->titleWithSeasonUrls([1]);
+        $url = $this->seasonUrl(1);
+        Http::fake([$url => Http::response('', 404)]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $prepared = $group->preparedPages()->with('sourcePage')->firstOrFail();
+
+        $this->app->call([new PrepareSeasonvarImportTitlePage($prepared->id), 'handle']);
+
+        $this->assertSame('failed', $prepared->fresh()->status->value);
+        $this->assertSame(1, $group->fresh()->failed_pages);
+        $this->assertSame(1, $group->run->fresh()->failed);
+        $this->assertSame('gone', $prepared->sourcePage->fresh()->import_status);
+        $this->assertNull($prepared->sourcePage->fresh()->import_claim_token);
+    }
+
+    public function test_transient_preparation_failure_is_recorded_and_rethrown_for_independent_retry(): void
+    {
+        Queue::fake();
+        Http::preventStrayRequests();
+        $title = $this->titleWithSeasonUrls([1]);
+        $url = $this->seasonUrl(1);
+        Http::fake([$url => Http::response('', 503)]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $prepared = $group->preparedPages()->with('sourcePage')->firstOrFail();
+        $exception = null;
+
+        try {
+            $this->app->call([new PrepareSeasonvarImportTitlePage($prepared->id), 'handle']);
+        } catch (SeasonvarSourceRequestException $caught) {
+            $exception = $caught;
+        }
+
+        $this->assertInstanceOf(SeasonvarSourceRequestException::class, $exception);
+        $this->assertSame(503, $exception->status);
+        $this->assertSame('preparing', $prepared->fresh()->status->value);
+        $this->assertSame(0, $group->fresh()->failed_pages);
+        $this->assertSame('failed', $prepared->sourcePage->fresh()->import_status);
+        $this->assertSame(1, $prepared->sourcePage->fresh()->failure_count);
+        $this->assertNull($prepared->sourcePage->fresh()->import_claim_token);
     }
 
     /** @param list<int> $seasonNumbers */

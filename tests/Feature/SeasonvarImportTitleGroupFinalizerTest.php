@@ -12,7 +12,9 @@ use App\Models\Season;
 use App\Models\SeasonvarImportPreparedPage;
 use App\Models\Source;
 use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
+use App\Services\Seasonvar\SeasonvarCatalogParser;
 use App\Services\Seasonvar\SeasonvarImportTitleGroupDispatcher;
+use App\Services\Seasonvar\SeasonvarPageClaimManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -51,6 +53,27 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         $this->assertSame(0, $group->fresh()->applied_pages);
     }
 
+    public function test_finalizer_releases_while_a_terminal_page_still_has_a_live_claim(): void
+    {
+        $title = $this->titleWithSeasonUrls([1]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $row = $group->preparedPages()->with('sourcePage')->firstOrFail();
+        $this->prepareRow($row, 1, 2);
+        $this->assertNotNull(app(SeasonvarPageClaimManager::class)->claim(
+            $row->sourcePage,
+            $group->seasonvar_import_run_id,
+            3600,
+        ));
+        $job = (new FinalizeSeasonvarImportTitleGroup($group->id))->withFakeQueueInteractions();
+
+        $this->app->call([$job, 'handle']);
+
+        $job->assertReleased(delay: 7);
+        $this->assertSame('running', $group->fresh()->status->value);
+        $this->assertSame(0, $group->fresh()->applied_pages);
+    }
+
     public function test_finalizer_applies_shuffled_pages_to_one_title_and_completes_manifest(): void
     {
         $title = $this->titleWithSeasonUrls([9, 1, 2]);
@@ -70,6 +93,11 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         $this->assertSame(9, $title->episodes()->count());
         $this->assertSame(0, data_get($group->run->fresh()->summary, 'title_manifest.missing_local'));
         $this->assertSame(3, data_get($group->run->fresh()->summary, 'title_manifest.source_seasons'));
+        $this->assertSame(0, data_get($group->run->fresh()->summary, 'title_manifest.local_episodes_before'));
+        $this->assertSame(9, data_get($group->run->fresh()->summary, 'title_manifest.local_episodes_after'));
+        $this->assertSame(9, data_get($group->run->fresh()->summary, 'title_manifest.added'));
+        $this->assertSame(3, data_get($group->run->fresh()->summary, 'title_manifest.unchanged'));
+        $this->assertSame(0, data_get($group->run->fresh()->summary, 'title_manifest.failed'));
         $this->assertSame(
             'completed',
             app(CatalogTitleRefreshStateStore::class)->read($title->id)->status?->value,
@@ -121,6 +149,73 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         $this->assertSame('partial', $group->fresh()->status->value);
         $this->assertSame(1, $group->fresh()->failed_pages);
         $this->assertSame(1, $group->fresh()->applied_pages);
+    }
+
+    public function test_finalizer_rejects_a_payload_from_an_outdated_parser_version(): void
+    {
+        $title = $this->titleWithSeasonUrls([1, 2]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $rows = $group->preparedPages()->with('sourcePage')->get();
+        $this->prepareRow($rows->first(), 1, 2);
+        $outdated = $rows->last();
+        $this->prepareRow($outdated, 2, 2);
+        $payload = $outdated->payload;
+        $payload['parser_version'] = SeasonvarCatalogParser::METADATA_VERSION - 1;
+        $outdated->update([
+            'parser_version' => SeasonvarCatalogParser::METADATA_VERSION - 1,
+            'payload' => $payload,
+        ]);
+
+        $this->app->call([(new FinalizeSeasonvarImportTitleGroup($group->id))->withFakeQueueInteractions(), 'handle']);
+
+        $this->assertSame('partial', $group->fresh()->status->value);
+        $this->assertSame(1, $group->fresh()->failed_pages);
+        $this->assertSame(1, $group->fresh()->applied_pages);
+        $this->assertSame(1, $group->run->fresh()->failed);
+        $this->assertSame('failed', $outdated->fresh()->status->value);
+    }
+
+    public function test_finalizer_rejects_a_payload_with_mismatched_staging_hash(): void
+    {
+        $title = $this->titleWithSeasonUrls([1, 2]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $rows = $group->preparedPages()->with('sourcePage')->get();
+        $this->prepareRow($rows->first(), 1, 2);
+        $mismatched = $rows->last();
+        $this->prepareRow($mismatched, 2, 2);
+        $mismatched->update(['content_hash' => hash('sha256', 'different-staging-content')]);
+
+        $this->app->call([(new FinalizeSeasonvarImportTitleGroup($group->id))->withFakeQueueInteractions(), 'handle']);
+
+        $this->assertSame('partial', $group->fresh()->status->value);
+        $this->assertSame(1, $group->fresh()->failed_pages);
+        $this->assertSame(1, $group->fresh()->applied_pages);
+        $this->assertSame('failed', $mismatched->fresh()->status->value);
+    }
+
+    public function test_finalizer_revalidates_the_persisted_source_page_family_before_apply(): void
+    {
+        $title = $this->titleWithSeasonUrls([1, 2]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $rows = $group->preparedPages()->with('sourcePage')->get();
+        $this->prepareRow($rows->first(), 1, 2);
+        $unrelated = $rows->last();
+        $this->prepareRow($unrelated, 2, 2);
+        $unrelatedUrl = 'https://seasonvar.ru/serial-99999-Drugoj_serial_psother-2-season.html';
+        $unrelated->sourcePage->update([
+            'url' => $unrelatedUrl,
+            'url_hash' => hash('sha256', $unrelatedUrl),
+        ]);
+
+        $this->app->call([(new FinalizeSeasonvarImportTitleGroup($group->id))->withFakeQueueInteractions(), 'handle']);
+
+        $this->assertSame('partial', $group->fresh()->status->value);
+        $this->assertSame(1, $group->fresh()->failed_pages);
+        $this->assertSame(1, $group->fresh()->applied_pages);
+        $this->assertSame('failed', $unrelated->fresh()->status->value);
     }
 
     private function prepareAllRows($rows, array $episodesBySeason): void
@@ -175,11 +270,16 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         $prepared = new SeasonvarPreparedCatalogPage(
             sourcePageId: $row->source_page_id,
             contentHash: hash('sha256', 'season-'.$seasonNumber),
-            parserVersion: 1,
+            parserVersion: SeasonvarCatalogParser::METADATA_VERSION,
             catalogData: $data,
             discoveredSeasonUrls: [$url],
         );
-        $row->markPrepared($prepared->toPayload(), [], $prepared->contentHash, 1);
+        $row->markPrepared(
+            $prepared->toPayload(),
+            [],
+            $prepared->contentHash,
+            SeasonvarCatalogParser::METADATA_VERSION,
+        );
         $row->group()->increment('prepared_pages');
     }
 

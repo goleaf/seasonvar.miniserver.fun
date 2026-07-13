@@ -94,12 +94,26 @@ final class SeasonvarImportTitleGroupDispatcher
         $created = 0;
 
         foreach ($this->normalizedUrls($urls) as $url) {
+            if (! $this->belongsToGroup($group, $url)) {
+                continue;
+            }
+
             $createdForUrl = $this->attachUrl($group, (int) $sourceId, $url);
 
             $created += $createdForUrl ? 1 : 0;
         }
 
         return $created;
+    }
+
+    private function belongsToGroup(SeasonvarImportTitleGroup $group, string $url): bool
+    {
+        $groupKeyHash = hash('sha256', $this->groupKeys->forUrl(
+            $url,
+            $this->seasonvarUrl->hash($url),
+        ));
+
+        return hash_equals($group->group_key_hash, $groupKeyHash);
     }
 
     public function adoptPage(

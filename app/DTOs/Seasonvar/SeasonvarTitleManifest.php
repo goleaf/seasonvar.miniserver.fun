@@ -18,8 +18,12 @@ final readonly class SeasonvarTitleManifest
     ) {}
 
     /** @return array<string, int> */
-    public function comparison(self $local): array
+    public function comparison(self $local, ?self $localBefore = null): array
     {
+        $localBefore ??= $local;
+        $missingLocal = $this->differenceCount($this, $local);
+        $localOnly = $this->differenceCount($local, $this);
+
         return [
             'source_seasons' => count($this->seasonKeys),
             'local_seasons' => count($local->seasonKeys),
@@ -27,12 +31,33 @@ final readonly class SeasonvarTitleManifest
             'local_episodes' => count($local->episodeKeys),
             'source_media' => count($this->mediaKeys),
             'local_media' => count($local->mediaKeys),
-            'missing_local' => count(array_diff_key($this->seasonKeys, $local->seasonKeys))
-                + count(array_diff_key($this->episodeKeys, $local->episodeKeys))
-                + count(array_diff_key($this->mediaKeys, $local->mediaKeys)),
-            'local_only' => count(array_diff_key($local->seasonKeys, $this->seasonKeys))
-                + count(array_diff_key($local->episodeKeys, $this->episodeKeys))
-                + count(array_diff_key($local->mediaKeys, $this->mediaKeys)),
+            'local_seasons_before' => count($localBefore->seasonKeys),
+            'local_episodes_before' => count($localBefore->episodeKeys),
+            'local_media_before' => count($localBefore->mediaKeys),
+            'local_seasons_after' => count($local->seasonKeys),
+            'local_episodes_after' => count($local->episodeKeys),
+            'local_media_after' => count($local->mediaKeys),
+            'added' => $this->differenceCount($this, $localBefore),
+            'unchanged' => $this->intersectionCount($this, $localBefore),
+            'failed' => $missingLocal,
+            'missing_local' => $missingLocal,
+            'local_only_before' => $this->differenceCount($localBefore, $this),
+            'local_only_after' => $localOnly,
+            'local_only' => $localOnly,
         ];
+    }
+
+    private function differenceCount(self $left, self $right): int
+    {
+        return count(array_diff_key($left->seasonKeys, $right->seasonKeys))
+            + count(array_diff_key($left->episodeKeys, $right->episodeKeys))
+            + count(array_diff_key($left->mediaKeys, $right->mediaKeys));
+    }
+
+    private function intersectionCount(self $left, self $right): int
+    {
+        return count(array_intersect_key($left->seasonKeys, $right->seasonKeys))
+            + count(array_intersect_key($left->episodeKeys, $right->episodeKeys))
+            + count(array_intersect_key($left->mediaKeys, $right->mediaKeys));
     }
 }
