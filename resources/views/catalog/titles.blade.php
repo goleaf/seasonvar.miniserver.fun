@@ -19,7 +19,7 @@
             aria-labelledby="catalog-filter-dialog-title"
             data-catalog-filter-dialog
             wire:ignore.self
-    class="fixed inset-x-0 top-0 m-0 min-h-dvh max-h-dvh w-full max-w-none overflow-y-auto overscroll-contain border-0 bg-slate-50 p-3 backdrop:bg-slate-900/40 lg:sticky lg:inset-auto lg:top-24 lg:order-1 lg:block lg:min-h-0 lg:max-h-none lg:w-auto lg:self-start lg:overflow-visible lg:overscroll-auto lg:bg-transparent lg:p-0 lg:pr-1"
+    class="fixed inset-x-0 top-0 m-0 min-h-dvh max-h-dvh w-full max-w-none overflow-y-auto border-0 bg-slate-50 p-3 backdrop:bg-slate-900/40 lg:sticky lg:inset-auto lg:top-24 lg:order-1 lg:block lg:min-h-0 lg:max-h-none lg:w-auto lg:self-start lg:overflow-visible lg:bg-transparent lg:p-0 lg:pr-1"
         >
             <div class="sticky top-0 z-20 mb-3 flex items-center justify-between gap-3 rounded-control bg-white p-2 shadow-panel lg:hidden">
                 <h2 id="catalog-filter-dialog-title" class="flex min-w-0 items-center gap-2 break-words text-base font-bold text-slate-800">

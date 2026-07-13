@@ -167,6 +167,10 @@ class CatalogVisualSystemTest extends TestCase
 
     public function test_public_views_do_not_define_internal_scroll_containers(): void
     {
+        $allowedClasses = [
+            'catalog/titles.blade.php' => ['overflow-y-auto'],
+        ];
+
         $forbiddenClasses = [
             'overflow-auto',
             'overflow-scroll',
@@ -191,14 +195,17 @@ class CatalogVisualSystemTest extends TestCase
                 continue;
             }
 
+            $relativePath = str_replace('\\', '/', $file->getRelativePathname());
+
             foreach ($forbiddenClasses as $class) {
-                if (str_contains($content, $class)) {
+                if (str_contains($content, $class)
+                    && ! in_array($class, $allowedClasses[$relativePath] ?? [], true)) {
                     $violations[] = $file->getRelativePathname().': '.$class;
                 }
             }
         }
 
-        $this->assertSame([], $violations, 'Публичный интерфейс не должен создавать прокрутку внутри блоков; контент должен переноситься и раскрывать страницу.');
+        $this->assertSame([], $violations, 'Публичный интерфейс не должен создавать прокрутку внутри блоков, кроме явно разрешённого viewport-sized native dialog.');
     }
 
     public function test_title_surfaces_use_one_title_link_and_keep_relation_links_accessible(): void
