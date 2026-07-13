@@ -19,19 +19,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Rate Limiter Cache Store
-    |--------------------------------------------------------------------------
-    |
-    | The framework rate limiter can use a store separate from the general
-    | application cache. Keeping limiter counters out of the SQLite-backed
-    | database cache reduces write contention from public throttled routes.
-    |
-    */
-
-    'limiter' => env('CACHE_LIMITER_STORE', 'redis-limiter'),
-
-    /*
-    |--------------------------------------------------------------------------
     | Cache Stores
     |--------------------------------------------------------------------------
     |
@@ -144,13 +131,6 @@ return [
             'connection' => env('REDIS_LOCK_CONNECTION', 'locks'),
             'lock_connection' => env('REDIS_LOCK_CONNECTION', 'locks'),
             'prefix' => env('REDIS_LOCK_CACHE_PREFIX', ''),
-        ],
-
-        'redis-limiter' => [
-            'driver' => 'redis',
-            'connection' => env('REDIS_LIMITER_CONNECTION', 'limiter'),
-            'lock_connection' => env('REDIS_LOCK_CONNECTION', 'locks'),
-            'prefix' => env('REDIS_LIMITER_CACHE_PREFIX', ''),
         ],
 
         'recomputable-failover' => [

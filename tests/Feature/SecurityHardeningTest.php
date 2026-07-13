@@ -97,7 +97,6 @@ class SecurityHardeningTest extends TestCase
             'plan_required',
             'region_blocked',
             'profile_restricted',
-            'concurrency_exceeded',
             'not_yet_published',
             'expired',
             'temporarily_unavailable',

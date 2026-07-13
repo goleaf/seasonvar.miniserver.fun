@@ -7,7 +7,6 @@ namespace App\Services\Seasonvar;
 use App\DTOs\MediaHealthCheckResultData;
 use App\Enums\MediaHealthErrorCategory;
 use App\Services\Media\PlaybackSourceUrlGuard;
-use App\Services\Security\SensitiveActionRateLimiter;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Carbon;
@@ -20,7 +19,6 @@ final class SeasonvarMediaAvailabilityChecker
     public function __construct(
         private readonly SeasonvarUrl $seasonvarUrl,
         private readonly PlaybackSourceUrlGuard $urls,
-        private readonly SensitiveActionRateLimiter $rateLimits,
     ) {}
 
     /** @param (callable(string, array<string, mixed>): void)|null $progress */
@@ -48,17 +46,6 @@ final class SeasonvarMediaAvailabilityChecker
                 null,
                 MediaHealthErrorCategory::InvalidUrl,
                 true,
-            );
-        }
-
-        if (! $this->rateLimits->attemptForSystem('source_health', $target->host)) {
-            return new MediaHealthCheckResultData(
-                true,
-                'not_checked',
-                null,
-                $checkedAt,
-                null,
-                MediaHealthErrorCategory::RateLimited,
             );
         }
 

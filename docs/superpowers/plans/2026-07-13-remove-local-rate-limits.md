@@ -302,6 +302,7 @@ git commit -m "feat: remove action rate limits"
 - Modify: `config/cache.php`
 - Modify: `config/database.php`
 - Modify: `.env.example`
+- Modify: `phpunit.xml`
 - Modify: `tests/Unit/CacheArchitectureTest.php`
 - Modify: `tests/Feature/CacheInfrastructureIntegrationTest.php`
 - Modify: `tests/Feature/RedisWorkloadIntegrationTest.php`
@@ -313,7 +314,7 @@ git commit -m "feat: remove action rate limits"
 - Consumes: `SeasonvarMediaAvailabilityChecker::check(string $url, ?callable $progress = null): MediaHealthCheckResultData` and external HTTP fake responses.
 - Produces: media checks that always reach the existing URL validation/HTTP boundary when enabled, and a playback enum with no local `429` status.
 
-- [ ] **Step 1: Change the source-health test to require both HTTP checks**
+- [x] **Step 1: Change the source-health test to require both HTTP checks**
 
 In `SeasonvarImportMaintenanceTest`, replace the test that configures `security.rate_limits.source_health` and expects the second result to be `not_checked`. Use an HTTP sequence and assert both checks execute:
 
@@ -370,7 +371,7 @@ Delete `test_throttle_middleware_uses_the_dedicated_limiter_store()` and the two
 $response->assertJsonMissingPath('components.redis_limiter');
 ```
 
-- [ ] **Step 2: Run the new expectations and verify RED**
+- [x] **Step 2: Run the new expectations and verify RED**
 
 Run:
 
@@ -383,7 +384,7 @@ php artisan test tests/Feature/CacheInfrastructureIntegrationTest.php --filter=r
 
 Expected: the old source-health limiter skips the second request, `ConcurrencyExceeded` maps to `429`, limiter config still exists, and readiness still exposes `redis_limiter`.
 
-- [ ] **Step 3: Remove the final runtime and configuration remnants**
+- [x] **Step 3: Remove the final runtime and configuration remnants**
 
 Change the media checker constructor to:
 
@@ -412,7 +413,7 @@ return [
 
 Delete `query_rate_limit` from `config/catalog.php`. From `config/cache.php`, delete the top-level `limiter` option and the `redis-limiter` store. From `config/database.php`, delete the Redis `limiter` connection. From `InfrastructureHealthCheck`, delete the `redis_limiter` component and remove it from the critical component list.
 
-Delete `.env.example` lines beginning with `RATE_LIMIT_`, `CACHE_LIMITER_`, or `REDIS_LIMITER_`. Delete the now-unused `RequestRateLimitKey` class and its unit test.
+Delete `.env.example` lines beginning with `RATE_LIMIT_`, `CACHE_LIMITER_`, or `REDIS_LIMITER_`. Delete the obsolete `CACHE_LIMITER_STORE` test environment entry from `phpunit.xml`. Delete the now-unused `RequestRateLimitKey` class and its unit test.
 
 Delete `RedisWorkloadIntegrationTest::test_dedicated_redis_limiter_store_is_atomic_and_isolated_from_domain_cache()`. Rename `CacheInfrastructureIntegrationTest::test_session_queue_and_limiter_connections_are_isolated()` to `test_session_and_queue_connections_are_isolated()` and retain only the `sessions` and `queues` writes/assertions/cleanup.
 
@@ -425,7 +426,7 @@ rg -n "\[408, 425, 429\]|status === 429" app/Services/Seasonvar
 
 Expected: the first command has no application/config/route matches; the second still finds importer/media external-response classification.
 
-- [ ] **Step 4: Run focused behavior tests and Pint**
+- [x] **Step 4: Run focused behavior tests and Pint**
 
 Run:
 
@@ -437,7 +438,7 @@ php artisan test tests/Feature/LocalRateLimitRemovalTest.php tests/Feature/Secur
 
 Expected: focused tests pass before and after formatting; the external `429` classifier test remains green.
 
-- [ ] **Step 5: Commit configuration and playback cleanup**
+- [x] **Step 5: Commit configuration and playback cleanup**
 
 ```bash
 git add .env.example app config tests

@@ -30,7 +30,6 @@ final class InfrastructureHealthCheck
             'redis_sessions' => $this->redis('sessions'),
             'redis_queues' => $this->redis('queues'),
             'redis_locks' => $this->redis('locks'),
-            'redis_limiter' => $this->redis('limiter'),
             'memcached' => $this->memcached(),
             'queue_workers' => $this->workers->status(),
             'horizon' => class_exists(Horizon::class)
@@ -38,7 +37,7 @@ final class InfrastructureHealthCheck
                 : ['status' => 'not_configured'],
             'cache_warming' => $this->warmingState(),
         ];
-        $critical = ['database', 'redis_sessions', 'redis_queues', 'redis_locks', 'redis_limiter'];
+        $critical = ['database', 'redis_sessions', 'redis_queues', 'redis_locks'];
         $ready = collect($critical)->every(fn (string $component): bool => $components[$component]['status'] === 'ok');
         $degraded = collect(['redis_cache', 'memcached', 'queue_workers', 'cache_warming'])
             ->contains(fn (string $component): bool => in_array(

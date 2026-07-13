@@ -30,7 +30,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\RateLimiter;
 use Tests\TestCase;
 
 class SeasonvarImportMaintenanceTest extends TestCase
@@ -367,32 +366,25 @@ class SeasonvarImportMaintenanceTest extends TestCase
         );
     }
 
-    public function test_media_health_rate_limit_stops_additional_provider_requests_without_marking_failure(): void
+    public function test_media_health_checks_are_not_skipped_by_a_local_request_budget(): void
     {
-        $limiterKey = 'sensitive-action:source_health:system:'.hash('sha256', 'media.example.com');
-        RateLimiter::clear($limiterKey);
         Http::preventStrayRequests();
-        config([
-            'security.rate_limits.source_health' => 1,
-            'seasonvar.media_check.retries' => 1,
-        ]);
+        config(['seasonvar.media_check.retries' => 1]);
         Http::fake([
-            'media.example.com/*' => Http::response('', 206, ['Content-Length' => '1']),
+            'media.example.com/*' => Http::sequence()
+                ->push('', 206, ['Content-Length' => '0'])
+                ->push('', 206, ['Content-Length' => '0']),
         ]);
         $checker = app(SeasonvarMediaAvailabilityChecker::class);
 
-        try {
-            $first = $checker->check('https://media.example.com/first.mp4');
-            $second = $checker->check('https://media.example.com/second.mp4');
+        $first = $checker->check('https://media.example.com/first.mp4');
+        $second = $checker->check('https://media.example.com/second.mp4');
 
-            $this->assertTrue($first->available);
-            $this->assertTrue($second->available);
-            $this->assertSame('not_checked', $second->checkStatus);
-            $this->assertSame('rate_limited', $second->errorCategory?->value);
-            Http::assertSentCount(1);
-        } finally {
-            RateLimiter::clear($limiterKey);
-        }
+        $this->assertTrue($first->available);
+        $this->assertTrue($second->available);
+        $this->assertSame('available', $second->checkStatus);
+        $this->assertNull($second->errorCategory);
+        Http::assertSentCount(2);
     }
 
     public function test_it_marks_legacy_parsed_source_pages_as_imported(): void

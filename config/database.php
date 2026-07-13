@@ -184,7 +184,6 @@ return [
         'cache' => $redisConnection('cache', 'CACHE', 'REDIS_CACHE_DB', 1),
         'queues' => $redisConnection('queues', 'QUEUE', 'REDIS_QUEUE_DB', 2),
         'sessions' => $redisConnection('sessions', 'SESSION', 'REDIS_SESSION_DB', 3),
-        'limiter' => $redisConnection('limiter', 'LIMITER', 'REDIS_LIMITER_DB', 4),
         'locks' => $redisConnection('locks', 'LOCK', 'REDIS_LOCK_DB', 5),
         'broadcasting' => $redisConnection('broadcasting', 'BROADCAST', 'REDIS_BROADCAST_DB', 6),
 

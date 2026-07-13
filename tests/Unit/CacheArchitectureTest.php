@@ -7,8 +7,6 @@ namespace Tests\Unit;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheKeyFactory;
 use App\Support\Cache\CacheTtlPolicy;
-use Illuminate\Routing\Middleware\ThrottleRequests;
-use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
 use InvalidArgumentException;
 use Tests\TestCase;
 
@@ -126,23 +124,15 @@ final class CacheArchitectureTest extends TestCase
         $this->assertSame('cache', config('cache.stores.redis-domain.connection'));
         $this->assertSame('locks', config('cache.stores.redis-domain.lock_connection'));
         $this->assertSame('memcached', config('cache.stores.memcached-hot.driver'));
-        $this->assertSame('redis', config('cache.stores.redis-limiter.driver'));
-        $this->assertSame('limiter', config('cache.stores.redis-limiter.connection'));
+        $this->assertNull(config('cache.limiter'));
+        $this->assertNull(config('cache.stores.redis-limiter'));
+        $this->assertNull(config('database.redis.limiter'));
         $this->assertSame('redis-locks', config('cache-architecture.stores.versions'));
         $this->assertNull(config('session.connection'));
         $this->assertSame('queues', config('queue.connections.redis.connection'));
 
-        foreach (['cache', 'sessions', 'queues', 'limiter', 'locks', 'broadcasting'] as $connection) {
+        foreach (['cache', 'sessions', 'queues', 'locks', 'broadcasting'] as $connection) {
             $this->assertIsArray(config('database.redis.'.$connection));
         }
-    }
-
-    public function test_throttle_middleware_uses_the_dedicated_limiter_store(): void
-    {
-        $middleware = app('router')->getMiddleware()['throttle'] ?? null;
-
-        $this->assertSame('limiter', config('cache.stores.redis-limiter.connection'));
-        $this->assertSame(ThrottleRequests::class, $middleware);
-        $this->assertNotSame(ThrottleRequestsWithRedis::class, $middleware);
     }
 }

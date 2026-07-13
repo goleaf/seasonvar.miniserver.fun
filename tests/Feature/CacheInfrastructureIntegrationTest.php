@@ -94,7 +94,6 @@ final class CacheInfrastructureIntegrationTest extends TestCase
                     'redis_sessions',
                     'redis_queues',
                     'redis_locks',
-                    'redis_limiter',
                     'memcached' => [
                         'status',
                         'latency_ms',
@@ -112,6 +111,7 @@ final class CacheInfrastructureIntegrationTest extends TestCase
                     'cache_warming',
                 ],
             ]);
+        $response->assertJsonMissingPath('components.redis_limiter');
         $this->assertFalse($response->headers->has('Set-Cookie'));
     }
 
@@ -136,20 +136,18 @@ final class CacheInfrastructureIntegrationTest extends TestCase
         }
     }
 
-    public function test_session_queue_and_limiter_connections_are_isolated(): void
+    public function test_session_and_queue_connections_are_isolated(): void
     {
         $this->requireInfrastructureTests();
         $key = 'integration-isolation-'.bin2hex(random_bytes(12));
-        $connections = ['sessions', 'queues', 'limiter'];
+        $connections = ['sessions', 'queues'];
 
         try {
             Redis::connection('sessions')->setex($key, 30, 'session');
             Redis::connection('queues')->setex($key, 30, 'queue');
-            Redis::connection('limiter')->setex($key, 30, 'limiter');
 
             $this->assertSame('session', Redis::connection('sessions')->get($key));
             $this->assertSame('queue', Redis::connection('queues')->get($key));
-            $this->assertSame('limiter', Redis::connection('limiter')->get($key));
         } finally {
             foreach ($connections as $connection) {
                 Redis::connection($connection)->del($key);

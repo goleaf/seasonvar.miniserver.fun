@@ -11,7 +11,6 @@ enum PlaybackAvailability: string
     case PlanRequired = 'plan_required';
     case RegionBlocked = 'region_blocked';
     case ProfileRestricted = 'profile_restricted';
-    case ConcurrencyExceeded = 'concurrency_exceeded';
     case NotYetPublished = 'not_yet_published';
     case Expired = 'expired';
     case TemporarilyUnavailable = 'temporarily_unavailable';
@@ -25,7 +24,6 @@ enum PlaybackAvailability: string
             self::PlanRequired => 'Для просмотра нужен подходящий тариф.',
             self::RegionBlocked => 'Видео недоступно в вашем регионе.',
             self::ProfileRestricted => 'Контент ограничен настройками профиля.',
-            self::ConcurrencyExceeded => 'Достигнут лимит одновременных просмотров.',
             self::NotYetPublished => 'Видео ещё не опубликовано.',
             self::Expired => 'Срок доступности видео истёк.',
             self::TemporarilyUnavailable => 'Видео временно недоступно.',
@@ -41,7 +39,6 @@ enum PlaybackAvailability: string
             self::PlanRequired => 402,
             self::RegionBlocked => 451,
             self::ProfileRestricted => 403,
-            self::ConcurrencyExceeded => 429,
             self::NotYetPublished => 425,
             self::Expired => 410,
             self::TemporarilyUnavailable => 503,

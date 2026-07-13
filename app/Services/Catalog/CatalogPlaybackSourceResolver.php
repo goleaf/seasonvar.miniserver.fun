@@ -119,7 +119,6 @@ class CatalogPlaybackSourceResolver
             PlaybackAvailability::PlanRequired,
             PlaybackAvailability::RegionBlocked,
             PlaybackAvailability::ProfileRestricted,
-            PlaybackAvailability::ConcurrencyExceeded,
             PlaybackAvailability::NotYetPublished,
             PlaybackAvailability::Expired,
             PlaybackAvailability::TemporarilyUnavailable,

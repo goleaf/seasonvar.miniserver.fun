@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Cache\RateLimiter;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Session\SessionManager;
 use Illuminate\Support\Facades\Cache;
@@ -14,21 +13,6 @@ use Tests\TestCase;
 
 final class RedisWorkloadIntegrationTest extends TestCase
 {
-    public function test_dedicated_redis_limiter_store_is_atomic_and_isolated_from_domain_cache(): void
-    {
-        $this->requireInfrastructureTests();
-        $key = 'integration-limiter-'.bin2hex(random_bytes(12));
-        $limiter = new RateLimiter(Cache::store('redis-limiter'));
-
-        try {
-            $this->assertSame(1, (int) $limiter->hit($key, 30));
-            $this->assertSame(1, (int) $limiter->attempts($key));
-            $this->assertFalse(Cache::store('redis-domain')->has($key));
-        } finally {
-            $limiter->clear($key);
-        }
-    }
-
     public function test_redis_session_handler_round_trips_on_the_sessions_connection(): void
     {
         $this->requireInfrastructureTests();

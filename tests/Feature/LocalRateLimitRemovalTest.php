@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\PlaybackAvailability;
 use App\Providers\AppServiceProvider;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
@@ -94,5 +95,20 @@ final class LocalRateLimitRemovalTest extends TestCase
         $this->assertFalse($files->contains(
             static fn (string $file): bool => str_contains((string) file_get_contents($file), 'SensitiveActionRateLimiter'),
         ));
+    }
+
+    public function test_action_rate_limiter_service_is_removed(): void
+    {
+        $this->assertFileDoesNotExist(app_path('Services/Security/SensitiveActionRateLimiter.php'));
+    }
+
+    public function test_playback_has_no_local_too_many_requests_status(): void
+    {
+        $statuses = array_map(
+            static fn (PlaybackAvailability $status): int => $status->httpStatus(),
+            PlaybackAvailability::cases(),
+        );
+
+        $this->assertNotContains(429, $statuses);
     }
 }
