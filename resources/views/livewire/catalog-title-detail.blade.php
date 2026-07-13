@@ -1,4 +1,5 @@
 <div
+    wire:init="startRefresh"
     @if ($refreshState->isActive())
         wire:poll.3s.visible="refreshCatalog"
     @endif

@@ -40,7 +40,7 @@ class CatalogTitleLiveRefreshTest extends TestCase
         Queue::fake();
     }
 
-    public function test_the_title_page_queues_refresh_and_polls_the_complete_livewire_shell_every_three_seconds(): void
+    public function test_the_browser_initializes_refresh_after_ssr_and_polls_the_complete_livewire_shell_every_three_seconds(): void
     {
         $title = $this->refreshableTitle(['title' => 'Старое название']);
 
@@ -49,6 +49,14 @@ class CatalogTitleLiveRefreshTest extends TestCase
             ->assertSeeLivewire('catalog-title-detail')
             ->assertSeeLivewire('catalog-title-player')
             ->assertSee('Старое название')
+            ->assertSee('wire:init="startRefresh"', false)
+            ->assertDontSee('wire:poll.3s.visible="refreshCatalog"', false)
+            ->assertDontSee('Обновляем данные');
+
+        Queue::assertNothingPushed();
+
+        Livewire::test(CatalogTitleDetail::class, ['catalogTitleId' => $title->id])
+            ->call('startRefresh')
             ->assertSee('wire:poll.3s.visible="refreshCatalog"', false)
             ->assertSee('Обновляем данные');
 

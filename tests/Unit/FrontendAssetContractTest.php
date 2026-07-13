@@ -61,6 +61,7 @@ class FrontendAssetContractTest extends TestCase
         $detail = File::get(resource_path('views/livewire/catalog-title-detail.blade.php'));
         $show = File::get(resource_path('views/catalog/show.blade.php'));
 
+        $this->assertStringContainsString('wire:init="startRefresh"', $detail);
         $this->assertStringContainsString('wire:poll.3s.visible="refreshCatalog"', $detail);
         $this->assertStringContainsString('data-livewire-catalog-title-detail', $detail);
         $this->assertStringContainsString('data-title-refresh-status', $detail);

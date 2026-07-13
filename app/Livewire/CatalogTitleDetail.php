@@ -45,6 +45,10 @@ class CatalogTitleDetail extends Component
     public function mount(int $catalogTitleId): void
     {
         $this->catalogTitleId = $catalogTitleId;
+    }
+
+    public function startRefresh(): void
+    {
         $this->refreshes->request($this->title());
     }
 
