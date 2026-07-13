@@ -60,7 +60,7 @@
 
 ### AUD-003 — Неограниченный single log и privacy retention
 
-- **Проблема:** один debug-log вырос примерно до 1,2 ГБ; rotation/retention в фактическом environment не включены.
+- **Проблема:** текущий single debug-log занимает 745 707 553 байта (около 711 MiB); rotation/retention в фактическом environment не включены.
 - **Влияние:** риск заполнения диска, медленные incident searches и избыточное хранение request/personal context.
 - **Предлагаемое решение:** переключить production на daily structured logs с ограниченным retention, настроить OS/container rotation, disk alerts и документированную redaction policy.
 - **Зависимости:** AUD-001, доступ к process manager/log collector и утверждённый retention period.
@@ -71,8 +71,8 @@
 
 ### AUD-004 — Незавершённый rollout importer worker unit
 
-- **Проблема:** один из десяти production-like workers завершился на старом recommendation builder с `Allowed memory size of 134217728 bytes exhausted`; repository unit уже задаёт `memory_limit=256M`, Laravel recycle `--memory=192` и `Restart=always`, но установленный systemd unit ещё нужно сверить и безопасно перезапустить после deployment.
-- **Влияние:** importer работает с уменьшенной на 10% ёмкостью, а следующий тяжёлый finalizer на не обновлённом worker может повторить падение до deployment нового кода/unit.
+- **Проблема:** на финальной проверке активные import workers отсутствуют, а `seasonvar-import-worker@21.service` остаётся в `failed` после старого recommendation OOM. Repository unit уже задаёт `memory_limit=256M`, Laravel recycle `--memory=192` и `Restart=always`, но установленный systemd rollout ещё нужно сверить и безопасно выполнить после deployment.
+- **Влияние:** новые queued imports и browser-инициированные targeted refreshes останутся в Redis до запуска worker; повторный тяжёлый finalizer на не обновлённом unit может снова упасть.
 - **Предлагаемое решение:** после merge/push установить versioned unit, выполнить `systemctl daemon-reload`, безопасно перезапустить все importer instances после опустошения очереди и отдельно восстановить instance 21; не поднимать старый 128-МБ unit поверх текущего кода вручную.
 - **Зависимости:** завершённый deploy этого commit, maintenance window, проверка пустой/reserved queue и свободной памяти для десяти процессов.
 - **Риски:** одновременный restart может прервать активную job; слишком высокий параллельный RSS может создать host-level pressure, поэтому concurrency надо сверить с AUD-002.
