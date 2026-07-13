@@ -590,6 +590,24 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $this->assertDatabaseCount('catalog_title_actor', 2);
     }
 
+    public function test_it_canonicalizes_relation_slugs_without_transient_unique_collisions(): void
+    {
+        $firstActor = Actor::query()->create([
+            'name' => 'Мицуиси Кэн',
+            'slug' => 'micuisi-ken',
+        ]);
+        $secondActor = Actor::query()->create([
+            'name' => 'Митсуйши Кен',
+            'slug' => 'mitsuisi-ken',
+        ]);
+
+        app(CatalogMetadataDeduplicator::class)->run();
+
+        $this->assertSame('mitsuisi-ken', $firstActor->fresh()->slug);
+        $this->assertSame('mitsuishi-ken', $secondActor->fresh()->slug);
+        $this->assertDatabaseCount('actors', 2);
+    }
+
     public function test_it_processes_all_pending_pages_across_import_chunks(): void
     {
         Http::preventStrayRequests();

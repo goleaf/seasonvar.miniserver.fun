@@ -186,6 +186,22 @@ class CatalogMetadataDeduplicator
 
         DB::table($modelTable.' as records')
             ->join(self::IDENTITY_TABLE.' as identities', 'identities.relation_id', '=', 'records.id')
+            ->whereColumn('records.slug', '!=', 'identities.canonical_key')
+            ->select('records.id as record_id')
+            ->chunkById($chunkSize, function ($records) use ($type, $modelClass): void {
+                DB::transaction(function () use ($records, $type, $modelClass): void {
+                    foreach ($records as $record) {
+                        $recordId = (int) $record->record_id;
+                        $modelClass::query()->whereKey($recordId)->update([
+                            'slug' => $this->stagingSlug($modelClass, $type, $recordId),
+                            'updated_at' => now(),
+                        ]);
+                    }
+                });
+            }, 'records.id', 'record_id');
+
+        DB::table($modelTable.' as records')
+            ->join(self::IDENTITY_TABLE.' as identities', 'identities.relation_id', '=', 'records.id')
             ->where(function ($query): void {
                 $query->whereColumn('records.name', '!=', 'identities.normalized_name')
                     ->orWhereColumn('records.slug', '!=', 'identities.canonical_key')
@@ -222,6 +238,21 @@ class CatalogMetadataDeduplicator
             }, 'records.id', 'record_id');
 
         return $result;
+    }
+
+    /** @param class-string<Model> $modelClass */
+    private function stagingSlug(string $modelClass, string $type, int $recordId): string
+    {
+        $base = "catalog-dedup-stage-{$type}-{$recordId}";
+        $candidate = $base;
+        $suffix = 1;
+
+        while ($modelClass::query()->where('slug', $candidate)->whereKeyNot($recordId)->exists()) {
+            $candidate = $base.'-'.$suffix;
+            $suffix++;
+        }
+
+        return $candidate;
     }
 
     /**
