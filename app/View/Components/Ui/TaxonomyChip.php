@@ -60,7 +60,7 @@ class TaxonomyChip extends Component
 
     public function classes(): string
     {
-        $classes = 'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition';
+        $classes = 'inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold transition';
         $stateClasses = match (true) {
             $this->active => 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100',
             $this->muted => 'bg-slate-50 text-slate-500',

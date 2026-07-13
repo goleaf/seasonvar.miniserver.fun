@@ -330,4 +330,12 @@ class SeasonvarCatalogParserTest extends TestCase
 
         $this->assertSame('https://seasonvar.ru/serial-1276--6_kadrov-1-season.html', $normalized);
     }
+
+    public function test_catalog_url_boundary_accepts_only_https_seasonvar_pages(): void
+    {
+        $url = app(SeasonvarUrl::class);
+
+        $this->assertTrue($url->isAllowed('https://seasonvar.ru/serial-1276--6_kadrov-1-season.html'));
+        $this->assertFalse($url->isAllowed('http://seasonvar.ru/serial-1276--6_kadrov-1-season.html'));
+    }
 }

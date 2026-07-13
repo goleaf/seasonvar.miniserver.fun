@@ -12,6 +12,8 @@ use InvalidArgumentException;
 
 class SeasonvarCatalogParser
 {
+    public const METADATA_VERSION = 1;
+
     /**
      * @var list<string>
      */

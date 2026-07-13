@@ -15,7 +15,7 @@
         <section class="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)] 2xl:grid-cols-[320px_minmax(0,1fr)]">
             <div class="min-w-0 space-y-5 xl:order-2">
                 <x-ui.panel title="Последние обновления" icon="fa-solid fa-clock-rotate-left" :pad="false">
-                    <div class="grid auto-rows-fr gap-3 p-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
+                    <div data-home-latest-updates-grid class="grid items-start gap-3 p-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 [&>[data-catalog-card]]:h-auto">
                         @forelse ($featuredTitles as $catalogTitle)
                             <x-title-card :title="$catalogTitle" />
                         @empty

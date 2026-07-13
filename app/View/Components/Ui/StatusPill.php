@@ -45,7 +45,7 @@ class StatusPill extends Component
     public function classes(): string
     {
         return implode(' ', [
-            'inline-flex items-center gap-1 font-bold',
+            'inline-flex max-w-full items-center gap-1 font-bold',
             self::VARIANT_CLASSES[$this->variant] ?? self::VARIANT_CLASSES['neutral'],
             self::SIZE_CLASSES[$this->size] ?? self::SIZE_CLASSES['sm'],
             self::SHAPE_CLASSES[$this->shape] ?? self::SHAPE_CLASSES['pill'],

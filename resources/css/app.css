@@ -39,9 +39,20 @@
     }
 }
 
-:where(a, button, input, select, summary, [tabindex]):focus-visible {
-    outline: 3px solid var(--color-emerald-500);
-    outline-offset: 3px;
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-emerald-700);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px var(--color-emerald-100);
+}
+
+[data-focus-frame]:focus-within {
+    border-color: var(--color-emerald-600);
+    box-shadow: 0 0 0 4px var(--color-emerald-100);
+}
+
+[data-focus-frame] :where(input, select, textarea):focus-visible {
+    outline: none;
+    box-shadow: none;
 }
 
 .plyr {

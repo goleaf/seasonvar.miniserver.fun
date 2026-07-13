@@ -33,7 +33,10 @@
                                 <span>Годы</span>
                             </div>
                             @if ($filterView->selectedYears() !== [])
-                                <a href="{{ route('titles.index', $filterView->yearQuery(null)) }}" wire:click.prevent="resetGroup('year')" class="text-xs font-bold text-emerald-700 hover:text-emerald-600">Сбросить</a>
+                                <a href="{{ route('titles.index', $filterView->yearQuery(null)) }}" wire:click.prevent="resetGroup('year')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                    <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                                    <span>Сбросить</span>
+                                </a>
                             @endif
                         </div>
                         <div class="space-y-1">
@@ -44,11 +47,11 @@
                                     'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveYear($bucket),
                                 ])>
                                     <span class="inline-flex min-w-0 items-center gap-2">
-                                        <input type="checkbox" wire:model="filters.years" name="year[]" value="{{ $filterView->bucketYear($bucket) }}" class="h-4 w-4 shrink-0 accent-emerald-700" @checked($filterView->isActiveYear($bucket))>
+                                        <input type="checkbox" wire:model="filters.years" name="year[]" value="{{ $filterView->bucketYear($bucket) }}" class="h-5 w-5 shrink-0 accent-emerald-700" @checked($filterView->isActiveYear($bucket))>
                                         <i class="fa-solid fa-calendar-days shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
-                                        <span>{{ $filterView->bucketYear($bucket) }}</span>
+                                        <span class="min-w-0 break-words">{{ $filterView->bucketYear($bucket) }}</span>
                                     </span>
-                                    <span class="text-xs font-bold">{{ $bucket->context_titles_count }}</span>
+                                    <span class="shrink-0 text-xs font-bold tabular-nums">{{ $bucket->context_titles_count }}</span>
                                 </label>
                             @empty
                                 <p class="text-sm text-slate-500">Годы не указаны.</p>
@@ -63,7 +66,10 @@
                                 <span>Тип публикации</span>
                             </div>
                             @if ($filterView->listState('publication_type') !== [])
-                                <a href="{{ route('titles.index', $filterView->withoutCatalogState('publication_type')) }}" wire:click.prevent="resetGroup('publication_type')" class="text-xs font-bold text-emerald-700 hover:text-emerald-600">Сбросить</a>
+                                <a href="{{ route('titles.index', $filterView->withoutCatalogState('publication_type')) }}" wire:click.prevent="resetGroup('publication_type')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                    <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                                    <span>Сбросить</span>
+                                </a>
                             @endif
                         </div>
                         <div class="space-y-1">
@@ -74,10 +80,10 @@
                                     'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! in_array($option->value, $filterView->listState('publication_type'), true),
                                 ])>
                                     <span class="inline-flex min-w-0 items-center gap-2">
-                                        <input type="checkbox" wire:model="filters.publicationTypes" name="publication_type[]" value="{{ $option->value }}" class="h-4 w-4 shrink-0 accent-emerald-700" @checked(in_array($option->value, $filterView->listState('publication_type'), true))>
-                                        <span>{{ $option->label }}</span>
+                                        <input type="checkbox" wire:model="filters.publicationTypes" name="publication_type[]" value="{{ $option->value }}" class="h-5 w-5 shrink-0 accent-emerald-700" @checked(in_array($option->value, $filterView->listState('publication_type'), true))>
+                                        <span class="min-w-0 break-words">{{ $option->label }}</span>
                                     </span>
-                                    <span class="text-xs font-bold">{{ $option->context_titles_count }}</span>
+                                    <span class="shrink-0 text-xs font-bold tabular-nums">{{ $option->context_titles_count }}</span>
                                 </label>
                             @empty
                                 <p class="text-sm text-slate-500">Типы не указаны.</p>
@@ -92,7 +98,10 @@
                                 <span>Субтитры</span>
                             </div>
                             @if ($filterView->listState('subtitles') !== [])
-                                <a href="{{ route('titles.index', $filterView->withoutCatalogState('subtitles')) }}" wire:click.prevent="resetGroup('subtitles')" class="text-xs font-bold text-emerald-700 hover:text-emerald-600">Сбросить</a>
+                                <a href="{{ route('titles.index', $filterView->withoutCatalogState('subtitles')) }}" wire:click.prevent="resetGroup('subtitles')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                    <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                                    <span>Сбросить</span>
+                                </a>
                             @endif
                         </div>
                         <div class="space-y-1">
@@ -103,10 +112,10 @@
                                     'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! in_array($option->value, $filterView->listState('subtitles'), true),
                                 ])>
                                     <span class="inline-flex min-w-0 items-center gap-2">
-                                        <input type="checkbox" wire:model="filters.subtitles" name="subtitles[]" value="{{ $option->value }}" class="h-4 w-4 shrink-0 accent-emerald-700" @checked(in_array($option->value, $filterView->listState('subtitles'), true))>
-                                        <span>{{ $option->label }}</span>
+                                        <input type="checkbox" wire:model="filters.subtitles" name="subtitles[]" value="{{ $option->value }}" class="h-5 w-5 shrink-0 accent-emerald-700" @checked(in_array($option->value, $filterView->listState('subtitles'), true))>
+                                        <span class="min-w-0 break-words">{{ $option->label }}</span>
                                     </span>
-                                    <span class="text-xs font-bold">{{ $option->context_titles_count }}</span>
+                                    <span class="shrink-0 text-xs font-bold tabular-nums">{{ $option->context_titles_count }}</span>
                                 </label>
                             @endforeach
                         </div>
@@ -120,12 +129,15 @@
                                     <span>{{ $label }}</span>
                                 </div>
                                 @if ($selectedTaxonomies->get($filterType, collect())->isNotEmpty())
-                                    <a href="{{ route('titles.index', $filterView->filterQuery($filterType, null)) }}" wire:click.prevent="resetGroup('{{ $filterType }}')" class="shrink-0 text-xs font-bold text-emerald-700 hover:text-emerald-600">Сбросить</a>
+                                    <a href="{{ route('titles.index', $filterView->filterQuery($filterType, null)) }}" wire:click.prevent="resetGroup('{{ $filterType }}')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                                        <span>Сбросить</span>
+                                    </a>
                                 @endif
                             </div>
                             @if (in_array($filterType, ['actor', 'director'], true))
                                 <label class="sr-only" for="catalog-filter-search-{{ $filterType }}">Найти в группе {{ $label }}</label>
-                                <div class="mb-2 flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                                <div data-focus-frame class="mb-2 flex min-h-11 items-center gap-2 rounded-control border border-transparent bg-slate-50 px-3 py-2 text-sm text-slate-500">
                                     <i class="fa-solid fa-magnifying-glass shrink-0 text-slate-400" aria-hidden="true"></i>
                                     <input
                                         id="catalog-filter-search-{{ $filterType }}"
@@ -140,7 +152,7 @@
                                 </div>
                             @elseif ($filterTaxonomies->get($filterType, collect())->count() > 8)
                                 <label class="sr-only" for="catalog-filter-search-{{ $filterType }}">Найти в группе {{ $label }}</label>
-                                <div class="mb-2 flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                                <div data-focus-frame class="mb-2 flex min-h-11 items-center gap-2 rounded-control border border-transparent bg-slate-50 px-3 py-2 text-sm text-slate-500">
                                     <i class="fa-solid fa-magnifying-glass shrink-0 text-slate-400" aria-hidden="true"></i>
                                     <input
                                         id="catalog-filter-search-{{ $filterType }}"
@@ -160,11 +172,11 @@
                                         'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveTaxonomy($filterType, $taxonomy),
                                     ])>
                                         <span class="inline-flex min-w-0 items-center gap-2">
-                                            <input type="checkbox" wire:model="filters.{{ $filterType }}" name="{{ $filterType }}[]" value="{{ $taxonomy->slug }}" class="h-4 w-4 shrink-0 accent-emerald-700" @checked($filterView->isActiveTaxonomy($filterType, $taxonomy))>
+                                            <input type="checkbox" wire:model="filters.{{ $filterType }}" name="{{ $filterType }}[]" value="{{ $taxonomy->slug }}" class="h-5 w-5 shrink-0 accent-emerald-700" @checked($filterView->isActiveTaxonomy($filterType, $taxonomy))>
                                             <i class="{{ $filterView->icon($filterType) }} shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
-                                            <span>{{ $taxonomy->name }}</span>
+                                            <span class="min-w-0 break-words">{{ $taxonomy->name }}</span>
                                         </span>
-                                        <span class="text-xs font-bold">{{ $taxonomy->context_titles_count }}</span>
+                                        <span class="shrink-0 text-xs font-bold tabular-nums">{{ $taxonomy->context_titles_count }}</span>
                                     </label>
                                 @empty
                                     <p class="text-sm text-slate-500">{{ in_array($filterType, ['actor', 'director'], true) && mb_strlen($optionSearch[$filterType] ?? '') >= 2 ? 'Ничего не найдено.' : 'Нет данных.' }}</p>
@@ -288,7 +300,7 @@
                             container-class="min-w-0 flex-1"
                             wire:model.live.debounce.650ms="filters.search"
                         />
-                        <button type="submit" wire:loading.attr="disabled" wire:target="filters.search,applySearch" class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60">
+                        <button type="submit" wire:loading.attr="disabled" wire:target="filters.search,applySearch" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60">
                             <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
                             <span>Найти</span>
                         </button>
@@ -300,14 +312,14 @@
                         <div class="text-xs font-bold uppercase tracking-wide text-slate-400">Найдено</div>
                         <div class="mt-1 inline-flex items-center gap-2 text-lg font-black text-slate-700">
                             <i class="fa-solid fa-magnifying-glass text-emerald-700" aria-hidden="true"></i>
-                            <span>{{ $titles->total() }}</span>
+                            <span class="tabular-nums">{{ $titles->total() }}</span>
                         </div>
                     </div>
                     <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                         <div class="text-xs font-bold uppercase tracking-wide text-slate-400">На странице</div>
                         <div class="mt-1 inline-flex items-center gap-2 text-lg font-black text-slate-700">
                             <i class="fa-solid fa-table-cells-large text-sky-700" aria-hidden="true"></i>
-                            <span>{{ $titles->count() }}</span>
+                            <span class="tabular-nums">{{ $titles->count() }}</span>
                         </div>
                     </div>
                     <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -321,8 +333,8 @@
 
                 <div class="mt-4 flex flex-wrap gap-2">
                     @foreach ($filterView->sortLabels as $sortKey => $sortLabel)
-                        <a href="{{ route('titles.index', $filterView->sortQuery($sortKey)) }}" wire:click.prevent="sortBy('{{ $sortKey }}')" @class([
-                            'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold',
+                        <a data-catalog-sort-option href="{{ route('titles.index', $filterView->sortQuery($sortKey)) }}" wire:click.prevent="sortBy('{{ $sortKey }}')" @class([
+                            'inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold',
                             'bg-emerald-50 text-emerald-700' => $filterView->isActiveSort($sortKey),
                             'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveSort($sortKey),
                         ])>
@@ -335,16 +347,16 @@
                 <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold">
                     <span class="text-slate-400">Вид:</span>
                     @foreach (['grid' => 'Сетка', 'list' => 'Список'] as $viewKey => $viewLabel)
-                        <a href="{{ route('titles.index', $filterView->viewQuery($viewKey)) }}" wire:click.prevent="setView('{{ $viewKey }}')" @class([
-                            'rounded-full px-2.5 py-1',
+                        <a data-catalog-view-option href="{{ route('titles.index', $filterView->viewQuery($viewKey)) }}" wire:click.prevent="setView('{{ $viewKey }}')" @class([
+                            'inline-flex min-h-11 items-center rounded-full px-3 py-2',
                             'bg-emerald-50 text-emerald-700' => $view === $viewKey,
                             'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $view !== $viewKey,
                         ])>{{ $viewLabel }}</a>
                     @endforeach
                     <span class="ml-2 text-slate-400">На странице:</span>
                     @foreach ([24, 48, 96] as $pageSize)
-                        <a href="{{ route('titles.index', $filterView->perPageQuery($pageSize)) }}" wire:click.prevent="setPerPage({{ $pageSize }})" @class([
-                            'rounded-full px-2.5 py-1',
+                        <a data-catalog-page-size-option href="{{ route('titles.index', $filterView->perPageQuery($pageSize)) }}" wire:click.prevent="setPerPage({{ $pageSize }})" @class([
+                            'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 py-2 tabular-nums',
                             'bg-emerald-50 text-emerald-700' => $perPage === $pageSize,
                             'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $perPage !== $pageSize,
                         ])>{{ $pageSize }}</a>
@@ -354,8 +366,8 @@
                 <nav class="mt-4 flex flex-wrap items-center gap-1.5" aria-label="Алфавитный переход по названиям">
                     <span class="mr-1 text-xs font-bold uppercase tracking-wide text-slate-400">Алфавит:</span>
                     @foreach ($filterView->alphabet as $letter)
-                        <a href="{{ route('titles.index', $filterView->alphabetQuery($letter)) }}" wire:click.prevent="setLetter('{{ $letter }}')" @class([
-                            'inline-flex min-h-9 min-w-9 items-center justify-center rounded-full px-2 text-xs font-bold transition',
+                        <a data-catalog-alphabet-option href="{{ route('titles.index', $filterView->alphabetQuery($letter)) }}" wire:click.prevent="setLetter('{{ $letter }}')" @class([
+                            'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-2 text-xs font-bold transition',
                             'bg-emerald-50 text-emerald-700' => $filterView->isActiveLetter($letter),
                             'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveLetter($letter),
                         ])>{{ $letter === 'latin' ? 'A–Z' : $letter }}</a>
@@ -467,7 +479,7 @@
                             <div class="flex flex-wrap gap-2">
                                 @foreach (['2160p', '1440p', '1080p', '720p', '480p', '360p', '240p'] as $quality)
                                     <label class="inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600">
-                                        <input type="checkbox" wire:model="filters.qualities" name="quality[]" value="{{ $quality }}" @checked(in_array($quality, $filterView->listState('quality'), true))>
+                                        <input type="checkbox" wire:model="filters.qualities" name="quality[]" value="{{ $quality }}" class="h-5 w-5 accent-emerald-700" @checked(in_array($quality, $filterView->listState('quality'), true))>
                                         <span>{{ $quality }}</span>
                                     </label>
                                 @endforeach

@@ -39,11 +39,17 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'available_from',
     'available_until',
     'indexed_at',
+    'relation_metadata_version',
 ])]
 class CatalogTitle extends Model
 {
     /** @use HasFactory<CatalogTitleFactory> */
     use HasFactory, HasPublicationAvailability, SoftDeletes;
+
+    /** @var array<string, mixed> */
+    protected $attributes = [
+        'relation_metadata_version' => 0,
+    ];
 
     public function getRouteKeyName(): string
     {
@@ -291,6 +297,7 @@ class CatalogTitle extends Model
             'available_until' => 'datetime',
             'indexed_at' => 'datetime',
             'provider_field_values' => 'array',
+            'relation_metadata_version' => 'integer',
         ];
     }
 }

@@ -29,6 +29,9 @@ class FrontendAssetContractTest extends TestCase
         $this->assertStringNotContainsString("Vite::fonts('instrument-sans')", $layout);
         $this->assertStringContainsString('registry=https://registry.npmjs.org/', $npmConfig);
         $this->assertStringNotContainsString('registry.npmmirror.com', $npmLock);
+        $this->assertStringContainsString('textarea,', $styles);
+        $this->assertStringContainsString('outline: 2px solid var(--color-emerald-700)', $styles);
+        $this->assertStringContainsString('[data-focus-frame]:focus-within', $styles);
     }
 
     public function test_player_assets_define_one_cleanup_safe_livewire_session_lifecycle(): void

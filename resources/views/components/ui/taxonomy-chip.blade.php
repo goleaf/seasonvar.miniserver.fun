@@ -1,11 +1,11 @@
 @if ($url())
-    <a href="{{ $url() }}" {{ $attributes->merge(['class' => $classes().' relative z-10 min-h-11']) }}>
+    <a href="{{ $url() }}" {{ $attributes->merge(['class' => $classes().' relative z-10 min-h-11 max-w-full']) }}>
         @if ($iconClass())
             <i class="{{ $iconClass() }} text-[0.85em]" aria-hidden="true"></i>
         @endif
-        <span>{{ $label($slot) }}</span>
+        <span class="min-w-0 break-words">{{ $label($slot) }}</span>
         @if ($count !== null)
-            <span class="text-slate-500">{{ $count }}</span>
+            <span class="shrink-0 tabular-nums text-slate-500">{{ $count }}</span>
         @endif
     </a>
 @else
@@ -13,9 +13,9 @@
         @if ($iconClass())
             <i class="{{ $iconClass() }} text-[0.85em]" aria-hidden="true"></i>
         @endif
-        <span>{{ $label($slot) }}</span>
+        <span class="min-w-0 break-words">{{ $label($slot) }}</span>
         @if ($count !== null)
-            <span class="text-slate-500">{{ $count }}</span>
+            <span class="shrink-0 tabular-nums text-slate-500">{{ $count }}</span>
         @endif
     </span>
 @endif

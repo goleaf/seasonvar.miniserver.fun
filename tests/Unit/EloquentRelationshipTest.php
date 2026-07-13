@@ -79,7 +79,7 @@ class EloquentRelationshipTest extends TestCase
             'context' => ['source_page_id' => $sourcePage->id],
         ]);
 
-        $sourcePage->load(['catalogTitle', 'seasons', 'episodes', 'reviews', 'snapshots', 'importEvents', 'lastImportRun']);
+        $sourcePage->load(['catalogTitle', 'seasons', 'episodes', 'reviews', 'snapshots', 'latestSnapshot', 'importEvents', 'lastImportRun']);
         $run->load(['events', 'snapshots', 'lastImportedSourcePages']);
         $catalogTitle->load('importEvents');
 
@@ -88,6 +88,7 @@ class EloquentRelationshipTest extends TestCase
         $this->assertTrue($sourcePage->episodes->first()?->is($episode));
         $this->assertTrue($sourcePage->reviews->first()?->is($review));
         $this->assertTrue($sourcePage->snapshots->first()?->is($snapshot));
+        $this->assertTrue($sourcePage->latestSnapshot?->is($snapshot));
         $this->assertTrue($sourcePage->importEvents->first()?->is($event));
         $this->assertTrue($sourcePage->lastImportRun?->is($run));
         $this->assertTrue($run->events->first()?->is($event));

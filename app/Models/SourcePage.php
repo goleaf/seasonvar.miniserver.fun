@@ -34,11 +34,21 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'import_claimed_at',
     'import_claim_expires_at',
     'import_claim_run_id',
+    'metadata_parser_version',
+    'metadata_attempted_version',
+    'metadata_parsed_at',
+    'metadata_presence',
 ])]
 class SourcePage extends Model
 {
     /** @use HasFactory<SourcePageFactory> */
     use HasFactory;
+
+    /** @var array<string, mixed> */
+    protected $attributes = [
+        'metadata_parser_version' => 0,
+        'metadata_attempted_version' => 0,
+    ];
 
     /**
      * @return BelongsTo<Source, $this>
@@ -97,6 +107,18 @@ class SourcePage extends Model
     }
 
     /**
+     * @return HasOne<SourcePageSnapshot, $this>
+     */
+    public function latestSnapshot(): HasOne
+    {
+        return $this->hasOne(SourcePageSnapshot::class)
+            ->ofMany([
+                'captured_at' => 'max',
+                'id' => 'max',
+            ]);
+    }
+
+    /**
      * @return HasMany<SeasonvarImportEvent, $this>
      */
     public function importEvents(): HasMany
@@ -135,6 +157,10 @@ class SourcePage extends Model
             'last_imported_at' => 'datetime',
             'import_claimed_at' => 'datetime',
             'import_claim_expires_at' => 'datetime',
+            'metadata_parser_version' => 'integer',
+            'metadata_attempted_version' => 'integer',
+            'metadata_parsed_at' => 'datetime',
+            'metadata_presence' => 'array',
         ];
     }
 }

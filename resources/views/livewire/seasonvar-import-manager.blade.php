@@ -22,7 +22,7 @@
                     wire:confirm="Закрыть зависшие запуски без живых задач?"
                     wire:loading.attr="disabled"
                     wire:target="recoverStaleImports"
-                    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-800 hover:bg-amber-100 disabled:cursor-wait disabled:opacity-60"
+                    class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-800 hover:bg-amber-100 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
                 >
                     <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
                     <span wire:loading.remove wire:target="recoverStaleImports">Закрыть зависшие</span>
@@ -33,14 +33,16 @@
     </header>
 
     @if ($notice)
-        <div role="status" class="rounded-control bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
-            {{ $notice }}
+        <div role="status" class="flex items-start gap-2 rounded-control bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+            <i class="fa-solid fa-circle-check mt-0.5 shrink-0" aria-hidden="true"></i>
+            <span class="min-w-0 break-words">{{ $notice }}</span>
         </div>
     @endif
 
     @error('run')
-        <div role="alert" class="rounded-control bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
-            {{ $message }}
+        <div role="alert" class="flex items-start gap-2 rounded-control border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
+            <i class="fa-solid fa-circle-exclamation mt-0.5 shrink-0" aria-hidden="true"></i>
+            <span class="min-w-0 break-words">{{ $message }}</span>
         </div>
     @enderror
 
@@ -52,7 +54,7 @@
                         <i class="{{ $health['icon'] }} {{ $health['tone'] }}" aria-hidden="true"></i>
                         <span>{{ $health['label'] }}</span>
                     </div>
-                    <div class="mt-1 text-xl font-black text-slate-800">{{ $health['count'] }}</div>
+                    <div class="mt-1 text-xl font-black tabular-nums text-slate-800">{{ $health['count'] }}</div>
                 </div>
             @endforeach
         </div>
@@ -66,11 +68,11 @@
         <form wire:submit="startImport" class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             <div class="grid gap-3 sm:grid-cols-2">
                 <label class="flex min-h-11 items-center gap-3 rounded-control bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-                    <input type="checkbox" wire:model="discover" class="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600">
+                    <input type="checkbox" wire:model="discover" class="h-5 w-5 rounded border-slate-300 text-emerald-700">
                     <span>Обновить карту сайта</span>
                 </label>
                 <label class="flex min-h-11 items-center gap-3 rounded-control bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-                    <input type="checkbox" wire:model="force" class="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600">
+                    <input type="checkbox" wire:model="force" class="h-5 w-5 rounded border-slate-300 text-emerald-700">
                     <span>Принудительно обновить страницы</span>
                 </label>
             </div>
@@ -80,7 +82,7 @@
                 wire:loading.attr="disabled"
                 wire:target="startImport"
                 @disabled($hasActiveRun)
-                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300"
+                class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 lg:w-auto"
             >
                 <i wire:loading.remove wire:target="startImport" class="fa-solid fa-play" aria-hidden="true"></i>
                 <i wire:loading wire:target="startImport" class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
@@ -117,6 +119,10 @@
                                         <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
                                     @elseif ($run['status'] === 'failed')
                                         <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+                                    @elseif ($run['status'] === 'partial')
+                                        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                                    @elseif ($run['status'] === 'cancelled')
+                                        <i class="fa-solid fa-ban" aria-hidden="true"></i>
                                     @else
                                         <i class="fa-solid fa-clock" aria-hidden="true"></i>
                                     @endif
@@ -127,7 +133,7 @@
                                 @endif
                             </div>
 
-                            <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
+                            <div class="mt-2 flex min-w-0 flex-wrap gap-x-4 gap-y-1 break-words text-xs font-semibold text-slate-500">
                                 <span>Старт: {{ $run['started_at'] }}</span>
                                 <span>Финиш: {{ $run['finished_at'] }}</span>
                                 <span>Heartbeat: {{ $run['heartbeat_at'] }}</span>
@@ -140,14 +146,14 @@
                             </div>
                         </div>
 
-                        <div class="flex flex-wrap gap-2">
+                        <div class="flex flex-wrap gap-2 max-sm:grid max-sm:grid-cols-1">
                             @if ($run['can_retry'])
                                 <button
                                     type="button"
                                     wire:click="retryImport({{ $run['id'] }})"
                                     wire:loading.attr="disabled"
                                     wire:target="retryImport({{ $run['id'] }})"
-                                    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-sky-50 px-4 py-2 text-sm font-bold text-sky-700 hover:bg-sky-100 disabled:cursor-wait disabled:opacity-60"
+                                    class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-sky-50 px-4 py-2 text-sm font-bold text-sky-700 hover:bg-sky-100 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
                                 >
                                     <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
                                     <span>Повторить</span>
@@ -160,7 +166,7 @@
                                     wire:confirm="Отменить запуск #{{ $run['id'] }}? Новые страницы обрабатываться не будут."
                                     wire:loading.attr="disabled"
                                     wire:target="cancelImport({{ $run['id'] }})"
-                                    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-rose-50 px-4 py-2 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:cursor-wait disabled:opacity-60"
+                                    class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-rose-50 px-4 py-2 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
                                 >
                                     <i class="fa-solid fa-ban" aria-hidden="true"></i>
                                     <span>Отменить</span>
@@ -169,7 +175,7 @@
                         </div>
                     </div>
 
-                    <div class="mt-4 h-2 overflow-hidden rounded-full bg-slate-100" aria-label="Выполнено {{ $run['progress'] }}%">
+                    <div class="mt-4 h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label="Выполнено" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $run['progress'] }}">
                         <div class="h-full rounded-full bg-emerald-600" style="width: {{ $run['progress'] }}%"></div>
                     </div>
 
@@ -185,7 +191,7 @@
                                     <i class="{{ $count['icon'] }} {{ $count['tone'] }}" aria-hidden="true"></i>
                                     <span>{{ $count['label'] }}</span>
                                 </div>
-                                <div class="mt-1 text-xl font-black text-slate-800">{{ $count['value'] }}</div>
+                                <div class="mt-1 text-xl font-black tabular-nums text-slate-800">{{ $count['value'] }}</div>
                             </div>
                         @endforeach
                     </div>
@@ -205,7 +211,8 @@
                 </article>
             @empty
                 <div class="px-4 py-10 text-center text-sm text-slate-500">
-                    Запуски импорта пока не создавались.
+                    <i class="fa-solid fa-inbox text-3xl text-slate-300" aria-hidden="true"></i>
+                    <p class="mt-3">Запуски импорта пока не создавались.</p>
                 </div>
             @endforelse
         </div>

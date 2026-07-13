@@ -19,7 +19,7 @@
                 container-class="min-w-0 flex-1"
                 input-class="min-h-11 min-w-0 flex-1 border-0 bg-transparent px-3 py-2.5 text-sm text-slate-700 outline-none placeholder:text-slate-500"
             />
-            <button type="submit" class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600">
+            <button type="submit" class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600">
                 <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
                 <span class="sr-only sm:not-sr-only">Найти</span>
             </button>
@@ -27,7 +27,7 @@
 
         <nav aria-label="Основная навигация" class="order-2 flex items-center gap-1.5 text-sm font-bold lg:order-3">
             <a href="{{ route('home') }}" @class([
-                'inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2',
+                'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-control px-3 py-2',
                 'bg-emerald-50 text-emerald-700' => request()->routeIs('home'),
                 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('home'),
             ]) @if (request()->routeIs('home')) aria-current="page" @endif>
@@ -35,7 +35,7 @@
                 <span class="sr-only xl:not-sr-only">Главная</span>
             </a>
             <a href="{{ route('titles.index') }}" @class([
-                'inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2',
+                'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-control px-3 py-2',
                 'bg-emerald-50 text-emerald-700' => request()->routeIs('titles.*'),
                 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('titles.*'),
             ]) @if (request()->routeIs('titles.*')) aria-current="page" @endif>
@@ -44,7 +44,7 @@
             </a>
             @auth
                 <a href="{{ route('viewing-activity') }}" @class([
-                    'inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2',
+                    'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-control px-3 py-2',
                     'bg-emerald-50 text-emerald-700' => request()->routeIs('viewing-activity'),
                     'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('viewing-activity'),
                 ]) @if (request()->routeIs('viewing-activity')) aria-current="page" @endif>
@@ -53,7 +53,7 @@
                 </a>
                 @can('manage-seasonvar-imports')
                     <a href="{{ route('admin.imports') }}" @class([
-                        'inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2',
+                        'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-control px-3 py-2',
                         'bg-emerald-50 text-emerald-700' => request()->routeIs('admin.imports'),
                         'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('admin.imports'),
                     ]) @if (request()->routeIs('admin.imports')) aria-current="page" @endif>

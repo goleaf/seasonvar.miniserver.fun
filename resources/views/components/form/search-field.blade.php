@@ -16,7 +16,7 @@
         <label for="{{ $id ?? $name }}" class="sr-only">{{ $label }}</label>
     @endif
 
-    <div @class([
+    <div data-focus-frame @class([
         $frameClass,
         'border-rose-300 ring-1 ring-rose-100' => $errors->has($name),
         'border-slate-200 focus-within:border-emerald-300' => ! $errors->has($name),

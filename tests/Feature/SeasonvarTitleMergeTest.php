@@ -73,6 +73,7 @@ class SeasonvarTitleMergeTest extends TestCase
             'title' => '1 сезон',
             'source_url' => $firstUrl,
             'source_url_hash' => hash('sha256', $firstUrl),
+            'relation_metadata_version' => 1,
         ]);
         $secondSeason = Season::factory()->create([
             'catalog_title_id' => $duplicate->id,
@@ -81,6 +82,7 @@ class SeasonvarTitleMergeTest extends TestCase
             'title' => '2 сезон',
             'source_url' => $secondUrl,
             'source_url_hash' => hash('sha256', $secondUrl),
+            'relation_metadata_version' => 0,
         ]);
         Episode::factory()->create([
             'season_id' => $firstSeason->id,
@@ -193,5 +195,6 @@ class SeasonvarTitleMergeTest extends TestCase
         $canonical->refresh()->load('seasons');
         $this->assertSame('Битва экстрасенсов', $canonical->title);
         $this->assertSame([1, 23], $canonical->seasons->sortBy('number')->pluck('number')->values()->all());
+        $this->assertSame(0, $canonical->relation_metadata_version);
     }
 }

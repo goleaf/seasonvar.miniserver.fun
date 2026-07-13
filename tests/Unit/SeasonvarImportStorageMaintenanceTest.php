@@ -67,6 +67,13 @@ class SeasonvarImportStorageMaintenanceTest extends TestCase
         $oldCompletedSnapshot = $this->createSnapshot($sourcePage, $completedRun, 'old-completed', now()->subDays(20));
         $runningSnapshot = $this->createSnapshot($sourcePage, $runningRun, 'running', now()->subDays(20));
         $recentSnapshot = $this->createSnapshot($sourcePage, $completedRun, 'recent', now()->subDay());
+        $retainedPage = SourcePage::factory()->create();
+        $latestRetainedSnapshot = $this->createSnapshot(
+            $retainedPage,
+            $completedRun,
+            'latest-retained',
+            now()->subDays(30),
+        );
 
         $result = (new SeasonvarImportStorageMaintenance)->prune();
 
@@ -78,6 +85,7 @@ class SeasonvarImportStorageMaintenanceTest extends TestCase
         $this->assertDatabaseMissing('source_page_snapshots', ['id' => $oldCompletedSnapshot->id]);
         $this->assertDatabaseHas('source_page_snapshots', ['id' => $runningSnapshot->id]);
         $this->assertDatabaseHas('source_page_snapshots', ['id' => $recentSnapshot->id]);
+        $this->assertDatabaseHas('source_page_snapshots', ['id' => $latestRetainedSnapshot->id]);
     }
 
     private function createImportRun(string $status): SeasonvarImportRun

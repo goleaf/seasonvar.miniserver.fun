@@ -14,11 +14,13 @@ use App\Models\SeasonvarImportEvent;
 use App\Models\SeasonvarImportRun;
 use App\Models\Source;
 use App\Models\SourcePage;
+use App\Models\SourcePageSnapshot;
 use App\Models\Taxonomy;
 use App\Models\Translation;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\MediaSourceHealthManager;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
+use App\Services\Seasonvar\SeasonvarCatalogParser;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use App\Services\Seasonvar\SeasonvarImportProcessInspector;
 use App\Services\Seasonvar\SeasonvarMediaAvailabilityChecker;
@@ -1372,6 +1374,182 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $this->assertSame($expectedSourceMediaKey, $media->source_media_key);
         $this->assertSame('720p', $media->quality);
         $this->assertSame('mp4', $media->format);
+    }
+
+    public function test_unchanged_remote_page_is_reparsed_when_its_metadata_version_is_stale(): void
+    {
+        Http::preventStrayRequests();
+        config(['seasonvar.media_check.enabled' => false]);
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $url = 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-1-season.html';
+        $body = $this->refreshPlannerSeasonPageHtml([1 => 'Начало']);
+        $page = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+            'content_hash' => hash('sha256', $body),
+            'parse_status' => 'parsed',
+            'import_status' => 'parsed',
+            'metadata_parser_version' => 0,
+            'metadata_attempted_version' => 0,
+        ]);
+        $title = CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $page->id,
+            'external_id' => '47915',
+            'source_url' => $url,
+            'source_url_hash' => hash('sha256', $url),
+            'relation_metadata_version' => 0,
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $title->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        Http::fake([
+            $url => Http::response($body),
+        ]);
+        $events = [];
+
+        app(SeasonvarCatalogImporter::class)->parsePage(
+            $page,
+            function (string $event) use (&$events): void {
+                $events[] = $event;
+            },
+        );
+
+        $this->assertNotContains('page-parse-skipped-unchanged', $events);
+        $this->assertSame(SeasonvarCatalogParser::METADATA_VERSION, $page->fresh()->metadata_parser_version);
+        $this->assertSame(SeasonvarCatalogParser::METADATA_VERSION, $page->metadata_attempted_version);
+        $this->assertSame('present', $page->metadata_presence['genres']);
+        $this->assertSame(SeasonvarCatalogParser::METADATA_VERSION, $title->fresh()->relation_metadata_version);
+        Http::assertSentCount(1);
+    }
+
+    public function test_refresh_planner_reserves_unattempted_snapshots_and_bounds_stale_metadata_refresh(): void
+    {
+        config(['seasonvar.metadata_backfill.page_limit' => 1]);
+        $source = Source::factory()->create();
+        $reserved = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'parse_status' => 'parsed',
+            'import_status' => 'parsed',
+            'last_imported_at' => now(),
+            'metadata_parser_version' => 0,
+            'metadata_attempted_version' => 0,
+        ]);
+        CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $reserved->id,
+        ]);
+        SourcePageSnapshot::query()->create([
+            'source_page_id' => $reserved->id,
+            'url' => $reserved->url,
+            'content_hash' => hash('sha256', 'reserved'),
+            'http_status' => 200,
+            'body_bytes' => 64,
+            'html' => '<html><head><title>Reserved</title></head><body><h1>Reserved</h1></body></html>',
+            'captured_at' => now(),
+        ]);
+        $withoutSnapshot = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'parse_status' => 'parsed',
+            'import_status' => 'parsed',
+            'last_imported_at' => now(),
+            'metadata_parser_version' => 0,
+            'metadata_attempted_version' => 0,
+        ]);
+        $attempted = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'parse_status' => 'parsed',
+            'import_status' => 'parsed',
+            'last_imported_at' => now(),
+            'metadata_parser_version' => 0,
+            'metadata_attempted_version' => SeasonvarCatalogParser::METADATA_VERSION,
+        ]);
+        SourcePageSnapshot::query()->create([
+            'source_page_id' => $attempted->id,
+            'url' => $attempted->url,
+            'content_hash' => hash('sha256', 'attempted'),
+            'http_status' => 200,
+            'body_bytes' => 64,
+            'html' => '<html><body>Rejected snapshot</body></html>',
+            'captured_at' => now(),
+        ]);
+        $events = [];
+        $selected = collect();
+
+        foreach (app(SeasonvarRefreshPlanner::class)->pageChunksForImportCycle(
+            10,
+            now()->subWeek(),
+            null,
+            function (string $event, array $context) use (&$events): void {
+                $events[] = compact('event', 'context');
+            },
+        ) as $pages) {
+            $selected = $selected->merge($pages);
+        }
+
+        $this->assertSame([$withoutSnapshot->id], $selected->pluck('id')->all());
+        $this->assertNotContains($reserved->id, $selected->pluck('id')->all());
+        $this->assertNotContains($attempted->id, $selected->pluck('id')->all());
+        $this->assertSame('stale_metadata', collect($events)->first()['context']['reason']);
+    }
+
+    public function test_import_cycle_persists_prefixed_metadata_backfill_counters_separately_from_page_failures(): void
+    {
+        Http::preventStrayRequests();
+        config(['seasonvar.media_check.enabled' => false]);
+        $page = SourcePage::factory()->create([
+            'parse_status' => 'parsed',
+            'import_status' => 'parsed',
+            'last_imported_at' => now(),
+        ]);
+        $title = CatalogTitle::factory()->create([
+            'source_id' => $page->source_id,
+            'source_page_id' => $page->id,
+            'relation_metadata_version' => 0,
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $title->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        $html = '<html><head><title>Локальный сериал</title></head><body><h1>Локальный сериал</h1><div class="pgs-sinfo_list">Студия: Bones</div></body></html>';
+        SourcePageSnapshot::query()->create([
+            'source_page_id' => $page->id,
+            'url' => $page->url,
+            'content_hash' => hash('sha256', $html),
+            'http_status' => 200,
+            'body_bytes' => mb_strlen($html, '8bit'),
+            'html' => $html,
+            'captured_at' => now(),
+        ]);
+
+        $this->artisan('seasonvar:import', ['--no-discovery' => true])
+            ->assertExitCode(0);
+
+        $run = SeasonvarImportRun::query()->latest('id')->firstOrFail();
+        $cycleEvent = SeasonvarImportEvent::query()
+            ->where('seasonvar_import_run_id', $run->id)
+            ->where('event', 'seasonvar-import-cycle-complete')
+            ->firstOrFail();
+
+        $this->assertSame(1, $run->summary['last_metadata_backfill']['pages_checked']);
+        $this->assertSame(1, $run->summary['last_metadata_backfill']['pages_updated']);
+        $this->assertSame(0, $run->summary['last_metadata_backfill']['failed']);
+        $this->assertSame(0, $run->failed);
+        $this->assertSame(1, $cycleEvent->context['metadata_pages_checked']);
+        $this->assertSame(1, $cycleEvent->context['metadata_pages_updated']);
+        $this->assertArrayHasKey('metadata_titles_checked', $cycleEvent->context);
+        $this->assertArrayHasKey('metadata_titles_updated', $cycleEvent->context);
+        $this->assertArrayHasKey('metadata_relations_attached', $cycleEvent->context);
+        $this->assertArrayHasKey('metadata_failed', $cycleEvent->context);
+        Http::assertNothingSent();
     }
 
     /**

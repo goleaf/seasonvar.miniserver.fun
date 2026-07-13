@@ -39,7 +39,7 @@
                 wire:click="playPrimary"
                 data-catalog-history
                 @disabled(! $primaryAction->isPlayable())
-                class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300"
+                class="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
             >
                 <i class="fa-solid fa-play" aria-hidden="true"></i>
                 <span>{{ $primaryAction->label }}</span>
@@ -85,9 +85,10 @@
                                 type="button"
                                 data-player-retry
                                 hidden
-                                class="min-h-11 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+                                class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
                             >
-                                Повторить
+                                <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
+                                <span>Повторить</span>
                             </button>
                         </div>
                         <video
@@ -180,14 +181,15 @@
                             wire:target="setWatchlist"
                             class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700"
                         >
-                            <i class="{{ $inWatchlist ? 'fa-solid' : 'fa-regular' }} fa-bookmark" aria-hidden="true"></i>
+                            <i wire:loading.remove wire:target="setWatchlist" class="{{ $inWatchlist ? 'fa-solid' : 'fa-regular' }} fa-bookmark" aria-hidden="true"></i>
+                            <i wire:loading wire:target="setWatchlist" class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
                             <span wire:loading.remove wire:target="setWatchlist">{{ $inWatchlist ? 'В списке просмотра' : 'Добавить в список' }}</span>
                             <span wire:loading wire:target="setWatchlist">Сохраняем…</span>
                         </button>
 
                         <label class="grid gap-1 text-sm font-semibold text-slate-600">
                             <span>{{ $userRating ? 'Ваша оценка: '.$userRating.' из '.$ratingMaximum : 'Ваша оценка' }}</span>
-                            <select wire:change="setRating($event.target.value)" wire:loading.attr="disabled" wire:target="setRating" class="min-h-11 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700">
+                            <select wire:change="setRating($event.target.value)" wire:loading.attr="disabled" wire:target="setRating" class="min-h-11 rounded-control border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700">
                                 <option value="">Не выбрана</option>
                                 @foreach ($ratingOptions as $rating)
                                     <option value="{{ $rating }}" @selected($userRating === $rating)>{{ $rating }} из {{ $ratingMaximum }}</option>
@@ -250,7 +252,7 @@
     <x-ui.panel id="seasons" title="Сезоны и серии" icon="fa-solid fa-layer-group" :pad="false" class="scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48">
         @if ($seasons->isNotEmpty())
             <div class="border-b border-slate-200 p-3">
-                <div class="flex gap-2 overflow-x-auto pb-1" aria-label="Доступные сезоны">
+                <nav class="flex gap-2 overflow-x-auto overscroll-x-contain pb-1" aria-label="Доступные сезоны">
                     @foreach ($seasons as $seasonOption)
                         <a
                             href="{{ route('titles.show', ['catalogTitle' => $title, 'season' => $seasonOption->id]).'#seasons' }}"
@@ -267,7 +269,7 @@
                             {{ $this->seasonDisplayLabel($seasonOption) }} · {{ $this->episodeCountLabel((int) $seasonOption->available_episodes_count) }}
                         </a>
                     @endforeach
-                </div>
+                </nav>
             </div>
 
             <div
@@ -304,8 +306,9 @@
                         @if ($episodeOption->title)
                             <span class="mt-1 block text-xs font-semibold text-slate-500">{{ $episodeOption->title }}</span>
                         @endif
-                        <span class="mt-1 block text-xs font-semibold text-slate-400">
-                            {{ $showView->episodeMediaItems($episodeOption)->count() }} видео
+                        <span class="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-slate-400">
+                            <i class="fa-solid fa-file-video" aria-hidden="true"></i>
+                            <span class="tabular-nums">{{ $showView->episodeMediaItems($episodeOption)->count() }} видео</span>
                         </span>
                     </a>
                     @if ($loop->last)

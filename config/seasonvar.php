@@ -54,6 +54,12 @@ return [
     'media_identity' => [
         'chunk_size' => (int) env('SEASONVAR_MEDIA_SOURCE_KEY_CHUNK_SIZE', 250),
     ],
+    'metadata_backfill' => [
+        'page_chunk_size' => (int) env('SEASONVAR_METADATA_BACKFILL_PAGE_CHUNK_SIZE', 50),
+        'page_limit' => (int) env('SEASONVAR_METADATA_BACKFILL_PAGE_LIMIT', 200),
+        'title_chunk_size' => (int) env('SEASONVAR_METADATA_BACKFILL_TITLE_CHUNK_SIZE', 50),
+        'title_limit' => (int) env('SEASONVAR_METADATA_BACKFILL_TITLE_LIMIT', 200),
+    ],
     'recommendations' => [
         'chunk_size' => (int) env('SEASONVAR_RECOMMENDATION_CHUNK_SIZE', 100),
         'min_score' => (int) env('SEASONVAR_RECOMMENDATION_MIN_SCORE', 600),

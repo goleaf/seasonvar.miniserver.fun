@@ -39,6 +39,36 @@ class CatalogVisualSystemTest extends TestCase
             ->assertSee('data-home-metrics', false);
     }
 
+    public function test_home_latest_updates_uses_a_five_column_natural_height_responsive_grid(): void
+    {
+        $response = $this->get(route('home'));
+
+        $response->assertOk();
+
+        $matched = preg_match(
+            '/<div data-home-latest-updates-grid class="([^"]+)"/',
+            $response->getContent(),
+            $matches,
+        );
+
+        $this->assertSame(1, $matched);
+
+        $classes = explode(' ', $matches[1]);
+
+        foreach ([
+            'items-start',
+            'sm:grid-cols-2',
+            'md:grid-cols-3',
+            'lg:grid-cols-4',
+            'xl:grid-cols-5',
+            '[&>[data-catalog-card]]:h-auto',
+        ] as $class) {
+            $this->assertContains($class, $classes);
+        }
+
+        $this->assertNotContains('auto-rows-fr', $classes);
+    }
+
     public function test_title_page_places_player_before_secondary_reference_metadata(): void
     {
         $title = CatalogTitle::factory()->create();
@@ -48,6 +78,20 @@ class CatalogVisualSystemTest extends TestCase
             ->assertOk()
             ->assertSee('data-title-hero', false)
             ->assertSeeInOrder(['data-title-hero', 'id="player"', 'data-title-reference'], false);
+    }
+
+    public function test_title_quick_navigation_is_flat_and_keeps_large_targets(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $content = $this->get(route('titles.show', $title))->assertOk()->getContent();
+
+        $matched = preg_match('/<nav aria-label="Быстрые переходы по сериалу"[^>]*>(.*?)<\/nav>/s', $content, $navigation);
+
+        $this->assertSame(1, $matched);
+        $this->assertSame(3, substr_count($navigation[1], 'data-title-quick-link'));
+        $this->assertSame(3, substr_count($navigation[1], 'min-h-11'));
+        $this->assertStringNotContainsString('bg-emerald-700', $navigation[1]);
+        $this->assertDoesNotMatchRegularExpression('/\b(?:border|ring|outline)(?:-|\s)/', $navigation[1]);
     }
 
     public function test_home_and_title_pages_each_render_only_the_layout_main_landmark(): void
@@ -129,6 +173,23 @@ class CatalogVisualSystemTest extends TestCase
             ->assertSee('wire:loading', false)
             ->assertSee('wire:key="catalog-title-', false)
             ->assertSee('wire:click="nextPage(\'page\')"', false);
+    }
+
+    public function test_catalog_sort_and_alphabet_links_keep_touch_sized_flat_controls(): void
+    {
+        CatalogTitle::factory()->create();
+        $content = $this->get(route('titles.index'))->assertOk()->getContent();
+
+        preg_match_all('/<a[^>]*data-catalog-(?:sort|alphabet)-option[^>]*class="([^"]+)"[^>]*>/s', $content, $controls);
+
+        $this->assertNotEmpty($controls[1]);
+
+        foreach ($controls[1] as $classes) {
+            $this->assertStringContainsString('min-h-11', $classes);
+            $this->assertDoesNotMatchRegularExpression('/\b(?:border|ring|outline)(?:-|\s)/', $classes);
+        }
+
+        $this->assertStringNotContainsString('min-h-9 min-w-9', $content);
     }
 
     public function test_title_poster_uses_non_cropping_fit_by_default(): void

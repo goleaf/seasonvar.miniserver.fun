@@ -49,8 +49,8 @@
             @else
                 <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
                     @foreach ($continueWatching as $item)
-                        <article wire:key="continue-watching-{{ $item->title->id }}" class="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] overflow-hidden rounded-panel border border-slate-200 bg-white">
-                            <x-title-poster :title="$item->title" class="h-full min-h-36 rounded-none border-0 bg-slate-50" image-class="h-full w-full object-contain" />
+                        <article data-continue-watching-card wire:key="continue-watching-{{ $item->title->id }}" class="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] overflow-hidden rounded-panel border border-slate-200 bg-white max-[419px]:grid-cols-1">
+                            <x-title-poster :title="$item->title" class="h-full min-h-36 rounded-none border-0 bg-slate-50 max-[419px]:aspect-[16/9] max-[419px]:max-h-48 max-[419px]:w-full" image-class="h-full w-full object-contain" />
 
                             <div class="flex min-w-0 flex-col p-3">
                                 <div class="text-xs font-semibold text-slate-500">
@@ -81,7 +81,7 @@
                                 <a
                                     href="{{ route('titles.show', ['catalogTitle' => $item->title, 'season' => $item->episode->season_id, 'episode' => $item->episode->id]) }}"
                                     wire:navigate
-                                    class="mt-3 inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-700 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-600"
+                                    class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-600"
                                 >
                                     <i class="fa-solid fa-play" aria-hidden="true"></i>
                                     <span>{{ $item->actionLabel }}</span>
@@ -167,7 +167,7 @@
                             wire:confirm="Удалить этот просмотр из истории?"
                             wire:loading.attr="disabled"
                             wire:target="removeHistoryItem({{ $progress->id }})"
-                            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-wait disabled:opacity-60 sm:justify-self-end"
+                            class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-wait disabled:opacity-60 sm:w-auto sm:justify-self-end"
                         >
                             <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                             <span>Удалить</span>

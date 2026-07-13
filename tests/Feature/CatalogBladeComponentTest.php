@@ -46,6 +46,17 @@ class CatalogBladeComponentTest extends TestCase
         }
     }
 
+    public function test_taxonomy_links_wrap_long_labels_without_losing_the_touch_target(): void
+    {
+        $html = Blade::render(
+            '<x-ui.taxonomy-chip href="/titles/actor/example">Очень длинное имя участника каталога без сокращения</x-ui.taxonomy-chip>',
+        );
+
+        $this->assertStringContainsString('max-w-full', $html);
+        $this->assertStringContainsString('min-h-11', $html);
+        $this->assertStringContainsString('break-words', $html);
+    }
+
     public function test_title_page_renders_componentized_episode_links_and_status_badges(): void
     {
         $catalogTitle = CatalogTitle::factory()->create([

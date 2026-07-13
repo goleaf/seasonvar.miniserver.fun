@@ -13,19 +13,19 @@
                     </div>
                 </div>
                 <div class="space-y-4 p-4">
-                    <nav aria-label="Быстрые переходы по сериалу" class="grid gap-2">
-                        <a href="#player" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-700 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-600">
-                            <i class="fa-solid fa-circle-play" aria-hidden="true"></i>
+                    <nav aria-label="Быстрые переходы по сериалу" class="-mx-2 grid gap-1">
+                        <a data-title-quick-link href="#player" class="relative inline-flex min-h-11 items-center gap-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-700 before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-emerald-600 hover:bg-emerald-100">
+                            <i class="fa-solid fa-circle-play w-4 text-center" aria-hidden="true"></i>
                             <span>Смотреть</span>
                         </a>
 
-                        <a href="#seasons" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
-                            <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                        <a data-title-quick-link href="#seasons" class="inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-700">
+                            <i class="fa-solid fa-layer-group w-4 text-center text-slate-400" aria-hidden="true"></i>
                             <span>Сезоны</span>
                         </a>
 
-                        <a href="#data-title-reference" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
-                            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                        <a data-title-quick-link href="#data-title-reference" class="inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-700">
+                            <i class="fa-solid fa-circle-info w-4 text-center text-slate-400" aria-hidden="true"></i>
                             <span>О сериале</span>
                         </a>
                     </nav>
@@ -36,7 +36,7 @@
                                 <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Сезонов</div>
                                 <i class="fa-solid fa-layer-group text-slate-400" aria-hidden="true"></i>
                             </div>
-                            <div class="mt-1 text-lg font-black text-slate-800">{{ $showView->parsedSeasonCount }}</div>
+                            <div class="mt-1 text-lg font-black tabular-nums text-slate-800">{{ $showView->parsedSeasonCount }}</div>
                         </div>
 
                         <div class="rounded-lg bg-slate-50 px-3 py-2">
@@ -44,7 +44,7 @@
                                 <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Серий</div>
                                 <i class="fa-solid fa-list-ol text-slate-400" aria-hidden="true"></i>
                             </div>
-                            <div class="mt-1 text-lg font-black text-slate-800">{{ $showView->episodeCount }}</div>
+                            <div class="mt-1 text-lg font-black tabular-nums text-slate-800">{{ $showView->episodeCount }}</div>
                         </div>
 
                         <div class="rounded-lg bg-slate-50 px-3 py-2">
@@ -52,7 +52,7 @@
                                 <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Видео</div>
                                 <i class="fa-solid fa-file-video text-slate-400" aria-hidden="true"></i>
                             </div>
-                            <div class="mt-1 text-lg font-black text-slate-800">{{ $showView->mediaCount }}</div>
+                            <div class="mt-1 text-lg font-black tabular-nums text-slate-800">{{ $showView->mediaCount }}</div>
                         </div>
                     </div>
 
@@ -73,9 +73,9 @@
                     <x-title-poster :title="$title" class="mx-auto aspect-[2/3] w-44 max-w-full border border-slate-200 shadow-panel sm:w-52 md:w-full" empty-class="grid h-full place-items-center px-6 text-center text-sm text-slate-500" />
 
                     <div class="min-w-0">
-                        <h1 class="flex items-start gap-3 text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">
+                        <h1 class="flex min-w-0 items-start gap-3 text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">
                             <i class="fa-solid fa-clapperboard mt-1 text-emerald-700" aria-hidden="true"></i>
-                            <span>{{ $title->title }}</span>
+                            <span class="min-w-0 break-words">{{ $title->title }}</span>
                         </h1>
                         @if ($title->original_title)
                             <div class="mt-2 break-words text-sm font-semibold text-slate-500">{{ $title->original_title }}</div>
