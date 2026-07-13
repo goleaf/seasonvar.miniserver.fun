@@ -5,6 +5,7 @@ use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogSitemapController;
 use App\Http\Controllers\PlaybackSourceController;
 use App\Livewire\CatalogSeries;
+use App\Livewire\ViewingActivity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -34,6 +35,7 @@ Route::get('/playback/{licensedMedia}', PlaybackSourceController::class)
     ->whereNumber('licensedMedia')
     ->name('playback.source');
 Route::get('/titles', CatalogSeries::class)->name('titles.index');
+Route::get('/watching', ViewingActivity::class)->name('viewing-activity');
 Route::get('/titles/year/{year}', CatalogSeries::class)
     ->where('year', '(?:19|20)\d{2}')
     ->name('titles.year');

@@ -1,6 +1,6 @@
 # Связи данных и фильтры
 
-Обновлено: 12.07.2026
+Обновлено: 13.07.2026
 
 ## Основные связи
 
@@ -48,6 +48,7 @@
 - `SeasonvarImportRun hasMany SourcePage` через `last_import_run_id`
 - Каждая модель связи каталога относится ко многим `CatalogTitle` через явную pivot-таблицу.
 - `User hasMany CatalogTitleUserState` и `User hasMany EpisodeViewProgress`; unique `(user_id, catalog_title_id)` хранит одну watchlist/rating запись, unique `(user_id, episode_id)` — одну каноническую позицию выпуска. Progress дополнительно хранит trusted duration/percent, первый и последний просмотр, неизменяемый `completed_at`, source media, ULID активной playback session и последний принятый event sequence.
+- Viewing History не имеет отдельной таблицы: фактической активностью считается `EpisodeViewProgress.first_started_at IS NOT NULL`. Удаление из истории удаляет каноническую user/episode строку и одновременно сбрасывает Continue Watching для этого выпуска.
 - Для метаданных каталога не используются morph- или polymorphic-связи.
 
 ## Целостность выпуска и публикации
@@ -107,6 +108,7 @@
 - Каждая metadata pivot-таблица имеет составной primary key по `catalog_title_id` и related ID, поэтому одну связь нельзя присоединить дважды.
 - Publication lookup и display-order индексы на тайтлах, сезонах, сериях и медиа обслуживают публичные scopes и упорядоченные relationship loads.
 - Индексы состояния страниц источника по `import_status`, `retry_after_at` и `last_imported_at` нужны для единственной команды импорта.
+- `episode_progress_user_history_idx` по `(user_id, last_watched_at, id)` обслуживает стабильную пагинацию истории. Он применяется после migrations persistent progress/backfill; backfill должен завершиться до первого публичного использования `/watching`.
 
 ## Поля импортера
 

@@ -86,26 +86,37 @@ class CatalogTitlePlaybackQuery
     /** @return Builder<Episode> */
     public function watchableEpisodes(CatalogTitle $catalogTitle, ?User $user): Builder
     {
+        return $this->watchableEpisodesForVisibleTitles($user)
+            ->where((new Season)->qualifyColumn('catalog_title_id'), $catalogTitle->id);
+    }
+
+    /** @return Builder<Episode> */
+    public function watchableEpisodesForVisibleTitles(?User $user): Builder
+    {
         $episode = new Episode;
+        $media = new LicensedMedia;
         $season = new Season;
+        $availableMedia = LicensedMedia::query()
+            ->availableTo($user)
+            ->forAvailableReleases($user)
+            ->withPlaybackLocation()
+            ->withoutKnownFailures()
+            ->whereColumn($media->qualifyColumn('episode_id'), $episode->qualifyColumn('id'))
+            ->whereColumn($media->qualifyColumn('catalog_title_id'), $season->qualifyColumn('catalog_title_id'))
+            ->selectRaw('1');
 
         return Episode::query()
             ->availableTo($user)
             ->join($season->getTable(), $season->qualifyColumn('id'), '=', $episode->qualifyColumn('season_id'))
             ->whereIn(
-                $episode->qualifyColumn('season_id'),
-                Season::query()
-                    ->availableTo($user)
-                    ->where('catalog_title_id', $catalogTitle->id)
-                    ->select('id'),
+                $season->qualifyColumn('catalog_title_id'),
+                $this->titles->visibleTo($user)->select('id'),
             )
             ->whereIn(
-                $episode->qualifyColumn('id'),
-                $this->availableMedia($catalogTitle, $user)
-                    ->whereNotNull('episode_id')
-                    ->select('episode_id')
-                    ->groupBy('episode_id'),
+                $episode->qualifyColumn('season_id'),
+                Season::query()->availableTo($user)->select('id'),
             )
+            ->whereExists($availableMedia->toBase())
             ->select([
                 $episode->qualifyColumn('id'),
                 $episode->qualifyColumn('season_id'),
@@ -123,6 +134,7 @@ class CatalogTitlePlaybackQuery
                 $season->qualifyColumn('sort_order').' as season_order_sort',
                 $season->qualifyColumn('number').' as season_order_number',
                 $season->qualifyColumn('id').' as season_order_id',
+                $season->qualifyColumn('catalog_title_id').' as playback_catalog_title_id',
             ])
             ->orderBy($season->qualifyColumn('kind'))
             ->orderBy($season->qualifyColumn('sort_order'))
@@ -132,6 +144,35 @@ class CatalogTitlePlaybackQuery
             ->orderBy($episode->qualifyColumn('sort_order'))
             ->orderBy($episode->qualifyColumn('number'))
             ->orderBy($episode->qualifyColumn('id'));
+    }
+
+    /** @return Builder<Episode> */
+    public function orderedEpisodesForVisibleTitles(?User $user): Builder
+    {
+        $episode = new Episode;
+        $season = new Season;
+
+        return Episode::query()
+            ->withTrashed()
+            ->join($season->getTable(), $season->qualifyColumn('id'), '=', $episode->qualifyColumn('season_id'))
+            ->whereIn(
+                $season->qualifyColumn('catalog_title_id'),
+                $this->titles->visibleTo($user)->select('id'),
+            )
+            ->select([
+                $episode->qualifyColumn('id'),
+                $episode->qualifyColumn('season_id'),
+                $episode->qualifyColumn('number'),
+                $episode->qualifyColumn('kind'),
+                $episode->qualifyColumn('sort_order'),
+            ])
+            ->addSelect([
+                $season->qualifyColumn('kind').' as season_order_kind',
+                $season->qualifyColumn('sort_order').' as season_order_sort',
+                $season->qualifyColumn('number').' as season_order_number',
+                $season->qualifyColumn('id').' as season_order_id',
+                $season->qualifyColumn('catalog_title_id').' as playback_catalog_title_id',
+            ]);
     }
 
     public function watchableEpisode(CatalogTitle $catalogTitle, ?User $user, int $episodeId): ?Episode

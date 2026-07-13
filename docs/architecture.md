@@ -14,6 +14,7 @@
 - JSON API обслуживает `App\Http\Controllers\Api\CatalogTitleController`: контроллер только принимает Form Request/model binding и возвращает API Resources, а выбор публичных связей выполняет `CatalogApiTitleQuery`.
 - `/stats` обслуживается тонким controller-view слоем: `CatalogController::stats()` отдает SEO и Livewire-обертку, live-данные рендерит `App\Livewire\StatsDashboard`, а постеры статистики отдает `CatalogStatsPosterResponder` через внутренний proxy-маршрут.
 - `/titles/{catalogTitle:slug}` сохраняет implicit route binding и статическую Blade-оболочку; `App\Livewire\CatalogTitlePlayer` отвечает только за URL-state активного сезона/серии/media и authenticated user actions. Locked `catalogTitleId` не принимается от browser updates, а Eloquent-коллекции существуют только как render data.
+- `/watching` обслуживает full-page `App\Livewire\ViewingActivity`: компонент хранит только paginator state, получает render-local данные из `CatalogViewingActivityQuery` и делегирует удаления в `CatalogViewingActivityService`.
 
 ## Actions и сервисы
 
@@ -33,6 +34,7 @@
 - `CatalogStatsPosterUrlGuard` проверяет, можно ли безопасно проксировать внешний poster URL; `CatalogStatsPageBuilder` не рендерит `poster_src` для URL, которые guard отвергнет, а `CatalogStatsPosterResponder` повторно применяет тот же guard перед HTTP-запросом.
 - `CatalogTitlePlaybackQuery` является общей playback boundary карточки: видимые summaries, точные counts, один активный сезон, playable media и deterministic next episode. `CatalogPrimaryActionResolver` выбирает continue/next/replay/start, а `CatalogUserStateService` записывает watchlist, rating и канонический user/episode progress только после повторной проверки доступности.
 - `CatalogPlaybackProgressSession` выпускает opaque encrypted token, привязанный к user/title/episode/media и TTL; в базе хранится только ULID session. `CatalogUserStateService` внутри короткой transaction использует unique row, `insertOrIgnore`, row lock и event sequence для idempotency/concurrent-device ordering. `CatalogPlaybackCompletionRule` единолично вычисляет percentage и completion по trusted media duration, configurable percent/remaining time или `ended`.
+- `CatalogViewingActivityQuery` не создаёт вторую историю: он ранжирует канонический progress через `ROW_NUMBER()` по сериалу, вычисляет следующий доступный выпуск одним оконным sequence-запросом в той же regular/special lane и затем пакетно загружает только выбранные тайтлы/серии. История пагинируется по user и eager-loads связи; отдельный grouped accessibility query помечает скрытые, удалённые и source-less строки без N+1.
 - `CatalogPlaybackSourceResolver` является единственной границей выдачи playback source: проверяет title/season/episode/media в момент разрешения и повторно на signed `/playback/{licensedMedia}`, ранжирует источники по явно заданным предпочтениям, provider priority, успешной проверке и качеству, затем возвращает небольшой `PlaybackSourceData`. Raw provider URL не передается в Livewire snapshot или Blade.
 - `PlaybackSourceUrlGuard` разделяется resolver и `SeasonvarMediaAvailabilityChecker`: допускаются только HTTPS-hosts из allowlist с публичными DNS-адресами. Availability checker не следует редиректам, использует Range/streaming, timeouts и лимит `Content-Length`, а progress context получает только `[redacted-url]`.
 
@@ -74,6 +76,7 @@
 - Счетчики rate limiter используют `CACHE_LIMITER_STORE=file`, отдельно от основного `CACHE_STORE=database`, чтобы публичный throttle не усиливал SQLite write contention.
 - Новые write/admin/import-control endpoints должны получать отдельный gate или policy до регистрации маршрута.
 - Authenticated действия карточки проходят auto-discovered `CatalogTitlePolicy::interact`; скрытие кнопок в Blade не используется как контроль доступа.
+- `/watching` отклоняет гостя до render. `EpisodeViewProgressPolicy` разрешает удалить только собственную запись и очистить только историю текущего user; чужой числовой ID не превращается в доступ к чужой истории.
 
 ## Защитные ограничения
 

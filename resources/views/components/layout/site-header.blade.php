@@ -42,6 +42,16 @@
                 <i class="fa-solid fa-table-cells-large" aria-hidden="true"></i>
                 <span class="sr-only xl:not-sr-only">Каталог</span>
             </a>
+            @auth
+                <a href="{{ route('viewing-activity') }}" @class([
+                    'inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2',
+                    'bg-emerald-50 text-emerald-700' => request()->routeIs('viewing-activity'),
+                    'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('viewing-activity'),
+                ]) @if (request()->routeIs('viewing-activity')) aria-current="page" @endif>
+                    <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+                    <span class="sr-only xl:not-sr-only">Мои просмотры</span>
+                </a>
+            @endauth
         </nav>
     </div>
 </header>

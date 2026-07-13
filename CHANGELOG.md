@@ -2,6 +2,8 @@
 
 ## 2026-07-13
 
+- Added the authenticated `/watching` Livewire page with one continue-watching action per accessible series, real-playback-only paginated history, Russian loading/empty/unavailable states, profile-scoped removal, and typed full-clear confirmation.
+- Derived continue/history state from canonical episode progress using fixed-query window ranking, deterministic release-lane navigation, batch hydration, and a new user/history ordering index; newly published episodes re-qualify completed series without cache invalidation.
 - Hardened persistent episode progress around the existing unique user/episode record: trusted media duration, percentage, first-start time, source media, opaque expiring playback sessions, monotonic event sequences, transactional retry-safe updates, and non-regressing completion state now feed the same history and continue-watching query.
 - Rebuilt the Plyr/HLS browser lifecycle around one guarded session per signed source: async initialization is generation-safe, listeners/timers/resources share AbortController cleanup, progress uses a playing-only heartbeat plus bounded lifecycle flushes, stale Livewire session events are rejected, and fixed Russian loading/retry/error states reveal no provider details. Cleanup also clears markers from the original media node restored by Plyr so Livewire navigation and the browser back-forward cache can initialize it exactly once again.
 - Centralized playback authorization and source selection in `CatalogPlaybackSourceResolver`: Blade/Livewire now receive a short-lived signed, viewer-bound internal URL instead of the stored provider URL, direct access rechecks the complete publication hierarchy and source ownership, and video sitemaps publish only internal player locations.

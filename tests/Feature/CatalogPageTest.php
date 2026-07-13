@@ -6,6 +6,7 @@ use App\Enums\ReleaseKind;
 use App\Livewire\CatalogSeries;
 use App\Livewire\CatalogTitlePlayer;
 use App\Livewire\StatsDashboard;
+use App\Livewire\ViewingActivity;
 use App\Models\Actor;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
@@ -1707,5 +1708,347 @@ class CatalogPageTest extends TestCase
             ->assertOk()
             ->assertSee('/playback/'.$lowerPriorityMedia->id.'?', false)
             ->assertDontSee('https://data00-cdn.11cdn.org/fallback.m3u8', false);
+    }
+
+    public function test_continue_watching_uses_one_accessible_recent_action_per_series(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $continuingTitle = CatalogTitle::factory()->create([
+            'title' => 'Продолжаемый сериал',
+            'slug' => 'prodolzhaemyi-serial',
+        ]);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $continuingTitle->id,
+            'number' => 1,
+        ]);
+        $episodes = collect([1, 2])->map(function (int $number) use ($continuingTitle, $season): Episode {
+            $episode = Episode::factory()->create([
+                'season_id' => $season->id,
+                'number' => $number,
+                'sort_order' => $number,
+                'title' => 'Продолжаемая серия '.$number,
+            ]);
+            LicensedMedia::factory()->create([
+                'catalog_title_id' => $continuingTitle->id,
+                'season_id' => $season->id,
+                'episode_id' => $episode->id,
+                'status' => 'published',
+                'published_at' => now(),
+            ]);
+
+            return $episode;
+        });
+        EpisodeViewProgress::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $continuingTitle->id,
+            'episode_id' => $episodes[0]->id,
+            'position_seconds' => 600,
+            'duration_seconds' => 600,
+            'progress_percent' => 100,
+            'first_started_at' => now()->subHours(2),
+            'completed_at' => now()->subHours(2),
+            'last_watched_at' => now()->subHours(2),
+        ]);
+        EpisodeViewProgress::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $continuingTitle->id,
+            'episode_id' => $episodes[1]->id,
+            'position_seconds' => 120,
+            'duration_seconds' => 600,
+            'progress_percent' => 20,
+            'first_started_at' => now()->subHour(),
+            'last_watched_at' => now()->subHour(),
+        ]);
+
+        $completedTitle = CatalogTitle::factory()->create([
+            'title' => 'Полностью просмотренный сериал',
+            'slug' => 'polnostiu-prosmotrennyi-serial',
+        ]);
+        $completedSeason = Season::factory()->create([
+            'catalog_title_id' => $completedTitle->id,
+            'number' => 1,
+        ]);
+        $completedEpisode = Episode::factory()->create([
+            'season_id' => $completedSeason->id,
+            'number' => 1,
+            'sort_order' => 1,
+        ]);
+        $completedMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $completedTitle->id,
+            'season_id' => $completedSeason->id,
+            'episode_id' => $completedEpisode->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        EpisodeViewProgress::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $completedTitle->id,
+            'episode_id' => $completedEpisode->id,
+            'position_seconds' => 600,
+            'duration_seconds' => 600,
+            'progress_percent' => 100,
+            'first_started_at' => now()->subMinutes(30),
+            'completed_at' => now()->subMinutes(30),
+            'last_watched_at' => now()->subMinutes(30),
+        ]);
+
+        $hiddenTitle = CatalogTitle::factory()->create([
+            'title' => 'Скрытый просмотр',
+            'slug' => 'skrytyi-prosmotr',
+            'publication_status' => 'hidden',
+        ]);
+        $hiddenSeason = Season::factory()->create(['catalog_title_id' => $hiddenTitle->id]);
+        $hiddenEpisode = Episode::factory()->create(['season_id' => $hiddenSeason->id]);
+        EpisodeViewProgress::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $hiddenTitle->id,
+            'episode_id' => $hiddenEpisode->id,
+            'position_seconds' => 60,
+            'duration_seconds' => 600,
+            'first_started_at' => now(),
+            'last_watched_at' => now(),
+        ]);
+        $mismatchedTitle = CatalogTitle::factory()->create([
+            'title' => 'Сериал с чужим источником',
+            'slug' => 'serial-s-chuzhim-istochnikom',
+        ]);
+        $mismatchedSeason = Season::factory()->create(['catalog_title_id' => $mismatchedTitle->id]);
+        $mismatchedEpisode = Episode::factory()->create(['season_id' => $mismatchedSeason->id]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $continuingTitle->id,
+            'season_id' => $mismatchedSeason->id,
+            'episode_id' => $mismatchedEpisode->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        EpisodeViewProgress::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $mismatchedTitle->id,
+            'episode_id' => $mismatchedEpisode->id,
+            'position_seconds' => 60,
+            'duration_seconds' => 600,
+            'first_started_at' => now(),
+            'last_watched_at' => now(),
+        ]);
+        EpisodeViewProgress::query()->create([
+            'user_id' => $otherUser->id,
+            'catalog_title_id' => $continuingTitle->id,
+            'episode_id' => $episodes[0]->id,
+            'position_seconds' => 300,
+            'duration_seconds' => 600,
+            'first_started_at' => now(),
+            'last_watched_at' => now(),
+        ]);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $component = Livewire::actingAs($user)
+            ->test(ViewingActivity::class)
+            ->assertSeeText('Продолжаемый сериал')
+            ->assertSeeText('Продолжить с 02:00')
+            ->assertSeeHtml('wire:key="continue-watching-'.$continuingTitle->id.'"')
+            ->assertDontSeeHtml('wire:key="continue-watching-'.$completedTitle->id.'"')
+            ->assertDontSeeHtml('wire:key="continue-watching-'.$mismatchedTitle->id.'"')
+            ->assertDontSeeText('Скрытый просмотр');
+
+        $this->assertSame(1, substr_count(
+            $component->html(),
+            'wire:key="continue-watching-'.$continuingTitle->id.'"',
+        ));
+        $queries = collect(DB::getQueryLog());
+        $this->assertLessThanOrEqual(12, $queries->count());
+        $continueSql = $queries->pluck('query')->implode("\n");
+        $this->assertStringContainsString('ROW_NUMBER() OVER', $continueSql);
+        $this->assertStringContainsString('LEAD(', $continueSql);
+
+        $newEpisode = Episode::factory()->create([
+            'season_id' => $completedSeason->id,
+            'number' => 2,
+            'sort_order' => 2,
+            'title' => 'Новая опубликованная серия',
+        ]);
+        $newMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $completedTitle->id,
+            'season_id' => $completedSeason->id,
+            'episode_id' => $newEpisode->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ViewingActivity::class)
+            ->assertSeeText('Полностью просмотренный сериал')
+            ->assertSeeHtml('wire:key="continue-watching-'.$completedTitle->id.'"')
+            ->assertSeeText('Следующая серия');
+
+        $completedMedia->update(['check_status' => 'unavailable']);
+
+        Livewire::actingAs($user)
+            ->test(ViewingActivity::class)
+            ->assertSeeHtml('wire:key="continue-watching-'.$completedTitle->id.'"')
+            ->assertSeeText('Следующая серия');
+
+        $newMedia->update(['check_status' => 'unavailable']);
+
+        Livewire::actingAs($user)
+            ->test(ViewingActivity::class)
+            ->assertDontSeeHtml('wire:key="continue-watching-'.$completedTitle->id.'"');
+    }
+
+    public function test_viewing_history_is_profile_scoped_paginated_and_requires_actual_playback(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $title = CatalogTitle::factory()->create([
+            'title' => 'История владельца',
+            'slug' => 'istoriia-vladeltsa',
+        ]);
+        $season = Season::factory()->create(['catalog_title_id' => $title->id, 'number' => 1]);
+
+        foreach (range(1, 13) as $number) {
+            $episode = Episode::factory()->create([
+                'season_id' => $season->id,
+                'number' => $number,
+                'sort_order' => $number,
+                'title' => $number === 1 ? 'Самая старая серия истории' : 'Серия истории '.$number,
+            ]);
+            LicensedMedia::factory()->create([
+                'catalog_title_id' => $title->id,
+                'season_id' => $season->id,
+                'episode_id' => $episode->id,
+                'status' => 'published',
+                'published_at' => now(),
+            ]);
+            EpisodeViewProgress::query()->create([
+                'user_id' => $user->id,
+                'catalog_title_id' => $title->id,
+                'episode_id' => $episode->id,
+                'position_seconds' => 30,
+                'duration_seconds' => 600,
+                'first_started_at' => now()->subMinutes(14 - $number),
+                'last_watched_at' => now()->subMinutes(14 - $number),
+            ]);
+        }
+
+        $pageVisitOnlyEpisode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 99,
+            'title' => 'Только открытая страница',
+        ]);
+        EpisodeViewProgress::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $title->id,
+            'episode_id' => $pageVisitOnlyEpisode->id,
+            'position_seconds' => 0,
+            'duration_seconds' => 0,
+            'first_started_at' => null,
+            'last_watched_at' => now(),
+        ]);
+
+        $otherTitle = CatalogTitle::factory()->create([
+            'title' => 'Чужая история',
+            'slug' => 'chuzhaia-istoriia',
+        ]);
+        $otherSeason = Season::factory()->create(['catalog_title_id' => $otherTitle->id]);
+        $otherEpisode = Episode::factory()->create(['season_id' => $otherSeason->id]);
+        EpisodeViewProgress::query()->create([
+            'user_id' => $otherUser->id,
+            'catalog_title_id' => $otherTitle->id,
+            'episode_id' => $otherEpisode->id,
+            'position_seconds' => 30,
+            'duration_seconds' => 600,
+            'first_started_at' => now(),
+            'last_watched_at' => now(),
+        ]);
+
+        $this->get(route('viewing-activity'))->assertForbidden();
+        $this->actingAs($user)
+            ->get(route('viewing-activity'))
+            ->assertOk()
+            ->assertSeeText('История просмотров')
+            ->assertDontSeeText('Чужая история')
+            ->assertDontSeeText('Только открытая страница');
+
+        Livewire::actingAs($user)
+            ->test(ViewingActivity::class)
+            ->assertSeeText('История владельца')
+            ->assertDontSeeText('Самая старая серия истории')
+            ->call('setPage', 2, 'historyPage')
+            ->assertSeeText('Самая старая серия истории')
+            ->assertSet('paginators.historyPage', 2);
+    }
+
+    public function test_viewing_history_removal_and_clear_are_authorized_and_synchronize_continue_watching(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $title = CatalogTitle::factory()->create([
+            'title' => 'Удаляемая история',
+            'slug' => 'udaliaemaia-istoriia',
+        ]);
+        $season = Season::factory()->create(['catalog_title_id' => $title->id]);
+        $episode = Episode::factory()->create(['season_id' => $season->id]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $title->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        $ownProgress = EpisodeViewProgress::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $title->id,
+            'episode_id' => $episode->id,
+            'position_seconds' => 90,
+            'duration_seconds' => 600,
+            'first_started_at' => now(),
+            'last_watched_at' => now(),
+        ]);
+        $otherProgress = EpisodeViewProgress::query()->create([
+            'user_id' => $otherUser->id,
+            'catalog_title_id' => $title->id,
+            'episode_id' => $episode->id,
+            'position_seconds' => 45,
+            'duration_seconds' => 600,
+            'first_started_at' => now(),
+            'last_watched_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ViewingActivity::class)
+            ->assertSeeText('Удаляемая история')
+            ->assertSeeHtml('wire:confirm="Удалить этот просмотр из истории?"')
+            ->call('removeHistoryItem', $otherProgress->id)
+            ->assertForbidden();
+
+        Livewire::actingAs($user)
+            ->test(ViewingActivity::class)
+            ->call('removeHistoryItem', $ownProgress->id)
+            ->assertSeeText('История просмотров пока пуста')
+            ->assertDontSeeText('Удаляемая история');
+
+        $this->assertFalse(EpisodeViewProgress::query()->whereKey($ownProgress->id)->exists());
+        $this->assertTrue(EpisodeViewProgress::query()->whereKey($otherProgress->id)->exists());
+
+        $secondOwnProgress = EpisodeViewProgress::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $title->id,
+            'episode_id' => $episode->id,
+            'position_seconds' => 120,
+            'duration_seconds' => 600,
+            'first_started_at' => now(),
+            'last_watched_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(ViewingActivity::class)
+            ->assertSeeHtml('wire:confirm.prompt="Очистить всю историю просмотров?')
+            ->call('clearHistory')
+            ->assertSeeText('История просмотров пока пуста');
+
+        $this->assertFalse(EpisodeViewProgress::query()->whereKey($secondOwnProgress->id)->exists());
+        $this->assertTrue(EpisodeViewProgress::query()->whereKey($otherProgress->id)->exists());
     }
 }

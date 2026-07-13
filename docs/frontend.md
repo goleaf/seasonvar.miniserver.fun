@@ -7,7 +7,7 @@
 - Vite 8 и `laravel-vite-plugin` 3 собирают фронтенд.
 - Tailwind CSS 4 подключается через `@tailwindcss/vite` и `resources/css/app.css`.
 - FontAwesome, Plyr и HLS подключаются из локальных npm-пакетов, без CDN.
-- Livewire 4 используется для интерактивного каталога `/titles`, playback-island карточки `/titles/{slug}` и live-страницы `/stats`; ассеты Livewire подключаются явно через layout.
+- Livewire 4 используется для интерактивного каталога `/titles`, playback-island карточки `/titles/{slug}`, личной страницы `/watching` и live-страницы `/stats`; ассеты Livewire подключаются явно через layout.
 
 ## Команды
 
@@ -32,6 +32,7 @@ composer dev
 - Состояния loading, buffering, automatic retry, expired/unavailable source и fatal error отображаются фиксированным русским текстом рядом с `wire:ignore` player island. Provider URL, exception text и raw media errors в status region не выводятся.
 - Поиск актеров и режиссеров выполняется Livewire на сервере с debounce 350 мс и лимитом 24 результата, поэтому полный справочник не попадает в браузер. Локальный поиск для остальных длинных групп остается progressive enhancement из `resources/js/app.js`; GET-форма работает без JavaScript.
 - Серверное состояние `/titles` ведёт `CatalogSeries`: строка поиска обновляется с debounce 650 мс, checkbox/расширенные поля применяются по submit, а сортировка, вид, размер страницы, алфавит и пагинация обновляются отдельными Livewire actions. Для всех форм сохранён обычный GET fallback; malformed и out-of-range `page` канонизируется redirect-ом, чтобы адресная строка не сохраняла stale границу.
+- `/watching` не сериализует Eloquent collections в публичное состояние: Continue Watching и paginator истории строятся только внутри render. Удаление использует `wire:confirm`, полная очистка — `wire:confirm.prompt`, а `historyPage` остаётся отдельным URL-параметром Livewire pagination.
 - Для HLS используется `hls.js/light`: он сохраняет воспроизведение HLS-плейлистов и не тянет модули субтитров, DRM и расширенной аналитики, которые сейчас не используются интерфейсом.
 - Layout подключает ассеты через `@vite('resources/js/app.js')`; не добавлять raw `<script>`/`<style>` для обычных assets.
 - Layout также содержит `@livewireStyles` и `@livewireScripts`; не дублировать Livewire/Alpine через CDN или отдельный npm-bundle.

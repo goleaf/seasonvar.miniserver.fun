@@ -10,6 +10,7 @@
 - Для будущих write/admin/moderation/import-control endpoints нужно добавлять отдельные gates или policies до публикации маршрута.
 - Blade-шаблоны не принимают решений авторизации. Допустимы только простые display checks: `@can`, `@cannot`, `@auth`, `@guest`.
 - Watchlist, rating и progress карточки доступны только authenticated user и проходят `CatalogTitlePolicy::interact`; policy повторно проверяет `CatalogTitle::availableTo($user)` независимо от видимости controls.
+- `/watching` доступен только authenticated user. `CatalogViewingActivityQuery` начинает обе выборки с `whereBelongsTo($user)`, а `EpisodeViewProgressPolicy` отдельно защищает удаление одной записи и полную очистку; чужой progress ID возвращает 403 и не изменяется.
 - Playable source не является публичным полем модели. Livewire получает только `PlaybackSourceData` с короткоживущим signed URL; `/playback/{licensedMedia}` сверяет подпись, viewer с текущей сессией и всю publication hierarchy повторно, поэтому прямой URL не обходит снятие с публикации или смену audience.
 
 ## Реализация

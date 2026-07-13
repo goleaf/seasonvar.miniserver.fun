@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Policies\EpisodeViewProgressPolicy;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\UsePolicy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -22,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'completed_at',
     'last_watched_at',
 ])]
+#[UsePolicy(EpisodeViewProgressPolicy::class)]
 class EpisodeViewProgress extends Model
 {
     protected $table = 'episode_view_progress';

@@ -2,6 +2,8 @@
 
 ## 13.07.2026 — Централизованная выдача playback source
 
+- Добавлена authenticated Livewire-страница `/watching`: Continue Watching дедуплицирован по сериалу и динамически выбирает сохранённый или следующий доступный выпуск, а фактическая история пагинируется без отдельной event-таблицы. Удаление одной записи и полная очистка защищены `EpisodeViewProgressPolicy` и сразу синхронизируют оба блока.
+- Continue Watching использует оконные SQL rank/lead по каноническому progress и release lane, пакетную загрузку тайтлов/серий и текущую playback boundary. Поэтому новая опубликованная серия возвращает завершённый сериал без cache invalidation, а hidden/expired/deleted/source-failed выпуски не получают ссылку.
 - Raw provider URLs удалены из HTML и Livewire payload; плеер использует короткоживущий signed endpoint с viewer binding и rate limit.
 - Persistent progress сохраняется одной строкой на user/episode: encrypted session token связывает user/title/episode/media, ULID и event sequence отбрасывают retries/out-of-order/старые вкладки, а короткая transaction атомарно обновляет source, trusted duration, percentage, first/last watched и completion. Completed episode не становится непросмотренным от позднего события или replay; отдельного unwatched product action пока нет.
 - Добавлен `SeasonvarTitlePageStateSynchronizer`: после успешного parse или unchanged-skip он выравнивает derived `missing_data_flags` уже разобранных и не закреплённых worker'ом страниц одного тайтла по canonical id и season URL hashes, не копируя page-specific import history.
@@ -178,7 +180,7 @@
 <!-- project-docs:start -->
 ## Автоматически обновляемое состояние документации
 
-- Последнее автоматическое обновление блоков документации: 12.07.2026.
+- Последнее автоматическое обновление блоков документации: 13.07.2026.
 - Команда обновления: `php artisan project:docs-refresh`.
 - Хук автокоммита: `.githooks/post-commit` через `scripts/docs-autocommit-push.sh`; отправка в Git включается только через `SEASONVAR_DOCS_AUTO_PUSH=1`.
 - Основной sitemap для robots и поисковых систем: `https://seasonvar.miniserver.fun/sitemap-index.xml`.
