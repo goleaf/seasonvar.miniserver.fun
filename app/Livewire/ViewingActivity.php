@@ -65,10 +65,10 @@ final class ViewingActivity extends Component
             'continueWatching' => $this->activity->continueWatching($user),
             'history' => $this->activity->history($user),
         ])->extends('layouts.app', [
-            'title' => 'Мои просмотры',
+            'title' => __('catalog.viewing.title'),
             'seo' => [
-                'title' => 'Мои просмотры',
-                'description' => 'Личная история просмотра сериалов.',
+                'title' => __('catalog.viewing.title'),
+                'description' => __('catalog.viewing.seo_description'),
                 'robots' => 'noindex, nofollow',
                 'canonical' => route('viewing-activity'),
             ],

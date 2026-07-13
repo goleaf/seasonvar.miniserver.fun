@@ -9,31 +9,31 @@
                         <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-emerald-50 text-emerald-700">
                             <i class="fa-solid fa-compass" aria-hidden="true"></i>
                         </span>
-                        <h2 class="text-sm font-bold text-slate-700">Быстрый доступ</h2>
+                        <h2 class="text-sm font-bold text-slate-700">{{ __('catalog.title.quick_access') }}</h2>
                     </div>
                 </div>
                 <div class="space-y-4 p-4">
-                    <nav aria-label="Быстрые переходы по сериалу" class="-mx-2 grid gap-1">
+                    <nav aria-label="{{ __('catalog.title.quick_navigation') }}" class="-mx-2 grid gap-1">
                         <a data-title-quick-link href="#player" class="relative inline-flex min-h-11 items-center gap-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-700 before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-emerald-600 hover:bg-emerald-100">
                             <i class="fa-solid fa-circle-play w-4 text-center" aria-hidden="true"></i>
-                            <span>Смотреть</span>
+                            <span>{{ __('catalog.title.watch') }}</span>
                         </a>
 
                         <a data-title-quick-link href="#seasons" class="inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-700">
                             <i class="fa-solid fa-layer-group w-4 text-center text-slate-400" aria-hidden="true"></i>
-                            <span>Сезоны</span>
+                            <span>{{ __('catalog.title.seasons') }}</span>
                         </a>
 
                         <a data-title-quick-link href="#data-title-reference" class="inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-700">
                             <i class="fa-solid fa-circle-info w-4 text-center text-slate-400" aria-hidden="true"></i>
-                            <span>О сериале</span>
+                            <span>{{ __('catalog.title.about') }}</span>
                         </a>
                     </nav>
 
                     <div class="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
                         <div class="rounded-lg bg-slate-50 px-3 py-2">
                             <div class="flex items-center justify-between gap-2">
-                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Сезонов</div>
+                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('catalog.title.seasons') }}</div>
                                 <i class="fa-solid fa-layer-group text-slate-400" aria-hidden="true"></i>
                             </div>
                             <div class="mt-1 text-lg font-black tabular-nums text-slate-800">{{ $showView->parsedSeasonCount }}</div>
@@ -41,7 +41,7 @@
 
                         <div class="rounded-lg bg-slate-50 px-3 py-2">
                             <div class="flex items-center justify-between gap-2">
-                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Серий</div>
+                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('catalog.title.episodes') }}</div>
                                 <i class="fa-solid fa-list-ol text-slate-400" aria-hidden="true"></i>
                             </div>
                             <div class="mt-1 text-lg font-black tabular-nums text-slate-800">{{ $showView->episodeCount }}</div>
@@ -49,7 +49,7 @@
 
                         <div class="rounded-lg bg-slate-50 px-3 py-2">
                             <div class="flex items-center justify-between gap-2">
-                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">Видео</div>
+                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('catalog.title.video') }}</div>
                                 <i class="fa-solid fa-file-video text-slate-400" aria-hidden="true"></i>
                             </div>
                             <div class="mt-1 text-lg font-black tabular-nums text-slate-800">{{ $showView->mediaCount }}</div>
@@ -65,7 +65,7 @@
                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
                     <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                         <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
-                        <span>К каталогу</span>
+                        <span>{{ __('catalog.title.back_to_catalog') }}</span>
                     </a>
                 </div>
 
@@ -75,10 +75,10 @@
                     <div class="min-w-0">
                         <h1 class="flex min-w-0 items-start gap-3 text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">
                             <i class="fa-solid fa-clapperboard mt-1 text-emerald-700" aria-hidden="true"></i>
-                            <span class="min-w-0 break-words">{{ $title->title }}</span>
+                            <span class="min-w-0 break-words">{{ $showView->displayTitle }}</span>
                         </h1>
-                        @if ($title->original_title)
-                            <div class="mt-2 break-words text-sm font-semibold text-slate-500">{{ $title->original_title }}</div>
+                        @if ($showView->displayOriginalTitle !== '')
+                            <div class="mt-2 break-words text-sm font-semibold text-slate-500">{{ $showView->displayOriginalTitle }}</div>
                         @endif
 
                         <div class="mt-4 flex flex-wrap gap-2 text-xs font-bold">
@@ -88,17 +88,17 @@
                             @foreach ($ageRatings as $ageRating)
                                 <x-ui.taxonomy-chip :taxonomy="$ageRating" active />
                             @endforeach
-                            <x-ui.taxonomy-chip icon="fa-solid fa-layer-group">{{ $seasons->count() }} сезонов</x-ui.taxonomy-chip>
-                            <x-ui.taxonomy-chip icon="fa-solid fa-list-ol">{{ $episodeCount }} серий</x-ui.taxonomy-chip>
-                            <x-ui.taxonomy-chip icon="fa-solid fa-file-video">{{ $mediaCount }} видео</x-ui.taxonomy-chip>
+                            <x-ui.taxonomy-chip icon="fa-solid fa-layer-group">{{ trans_choice('catalog.counts.seasons', $seasons->count()) }}</x-ui.taxonomy-chip>
+                            <x-ui.taxonomy-chip icon="fa-solid fa-list-ol">{{ trans_choice('catalog.counts.episodes', $episodeCount) }}</x-ui.taxonomy-chip>
+                            <x-ui.taxonomy-chip icon="fa-solid fa-file-video">{{ trans_choice('catalog.counts.videos', $mediaCount) }}</x-ui.taxonomy-chip>
                         </div>
 
                         <section class="mt-5 rounded-control border border-slate-200 bg-white p-4">
                             <h2 class="flex items-center gap-2 text-sm font-bold text-slate-700">
                                 <i class="fa-solid fa-book-open text-slate-400" aria-hidden="true"></i>
-                                <span>Описание</span>
+                                <span>{{ __('catalog.title.description') }}</span>
                             </h2>
-                            <p class="mt-2 text-sm leading-6 text-slate-600">{{ $title->description ?: 'Описание пока отсутствует.' }}</p>
+                            <p class="mt-2 text-sm leading-6 text-slate-600">{{ $showView->displayDescription !== '' ? $showView->displayDescription : __('catalog.title.description_missing') }}</p>
                         </section>
 
                     </div>
@@ -107,12 +107,12 @@
 
             <livewire:catalog-title-player :catalog-title-id="$title->id" />
 
-            <x-ui.panel data-title-reference title="О сериале" icon="fa-solid fa-circle-info">
+            <x-ui.panel data-title-reference :title="__('catalog.title.about')" icon="fa-solid fa-circle-info">
                 @if ($actors->isNotEmpty())
                     <div>
                         <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
                             <i class="fa-solid fa-user-group text-slate-400" aria-hidden="true"></i>
-                            <span>В ролях</span>
+                            <span>{{ __('catalog.title.cast') }}</span>
                         </div>
                         <div class="mt-2 flex flex-wrap gap-2">
                             @foreach ($actors->take(12) as $actor)
@@ -142,7 +142,7 @@
                         <div class="grid gap-2 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
                             <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
                                 <i class="fa-solid fa-signature text-slate-400" aria-hidden="true"></i>
-                                <span>Другие названия</span>
+                                <span>{{ __('catalog.title.other_names') }}</span>
                             </dt>
                             <dd class="flex flex-wrap gap-1.5">
                                 @foreach ($aliases as $alias)
@@ -155,12 +155,12 @@
                         <div class="grid gap-2 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
                             <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
                                 <i class="fa-solid fa-star text-slate-400" aria-hidden="true"></i>
-                                <span>Рейтинги</span>
+                                <span>{{ __('catalog.title.ratings') }}</span>
                             </dt>
                             <dd class="flex flex-wrap gap-1.5">
                                 @foreach ($ratings as $rating)
                                     <x-ui.status-pill variant="success">
-                                        {{ mb_strtoupper($rating->provider) }}: {{ $rating->rating }}@if ($rating->votes) · {{ $rating->votes }} голосов @endif
+                                        {{ mb_strtoupper($rating->provider) }}: {{ $rating->rating }}@if ($rating->votes) · {{ trans_choice('catalog.counts.votes', $rating->votes) }} @endif
                                     </x-ui.status-pill>
                                 @endforeach
                             </dd>
@@ -168,7 +168,7 @@
                     @endif
                     @if ($title->year)
                         <div class="grid gap-2 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
-                            <dt class="font-bold text-slate-500">Вышел</dt>
+                            <dt class="font-bold text-slate-500">{{ __('catalog.title.released') }}</dt>
                             <dd><a href="{{ route('titles.year', ['year' => $title->year]) }}" class="font-bold text-emerald-700">{{ $title->year }}</a></dd>
                         </div>
                     @endif
@@ -183,7 +183,7 @@
                 @endif
             </x-ui.panel>
 
-            <x-ui.panel title="Советуем посмотреть" icon="fa-solid fa-thumbs-up" :pad="false">
+            <x-ui.panel :title="__('catalog.title.recommendations')" icon="fa-solid fa-thumbs-up" :pad="false">
                 @if ($recommendedTitleRecommendations->first()?->recommendedTitle)
                     <div class="space-y-3 p-3">
                         <div class="grid gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
@@ -206,7 +206,7 @@
                                 <div class="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
                                     <div class="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">
                                         <i class="fa-solid fa-ranking-star text-emerald-700" aria-hidden="true"></i>
-                                        <span>Ближайшие совпадения</span>
+                                        <span>{{ __('catalog.title.closest_matches') }}</span>
                                     </div>
                                     <div class="divide-y divide-slate-200">
                                         @foreach ($recommendedTitleRecommendations->skip(1)->take(4) as $recommendation)
@@ -262,7 +262,7 @@
                                     <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
                                         <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
                                             <i class="fa-solid fa-tags text-emerald-700" aria-hidden="true"></i>
-                                            <span>По похожим жанрам</span>
+                                            <span>{{ __('catalog.title.similar_genres') }}</span>
                                         </div>
                                     </div>
                                     <div class="divide-y divide-slate-200">
@@ -278,7 +278,7 @@
                                     <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
                                         <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
                                             <i class="fa-solid fa-calendar-days text-emerald-700" aria-hidden="true"></i>
-                                            <span>За {{ $title->year }} год</span>
+                                            <span>{{ __('catalog.title.same_year', ['year' => $title->year]) }}</span>
                                         </div>
                                     </div>
                                     <div class="divide-y divide-slate-200">
@@ -294,7 +294,7 @@
                             <div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
                                 <div class="inline-flex items-center gap-2">
                                     <i class="fa-solid fa-circle-info text-slate-400" aria-hidden="true"></i>
-                                    <span>Похожие сериалы пока не подобраны.</span>
+                                    <span>{{ __('catalog.title.recommendations_missing') }}</span>
                                 </div>
                             </div>
                         </div>
@@ -303,7 +303,7 @@
             </x-ui.panel>
 
             @if (! empty($seo['faq']))
-                <x-ui.panel title="Вопросы о сериале" icon="fa-solid fa-circle-question" :pad="false">
+                <x-ui.panel :title="__('catalog.title.questions')" icon="fa-solid fa-circle-question" :pad="false">
                     <div class="divide-y divide-slate-200">
                         @foreach ($seo['faq'] as $faqItem)
                             <details class="group px-4 py-3">
@@ -318,7 +318,7 @@
                 </x-ui.panel>
             @endif
 
-            <x-ui.panel title="Связи каталога" icon="fa-solid fa-diagram-project">
+            <x-ui.panel :title="__('catalog.title.relations')" icon="fa-solid fa-diagram-project">
                 <div class="space-y-3">
                     @forelse ($taxonomyGroups as $taxonomyType => $taxonomies)
                         <div>
@@ -336,7 +336,7 @@
                             </div>
                         </div>
                     @empty
-                        <span class="text-sm text-slate-500">Связи не указаны.</span>
+                        <span class="text-sm text-slate-500">{{ __('catalog.title.relations_missing') }}</span>
                     @endforelse
                 </div>
             </x-ui.panel>

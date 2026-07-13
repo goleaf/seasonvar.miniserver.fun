@@ -85,7 +85,7 @@
             <meta name="topic-authority-keywords" content="{{ $topicAuthoritySignals->pluck('query')->take(35)->implode(', ') }}">
             <meta name="release-calendar-keywords" content="{{ $releaseCalendarQueries->pluck('query')->take(35)->implode(', ') }}">
             <meta name="resource-type" content="document">
-            <meta name="language" content="Russian">
+            <meta name="language" content="{{ $languageName }}">
         @endif
         @foreach ($topicTerms->take(10) as $term)
             <meta name="entity" content="{{ $term }}">
@@ -98,7 +98,7 @@
         @endforeach
         <meta name="theme-color" content="#ecfdf5">
         <link rel="canonical" href="{{ $canonicalUrl }}">
-        <link rel="alternate" hreflang="ru" href="{{ $canonicalUrl }}">
+        <link rel="alternate" hreflang="{{ $htmlLang }}" href="{{ $canonicalUrl }}">
         <link rel="alternate" hreflang="x-default" href="{{ $canonicalUrl }}">
         <link rel="sitemap" type="application/xml" href="{{ route('sitemap.index') }}">
         <link rel="sitemap" type="application/xml" href="{{ route('sitemap.landings') }}">
@@ -109,7 +109,7 @@
         <meta name="referrer" content="strict-origin-when-cross-origin">
         <meta name="DC.title" content="{{ $fullTitle }}">
         <meta name="DC.description" content="{{ $seoDescription }}">
-        <meta name="DC.language" content="ru">
+        <meta name="DC.language" content="{{ $htmlLang }}">
         @if (! empty($seo['prev']))
             <link rel="prev" href="{{ $seo['prev'] }}">
         @endif

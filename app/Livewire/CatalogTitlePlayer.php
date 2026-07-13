@@ -391,38 +391,41 @@ class CatalogTitlePlayer extends Component
 
     public function episodeCountLabel(int $count): string
     {
-        $noun = match (true) {
-            $count % 10 === 1 && $count % 100 !== 11 => 'серия доступна',
-            in_array($count % 10, [2, 3, 4], true) && ! in_array($count % 100, [12, 13, 14], true) => 'серии доступны',
-            default => 'серий доступно',
-        };
-
-        return $count.' '.$noun;
+        return trans_choice('catalog.counts.available_episodes', $count);
     }
 
     public function episodeDisplayLabel(Episode $episode): string
     {
         if ($episode->kind === ReleaseKind::Special) {
-            return $episode->number !== null ? 'Спецвыпуск '.$episode->number : 'Спецвыпуск';
+            return $episode->number !== null
+                ? __('catalog.release.special_episode', ['number' => $episode->number])
+                : __('catalog.release.special_episode_without_number');
         }
 
-        return $episode->number !== null ? $episode->number.' серия' : 'Серия без номера';
+        return $episode->number !== null
+            ? __('catalog.release.episode', ['number' => $episode->number])
+            : __('catalog.release.episode_without_number');
     }
 
     public function selectedEpisodeLabel(Episode $episode): string
     {
-        return $episode->kind === ReleaseKind::Special
-            ? 'Выбран '.$this->episodeDisplayLabel($episode)
-            : 'Выбрана '.$this->episodeDisplayLabel($episode);
+        return __(
+            $episode->kind === ReleaseKind::Special ? 'catalog.release.selected_special' : 'catalog.release.selected_episode',
+            ['episode' => $this->episodeDisplayLabel($episode)],
+        );
     }
 
     public function seasonDisplayLabel(Season $season): string
     {
         if ($season->kind === ReleaseKind::Special) {
-            return $season->number !== null ? 'Спецсезон '.$season->number : 'Спецсезон';
+            return $season->number !== null
+                ? __('catalog.release.special_season', ['number' => $season->number])
+                : __('catalog.release.special_season_without_number');
         }
 
-        return $season->number !== null ? 'Сезон '.$season->number : 'Сезон без номера';
+        return $season->number !== null
+            ? __('catalog.release.season', ['number' => $season->number])
+            : __('catalog.release.season_without_number');
     }
 
     /** @param Collection<int, Season> $seasons */

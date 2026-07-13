@@ -176,8 +176,8 @@ final class CatalogViewingActivityQuery
                 episode: $episode,
                 actionType: $item['action_type'],
                 actionLabel: $item['action_type'] === 'continue'
-                    ? 'Продолжить с '.$this->formatPosition($position)
-                    : 'Следующая серия',
+                    ? __('catalog.player.continue_from', ['position' => $this->formatPosition($position)])
+                    : __('catalog.player.next'),
                 progressPercent: $item['progress_percent'],
             );
         })->filter()->values();

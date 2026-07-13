@@ -7,6 +7,7 @@ namespace App\Services\Catalog;
 use App\Enums\PublicationStatus;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
+use App\Models\CatalogTitleSlug;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
@@ -77,6 +78,19 @@ final class CatalogAdministrationService
                 $current = CatalogTitle::query()->withTrashed()->lockForUpdate()->findOrFail($title->id);
                 $this->assertVersion($expectedVersion, $this->titleVersion($current));
                 $publicationStatus = PublicationStatus::from((string) $attributes['publication_status']);
+                $nextSlug = (string) $attributes['slug'];
+
+                if ($current->slug !== $nextSlug) {
+                    CatalogTitleSlug::query()
+                        ->whereBelongsTo($current)
+                        ->where('slug', $nextSlug)
+                        ->delete();
+                    CatalogTitleSlug::query()->firstOrCreate([
+                        'slug' => $current->slug,
+                    ], [
+                        'catalog_title_id' => $current->id,
+                    ]);
+                }
 
                 $current->forceFill([
                     ...Arr::only($attributes, [

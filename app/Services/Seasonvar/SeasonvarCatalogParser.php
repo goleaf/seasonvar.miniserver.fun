@@ -14,6 +14,19 @@ class SeasonvarCatalogParser
 {
     public const METADATA_VERSION = 1;
 
+    private const METADATA_PRESENCE_FIELDS = [
+        'genres' => ['type' => 'genre', 'labels' => ['Жанр']],
+        'countries' => ['type' => 'country', 'labels' => ['Страна']],
+        'actors' => ['type' => 'actor', 'labels' => ['В ролях', 'Актеры', 'Актёры']],
+        'directors' => ['type' => 'director', 'labels' => ['Режиссер', 'Режиссёр']],
+        'age_ratings' => ['type' => 'age_rating', 'labels' => ['Ограничение']],
+        'translations' => ['type' => 'translation', 'labels' => ['Перевод', 'Озвучка']],
+        'statuses' => ['type' => 'status', 'labels' => ['Статус']],
+        'networks' => ['type' => 'network', 'labels' => ['Телеканал', 'Канал']],
+        'studios' => ['type' => 'studio', 'labels' => ['Студии', 'Студия']],
+        'tags' => ['type' => 'tag', 'labels' => []],
+    ];
+
     /**
      * @var list<string>
      */
@@ -172,6 +185,34 @@ class SeasonvarCatalogParser
             'reviews' => $this->reviews($xpath),
             'parse_meta' => $parseMeta,
         ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $taxonomies
+     * @param  array<string, mixed>  $parseMeta
+     * @return array<string, 'present'|'rejected_invalid'|'absent_in_source'>
+     */
+    public function metadataPresence(array $taxonomies, array $parseMeta): array
+    {
+        $presentTypes = collect($taxonomies)->pluck('type')->unique();
+        $labels = collect($parseMeta['info_labels'] ?? [])
+            ->filter(fn (mixed $label): bool => is_string($label))
+            ->map(fn (string $label): string => Str::lower($label));
+
+        return collect(self::METADATA_PRESENCE_FIELDS)
+            ->mapWithKeys(function (array $definition, string $field) use ($presentTypes, $labels): array {
+                if ($presentTypes->contains($definition['type'])) {
+                    return [$field => 'present'];
+                }
+
+                $hadSourceValue = collect($definition['labels'])
+                    ->map(fn (string $label): string => Str::lower($label))
+                    ->intersect($labels)
+                    ->isNotEmpty();
+
+                return [$field => $hadSourceValue ? 'rejected_invalid' : 'absent_in_source'];
+            })
+            ->all();
     }
 
     private function loadHtml(string $html): DOMDocument

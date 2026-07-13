@@ -53,10 +53,22 @@ HTTP query-параметр `q` проходит через `CatalogTitlesReques
 | `смотреть онлайн` | `insufficient`, поскольку оба токена входят в список стоп-слов. |
 | `znakhar` | `ready`, токен `znakhar`; legacy-варианты включают совместимое написание `znaxar`. |
 
+## FTS5-документы и rebuild
+
+Additive migration `2026_07_13_170000_create_catalog_search_index` создаёт один `catalog_title_search_documents` на тайтл, external-content FTS5 table и три trigger для insert/update/delete. Удаление тайтла каскадно удаляет документ, а delete trigger удаляет FTS row. Миграция не backfill-ит каталог; singleton `catalog_search_index_states` остаётся в `building`, пока отдельная проверенная перестройка не завершится.
+
+`CatalogSearchDocumentBuilder` принимает только заранее загруженный тайтл. Отдельные weighted-поля содержат название, original title, алиасы, людей, остальные справочники, транслитерацию и описание; source URL, media URL, provider ID, snapshot и importer state не копируются. Детерминированный fingerprint не зависит от timestamps и порядка relation rows.
+
+`CatalogSearchIndexer` пакетно загружает алиасы и все десять relations, индексирует только публично видимые тайтлы и выполняет upsert только при изменившемся fingerprint. Полная перестройка использует checkpoint ID и bounded `chunkById`; после каждого пакета checkpoint сохраняется. Команда:
+
+```bash
+php artisan catalog:search-rebuild --chunk=200
+```
+
+Команда отказывается работать при `queued` или `running` import run. Состояние становится `ready` только при совпадении source/document counts и успешном FTS5 external-content integrity check. Ошибка сохраняется в sanitized виде, checkpoint остаётся для resume, а публичный поиск продолжает legacy path.
+
 ## Ограничения rollout
 
-Нормализатор и парсер подключены к текущему Eloquent legacy-поиску. Additive migration `2026_07_12_230000_add_catalog_alias_search_index` добавляет covering lookup `(name_hash, catalog_title_id)` для exact alias branch; production-данные не backfill-ятся и importer payload не меняется. FTS5-таблицы еще не созданы, а построение и синхронизация полнотекстового индекса не выполняются.
+Нормализатор и парсер уже подключены к текущему Eloquent legacy-поиску. Migration `2026_07_12_230000_add_catalog_alias_search_index` добавляет covering lookup `(name_hash, catalog_title_id)` для exact alias branch. Ranked BM25 driver, write-boundary synchronization, people lookup и typo suggestions включаются отдельными следующими этапами; до состояния `ready` неполный FTS5 никогда не ограничивает публичную выдачу.
 
-FTS5, typo suggestions и ранжирование BM25 остаются отдельным этапом. Текущий Eloquent-поиск возвращает истинный ноль, а интерфейс различает неизвестный запрос и запрос только из стоп-слов. `Очистить поиск` сохраняет фильтры, год и сортировку; `Сбросить фильтры` сохраняет поисковую строку и сортировку.
-
-На SQLite создание индекса кратковременно блокирует schema writes. Deployment order: штатно остановить importer/queue workers, выполнить согласованный WAL checkpoint и backup, запустить `php artisan migrate --force`, проверить `/titles?q=<известный external_id>` и затем вернуть workers. Миграция обратима через обычный rollback и не должна применяться параллельно активному bulk import.
+На SQLite создание индекса кратковременно блокирует schema writes. Deployment order: дождаться terminal состояния importer/finalizer, выполнить согласованный WAL checkpoint и backup, запустить `php artisan migrate --force`, затем `php artisan catalog:search-rebuild --chunk=200`, проверить state/counts/integrity и только после этого включать ranked driver и возвращать workers. Migration и rebuild не выполняются параллельно активному bulk import.

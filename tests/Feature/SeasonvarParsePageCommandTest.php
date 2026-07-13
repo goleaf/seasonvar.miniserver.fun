@@ -123,6 +123,10 @@ class SeasonvarParsePageCommandTest extends TestCase
             'signal_key' => '2024',
             'weight' => 25,
         ]);
+        $this->assertDatabaseHas('catalog_title_search_documents', [
+            'catalog_title_id' => $catalogTitle->id,
+            'normalized_title_key' => 'черный список на кухне',
+        ]);
         $this->assertSame(3, CatalogTitleRecommendationSignal::query()
             ->where('catalog_title_id', $catalogTitle->id)
             ->where('signal_type', 'page_quality')

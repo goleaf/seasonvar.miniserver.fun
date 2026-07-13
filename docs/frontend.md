@@ -42,4 +42,9 @@ composer dev
 - Plyr получает локальный Vite URL из `resources/images/plyr.svg`, а HLS-код загружается только когда браузеру действительно нужен `hls.js/light`.
 - Проектная pagination переопределена в `resources/views/vendor/pagination/tailwind.blade.php`: весь текст русский, тема только светлая, элементы управления имеют высоту не менее 44 пикселей.
 - Livewire pagination каталога переопределена в `resources/views/vendor/livewire/tailwind.blade.php`: русские подписи, стабильные `wire:key`, светлая тема и элементы управления не менее 44 пикселей.
+- Новые пользовательские строки Blade/Livewire добавляются в `lang/{locale}/catalog.php`; plural counts выводятся через `trans_choice()`. Интерфейсная locale управляет только UI и page metadata и не подменяет перевод, язык аудио или субтитров.
+- Essential title metadata остаётся в статическом Blade response. `CatalogShowViewModel` передаёт presentation-safe plain text, а Livewire player не становится источником `<h1>`, description, canonical или Open Graph.
+- Ссылки сортировки, вида, размера страницы, алфавита, фильтров и быстрого доступа используют плоские состояния без декоративной border/ring-обводки и сохраняют touch-target не менее 44 пикселей. Рамки остаются у форм, alert, player/media frames и структурных карточек.
+- Общий `focus-visible` определен в `resources/css/app.css`; составной `x-form.search-field` и локальные поиски фильтров используют `data-focus-frame`, чтобы клавиатурный focus охватывал весь control без двойного контура.
+- Проверка responsive player должна подтверждать, что смена viewport не заменяет существующий `video.js-catalog-player`: player island остается под `wire:ignore`, а lifecycle-cleanup срабатывает только при смене выпуска или навигации.
 - Blade не должен содержать `@php`/`@endphp` или asset-логику на PHP; используйте Laravel/Vite helpers и конфигурацию Vite.

@@ -28,10 +28,10 @@
         window.history.replaceState({}, '', targetUrl);
     "
 >
-    <x-ui.panel title="Просмотр" icon="fa-solid fa-circle-play">
+    <x-ui.panel :title="__('catalog.player.watch')" icon="fa-solid fa-circle-play">
         <div class="flex flex-col gap-3 rounded-lg bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div class="min-w-0">
-                <div class="text-xs font-bold uppercase tracking-wide text-emerald-700">Продолжить просмотр</div>
+                <div class="text-xs font-bold uppercase tracking-wide text-emerald-700">{{ __('catalog.player.continue') }}</div>
                 <div class="mt-1 text-lg font-black text-slate-800">{{ $primaryAction->label }}</div>
             </div>
             <button
@@ -48,7 +48,7 @@
 
         <div class="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.45fr)]">
             <div class="min-w-0">
-                <h3 class="mb-2 text-sm font-bold text-slate-700">Сейчас открыто</h3>
+                <h3 class="mb-2 text-sm font-bold text-slate-700">{{ __('catalog.player.current') }}</h3>
                 <div class="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600">
                     @if ($selectedEpisode)
                         <x-ui.status-pill icon="fa-solid fa-circle-play" variant="success">
@@ -58,7 +58,7 @@
                             <x-ui.status-pill icon="fa-solid fa-file-lines">{{ $selectedEpisode->title }}</x-ui.status-pill>
                         @endif
                     @else
-                        <x-ui.status-pill icon="fa-solid fa-circle-info">Серия не выбрана</x-ui.status-pill>
+                        <x-ui.status-pill icon="fa-solid fa-circle-info">{{ __('catalog.player.episode_not_selected') }}</x-ui.status-pill>
                     @endif
                 </div>
 
@@ -79,7 +79,7 @@
                         >
                             <span class="inline-flex items-center gap-2">
                                 <i data-player-status-icon class="fa-solid fa-circle-notch fa-spin text-emerald-700" aria-hidden="true"></i>
-                                <span data-player-status-text>Подготавливаем видео…</span>
+                                <span data-player-status-text>{{ __('catalog.player.preparing') }}</span>
                             </span>
                             <button
                                 type="button"
@@ -88,7 +88,7 @@
                                 class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
                             >
                                 <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
-                                <span>Повторить</span>
+                                <span>{{ __('catalog.player.retry') }}</span>
                             </button>
                         </div>
                         <video
@@ -106,7 +106,7 @@
                             @if ($showView->selectedMediaFormat === 'm3u8') data-hls-src="{{ $showView->selectedMediaUrl }}" @endif
                         >
                             <source src="{{ $showView->selectedMediaUrl }}" @if ($showView->selectedMediaType) type="{{ $showView->selectedMediaType }}" @endif>
-                            Ваш браузер не поддерживает воспроизведение видео.
+                            {{ __('catalog.player.unsupported_browser') }}
                         </video>
                     </div>
                 @else
@@ -115,7 +115,7 @@
                             <div>
                                 <i class="fa-solid fa-circle-play text-3xl text-amber-600" aria-hidden="true"></i>
                                 <div class="mt-3 text-lg font-bold text-amber-800">{{ $playbackSource->message }}</div>
-                                <p class="mt-1 text-sm">Выберите другой доступный сезон или серию.</p>
+                                <p class="mt-1 text-sm">{{ __('catalog.player.choose_another') }}</p>
                             </div>
                         </div>
                     </div>
@@ -130,7 +130,7 @@
                 @endif
 
                 @if ($selectedEpisode && ($episodeNavigation->previous || $episodeNavigation->next))
-                    <nav class="mt-3 grid gap-2 sm:grid-cols-2" aria-label="Навигация по доступным сериям">
+                    <nav class="mt-3 grid gap-2 sm:grid-cols-2" aria-label="{{ __('catalog.player.episode_navigation') }}">
                         @if ($episodeNavigation->previous)
                             <a
                                 href="{{ route('titles.show', $showView->episodeQuery($episodeNavigation->previous)).'#player' }}"
@@ -141,7 +141,7 @@
                             >
                                 <i class="fa-solid fa-arrow-left shrink-0" aria-hidden="true"></i>
                                 <span class="min-w-0">
-                                    <span class="block text-xs uppercase tracking-wide text-slate-400">Предыдущая</span>
+                                    <span class="block text-xs uppercase tracking-wide text-slate-400">{{ __('catalog.player.previous') }}</span>
                                     <span class="block break-words">{{ $this->episodeDisplayLabel($episodeNavigation->previous) }}</span>
                                 </span>
                             </a>
@@ -156,7 +156,7 @@
                                 class="flex min-h-11 items-center justify-end gap-3 rounded-control bg-slate-50 px-3 py-2 text-right text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 sm:col-start-2"
                             >
                                 <span class="min-w-0">
-                                    <span class="block text-xs uppercase tracking-wide text-slate-400">Следующая</span>
+                                    <span class="block text-xs uppercase tracking-wide text-slate-400">{{ __('catalog.player.next_short') }}</span>
                                     <span class="block break-words">{{ $this->episodeDisplayLabel($episodeNavigation->next) }}</span>
                                 </span>
                                 <i class="fa-solid fa-arrow-right shrink-0" aria-hidden="true"></i>
@@ -166,10 +166,10 @@
                 @endif
             </div>
 
-            <section class="rounded-lg bg-slate-50 p-4" aria-label="Личное состояние просмотра">
+            <section class="rounded-lg bg-slate-50 p-4" aria-label="{{ __('catalog.player.personal_state') }}">
                 <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
                     <i class="fa-solid fa-user-check text-emerald-700" aria-hidden="true"></i>
-                    <span>Ваш сериал</span>
+                    <span>{{ __('catalog.player.your_series') }}</span>
                 </div>
 
                 @if ($isAuthenticated)
@@ -183,16 +183,16 @@
                         >
                             <i wire:loading.remove wire:target="setWatchlist" class="{{ $inWatchlist ? 'fa-solid' : 'fa-regular' }} fa-bookmark" aria-hidden="true"></i>
                             <i wire:loading wire:target="setWatchlist" class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
-                            <span wire:loading.remove wire:target="setWatchlist">{{ $inWatchlist ? 'В списке просмотра' : 'Добавить в список' }}</span>
-                            <span wire:loading wire:target="setWatchlist">Сохраняем…</span>
+                            <span wire:loading.remove wire:target="setWatchlist">{{ $inWatchlist ? __('catalog.player.in_watchlist') : __('catalog.player.add_watchlist') }}</span>
+                            <span wire:loading wire:target="setWatchlist">{{ __('catalog.player.saving') }}</span>
                         </button>
 
                         <label class="grid gap-1 text-sm font-semibold text-slate-600">
-                            <span>{{ $userRating ? 'Ваша оценка: '.$userRating.' из '.$ratingMaximum : 'Ваша оценка' }}</span>
+                            <span>{{ $userRating ? __('catalog.player.your_rating_value', ['rating' => $userRating, 'maximum' => $ratingMaximum]) : __('catalog.player.your_rating') }}</span>
                             <select wire:change="setRating($event.target.value)" wire:loading.attr="disabled" wire:target="setRating" class="min-h-11 rounded-control border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700">
-                                <option value="">Не выбрана</option>
+                                <option value="">{{ __('catalog.player.rating_missing') }}</option>
                                 @foreach ($ratingOptions as $rating)
-                                    <option value="{{ $rating }}" @selected($userRating === $rating)>{{ $rating }} из {{ $ratingMaximum }}</option>
+                                    <option value="{{ $rating }}" @selected($userRating === $rating)>{{ __('catalog.player.rating_value', ['rating' => $rating, 'maximum' => $ratingMaximum]) }}</option>
                                 @endforeach
                             </select>
                         </label>
@@ -201,21 +201,21 @@
                         @enderror
                     </div>
                 @else
-                    <p class="mt-3 text-sm leading-6 text-slate-500">После входа здесь появятся список просмотра, личная оценка и сохранение позиции.</p>
+                    <p class="mt-3 text-sm leading-6 text-slate-500">{{ __('catalog.player.auth_hint') }}</p>
                 @endif
 
                 <dl class="mt-3 grid gap-1 text-sm text-slate-500">
                     <div class="flex flex-wrap items-baseline justify-between gap-2">
-                        <dt>В списках просмотра:</dt>
+                        <dt>{{ __('catalog.player.watchlist_total') }}</dt>
                         <dd class="font-bold text-slate-700">{{ $userStateSummary->watchlistCount }}</dd>
                     </div>
                     <div class="flex flex-wrap items-baseline justify-between gap-2">
-                        <dt>Оценка зрителей:</dt>
+                        <dt>{{ __('catalog.player.audience_rating') }}</dt>
                         <dd class="font-bold text-slate-700">
                             @if ($userStateSummary->ratingAverage !== null)
-                                {{ number_format($userStateSummary->ratingAverage, 1, ',', '') }} из {{ $ratingMaximum }} ({{ $userStateSummary->ratingCount }})
+                                {{ __('catalog.player.of_maximum', ['rating' => number_format($userStateSummary->ratingAverage, 1, ',', ''), 'maximum' => $ratingMaximum]) }} ({{ trans_choice('catalog.counts.ratings', $userStateSummary->ratingCount) }})
                             @else
-                                Нет оценок
+                                {{ __('catalog.player.no_ratings') }}
                             @endif
                         </dd>
                     </div>
@@ -225,8 +225,8 @@
 
         @if ($selectedEpisode && $selectedEpisode->licensedMedia->count() > 1)
             <div class="mt-4">
-                <div class="text-sm font-bold text-slate-700">Настройки просмотра</div>
-                <div class="mt-2 text-xs font-bold uppercase tracking-wide text-slate-500">Вариант</div>
+                <div class="text-sm font-bold text-slate-700">{{ __('catalog.player.settings') }}</div>
+                <div class="mt-2 text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('catalog.player.variant') }}</div>
                 <div class="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     @foreach ($selectedEpisode->licensedMedia as $episodeMedia)
                         <a
@@ -249,10 +249,10 @@
         @endif
     </x-ui.panel>
 
-    <x-ui.panel id="seasons" title="Сезоны и серии" icon="fa-solid fa-layer-group" :pad="false" class="scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48">
+    <x-ui.panel id="seasons" :title="__('catalog.player.seasons_and_episodes')" icon="fa-solid fa-layer-group" :pad="false" class="scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48">
         @if ($seasons->isNotEmpty())
             <div class="border-b border-slate-200 p-3">
-                <nav class="flex gap-2 overflow-x-auto overscroll-x-contain pb-1" aria-label="Доступные сезоны">
+                <nav class="flex gap-2 overflow-x-auto overscroll-x-contain pb-1" aria-label="{{ __('catalog.player.available_seasons') }}">
                     @foreach ($seasons as $seasonOption)
                         <a
                             href="{{ route('titles.show', ['catalogTitle' => $title, 'season' => $seasonOption->id]).'#seasons' }}"
@@ -308,23 +308,23 @@
                         @endif
                         <span class="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-slate-400">
                             <i class="fa-solid fa-file-video" aria-hidden="true"></i>
-                            <span class="tabular-nums">{{ $showView->episodeMediaItems($episodeOption)->count() }} видео</span>
+                            <span class="tabular-nums">{{ trans_choice('catalog.counts.videos', $showView->episodeMediaItems($episodeOption)->count()) }}</span>
                         </span>
                     </a>
                     @if ($loop->last)
                         </div>
                     @endif
                 @empty
-                    <div class="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">В этом сезоне пока нет доступных серий с рабочим источником.</div>
+                    <div class="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">{{ __('catalog.player.season_empty') }}</div>
                 @endforelse
             </div>
         @else
-            <p class="p-4 text-sm text-slate-500">Доступные сезоны пока не опубликованы.</p>
+            <p class="p-4 text-sm text-slate-500">{{ __('catalog.player.seasons_empty') }}</p>
         @endif
     </x-ui.panel>
 
     <div wire:loading.delay class="rounded-lg bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700" role="status">
         <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
-        <span>Обновляем доступные серии…</span>
+        <span>{{ __('catalog.player.updating_episodes') }}</span>
     </div>
 </div>

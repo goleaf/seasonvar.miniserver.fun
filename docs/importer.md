@@ -59,6 +59,18 @@ Provider владеет external/source IDs, URL/hash, crawl/import metadata, и
 
 Parser фиксирует признаки `has_info_list`, `has_season_list` и `has_episode_script`. Отсутствие блока означает частичный ответ, а не удаление данных. Связи синхронизируются через additive `syncWithoutDetaching`, сезоны/серии/media только upsert-ятся, soft-deleted строки не восстанавливаются. Managed recommendation signals заменяются только при полном metadata snapshot. Политики удаления по complete snapshot пока нет; importer ничего не удаляет только из-за отсутствия записи в одном ответе.
 
+## Версионированное восстановление metadata
+
+`SeasonvarCatalogParser::METADATA_VERSION` задаёт текущую версию разбора связей. `source_pages` отдельно хранят успешно применённую и уже предпринятую версии, время разбора и allowlisted `metadata_presence`; `catalog_titles.relation_metadata_version` показывает версию производных связей тайтла. Поэтому изменение parser не требует немедленно повторно скачивать весь источник.
+
+В начале полного цикла и queued finalizer `SeasonvarCatalogMetadataBackfill` разбирает только сохранённый `latestSnapshot` и не выполняет HTTP-запросов. Один запуск ограничен `SEASONVAR_METADATA_BACKFILL_PAGE_LIMIT` и `SEASONVAR_METADATA_BACKFILL_TITLE_LIMIT`; chunk-параметры управляют памятью. Валидный snapshot применяет связи и версии в одной transaction. Детерминированно невалидный snapshot продвигает только attempted version, чтобы одна строка не блокировала очередь; инфраструктурная ошибка не продвигает версии. Планировщик назначает `stale_metadata` только старой странице без пригодной ещё не предпринятой локальной копии и сохраняет обычную границу `refresh_after`.
+
+Retention всегда оставляет snapshot с максимальным `captured_at`, а при равенстве — с максимальным `id`. При merge сохраняется минимальная relation version, чтобы устаревшие связи не маскировались актуальной канонической строкой. В `metadata_presence` допустимы только `present`, `rejected_invalid` и `absent_in_source`; raw provider values туда не попадают.
+
+## Пересборка рекомендаций
+
+Полная пересборка хранит профили компактно и строит bounded candidate pool только по информативным связям: жанрам, тегам, режиссёрам, актёрам, сетям и студиям. Страна, перевод, статус и возрастной рейтинг по-прежнему участвуют в точном score, но не могут сами расширить pool на весь каталог. `SEASONVAR_RECOMMENDATION_CANDIDATE_LIMIT` ограничивает число профилей для точного scoring одного тайтла, а `SEASONVAR_RECOMMENDATION_CANDIDATE_SCAN_PER_FEATURE` — число детерминированно выбранных тайтлов из одного общего признака. Итоговый лимит выдачи остаётся `SEASONVAR_RECOMMENDATION_MAX_PER_TITLE`.
+
 ## Порядок деплоя
 
 1. Дождаться завершения активных import jobs и сделать backup SQLite.

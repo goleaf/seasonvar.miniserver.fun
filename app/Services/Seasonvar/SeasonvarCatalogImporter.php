@@ -16,11 +16,13 @@ use App\Models\CatalogTitleAlias;
 use App\Models\CatalogTitleRating;
 use App\Models\CatalogTitleRecommendationSignal;
 use App\Models\CatalogTitleReview;
+use App\Models\CatalogTitleSlug;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\SourcePage;
 use App\Models\SourcePageSnapshot;
+use App\Services\Catalog\Search\CatalogSearchIndexer;
 use App\Services\Crawler\PoliteHttpClient;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\ExternalPlaylistImporter;
@@ -53,6 +55,7 @@ class SeasonvarCatalogImporter
         private readonly RecordSeasonvarPageFailure $recordPageFailure,
         private readonly SeasonvarTitlePageStateSynchronizer $titlePageStateSynchronizer,
         private readonly SeasonvarImportErrorSanitizer $errors,
+        private readonly CatalogSearchIndexer $searchIndexer,
     ) {}
 
     /**
@@ -437,7 +440,12 @@ class SeasonvarCatalogImporter
         $needsMediaRefresh = $existingCatalogTitle !== null
             && $this->catalogTitleNeedsMediaRefresh($existingCatalogTitle);
 
-        if (! $force && ! $contentChanged && $page->parse_status === 'parsed' && $existingCatalogTitle !== null && ! $needsMediaRefresh) {
+        if (! $force
+            && ! $contentChanged
+            && $page->parse_status === 'parsed'
+            && $page->metadata_parser_version >= SeasonvarCatalogParser::METADATA_VERSION
+            && $existingCatalogTitle !== null
+            && ! $needsMediaRefresh) {
             $this->titlePageStateSynchronizer->synchronize($existingCatalogTitle, $page, $importRunId);
 
             $this->report($progress, 'page-parse-skipped-unchanged', [
@@ -504,6 +512,10 @@ class SeasonvarCatalogImporter
             $page->update([
                 'parse_status' => 'parsed',
                 'error_message' => null,
+                'metadata_parser_version' => SeasonvarCatalogParser::METADATA_VERSION,
+                'metadata_attempted_version' => SeasonvarCatalogParser::METADATA_VERSION,
+                'metadata_parsed_at' => now(),
+                'metadata_presence' => $this->parser->metadataPresence($data->taxonomies, $data->parseMeta),
             ]);
 
             return [
@@ -521,8 +533,12 @@ class SeasonvarCatalogImporter
             $this->importParsedPlaylists($catalogTitle, $data->media, $progress),
         );
         $this->syncMediaTranslations($catalogTitle, $progress);
+        $catalogTitle->update([
+            'relation_metadata_version' => SeasonvarCatalogParser::METADATA_VERSION,
+        ]);
         $missingDataFlags = $this->titlePageStateSynchronizer
             ->synchronize($catalogTitle, $page, $importRunId);
+        $this->searchIndexer->synchronizeTitleIds([$catalogTitle->id]);
 
         $this->report($progress, 'page-parse-complete', [
             'source_page_id' => $page->id,
@@ -646,10 +662,12 @@ class SeasonvarCatalogImporter
         $slug = $baseSlug;
         $counter = 2;
 
-        while (CatalogTitle::query()
-            ->where('slug', $slug)
-            ->when($ignoreId !== null, fn ($query) => $query->whereKeyNot($ignoreId))
-            ->exists()
+        while (
+            CatalogTitle::query()
+                ->where('slug', $slug)
+                ->when($ignoreId !== null, fn ($query) => $query->whereKeyNot($ignoreId))
+                ->exists()
+            || CatalogTitleSlug::query()->where('slug', $slug)->exists()
         ) {
             $slug = $baseSlug.'-'.$counter;
             $counter++;

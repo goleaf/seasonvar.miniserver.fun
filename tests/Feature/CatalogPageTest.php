@@ -176,6 +176,33 @@ class CatalogPageTest extends TestCase
         $this->get('/titles/redaktorskoe-nazvanie')->assertNotFound();
     }
 
+    public function test_catalog_admin_preserves_the_previous_public_slug_as_a_permanent_redirect(): void
+    {
+        config(['seasonvar.admin_emails' => ['admin@example.com']]);
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        $title = CatalogTitle::factory()->create([
+            'slug' => 'prezhnii-adres',
+            'title' => 'Стабильный адрес',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(CatalogAdministrationManager::class)
+            ->call('selectTitle', $title->id)
+            ->set('titleForm.slug', 'novyi-adres')
+            ->call('saveTitle')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('catalog_title_slugs', [
+            'catalog_title_id' => $title->id,
+            'slug' => 'prezhnii-adres',
+        ]);
+
+        $this->get('/titles/prezhnii-adres?episode=999')
+            ->assertStatus(301)
+            ->assertRedirect(route('titles.show', ['catalogTitle' => 'novyi-adres']));
+        $this->get('/titles/novyi-adres')->assertOk();
+    }
+
     public function test_catalog_admin_rejects_duplicate_identity_and_stale_concurrent_edits(): void
     {
         config(['seasonvar.admin_emails' => ['admin@example.com']]);
@@ -1001,6 +1028,60 @@ class CatalogPageTest extends TestCase
             ->assertDontSee('object-cover transition group-hover:scale-[1.02]', false);
     }
 
+    public function test_title_page_server_renders_safe_localized_metadata_without_inferring_content_language(): void
+    {
+        app()->setLocale('en');
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Verified <em>Series</em>',
+            'slug' => 'verified-series',
+            'description' => '<p>Trusted description.</p><script>alert("private")</script>',
+            'poster_url' => null,
+        ]);
+        CatalogTitleRating::query()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'provider' => 'imdb',
+            'rating' => 8.4,
+            'votes' => 21,
+        ]);
+
+        $response = $this->get(route('titles.show', $catalogTitle));
+        $content = $response->assertOk()->getContent();
+        $canonical = route('titles.show', $catalogTitle);
+
+        $this->assertStringContainsString('<html lang="en">', $content);
+        $this->assertStringContainsString('<link rel="canonical" href="'.$canonical.'">', $content);
+        $this->assertStringContainsString('<meta property="og:locale" content="en_US">', $content);
+        $this->assertStringContainsString('<meta property="og:title" content="Watch Verified Series online', $content);
+        $this->assertStringContainsString('<meta property="og:description" content="Trusted description.">', $content);
+        $this->assertStringContainsString('Trusted description.', $content);
+        $this->assertStringContainsString('0 seasons', $content);
+        $this->assertStringContainsString('0 episodes', $content);
+        $this->assertStringContainsString('21 votes', $content);
+        $this->assertStringContainsString('"@type":"TVSeries"', $content);
+        $this->assertStringNotContainsString('alert', $content);
+        $this->assertStringNotContainsString('&lt;em&gt;', $content);
+        $this->assertDoesNotMatchRegularExpression('/"@type":"TVSeries"[^<]+"inLanguage"/', $content);
+        $this->assertMatchesRegularExpression('/<h1[^>]*>.*Verified Series.*<\/h1>.*Trusted description\..*wire:snapshot/s', $content);
+    }
+
+    public function test_complex_catalog_filters_use_the_unfiltered_catalog_canonical(): void
+    {
+        $genre = Genre::query()->create(['name' => 'Драма', 'slug' => 'drama']);
+        $country = Country::query()->create(['name' => 'Россия', 'slug' => 'rossiya']);
+        CatalogTitle::factory()->create()->genres()->attach($genre);
+
+        $response = $this->get(route('titles.index', [
+            'genre' => [$genre->slug],
+            'country' => [$country->slug],
+            'sort' => 'title_asc',
+        ]));
+
+        $response
+            ->assertOk()
+            ->assertSee('<link rel="canonical" href="'.route('titles.index').'">', false)
+            ->assertSee('<meta name="robots" content="noindex,follow', false);
+    }
+
     public function test_public_catalog_pages_do_not_render_decorative_panel_subtitles(): void
     {
         $catalogTitle = CatalogTitle::factory()->create([
@@ -1486,7 +1567,7 @@ class CatalogPageTest extends TestCase
 
         $this->get(route('titles.show', $catalogTitle))
             ->assertOk()
-            ->assertSeeText('2 серий')
+            ->assertSeeText('2 серии')
             ->assertSeeText('Начать с 1 серии')
             ->assertSeeText('Серия активного сезона')
             ->assertDontSeeText('Серия неактивного сезона');
@@ -1951,7 +2032,7 @@ class CatalogPageTest extends TestCase
             ->call('setRating', 8)
             ->assertSeeText('В списке просмотра')
             ->assertSeeText('В списках просмотра:')
-            ->assertSeeText('8,0 из 9 (1)');
+            ->assertSeeText('8,0 из 9 (1 оценка)');
 
         $this->assertSame(1, CatalogTitleUserState::query()
             ->whereBelongsTo($firstUser)
@@ -1975,7 +2056,7 @@ class CatalogPageTest extends TestCase
             ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
             ->call('setWatchlist', true)
             ->call('setRating', 6)
-            ->assertSeeText('7,0 из 9 (2)');
+            ->assertSeeText('7,0 из 9 (2 оценки)');
 
         $this->assertSame(2, CatalogTitleUserState::query()
             ->whereBelongsTo($catalogTitle)
@@ -1987,12 +2068,12 @@ class CatalogPageTest extends TestCase
 
         $firstComponent
             ->call('setRating', 9)
-            ->assertSeeText('7,5 из 9 (2)')
+            ->assertSeeText('7,5 из 9 (2 оценки)')
             ->call('setWatchlist', false)
             ->call('setWatchlist', false)
             ->assertDontSeeText('В списке просмотра')
             ->call('setRating', '')
-            ->assertSeeText('6,0 из 9 (1)');
+            ->assertSeeText('6,0 из 9 (1 оценка)');
 
         $this->assertFalse(CatalogTitleUserState::query()
             ->whereBelongsTo($firstUser)

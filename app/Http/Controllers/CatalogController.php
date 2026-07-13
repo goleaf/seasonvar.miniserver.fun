@@ -8,6 +8,7 @@ use App\Services\Catalog\CatalogHomePageBuilder;
 use App\Services\Catalog\CatalogStatsPageBuilder;
 use App\Services\Catalog\CatalogStatsPosterResponder;
 use App\Services\Catalog\CatalogTitlePageBuilder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -24,8 +25,14 @@ class CatalogController extends Controller
         return view('catalog.index', $this->homePage->data());
     }
 
-    public function show(CatalogShowRequest $request, CatalogTitle $catalogTitle): View
+    public function show(CatalogShowRequest $request, CatalogTitle $catalogTitle): View|RedirectResponse
     {
+        $requestedSlug = $request->route()?->originalParameter('catalogTitle');
+
+        if (is_string($requestedSlug) && $requestedSlug !== $catalogTitle->slug) {
+            return redirect()->route('titles.show', $catalogTitle, 301);
+        }
+
         return view('catalog.show', $this->titlePage->data($request, $catalogTitle));
     }
 

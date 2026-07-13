@@ -2,6 +2,12 @@
 
 ## 2026-07-13
 
+- Added Russian/English catalog translation domains and framework pluralization for result, season, episode, rating, importer, and viewing-history counts; newly touched Livewire/Blade UI no longer embeds interface copy in component code.
+- Hardened title SSR metadata with plain-text sanitization, locale-aware HTML/Open Graph/WebPage language, verified-content fallbacks, initial-response title/description rendering, and no inferred `TVSeries.inLanguage` from UI or media labels.
+- Canonicalized complex/search catalog URLs to the unfiltered catalog while retaining indexable taxonomy/year routes, and added additive historical-slug redirects that survive admin edits and importer duplicate merges without bypassing publication access.
+- Flattened title-page quick navigation and kept plain catalog navigation free of decorative borders/rings, using typography, restrained backgrounds, icons, and a narrow active marker while preserving borders on forms, alerts, media frames, and structural cards.
+- Standardized a visible two-layer keyboard focus treatment across links, buttons, inputs, selects, textareas, and search frames; enlarged sort, view, page-size, alphabet, filter, and header targets to at least 44 px and improved semantic season navigation/progress indicators.
+- Hardened responsive rendering for long taxonomy labels, counts, Continue Watching cards, importer metadata/actions/states, ratings, episode media counts, and player retry/watchlist loading controls without recreating the `wire:ignore` player during viewport changes.
 - Added the authorized `/admin/catalog` Livewire 4 workspace for bounded title lookup, editorial metadata, publication windows, actor/director/genre/country/translation relations, regular/special seasons and episodes, and allowlisted external video sources; existing importer runs remain in the linked `/admin/imports` workflow.
 - Added policy-backed explicit field allowlists, hierarchy-scoped model resolution, per-action throttling, reversible hide/unpublish actions, short row-locking transactions, and version fingerprints that reject stale concurrent edits while preserving progress, history, ratings and watchlists.
 - Reused existing database unique keys and importer ownership rules instead of adding schema: pivot attachment is idempotent, provider baselines remain intact, publication changes refresh SQL visibility/index timestamps and precisely invalidate stats/recommendations without exposing stored source URLs.

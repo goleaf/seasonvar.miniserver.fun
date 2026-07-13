@@ -2,8 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Enums\CatalogSearchIndexStatus;
 use App\Models\Actor;
+use App\Models\CatalogSearchIndexState;
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleAlias;
+use App\Models\Genre;
+use App\Services\Catalog\Search\CatalogSearchIndexer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -212,5 +217,64 @@ class CatalogSearchPageTest extends TestCase
             ->assertOk()
             ->assertSeeText('Запрос «смотреть онлайн» слишком общий.')
             ->assertDontSeeText('Посторонний сериал');
+    }
+
+    public function test_ready_fts_orders_exact_title_original_alias_and_weighted_fields(): void
+    {
+        $exactTitle = CatalogTitle::factory()->create(['title' => 'Ветер', 'description' => null]);
+        $originalTitle = CatalogTitle::factory()->create([
+            'title' => 'Оригинальное совпадение',
+            'original_title' => 'Ветер',
+            'description' => null,
+        ]);
+        $aliasTitle = CatalogTitle::factory()->create(['title' => 'Совпадение алиаса', 'description' => null]);
+        CatalogTitleAlias::query()->create([
+            'catalog_title_id' => $aliasTitle->id,
+            'name' => 'Ветер',
+            'name_hash' => hash('sha256', 'ветер'),
+            'type' => 'alternative',
+            'source' => 'seasonvar',
+        ]);
+        $personTitle = CatalogTitle::factory()->create(['title' => 'Совпадение актёра', 'description' => null]);
+        $actor = Actor::query()->create(['name' => 'Ветер', 'slug' => 'veter-actor']);
+        $personTitle->actors()->attach($actor);
+        $taxonomyTitle = CatalogTitle::factory()->create(['title' => 'Совпадение жанра', 'description' => null]);
+        $genre = Genre::query()->create(['name' => 'Ветер', 'slug' => 'veter-genre']);
+        $taxonomyTitle->genres()->attach($genre);
+        $descriptionTitle = CatalogTitle::factory()->create([
+            'title' => 'Совпадение описания',
+            'description' => 'Ветер упомянут только в описании.',
+        ]);
+        $titles = collect([$exactTitle, $originalTitle, $aliasTitle, $personTitle, $taxonomyTitle, $descriptionTitle]);
+        app(CatalogSearchIndexer::class)->indexTitleIds($titles->pluck('id'));
+        CatalogSearchIndexState::query()->findOrFail(CatalogSearchIndexState::SINGLETON_ID)->update([
+            'version' => CatalogSearchIndexer::INDEX_VERSION,
+            'status' => CatalogSearchIndexStatus::Ready,
+            'source_count' => $titles->count(),
+            'document_count' => $titles->count(),
+            'completed_at' => now(),
+        ]);
+
+        $this->get(route('titles.index', ['q' => 'Ветер']))
+            ->assertOk()
+            ->assertSeeInOrder($titles->pluck('title')->all());
+    }
+
+    public function test_stale_index_uses_legacy_search_and_never_hides_new_title_text(): void
+    {
+        $title = CatalogTitle::factory()->create(['title' => 'Старое имя']);
+        app(CatalogSearchIndexer::class)->indexTitleIds([$title->id]);
+        $title->update(['title' => 'Совершенно новое имя']);
+        CatalogSearchIndexState::query()->findOrFail(CatalogSearchIndexState::SINGLETON_ID)->update([
+            'version' => CatalogSearchIndexer::INDEX_VERSION,
+            'status' => CatalogSearchIndexStatus::Stale,
+            'source_count' => 1,
+            'document_count' => 1,
+            'completed_at' => now(),
+        ]);
+
+        $this->get(route('titles.index', ['q' => 'Совершенно новое имя']))
+            ->assertOk()
+            ->assertSee('href="'.route('titles.show', $title).'"', false);
     }
 }

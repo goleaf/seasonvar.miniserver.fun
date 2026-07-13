@@ -266,7 +266,7 @@
                                     @if ($titleContext !== null)
                                         <span><i class="fa-solid fa-clapperboard text-slate-400" aria-hidden="true"></i> Сериал: {{ $titleContext->title }}</span>
                                     @endif
-                                    <span><i class="fa-solid fa-magnifying-glass text-slate-400" aria-hidden="true"></i> Найдено сейчас: {{ $titles->total() }}</span>
+                                    <span><i class="fa-solid fa-magnifying-glass text-slate-400" aria-hidden="true"></i> {{ __('catalog.catalog.found_now', ['results' => trans_choice('catalog.counts.results', $titles->total())]) }}</span>
                                     <a href="{{ route('titles.index') }}" wire:click.prevent="resetAll" class="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-600">
                                         <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
                                         <span>Сбросить все</span>
@@ -276,7 +276,7 @@
                         @else
                             <div class="mt-3 text-sm text-slate-500">
                                 <i class="fa-solid fa-magnifying-glass text-slate-400" aria-hidden="true"></i>
-                                Найдено: {{ $titles->total() }}
+                                {{ __('catalog.catalog.found', ['results' => trans_choice('catalog.counts.results', $titles->total())]) }}
                             </div>
                         @endif
                     </div>
@@ -309,21 +309,21 @@
 
                 <div class="mt-5 grid gap-3 sm:grid-cols-3">
                     <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                        <div class="text-xs font-bold uppercase tracking-wide text-slate-400">Найдено</div>
+                        <div class="text-xs font-bold uppercase tracking-wide text-slate-400">{{ __('catalog.catalog.found_label') }}</div>
                         <div class="mt-1 inline-flex items-center gap-2 text-lg font-black text-slate-700">
                             <i class="fa-solid fa-magnifying-glass text-emerald-700" aria-hidden="true"></i>
                             <span class="tabular-nums">{{ $titles->total() }}</span>
                         </div>
                     </div>
                     <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                        <div class="text-xs font-bold uppercase tracking-wide text-slate-400">На странице</div>
+                        <div class="text-xs font-bold uppercase tracking-wide text-slate-400">{{ __('catalog.catalog.page_label') }}</div>
                         <div class="mt-1 inline-flex items-center gap-2 text-lg font-black text-slate-700">
                             <i class="fa-solid fa-table-cells-large text-sky-700" aria-hidden="true"></i>
                             <span class="tabular-nums">{{ $titles->count() }}</span>
                         </div>
                     </div>
                     <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                        <div class="text-xs font-bold uppercase tracking-wide text-slate-400">Сортировка</div>
+                        <div class="text-xs font-bold uppercase tracking-wide text-slate-400">{{ __('catalog.catalog.sort_label') }}</div>
                         <div class="mt-1 inline-flex items-center gap-2 text-lg font-black text-slate-700">
                             <i class="{{ $filterView->sortIcon($sort) }} text-amber-700" aria-hidden="true"></i>
                             <span>{{ $filterView->sortLabel($sort) }}</span>

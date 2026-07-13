@@ -96,6 +96,11 @@
 - Переменные для layout SEO готовит `AppLayoutData`.
 - View state для фильтров и страницы тайтла находится в `App\View\ViewModels`.
 - SEO, JSON-LD, breadcrumbs, поисковые фразы и related links готовит `CatalogSeoBuilder`.
+- Публичная карточка тайтла отдаёт title, plain-text description, canonical, Open Graph и `TVSeries` JSON-LD в первом server-rendered response; Livewire отвечает только за интерактивный player/user state.
+- `App\Support\PlainText` удаляет HTML, script/style blocks, control characters и лишние пробелы из provider/editorial metadata до её использования в meta/JSON-LD и plain-text UI.
+- Locale интерфейса задаёт `<html lang>`, Open Graph locale и язык `WebPage`, но не язык произведения или media track. Отдельного content locale/audio/subtitle preference в текущей доменной модели нет, поэтому `TVSeries.inLanguage` намеренно отсутствует.
+- Переводы каталога хранятся в `lang/{locale}/catalog.php`; русская локаль — основная/fallback, а plural counts формируются `trans_choice()` вместо ручных окончаний.
+- `catalog_title_slugs` хранит прежние публичные slug. Route binding применяет ту же publication/access boundary, а controller отвечает `301` на текущий canonical slug без переноса query string. Import slug allocation резервирует историю, а merge переносит её к каноническому тайтлу.
 
 ## API Resources
 

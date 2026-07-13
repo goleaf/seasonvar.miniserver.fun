@@ -2,6 +2,7 @@
 
 namespace App\View\ViewData;
 
+use App\Support\PlainText;
 use Illuminate\Support\Str;
 
 class AppLayoutData
@@ -22,8 +23,12 @@ class AppLayoutData
         $fullTitle = Str::contains(Str::lower($pageTitle), Str::lower($siteName))
             ? $pageTitle
             : $pageTitle.' - '.$siteName;
-        $seoDescription = trim((string) ($seo['description'] ?? 'Каталог сериалов онлайн с фильтрами по жанрам, странам, актерам, годам, сезонам и сериям.'));
-        $seoDescription = preg_replace('/\s+/u', ' ', strip_tags($seoDescription)) ?: $seoDescription;
+        $seoDescription = PlainText::clean($seo['description'] ?? __('catalog.seo.default_description'), 190);
+
+        if ($seoDescription === '') {
+            $seoDescription = PlainText::clean(__('catalog.seo.default_description'), 190);
+        }
+
         $canonicalUrl = $seo['canonical'] ?? url()->current();
         $layoutSearchValue = request()->query('q', '');
         $layoutSearchQuery = is_scalar($layoutSearchValue)
@@ -55,8 +60,10 @@ class AppLayoutData
         $seoType = $seo['type'] ?? 'website';
         $seoImage = $seo['image'] ?? null;
         $seoVideo = $seo['video'] ?? null;
-        $seoLocale = $seo['locale'] ?? 'ru_RU';
-        $htmlLang = $seo['htmlLang'] ?? 'ru';
+        $interfaceLocale = str_replace('_', '-', app()->currentLocale());
+        $htmlLang = $seo['htmlLang'] ?? $interfaceLocale;
+        $seoLocale = $seo['locale'] ?? __('catalog.locale.open_graph');
+        $languageName = __('catalog.locale.language_name');
         $seoTags = collect($seo['tags'] ?? [])->filter()->unique()->take(25)->values();
         $seoClusterTerms = collect($seo['keyword_clusters'] ?? [])
             ->flatMap(fn ($cluster) => collect($cluster['items'] ?? []));
@@ -1060,7 +1067,7 @@ class AppLayoutData
                 'url' => $canonicalUrl,
                 'name' => $fullTitle,
                 'description' => $seoDescription,
-                'inLanguage' => 'ru',
+                'inLanguage' => $htmlLang,
                 'keywords' => $expandedKeywords->take(60)->implode(', '),
                 'about' => $semanticEntities->take(8)->values()->all(),
                 'mentions' => $semanticEntities->slice(8)->values()->all(),
@@ -1693,8 +1700,7 @@ class AppLayoutData
 
     private function cleanGeneratedPhrase(mixed $phrase): string
     {
-        $phrase = html_entity_decode(strip_tags((string) $phrase), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $phrase = preg_replace('/[\p{C}\s]+/u', ' ', $phrase) ?: '';
+        $phrase = PlainText::clean($phrase);
         $phrase = trim($phrase, " \t\n\r\0\x0B.,;:|-");
 
         if ($phrase === '') {

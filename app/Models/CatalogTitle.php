@@ -67,6 +67,20 @@ class CatalogTitle extends Model
         return parent::resolveRouteBindingQuery($query, $value, $field)->availableTo(request()->user());
     }
 
+    public function resolveRouteBinding($value, $field = null): ?Model
+    {
+        $current = parent::resolveRouteBinding($value, $field);
+
+        if ($current !== null || ! request()->routeIs('titles.show') || ($field ?? $this->getRouteKeyName()) !== 'slug') {
+            return $current;
+        }
+
+        return $this->newQuery()
+            ->availableTo(request()->user())
+            ->whereHas('historicalSlugs', fn (Builder $query): Builder => $query->where('slug', $value))
+            ->first();
+    }
+
     /**
      * @return BelongsTo<Source, $this>
      */
@@ -149,6 +163,18 @@ class CatalogTitle extends Model
     public function aliases(): HasMany
     {
         return $this->hasMany(CatalogTitleAlias::class);
+    }
+
+    /** @return HasOne<CatalogTitleSearchDocument, $this> */
+    public function searchDocument(): HasOne
+    {
+        return $this->hasOne(CatalogTitleSearchDocument::class);
+    }
+
+    /** @return HasMany<CatalogTitleSlug, $this> */
+    public function historicalSlugs(): HasMany
+    {
+        return $this->hasMany(CatalogTitleSlug::class);
     }
 
     /**

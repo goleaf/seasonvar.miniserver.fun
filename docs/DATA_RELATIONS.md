@@ -13,6 +13,7 @@
 - `CatalogTitle hasManyThrough Episode`
 - `CatalogTitle hasMany LicensedMedia`
 - `CatalogTitle hasMany CatalogTitleAlias`
+- `CatalogTitle hasMany CatalogTitleSlug` для прежних публичных адресов
 - `CatalogTitle hasMany CatalogTitleRating`
 - `CatalogTitle hasMany CatalogTitleReview`
 - `CatalogTitle hasMany SeasonvarImportEvent`
@@ -63,6 +64,7 @@
 - Обычные сезоны и серии имеют `kind=regular`, спецвыпуски — `kind=special`. Unique-ключи `(catalog_title_id, kind, number)` и `(season_id, kind, number)` разрешают специальный и обычный выпуск с одним номером, но запрещают дубли внутри вида.
 - Порядок сезонов и серий детерминирован: `kind`, `sort_order`, `number`, `id`; обычные выпуски идут до специальных и не перенумеровываются из-за specials.
 - `CatalogTitle`, `Season`, `Episode` и `LicensedMedia` используют soft delete; merge импортёра применяет физическое удаление только к уже объединённым дублям, чтобы не оставлять конфликтующие provider keys.
+- `catalog_title_slugs.slug` глобально уникален внутри истории. При редакционном изменении текущий slug записывается в историю, при возврате к прежнему адресу его historical row удаляется, а при importer merge slug дубля и его история переносятся к каноническому тайтлу. Исторический URL не обходит publication/access scope и отвечает `301` только на доступную текущую карточку.
 - `CatalogTitle.provider_field_values` хранит только последний baseline импортируемых `title`, `original_title`, `description` и `poster_url`; это не публичная metadata и не источник отображения. Импорт меняет текущее поле лишь пока оно совпадает с предыдущим baseline, поэтому локальное редакционное значение не затирается.
 - Автоматическая identity тайтла — `(source_id, external_id)`, при отсутствии provider ID — точный canonical URL hash/source page. Актёры и режиссёры используют пригодный provider person URL; одинаковое имя с разными стабильными URL создаёт разные строки со стабильными slug suffix. Fallback по имени применяется только при отсутствии пригодного provider URL.
 - Admin attaches metadata через `syncWithoutDetaching`, а importer relation sync использует ту же idempotent семантику: локально добавленные pivot rows не отсоединяются частичным или повторным provider import. Concurrent admin writes проверяют fingerprints редактируемых полей и relation IDs под row lock.
@@ -96,6 +98,7 @@
 - Синтаксически корректные, но уже отсутствующие slug справочников тихо отбрасываются; неподдерживаемые enum-значения показывают ошибку валидации и не должны откатываться к полной выдаче каталога.
 - Фильтры года должны принимать четырехзначный год от 1900 до следующего года.
 - Языки и отдельные аудиодорожки не фильтруются как самостоятельные сущности, потому что нормализованных таблиц для них нет. Текущая `Translation` представляет озвучку/перевод, а `licensed_media.has_subtitles` — только наличие субтитров.
+- Locale интерфейса не используется как скрытая media preference: язык произведения, отдельные audio/subtitle language entities и profile preference в текущей схеме отсутствуют.
 
 ## Индексы запросов
 

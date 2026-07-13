@@ -1,0 +1,147 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Enums\CatalogSearchIndexStatus;
+use App\Models\Actor;
+use App\Models\CatalogSearchIndexState;
+use App\Models\CatalogTitle;
+use App\Models\CatalogTitleAlias;
+use App\Models\Genre;
+use App\Services\Catalog\Search\CatalogSearchIndexer;
+use App\Services\Catalog\Search\CatalogSearchQueryParser;
+use App\Services\Catalog\Search\CatalogTitleSearch;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class CatalogTitleSearchTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_ranked_candidates_prioritize_exact_title_original_alias_and_weighted_fields(): void
+    {
+        $exactTitle = CatalogTitle::factory()->create([
+            'title' => 'Северный ветер',
+            'original_title' => null,
+            'description' => null,
+        ]);
+        $originalTitle = CatalogTitle::factory()->create([
+            'title' => 'Другой фильм',
+            'original_title' => 'Северный ветер',
+            'description' => null,
+        ]);
+        $aliasTitle = CatalogTitle::factory()->create([
+            'title' => 'Третий фильм',
+            'original_title' => null,
+            'description' => null,
+        ]);
+        CatalogTitleAlias::query()->create([
+            'catalog_title_id' => $aliasTitle->id,
+            'name' => 'Северный ветер',
+            'name_hash' => hash('sha256', 'северный ветер'),
+            'type' => 'alternative',
+            'source' => 'seasonvar',
+        ]);
+        $personTitle = CatalogTitle::factory()->create([
+            'title' => 'Фильм с актёром',
+            'description' => null,
+        ]);
+        $actor = Actor::query()->create([
+            'name' => 'Северный Ветер',
+            'slug' => 'severnyi-veter-actor',
+        ]);
+        $personTitle->actors()->attach($actor);
+        $taxonomyTitle = CatalogTitle::factory()->create([
+            'title' => 'Фильм по жанру',
+            'description' => null,
+        ]);
+        $genre = Genre::query()->create([
+            'name' => 'Северный ветер',
+            'slug' => 'severnyi-veter-genre',
+        ]);
+        $taxonomyTitle->genres()->attach($genre);
+        $descriptionTitle = CatalogTitle::factory()->create([
+            'title' => 'Фильм по описанию',
+            'description' => 'Только здесь встречается северный ветер.',
+        ]);
+        $ids = collect([
+            $exactTitle,
+            $originalTitle,
+            $aliasTitle,
+            $personTitle,
+            $taxonomyTitle,
+            $descriptionTitle,
+        ])->pluck('id');
+        app(CatalogSearchIndexer::class)->indexTitleIds($ids);
+        $this->markReady($ids->count());
+        $query = app(CatalogSearchQueryParser::class)->parse('Северный ветер');
+
+        $rankedIds = app(CatalogTitleSearch::class)
+            ->candidateQuery($query)?->pluck('catalog_title_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+
+        $this->assertSame([
+            $exactTitle->id,
+            $originalTitle->id,
+            $aliasTitle->id,
+            $personTitle->id,
+            $taxonomyTitle->id,
+            $descriptionTitle->id,
+        ], $rankedIds);
+    }
+
+    public function test_ready_index_matches_transliteration_short_and_punctuation_queries(): void
+    {
+        $znakhar = CatalogTitle::factory()->create(['title' => 'Знахарь']);
+        $oa = CatalogTitle::factory()->create(['title' => 'OA']);
+        $numbers = CatalogTitle::factory()->create(['title' => '11/22/63']);
+        app(CatalogSearchIndexer::class)->indexTitleIds([$znakhar->id, $oa->id, $numbers->id]);
+        $this->markReady(3);
+        $parser = app(CatalogSearchQueryParser::class);
+        $search = app(CatalogTitleSearch::class);
+
+        $this->assertSame([$znakhar->id], $search->candidateQuery($parser->parse('znakhar'))?->pluck('catalog_title_id')->all());
+        $this->assertSame([$oa->id], $search->candidateQuery($parser->parse('OA'))?->pluck('catalog_title_id')->all());
+        $this->assertSame([$numbers->id], $search->candidateQuery($parser->parse('11.22.63'))?->pluck('catalog_title_id')->all());
+    }
+
+    public function test_non_ready_or_version_mismatched_state_returns_null_for_legacy_fallback(): void
+    {
+        $query = app(CatalogSearchQueryParser::class)->parse('Знахарь');
+        $search = app(CatalogTitleSearch::class);
+
+        foreach ([
+            CatalogSearchIndexStatus::Building,
+            CatalogSearchIndexStatus::Stale,
+            CatalogSearchIndexStatus::Failed,
+        ] as $status) {
+            CatalogSearchIndexState::query()->findOrFail(CatalogSearchIndexState::SINGLETON_ID)->update([
+                'version' => CatalogSearchIndexer::INDEX_VERSION,
+                'status' => $status,
+            ]);
+
+            $this->assertNull($search->candidateQuery($query));
+            $search->forgetState();
+        }
+
+        CatalogSearchIndexState::query()->findOrFail(CatalogSearchIndexState::SINGLETON_ID)->update([
+            'version' => CatalogSearchIndexer::INDEX_VERSION + 1,
+            'status' => CatalogSearchIndexStatus::Ready,
+        ]);
+        $search->forgetState();
+
+        $this->assertNull($search->candidateQuery($query));
+    }
+
+    private function markReady(int $count): void
+    {
+        CatalogSearchIndexState::query()->findOrFail(CatalogSearchIndexState::SINGLETON_ID)->update([
+            'version' => CatalogSearchIndexer::INDEX_VERSION,
+            'status' => CatalogSearchIndexStatus::Ready,
+            'source_count' => $count,
+            'document_count' => $count,
+            'completed_at' => now(),
+        ]);
+    }
+}

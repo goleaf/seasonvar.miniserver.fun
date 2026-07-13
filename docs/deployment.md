@@ -2,6 +2,14 @@
 
 Обновлено: 13.07.2026
 
+## История публичных slug и локализованные metadata от 13.07.2026
+
+Миграция `2026_07_13_150000_create_catalog_title_slugs_table` additive: создаёт пустую таблицу прежних slug с unique `slug`, foreign key на `catalog_titles` и cascade delete. Источника для достоверного backfill прошлых адресов в базе нет, поэтому существующие slug не копируются: история начинает фиксироваться при следующем редакционном изменении или importer merge.
+
+Порядок rollout: дождаться активных catalog/import writes → сделать backup SQLite → развернуть migration и код в одном maintenance window → выполнить `php artisan migrate --force` → `php artisan config:cache` → `php artisan queue:restart`. Web и workers не должны запускать новый код до migration, потому что admin validation, importer slug allocation и route binding обращаются к новой таблице. Rollback удаляет только накопленную историю redirects и не меняет текущие `catalog_titles.slug`; перед rollback нужно учитывать, что старые ссылки после этого перестанут перенаправляться.
+
+После deploy проверить текущий URL карточки, `301` со старого slug без query string, canonical/OG/JSON-LD и русские plural-формы. Добавление языковых prefixed routes в этот rollout не входит: публичные URL остаются прежними.
+
 ## Health monitoring видеоисточников от 13.07.2026
 
 Миграция `2026_07_13_021800_add_health_state_to_licensed_media_table` additive: добавляет health status, success/error/failure/latency/retry timestamps и индекс `licensed_media_health_due_idx`. Existing `available` backfill-ится как `active`; legacy `status=unavailable` и `check_failed/unavailable/invalid_url` — как `unavailable` с одной failure и немедленным `next_check_at`. Строки не удаляются, URL не изменяются, unique constraints не перестраиваются.

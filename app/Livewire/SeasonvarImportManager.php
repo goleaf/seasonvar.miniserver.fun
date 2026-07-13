@@ -47,8 +47,8 @@ final class SeasonvarImportManager extends Component
             discover: (bool) $validated['discover'],
         );
         $this->notice = $result->created
-            ? 'Запуск #'.$result->run->id.' поставлен в очередь.'
-            : 'Активный запуск #'.$result->run->id.' уже существует.';
+            ? __('catalog.importer.queued', ['id' => $result->run->id])
+            : __('catalog.importer.already_active', ['id' => $result->run->id]);
     }
 
     public function retryImport(mixed $runId): void
@@ -62,8 +62,8 @@ final class SeasonvarImportManager extends Component
         $this->rateLimits->enforce('import_admin', $this->user(), $runId);
         $result = $this->imports->retry($this->user(), $runId);
         $this->notice = $result->created
-            ? 'Повторный запуск #'.$result->run->id.' поставлен в очередь.'
-            : 'Активный запуск #'.$result->run->id.' уже существует.';
+            ? __('catalog.importer.retry_queued', ['id' => $result->run->id])
+            : __('catalog.importer.already_active', ['id' => $result->run->id]);
     }
 
     public function cancelImport(mixed $runId): void
@@ -77,8 +77,8 @@ final class SeasonvarImportManager extends Component
         $this->rateLimits->enforce('import_admin', $this->user(), $runId);
         $run = $this->imports->cancel($this->user(), $runId);
         $this->notice = $run->status === 'cancelled'
-            ? 'Запуск #'.$run->id.' отменён.'
-            : 'Запуск #'.$run->id.' уже завершён.';
+            ? __('catalog.importer.cancelled', ['id' => $run->id])
+            : __('catalog.importer.already_finished', ['id' => $run->id]);
     }
 
     public function recoverStaleImports(): void
@@ -87,8 +87,8 @@ final class SeasonvarImportManager extends Component
         Gate::forUser($this->user())->authorize('manage-seasonvar-imports');
         $count = $this->imports->recoverStale();
         $this->notice = $count > 0
-            ? 'Зависших запусков закрыто: '.$count.'.'
-            : 'Зависшие запуски не найдены.';
+            ? __('catalog.importer.stale_recovered', ['count' => $count])
+            : __('catalog.importer.stale_missing');
     }
 
     public function refreshRuns(): void
@@ -108,10 +108,10 @@ final class SeasonvarImportManager extends Component
             'mediaHealth' => $dashboard['media_health'],
             'mediaDueCount' => $dashboard['media_due_count'],
         ])->extends('layouts.app', [
-            'title' => 'Импорт Seasonvar',
+            'title' => __('catalog.importer.title'),
             'seo' => [
-                'title' => 'Импорт Seasonvar',
-                'description' => 'Служебное управление очередью обновления каталога.',
+                'title' => __('catalog.importer.title'),
+                'description' => __('catalog.importer.seo_description'),
                 'robots' => 'noindex, nofollow',
                 'canonical' => route('admin.imports'),
             ],

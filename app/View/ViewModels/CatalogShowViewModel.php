@@ -8,6 +8,7 @@ use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Services\Media\ExternalMediaMetadata;
+use App\Support\PlainText;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
@@ -16,18 +17,7 @@ class CatalogShowViewModel
     /**
      * @var array<string, string>
      */
-    public array $taxonomyLabels = [
-        'genre' => 'Жанры',
-        'country' => 'Страны',
-        'actor' => 'Актеры',
-        'director' => 'Режиссеры',
-        'age_rating' => 'Возрастной рейтинг',
-        'translation' => 'Перевод',
-        'status' => 'Статус',
-        'network' => 'Каналы',
-        'studio' => 'Студии',
-        'tag' => 'Теги',
-    ];
+    public array $taxonomyLabels;
 
     /**
      * @var array<string, string>
@@ -156,6 +146,12 @@ class CatalogShowViewModel
 
     public int $parsedSeasonCount;
 
+    public string $displayTitle;
+
+    public string $displayOriginalTitle;
+
+    public string $displayDescription;
+
     /**
      * @var array<int, array{variant_type: string, variant_name: string|null, variant_key: string, has_subtitles: bool}>
      */
@@ -180,6 +176,22 @@ class CatalogShowViewModel
         ?int $parsedSeasonCount = null,
         ?int $mediaCount = null,
     ) {
+        $this->taxonomyLabels = [
+            'genre' => __('catalog.taxonomy.genres'),
+            'country' => __('catalog.taxonomy.countries'),
+            'actor' => __('catalog.taxonomy.actors'),
+            'director' => __('catalog.taxonomy.directors'),
+            'age_rating' => __('catalog.taxonomy.age_rating'),
+            'translation' => __('catalog.taxonomy.translation'),
+            'status' => __('catalog.taxonomy.status'),
+            'network' => __('catalog.taxonomy.networks'),
+            'studio' => __('catalog.taxonomy.studios'),
+            'tag' => __('catalog.taxonomy.tags'),
+        ];
+        $titleAttributes = $this->title->getAttributes();
+        $this->displayTitle = PlainText::clean($titleAttributes['title'] ?? '');
+        $this->displayOriginalTitle = PlainText::clean($titleAttributes['original_title'] ?? '');
+        $this->displayDescription = PlainText::clean($titleAttributes['description'] ?? '', 20000);
         $this->taxonomyGroups = $this->taxonomiesByType;
         $this->genres = $this->taxonomies('genre');
         $this->countries = $this->taxonomies('country');
@@ -202,7 +214,7 @@ class CatalogShowViewModel
         $this->selectedVariantKey = $this->selectedMedia ? $this->mediaVariantKey($this->selectedMedia) : null;
         $this->selectedQuality = $this->selectedMedia ? $this->mediaQuality($this->selectedMedia) : null;
         $this->selectedFormat = $this->selectedMedia ? $this->mediaFormat($this->selectedMedia) : null;
-        $this->selectedPlaybackLabel = $this->selectedMedia ? $this->playbackLabel($this->selectedMedia) : 'Вариант не выбран';
+        $this->selectedPlaybackLabel = $this->selectedMedia ? $this->playbackLabel($this->selectedMedia) : __('catalog.player.variant_not_selected');
         $this->selectedMediaBadges = $this->buildSelectedMediaBadges();
         $this->playbackOptionGroups = $this->buildPlaybackOptionGroups();
         $this->selectedSeasonId = $this->selectedEpisode?->season_id ?? $this->selectedMedia?->season_id;
@@ -251,11 +263,11 @@ class CatalogShowViewModel
         $releasedEpisodeLabel = null;
 
         if ($season->episodes_released !== null) {
-            $releasedEpisodeLabel = $season->episodes_released.' '.$this->episodePlural((int) $season->episodes_released);
+            $releasedEpisodeLabel = trans_choice('catalog.counts.episodes', (int) $season->episodes_released);
         }
 
         $totalEpisodeLabel = $season->episodes_released !== null
-            ? ($season->episodes_total !== null ? 'из '.$season->episodes_total : null)
+            ? ($season->episodes_total !== null ? __('catalog.player.of_total', ['count' => $season->episodes_total]) : null)
             : null;
 
         return collect([
@@ -338,14 +350,14 @@ class CatalogShowViewModel
     public function mediaDetailsLabel(LicensedMedia $media): string
     {
         $details = collect([
-            $media->season ? 'Сезон '.$media->season->number : null,
-            $media->episode ? 'Серия '.$media->episode->number : null,
+            $media->season ? __('catalog.player.media_season', ['number' => $media->season->number]) : null,
+            $media->episode ? __('catalog.player.media_episode', ['number' => $media->episode->number]) : null,
             $this->mediaQuality($media) ? Str::upper($this->mediaQuality($media)) : null,
             $this->variantDisplayLabel($media),
             $this->mediaFormat($media) ? Str::upper($this->mediaFormat($media)) : null,
         ])->filter()->implode(' / ');
 
-        return $details !== '' ? $details : 'Видео сериала';
+        return $details !== '' ? $details : __('catalog.player.series_video');
     }
 
     /**
@@ -360,8 +372,8 @@ class CatalogShowViewModel
         }
 
         return collect([
-            $mediaItems->count() > 1 ? $mediaItems->count().' '.$this->variantPlural($mediaItems->count()) : null,
-            $mediaItems->contains(fn (LicensedMedia $media): bool => $this->mediaHasSubtitles($media)) ? 'субтитры' : null,
+            $mediaItems->count() > 1 ? trans_choice('catalog.counts.variants', $mediaItems->count()) : null,
+            $mediaItems->contains(fn (LicensedMedia $media): bool => $this->mediaHasSubtitles($media)) ? __('catalog.player.subtitles_lower') : null,
             $this->bestQualityLabel($mediaItems),
         ])->filter()->unique()->values();
     }
@@ -380,7 +392,7 @@ class CatalogShowViewModel
 
         return collect([
             [
-                'label' => 'Варианты перевода',
+                'label' => __('catalog.player.translation_variants'),
                 'icon' => 'fa-solid fa-language',
                 'options' => $this->playbackOptions(
                     $this->selectedEpisodeMediaItems,
@@ -391,24 +403,24 @@ class CatalogShowViewModel
                 ),
             ],
             [
-                'label' => 'Качество',
+                'label' => __('catalog.player.quality'),
                 'icon' => 'fa-solid fa-display',
                 'options' => $this->playbackOptions(
                     $variantMediaItems,
                     'quality',
                     fn (LicensedMedia $media): ?string => $this->mediaQuality($media),
-                    fn (LicensedMedia $media): string => $this->mediaQuality($media) ? Str::upper($this->mediaQuality($media)) : 'Без качества',
+                    fn (LicensedMedia $media): string => $this->mediaQuality($media) ? Str::upper($this->mediaQuality($media)) : __('catalog.player.quality_missing'),
                     'fa-solid fa-display',
                 ),
             ],
             [
-                'label' => 'Формат',
+                'label' => __('catalog.player.format'),
                 'icon' => 'fa-solid fa-file-video',
                 'options' => $this->playbackOptions(
                     $qualityMediaItems,
                     'format',
                     fn (LicensedMedia $media): ?string => $this->mediaFormat($media),
-                    fn (LicensedMedia $media): string => $this->mediaFormat($media) ? Str::upper($this->mediaFormat($media)) : 'Поток',
+                    fn (LicensedMedia $media): string => $this->mediaFormat($media) ? Str::upper($this->mediaFormat($media)) : __('catalog.player.stream'),
                     'fa-solid fa-file-video',
                 ),
             ],
@@ -510,7 +522,7 @@ class CatalogShowViewModel
             $this->variantDisplayLabel($media),
             $this->mediaQuality($media) ? Str::upper($this->mediaQuality($media)) : null,
             $this->mediaFormat($media) ? Str::upper($this->mediaFormat($media)) : null,
-        ])->filter()->implode(' / ') ?: 'Видео';
+        ])->filter()->implode(' / ') ?: __('catalog.player.video');
     }
 
     private function variantDisplayLabel(LicensedMedia $media): string
@@ -518,10 +530,10 @@ class CatalogShowViewModel
         $variant = $this->mediaVariant($media);
 
         return match ($variant['variant_type']) {
-            'subtitles' => 'Субтитры',
-            'original' => 'Оригинал',
-            'trailer' => 'Трейлер',
-            default => $variant['variant_name'] ?: $media->translation_name ?: 'Озвучка',
+            'subtitles' => __('catalog.player.subtitles'),
+            'original' => __('catalog.player.original'),
+            'trailer' => __('catalog.player.trailer'),
+            default => $variant['variant_name'] ?: $media->translation_name ?: __('catalog.player.voiceover'),
         };
     }
 
@@ -689,15 +701,6 @@ class CatalogShowViewModel
         };
     }
 
-    private function variantPlural(int $count): string
-    {
-        return match (true) {
-            $count % 10 === 1 && $count % 100 !== 11 => 'вариант',
-            in_array($count % 10, [2, 3, 4], true) && ! in_array($count % 100, [12, 13, 14], true) => 'варианта',
-            default => 'вариантов',
-        };
-    }
-
     private function sameNormalizedValue(?string $actual, string $expected): bool
     {
         return $actual !== null && Str::lower($actual) === Str::lower($expected);
@@ -717,23 +720,14 @@ class CatalogShowViewModel
     private function buildTaxonomyRows(): array
     {
         return [
-            ['label' => 'Жанр', 'items' => $this->genres, 'icon' => $this->taxonomyIcon('genre')],
-            ['label' => 'Возрастной рейтинг', 'items' => $this->ageRatings, 'icon' => $this->taxonomyIcon('age_rating')],
-            ['label' => 'Страна', 'items' => $this->countries, 'icon' => $this->taxonomyIcon('country')],
-            ['label' => 'Режиссер', 'items' => $this->directors, 'icon' => $this->taxonomyIcon('director')],
-            ['label' => 'Перевод', 'items' => $this->translations, 'icon' => $this->taxonomyIcon('translation')],
-            ['label' => 'Статус', 'items' => $this->statuses, 'icon' => $this->taxonomyIcon('status')],
-            ['label' => 'Канал', 'items' => $this->networks, 'icon' => $this->taxonomyIcon('network')],
-            ['label' => 'Студия', 'items' => $this->studios, 'icon' => $this->taxonomyIcon('studio')],
+            ['label' => __('catalog.taxonomy.genre'), 'items' => $this->genres, 'icon' => $this->taxonomyIcon('genre')],
+            ['label' => __('catalog.taxonomy.age_rating'), 'items' => $this->ageRatings, 'icon' => $this->taxonomyIcon('age_rating')],
+            ['label' => __('catalog.taxonomy.country'), 'items' => $this->countries, 'icon' => $this->taxonomyIcon('country')],
+            ['label' => __('catalog.taxonomy.director'), 'items' => $this->directors, 'icon' => $this->taxonomyIcon('director')],
+            ['label' => __('catalog.taxonomy.translation'), 'items' => $this->translations, 'icon' => $this->taxonomyIcon('translation')],
+            ['label' => __('catalog.taxonomy.status'), 'items' => $this->statuses, 'icon' => $this->taxonomyIcon('status')],
+            ['label' => __('catalog.taxonomy.network'), 'items' => $this->networks, 'icon' => $this->taxonomyIcon('network')],
+            ['label' => __('catalog.taxonomy.studio'), 'items' => $this->studios, 'icon' => $this->taxonomyIcon('studio')],
         ];
-    }
-
-    private function episodePlural(int $count): string
-    {
-        return match (true) {
-            $count % 10 === 1 && $count % 100 !== 11 => 'серия',
-            in_array($count % 10, [2, 3, 4], true) && ! in_array($count % 100, [12, 13, 14], true) => 'серии',
-            default => 'серий',
-        };
     }
 }

@@ -120,10 +120,23 @@ class SeasonvarImportStorageMaintenance
     private function pruneSourcePageSnapshots(Carbon $cutoff, int $chunkSize): int
     {
         $deleted = 0;
+        $table = (new SourcePageSnapshot)->getTable();
 
         SourcePageSnapshot::query()
             ->where('captured_at', '<', $cutoff)
             ->whereDoesntHave('run', fn ($query) => $query->whereIn('status', ['queued', 'running']))
+            ->whereExists(function ($query) use ($table): void {
+                $query->selectRaw('1')
+                    ->from($table.' as newer_snapshot')
+                    ->whereColumn('newer_snapshot.source_page_id', $table.'.source_page_id')
+                    ->where(function ($query) use ($table): void {
+                        $query->whereColumn('newer_snapshot.captured_at', '>', $table.'.captured_at')
+                            ->orWhere(function ($query) use ($table): void {
+                                $query->whereColumn('newer_snapshot.captured_at', $table.'.captured_at')
+                                    ->whereColumn('newer_snapshot.id', '>', $table.'.id');
+                            });
+                    });
+            })
             ->select('id')
             ->chunkById($chunkSize, function ($snapshots) use (&$deleted): void {
                 $deleted += SourcePageSnapshot::query()

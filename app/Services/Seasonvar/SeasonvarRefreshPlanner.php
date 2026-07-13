@@ -49,8 +49,13 @@ class SeasonvarRefreshPlanner
         foreach ($this->candidateQueries($refreshAfter) as $reason => $callback) {
             $reasonSelected = 0;
             $query = $this->baseQuery($importRunId)->tap($callback);
+            $pagesForReason = $query->lazyById($chunkSize);
 
-            foreach ($query->lazyById($chunkSize)->chunk($chunkSize) as $pages) {
+            if ($reason === 'stale_metadata') {
+                $pagesForReason = $pagesForReason->take($this->metadataRefreshLimit());
+            }
+
+            foreach ($pagesForReason->chunk($chunkSize) as $pages) {
                 $pages = $pages instanceof Collection ? $pages : $pages->collect();
                 $pages = $this->rejectAlreadySelectedPages($pages, $selectedIds);
 
@@ -134,6 +139,12 @@ class SeasonvarRefreshPlanner
                     ->orWhereNull('import_claim_expires_at')
                     ->orWhere('import_claim_expires_at', '<=', now());
             })
+            ->where(function (Builder $query): void {
+                $query->where('parse_status', '!=', 'parsed')
+                    ->orWhere('metadata_parser_version', '>=', SeasonvarCatalogParser::METADATA_VERSION)
+                    ->orWhere('metadata_attempted_version', '>=', SeasonvarCatalogParser::METADATA_VERSION)
+                    ->orWhereDoesntHave('latestSnapshot');
+            })
             ->when($importRunId !== null, function (Builder $query) use ($importRunId): Builder {
                 return $query->where(function (Builder $query) use ($importRunId): void {
                     $query->whereNull('last_import_run_id')
@@ -206,8 +217,21 @@ class SeasonvarRefreshPlanner
                         ->orWhere('retry_after_at', '<=', now());
                 }),
 
+            'stale_metadata' => fn (Builder $query): Builder => $query
+                ->where('parse_status', 'parsed')
+                ->where('metadata_parser_version', '<', SeasonvarCatalogParser::METADATA_VERSION)
+                ->where(function (Builder $query) use ($refreshAfter): void {
+                    $query->whereNull('last_imported_at')
+                        ->orWhere('last_imported_at', '<=', $refreshAfter);
+                })
+                ->where(function (Builder $query): void {
+                    $query->where('metadata_attempted_version', '>=', SeasonvarCatalogParser::METADATA_VERSION)
+                        ->orWhereDoesntHave('latestSnapshot');
+                }),
+
             'stale' => fn (Builder $query): Builder => $query
                 ->where('parse_status', 'parsed')
+                ->where('metadata_parser_version', '>=', SeasonvarCatalogParser::METADATA_VERSION)
                 ->where(function (Builder $query) use ($refreshAfter): void {
                     $query->whereNull('last_imported_at')
                         ->orWhere('last_imported_at', '<=', $refreshAfter);
@@ -235,6 +259,11 @@ class SeasonvarRefreshPlanner
             $query->where('status', 'unavailable')
                 ->orWhereIn('health_status', ['unavailable', 'disabled']);
         });
+    }
+
+    private function metadataRefreshLimit(): int
+    {
+        return max(1, (int) config('seasonvar.metadata_backfill.page_limit', 200));
     }
 
     /**

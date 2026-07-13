@@ -24,17 +24,17 @@
                         @if ($latestSeason)
                             <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
                                 <i class="fa-solid fa-layer-group text-[0.85em]" aria-hidden="true"></i>
-                                <span>{{ $latestSeason->number }} сезон</span>
+                                <span>{{ __('catalog.release.season', ['number' => $latestSeason->number]) }}</span>
                             </span>
                         @endif
                         <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700">
                             <i class="fa-solid fa-circle-play text-[0.85em]" aria-hidden="true"></i>
-                            <span>{{ $episodesCount }} серий</span>
+                            <span>{{ trans_choice('catalog.counts.episodes', $episodesCount) }}</span>
                         </span>
                         @if ($mediaCount > 0)
                             <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700">
                                 <i class="fa-solid fa-file-video text-[0.85em]" aria-hidden="true"></i>
-                                <span>{{ $mediaCount }} видео</span>
+                                <span>{{ trans_choice('catalog.counts.videos', $mediaCount) }}</span>
                             </span>
                         @endif
                     </div>
@@ -69,12 +69,12 @@
                         @if ($latestSeason)
                             <span class="inline-flex min-w-0 items-center gap-1 text-sm text-slate-500">
                                 <i class="fa-solid fa-layer-group shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
-                                <span>Сезон {{ $latestSeason->number }}</span>
+                                <span>{{ __('catalog.release.season', ['number' => $latestSeason->number]) }}</span>
                             </span>
                         @else
                             <span class="inline-flex min-w-0 items-center gap-1 text-sm text-slate-500">
                                 <i class="fa-solid fa-layer-group shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
-                                <span>Сезон не указан</span>
+                                <span>{{ __('catalog.release.season_without_number') }}</span>
                             </span>
                         @endif
                     </div>
@@ -89,17 +89,17 @@
                         @unless ($compact)
                             <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
                                 <i class="fa-solid fa-layer-group text-[0.85em]" aria-hidden="true"></i>
-                                <span>{{ $seasonsCount }} сезон(ов)</span>
+                                <span>{{ trans_choice('catalog.counts.seasons', $seasonsCount) }}</span>
                             </span>
                         @endunless
                         <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700">
                             <i class="fa-solid fa-circle-play text-[0.85em]" aria-hidden="true"></i>
-                            <span>{{ $episodesCount }} серий</span>
+                            <span>{{ trans_choice('catalog.counts.episodes', $episodesCount) }}</span>
                         </span>
                         @if ($mediaCount > 0)
                             <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700">
                                 <i class="fa-solid fa-file-video text-[0.85em]" aria-hidden="true"></i>
-                                <span>{{ $mediaCount }} видео</span>
+                                <span>{{ trans_choice('catalog.counts.videos', $mediaCount) }}</span>
                             </span>
                         @endif
                     </div>

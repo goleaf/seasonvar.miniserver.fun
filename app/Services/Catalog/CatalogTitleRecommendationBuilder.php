@@ -6,7 +6,6 @@ use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class CatalogTitleRecommendationBuilder
@@ -14,6 +13,21 @@ class CatalogTitleRecommendationBuilder
     private const ALGORITHM_VERSION = 'v2';
 
     private const DEFAULT_MIN_SCORE = 600;
+
+    /**
+     * Broad attributes remain part of exact scoring, but they are too common to
+     * be useful as the only candidate seed on a large catalog.
+     *
+     * @var list<string>
+     */
+    private const CANDIDATE_FEATURE_TYPES = [
+        'genre',
+        'tag',
+        'director',
+        'actor',
+        'network',
+        'studio',
+    ];
 
     /**
      * @var array<string, int>
@@ -47,6 +61,12 @@ class CatalogTitleRecommendationBuilder
         'age_rating' => 50,
     ];
 
+    /** @var array<string, array<int, string>> */
+    private array $candidateFeatureMap = [];
+
+    /** @var list<string> */
+    private array $profileRelationTypes = [];
+
     public function __construct(
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogTitleQuery $titles,
@@ -58,48 +78,73 @@ class CatalogTitleRecommendationBuilder
      */
     public function rebuild(?callable $progress = null): array
     {
+        try {
+            return $this->performRebuild($progress);
+        } finally {
+            $this->candidateFeatureMap = [];
+        }
+    }
+
+    /**
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @return array{mode: string, algorithm_version: string, titles: int, titles_with_recommendations: int, titles_without_recommendations: int, stored: int, deleted: int, average_recommendations: float, min_score: int, max_per_title: int, duration_ms: int}
+     */
+    private function performRebuild(?callable $progress): array
+    {
         $startedAt = microtime(true);
         $chunkSize = max(10, (int) config('seasonvar.recommendations.chunk_size', 100));
         $minScore = max(1, (int) config('seasonvar.recommendations.min_score', self::DEFAULT_MIN_SCORE));
         $maxPerTitle = max(1, (int) config('seasonvar.recommendations.max_per_title', 12));
         $computedAt = now();
-        $profiles = $this->profiles($chunkSize);
-        $featureMap = $this->featureMap($profiles);
+        $profiles = $this->compactProfileIndex($chunkSize);
         $stored = 0;
         $deleted = $this->deleteOutOfScopeRecommendations();
         $titlesWithRecommendations = 0;
 
         $this->progress($progress, 'catalog-title-recommendations-started', [
-            'titles' => $profiles->count(),
+            'titles' => count($profiles),
             'chunk_size' => $chunkSize,
             'min_score' => $minScore,
             'max_per_title' => $maxPerTitle,
         ]);
 
-        foreach ($profiles->chunk($chunkSize) as $chunk) {
-            foreach ($chunk as $profile) {
-                $rows = $this->recommendationRows($profile, $profiles, $featureMap, $minScore, $maxPerTitle, $computedAt);
-                $result = $this->replaceTitleRecommendations(
-                    $profile['id'],
-                    $rows,
-                );
+        $processedInChunk = 0;
 
-                $stored += $result['stored'];
-                $deleted += $result['deleted'];
+        foreach ($profiles as $encodedProfile) {
+            $profile = $this->decodeProfile($encodedProfile);
+            $rows = $this->recommendationRows($profile, $profiles, $minScore, $maxPerTitle, $computedAt);
+            $result = $this->replaceTitleRecommendations(
+                $profile['id'],
+                $rows,
+            );
 
-                if ($rows !== []) {
-                    $titlesWithRecommendations++;
-                }
+            $stored += $result['stored'];
+            $deleted += $result['deleted'];
+            $processedInChunk++;
+
+            if ($rows !== []) {
+                $titlesWithRecommendations++;
             }
 
+            if ($processedInChunk === $chunkSize) {
+                $this->progress($progress, 'catalog-title-recommendations-chunk-complete', [
+                    'processed' => $processedInChunk,
+                    'stored' => $stored,
+                    'deleted' => $deleted,
+                ]);
+                $processedInChunk = 0;
+            }
+        }
+
+        if ($processedInChunk > 0) {
             $this->progress($progress, 'catalog-title-recommendations-chunk-complete', [
-                'processed' => $chunk->count(),
+                'processed' => $processedInChunk,
                 'stored' => $stored,
                 'deleted' => $deleted,
             ]);
         }
 
-        $titleCount = $profiles->count();
+        $titleCount = count($profiles);
         $result = [
             'mode' => 'full',
             'algorithm_version' => self::ALGORITHM_VERSION,
@@ -119,23 +164,13 @@ class CatalogTitleRecommendationBuilder
         return $result;
     }
 
-    /**
-     * @return Collection<int, array{
-     *     id: int,
-     *     type: string,
-     *     year: int|null,
-     *     published_media_count: int,
-     *     reviews_count: int,
-     *     best_rating: float|null,
-     *     signal_score: int,
-     *     signals: array<string, int>,
-     *     relations: array<string, list<int>>
-     * }>
-     */
-    private function profiles(int $chunkSize): Collection
+    /** @return array<int, string> */
+    private function compactProfileIndex(int $chunkSize): array
     {
-        $profiles = collect();
+        $profiles = [];
+        $featureMap = [];
         $publicCounts = $this->titles->publicCardCounts(null);
+        $this->profileRelationTypes = array_keys($this->taxonomies->relations());
 
         $this->titles->visibleTo(null)
             ->select(['id', 'type', 'year'])
@@ -148,8 +183,8 @@ class CatalogTitleRecommendationBuilder
                 'licensedMedia as published_media_count' => $publicCounts['licensedMedia as published_media_count'],
             ])
             ->lazyById($chunkSize)
-            ->each(function (CatalogTitle $title) use ($profiles): void {
-                $profiles->put($title->id, [
+            ->each(function (CatalogTitle $title) use (&$featureMap, &$profiles): void {
+                $profile = [
                     'id' => (int) $title->id,
                     'type' => (string) $title->type,
                     'year' => $title->year !== null ? (int) $title->year : null,
@@ -159,8 +194,35 @@ class CatalogTitleRecommendationBuilder
                     'signal_score' => $this->signalScore($title),
                     'signals' => $this->profileSignals($title),
                     'relations' => $this->profileRelations($title),
-                ]);
+                ];
+                $profiles[$title->id] = $this->encodeProfile($profile);
+
+                foreach ($profile['relations'] as $filterType => $ids) {
+                    if (! in_array($filterType, self::CANDIDATE_FEATURE_TYPES, true)) {
+                        continue;
+                    }
+
+                    foreach ($ids as $id) {
+                        $featureMap[$filterType][$id] = ($featureMap[$filterType][$id] ?? '')
+                            .pack('V', $profile['id']);
+                    }
+                }
             });
+
+        foreach ($featureMap as $filterType => &$features) {
+            foreach ($features as $featureId => $packedTitleIds) {
+                if (strlen($packedTitleIds) === 4) {
+                    unset($features[$featureId]);
+                }
+            }
+
+            if ($features === []) {
+                unset($featureMap[$filterType]);
+            }
+        }
+        unset($features);
+
+        $this->candidateFeatureMap = $featureMap;
 
         return $profiles;
     }
@@ -214,40 +276,22 @@ class CatalogTitleRecommendationBuilder
     }
 
     /**
-     * @param  Collection<int, array{id: int, relations: array<string, list<int>>}>  $profiles
-     * @return array<string, array<int, list<int>>>
-     */
-    private function featureMap(Collection $profiles): array
-    {
-        $map = [];
-
-        foreach ($profiles as $profile) {
-            foreach ($profile['relations'] as $filterType => $ids) {
-                foreach ($ids as $id) {
-                    $map[$filterType][$id][] = $profile['id'];
-                }
-            }
-        }
-
-        return $map;
-    }
-
-    /**
      * @param  array{id: int, type: string, year: int|null, published_media_count: int, reviews_count: int, best_rating: float|null, signal_score: int, signals: array<string, int>, relations: array<string, list<int>>}  $source
-     * @param  Collection<int, array{id: int, type: string, year: int|null, published_media_count: int, reviews_count: int, best_rating: float|null, signal_score: int, signals: array<string, int>, relations: array<string, list<int>>}>  $profiles
-     * @param  array<string, array<int, list<int>>>  $featureMap
+     * @param  array<int, string>  $profiles
      * @return list<array<string, mixed>>
      */
-    private function recommendationRows(array $source, Collection $profiles, array $featureMap, int $minScore, int $maxPerTitle, Carbon $computedAt): array
+    private function recommendationRows(array $source, array $profiles, int $minScore, int $maxPerTitle, Carbon $computedAt): array
     {
-        $rows = [];
+        $rowsByDiversity = [];
 
-        foreach ($this->candidateIds($source, $featureMap) as $candidateId) {
-            $candidate = $profiles->get($candidateId);
+        foreach ($this->candidateIds($source) as $candidateId) {
+            $encodedCandidate = $profiles[$candidateId] ?? null;
 
-            if ($candidate === null || $candidate['id'] === $source['id']) {
+            if ($encodedCandidate === null) {
                 continue;
             }
+
+            $candidate = $this->decodeProfile($encodedCandidate);
 
             $scored = $this->score($source, $candidate, $minScore);
 
@@ -255,7 +299,7 @@ class CatalogTitleRecommendationBuilder
                 continue;
             }
 
-            $rows[] = [
+            $this->retainDiversityCandidate($rowsByDiversity, [
                 'catalog_title_id' => $source['id'],
                 'recommended_title_id' => $candidate['id'],
                 'score' => $scored['score'],
@@ -267,32 +311,147 @@ class CatalogTitleRecommendationBuilder
                 'reasons' => $scored['reasons'],
                 'diversity_key' => $scored['diversity_key'],
                 'computed_at' => $computedAt,
-            ];
+            ], $maxPerTitle);
+        }
+
+        $rows = [];
+
+        foreach ($rowsByDiversity as $diversityRows) {
+            array_push($rows, ...$diversityRows);
         }
 
         return $this->rankRows($rows, $maxPerTitle);
     }
 
     /**
+     * @param  array<string, list<array<string, mixed>>>  $rowsByDiversity
+     * @param  array<string, mixed>  $row
+     */
+    private function retainDiversityCandidate(array &$rowsByDiversity, array $row, int $maxPerTitle): void
+    {
+        $key = (string) $row['diversity_key'];
+        $rowsByDiversity[$key][] = $row;
+
+        if (count($rowsByDiversity[$key]) <= $maxPerTitle) {
+            return;
+        }
+
+        usort(
+            $rowsByDiversity[$key],
+            fn (array $left, array $right): int => (int) $right['score'] <=> (int) $left['score'],
+        );
+        array_pop($rowsByDiversity[$key]);
+    }
+
+    /**
      * @param  array{id: int, relations: array<string, list<int>>}  $source
-     * @param  array<string, array<int, list<int>>>  $featureMap
      * @return list<int>
      */
-    private function candidateIds(array $source, array $featureMap): array
+    private function candidateIds(array $source): array
     {
-        $candidateIds = [];
+        $candidateLimit = max(1, (int) config('seasonvar.recommendations.candidate_limit', 120));
+        $scanPerFeature = max(1, (int) config('seasonvar.recommendations.candidate_scan_per_feature', 60));
+        $candidateScores = [];
+        $retainedPoolSize = $candidateLimit * 4;
 
-        foreach ($source['relations'] as $filterType => $ids) {
-            foreach ($ids as $id) {
-                foreach ($featureMap[$filterType][$id] ?? [] as $candidateId) {
-                    $candidateIds[$candidateId] = true;
+        foreach (self::CANDIDATE_FEATURE_TYPES as $filterType) {
+            foreach ($source['relations'][$filterType] ?? [] as $featureId) {
+                $packedTitleIds = $this->candidateFeatureMap[$filterType][$featureId] ?? null;
+
+                if ($packedTitleIds === null) {
+                    continue;
+                }
+
+                foreach ($this->sampledFeatureTitleIds(
+                    $packedTitleIds,
+                    $source['id'],
+                    $filterType,
+                    $featureId,
+                    $scanPerFeature,
+                ) as $candidateId) {
+                    if ($candidateId === $source['id']) {
+                        continue;
+                    }
+
+                    $candidateScores[$candidateId] = ($candidateScores[$candidateId] ?? 0)
+                        + (self::MATCH_WEIGHTS[$filterType] ?? 0);
+                }
+
+                if (count($candidateScores) > $retainedPoolSize * 2) {
+                    arsort($candidateScores, SORT_NUMERIC);
+                    $candidateScores = array_slice($candidateScores, 0, $retainedPoolSize, true);
                 }
             }
         }
 
-        unset($candidateIds[$source['id']]);
+        arsort($candidateScores, SORT_NUMERIC);
 
-        return array_keys($candidateIds);
+        return array_map(
+            static fn (int|string $id): int => (int) $id,
+            array_keys(array_slice($candidateScores, 0, $candidateLimit, true)),
+        );
+    }
+
+    /** @return iterable<int> */
+    private function sampledFeatureTitleIds(
+        string $packedTitleIds,
+        int $sourceId,
+        string $filterType,
+        int $featureId,
+        int $limit,
+    ): iterable {
+        $titleCount = intdiv(strlen($packedTitleIds), 4);
+        $selected = min($titleCount, $limit);
+        $start = $titleCount > $selected
+            ? (int) (sprintf('%u', crc32($sourceId.':'.$filterType.':'.$featureId)) % $titleCount)
+            : 0;
+
+        for ($index = 0; $index < $selected; $index++) {
+            $offset = (($start + $index) % $titleCount) * 4;
+            $unpacked = unpack('Vtitle_id', $packedTitleIds, $offset);
+
+            if (is_array($unpacked)) {
+                yield (int) $unpacked['title_id'];
+            }
+        }
+    }
+
+    /**
+     * @return array{id: int, type: string, year: int|null, published_media_count: int, reviews_count: int, best_rating: float|null, signal_score: int, signals: array<string, int>, relations: array<string, list<int>>}
+     */
+    private function decodeProfile(string $profile): array
+    {
+        $decoded = json_decode($profile, true, flags: JSON_THROW_ON_ERROR);
+
+        return [
+            'id' => (int) $decoded[0],
+            'type' => (string) $decoded[1],
+            'year' => $decoded[2] !== null ? (int) $decoded[2] : null,
+            'published_media_count' => (int) $decoded[3],
+            'reviews_count' => (int) $decoded[4],
+            'best_rating' => $decoded[5] !== null ? (float) $decoded[5] : null,
+            'signal_score' => (int) $decoded[6],
+            'signals' => (array) $decoded[7],
+            'relations' => array_combine($this->profileRelationTypes, (array) $decoded[8]),
+        ];
+    }
+
+    /**
+     * @param  array{id: int, type: string, year: int|null, published_media_count: int, reviews_count: int, best_rating: float|null, signal_score: int, signals: array<string, int>, relations: array<string, list<int>>}  $profile
+     */
+    private function encodeProfile(array $profile): string
+    {
+        return json_encode([
+            $profile['id'],
+            $profile['type'],
+            $profile['year'],
+            $profile['published_media_count'],
+            $profile['reviews_count'],
+            $profile['best_rating'],
+            $profile['signal_score'],
+            $profile['signals'],
+            array_values($profile['relations']),
+        ], JSON_THROW_ON_ERROR);
     }
 
     /**

@@ -1036,7 +1036,7 @@ class SeasonvarImportMaintenanceTest extends TestCase
             ->all();
 
         $this->assertSame([$missingVideoPage->id, $pendingPage->id], $pages->take(2)->pluck('id')->all());
-        $this->assertSame(['episodes_without_video', 'pending', 'stale'], $selectedReasons);
+        $this->assertSame(['episodes_without_video', 'pending', 'stale_metadata'], $selectedReasons);
     }
 
     public function test_refresh_planner_retries_a_bounded_attention_batch_on_every_start(): void
@@ -1459,7 +1459,7 @@ class SeasonvarImportMaintenanceTest extends TestCase
             'source_id' => $source->id,
             'parse_status' => 'parsed',
             'import_status' => 'parsed',
-            'last_imported_at' => now(),
+            'last_imported_at' => now()->subWeeks(2),
             'metadata_parser_version' => 0,
             'metadata_attempted_version' => 0,
         ]);
@@ -1467,7 +1467,7 @@ class SeasonvarImportMaintenanceTest extends TestCase
             'source_id' => $source->id,
             'parse_status' => 'parsed',
             'import_status' => 'parsed',
-            'last_imported_at' => now(),
+            'last_imported_at' => now()->subWeeks(2),
             'metadata_parser_version' => 0,
             'metadata_attempted_version' => SeasonvarCatalogParser::METADATA_VERSION,
         ]);

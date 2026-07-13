@@ -6,6 +6,7 @@ use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
 use App\Models\CatalogTitleRating;
 use App\Models\CatalogTitleReview;
+use App\Models\CatalogTitleSlug;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
@@ -161,6 +162,7 @@ class SeasonvarTitleMerger
             $this->mergeRatings($canonical, $duplicate);
             $this->mergeReviews($canonical, $duplicate);
             $this->moveLooseMedia($duplicate, $canonical);
+            $this->preservePublicSlugs($canonical, $duplicate);
 
             $duplicate->forceDelete();
             $mergedTitles++;
@@ -177,6 +179,19 @@ class SeasonvarTitleMerger
             'seasons' => $mergedSeasons,
             'episodes' => $movedEpisodes,
         ];
+    }
+
+    private function preservePublicSlugs(CatalogTitle $canonical, CatalogTitle $duplicate): void
+    {
+        CatalogTitleSlug::query()
+            ->whereBelongsTo($duplicate)
+            ->update(['catalog_title_id' => $canonical->id]);
+
+        CatalogTitleSlug::query()->firstOrCreate([
+            'slug' => $duplicate->slug,
+        ], [
+            'catalog_title_id' => $canonical->id,
+        ]);
     }
 
     /**
@@ -381,6 +396,7 @@ class SeasonvarTitleMerger
             'description' => $titles->pluck('description')->filter()->first() ?: $canonical->description,
             'original_title' => $this->preferredOriginalTitle($canonical, $titles),
             'indexed_at' => $titles->pluck('indexed_at')->filter()->max() ?: $canonical->indexed_at,
+            'relation_metadata_version' => $titles->min('relation_metadata_version') ?? 0,
         ])->save();
     }
 

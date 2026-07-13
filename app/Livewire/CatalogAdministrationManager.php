@@ -610,7 +610,14 @@ final class CatalogAdministrationManager extends Component
         return [
             'titleForm.title' => ['required', 'string', 'max:255'],
             'titleForm.original_title' => ['nullable', 'string', 'max:255'],
-            'titleForm.slug' => ['required', 'string', 'max:255', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', Rule::unique('catalog_titles', 'slug')->ignore($title->id)],
+            'titleForm.slug' => [
+                'required',
+                'string',
+                'max:255',
+                'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
+                Rule::unique('catalog_titles', 'slug')->ignore($title->id),
+                Rule::unique('catalog_title_slugs', 'slug')->where(fn ($query) => $query->where('catalog_title_id', '<>', $title->id)),
+            ],
             'titleForm.external_id' => ['nullable', 'string', 'max:120', 'regex:/^[A-Za-z0-9._:-]+$/', Rule::unique('catalog_titles', 'external_id')->where('source_id', $title->source_id)->ignore($title->id)],
             'titleForm.type' => ['required', 'string', Rule::in(['serial'])],
             'titleForm.year' => ['nullable', 'integer', 'between:1900,'.(now()->year + 5)],

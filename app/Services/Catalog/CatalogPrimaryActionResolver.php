@@ -35,7 +35,11 @@ class CatalogPrimaryActionResolver
                 $episode = $this->playback->watchableEpisode($catalogTitle, $user, $progress->episode_id);
 
                 if ($episode !== null) {
-                    return $this->episodeAction('continue', 'Продолжить '.$episode->number.' серию', $catalogTitle, $user, $episode, $progress->position_seconds);
+                    $label = $episode->number !== null
+                        ? __('catalog.player.continue_episode', ['number' => $episode->number])
+                        : __('catalog.player.continue_release');
+
+                    return $this->episodeAction('continue', $label, $catalogTitle, $user, $episode, $progress->position_seconds);
                 }
             }
 
@@ -46,13 +50,17 @@ class CatalogPrimaryActionResolver
                     : null;
 
                 if ($nextEpisode !== null) {
-                    return $this->episodeAction('next', 'Следующая: '.$nextEpisode->number.' серия', $catalogTitle, $user, $nextEpisode);
+                    $label = $nextEpisode->number !== null
+                        ? __('catalog.player.next_episode', ['number' => $nextEpisode->number])
+                        : __('catalog.player.next_release');
+
+                    return $this->episodeAction('next', $label, $catalogTitle, $user, $nextEpisode);
                 }
 
                 $firstEpisode = $this->playback->firstWatchableEpisode($catalogTitle, $user);
 
                 if ($firstEpisode !== null) {
-                    return $this->episodeAction('replay', 'Смотреть сначала', $catalogTitle, $user, $firstEpisode);
+                    return $this->episodeAction('replay', __('catalog.player.replay'), $catalogTitle, $user, $firstEpisode);
                 }
             }
         }
@@ -60,7 +68,11 @@ class CatalogPrimaryActionResolver
         $firstEpisode = $this->playback->firstWatchableEpisode($catalogTitle, $user);
 
         if ($firstEpisode !== null) {
-            return $this->episodeAction('start', 'Начать с '.$firstEpisode->number.' серии', $catalogTitle, $user, $firstEpisode);
+            $label = $firstEpisode->number !== null
+                ? __('catalog.player.start_episode', ['number' => $firstEpisode->number])
+                : __('catalog.player.start_release');
+
+            return $this->episodeAction('start', $label, $catalogTitle, $user, $firstEpisode);
         }
 
         $titleMedia = $this->playback->titleMedia($catalogTitle, $user);
@@ -68,12 +80,12 @@ class CatalogPrimaryActionResolver
         if ($titleMedia !== null) {
             return new CatalogPrimaryAction(
                 type: 'title-media',
-                label: 'Смотреть доступное видео',
+                label: __('catalog.player.watch_available'),
                 mediaId: $titleMedia->id,
             );
         }
 
-        return new CatalogPrimaryAction(type: 'unavailable', label: 'Видео пока недоступно');
+        return new CatalogPrimaryAction(type: 'unavailable', label: __('catalog.player.unavailable'));
     }
 
     private function episodeAction(

@@ -243,4 +243,81 @@ class CatalogTitleRecommendationBuilderTest extends TestCase
             'recommended_title_id' => $memberCandidate->id,
         ]);
     }
+
+    public function test_profile_index_uses_compact_serialized_payloads_and_packed_feature_ids(): void
+    {
+        $genre = Genre::query()->create([
+            'name' => 'Компактный жанр',
+            'slug' => 'kompaktnyi-zhanr',
+        ]);
+        $first = CatalogTitle::factory()->create();
+        $second = CatalogTitle::factory()->create();
+        $singletonActor = Actor::query()->create([
+            'name' => 'Уникальный актёр',
+            'slug' => 'unikalnyi-akter',
+        ]);
+        $first->genres()->attach($genre->id);
+        $second->genres()->attach($genre->id);
+        $first->actors()->attach($singletonActor->id);
+        $method = new \ReflectionMethod(CatalogTitleRecommendationBuilder::class, 'compactProfileIndex');
+
+        $builder = app(CatalogTitleRecommendationBuilder::class);
+        $profiles = $method->invoke($builder, 10);
+        $decode = new \ReflectionMethod(CatalogTitleRecommendationBuilder::class, 'decodeProfile');
+        $candidateIds = new \ReflectionMethod(CatalogTitleRecommendationBuilder::class, 'candidateIds');
+
+        $this->assertIsString($profiles[$first->id]);
+        $this->assertIsString($profiles[$second->id]);
+        $this->assertSame(
+            [$second->id],
+            $candidateIds->invoke($builder, $decode->invoke($builder, $profiles[$first->id])),
+        );
+    }
+
+    public function test_candidate_buffer_keeps_only_the_best_rows_per_diversity_key(): void
+    {
+        $builder = app(CatalogTitleRecommendationBuilder::class);
+        $retain = new \ReflectionMethod(CatalogTitleRecommendationBuilder::class, 'retainDiversityCandidate');
+        $rows = [];
+
+        foreach (range(1, 10) as $score) {
+            $arguments = [&$rows, [
+                'score' => $score,
+                'diversity_key' => 'genre:1',
+            ], 3];
+            $retain->invokeArgs($builder, $arguments);
+        }
+
+        $this->assertCount(3, $rows['genre:1']);
+        $this->assertSame([10, 9, 8], collect($rows['genre:1'])->sortByDesc('score')->pluck('score')->values()->all());
+    }
+
+    public function test_candidate_selection_is_hard_bounded_before_exact_scoring(): void
+    {
+        config([
+            'seasonvar.recommendations.candidate_limit' => 2,
+            'seasonvar.recommendations.candidate_scan_per_feature' => 10,
+        ]);
+
+        $genre = Genre::query()->create([
+            'name' => 'Ограниченный жанр',
+            'slug' => 'ogranichennyi-zhanr',
+        ]);
+        $source = CatalogTitle::factory()->create();
+        $source->genres()->attach($genre);
+
+        collect(range(1, 5))->each(function () use ($genre): void {
+            $candidate = CatalogTitle::factory()->create();
+            $candidate->genres()->attach($genre);
+        });
+
+        $builder = app(CatalogTitleRecommendationBuilder::class);
+        $profilesMethod = new \ReflectionMethod($builder, 'compactProfileIndex');
+        $decodeMethod = new \ReflectionMethod($builder, 'decodeProfile');
+        $candidateMethod = new \ReflectionMethod($builder, 'candidateIds');
+        $profiles = $profilesMethod->invoke($builder, 10);
+        $sourceProfile = $decodeMethod->invoke($builder, $profiles[$source->id]);
+
+        $this->assertCount(2, $candidateMethod->invoke($builder, $sourceProfile));
+    }
 }

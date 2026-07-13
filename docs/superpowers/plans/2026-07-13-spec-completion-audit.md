@@ -138,7 +138,7 @@
 - [x] Recheck run status and claims after lock acquisition to avoid stale work.
 - [x] Run `SeasonvarParallelImportTest` and `SeasonvarImportMaintenanceTest`: 54 tests, 298 assertions, GREEN; full suite: 314 tests, 2194 assertions, GREEN.
 - [x] Update queue/architecture/importer/performance documentation.
-- [ ] Commit Tasks 1-2 as one operational reliability change on `main` after all checks pass.
+- [x] Commit Tasks 1-2 as one operational reliability change on `main` after all checks pass (`0451f2c`).
 - [ ] Restart long-lived workers through `php artisan queue:restart`, verify exactly ten active units, zero repeated 900-second finalizer kills, decreasing reserved jobs and terminal completion of runs with zero claims.
 
 ### Task 3: Add Versioned Metadata Schema and Model Contracts
@@ -160,12 +160,12 @@
 - `SourcePage::latestSnapshot(): HasOne` selects by maximum `captured_at`, then maximum `id`.
 - Queue indexes match page type/version/attempt/id and title version/id; snapshots add `(source_page_id, captured_at, id)`.
 
-- [ ] Write migration/default/cast/fillable/relation/index tests and confirm RED.
-- [ ] Create one additive reversible migration with no production backfill.
-- [ ] Implement model casts, fillable attributes and `latestSnapshot()`.
-- [ ] Add bounded metadata chunk/hard-limit config keys and `.env.example` entries.
-- [ ] Run migration/model tests, rollback on an isolated SQLite database, Pint and diff checks.
-- [ ] Commit the schema/model contract on `main`.
+- [x] Write migration/default/cast/fillable/relation/index tests and confirm RED.
+- [x] Create one additive reversible migration with no production backfill.
+- [x] Implement model casts, fillable attributes and `latestSnapshot()`.
+- [x] Add bounded metadata chunk/hard-limit config keys and `.env.example` entries.
+- [x] Run migration/model tests, rollback on an isolated SQLite database, Pint and diff checks.
+- [x] Commit the schema/model contract on `main` (`a00ed45`).
 
 ### Task 4: Implement and Integrate Local Metadata Backfill
 
@@ -193,12 +193,12 @@
 - Successful local/remote parse advances current versions atomically; deterministic invalid snapshot advances only attempted version; infrastructure failure advances no version.
 - `stale_metadata` remote planner reason excludes pages still eligible for an unattempted retained snapshot.
 
-- [ ] Add RED tests for latest-snapshot ordering, idempotency, season URL-hash title resolution, media-derived translation, presence precedence, invalid snapshot fairness, hard limits, rollback, zero HTTP and missing snapshot behavior.
-- [ ] Implement bounded local parsing before transaction and shared relation synchronization inside transaction.
-- [ ] Add RED integration tests for unchanged fast path, successful remote version advancement, planner ordering, snapshot retention, merge minimum version, progress counters and HTTPS-only source URLs.
-- [ ] Integrate backfill after retention maintenance and before remote selection/global derived work in sync and queued finalization.
-- [ ] Preserve the snapshot selected by latest `captured_at`; preserve minimum relation version during merge.
-- [ ] Run metadata tests, all importer tests, Pint and docs refresh.
+- [x] Add RED tests for latest-snapshot ordering, idempotency, season URL-hash title resolution, media-derived translation, presence precedence, invalid snapshot fairness, hard limits, rollback, zero HTTP and missing snapshot behavior.
+- [x] Implement bounded local parsing before transaction and shared relation synchronization inside transaction.
+- [x] Add RED integration tests for unchanged fast path, successful remote version advancement, planner ordering, snapshot retention, merge minimum version, progress counters and HTTPS-only source URLs.
+- [x] Integrate backfill after retention maintenance and before remote selection/global derived work in sync and queued finalization.
+- [x] Preserve the snapshot selected by latest `captured_at`; preserve minimum relation version during merge.
+- [x] Run metadata tests, importer regression tests, Pint, isolated migrate/rollback/migrate and docs refresh.
 - [ ] Commit the local metadata recovery milestone on `main`.
 
 ### Task 5: Add Additive FTS5 Schema and Index State
@@ -218,10 +218,10 @@
 - Insert/update/delete triggers keep FTS rows synchronized with document rows.
 - Singleton state stores version, `building|ready|stale|failed`, source/document counts, checkpoint ID and completion/error timestamps without public exposure.
 
-- [ ] Write RED schema/trigger/cascade/state tests on SQLite FTS5.
-- [ ] Implement reversible migration; `down()` drops triggers and virtual table before ordinary tables.
-- [ ] Implement models/enums/casts and relationships.
-- [ ] Verify isolated migrate/rollback/migrate, FTS integrity, focused tests and Pint.
+- [x] Write RED schema/trigger/cascade/state tests on SQLite FTS5.
+- [x] Implement reversible migration; `down()` drops triggers and virtual table before ordinary tables.
+- [x] Implement models/enums/casts and relationships.
+- [x] Verify isolated migrate/rollback/migrate, trigger synchronization, cascade delete, focused tests and Pint.
 - [ ] Commit the additive search schema milestone.
 
 ### Task 6: Build Search Documents, Indexer and Resumable Rebuild
@@ -242,11 +242,11 @@
 - `catalog:search-rebuild --chunk=200` refuses active import runs, resumes from checkpoint and marks `ready` only when counts and FTS integrity pass.
 - Failed rebuild records sanitized state and keeps legacy search active.
 
-- [ ] Add RED builder tests for weights/transliteration/no raw URL or importer state/fingerprint stability.
-- [ ] Add RED indexer tests for idempotent bulk updates, trigger visibility and bounded eager loading.
-- [ ] Add RED command tests for active-import refusal, checkpoint resume, count mismatch, integrity failure and successful ready state.
-- [ ] Implement builder, indexer and command with no production backfill in migration.
-- [ ] Run focused tests, command on isolated fixture DB, Pint and docs refresh.
+- [x] Add RED builder tests for weights/transliteration/no raw URL or importer state/fingerprint stability.
+- [x] Add RED indexer tests for idempotent bulk updates, trigger visibility and bounded eager loading.
+- [x] Add RED command tests for active-import refusal, checkpoint resume, count mismatch, integrity failure and successful ready state.
+- [x] Implement builder, indexer and command with no production backfill in migration.
+- [x] Run focused tests, command on isolated fixture DB, Pint and update search documentation.
 - [ ] Commit the rebuild milestone.
 
 ### Task 7: Synchronize Search Index With Catalog Writes

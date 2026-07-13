@@ -4,6 +4,7 @@ namespace App\Services\Catalog;
 
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
+use App\Support\PlainText;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -192,29 +193,31 @@ class CatalogSeoBuilder
         ?LicensedMedia $selectedMedia,
         ?string $selectedMediaUrl,
     ): array {
+        $displayTitle = PlainText::clean($catalogTitle->title) ?: __('catalog.navigation.all_titles');
         $genres = $this->taxonomyNames($taxonomiesByType, 'genre');
         $countries = $this->taxonomyNames($taxonomiesByType, 'country');
         $actors = $this->taxonomyNames($taxonomiesByType, 'actor')->take(10);
         $directors = $this->taxonomyNames($taxonomiesByType, 'director')->take(10);
         $ageRatings = $this->taxonomyNames($taxonomiesByType, 'age_rating');
         $fallbackDescription = collect([
-            'Сериал '.$catalogTitle->title.' смотреть онлайн.',
-            $catalogTitle->year ? 'Год выхода: '.$catalogTitle->year.'.' : null,
-            $genres->isNotEmpty() ? 'Жанры: '.$genres->take(5)->implode(', ').'.' : null,
-            $countries->isNotEmpty() ? 'Страна: '.$countries->take(3)->implode(', ').'.' : null,
-            $seasons->count() > 0 ? 'Сезонов: '.$seasons->count().'.' : null,
-            $episodeCount > 0 ? 'Серий: '.$episodeCount.'.' : null,
-            $mediaCount > 0 ? 'Видео доступно во встроенном плеере.' : null,
+            __('catalog.seo.title_fallback_start', ['title' => $displayTitle]),
+            $catalogTitle->year ? __('catalog.seo.year', ['year' => $catalogTitle->year]) : null,
+            $genres->isNotEmpty() ? __('catalog.seo.genres', ['genres' => $genres->take(5)->implode(', ')]) : null,
+            $countries->isNotEmpty() ? __('catalog.seo.countries', ['countries' => $countries->take(3)->implode(', ')]) : null,
+            $seasons->count() > 0 ? trans_choice('catalog.counts.seasons', $seasons->count()).'.' : null,
+            $episodeCount > 0 ? trans_choice('catalog.counts.episodes', $episodeCount).'.' : null,
+            $mediaCount > 0 ? __('catalog.seo.player_available') : null,
         ])->filter()->implode(' ');
         $description = $this->seoDescription($catalogTitle->description ?: $fallbackDescription, 190);
-        $pageTitle = 'Сериал '.$catalogTitle->title.' смотреть онлайн';
+        $pageTitle = __('catalog.seo.title_page', ['title' => $displayTitle]);
 
         if ($catalogTitle->year) {
-            $pageTitle .= ' - '.$catalogTitle->year;
+            $pageTitle .= __('catalog.seo.title_year_suffix', ['year' => $catalogTitle->year]);
         }
 
         $alternateNames = collect([$catalogTitle->original_title])
             ->merge($catalogTitle->relationLoaded('aliases') ? $catalogTitle->aliases->pluck('name') : [])
+            ->map(fn (mixed $name): string => PlainText::clean($name))
             ->filter()
             ->unique()
             ->values();
@@ -224,13 +227,12 @@ class CatalogSeoBuilder
         $seriesSchema = $this->withoutEmpty([
             '@context' => 'https://schema.org',
             '@type' => 'TVSeries',
-            'name' => $catalogTitle->title,
+            'name' => $displayTitle,
             'alternateName' => $alternateNames->isNotEmpty() ? $alternateNames->all() : null,
             'description' => $description,
             'url' => route('titles.show', $catalogTitle),
             'mainEntityOfPage' => route('titles.show', $catalogTitle),
             'image' => $catalogTitle->poster_url,
-            'inLanguage' => 'ru',
             'isAccessibleForFree' => true,
             'publisher' => $this->organizationJsonLd(false),
             'datePublished' => $catalogTitle->year ? (string) $catalogTitle->year : null,
@@ -250,9 +252,14 @@ class CatalogSeoBuilder
                 'ratingCount' => $rating->votes,
             ]) : null,
         ]);
-        $faqItems = $this->titleFaqItems($catalogTitle, $genres, $countries, $seasons->count(), $episodeCount, $mediaCount);
-        $keywordCollection = $this->titleKeywordCollection($catalogTitle, $alternateNames, $genres, $countries, $actors, $directors, $seasons->count(), $episodeCount, $mediaCount);
-        $searchPhrases = $this->titleSearchPhrases($catalogTitle, $keywordCollection, $genres, $countries, $seasons->count(), $episodeCount, $mediaCount);
+        $faqItems = $this->titleFaqItems($displayTitle, $catalogTitle->year, $genres, $countries, $seasons->count(), $episodeCount, $mediaCount);
+        $usesRussianVocabulary = str_starts_with(app()->currentLocale(), 'ru');
+        $keywordCollection = $usesRussianVocabulary
+            ? $this->titleKeywordCollection($catalogTitle, $alternateNames, $genres, $countries, $actors, $directors, $seasons->count(), $episodeCount, $mediaCount)
+            : collect([$displayTitle])->merge($alternateNames)->merge($genres)->merge($countries)->filter()->unique()->values();
+        $searchPhrases = $usesRussianVocabulary
+            ? $this->titleSearchPhrases($catalogTitle, $keywordCollection, $genres, $countries, $seasons->count(), $episodeCount, $mediaCount)
+            : collect();
         $jsonLd = array_values(array_filter([
             $this->organizationJsonLd(),
             $this->websiteJsonLd(),
@@ -262,9 +269,9 @@ class CatalogSeoBuilder
             $this->faqJsonLd($faqItems),
             $this->episodeItemListJsonLd($catalogTitle, $seasons),
             $this->breadcrumbJsonLd([
-                ['name' => 'Главная', 'url' => route('home')],
-                ['name' => 'Сериалы', 'url' => route('titles.index')],
-                ['name' => $catalogTitle->title, 'url' => route('titles.show', $catalogTitle)],
+                ['name' => __('catalog.navigation.home'), 'url' => route('home')],
+                ['name' => __('catalog.navigation.all_titles'), 'url' => route('titles.index')],
+                ['name' => $displayTitle, 'url' => route('titles.show', $catalogTitle)],
             ]),
         ], fn (array $item): bool => $item !== []));
 
@@ -272,7 +279,7 @@ class CatalogSeoBuilder
             $jsonLd[] = $this->withoutEmpty([
                 '@context' => 'https://schema.org',
                 '@type' => 'VideoObject',
-                'name' => $selectedMedia?->title ?: $catalogTitle->title,
+                'name' => PlainText::clean($selectedMedia?->title) ?: $displayTitle,
                 'description' => $description,
                 'thumbnailUrl' => $catalogTitle->poster_url,
                 'uploadDate' => $this->sitemapDate($catalogTitle->indexed_at ?: $catalogTitle->updated_at),
@@ -288,25 +295,25 @@ class CatalogSeoBuilder
             'news_keywords' => $keywordCollection->take(15)->implode(', '),
             'canonical' => route('titles.show', $catalogTitle),
             'image' => $catalogTitle->poster_url,
-            'image_alt' => 'Постер '.$catalogTitle->title,
+            'image_alt' => __('catalog.seo.poster_alt', ['title' => $displayTitle]),
             'video' => $selectedMediaUrl,
             'published_time' => $this->sitemapDate($catalogTitle->created_at),
             'updated_time' => $this->sitemapDate($catalogTitle->indexed_at ?: $catalogTitle->updated_at),
-            'section' => 'Сериал онлайн',
+            'section' => __('catalog.seo.section'),
             'tags' => $keywordCollection->take(25)->values()->all(),
-            'seo_text' => $this->titleSeoText($catalogTitle, $genres, $countries, $actors, $directors, $seasons->count(), $episodeCount, $mediaCount),
+            'seo_text' => $usesRussianVocabulary ? $this->titleSeoText($catalogTitle, $genres, $countries, $actors, $directors, $seasons->count(), $episodeCount, $mediaCount) : [],
             'search_phrases' => $searchPhrases,
-            'keyword_clusters' => $this->titleKeywordClusters($catalogTitle, $genres, $countries, $actors, $directors, $seasons->count(), $episodeCount, $mediaCount),
-            'related_links' => $this->titleRelatedLinks($catalogTitle, $taxonomiesByType),
+            'keyword_clusters' => $usesRussianVocabulary ? $this->titleKeywordClusters($catalogTitle, $genres, $countries, $actors, $directors, $seasons->count(), $episodeCount, $mediaCount) : [],
+            'related_links' => $usesRussianVocabulary ? $this->titleRelatedLinks($catalogTitle, $taxonomiesByType) : [],
             'search_context' => [
                 'type' => 'title',
-                'title' => $catalogTitle->title,
+                'title' => $displayTitle,
                 'slug' => $catalogTitle->slug,
             ],
             'breadcrumbs' => [
-                ['name' => 'Главная', 'url' => route('home')],
-                ['name' => 'Сериалы', 'url' => route('titles.index')],
-                ['name' => $catalogTitle->title, 'url' => route('titles.show', $catalogTitle)],
+                ['name' => __('catalog.navigation.home'), 'url' => route('home')],
+                ['name' => __('catalog.navigation.all_titles'), 'url' => route('titles.index')],
+                ['name' => $displayTitle, 'url' => route('titles.show', $catalogTitle)],
             ],
             'faq' => $faqItems,
             'type' => 'video.tv_show',
@@ -326,69 +333,43 @@ class CatalogSeoBuilder
 
     private function seoDescription(?string $value, int $limit = 180): string
     {
-        $text = strip_tags((string) $value);
-        $text = preg_replace('/\s+/u', ' ', trim($text)) ?: '';
-
-        return $text;
-    }
-
-    private function canonicalFromRequest(Request $request): string
-    {
-        $query = collect($request->query())
-            ->reject(fn (mixed $value, string $key): bool => in_array($key, ['sort', 'view', 'per_page'], true))
-            ->map(fn (mixed $value): mixed => $this->canonicalQueryValue($value))
-            ->filter(fn (mixed $value): bool => $value !== null && $value !== [])
-            ->sortKeys()
-            ->all();
-
-        return $query === []
-            ? $request->url()
-            : $request->url().'?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+        return PlainText::clean($value, $limit);
     }
 
     private function catalogCanonicalUrl(Request $request, Collection $activeTaxonomies, ?int $year, int $currentPage, ?CatalogTitle $titleContext = null): string
     {
-        $query = [];
+        $pageQuery = $currentPage > 1 ? ['page' => $currentPage] : [];
+        $hasSearch = $this->hasSearchQuery($request);
+        $hasComplexQuery = $this->hasComplexCatalogQuery($request);
 
-        if ($titleContext !== null) {
-            $query['title'] = $titleContext->slug;
-        }
-
-        if ($year !== null) {
-            $query['year'] = $year;
-        }
-
-        if ($currentPage > 1) {
-            $query['page'] = $currentPage;
-        }
-
-        if ($activeTaxonomies->count() === 1 && ! $this->hasSearchQuery($request) && ! $this->hasComplexCatalogQuery($request)) {
+        if ($activeTaxonomies->count() === 1
+            && $year === null
+            && $titleContext === null
+            && ! $hasSearch
+            && ! $hasComplexQuery) {
             $filterType = (string) $activeTaxonomies->keys()->first();
             $taxonomy = $activeTaxonomies->first();
-            $url = route('titles.taxonomy', ['type' => $filterType, 'taxonomy' => $taxonomy->slug]);
 
-            return $query === []
-                ? $url
-                : $url.'?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+            return route('titles.taxonomy', [
+                'type' => $filterType,
+                'taxonomy' => $taxonomy->slug,
+                ...$pageQuery,
+            ]);
         }
 
-        if ($activeTaxonomies->isEmpty()) {
-            $search = $request->query('q');
-
-            if (is_scalar($search) && trim((string) $search) !== '') {
-                $query['q'] = trim((string) $search);
-            }
-
-            if ($titleContext === null && $year !== null && ! isset($query['q']) && $currentPage === 1) {
-                return route('titles.year', ['year' => $year]);
-            }
-
-            return $query === []
-                ? route('titles.index')
-                : route('titles.index').'?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+        if ($activeTaxonomies->isEmpty()
+            && $year !== null
+            && $titleContext === null
+            && ! $hasSearch
+            && ! $hasComplexQuery) {
+            return route('titles.year', ['year' => $year, ...$pageQuery]);
         }
 
-        return $this->canonicalFromRequest($request);
+        if ($activeTaxonomies->isEmpty() && $year === null && $titleContext === null && ! $hasSearch && ! $hasComplexQuery) {
+            return route('titles.index', $pageQuery);
+        }
+
+        return route('titles.index');
     }
 
     private function hasSearchQuery(Request $request): bool
@@ -396,27 +377,6 @@ class CatalogSeoBuilder
         $search = $request->query('q');
 
         return is_scalar($search) && trim((string) $search) !== '';
-    }
-
-    private function canonicalQueryValue(mixed $value): mixed
-    {
-        if (is_array($value)) {
-            return collect($value)
-                ->filter(fn (mixed $item): bool => is_scalar($item) && trim((string) $item) !== '')
-                ->map(fn (mixed $item): string => trim((string) $item))
-                ->unique()
-                ->sort()
-                ->values()
-                ->all();
-        }
-
-        if (! is_scalar($value)) {
-            return null;
-        }
-
-        $value = trim((string) $value);
-
-        return $value === '' ? null : $value;
     }
 
     private function hasComplexCatalogQuery(Request $request): bool
@@ -459,6 +419,7 @@ class CatalogSeoBuilder
         return $taxonomiesByType
             ->get($type, collect())
             ->pluck('name')
+            ->map(fn (mixed $name): string => PlainText::clean($name))
             ->filter()
             ->unique()
             ->values();
@@ -499,7 +460,7 @@ class CatalogSeoBuilder
                 route('sitemap.index'),
                 route('feed'),
             ],
-            'keywords' => 'сериалы онлайн, каталог сериалов, смотреть сериалы онлайн',
+            'keywords' => __('catalog.seo.website_keywords'),
         ];
     }
 
@@ -511,24 +472,24 @@ class CatalogSeoBuilder
         return [
             '@context' => 'https://schema.org',
             '@type' => 'ItemList',
-            'name' => 'Навигация сайта',
+            'name' => __('catalog.navigation.site_navigation'),
             'itemListElement' => [
                 [
                     '@type' => 'SiteNavigationElement',
                     'position' => 1,
-                    'name' => 'Главная',
+                    'name' => __('catalog.navigation.home'),
                     'url' => route('home'),
                 ],
                 [
                     '@type' => 'SiteNavigationElement',
                     'position' => 2,
-                    'name' => 'Все сериалы',
+                    'name' => __('catalog.navigation.all_titles'),
                     'url' => route('titles.index'),
                 ],
                 [
                     '@type' => 'SiteNavigationElement',
                     'position' => 3,
-                    'name' => 'Поиск',
+                    'name' => __('catalog.navigation.search'),
                     'url' => route('titles.index').'?q={search_term_string}',
                 ],
                 [
@@ -567,7 +528,7 @@ class CatalogSeoBuilder
             'name' => $name,
             'description' => $this->seoDescription($description),
             'url' => $url,
-            'inLanguage' => 'ru',
+            'inLanguage' => str_replace('_', '-', app()->currentLocale()),
             'isPartOf' => [
                 '@type' => 'WebSite',
                 'name' => $this->siteName(),
@@ -934,7 +895,8 @@ class CatalogSeoBuilder
      * @return list<array{question: string, answer: string}>
      */
     private function titleFaqItems(
-        CatalogTitle $catalogTitle,
+        string $title,
+        ?int $year,
         Collection $genres,
         Collection $countries,
         int $seasonCount,
@@ -943,32 +905,32 @@ class CatalogSeoBuilder
     ): array {
         $genreText = $genres->take(5)->implode(', ');
         $countryText = $countries->take(3)->implode(', ');
-        $watchQuestion = Str::endsWith(Str::lower($catalogTitle->title), 'онлайн')
-            ? 'Где смотреть сериал '.$catalogTitle->title.'?'
-            : 'Где смотреть сериал '.$catalogTitle->title.' онлайн?';
 
         return collect([
             [
-                'question' => $watchQuestion,
+                'question' => __('catalog.seo.faq.watch_question', ['title' => $title]),
                 'answer' => $mediaCount > 0
-                    ? 'Сериал '.$catalogTitle->title.' доступен на этой странице во встроенном плеере. Видео открывается через выбранную серию.'
-                    : 'Для сериала '.$catalogTitle->title.' сейчас нет доступного видео.',
+                    ? __('catalog.seo.faq.watch_available', ['title' => $title])
+                    : __('catalog.seo.faq.watch_unavailable', ['title' => $title]),
             ],
             [
-                'question' => 'Сколько сезонов и серий в сериале '.$catalogTitle->title.'?',
-                'answer' => 'В каталоге сейчас указано сезонов: '.$seasonCount.', серий: '.$episodeCount.'.',
+                'question' => __('catalog.seo.faq.counts_question', ['title' => $title]),
+                'answer' => __('catalog.seo.faq.counts_answer', [
+                    'seasons' => trans_choice('catalog.counts.seasons', $seasonCount),
+                    'episodes' => trans_choice('catalog.counts.episodes', $episodeCount),
+                ]),
             ],
             [
-                'question' => 'Какой год, жанр и страна у сериала '.$catalogTitle->title.'?',
+                'question' => __('catalog.seo.faq.facts_question', ['title' => $title]),
                 'answer' => collect([
-                    $catalogTitle->year ? 'Год выхода: '.$catalogTitle->year : null,
-                    $genreText !== '' ? 'жанры: '.$genreText : null,
-                    $countryText !== '' ? 'страна: '.$countryText : null,
+                    $year ? __('catalog.seo.faq.year_fact', ['year' => $year]) : null,
+                    $genreText !== '' ? __('catalog.seo.faq.genres_fact', ['genres' => $genreText]) : null,
+                    $countryText !== '' ? __('catalog.seo.faq.countries_fact', ['countries' => $countryText]) : null,
                 ])->filter()->implode('; ').'.',
             ],
             [
-                'question' => 'Какая информация есть на странице сериала '.$catalogTitle->title.'?',
-                'answer' => 'На странице показаны описание, сезоны, серии, постер, связи каталога и доступные видео, если они есть.',
+                'question' => __('catalog.seo.faq.information_question', ['title' => $title]),
+                'answer' => __('catalog.seo.faq.information_answer'),
             ],
         ])
             ->filter(fn (array $item): bool => trim($item['answer'], " .\t\n\r\0\x0B") !== '')
@@ -1008,7 +970,9 @@ class CatalogSeoBuilder
             ->values()
             ->map(fn ($season): array => $this->withoutEmpty([
                 '@type' => 'CreativeWorkSeason',
-                'name' => 'Сезон '.$season->number,
+                'name' => $season->number !== null
+                    ? __('catalog.release.season', ['number' => $season->number])
+                    : __('catalog.release.season_without_number'),
                 'seasonNumber' => (int) $season->number,
                 'numberOfEpisodes' => $season->relationLoaded('episodes')
                     ? $season->episodes->count()
@@ -1051,8 +1015,10 @@ class CatalogSeoBuilder
                     'position' => $index + 1,
                     'item' => $this->withoutEmpty([
                         '@type' => 'TVEpisode',
-                        'name' => $item['episode']->title ?: $item['episode']->number.' серия',
-                        'episodeNumber' => (int) $item['episode']->number,
+                        'name' => PlainText::clean($item['episode']->title) ?: ($item['episode']->number !== null
+                            ? __('catalog.release.episode', ['number' => $item['episode']->number])
+                            : __('catalog.release.episode_without_number')),
+                        'episodeNumber' => $item['episode']->number !== null ? (int) $item['episode']->number : null,
                         'partOfSeason' => [
                             '@type' => 'CreativeWorkSeason',
                             'seasonNumber' => (int) $item['season']->number,

@@ -4,10 +4,10 @@
             <div class="min-w-0">
                 <h1 class="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">
                     <i class="fa-solid fa-clock-rotate-left text-emerald-700" aria-hidden="true"></i>
-                    <span>Мои просмотры</span>
+                    <span>{{ __('catalog.viewing.title') }}</span>
                 </h1>
                 <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                    Здесь сохраняются только начатые просмотры. Недоступные выпуски остаются в истории без ссылки на просмотр.
+                    {{ __('catalog.viewing.intro') }}
                 </p>
             </div>
 
@@ -15,66 +15,66 @@
                 <button
                     type="button"
                     wire:click="clearHistory"
-                    wire:confirm.prompt="Очистить всю историю просмотров?&#10;&#10;Введите ОЧИСТИТЬ для подтверждения|ОЧИСТИТЬ"
+                    wire:confirm.prompt="{{ __('catalog.viewing.clear_confirmation') }}&#10;&#10;{{ __('catalog.viewing.clear_prompt') }}|{{ __('catalog.viewing.clear_token') }}"
                     wire:loading.attr="disabled"
                     wire:target="clearHistory"
                     class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:cursor-wait disabled:opacity-60"
                 >
                     <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
-                    <span wire:loading.remove wire:target="clearHistory">Очистить историю</span>
-                    <span wire:loading wire:target="clearHistory">Очищаем…</span>
+                    <span wire:loading.remove wire:target="clearHistory">{{ __('catalog.viewing.clear') }}</span>
+                    <span wire:loading wire:target="clearHistory">{{ __('catalog.viewing.clearing') }}</span>
                 </button>
             @endif
         </div>
     </header>
 
     <x-ui.panel
-        title="Продолжить просмотр"
-        subtitle="По одному последнему доступному действию для каждого сериала."
+        :title="__('catalog.viewing.continue')"
+        :subtitle="__('catalog.viewing.continue_description')"
         icon="fa-solid fa-circle-play"
         :pad="false"
     >
         <div wire:loading.flex wire:target="removeHistoryItem,clearHistory" class="min-h-24 items-center justify-center gap-2 px-4 py-8 text-sm font-semibold text-slate-500">
             <i class="fa-solid fa-spinner fa-spin text-emerald-700" aria-hidden="true"></i>
-            <span>Обновляем просмотры…</span>
+            <span>{{ __('catalog.viewing.updating') }}</span>
         </div>
 
         <div wire:loading.remove wire:target="removeHistoryItem,clearHistory">
             @if ($continueWatching->isEmpty())
                 <div class="px-4 py-8 text-center">
                     <i class="fa-regular fa-circle-check text-3xl text-emerald-700" aria-hidden="true"></i>
-                    <p class="mt-3 text-sm font-bold text-slate-700">Нет незавершённых сериалов</p>
-                    <p class="mt-1 text-sm leading-6 text-slate-500">Начните смотреть доступную серию, и она появится здесь.</p>
+                    <p class="mt-3 text-sm font-bold text-slate-700">{{ __('catalog.viewing.continue_empty') }}</p>
+                    <p class="mt-1 text-sm leading-6 text-slate-500">{{ __('catalog.viewing.continue_empty_hint') }}</p>
                 </div>
             @else
                 <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
                     @foreach ($continueWatching as $item)
-                        <article data-continue-watching-card wire:key="continue-watching-{{ $item->title->id }}" class="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] overflow-hidden rounded-panel border border-slate-200 bg-white max-[419px]:grid-cols-1">
-                            <x-title-poster :title="$item->title" class="h-full min-h-36 rounded-none border-0 bg-slate-50 max-[419px]:aspect-[16/9] max-[419px]:max-h-48 max-[419px]:w-full" image-class="h-full w-full object-contain" />
+                        <article data-continue-watching-card wire:key="continue-watching-{{ $item->title->id }}" class="grid min-w-0 grid-cols-1 overflow-hidden rounded-panel border border-slate-200 bg-white min-[420px]:grid-cols-[5.5rem_minmax(0,1fr)]">
+                            <x-title-poster :title="$item->title" class="aspect-[16/9] max-h-48 min-h-36 w-full rounded-none border-0 bg-slate-50 min-[420px]:aspect-auto min-[420px]:h-full min-[420px]:max-h-none min-[420px]:w-auto" image-class="h-full w-full object-contain" />
 
                             <div class="flex min-w-0 flex-col p-3">
                                 <div class="text-xs font-semibold text-slate-500">
                                     @if ($item->episode->season?->number !== null)
-                                        Сезон {{ $item->episode->season->number }}
+                                        {{ __('catalog.release.season', ['number' => $item->episode->season->number]) }}
                                     @else
-                                        Специальный сезон
+                                        {{ __('catalog.viewing.special_season') }}
                                     @endif
                                     <span aria-hidden="true"> · </span>
                                     @if ($item->episode->number !== null)
-                                        серия {{ $item->episode->number }}
+                                        {{ __('catalog.viewing.episode_number', ['number' => $item->episode->number]) }}
                                     @else
-                                        выпуск без номера
+                                        {{ __('catalog.viewing.episode_without_number') }}
                                     @endif
                                 </div>
 
                                 <h2 class="mt-1 break-words text-base font-black leading-6 text-slate-800">{{ $item->title->title }}</h2>
 
                                 @if ($item->actionType === 'continue' && $item->progressPercent !== null)
-                                    <div class="mt-3" aria-label="Просмотрено {{ $item->progressPercent }}%">
+                                    <div class="mt-3" aria-label="{{ __('catalog.viewing.watched_percent', ['percent' => $item->progressPercent]) }}">
                                         <div class="h-1.5 overflow-hidden rounded-full bg-slate-100">
                                             <div class="h-full rounded-full bg-emerald-600" style="width: {{ $item->progressPercent }}%"></div>
                                         </div>
-                                        <div class="mt-1 text-xs font-semibold text-slate-500">{{ $item->progressPercent }}% просмотрено</div>
+                                        <div class="mt-1 text-xs font-semibold text-slate-500">{{ __('catalog.viewing.watched_percent_label', ['percent' => $item->progressPercent]) }}</div>
                                     </div>
                                 @endif
 
@@ -95,16 +95,16 @@
     </x-ui.panel>
 
     <x-ui.panel
-        title="История просмотров"
-        subtitle="Недавние действия отсортированы по времени просмотра."
+        :title="__('catalog.viewing.history')"
+        :subtitle="__('catalog.viewing.history_description').' '.trans_choice('catalog.counts.history_items', $history->total()).'.'"
         icon="fa-solid fa-list-ul"
         :pad="false"
     >
         @if ($history->isEmpty())
             <div class="px-4 py-10 text-center">
                 <i class="fa-regular fa-clock text-3xl text-slate-400" aria-hidden="true"></i>
-                <p class="mt-3 text-sm font-bold text-slate-700">История просмотров пока пуста</p>
-                <p class="mt-1 text-sm leading-6 text-slate-500">Открытие карточки сериала само по себе не добавляет запись.</p>
+                <p class="mt-3 text-sm font-bold text-slate-700">{{ __('catalog.viewing.history_empty') }}</p>
+                <p class="mt-1 text-sm leading-6 text-slate-500">{{ __('catalog.viewing.history_empty_hint') }}</p>
             </div>
         @else
             <div class="divide-y divide-slate-200">
@@ -129,20 +129,20 @@
                                 </a>
                                 <p class="mt-1 text-sm font-semibold text-slate-600">
                                     @if ($progress->episode->season?->number !== null)
-                                        Сезон {{ $progress->episode->season->number }},
+                                        {{ __('catalog.release.season', ['number' => $progress->episode->season->number]) }},
                                     @endif
                                     @if ($progress->episode->number !== null)
-                                        серия {{ $progress->episode->number }}
+                                        {{ __('catalog.viewing.episode_number', ['number' => $progress->episode->number]) }}
                                     @else
-                                        выпуск без номера
+                                        {{ __('catalog.viewing.episode_without_number') }}
                                     @endif
                                     @if ($progress->episode->title)
                                         — {{ $progress->episode->title }}
                                     @endif
                                 </p>
                             @else
-                                <div class="text-base font-black text-slate-700">Недоступный выпуск</div>
-                                <p class="mt-1 text-sm leading-6 text-slate-500">Ссылка скрыта: выпуск удалён, снят с публикации или временно недоступен.</p>
+                                <div class="text-base font-black text-slate-700">{{ __('catalog.viewing.unavailable_episode') }}</div>
+                                <p class="mt-1 text-sm leading-6 text-slate-500">{{ __('catalog.viewing.unavailable_hint') }}</p>
                             @endif
 
                             <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
@@ -153,7 +153,7 @@
                                 @if ($progress->completed_at)
                                     <span class="inline-flex items-center gap-1 text-emerald-700">
                                         <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
-                                        Просмотрено
+                                        {{ __('catalog.viewing.completed') }}
                                     </span>
                                 @elseif ($progress->progress_percent !== null)
                                     <span>{{ $progress->progress_percent }}%</span>
@@ -164,13 +164,13 @@
                         <button
                             type="button"
                             wire:click="removeHistoryItem({{ $progress->id }})"
-                            wire:confirm="Удалить этот просмотр из истории?"
+                            wire:confirm="{{ __('catalog.viewing.remove_confirmation') }}"
                             wire:loading.attr="disabled"
                             wire:target="removeHistoryItem({{ $progress->id }})"
                             class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-wait disabled:opacity-60 sm:w-auto sm:justify-self-end"
                         >
                             <i class="fa-solid fa-xmark" aria-hidden="true"></i>
-                            <span>Удалить</span>
+                            <span>{{ __('catalog.viewing.remove') }}</span>
                         </button>
                     </article>
                 @endforeach

@@ -41,4 +41,28 @@ class BladeTemplateTest extends TestCase
             ->assertSee('fa-solid fa-circle-check', false)
             ->assertSee('bg-emerald-50', false);
     }
+
+    public function test_catalog_count_translations_follow_russian_and_english_plural_rules(): void
+    {
+        app()->setLocale('ru');
+
+        $this->assertSame('1 сериал', trans_choice('catalog.counts.results', 1));
+        $this->assertSame('2 сериала', trans_choice('catalog.counts.results', 2));
+        $this->assertSame('5 сериалов', trans_choice('catalog.counts.results', 5));
+        $this->assertSame('11 сериалов', trans_choice('catalog.counts.results', 11));
+        $this->assertSame('21 сериал', trans_choice('catalog.counts.results', 21));
+        $this->assertSame('22 серии', trans_choice('catalog.counts.episodes', 22));
+        $this->assertSame('25 оценок', trans_choice('catalog.counts.ratings', 25));
+        $this->assertSame('1 запись импорта', trans_choice('catalog.counts.import_records', 1));
+        $this->assertSame('2 записи истории', trans_choice('catalog.counts.history_items', 2));
+
+        app()->setLocale('en');
+
+        $this->assertSame('1 series', trans_choice('catalog.counts.results', 1));
+        $this->assertSame('2 series', trans_choice('catalog.counts.results', 2));
+        $this->assertSame('1 season', trans_choice('catalog.counts.seasons', 1));
+        $this->assertSame('2 seasons', trans_choice('catalog.counts.seasons', 2));
+        $this->assertSame('1 rating', trans_choice('catalog.counts.ratings', 1));
+        $this->assertSame('2 history items', trans_choice('catalog.counts.history_items', 2));
+    }
 }

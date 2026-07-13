@@ -86,14 +86,15 @@ class SeasonvarUrl
     {
         $parts = parse_url($url);
 
-        if (! is_array($parts) || ! isset($parts['host'])) {
+        if (! is_array($parts) || ! isset($parts['scheme'], $parts['host'])) {
             return false;
         }
 
+        $scheme = strtolower($parts['scheme']);
         $host = strtolower($parts['host']);
         $path = strtolower($parts['path'] ?? '');
 
-        if (! in_array($host, self::ALLOWED_HOSTS, true)) {
+        if ($scheme !== 'https' || ! in_array($host, self::ALLOWED_HOSTS, true)) {
             return false;
         }
 
