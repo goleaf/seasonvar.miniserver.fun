@@ -4,7 +4,7 @@
 
 **Goal:** Automatically load the full catalog filter panel and update selected filters, contextual counts, result cards, and URLs live through linked Livewire 4 islands without restoring heavy facet SQL to the first SSR.
 
-**Architecture:** Keep `CatalogSeries` as the single state owner. Split result and facet data boundaries in `CatalogTitlesPageBuilder`, expose each boundary as a request-cached Livewire computed property, and render a deferred filter island plus an eager result island under the same name so Livewire updates them atomically. Move the two island bodies into explicit class-backed Blade components so each isolated render receives only its computed render-local data and the deferred placeholder evaluates no facet queries.
+**Architecture:** Keep `CatalogSeries` as the single state owner. Split result and facet data boundaries in `CatalogTitlesPageBuilder`, expose each boundary as a request-cached Livewire computed property, and render a deferred filter island plus an eager result island under the same name so Livewire updates them atomically. Move the deferred filter body into an explicit class-backed Blade component; keep the eager result markup in the parent island with an explicit `with: $this->catalogPage` scope, so the placeholder evaluates no facet queries without duplicating the already large result template.
 
 **Tech Stack:** PHP 8.5, Laravel 13.19, Livewire 4.3.3 Islands, SQLite FTS5/JSON1, Blade, Tailwind CSS 4.3, PHPUnit 12.5, Playwright CLI.
 
@@ -97,9 +97,7 @@ git commit -m "refactor: separate catalog results and facets"
 
 **Files:**
 - Create: `app/View/Components/Catalog/TitleFilters.php`
-- Create: `app/View/Components/Catalog/TitleResults.php`
 - Create: `resources/views/components/catalog/title-filters.blade.php`
-- Create: `resources/views/components/catalog/title-results.blade.php`
 - Modify: `app/Livewire/CatalogSeries.php`
 - Modify: `resources/views/catalog/titles.blade.php`
 - Test: `tests/Feature/CatalogPageTest.php`
@@ -166,7 +164,7 @@ public function catalogFacets(): array
 
 Make `render()` use `$this->catalogPage`. Keep `filters.search` submit-driven. Existing `updated()` normalization and `resetPage()` remain the state boundary for live checkbox/select changes.
 
-- [ ] **Step 4: Extract both island views through explicit class components**
+- [ ] **Step 4: Extract the deferred filter view through an explicit class component**
 
 Implement the component without queries:
 
@@ -188,7 +186,7 @@ final class TitleFilters extends Component
 }
 ```
 
-Implement `TitleResults` with the same constructor/render pattern but only the `array $data` argument. Move the existing GET filter form into `title-filters.blade.php` and the complete result toolbar/cards/empty-state/paginator `<div class="order-1 …">` into `title-results.blade.php`. Change facet checkbox/select bindings to `wire:model.live`. Remove the JavaScript apply button and retain an ordinary Russian submit button only inside `<noscript>`.
+Move the existing GET filter form into `title-filters.blade.php`. Keep the complete result toolbar/cards/empty-state/paginator `<div class="order-1 …">` in `titles.blade.php`, scoped into the eager island through `with: $this->catalogPage`. Change facet and advanced checkbox/select bindings to `wire:model.live`. Remove the JavaScript apply button from the sidebar and retain an ordinary Russian submit button only inside `<noscript>`.
 
 - [ ] **Step 5: Wrap the two top-level regions in linked islands**
 
@@ -203,8 +201,8 @@ Use an automatic placeholder that evaluates no facet computed data:
     <x-catalog.title-filters :data="$this->catalogFacets" :option-search="$this->optionSearch" />
 @endisland
 
-@island(name: 'catalog-live')
-    <x-catalog.title-results :data="$this->catalogPage" />
+@island(name: 'catalog-live', with: $this->catalogPage)
+    <div class="order-1 …">…</div>
 @endisland
 ```
 
@@ -217,8 +215,8 @@ Run the command from Step 2. Expected: all catalog component/UI tests pass.
 - [ ] **Step 7: Commit islands**
 
 ```bash
-git add app/Livewire/CatalogSeries.php app/View/Components/Catalog/TitleFilters.php app/View/Components/Catalog/TitleResults.php resources/views/catalog/titles.blade.php resources/views/components/catalog/title-filters.blade.php resources/views/components/catalog/title-results.blade.php tests/Feature/CatalogPageTest.php tests/Feature/CatalogVisualSystemTest.php
-git commit -m "feat: update catalog filters through live islands"
+git add app/Livewire/CatalogSeries.php app/Services/Catalog/CatalogTitlesPageBuilder.php app/View/Components/Catalog/TitleFilters.php resources/views/catalog/titles.blade.php resources/views/components/catalog/title-filters.blade.php tests/Feature/CatalogPageTest.php tests/Feature/CatalogVisualSystemTest.php
+git commit -m "feat: load catalog filters as live islands"
 ```
 
 ---

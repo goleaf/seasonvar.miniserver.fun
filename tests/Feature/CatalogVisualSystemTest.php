@@ -302,6 +302,8 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('data-catalog-filter-dialog', $content);
         $this->assertStringContainsString('data-catalog-filter-dialog-open', $content);
         $this->assertStringContainsString('data-catalog-filter-dialog-close', $content);
+        $this->assertStringContainsString('max-h-dvh', $content);
+        $this->assertStringContainsString('overflow-y-auto', $content);
         $this->assertStringContainsString('data-catalog-mobile-view-controls', $content);
         $this->assertStringContainsString('data-catalog-mobile-page-size-controls', $content);
         $this->assertStringContainsString('wire:click.prevent="setView(\'grid\')"', $content);
@@ -328,6 +330,9 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertIsString($filterTemplate);
         $this->assertStringContainsString('wire:model.live="filters.{{ $filterType }}"', $filterTemplate);
         $this->assertStringContainsString('wire:loading.delay', $filterTemplate);
+        $this->assertStringNotContainsString('wire:loading.delay.flex', $filterTemplate);
+        $this->assertDoesNotMatchRegularExpression('/wire:model\.live=.*@checked/m', $filterTemplate);
+        $this->assertSame(4, substr_count($filterTemplate, 'wire:replace.self'));
         $this->assertStringContainsString('Обновляем подборку', $filterTemplate);
     }
 
@@ -350,6 +355,12 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('wire:model.live="filters.ratingSource"', $content);
         $this->assertStringContainsString('wire:model.live="filters.video"', $content);
         $this->assertStringContainsString('wire:model.live="filters.qualities"', $content);
+
+        $template = file_get_contents(resource_path('views/catalog/titles.blade.php'));
+
+        $this->assertIsString($template);
+        $this->assertDoesNotMatchRegularExpression('/wire:model\.live=.*@checked/m', $template);
+        $this->assertSame(1, substr_count($template, 'wire:replace.self'));
 
         foreach (['year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_min', 'votes_min'] as $name) {
             $this->assertMatchesRegularExpression('/name="'.preg_quote($name, '/').'"[^>]*class="[^"]*w-full[^"]*sm:w-/s', $content);

@@ -1,7 +1,9 @@
                 <form method="GET" action="{{ route('titles.index') }}" wire:submit="applyFilters" wire:loading.class="opacity-60" class="relative space-y-5 transition-opacity">
-                    <div wire:loading.delay.flex role="status" aria-live="polite" class="sticky top-0 z-20 min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700">
-                        <x-ui.icon name="fa-solid fa-spinner fa-spin" />
-                        <span>Обновляем подборку…</span>
+                    <div wire:loading.delay role="status" aria-live="polite" class="sticky top-0 z-20 rounded-control bg-emerald-50 text-sm font-bold text-emerald-700">
+                        <span class="flex min-h-11 items-center justify-center gap-2 px-3 py-2">
+                            <x-ui.icon name="fa-solid fa-spinner fa-spin" />
+                            <span>Обновляем подборку…</span>
+                        </span>
                     </div>
                     @foreach ($filterView->filterFormState() as $stateKey => $stateValue)
                         @if (is_array($stateValue))
@@ -33,7 +35,7 @@
                                     'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveYear($bucket),
                                 ])>
                                     <span class="inline-flex min-w-0 items-center gap-2">
-                                        <input type="checkbox" wire:model.live="filters.years" name="year[]" value="{{ $filterView->bucketYear($bucket) }}" class="h-5 w-5 shrink-0 accent-emerald-700" @checked($filterView->isActiveYear($bucket))>
+                                        <input type="checkbox" wire:model.live="filters.years" wire:replace.self name="year[]" value="{{ $filterView->bucketYear($bucket) }}" class="h-5 w-5 shrink-0 accent-emerald-700">
                                         <x-ui.icon name="fa-solid fa-calendar-days text-[0.85em] text-slate-400" />
                                         <span class="min-w-0 break-words">{{ $filterView->bucketYear($bucket) }}</span>
                                     </span>
@@ -66,7 +68,7 @@
                                     'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! in_array($option->value, $filterView->listState('publication_type'), true),
                                 ])>
                                     <span class="inline-flex min-w-0 items-center gap-2">
-                                        <input type="checkbox" wire:model.live="filters.publicationTypes" name="publication_type[]" value="{{ $option->value }}" class="h-5 w-5 shrink-0 accent-emerald-700" @checked(in_array($option->value, $filterView->listState('publication_type'), true))>
+                                        <input type="checkbox" wire:model.live="filters.publicationTypes" wire:replace.self name="publication_type[]" value="{{ $option->value }}" class="h-5 w-5 shrink-0 accent-emerald-700">
                                         <span class="min-w-0 break-words">{{ $option->label }}</span>
                                     </span>
                                     <span class="shrink-0 text-xs font-bold tabular-nums">{{ $option->context_titles_count }}</span>
@@ -98,7 +100,7 @@
                                     'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! in_array($option->value, $filterView->listState('subtitles'), true),
                                 ])>
                                     <span class="inline-flex min-w-0 items-center gap-2">
-                                        <input type="checkbox" wire:model.live="filters.subtitles" name="subtitles[]" value="{{ $option->value }}" class="h-5 w-5 shrink-0 accent-emerald-700" @checked(in_array($option->value, $filterView->listState('subtitles'), true))>
+                                        <input type="checkbox" wire:model.live="filters.subtitles" wire:replace.self name="subtitles[]" value="{{ $option->value }}" class="h-5 w-5 shrink-0 accent-emerald-700">
                                         <span class="min-w-0 break-words">{{ $option->label }}</span>
                                     </span>
                                     <span class="shrink-0 text-xs font-bold tabular-nums">{{ $option->context_titles_count }}</span>
@@ -166,7 +168,7 @@
                                         'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveTaxonomy($filterType, $taxonomy),
                                     ])>
                                         <span class="inline-flex min-w-0 items-center gap-2">
-                                            <input type="checkbox" wire:model.live="filters.{{ $filterType }}" name="{{ $filterType }}[]" value="{{ $taxonomy->slug }}" class="h-5 w-5 shrink-0 accent-emerald-700" @checked($filterView->isActiveTaxonomy($filterType, $taxonomy))>
+                                            <input type="checkbox" wire:model.live="filters.{{ $filterType }}" wire:replace.self name="{{ $filterType }}[]" value="{{ $taxonomy->slug }}" class="h-5 w-5 shrink-0 accent-emerald-700">
                                             <x-ui.icon name="{{ $filterView->icon($filterType) }} text-[0.85em] text-slate-400" />
                                             <span class="min-w-0 break-words">{{ $taxonomy->name }}</span>
                                         </span>
