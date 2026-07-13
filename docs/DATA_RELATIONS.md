@@ -107,6 +107,7 @@
 - `source_pages_type_status_crawled_id_idx` по `page_type, parse_status, last_crawled_at, id` нужен для циклов обновления.
 - `licensed_media_title_status_published_idx` по `catalog_title_id, status, published_at` нужен для списков медиа карточки.
 - `licensed_media_episode_status_quality_idx` по `episode_id, status, quality` нужен для выбора медиа серии.
+- `licensed_media_health_due_idx` по `health_status, next_check_at, id` нужен для bounded due backlog без полного сканирования media.
 - Уникальная пара `licensed_media.catalog_title_id + source_media_key` нужна для стабильного обновления видео-ссылок.
 - Unique-пары `catalog_titles.source_id + external_id` и `catalog_titles.source_id + source_url_hash` сохраняют стабильную идентичность тайтла у внешнего провайдера.
 - `catalog_title_ratings.catalog_title_id + provider` запрещает второй рейтинг того же провайдера для тайтла.

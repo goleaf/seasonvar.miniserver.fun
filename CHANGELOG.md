@@ -2,6 +2,9 @@
 
 ## 2026-07-13
 
+- Added centralized licensed-media health states (`active`, `degraded`, `unavailable`, `disabled`) with atomic failure counters, last-success/error/latency metadata, bounded exponential retries, configurable failure thresholds, and automatic recovery into playback eligibility.
+- Hardened source probes with HTTPS/provider allowlists, public-DNS validation and per-request DNS pinning, blocked credentials/private/link-local/metadata targets and redirects, strict connect/total timeouts, bounded streamed Range/manifest reads, safe error categories, and fully redacted operational events.
+- Integrated health state into playback fallback, public episode/media counts, refresh planning, queued-import finalization, stats cache refresh, and an aggregate-only `/admin/imports` health panel; added an additive migration with safe legacy-state backfill and a due-check index.
 - Added the authorized `/admin/imports` Livewire operations screen with duplicate-safe queued starts, active-only visible polling, cooperative cancellation, retry audit links, stale-running recovery, bounded counters, and sanitized errors.
 - Added a scalar-payload unique coordinator job with explicit attempts/backoff/timeout, transient/permanent failure classification, queued/running/completed/partial/failed/cancelled status transitions, and heartbeat tracking across coordinator, page, and finalizer jobs.
 - Added nullable requester/retry foreign keys and heartbeat/cancellation indexes to import runs, expanded queue diagnostics to include queued coordinators, and centralized credential/URL/path redaction for persisted and logged importer failures.

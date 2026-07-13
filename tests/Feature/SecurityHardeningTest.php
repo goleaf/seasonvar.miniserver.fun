@@ -184,6 +184,7 @@ class SecurityHardeningTest extends TestCase
             'published_at' => now()->subMinute(),
             'status' => 'unavailable',
             'check_status' => 'unavailable',
+            'health_status' => 'unavailable',
         ]);
         $this->get($url())->assertServiceUnavailable()->assertSeeText('Видео временно недоступно.');
     }
@@ -208,6 +209,7 @@ class SecurityHardeningTest extends TestCase
             'quality' => '720p',
             'translation_name' => 'Русский',
             'check_status' => 'unavailable',
+            'health_status' => 'unavailable',
         ]);
         $fallback = LicensedMedia::factory()->create([
             'catalog_title_id' => $failedPreferred->catalog_title_id,
@@ -252,6 +254,21 @@ class SecurityHardeningTest extends TestCase
         $this->assertSame(PlaybackAvailability::Ready, $resolved->status);
         $this->assertStringContainsString('/playback/'.$matching->id.'?', (string) $resolved->url);
         $this->assertStringNotContainsString('/playback/'.$fallback->id.'?', (string) $resolved->url);
+
+        $matching->update([
+            'health_status' => 'degraded',
+            'check_status' => 'check_failed',
+            'last_http_status' => 503,
+        ]);
+        $degraded = $resolver->resolve(
+            $title,
+            null,
+            $episode,
+            $matching->id,
+            new PlaybackPreferencesData,
+        );
+
+        $this->assertSame(PlaybackAvailability::Ready, $degraded->status);
 
         $blocked = $resolver->resolve(
             $title,

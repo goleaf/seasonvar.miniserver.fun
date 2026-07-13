@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\DTOs\MediaHealthCheckResultData;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
 use App\Models\Country;
@@ -16,6 +17,7 @@ use App\Models\SourcePage;
 use App\Models\Taxonomy;
 use App\Models\Translation;
 use App\Services\Media\ExternalMediaMetadata;
+use App\Services\Media\MediaSourceHealthManager;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use App\Services\Seasonvar\SeasonvarImportProcessInspector;
@@ -189,10 +191,13 @@ class SeasonvarImportMaintenanceTest extends TestCase
     public function test_media_availability_checks_reject_unsafe_urls_and_do_not_follow_redirects(): void
     {
         Http::preventStrayRequests();
+        config(['seasonvar.media_check.max_response_bytes' => 16]);
         Http::fake([
-            'media.example.com/*' => Http::response('', 302, [
+            'media.example.com/redirect.m3u8' => Http::response('', 302, [
                 'Location' => 'http://127.0.0.1/private.m3u8',
             ]),
+            'media.example.com/oversized.mp4' => Http::response(str_repeat('x', 17), 206),
+            'media.example.com/manifest.m3u8' => Http::response("#EXTM3U\n", 200),
         ]);
         $events = [];
         $progress = function (string $event, array $context) use (&$events): void {
@@ -202,15 +207,121 @@ class SeasonvarImportMaintenanceTest extends TestCase
 
         $unsafe = $checker->check('https://127.0.0.1/private.m3u8', $progress);
         $redirect = $checker->check('https://media.example.com/redirect.m3u8', $progress);
+        $oversized = $checker->check('https://media.example.com/oversized.mp4', $progress);
+        $manifest = $checker->check('https://media.example.com/manifest.m3u8', $progress);
 
-        $this->assertFalse($unsafe['available']);
-        $this->assertSame('invalid_url', $unsafe['status']);
-        $this->assertFalse($redirect['available']);
-        $this->assertSame('unavailable', $redirect['status']);
-        $this->assertSame(302, $redirect['http_status']);
+        $this->assertFalse($unsafe->available);
+        $this->assertSame('invalid_url', $unsafe->checkStatus);
+        $this->assertSame('invalid_url', $unsafe->errorCategory?->value);
+        $this->assertTrue($unsafe->permanentFailure);
+        $this->assertFalse($redirect->available);
+        $this->assertSame('unavailable', $redirect->checkStatus);
+        $this->assertSame('unsafe_redirect', $redirect->errorCategory?->value);
+        $this->assertSame(302, $redirect->httpStatus);
+        $this->assertSame('response_too_large', $oversized->errorCategory?->value);
+        $this->assertTrue($oversized->permanentFailure);
+        $this->assertTrue($manifest->available);
         $this->assertSame('[redacted-url]', $events[0]['context']['url']);
         $this->assertSame('[redacted-url]', $events[1]['context']['url']);
-        Http::assertSentCount(1);
+        Http::assertSentCount(3);
+    }
+
+    public function test_media_health_uses_failure_thresholds_and_recovers_after_a_successful_check(): void
+    {
+        Http::preventStrayRequests();
+        config([
+            'seasonvar.media_check.retries' => 1,
+            'seasonvar.media_check.unavailable_after_failures' => 3,
+            'seasonvar.media_check.retry_base_minutes' => 5,
+        ]);
+        Http::fakeSequence('media.example.com/*')
+            ->push('', 503)
+            ->push('', 503)
+            ->push('', 503)
+            ->push('', 206, ['Content-Length' => '1'])
+            ->push('', 404);
+
+        $media = LicensedMedia::factory()->create([
+            'playback_url' => 'https://media.example.com/video/s01e01.mp4',
+            'path' => 'https://media.example.com/video/s01e01.mp4',
+            'status' => 'published',
+            'check_status' => 'available',
+            'health_status' => 'active',
+        ]);
+        $checker = app(SeasonvarMediaAvailabilityChecker::class);
+        $health = app(MediaSourceHealthManager::class);
+
+        foreach ([1, 2] as $failureCount) {
+            $health->record($media, $checker->check((string) $media->playback_url));
+            $media->refresh();
+
+            $this->assertSame('degraded', $media->health_status->value);
+            $this->assertSame('published', $media->status);
+            $this->assertSame($failureCount, $media->consecutive_failures);
+            $this->assertSame('provider_temporary', $media->last_error_category?->value);
+            $this->assertNotNull($media->next_check_at);
+        }
+
+        $health->record($media, $checker->check((string) $media->playback_url));
+        $media->refresh();
+
+        $this->assertSame('unavailable', $media->health_status->value);
+        $this->assertSame('unavailable', $media->status);
+        $this->assertSame(3, $media->consecutive_failures);
+
+        $health->record($media, $checker->check((string) $media->playback_url));
+        $media->refresh();
+
+        $this->assertSame('active', $media->health_status->value);
+        $this->assertSame('published', $media->status);
+        $this->assertSame(0, $media->consecutive_failures);
+        $this->assertNull($media->last_error_category);
+        $this->assertNotNull($media->last_successful_check_at);
+        $this->assertNotNull($media->check_latency_ms);
+
+        $health->record($media, $checker->check((string) $media->playback_url));
+        $media->refresh();
+
+        $this->assertSame('unavailable', $media->health_status->value);
+        $this->assertSame(1, $media->consecutive_failures);
+        $this->assertSame('not_found', $media->last_error_category?->value);
+
+        $media->update(['health_status' => 'disabled']);
+        $health->record(
+            $media,
+            new MediaHealthCheckResultData(true, 'available', 206, now(), 1),
+        );
+
+        $this->assertSame('disabled', $media->fresh()->health_status->value);
+    }
+
+    public function test_media_health_classifies_timeouts_without_logging_the_source_url(): void
+    {
+        Http::preventStrayRequests();
+        config(['seasonvar.media_check.retries' => 1]);
+        Http::fake([
+            'media.example.com/*' => Http::failedConnection('cURL error 28: Operation timed out'),
+        ]);
+        $events = [];
+
+        $result = app(SeasonvarMediaAvailabilityChecker::class)->check(
+            'https://media.example.com/private/source.mp4?token=secret',
+            function (string $event, array $context) use (&$events): void {
+                $events[] = compact('event', 'context');
+            },
+        );
+
+        $this->assertFalse($result->available);
+        $this->assertSame('timeout', $result->errorCategory?->value);
+        $this->assertSame('check_failed', $result->checkStatus);
+        $this->assertStringNotContainsString(
+            'private/source.mp4',
+            (string) json_encode($events, JSON_THROW_ON_ERROR),
+        );
+        $this->assertStringNotContainsString(
+            'token=secret',
+            (string) json_encode($events, JSON_THROW_ON_ERROR),
+        );
     }
 
     public function test_it_marks_legacy_parsed_source_pages_as_imported(): void

@@ -42,6 +42,10 @@ return [
         'max_response_bytes' => (int) env('SEASONVAR_MEDIA_CHECK_MAX_RESPONSE_BYTES', 65536),
         'chunk_size' => (int) env('SEASONVAR_MEDIA_CHECK_CHUNK_SIZE', 25),
         'refresh_after_hours' => (int) env('SEASONVAR_MEDIA_CHECK_REFRESH_AFTER_HOURS', 168),
+        'unavailable_after_failures' => (int) env('SEASONVAR_MEDIA_CHECK_FAILURE_THRESHOLD', 3),
+        'retry_base_minutes' => (int) env('SEASONVAR_MEDIA_CHECK_RETRY_BASE_MINUTES', 15),
+        'retry_max_minutes' => (int) env('SEASONVAR_MEDIA_CHECK_RETRY_MAX_MINUTES', 1440),
+        'permanent_retry_minutes' => (int) env('SEASONVAR_MEDIA_CHECK_PERMANENT_RETRY_MINUTES', 360),
     ],
     'media_metadata' => [
         'chunk_size' => (int) env('SEASONVAR_MEDIA_METADATA_CHUNK_SIZE', 100),

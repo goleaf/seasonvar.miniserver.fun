@@ -44,6 +44,24 @@
         </div>
     @enderror
 
+    <x-ui.panel title="Здоровье видеоисточников" subtitle="Агрегаты без адресов источников и внутренних диагностических данных." icon="fa-solid fa-heart-pulse">
+        <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            @foreach ($mediaHealth as $health)
+                <div wire:key="media-health-{{ $health['status'] }}" class="rounded-control bg-slate-50 p-3">
+                    <div class="flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
+                        <i class="{{ $health['icon'] }} {{ $health['tone'] }}" aria-hidden="true"></i>
+                        <span>{{ $health['label'] }}</span>
+                    </div>
+                    <div class="mt-1 text-xl font-black text-slate-800">{{ $health['count'] }}</div>
+                </div>
+            @endforeach
+        </div>
+        <div class="mt-3 flex items-center gap-2 text-sm font-semibold text-slate-600">
+            <i class="fa-solid fa-clock-rotate-left text-sky-700" aria-hidden="true"></i>
+            <span>Ожидают проверки: {{ $mediaDueCount }}</span>
+        </div>
+    </x-ui.panel>
+
     <x-ui.panel title="Новый запуск" subtitle="Одновременно допускается только один queued или running запуск." icon="fa-solid fa-play">
         <form wire:submit="startImport" class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             <div class="grid gap-3 sm:grid-cols-2">

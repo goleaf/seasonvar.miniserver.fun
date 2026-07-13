@@ -6,6 +6,7 @@ namespace App\Services\Catalog;
 
 use App\DTOs\PlaybackPreferencesData;
 use App\DTOs\PlaybackSourceData;
+use App\Enums\MediaHealthStatus;
 use App\Enums\PlaybackAvailability;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
@@ -178,8 +179,7 @@ class CatalogPlaybackSourceResolver
     private function mediaStatus(LicensedMedia $media, ?User $user): PlaybackAvailability
     {
         if ($media->status === 'unavailable'
-            || in_array($media->check_status, ['unavailable', 'check_failed', 'invalid_url'], true)
-            || ($media->last_http_status !== null && $media->last_http_status >= 400)) {
+            || ! ($media->health_status ?? MediaHealthStatus::Active)->isPlayable()) {
             return PlaybackAvailability::TemporarilyUnavailable;
         }
 
@@ -252,7 +252,7 @@ class CatalogPlaybackSourceResolver
         $audioMatch = $this->matches($media->translation_name, $preferences->audioLanguage) ? 1 : 0;
         $qualityMatch = $this->matches($media->quality, $preferences->quality) ? 1 : 0;
         $formatMatch = $this->matches($media->format, $preferences->format) ? 1 : 0;
-        $knownAvailable = $media->check_status === 'available' ? 1 : 0;
+        $knownAvailable = $media->health_status === MediaHealthStatus::Active ? 1 : 0;
         $qualityRank = $this->qualityRank($media->quality);
 
         return sprintf(

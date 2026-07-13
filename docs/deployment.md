@@ -2,6 +2,14 @@
 
 Обновлено: 13.07.2026
 
+## Health monitoring видеоисточников от 13.07.2026
+
+Миграция `2026_07_13_021800_add_health_state_to_licensed_media_table` additive: добавляет health status, success/error/failure/latency/retry timestamps и индекс `licensed_media_health_due_idx`. Existing `available` backfill-ится как `active`; legacy `status=unavailable` и `check_failed/unavailable/invalid_url` — как `unavailable` с одной failure и немедленным `next_check_at`. Строки не удаляются, URL не изменяются, unique constraints не перестраиваются.
+
+Порядок production rollout для SQLite: дождаться finalizer/page jobs → остановить workers → сделать backup → развернуть код → `php artisan migrate --force` → задать/проверить `SEASONVAR_MEDIA_CHECK_FAILURE_THRESHOLD`, retry intervals и официальный `PLAYBACK_ALLOWED_HOSTS` → `php artisan config:cache` → `php artisan queue:restart` и запустить workers. Web/worker код не должен обслуживать запросы между deploy и migration, потому что новый resolver читает `health_status`.
+
+Отдельный `schedule:run` не нужен: внешний cron запускает queued importer, а finalizer берёт только due sources. `disabled` не проверяется автоматически. Перед добавлением host в allowlist нужно подтвердить лицензионный/provider contract; private, reserved, link-local, metadata IP, credentials, redirects и HTTP блокируются независимо от allowlist.
+
 ## Admin queue interface от 13.07.2026
 
 Перед deploy дождаться active import jobs и сделать backup SQLite. Затем применить additive `2026_07_13_140000_add_administration_fields_to_seasonvar_import_runs`, задать comma-separated `SEASONVAR_IMPORT_ADMIN_EMAILS`, пересобрать config cache и выполнить `php artisan queue:restart`. Migration добавляет nullable foreign keys/timestamps и indexes; данные не переписывает и backfill не требует.
@@ -79,7 +87,7 @@ Google-интеграции по умолчанию выключены. Если
 - `SEASONVAR_IMPORT_SLEEP_SECONDS` — пауза между циклами `--forever`.
 - `SEASONVAR_IMPORT_REFRESH_AFTER_HOURS` и `SEASONVAR_IMPORT_MISSING_DATA_RETRY_HOURS` — частота повторной проверки страниц источника.
 - `SEASONVAR_IMPORT_LOCK_SECONDS` и `SEASONVAR_IMPORT_STALE_AFTER_MINUTES` — защита от параллельного и зависшего импорта.
-- `SEASONVAR_MEDIA_CHECK_*` — включение, timeout, retries, максимальный ответ, размер пачки и возраст повторной проверки внешних media URL.
+- `SEASONVAR_MEDIA_CHECK_*` — включение, timeout/retries/максимальный fragment, размер пачки, successful refresh age, failure threshold и bounded retry intervals внешних media URL.
 - `PLAYBACK_SIGNED_URL_TTL_SECONDS`, `PLAYBACK_ALLOWED_HOSTS`, `PLAYBACK_ENFORCE_PUBLIC_DNS` — срок внутренней playback-ссылки и HTTPS/DNS allowlist provider sources. После изменения выполнить `php artisan config:cache`; в allowlist добавляются только официальные media-домены лицензированных провайдеров.
 - `SEASONVAR_MEDIA_METADATA_CHUNK_SIZE` и `SEASONVAR_MEDIA_SOURCE_KEY_CHUNK_SIZE` — размеры сервисных дозаполнений старых media rows.
 - `GOOGLE_APPLICATION_CREDENTIALS`, `GOOGLE_CLOUD_PROJECT`, `GOOGLE_PROJECT_ID` — runtime credential/project значения для Google API или локальных MCP, если они включены.

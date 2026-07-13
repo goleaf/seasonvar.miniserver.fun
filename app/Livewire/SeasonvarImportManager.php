@@ -85,6 +85,8 @@ final class SeasonvarImportManager extends Component
             'runs' => $dashboard['runs'],
             'hasActiveRun' => $dashboard['has_active_run'],
             'staleCount' => $dashboard['stale_count'],
+            'mediaHealth' => $dashboard['media_health'],
+            'mediaDueCount' => $dashboard['media_due_count'],
         ])->extends('layouts.app', [
             'title' => 'Импорт Seasonvar',
             'seo' => [

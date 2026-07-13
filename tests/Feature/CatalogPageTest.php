@@ -63,6 +63,11 @@ class CatalogPageTest extends TestCase
         Queue::fake();
         $admin = User::factory()->create(['email' => 'admin@example.com']);
         $ordinaryUser = User::factory()->create(['email' => 'viewer@example.com']);
+        LicensedMedia::factory()->create([
+            'health_status' => 'degraded',
+            'consecutive_failures' => 2,
+            'next_check_at' => now()->subMinute(),
+        ]);
 
         $this->get(route('admin.imports'))->assertForbidden();
         $this->actingAs($ordinaryUser)->get(route('admin.imports'))->assertForbidden();
@@ -71,6 +76,9 @@ class CatalogPageTest extends TestCase
             ->assertOk()
             ->assertSeeLivewire('seasonvar-import-manager')
             ->assertSeeText('Импорт Seasonvar')
+            ->assertSeeText('Здоровье видеоисточников')
+            ->assertSeeText('Нестабильно')
+            ->assertSeeText('Ожидают проверки')
             ->assertDontSee('wire:poll.5s.visible="refreshRuns"', false);
 
         $component = Livewire::actingAs($admin)
@@ -1864,6 +1872,7 @@ class CatalogPageTest extends TestCase
             'format' => 'm3u8',
             'status' => 'published',
             'check_status' => 'unavailable',
+            'health_status' => 'unavailable',
             'published_at' => $media->published_at,
         ]);
         $lowerPriorityMedia = LicensedMedia::factory()->create([
@@ -2092,14 +2101,20 @@ class CatalogPageTest extends TestCase
             ->assertSeeHtml('wire:key="continue-watching-'.$completedTitle->id.'"')
             ->assertSeeText('Следующая серия');
 
-        $completedMedia->update(['check_status' => 'unavailable']);
+        $completedMedia->update([
+            'check_status' => 'unavailable',
+            'health_status' => 'unavailable',
+        ]);
 
         Livewire::actingAs($user)
             ->test(ViewingActivity::class)
             ->assertSeeHtml('wire:key="continue-watching-'.$completedTitle->id.'"')
             ->assertSeeText('Следующая серия');
 
-        $newMedia->update(['check_status' => 'unavailable']);
+        $newMedia->update([
+            'check_status' => 'unavailable',
+            'health_status' => 'unavailable',
+        ]);
 
         Livewire::actingAs($user)
             ->test(ViewingActivity::class)

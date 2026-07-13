@@ -3,8 +3,10 @@
 namespace App\Services\Seasonvar;
 
 use App\Actions\Seasonvar\RecordSeasonvarPageFailure;
+use App\DTOs\MediaHealthCheckResultData;
 use App\DTOs\Seasonvar\SeasonvarCatalogData;
 use App\Enums\ContentAudience;
+use App\Enums\MediaHealthStatus;
 use App\Enums\PublicationStatus;
 use App\Enums\ReleaseKind;
 use App\Enums\SeasonvarImportFailureType;
@@ -22,6 +24,7 @@ use App\Models\SourcePageSnapshot;
 use App\Services\Crawler\PoliteHttpClient;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\ExternalPlaylistImporter;
+use App\Services\Media\MediaSourceHealthManager;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -42,6 +45,7 @@ class SeasonvarCatalogImporter
         private readonly SeasonvarEditorialFieldResolver $editorialFields,
         private readonly ExternalPlaylistImporter $playlistImporter,
         private readonly SeasonvarMediaAvailabilityChecker $mediaAvailabilityChecker,
+        private readonly MediaSourceHealthManager $mediaHealth,
         private readonly ExternalMediaMetadata $mediaMetadata,
         private readonly SeasonvarCatalogRelationSyncer $relationSyncer,
         private readonly SeasonvarRelationMetadataNormalizer $relationMetadata,
@@ -1139,17 +1143,15 @@ class SeasonvarCatalogImporter
             return true;
         }
 
-        if ($media->status === 'unavailable' || in_array($media->check_status, ['check_failed', 'unavailable'], true)) {
+        if ($media->health_status === MediaHealthStatus::Disabled) {
+            return false;
+        }
+
+        if ($media->checked_at === null || $media->check_status === null || $media->next_check_at === null) {
             return true;
         }
 
-        if ($media->checked_at === null || $media->check_status === null) {
-            return true;
-        }
-
-        $refreshAfter = now()->subHours(max(1, (int) config('seasonvar.media_check.refresh_after_hours', 168)));
-
-        return $media->checked_at->lessThanOrEqualTo($refreshAfter);
+        return $media->next_check_at->isPast();
     }
 
     /**
@@ -1206,7 +1208,7 @@ class SeasonvarCatalogImporter
                 $result['skipped']++;
                 $this->report($progress, 'seasonvar-media-skipped', [
                     'catalog_title_id' => $catalogTitle->id,
-                    'url' => $item['url'],
+                    'url' => '[redacted-url]',
                     'reason' => $exception->getMessage(),
                 ]);
 
@@ -1226,7 +1228,7 @@ class SeasonvarCatalogImporter
                 $result['skipped']++;
                 $this->report($progress, 'seasonvar-media-skipped', [
                     'catalog_title_id' => $catalogTitle->id,
-                    'url' => $playbackUrl,
+                    'url' => '[redacted-url]',
                     'season_number' => $seasonNumber,
                     'episode_number' => $episodeNumber,
                     'reason' => 'серия для медиа не найдена',
@@ -1283,22 +1285,22 @@ class SeasonvarCatalogImporter
                     'licensed_media_id' => $media->id,
                     'season_number' => $season?->number,
                     'episode_number' => $episode?->number,
-                    'playback_url' => $playbackUrl,
+                    'playback_url' => '[redacted-url]',
                     'reason' => 'медиа уже актуально',
                 ]);
 
                 continue;
             }
 
-            $availability = $this->checkMediaUrl($playbackUrl, $progress);
-
             $media->fill([
                 ...$mediaUpdates,
-                'status' => $availability['available'] ? 'published' : 'unavailable',
-                'check_status' => $availability['status'],
-                'last_http_status' => $availability['http_status'],
-                'checked_at' => $availability['checked_at'],
+                'status' => $media->status ?: 'published',
             ])->save();
+
+            if ($media->health_status !== MediaHealthStatus::Disabled) {
+                $availability = $this->checkMediaUrl($playbackUrl, $progress);
+                $media = $this->mediaHealth->record($media, $availability);
+            }
 
             $result[$wasExisting ? 'updated' : 'attached']++;
             $this->report($progress, $media->wasRecentlyCreated ? 'seasonvar-media-attached' : 'seasonvar-media-updated', [
@@ -1306,7 +1308,7 @@ class SeasonvarCatalogImporter
                 'licensed_media_id' => $media->id,
                 'season_number' => $season?->number,
                 'episode_number' => $episode?->number,
-                'playback_url' => $playbackUrl,
+                'playback_url' => '[redacted-url]',
                 'quality' => $media->quality,
                 'format' => $media->format,
                 'check_status' => $media->check_status,
@@ -1760,10 +1762,7 @@ class SeasonvarCatalogImporter
         return $this->mediaMetadata->translationName($title, $sourceUrl);
     }
 
-    /**
-     * @return array{available: bool, status: string, http_status: int|null, checked_at: Carbon|null}
-     */
-    private function checkMediaUrl(string $url, ?callable $progress = null): array
+    private function checkMediaUrl(string $url, ?callable $progress = null): MediaHealthCheckResultData
     {
         return $this->mediaAvailabilityChecker->check($url, $progress);
     }
@@ -1838,7 +1837,7 @@ class SeasonvarCatalogImporter
             ->where('catalog_title_id', $catalogTitle->id)
             ->where(function (Builder $query): void {
                 $query->where('status', 'unavailable')
-                    ->orWhereIn('check_status', ['check_failed', 'unavailable']);
+                    ->orWhereIn('health_status', ['unavailable', 'disabled']);
             });
     }
 

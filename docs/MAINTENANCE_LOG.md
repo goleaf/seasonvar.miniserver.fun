@@ -1,5 +1,12 @@
 # Журнал обслуживания
 
+## 13.07.2026 — безопасный health monitoring видеоисточников
+
+- Добавлена единая state machine `active/degraded/unavailable/disabled` с configurable threshold, exponential retry и recovery; transient timeout больше не отключает источник после одной проверки.
+- Probe использует HTTPS allowlist, проверку всех A/AAAA и pin публичного IP, запрещает redirects/credentials/private/link-local/metadata targets, читает только bounded Range или HLS manifest fragment и не сохраняет URL/token/body в диагностике.
+- Playback, публичные media/counts, refresh planner, queued finalizer, stats snapshot и `/admin/imports` переведены на канонический health status. Admin показывает только агрегаты и due count.
+- Additive migration и rollback проверены на отдельной временной SQLite-базе; thresholds, permanent failure, timeout, recovery, disabled и source fallback проверены в существующих feature tests.
+
 ## 13.07.2026 — операционный importer UI и queue coordinator
 
 - Добавлен защищённый gate и Livewire-экран `/admin/imports`; долгий importer не выполняется в HTTP-запросе.

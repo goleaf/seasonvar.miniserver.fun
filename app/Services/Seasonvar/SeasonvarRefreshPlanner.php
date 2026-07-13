@@ -233,7 +233,7 @@ class SeasonvarRefreshPlanner
     {
         return $query->where(function (Builder $query): void {
             $query->where('status', 'unavailable')
-                ->orWhereIn('check_status', ['check_failed', 'unavailable']);
+                ->orWhereIn('health_status', ['unavailable', 'disabled']);
         });
     }
 

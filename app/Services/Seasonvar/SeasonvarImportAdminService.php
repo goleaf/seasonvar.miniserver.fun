@@ -7,6 +7,7 @@ namespace App\Services\Seasonvar;
 use App\DTOs\Seasonvar\SeasonvarImportStartResultData;
 use App\Enums\SeasonvarImportStatus;
 use App\Jobs\StartSeasonvarQueuedImport;
+use App\Models\LicensedMedia;
 use App\Models\SeasonvarImportRun;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -144,7 +145,7 @@ final class SeasonvarImportAdminService
     }
 
     /**
-     * @return array{runs: list<array<string, mixed>>, has_active_run: bool, stale_count: int}
+     * @return array{runs: list<array<string, mixed>>, has_active_run: bool, stale_count: int, media_health: list<array<string, mixed>>, media_due_count: int}
      */
     public function dashboard(): array
     {
@@ -153,11 +154,31 @@ final class SeasonvarImportAdminService
             ->latest('id')
             ->limit(20)
             ->get();
+        $healthCounts = LicensedMedia::query()
+            ->selectRaw('health_status, COUNT(*) AS aggregate')
+            ->groupBy('health_status')
+            ->pluck('aggregate', 'health_status');
 
         return [
             'runs' => $runs->map(fn (SeasonvarImportRun $run): array => $this->present($run))->all(),
             'has_active_run' => $this->activeRun() !== null,
             'stale_count' => $this->staleRunsQuery()->count(),
+            'media_health' => collect([
+                ['status' => 'active', 'label' => 'Активно', 'icon' => 'fa-solid fa-circle-check', 'tone' => 'text-emerald-700'],
+                ['status' => 'degraded', 'label' => 'Нестабильно', 'icon' => 'fa-solid fa-triangle-exclamation', 'tone' => 'text-amber-700'],
+                ['status' => 'unavailable', 'label' => 'Недоступно', 'icon' => 'fa-solid fa-circle-xmark', 'tone' => 'text-rose-700'],
+                ['status' => 'disabled', 'label' => 'Отключено', 'icon' => 'fa-solid fa-ban', 'tone' => 'text-slate-500'],
+            ])->map(function (array $item) use ($healthCounts): array {
+                $item['count'] = (int) ($healthCounts[$item['status']] ?? 0);
+
+                return $item;
+            })->all(),
+            'media_due_count' => LicensedMedia::query()
+                ->where('health_status', '!=', 'disabled')
+                ->where(function (Builder $query): void {
+                    $query->whereNull('next_check_at')->orWhere('next_check_at', '<=', now());
+                })
+                ->count(),
         ];
     }
 

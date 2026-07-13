@@ -119,7 +119,7 @@ final class SeasonvarTitlePageStateSynchronizer
         }
 
         if ($media->contains(fn (LicensedMedia $media): bool => $media->status === 'unavailable'
-            || in_array($media->check_status, ['check_failed', 'unavailable'], true))) {
+            || in_array($media->health_status?->value, ['unavailable', 'disabled'], true))) {
             $flags[] = 'unavailable_video';
         }
 

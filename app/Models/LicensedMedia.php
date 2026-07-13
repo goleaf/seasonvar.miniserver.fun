@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\ContentAudience;
+use App\Enums\MediaHealthErrorCategory;
+use App\Enums\MediaHealthStatus;
 use App\Models\Concerns\HasPublicationAvailability;
 use Database\Factories\LicensedMediaFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -36,8 +38,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'has_subtitles',
     'format',
     'check_status',
+    'health_status',
     'last_http_status',
     'checked_at',
+    'last_successful_check_at',
+    'last_error_category',
+    'consecutive_failures',
+    'check_latency_ms',
+    'next_check_at',
 ])]
 class LicensedMedia extends Model
 {
@@ -46,6 +54,8 @@ class LicensedMedia extends Model
 
     protected $attributes = [
         'has_subtitles' => false,
+        'health_status' => 'active',
+        'consecutive_failures' => 0,
     ];
 
     /**
@@ -114,17 +124,10 @@ class LicensedMedia extends Model
      */
     public function scopeWithoutKnownFailures(Builder $query): Builder
     {
-        return $query
-            ->where(function (Builder $query): void {
-                $query
-                    ->whereNull($this->qualifyColumn('check_status'))
-                    ->orWhereNotIn($this->qualifyColumn('check_status'), ['unavailable', 'check_failed', 'invalid_url']);
-            })
-            ->where(function (Builder $query): void {
-                $query
-                    ->whereNull($this->qualifyColumn('last_http_status'))
-                    ->orWhere($this->qualifyColumn('last_http_status'), '<', 400);
-            });
+        return $query->whereIn($this->qualifyColumn('health_status'), [
+            MediaHealthStatus::Active->value,
+            MediaHealthStatus::Degraded->value,
+        ]);
     }
 
     /**
@@ -136,11 +139,17 @@ class LicensedMedia extends Model
             'duration_seconds' => 'integer',
             'has_subtitles' => 'boolean',
             'last_http_status' => 'integer',
+            'health_status' => MediaHealthStatus::class,
+            'last_error_category' => MediaHealthErrorCategory::class,
+            'consecutive_failures' => 'integer',
+            'check_latency_ms' => 'integer',
             'published_at' => 'datetime',
             'audience' => ContentAudience::class,
             'available_from' => 'datetime',
             'available_until' => 'datetime',
             'checked_at' => 'datetime',
+            'last_successful_check_at' => 'datetime',
+            'next_check_at' => 'datetime',
         ];
     }
 }

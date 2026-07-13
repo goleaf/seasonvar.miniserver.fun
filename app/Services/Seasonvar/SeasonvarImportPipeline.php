@@ -2,6 +2,7 @@
 
 namespace App\Services\Seasonvar;
 
+use App\Enums\MediaHealthStatus;
 use App\Models\Actor;
 use App\Models\AgeRating;
 use App\Models\CatalogStatus;
@@ -22,6 +23,7 @@ use App\Models\Translation;
 use App\Services\Catalog\CatalogRelationNameSanitizer;
 use App\Services\Catalog\CatalogTitleRecommendationBuilder;
 use App\Services\Media\ExternalMediaMetadata;
+use App\Services\Media\MediaSourceHealthManager;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +40,7 @@ class SeasonvarImportPipeline
         private readonly SeasonvarSitemapMirror $sitemapMirror,
         private readonly SeasonvarTitleMerger $titleMerger,
         private readonly SeasonvarMediaAvailabilityChecker $mediaAvailabilityChecker,
+        private readonly MediaSourceHealthManager $mediaHealth,
         private readonly ExternalMediaMetadata $mediaMetadata,
         private readonly SeasonvarRefreshPlanner $refreshPlanner,
         private readonly CatalogTitleRecommendationBuilder $recommendations,
@@ -718,13 +721,11 @@ class SeasonvarImportPipeline
         }
 
         $chunkSize = $this->mediaCheckChunkSize();
-        $refreshAfter = now()->subHours(max(1, (int) config('seasonvar.media_check.refresh_after_hours', 168)));
         $mediaQuery = LicensedMedia::query()
-            ->where(function ($query) use ($refreshAfter): void {
-                $query->whereNull('check_status')
-                    ->orWhereNull('checked_at')
-                    ->orWhere('checked_at', '<=', $refreshAfter)
-                    ->orWhereIn('check_status', ['check_failed', 'unavailable']);
+            ->where('health_status', '!=', 'disabled')
+            ->where(function ($query): void {
+                $query->whereNull('next_check_at')
+                    ->orWhere('next_check_at', '<=', now());
             })
             ->where(function ($query): void {
                 $query->whereNotNull('playback_url')
@@ -751,35 +752,20 @@ class SeasonvarImportPipeline
             foreach ($mediaItems as $media) {
                 $url = $media->playback_url ?: $media->path;
 
-                if (! is_string($url) || trim($url) === '') {
-                    $media->fill([
-                        'check_status' => 'invalid_url',
-                        'status' => 'unavailable',
-                        'checked_at' => now(),
-                    ])->save();
-
-                    $result['media_failed']++;
-
-                    continue;
-                }
-
-                $availability = $this->mediaAvailabilityChecker->check($url, $progress);
-                $media->fill([
-                    'status' => $availability['available'] ? 'published' : 'unavailable',
-                    'check_status' => $availability['status'],
-                    'last_http_status' => $availability['http_status'],
-                    'checked_at' => $availability['checked_at'],
-                    'published_at' => $availability['available'] ? ($media->published_at ?? now()) : $media->published_at,
-                ])->save();
+                $availability = $this->mediaAvailabilityChecker->check(is_string($url) ? $url : '', $progress);
+                $media = $this->mediaHealth->record($media, $availability);
 
                 $result['media_checked']++;
                 $result['media_updated']++;
 
-                if ($availability['available']) {
+                if ($availability->available) {
                     $result['media_available']++;
                 } else {
-                    $result['media_unavailable']++;
                     $result['media_failed']++;
+
+                    if ($media->health_status === MediaHealthStatus::Unavailable) {
+                        $result['media_unavailable']++;
+                    }
                 }
             }
 

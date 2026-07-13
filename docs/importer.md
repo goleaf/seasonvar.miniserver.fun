@@ -24,6 +24,17 @@ Page jobs принимают только IDs, lease token, canonical group key 
 
 Счётчики admin UI — операционные: `created` объединяет новые source pages и media rows, `updated` — успешно обработанные source pages и обновлённые media, `skipped` — необработанные выбранные pages и пропущенные media, `failed` — page/media failures. Это не точное число созданных Eloquent entities: текущая pipeline не хранит entity-level deltas, а выдавать их приближённо было бы некорректно.
 
+## Здоровье видеоисточников
+
+`SeasonvarMediaAvailabilityChecker` возвращает нормализованный результат без provider body/URL, а `MediaSourceHealthManager` атомарно применяет его к одной строке `licensed_media`. Health-check не выполняется внутри catalog transaction. В queued-режиме due backlog обрабатывается finalizer job; отдельного Laravel scheduler для этого нет, потому что production cron уже запускает единый dispatcher `seasonvar:import --queued` десять раз в сутки.
+
+- `active` — последняя проверка успешна; источник участвует в playback и counts.
+- `degraded` — временная ошибка ещё не достигла порога; источник остаётся кандидатом, а resolver может выбрать резервный вариант.
+- `unavailable` — постоянная ошибка или достигнутый failure threshold; источник исключён из playback/counts до успешной перепроверки.
+- `disabled` — ручное операционное отключение; автоматические проверки и recovery не меняют его.
+
+Каждый результат сохраняет `checked_at`, `last_successful_check_at`, bounded `check_latency_ms`, allowlisted `last_error_category`, `consecutive_failures` и `next_check_at`. Timeout/connection/408/425/429/5xx используют exponential retry; redirect, invalid URL, 401/403, 404/410, oversized response и invalid manifest сразу дают `unavailable`, но всё равно получают будущую перепроверку. Один timeout по умолчанию даёт только `degraded`; успешный ответ сбрасывает счётчик и возвращает `active`.
+
 Retry не воскрешает старую строку: создаётся новый run с `retry_of_run_id`, поэтому audit trail и счётчики прошлой попытки не переписываются. Idempotent upsert/identity/lease-границы не дублируют каталог. Cancel освобождает claims и запрещает новым jobs начинать; текущий HTTP/transaction step не прерывается посредине.
 
 ## Идентичность и идемпотентность
@@ -49,10 +60,9 @@ Parser фиксирует признаки `has_info_list`, `has_season_list` и
 ## Порядок деплоя
 
 1. Дождаться завершения активных import jobs и сделать backup SQLite.
-2. Применить additive migration `2026_07_13_140000_add_administration_fields_to_seasonvar_import_runs`: она добавляет только nullable requester/retry foreign keys, heartbeat/cancel timestamps и indexes, backfill не требуется.
-3. Развернуть код.
-3. Выполнить `php artisan migrate --force`: сначала nullable JSON `provider_field_values`, затем неуникальные person source URL indexes.
-5. Задать `SEASONVAR_IMPORT_ADMIN_EMAILS`, пересобрать config cache и перезапустить queue workers через `php artisan queue:restart`.
-6. Выполнить targeted repeat import на тестовой/проверочной странице и сверить counts/relations до и после.
+2. Применить additive migrations через `php artisan migrate --force`, включая `2026_07_13_021800_add_health_state_to_licensed_media_table` и admin/import identity migrations по timestamp.
+3. Health migration добавляет поля с безопасными defaults, backfill-ит прошлый `available` в `active`, известные failures в `unavailable` и ставит существующие проверенные строки в due backlog без удаления/merge данных.
+4. Задать `SEASONVAR_IMPORT_ADMIN_EMAILS` и `SEASONVAR_MEDIA_CHECK_*`, пересобрать config cache и перезапустить queue workers через `php artisan queue:restart`.
+5. Выполнить targeted repeat import на тестовой/проверочной странице и сверить counts/relations/health до и после.
 
 Все указанные migrations additive и не делают удалений. Admin fields nullable и не требуют backfill; отсутствие editorial baseline намеренно заставляет первый repeat import считать существующее заполненное поле потенциально редакционным.

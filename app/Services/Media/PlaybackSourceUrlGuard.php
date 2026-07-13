@@ -4,14 +4,20 @@ declare(strict_types=1);
 
 namespace App\Services\Media;
 
+use App\DTOs\VerifiedExternalUrlData;
 use Illuminate\Support\Str;
 
 class PlaybackSourceUrlGuard
 {
-    /** @var array<string, bool> */
+    /** @var array<string, list<string>> */
     private array $publicHosts = [];
 
     public function safeExternalUrl(mixed $url): ?string
+    {
+        return $this->verifiedExternalUrl($url)?->url;
+    }
+
+    public function verifiedExternalUrl(mixed $url): ?VerifiedExternalUrlData
     {
         if (! is_string($url)) {
             return null;
@@ -37,11 +43,17 @@ class PlaybackSourceUrlGuard
             return null;
         }
 
-        if (! $this->allowedHost($host) || ! $this->publicHost($host)) {
+        if (! $this->allowedHost($host)) {
             return null;
         }
 
-        return $url;
+        $addresses = $this->publicAddresses($host);
+
+        if ($addresses === null) {
+            return null;
+        }
+
+        return new VerifiedExternalUrlData($url, $host, $addresses[0] ?? null);
     }
 
     private function allowedHost(string $host): bool
@@ -57,19 +69,31 @@ class PlaybackSourceUrlGuard
         return false;
     }
 
-    private function publicHost(string $host): bool
+    /** @return list<string>|null */
+    private function publicAddresses(string $host): ?array
     {
         if (! (bool) config('playback.enforce_public_dns', true)) {
-            return true;
+            return [];
         }
 
-        return $this->publicHosts[$host] ??= $this->resolvePublicHost($host);
+        if (array_key_exists($host, $this->publicHosts)) {
+            return $this->publicHosts[$host];
+        }
+
+        $addresses = $this->resolvePublicAddresses($host);
+
+        if ($addresses === null) {
+            return null;
+        }
+
+        return $this->publicHosts[$host] = $addresses;
     }
 
-    private function resolvePublicHost(string $host): bool
+    /** @return list<string>|null */
+    private function resolvePublicAddresses(string $host): ?array
     {
         if ($host === 'localhost' || str_ends_with($host, '.localhost') || str_ends_with($host, '.local')) {
-            return false;
+            return null;
         }
 
         $addresses = filter_var($host, FILTER_VALIDATE_IP) !== false
@@ -86,15 +110,15 @@ class PlaybackSourceUrlGuard
         }
 
         if ($addresses === []) {
-            return false;
+            return null;
         }
 
         foreach (array_unique($addresses) as $address) {
             if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-                return false;
+                return null;
             }
         }
 
-        return true;
+        return array_values(array_unique($addresses));
     }
 }
