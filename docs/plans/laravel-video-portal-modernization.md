@@ -52,11 +52,11 @@
 
 ### P1-4 — Controlled live migrations
 
-- **Проблема / evidence:** в начале аудита были pending alias cleanup/unique/source availability migrations; в ходе общего deployment workflow были также применены новые search/import migrations.
+- **Проблема / evidence:** в начале аудита были pending alias cleanup/unique/source availability migrations; в ходе общего deployment workflow были также применены новые search/import migrations. Последний status оставляет relation source identity migration pending при активном queued import run `#742`.
 - **Файлы:** `database/migrations/*`, deployment/importer docs.
 - **Решение:** isolated migrate/rollback для исходного набора доказан; cleanup/search/import migrations применены. Новая relation source identity migration остаётся pending до backup/importer stop point/maintenance preflight.
 - **Риск / migration:** cleanup migration необратима по данным, хотя schema down безопасен; возможен lock/SQLite writer contention.
-- **Test:** temporary SQLite full migrate → rollback → migrate; live `migrate:status` read-only.
+- **Test:** temporary SQLite full migrate; targeted relation-identity rollback; live `migrate:status` и importer status read-only.
 - **Rollback:** восстановление DB backup для deleted duplicate rows; schema down только в maintenance window.
 - **Источник:** Laravel migrations/deployment docs и project `docs/deployment.md`.
 - **Статус:** исходный migration code/live status verified; relation identity migration pending, production backup artifact не проверялся.

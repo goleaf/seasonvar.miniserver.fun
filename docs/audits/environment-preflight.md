@@ -23,10 +23,10 @@ PHP удовлетворяет `^8.3`, Laravel 13 и PHPUnit 12. Node совме
 
 ## Runtime и данные
 
-- Первый `php artisan migrate:status` read-only показал pending cleanup/availability migrations. Во время общей repository работы deployment workflow применил их и остальные существовавшие migrations. Позднее параллельный commit добавил relation source identity migration `171455`; финальный status для неё `Pending`, остальные migrations — `Ran`. Временная SQLite до этого прошла full migrate, rollback последних семи и повторный migrate; новая migration отдельно покрыта своим feature test, но live DB автономно не изменялась.
+- Первый `php artisan migrate:status` read-only показал pending cleanup/availability migrations. Во время общей repository работы deployment workflow применил их и остальные существовавшие migrations. Позднее параллельный commit добавил relation source identity migration `171455`; финальный status для неё `Pending`, остальные migrations — `Ran`. Отдельная временная SQLite прошла полный migrate с этой таблицей и её targeted rollback. Live DB автономно не изменялась: финальная проверка увидела активный queued import run, а deployment contract требует сначала завершить jobs и подтвердить backup.
 - `PRAGMA quick_check` вернул `ok`; `PRAGMA foreign_key_check` — 0 нарушений. Обнаружено 53 таблицы.
 - Финальный `php artisan app:health --json`: status/readiness `ok/true`, DB, Redis cache/session/queue/locks, Memcached и queue worker `ok`; cache-warm state остаётся `unknown`.
-- `php artisan seasonvar:import --status`: очереди пусты, активных runs нет, последний run завершён без errors. Команда была только read-only status.
+- Финальный `php artisan seasonvar:import --status`: run `#742` ещё выполняется через queue (9646 pending, 9 delayed, 4 reserved jobs и 3949 live claims). Команда была только read-only status; поэтому pending migration не применялась к live DB.
 - `php artisan about` подтвердил, что public storage link сейчас отсутствует; это не мешает внешней media delivery.
 
 ## Baseline build и tests

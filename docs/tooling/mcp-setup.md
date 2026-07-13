@@ -16,6 +16,7 @@
 2. Context7 отсутствовал. Добавлен official npx server без API key; anonymous mode работает с меньшими лимитами. Rate-limit loop не выполнялся.
 3. Playwright CLI по умолчанию искал branded Chrome. Установленный MCP использует managed Chromium; CLI smoke получил тот же executable через ignored temporary config. Browser artifacts удалены после проверки.
 4. Текущий Codex process не hot-load-ит новые tables. Repository work продолжен через protocol handshakes, official docs и Playwright CLI; новая session должна перечитать config.
+5. Повторная загрузка official Codex manual helper завершилась ошибкой `Manual response is missing x-content-sha256`. Команда не запускалась повторно без изменения условий; проектный MCP status подтверждён через `codex mcp list`, strict integration doctor и уже выполненные protocol handshakes.
 
 ## Проверки
 
