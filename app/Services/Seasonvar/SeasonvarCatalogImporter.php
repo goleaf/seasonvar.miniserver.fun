@@ -6,7 +6,9 @@ use App\Actions\Seasonvar\RecordSeasonvarPageFailure;
 use App\DTOs\MediaHealthCheckResultData;
 use App\DTOs\Seasonvar\SeasonvarCatalogData;
 use App\DTOs\Seasonvar\SeasonvarPageHandlerResult;
+use App\DTOs\Seasonvar\SeasonvarPreparedCatalogPage;
 use App\Enums\ContentAudience;
+use App\Enums\MediaHealthErrorCategory;
 use App\Enums\MediaHealthStatus;
 use App\Enums\PublicationStatus;
 use App\Enums\ReleaseKind;
@@ -51,6 +53,7 @@ class SeasonvarCatalogImporter
         private readonly SeasonvarDiscoveredPageStore $discoveredPages,
         private readonly PoliteHttpClient $httpClient,
         private readonly SeasonvarSourcePageFetcher $pageFetcher,
+        private readonly SeasonvarCatalogPagePreparer $pagePreparer,
         private readonly SeasonvarCatalogParser $parser,
         private readonly SeasonvarCatalogIdentityResolver $identityResolver,
         private readonly SeasonvarEditorialFieldResolver $editorialFields,
@@ -418,7 +421,6 @@ class SeasonvarCatalogImporter
             return (new SeasonvarPageHandlerResult(catalogTitle: $existingCatalogTitle))->toLegacyResult();
         }
 
-        $body = $fetched->body;
         $contentHash = $fetched->contentHash;
         $contentChanged = $fetched->contentChanged;
 
@@ -451,12 +453,40 @@ class SeasonvarCatalogImporter
             ];
         }
 
+        $prepared = $this->pagePreparer->prepareFetched($page, $fetched, $progress);
+
+        return $this->applyPreparedPage(
+            $page,
+            $prepared,
+            $preferredCatalogTitle,
+            $importRunId,
+            $progress,
+        );
+    }
+
+    /**
+     * Apply a network-free prepared payload to one canonical catalog title.
+     *
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @return array{catalog_title: CatalogTitle, media_attached: int, media_updated: int, media_skipped: int, media_failed: int}
+     */
+    public function applyPreparedPage(
+        SourcePage $page,
+        SeasonvarPreparedCatalogPage $prepared,
+        ?CatalogTitle $preferredCatalogTitle = null,
+        ?int $importRunId = null,
+        ?callable $progress = null,
+    ): array {
+        if ((int) $page->id !== $prepared->sourcePageId) {
+            throw new RuntimeException('Подготовленная страница не соответствует исходной странице Seasonvar.');
+        }
+
+        $data = $prepared->catalogData;
+
         $this->report($progress, 'html-parse-started', [
             'source_page_id' => $page->id,
             'url' => $page->url,
         ]);
-
-        $data = SeasonvarCatalogData::fromParsed($this->parser->parse($body, $page->url));
 
         $this->report($progress, 'html-parse-complete', [
             'source_page_id' => $page->id,
@@ -481,8 +511,8 @@ class SeasonvarCatalogImporter
             ],
         ]);
 
-        $transactionResult = $this->databaseTransaction->run(function () use ($page, $data, $contentHash, $progress, $preferredCatalogTitle): array {
-            $catalogTitle = $this->upsertCatalogTitle($page, $data, $contentHash, $progress, $preferredCatalogTitle);
+        $transactionResult = $this->databaseTransaction->run(function () use ($page, $data, $prepared, $progress, $preferredCatalogTitle): array {
+            $catalogTitle = $this->upsertCatalogTitle($page, $data, $prepared->contentHash, $progress, $preferredCatalogTitle);
             $this->relationSyncer->sync($catalogTitle, $data->taxonomies, $progress);
             $this->syncCatalogAliases($catalogTitle, $data->aliases, $progress);
             $this->syncCatalogRatings($catalogTitle, $data->ratings, $progress);
@@ -496,10 +526,11 @@ class SeasonvarCatalogImporter
             $this->syncEpisodes($seasons, $page, $data->episodes, $progress);
 
             $page->update([
+                'content_hash' => $prepared->contentHash,
                 'parse_status' => 'parsed',
                 'error_message' => null,
-                'metadata_parser_version' => SeasonvarCatalogParser::METADATA_VERSION,
-                'metadata_attempted_version' => SeasonvarCatalogParser::METADATA_VERSION,
+                'metadata_parser_version' => $prepared->parserVersion,
+                'metadata_attempted_version' => $prepared->parserVersion,
                 'metadata_parsed_at' => now(),
                 'metadata_presence' => $this->parser->metadataPresence($data->taxonomies, $data->parseMeta),
             ]);
@@ -514,13 +545,16 @@ class SeasonvarCatalogImporter
             progress: $progress,
         );
         $catalogTitle = $transactionResult['catalog_title'];
-        $mediaResult = $this->mergeMediaResult(
-            $this->syncParsedMedia($catalogTitle, $transactionResult['seasons'], $data->media, $progress),
-            $this->importParsedPlaylists($catalogTitle, $data->media, $progress),
+        $mediaResult = $this->syncParsedMedia(
+            $catalogTitle,
+            $transactionResult['seasons'],
+            $data->media,
+            $progress,
+            allowNetwork: false,
         );
         $this->syncMediaTranslations($catalogTitle, $progress);
         $catalogTitle->update([
-            'relation_metadata_version' => SeasonvarCatalogParser::METADATA_VERSION,
+            'relation_metadata_version' => $prepared->parserVersion,
         ]);
         $missingDataFlags = $this->titlePageStateSynchronizer
             ->synchronize($catalogTitle, $page, $importRunId);
@@ -1169,8 +1203,13 @@ class SeasonvarCatalogImporter
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return array{attached: int, updated: int, skipped: int, failed: int}
      */
-    private function syncParsedMedia(CatalogTitle $catalogTitle, array $seasons, array $mediaItems, ?callable $progress = null): array
-    {
+    private function syncParsedMedia(
+        CatalogTitle $catalogTitle,
+        array $seasons,
+        array $mediaItems,
+        ?callable $progress = null,
+        bool $allowNetwork = true,
+    ): array {
         $result = $this->emptyMediaResult();
 
         $this->report($progress, 'seasonvar-media-sync-started', [
@@ -1269,7 +1308,9 @@ class SeasonvarCatalogImporter
                 'season_id' => $season?->id,
                 'episode_id' => $episode?->id,
                 'title' => $item['title'] ?: $this->mediaTitle($catalogTitle, $season, $episode, $isTrailer),
-                'storage_disk' => 'seasonvar_parsed',
+                'storage_disk' => ($item['storage_disk'] ?? null) === 'external_playlist'
+                    ? 'external_playlist'
+                    : 'seasonvar_parsed',
                 'path' => $playbackUrl,
                 'playback_url' => $playbackUrl,
                 'source_media_key' => $sourceMediaKey,
@@ -1307,8 +1348,14 @@ class SeasonvarCatalogImporter
             ])->save();
 
             if ($media->health_status !== MediaHealthStatus::Disabled) {
-                $availability = $this->checkMediaUrl($playbackUrl, $progress);
-                $media = $this->mediaHealth->record($media, $availability);
+                $availability = $this->preparedMediaAvailability($item);
+
+                if ($availability !== null || $allowNetwork) {
+                    $media = $this->mediaHealth->record(
+                        $media,
+                        $availability ?? $this->checkMediaUrl($playbackUrl, $progress),
+                    );
+                }
             }
 
             $result[$wasExisting ? 'updated' : 'attached']++;
@@ -1774,6 +1821,44 @@ class SeasonvarCatalogImporter
     private function checkMediaUrl(string $url, ?callable $progress = null): MediaHealthCheckResultData
     {
         return $this->mediaAvailabilityChecker->check($url, $progress);
+    }
+
+    /** @param array<string, mixed> $item */
+    private function preparedMediaAvailability(array $item): ?MediaHealthCheckResultData
+    {
+        $availability = $item['availability'] ?? null;
+
+        if (! is_array($availability)
+            || ! isset($availability['available'], $availability['check_status'], $availability['checked_at'])
+            || ! is_bool($availability['available'])
+            || ! is_string($availability['check_status'])
+            || ! is_string($availability['checked_at'])) {
+            return null;
+        }
+
+        try {
+            $checkedAt = Carbon::parse($availability['checked_at']);
+        } catch (Throwable) {
+            return null;
+        }
+
+        $errorCategory = isset($availability['error_category']) && is_string($availability['error_category'])
+            ? MediaHealthErrorCategory::tryFrom($availability['error_category'])
+            : null;
+
+        return new MediaHealthCheckResultData(
+            available: $availability['available'],
+            checkStatus: $availability['check_status'],
+            httpStatus: isset($availability['http_status']) && is_numeric($availability['http_status'])
+                ? (int) $availability['http_status']
+                : null,
+            checkedAt: $checkedAt,
+            latencyMs: isset($availability['latency_ms']) && is_numeric($availability['latency_ms'])
+                ? (int) $availability['latency_ms']
+                : null,
+            errorCategory: $errorCategory,
+            permanentFailure: (bool) ($availability['permanent_failure'] ?? false),
+        );
     }
 
     private function isDirectPlayerMediaUrl(string $url): bool

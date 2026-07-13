@@ -4,19 +4,20 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Jobs\FinalizeSeasonvarImportTitleGroup;
+use App\Jobs\PrepareSeasonvarImportTitlePage;
 use App\Jobs\RefreshSeasonvarCatalogTitle;
 use App\Models\CatalogTitle;
-use App\Models\SeasonvarImportRun;
+use App\Models\Season;
 use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
-use App\Services\Seasonvar\SeasonvarImportGroupKey;
-use App\Services\Seasonvar\SeasonvarImportPipeline;
-use App\Services\Seasonvar\SeasonvarTitleMerger;
+use App\Services\Seasonvar\SeasonvarImportTitleGroupDispatcher;
 use App\Services\Seasonvar\SeasonvarUrl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
 use InvalidArgumentException;
-use Mockery;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -41,51 +42,32 @@ class RefreshSeasonvarCatalogTitleJobTest extends TestCase
         ]);
 
         Cache::store('array')->flush();
+        Queue::fake();
+        Http::preventStrayRequests();
     }
 
-    public function test_it_is_unique_per_title_and_runs_the_forced_targeted_pipeline_on_the_import_queue(): void
+    public function test_it_is_unique_per_title_and_dispatches_every_known_page_without_http_or_catalog_mutation(): void
     {
         $this->freezeTime();
         $url = 'https://seasonvar.ru/serial-42-Test-1-season.html';
         $title = $this->refreshableTitle($url);
-        $run = SeasonvarImportRun::query()->create([
-            'mode' => 'url',
-            'status' => 'completed',
-            'argument' => $url,
-            'force' => true,
-            'started_at' => now(),
-            'finished_at' => now(),
+        $secondUrl = 'https://seasonvar.ru/serial-42-Test-2-season.html';
+        Season::factory()->for($title)->create([
+            'number' => 1,
+            'source_url' => $url,
+            'source_url_hash' => hash('sha256', $url),
         ]);
-        $pipeline = Mockery::mock(SeasonvarImportPipeline::class);
-        $pipeline->shouldReceive('run')->once()->withArgs(fn (
-            ?string $argument,
-            bool $force,
-            bool $forever,
-            ?int $sleepSeconds,
-            bool $discover,
-        ): bool => $argument === $url
-            && $force
-            && ! $forever
-            && $sleepSeconds === null
-            && ! $discover)->andReturn($run);
-        $merger = Mockery::mock(SeasonvarTitleMerger::class);
-        $merger->shouldReceive('mergeForCanonicalSlug')
-            ->once()
-            ->with($title->slug)
-            ->andReturn([
-                'groups' => 1,
-                'titles' => 2,
-                'seasons' => 3,
-                'episodes' => 4,
-            ]);
+        Season::factory()->for($title)->create([
+            'number' => 2,
+            'source_url' => $secondUrl,
+            'source_url_hash' => hash('sha256', $secondUrl),
+        ]);
 
         $job = new RefreshSeasonvarCatalogTitle($title->id);
         $job->handle(
-            $pipeline,
+            app(SeasonvarImportTitleGroupDispatcher::class),
             app(SeasonvarUrl::class),
-            app(SeasonvarImportGroupKey::class),
             app(CatalogTitleRefreshStateStore::class),
-            $merger,
         );
 
         $state = app(CatalogTitleRefreshStateStore::class)->read($title->id);
@@ -97,54 +79,24 @@ class RefreshSeasonvarCatalogTitleJobTest extends TestCase
         $this->assertSame('catalog-title-refresh:'.$title->id, $job->uniqueId());
         $this->assertSame(now()->addSeconds(21_600)->getTimestamp(), $job->retryUntil()->getTimestamp());
         $this->assertSame([60, 300, 900], $job->backoff());
-        $this->assertSame('completed', $state->status?->value);
-        $this->assertSame($run->id, $state->importRunId);
+        $this->assertSame('running', $state->status?->value);
+        $this->assertNotNull($state->importRunId);
+        $this->assertSame(1, CatalogTitle::query()->count());
+        $this->assertSame(2, $title->seasons()->count());
+        Queue::assertPushed(PrepareSeasonvarImportTitlePage::class, 2);
+        Queue::assertPushed(FinalizeSeasonvarImportTitleGroup::class, 1);
     }
 
-    public function test_it_releases_when_the_title_group_is_already_being_imported(): void
-    {
-        $url = 'https://seasonvar.ru/serial-42-Test-1-season.html';
-        $title = $this->refreshableTitle($url);
-        $groupKeys = app(SeasonvarImportGroupKey::class);
-        $lock = Cache::store('array')->lock($groupKeys->forUrl($url, hash('sha256', $url)), 1200);
-        $this->assertTrue($lock->get());
-
-        try {
-            $states = app(CatalogTitleRefreshStateStore::class);
-            $states->queued($title->id);
-            $pipeline = Mockery::mock(SeasonvarImportPipeline::class);
-            $pipeline->shouldNotReceive('run');
-            $job = (new RefreshSeasonvarCatalogTitle($title->id))->withFakeQueueInteractions();
-
-            $job->handle(
-                $pipeline,
-                app(SeasonvarUrl::class),
-                $groupKeys,
-                $states,
-                app(SeasonvarTitleMerger::class),
-            );
-
-            $job->assertReleased(delay: 30);
-            $this->assertSame('queued', $states->read($title->id)->status?->value);
-        } finally {
-            $lock->release();
-        }
-    }
-
-    public function test_it_rejects_a_non_seasonvar_source_url_before_running_the_pipeline(): void
+    public function test_it_rejects_a_non_seasonvar_source_url_before_dispatching_pages(): void
     {
         $title = $this->refreshableTitle('https://example.com/serial-42-Test-1-season.html');
-        $pipeline = Mockery::mock(SeasonvarImportPipeline::class);
-        $pipeline->shouldNotReceive('run');
 
         $this->expectException(InvalidArgumentException::class);
 
         (new RefreshSeasonvarCatalogTitle($title->id))->handle(
-            $pipeline,
+            app(SeasonvarImportTitleGroupDispatcher::class),
             app(SeasonvarUrl::class),
-            app(SeasonvarImportGroupKey::class),
             app(CatalogTitleRefreshStateStore::class),
-            app(SeasonvarTitleMerger::class),
         );
     }
 

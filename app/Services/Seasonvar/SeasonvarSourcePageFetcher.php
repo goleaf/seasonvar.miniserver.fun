@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Seasonvar;
 
 use App\DTOs\Seasonvar\SeasonvarFetchedPage;
+use App\Enums\SeasonvarPageType;
 use App\Exceptions\Seasonvar\SeasonvarSourceRequestException;
 use App\Models\SourcePage;
 use App\Models\SourcePageSnapshot;
@@ -49,6 +50,16 @@ final class SeasonvarSourcePageFetcher
                 throw new RuntimeException('Seasonvar вернул 304 для страницы без сохраненного содержимого.');
             }
 
+            $snapshot = $page->snapshots()
+                ->where('content_hash', $page->content_hash)
+                ->latest('captured_at')
+                ->latest('id')
+                ->first();
+
+            if ($snapshot === null) {
+                throw new RuntimeException('Seasonvar вернул 304, но сохраненный HTML-снимок страницы не найден.');
+            }
+
             $page->update([
                 'http_status' => 304,
                 'last_crawled_at' => now(),
@@ -59,11 +70,11 @@ final class SeasonvarSourcePageFetcher
 
             return new SeasonvarFetchedPage(
                 sourcePageId: $page->id,
-                body: '',
+                body: $snapshot->html,
                 contentHash: $page->content_hash,
                 httpStatus: 304,
                 contentChanged: false,
-                snapshotId: null,
+                snapshotId: $snapshot->id,
                 notModified: true,
             );
         }
@@ -143,6 +154,8 @@ final class SeasonvarSourcePageFetcher
         int $httpStatus,
         ?int $importRunId,
     ): SourcePageSnapshot {
+        $snapshotBody = $this->snapshotBody($page, $body);
+
         return SourcePageSnapshot::query()->updateOrCreate(
             [
                 'source_page_id' => $page->id,
@@ -152,11 +165,27 @@ final class SeasonvarSourcePageFetcher
                 'seasonvar_import_run_id' => $importRunId,
                 'url' => $page->url,
                 'http_status' => $httpStatus,
-                'body_bytes' => mb_strlen($body, '8bit'),
-                'html' => $body,
+                'body_bytes' => mb_strlen($snapshotBody, '8bit'),
+                'html' => $snapshotBody,
                 'captured_at' => now(),
             ],
         );
+    }
+
+    private function snapshotBody(SourcePage $page, string $body): string
+    {
+        $pageType = SeasonvarPageType::tryFrom((string) $page->page_type) ?? SeasonvarPageType::Unknown;
+
+        if ($pageType === SeasonvarPageType::Serial) {
+            return $body;
+        }
+
+        return json_encode([
+            'page_type' => $pageType->value,
+            'source_body_bytes' => mb_strlen($body, '8bit'),
+            'content_hash' => hash('sha256', $body),
+            'snapshot_policy' => 'metadata_only_no_source_prose',
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }
 
     /**

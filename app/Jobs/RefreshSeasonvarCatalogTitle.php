@@ -6,9 +6,7 @@ namespace App\Jobs;
 
 use App\Models\CatalogTitle;
 use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
-use App\Services\Seasonvar\SeasonvarImportGroupKey;
-use App\Services\Seasonvar\SeasonvarImportPipeline;
-use App\Services\Seasonvar\SeasonvarTitleMerger;
+use App\Services\Seasonvar\SeasonvarImportTitleGroupDispatcher;
 use App\Services\Seasonvar\SeasonvarUrl;
 use DateTimeInterface;
 use Illuminate\Bus\Queueable;
@@ -21,7 +19,6 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
-use RuntimeException;
 use Throwable;
 
 final class RefreshSeasonvarCatalogTitle implements ShouldBeUnique, ShouldQueue
@@ -51,11 +48,9 @@ final class RefreshSeasonvarCatalogTitle implements ShouldBeUnique, ShouldQueue
     }
 
     public function handle(
-        SeasonvarImportPipeline $pipeline,
+        SeasonvarImportTitleGroupDispatcher $groups,
         SeasonvarUrl $urls,
-        SeasonvarImportGroupKey $groupKeys,
         CatalogTitleRefreshStateStore $states,
-        SeasonvarTitleMerger $titleMerger,
     ): void {
         $catalogTitle = CatalogTitle::query()->findOrFail($this->catalogTitleId);
         $url = $urls->normalize((string) $catalogTitle->source_url);
@@ -64,37 +59,11 @@ final class RefreshSeasonvarCatalogTitle implements ShouldBeUnique, ShouldQueue
             throw new InvalidArgumentException('Ссылка тайтла не принадлежит разрешенному каталогу Seasonvar.');
         }
 
-        $lock = Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'))->lock(
-            $groupKeys->forUrl($url, $urls->hash($url)),
-            $this->timeout + 300,
+        $group = $groups->start(
+            $catalogTitle,
+            (string) config('seasonvar.title_refresh.queue', 'seasonvar-title-refresh'),
         );
-
-        if (! $lock->get()) {
-            $states->queued($this->catalogTitleId);
-            $this->release(30);
-
-            return;
-        }
-
-        try {
-            $states->running($this->catalogTitleId);
-            $run = $pipeline->run(
-                argument: $url,
-                force: true,
-                forever: false,
-                sleepSeconds: null,
-                discover: false,
-            );
-
-            if (! in_array($run->status, ['completed', 'partial'], true)) {
-                throw new RuntimeException('Целевое обновление Seasonvar завершилось без успешного состояния.');
-            }
-
-            $titleMerger->mergeForCanonicalSlug($catalogTitle->slug);
-            $states->completed($this->catalogTitleId, $run->id);
-        } finally {
-            $lock->release();
-        }
+        $states->running($this->catalogTitleId, $group->seasonvar_import_run_id);
     }
 
     /** @return list<int> */

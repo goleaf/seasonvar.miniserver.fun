@@ -89,6 +89,32 @@ final readonly class SeasonvarCatalogData
         return (bool) ($this->parseMeta['has_info_list'] ?? false);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function toArray(): array
+    {
+        return [
+            'title' => $this->title,
+            'original_title' => $this->originalTitle,
+            'type' => $this->type,
+            'year' => $this->year,
+            'description' => $this->description,
+            'poster_url' => $this->posterUrl,
+            'external_id' => $this->externalId,
+            'current_season_number' => $this->currentSeasonNumber,
+            'seasons' => $this->seasons,
+            'episodes' => $this->episodes,
+            'media' => $this->media,
+            'taxonomies' => $this->taxonomies,
+            'ratings' => $this->ratings,
+            'recommendation_signals' => $this->recommendationSignals,
+            'aliases' => $this->aliases,
+            'reviews' => $this->reviews,
+            'parse_meta' => $this->parseMeta,
+        ];
+    }
+
     public function hasCompleteSeasonSnapshot(): bool
     {
         return (bool) ($this->parseMeta['has_season_list'] ?? false);

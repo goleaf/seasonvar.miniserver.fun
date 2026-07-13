@@ -41,7 +41,7 @@ final class CatalogTitleRefreshStateStore
         return $this->write($catalogTitleId, $state);
     }
 
-    public function running(int $catalogTitleId): CatalogTitleRefreshState
+    public function running(int $catalogTitleId, ?int $importRunId = null): CatalogTitleRefreshState
     {
         $previous = $this->read($catalogTitleId);
         $now = now();
@@ -50,6 +50,7 @@ final class CatalogTitleRefreshStateStore
             queuedAt: $previous->queuedAt ?? $now,
             startedAt: $now,
             activeUntil: $now->copy()->addSeconds($this->activeSeconds()),
+            importRunId: $importRunId,
         );
 
         return $this->write($catalogTitleId, $state);
@@ -60,6 +61,20 @@ final class CatalogTitleRefreshStateStore
         $previous = $this->read($catalogTitleId);
         $state = new CatalogTitleRefreshState(
             status: SeasonvarImportStatus::Completed,
+            queuedAt: $previous->queuedAt,
+            startedAt: $previous->startedAt,
+            completedAt: now(),
+            importRunId: $importRunId,
+        );
+
+        return $this->write($catalogTitleId, $state);
+    }
+
+    public function partial(int $catalogTitleId, ?int $importRunId = null): CatalogTitleRefreshState
+    {
+        $previous = $this->read($catalogTitleId);
+        $state = new CatalogTitleRefreshState(
+            status: SeasonvarImportStatus::Partial,
             queuedAt: $previous->queuedAt,
             startedAt: $previous->startedAt,
             completedAt: now(),
