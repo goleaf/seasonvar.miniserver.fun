@@ -119,4 +119,6 @@ Retention всегда оставляет snapshot с максимальным `
 4. Задать `SEASONVAR_IMPORT_ADMIN_EMAILS` и `SEASONVAR_MEDIA_CHECK_*`, пересобрать config cache и перезапустить queue workers через `php artisan queue:restart`.
 5. Выполнить targeted repeat import на тестовой/проверочной странице и сверить counts/relations/health до и после.
 
+Пока additive migration реестра ожидает применения, `CatalogRelationSourceIdentityRegistry` fail-open возвращает canonical fallback и не обращается к отсутствующей таблице: уже запущенные workers не падают, но новые source mappings в этот период не закрепляются. Это только rolling-deploy совместимость, а не замена migration; после её применения обязателен штатный `queue:restart` из шага 4.
+
 Все указанные migrations additive и не делают удалений. Admin fields nullable и не требуют backfill; отсутствие editorial baseline намеренно заставляет первый repeat import считать существующее заполненное поле потенциально редакционным.
