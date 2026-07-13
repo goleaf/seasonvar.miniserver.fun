@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\Catalog;
 
+use App\DTOs\CatalogUserStateSummary;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUserState;
 use App\Models\EpisodeViewProgress;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 
 class CatalogUserStateService
 {
@@ -26,27 +29,64 @@ class CatalogUserStateService
             ->first();
     }
 
-    public function toggleWatchlist(User $user, CatalogTitle $catalogTitle): CatalogTitleUserState
+    public function summary(CatalogTitle $catalogTitle): CatalogUserStateSummary
     {
-        $state = CatalogTitleUserState::query()->firstOrNew([
-            'user_id' => $user->id,
-            'catalog_title_id' => $catalogTitle->id,
-        ]);
-        $state->in_watchlist = ! (bool) $state->in_watchlist;
-        $state->save();
+        $aggregate = CatalogTitleUserState::query()
+            ->whereBelongsTo($catalogTitle)
+            ->toBase()
+            ->selectRaw('COUNT(CASE WHEN in_watchlist = 1 THEN 1 END) AS watchlist_count')
+            ->selectRaw('COUNT(rating) AS rating_count')
+            ->selectRaw('AVG(rating) AS rating_average')
+            ->first();
 
-        return $state;
+        return new CatalogUserStateSummary(
+            watchlistCount: (int) ($aggregate?->watchlist_count ?? 0),
+            ratingCount: (int) ($aggregate?->rating_count ?? 0),
+            ratingAverage: $aggregate?->rating_average !== null ? (float) $aggregate->rating_average : null,
+        );
     }
 
-    public function setRating(User $user, CatalogTitle $catalogTitle, ?int $rating): CatalogTitleUserState
+    /** @return array{minimum: int, maximum: int} */
+    public function ratingRange(): array
     {
-        return CatalogTitleUserState::query()->updateOrCreate(
-            [
-                'user_id' => $user->id,
-                'catalog_title_id' => $catalogTitle->id,
-            ],
-            ['rating' => $rating],
-        );
+        $minimum = max(1, min(255, (int) config('catalog.user_rating.minimum', 1)));
+        $maximum = max($minimum, min(255, (int) config('catalog.user_rating.maximum', 10)));
+
+        return ['minimum' => $minimum, 'maximum' => $maximum];
+    }
+
+    /** @return list<int> */
+    public function ratingOptions(): array
+    {
+        $range = $this->ratingRange();
+
+        return range($range['minimum'], $range['maximum']);
+    }
+
+    public function ratingValidationMessage(): string
+    {
+        $range = $this->ratingRange();
+
+        return "Оценка должна быть от {$range['minimum']} до {$range['maximum']}.";
+    }
+
+    public function setWatchlist(User $user, CatalogTitle $catalogTitle, bool $inWatchlist): ?CatalogTitleUserState
+    {
+        $this->authorizeInteraction($user, $catalogTitle);
+
+        return $this->writeState($user, $catalogTitle, ['in_watchlist' => $inWatchlist]);
+    }
+
+    public function setRating(User $user, CatalogTitle $catalogTitle, ?int $rating): ?CatalogTitleUserState
+    {
+        $this->authorizeInteraction($user, $catalogTitle);
+        $range = $this->ratingRange();
+
+        if ($rating !== null && ($rating < $range['minimum'] || $rating > $range['maximum'])) {
+            throw ValidationException::withMessages(['rating' => $this->ratingValidationMessage()]);
+        }
+
+        return $this->writeState($user, $catalogTitle, ['rating' => $rating]);
     }
 
     public function recordProgress(
@@ -59,6 +99,7 @@ class CatalogUserStateService
         int $reportedDurationSeconds,
         bool $ended,
     ): ?EpisodeViewProgress {
+        $this->authorizeInteraction($user, $catalogTitle);
         $maximumDuration = max(60, min(604800, (int) config('playback.progress.max_duration_seconds', 86400)));
         $positionTolerance = max(0, min(60, (int) config('playback.progress.position_tolerance_seconds', 5)));
 
@@ -164,5 +205,53 @@ class CatalogUserStateService
 
             return $progress;
         }, attempts: 3);
+    }
+
+    /**
+     * @param  array{in_watchlist: bool}|array{rating: int|null}  $attributes
+     */
+    private function writeState(User $user, CatalogTitle $catalogTitle, array $attributes): ?CatalogTitleUserState
+    {
+        return DB::transaction(function () use ($user, $catalogTitle, $attributes): ?CatalogTitleUserState {
+            $now = now();
+            $column = array_key_first($attributes);
+            $value = $attributes[$column];
+            $shouldCreate = $column === 'in_watchlist' ? $value === true : $value !== null;
+
+            if ($shouldCreate) {
+                CatalogTitleUserState::query()->insertOrIgnore([
+                    'user_id' => $user->id,
+                    'catalog_title_id' => $catalogTitle->id,
+                    'in_watchlist' => $attributes['in_watchlist'] ?? false,
+                    'rating' => $attributes['rating'] ?? null,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            }
+
+            $update = CatalogTitleUserState::query()
+                ->whereBelongsTo($user)
+                ->whereBelongsTo($catalogTitle);
+
+            if ($value === null) {
+                $update->whereNotNull($column);
+            } else {
+                $update->where(function ($query) use ($column, $value): void {
+                    $query->whereNull($column)->orWhere($column, '!=', $value);
+                });
+            }
+
+            $update->update([$column => $value, 'updated_at' => $now]);
+
+            return CatalogTitleUserState::query()
+                ->whereBelongsTo($user)
+                ->whereBelongsTo($catalogTitle)
+                ->first();
+        }, attempts: 3);
+    }
+
+    private function authorizeInteraction(User $user, CatalogTitle $catalogTitle): void
+    {
+        Gate::forUser($user)->authorize('interact', $catalogTitle);
     }
 }

@@ -2,6 +2,8 @@
 
 ## 2026-07-13
 
+- Consolidated favorites into the existing watchlist concept and replaced toggle read-modify-write with authorized desired-state conditional writes protected by the existing user/title unique key; repeated Livewire requests do not change timestamps, no-op removals create no rows, and browser user/profile IDs are never accepted.
+- Centralized the configurable internal rating range, added one-query user watchlist/rating aggregates with immediate create/change/remove updates, and kept imported provider ratings fully separate from viewer averages.
 - Added the authenticated `/watching` Livewire page with one continue-watching action per accessible series, real-playback-only paginated history, Russian loading/empty/unavailable states, profile-scoped removal, and typed full-clear confirmation.
 - Derived continue/history state from canonical episode progress using fixed-query window ranking, deterministic release-lane navigation, batch hydration, and a new user/history ordering index; newly published episodes re-qualify completed series without cache invalidation.
 - Hardened persistent episode progress around the existing unique user/episode record: trusted media duration, percentage, first-start time, source media, opaque expiring playback sessions, monotonic event sequences, transactional retry-safe updates, and non-regressing completion state now feed the same history and continue-watching query.

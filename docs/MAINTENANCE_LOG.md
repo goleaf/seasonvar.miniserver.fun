@@ -17,6 +17,8 @@
 
 ## 2026-07-13
 
+- Список просмотра карточки переведён с race-prone toggle на explicit desired-state insert-or-ignore и conditional update под unique `(user_id, catalog_title_id)`; одинаковый retry не меняет даже `updated_at`, очистка отсутствующего состояния не создаёт строку, browser не передаёт user/profile ID, а policy теперь применяется внутри общего write-сервиса.
+- «Избранное» закреплено как название того же списка просмотра без второй таблицы. Диапазон внутренних оценок централизован в `config/catalog.php`; count/average обновляются одним conditional aggregate и не смешиваются с импортными provider ratings.
 - Livewire-плеер карточки тайтла получил кнопки предыдущей/следующей доступной серии. Навигация использует keyset-запросы по `sort_order`, номеру и ID, переходит между видимыми сезонами, пропускает hidden/expired/source-less записи и не смешивает обычные выпуски со спецвыпусками.
 - `catalogTitleId` остаётся locked-свойством, изменяемые URL-параметры сезона/серии повторно проверяются в общей playback boundary, а смена сезона не затрагивает watchlist и пользовательскую оценку. Alpine сохраняет одну history-запись перед действием, после чего Livewire атомарно заменяет все URL-параметры playback state; Back/Forward больше не перебирают variant/quality/format по одному.
 

@@ -10,6 +10,7 @@ use App\Livewire\ViewingActivity;
 use App\Models\Actor;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
+use App\Models\CatalogTitleRating;
 use App\Models\CatalogTitleRecommendation;
 use App\Models\CatalogTitleUserState;
 use App\Models\Country;
@@ -25,6 +26,8 @@ use App\Models\User;
 use App\Services\Catalog\CatalogPlaybackProgressSession;
 use App\Services\Catalog\CatalogStatsPageBuilder;
 use App\Services\Catalog\CatalogStatsPosterUrlGuard;
+use App\Services\Catalog\CatalogUserStateService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -1333,7 +1336,7 @@ class CatalogPageTest extends TestCase
             ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id]);
 
         $component
-            ->call('toggleWatchlist')
+            ->call('setWatchlist', true)
             ->call('setRating', 8)
             ->call('recordProgress', $episode->id, $firstSession, 1, 0, 600, false)
             ->call('recordProgress', $episode->id, $firstSession, 1, 90, 600, false)
@@ -1504,8 +1507,148 @@ class CatalogPageTest extends TestCase
         auth()->logout();
 
         Livewire::test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
-            ->call('toggleWatchlist')
+            ->call('setWatchlist', true)
             ->assertForbidden();
+
+        Livewire::test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->call('setRating', 8)
+            ->assertForbidden();
+    }
+
+    public function test_watchlist_and_user_ratings_are_idempotent_profile_scoped_and_aggregated_separately(): void
+    {
+        config()->set('catalog.user_rating.minimum', 2);
+        config()->set('catalog.user_rating.maximum', 9);
+
+        $catalogTitle = CatalogTitle::factory()->create();
+        CatalogTitleRating::query()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'provider' => 'kinopoisk',
+            'rating' => 9.6,
+            'votes' => 1200,
+            'raw_value' => '9.6/10',
+        ]);
+        $firstUser = User::factory()->create();
+        $secondUser = User::factory()->create();
+
+        $firstComponent = Livewire::actingAs($firstUser)
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->call('setWatchlist', true)
+            ->call('setRating', 8);
+        $firstUpdatedAt = CatalogTitleUserState::query()
+            ->whereBelongsTo($firstUser)
+            ->whereBelongsTo($catalogTitle)
+            ->sole()
+            ->updated_at;
+
+        $this->travel(1)->second();
+
+        $firstComponent
+            ->call('setWatchlist', true)
+            ->call('setRating', 8)
+            ->assertSeeText('В списке просмотра')
+            ->assertSeeText('В списках просмотра:')
+            ->assertSeeText('8,0 из 9 (1)');
+
+        $this->assertSame(1, CatalogTitleUserState::query()
+            ->whereBelongsTo($firstUser)
+            ->whereBelongsTo($catalogTitle)
+            ->count());
+        $this->assertSame($firstUpdatedAt?->toISOString(), CatalogTitleUserState::query()
+            ->whereBelongsTo($firstUser)
+            ->whereBelongsTo($catalogTitle)
+            ->sole()
+            ->updated_at?->toISOString());
+
+        $emptyUser = User::factory()->create();
+        Livewire::actingAs($emptyUser)
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->call('setWatchlist', false)
+            ->call('setRating', '');
+
+        $this->assertFalse(CatalogTitleUserState::query()->whereBelongsTo($emptyUser)->exists());
+
+        Livewire::actingAs($secondUser)
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id])
+            ->call('setWatchlist', true)
+            ->call('setRating', 6)
+            ->assertSeeText('7,0 из 9 (2)');
+
+        $this->assertSame(2, CatalogTitleUserState::query()
+            ->whereBelongsTo($catalogTitle)
+            ->where('in_watchlist', true)
+            ->count());
+
+        $firstComponent = Livewire::actingAs($firstUser)
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id]);
+
+        $firstComponent
+            ->call('setRating', 9)
+            ->assertSeeText('7,5 из 9 (2)')
+            ->call('setWatchlist', false)
+            ->call('setWatchlist', false)
+            ->assertDontSeeText('В списке просмотра')
+            ->call('setRating', '')
+            ->assertSeeText('6,0 из 9 (1)');
+
+        $this->assertFalse(CatalogTitleUserState::query()
+            ->whereBelongsTo($firstUser)
+            ->whereBelongsTo($catalogTitle)
+            ->sole()
+            ->in_watchlist);
+        $this->assertSame(1, CatalogTitleUserState::query()
+            ->whereBelongsTo($catalogTitle)
+            ->where('in_watchlist', true)
+            ->count());
+        $this->assertNull(CatalogTitleUserState::query()
+            ->whereBelongsTo($firstUser)
+            ->whereBelongsTo($catalogTitle)
+            ->sole()
+            ->rating);
+        $this->assertDatabaseHas('catalog_title_ratings', [
+            'catalog_title_id' => $catalogTitle->id,
+            'provider' => 'kinopoisk',
+            'rating' => 9.6,
+            'votes' => 1200,
+        ]);
+    }
+
+    public function test_user_state_writes_validate_the_configured_rating_range_and_title_access(): void
+    {
+        config()->set('catalog.user_rating.minimum', 2);
+        config()->set('catalog.user_rating.maximum', 5);
+
+        $user = User::factory()->create();
+        $catalogTitle = CatalogTitle::factory()->create();
+        $component = Livewire::actingAs($user)
+            ->test(CatalogTitlePlayer::class, ['catalogTitleId' => $catalogTitle->id]);
+
+        $component
+            ->call('setRating', 1)
+            ->assertHasErrors('rating')
+            ->call('setRating', 6)
+            ->assertHasErrors('rating')
+            ->call('setRating', 'invalid')
+            ->assertHasErrors('rating')
+            ->call('setRating', 5)
+            ->assertHasNoErrors('rating');
+
+        $this->assertSame(5, CatalogTitleUserState::query()
+            ->whereBelongsTo($user)
+            ->whereBelongsTo($catalogTitle)
+            ->sole()
+            ->rating);
+
+        $catalogTitle->update(['publication_status' => 'hidden']);
+
+        $this->assertThrows(
+            fn () => app(CatalogUserStateService::class)->setWatchlist($user, $catalogTitle, true),
+            AuthorizationException::class,
+        );
+        $this->assertThrows(
+            fn () => app(CatalogUserStateService::class)->setRating($user, $catalogTitle, 4),
+            AuthorizationException::class,
+        );
     }
 
     public function test_catalog_title_player_excludes_unavailable_releases_from_counts_actions_and_selections(): void

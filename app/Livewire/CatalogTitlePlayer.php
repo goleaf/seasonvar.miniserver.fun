@@ -23,7 +23,6 @@ use App\View\ViewModels\CatalogShowViewModel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Renderless;
 use Livewire\Attributes\Url;
@@ -169,15 +168,15 @@ class CatalogTitlePlayer extends Component
         $this->syncMediaProfile($media);
     }
 
-    public function toggleWatchlist(): void
+    public function setWatchlist(bool $inWatchlist): void
     {
-        $user = $this->authorizedUser();
-        $this->userState->toggleWatchlist($user, $this->title());
+        $user = $this->authenticatedUser();
+        $this->userState->setWatchlist($user, $this->title(), $inWatchlist);
     }
 
     public function setRating(int|string|null $rating): void
     {
-        $user = $this->authorizedUser();
+        $user = $this->authenticatedUser();
 
         if ($rating === null || $rating === '') {
             $this->resetErrorBag('rating');
@@ -186,10 +185,10 @@ class CatalogTitlePlayer extends Component
             return;
         }
 
-        $rating = filter_var($rating, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 10]]);
+        $rating = filter_var($rating, FILTER_VALIDATE_INT);
 
         if ($rating === false) {
-            $this->addError('rating', 'Оценка должна быть от 1 до 10.');
+            $this->addError('rating', $this->userState->ratingValidationMessage());
 
             return;
         }
@@ -207,7 +206,7 @@ class CatalogTitlePlayer extends Component
         int $reportedDurationSeconds,
         bool $ended = false,
     ): void {
-        $user = $this->authorizedUser();
+        $user = $this->authenticatedUser();
 
         $this->userState->recordProgress(
             $user,
@@ -307,6 +306,8 @@ class CatalogTitlePlayer extends Component
             mediaCount: $seasons->sum('available_media_count'),
         );
         $state = $user !== null ? $this->userState->state($user, $title) : null;
+        $stateSummary = $this->userState->summary($title);
+        $ratingRange = $this->userState->ratingRange();
 
         return view('livewire.catalog-title-player', [
             'title' => $title,
@@ -324,6 +325,9 @@ class CatalogTitlePlayer extends Component
             'showView' => $showView,
             'inWatchlist' => (bool) ($state?->in_watchlist ?? false),
             'userRating' => $state?->rating,
+            'userStateSummary' => $stateSummary,
+            'ratingOptions' => $this->userState->ratingOptions(),
+            'ratingMaximum' => $ratingRange['maximum'],
             'isAuthenticated' => $user !== null,
         ]);
     }
@@ -517,12 +521,11 @@ class CatalogTitlePlayer extends Component
         return $this->resolvedEpisode = $this->playback->watchableEpisode($title, $user, $episodeId);
     }
 
-    private function authorizedUser(): User
+    private function authenticatedUser(): User
     {
         $user = $this->user();
 
         abort_unless($user instanceof User, 403);
-        Gate::authorize('interact', $this->title());
 
         return $user;
     }

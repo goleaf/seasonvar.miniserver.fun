@@ -47,7 +47,7 @@
 - `SeasonvarImportRun hasMany SourcePageSnapshot`
 - `SeasonvarImportRun hasMany SourcePage` через `last_import_run_id`
 - Каждая модель связи каталога относится ко многим `CatalogTitle` через явную pivot-таблицу.
-- `User hasMany CatalogTitleUserState` и `User hasMany EpisodeViewProgress`; unique `(user_id, catalog_title_id)` хранит одну watchlist/rating запись, unique `(user_id, episode_id)` — одну каноническую позицию выпуска. Progress дополнительно хранит trusted duration/percent, первый и последний просмотр, неизменяемый `completed_at`, source media, ULID активной playback session и последний принятый event sequence.
+- `User hasMany CatalogTitleUserState` и `User hasMany EpisodeViewProgress`; unique `(user_id, catalog_title_id)` хранит одну запись списка просмотра и внутренней пользовательской оценки, unique `(user_id, episode_id)` — одну каноническую позицию выпуска. Отдельной таблицы favorites нет: в текущем продукте «избранное» означает тот же список просмотра. `CatalogTitleRating` остаётся импортной provider-оценкой и не участвует во внутреннем среднем; editorial rating в модели отсутствует и не симулируется. Пока отдельной модели профиля нет, владельцем приватной строки является текущий `User`. Progress дополнительно хранит trusted duration/percent, первый и последний просмотр, неизменяемый `completed_at`, source media, ULID активной playback session и последний принятый event sequence.
 - Viewing History не имеет отдельной таблицы: фактической активностью считается `EpisodeViewProgress.first_started_at IS NOT NULL`. Удаление из истории удаляет каноническую user/episode строку и одновременно сбрасывает Continue Watching для этого выпуска.
 - Для метаданных каталога не используются morph- или polymorphic-связи.
 

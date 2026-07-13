@@ -175,19 +175,22 @@
                     <div class="mt-3 grid gap-3">
                         <button
                             type="button"
-                            wire:click="toggleWatchlist"
+                            wire:click="setWatchlist({{ $inWatchlist ? 'false' : 'true' }})"
+                            wire:loading.attr="disabled"
+                            wire:target="setWatchlist"
                             class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700"
                         >
                             <i class="{{ $inWatchlist ? 'fa-solid' : 'fa-regular' }} fa-bookmark" aria-hidden="true"></i>
-                            <span>{{ $inWatchlist ? 'В списке просмотра' : 'Добавить в список' }}</span>
+                            <span wire:loading.remove wire:target="setWatchlist">{{ $inWatchlist ? 'В списке просмотра' : 'Добавить в список' }}</span>
+                            <span wire:loading wire:target="setWatchlist">Сохраняем…</span>
                         </button>
 
                         <label class="grid gap-1 text-sm font-semibold text-slate-600">
-                            <span>{{ $userRating ? 'Ваша оценка: '.$userRating.' из 10' : 'Ваша оценка' }}</span>
-                            <select wire:change="setRating($event.target.value)" class="min-h-11 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700">
+                            <span>{{ $userRating ? 'Ваша оценка: '.$userRating.' из '.$ratingMaximum : 'Ваша оценка' }}</span>
+                            <select wire:change="setRating($event.target.value)" wire:loading.attr="disabled" wire:target="setRating" class="min-h-11 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700">
                                 <option value="">Не выбрана</option>
-                                @foreach (range(1, 10) as $rating)
-                                    <option value="{{ $rating }}" @selected($userRating === $rating)>{{ $rating }} из 10</option>
+                                @foreach ($ratingOptions as $rating)
+                                    <option value="{{ $rating }}" @selected($userRating === $rating)>{{ $rating }} из {{ $ratingMaximum }}</option>
                                 @endforeach
                             </select>
                         </label>
@@ -198,6 +201,23 @@
                 @else
                     <p class="mt-3 text-sm leading-6 text-slate-500">После входа здесь появятся список просмотра, личная оценка и сохранение позиции.</p>
                 @endif
+
+                <dl class="mt-3 grid gap-1 text-sm text-slate-500">
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                        <dt>В списках просмотра:</dt>
+                        <dd class="font-bold text-slate-700">{{ $userStateSummary->watchlistCount }}</dd>
+                    </div>
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                        <dt>Оценка зрителей:</dt>
+                        <dd class="font-bold text-slate-700">
+                            @if ($userStateSummary->ratingAverage !== null)
+                                {{ number_format($userStateSummary->ratingAverage, 1, ',', '') }} из {{ $ratingMaximum }} ({{ $userStateSummary->ratingCount }})
+                            @else
+                                Нет оценок
+                            @endif
+                        </dd>
+                    </div>
+                </dl>
             </section>
         </div>
 
