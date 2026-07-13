@@ -162,6 +162,10 @@ class SeasonvarCatalogMetadataBackfillTest extends TestCase
         $this->assertDatabaseHas((new Studio)->getTable(), ['name' => 'A-1 Pictures']);
         $this->assertDatabaseHas((new Network)->getTable(), ['name' => 'Пятница']);
         $this->assertDatabaseHas((new Translation)->getTable(), ['name' => 'RuDub']);
+        $this->assertStringContainsString(
+            'A-1 Pictures',
+            (string) $title->searchDocument()->value('taxonomies'),
+        );
         $this->assertSame(1, $result['pages_checked']);
         $this->assertSame(1, $result['pages_updated']);
         $this->assertGreaterThanOrEqual(3, $result['relations_attached']);

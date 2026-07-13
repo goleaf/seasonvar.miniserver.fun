@@ -214,21 +214,265 @@ const loadCatalogFilterSearch = () => {
     });
 };
 
+let returnFocus = null;
+const initializedCatalogDialogs = new WeakSet();
+
+const loadCatalogFilterDialog = () => {
+    const dialog = document.querySelector('[data-catalog-filter-dialog]');
+
+    if (!(dialog instanceof HTMLDialogElement) || initializedCatalogDialogs.has(dialog)) {
+        return;
+    }
+
+    initializedCatalogDialogs.add(dialog);
+
+    document.querySelectorAll('[data-catalog-filter-dialog-open]').forEach((trigger) => {
+        trigger.addEventListener('click', (event) => {
+            if (window.matchMedia('(min-width: 1024px)').matches || dialog.open) {
+                return;
+            }
+
+            event.preventDefault();
+            returnFocus = trigger;
+            dialog.showModal();
+        });
+    });
+
+    dialog.querySelectorAll('[data-catalog-filter-dialog-close]').forEach((button) => {
+        button.addEventListener('click', () => dialog.close());
+    });
+
+    dialog.addEventListener('close', () => {
+        returnFocus?.focus();
+        returnFocus = null;
+    });
+};
+
+const initializedPeopleComboboxes = new WeakSet();
+
+const peopleFilterUrl = (type, slug) => {
+    const url = new URL(window.location.href);
+    const parameter = `${type}[]`;
+
+    url.searchParams.delete('page');
+
+    if (!url.searchParams.getAll(parameter).includes(slug)) {
+        url.searchParams.append(parameter, slug);
+    }
+
+    return url.toString();
+};
+
+const loadCatalogPeopleComboboxes = () => {
+    document.querySelectorAll('[data-catalog-people-combobox]').forEach((combobox) => {
+        if (initializedPeopleComboboxes.has(combobox)) {
+            return;
+        }
+
+        const input = combobox.querySelector('[data-catalog-people-input]');
+        const options = combobox.querySelector('[data-catalog-people-options]');
+        const status = combobox.querySelector('[data-catalog-people-status]');
+        const loading = combobox.querySelector('[data-catalog-people-loading]');
+        const type = combobox.getAttribute('data-people-type');
+        const endpoint = combobox.getAttribute('data-people-endpoint');
+
+        if (!(input instanceof HTMLInputElement)
+            || !(options instanceof HTMLElement)
+            || !['actor', 'director'].includes(type)
+            || !endpoint) {
+            return;
+        }
+
+        initializedPeopleComboboxes.add(combobox);
+
+        let debounceTimer = null;
+        let requestController = null;
+        let optionLinks = [];
+        let activeIndex = -1;
+
+        const setExpanded = (expanded) => {
+            input.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            options.classList.toggle('hidden', !expanded);
+        };
+
+        const setActive = (index) => {
+            if (optionLinks.length === 0) {
+                activeIndex = -1;
+                input.removeAttribute('aria-activedescendant');
+                return;
+            }
+
+            activeIndex = (index + optionLinks.length) % optionLinks.length;
+
+            optionLinks.forEach((link, optionIndex) => {
+                const active = optionIndex === activeIndex;
+                link.setAttribute('aria-selected', active ? 'true' : 'false');
+                link.classList.toggle('bg-emerald-50', active);
+            });
+
+            const activeOption = optionLinks[activeIndex];
+            input.setAttribute('aria-activedescendant', activeOption.id);
+            activeOption.scrollIntoView({ block: 'nearest' });
+        };
+
+        const closeOptions = () => {
+            setExpanded(false);
+            setActive(-1);
+        };
+
+        const renderOptions = (people) => {
+            options.replaceChildren();
+            optionLinks = people.map((person, index) => {
+                const link = document.createElement('a');
+                const name = document.createElement('span');
+                const count = document.createElement('span');
+
+                link.id = `${input.id}-option-${index}`;
+                link.href = peopleFilterUrl(type, person.slug);
+                link.setAttribute('role', 'option');
+                link.setAttribute('aria-selected', 'false');
+                link.className = 'flex min-h-11 items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-semibold text-emerald-950 hover:bg-emerald-50 hover:text-emerald-700';
+                name.className = 'min-w-0 break-words';
+                name.textContent = person.name;
+                count.className = 'shrink-0 text-xs font-bold tabular-nums text-emerald-700';
+                count.textContent = String(person.count);
+                link.append(name, count);
+                options.append(link);
+
+                return link;
+            });
+
+            activeIndex = -1;
+            status.textContent = people.length === 0
+                ? 'Совпадений не найдено.'
+                : `Найдено вариантов: ${people.length}.`;
+            setExpanded(true);
+        };
+
+        const lookup = async () => {
+            const query = normalizeCatalogFilterText(input.value);
+
+            requestController?.abort();
+            requestController = null;
+
+            if (query.length < 2) {
+                status.textContent = 'Введите не менее двух символов.';
+                options.replaceChildren();
+                optionLinks = [];
+                closeOptions();
+                return;
+            }
+
+            const controller = new AbortController();
+            const url = new URL(endpoint, window.location.origin);
+
+            requestController = controller;
+            url.searchParams.set('type', type);
+            url.searchParams.set('q', query);
+            loading?.classList.remove('hidden');
+            status.textContent = 'Ищем варианты…';
+
+            try {
+                const response = await fetch(url, {
+                    headers: { Accept: 'application/json' },
+                    signal: controller.signal,
+                });
+
+                if (!response.ok) {
+                    throw new Error(`People lookup failed with ${response.status}`);
+                }
+
+                const payload = await response.json();
+
+                if (requestController !== controller) {
+                    return;
+                }
+
+                renderOptions(Array.isArray(payload.data) ? payload.data : []);
+            } catch (error) {
+                if (error instanceof DOMException && error.name === 'AbortError') {
+                    return;
+                }
+
+                options.replaceChildren();
+                optionLinks = [];
+                status.textContent = 'Не удалось загрузить варианты. Повторите поиск.';
+                setExpanded(true);
+            } finally {
+                if (requestController === controller) {
+                    requestController = null;
+                    loading?.classList.add('hidden');
+                }
+            }
+        };
+
+        input.addEventListener('input', () => {
+            window.clearTimeout(debounceTimer);
+            debounceTimer = window.setTimeout(() => void lookup(), 300);
+        });
+
+        input.addEventListener('keydown', (event) => {
+            switch (event.key) {
+                case 'ArrowDown':
+                    if (optionLinks.length > 0) {
+                        event.preventDefault();
+                        setExpanded(true);
+                        setActive(activeIndex + 1);
+                    }
+                    break;
+                case 'ArrowUp':
+                    if (optionLinks.length > 0) {
+                        event.preventDefault();
+                        setExpanded(true);
+                        setActive(activeIndex - 1);
+                    }
+                    break;
+                case 'Enter':
+                    if (activeIndex >= 0) {
+                        event.preventDefault();
+                        optionLinks[activeIndex].click();
+                    }
+                    break;
+                case 'Escape':
+                    if (!options.classList.contains('hidden')) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        closeOptions();
+                    }
+                    break;
+                default:
+                    break;
+            }
+        });
+
+        input.addEventListener('blur', () => {
+            window.setTimeout(closeOptions, 150);
+        });
+    });
+};
+
+const loadCatalogInterfaces = () => {
+    loadCatalogFilterDialog();
+    loadCatalogFilterSearch();
+    loadCatalogPeopleComboboxes();
+};
+
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         void loadCatalogPlayers();
         loadCatalogSeasonAnchors();
-        loadCatalogFilterSearch();
+        loadCatalogInterfaces();
     });
 } else {
     void loadCatalogPlayers();
     loadCatalogSeasonAnchors();
-    loadCatalogFilterSearch();
+    loadCatalogInterfaces();
 }
 
 document.addEventListener('livewire:init', () => {
     window.Livewire.hook('morphed', () => {
         void loadCatalogPlayers();
+        loadCatalogInterfaces();
     });
     window.Livewire.hook('morph.removing', ({ el }) => {
         destroyCatalogPlayersWithin(el);
@@ -242,6 +486,7 @@ document.addEventListener('livewire:navigating', () => {
 
 document.addEventListener('livewire:navigated', () => {
     void loadCatalogPlayers();
+    loadCatalogInterfaces();
 });
 
 window.addEventListener('pagehide', () => {

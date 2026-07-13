@@ -1,6 +1,6 @@
 # Frontend
 
-Обновлено: 12.07.2026
+Обновлено: 13.07.2026
 
 ## Стек
 
@@ -30,7 +30,8 @@ composer dev
 - Player-код для Plyr/HLS находится в `resources/js/player.js` и загружается dynamic import только на страницах с `video.js-catalog-player`.
 - Player создаёт одну guarded browser-session на точный `title:episode:media` source, восстанавливает позицию после metadata load и отправляет bounded progress только для authenticated markup: первый `play` создаёт start event, 30-секундный heartbeat работает лишь во время воспроизведения, а pause, stable seek, hidden visibility, navigation, pagehide и ended принудительно фиксируют позицию. Каждый event несёт opaque server-issued progress token и возрастающий sequence; browser duration остаётся только sanity signal и не становится trusted duration. `AbortController` освобождает listeners/timers/Plyr/HLS, generation token отменяет stale async-init, а cleanup очищает и media node, восстановленный `Plyr.destroy()`.
 - Состояния loading, buffering, automatic retry, expired/unavailable source и fatal error отображаются фиксированным русским текстом рядом с `wire:ignore` player island. Provider URL, exception text и raw media errors в status region не выводятся.
-- Поиск актеров и режиссеров выполняется Livewire на сервере с debounce 350 мс и лимитом 24 результата, поэтому полный справочник не попадает в браузер. Локальный поиск для остальных длинных групп остается progressive enhancement из `resources/js/app.js`; GET-форма работает без JavaScript.
+- Поиск актёров и режиссёров выполняется read-only API combobox из `resources/js/app.js`: debounce 300 мс, `AbortController` для stale request, максимум 20 результатов, клавиши Arrow Up/Down, Enter и Escape. Результат добавляет slug в обычный URL, поэтому выбранное состояние и GET-фильтрация не зависят от публичных model IDs. Локальный поиск для остальных длинных групп остаётся progressive enhancement по уже загруженному ограниченному списку.
+- На catalog listing routes header search скрыт, а основная форма имеет уникальное имя `Поиск по каталогу` или `Искать в выбранной подборке`. Мобильные фильтры открываются через native `<dialog>`; desktop использует тот же DOM-узел как sticky sidebar, без дублирования формы и input IDs. Native Escape закрывает dialog, обработчик `close` возвращает focus trigger.
 - Серверное состояние `/titles` ведёт `CatalogSeries`: строка поиска обновляется с debounce 650 мс, checkbox/расширенные поля применяются по submit, а сортировка, вид, размер страницы, алфавит и пагинация обновляются отдельными Livewire actions. Для всех форм сохранён обычный GET fallback; malformed и out-of-range `page` канонизируется redirect-ом, чтобы адресная строка не сохраняла stale границу.
 - `/watching` не сериализует Eloquent collections в публичное состояние: Continue Watching и paginator истории строятся только внутри render. Удаление использует `wire:confirm`, полная очистка — `wire:confirm.prompt`, а `historyPage` остаётся отдельным URL-параметром Livewire pagination.
 - `/admin/imports` опрашивает сервер через `wire:poll.5s.visible` только пока есть active run. После terminal state poll-attribute исчезает; run models и collections не хранятся в public snapshot, а rows имеют stable `wire:key`.

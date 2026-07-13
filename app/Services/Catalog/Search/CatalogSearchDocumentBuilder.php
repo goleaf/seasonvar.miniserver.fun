@@ -38,7 +38,7 @@ final readonly class CatalogSearchDocumentBuilder
             $originalTitle,
             ...$aliases,
             ...$people,
-        ]));
+        ]))->map(fn (string $value): string => $this->normalizer->key($value));
         $transliteration = $this->sortedUniqueText(collect([
             $titleText,
             $originalTitle,

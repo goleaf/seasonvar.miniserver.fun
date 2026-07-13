@@ -1,6 +1,6 @@
 # Разработка
 
-Обновлено: 12.07.2026
+Обновлено: 13.07.2026
 
 ## Локальная установка
 
@@ -15,6 +15,7 @@
 
 ```bash
 composer install
+composer hooks:install
 cp .env.example .env
 php artisan key:generate
 mkdir -p database
@@ -38,13 +39,25 @@ composer dev
 
 ## Git workflow
 
-- Рабочая ветка проекта — только существующая `main`.
+- Единственная рабочая ветка проекта — существующая `main`.
 - Не создавать feature branches, временные ветки, worktree-ветки, PR-ветки или дополнительные `main`-подобные ветки без прямого нового указания пользователя.
 - Если локальный checkout оказался на другой ветке, сначала безопасно перенесите незакоммиченные изменения на `main`, затем продолжайте работу только в `main`.
 - Перед commit или push выполните `git status --short --branch` и проверьте, что текущая ветка — `main`.
 - Не коммитьте и не отправляйте изменения из веток, отличных от `main`.
 - Не оставляйте рабочее дерево грязным после задачи: разрешенные изменения должны быть закоммичены, а чужие/посторонние незакоммиченные изменения нужно явно отметить как блокер.
-- `core.hooksPath` должен указывать на `.githooks`. `pre-commit` блокирует commit вне `main`, unstaged tracked changes и untracked files; `pre-push` блокирует push вне `main` и push с dirty tree.
+- Установить версионируемые hooks: `composer hooks:install`. Команда локально задаёт `core.hooksPath=.githooks`; `composer setup` выполняет её автоматически.
+- `pre-commit` блокирует commit вне `main`, unresolved conflicts, staged временные/debug-файлы, staged `.env`/credential paths, unstaged tracked changes и untracked files.
+- `pre-push` повторно проверяет `main`, unresolved conflicts и уже tracked временные/credential paths, затем требует clean working tree.
+- Проверки только читают Git state и печатают причину отказа. Они не добавляют файлы, не исправляют код, не удаляют изменения и не зависят от персональных абсолютных путей. `.env.example` явно разрешён; реальные `.env`, private keys и credential JSON должны храниться вне Git.
+- Проверка secrets намеренно лёгкая и основана на очевидных именах путей; она не заменяет review staged diff или полноценный secret scanner CI для произвольно названных файлов.
+- `post-commit` запускает только управляемое обновление Markdown через `project:docs-refresh`; исходный PHP/Blade/JS код hook не редактирует, auto-push выключен без явного `SEASONVAR_DOCS_AUTO_PUSH=1`.
+
+Проверить установку без изменения файлов:
+
+```bash
+git config --local --get core.hooksPath
+bash -n .githooks/pre-commit .githooks/pre-push .githooks/post-commit .githooks/lib/git-guard.sh
+```
 
 ## Команды проекта
 

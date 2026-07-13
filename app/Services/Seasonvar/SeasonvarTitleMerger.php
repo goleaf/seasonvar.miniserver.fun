@@ -10,6 +10,7 @@ use App\Models\CatalogTitleSlug;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
+use App\Services\Catalog\Search\CatalogSearchIndexer;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +32,10 @@ class SeasonvarTitleMerger
         'tags',
     ];
 
-    public function __construct(private readonly SeasonvarImportGroupKey $groupKeys) {}
+    public function __construct(
+        private readonly SeasonvarImportGroupKey $groupKeys,
+        private readonly CatalogSearchIndexer $searchIndexer,
+    ) {}
 
     /**
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
@@ -64,6 +68,11 @@ class SeasonvarTitleMerger
             $result['episodes'] += $groupResult['episodes'];
 
             $canonical = $titles->first();
+
+            if ($canonical !== null) {
+                $this->searchIndexer->synchronizeTitleIds([$canonical->id]);
+            }
+
             $this->report($progress, 'seasonvar-title-merged', [
                 'catalog_title_id' => $canonical?->id,
                 'title' => $canonical?->title,

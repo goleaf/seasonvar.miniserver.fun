@@ -73,7 +73,6 @@ class CatalogTitlePageBuilder
         return [
             'title' => $catalogTitle,
             'taxonomiesByType' => $taxonomiesByType,
-            'taxonomyGroups' => $showView->taxonomyGroups,
             'genres' => $showView->genres,
             'countries' => $showView->countries,
             'actors' => $showView->actors,
@@ -84,8 +83,6 @@ class CatalogTitlePageBuilder
             'networks' => $showView->networks,
             'studios' => $showView->studios,
             'tags' => $showView->tags,
-            'taxonomyLabels' => $showView->taxonomyLabels,
-            'taxonomyIcons' => $showView->taxonomyIcons,
             'taxonomyRows' => $showView->taxonomyRows,
             'seasons' => $seasons,
             'episodeCount' => $episodeCount,

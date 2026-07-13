@@ -6,6 +6,7 @@ use App\DTOs\Seasonvar\SeasonvarCatalogData;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
 use App\Models\SourcePage;
+use App\Services\Catalog\Search\CatalogSearchIndexer;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -18,6 +19,7 @@ class SeasonvarCatalogMetadataBackfill
         private readonly SeasonvarCatalogRelationSyncer $relationSyncer,
         private readonly SeasonvarRelationMetadataNormalizer $relationMetadata,
         private readonly SeasonvarDatabaseTransaction $databaseTransaction,
+        private readonly CatalogSearchIndexer $searchIndexer,
     ) {}
 
     /**
@@ -28,6 +30,7 @@ class SeasonvarCatalogMetadataBackfill
     {
         $result = $this->emptyResult();
         $attemptedTitleIds = [];
+        $updatedTitleIds = [];
 
         $this->report($progress, 'seasonvar-metadata-backfill-started', [
             'metadata_version' => SeasonvarCatalogParser::METADATA_VERSION,
@@ -147,6 +150,7 @@ class SeasonvarCatalogMetadataBackfill
                 $result['titles_checked']++;
                 $result['titles_updated'] += $titleWasStale ? 1 : 0;
                 $result['relations_attached'] += $attached;
+                $updatedTitleIds[$title->id] = true;
                 $this->report($progress, 'seasonvar-metadata-page-complete', [
                     'source_page_id' => $page->id,
                     'catalog_title_id' => $title->id,
@@ -198,6 +202,7 @@ class SeasonvarCatalogMetadataBackfill
 
                 $result['titles_updated']++;
                 $result['relations_attached'] += $attached;
+                $updatedTitleIds[$title->id] = true;
                 $this->report($progress, 'seasonvar-metadata-title-complete', [
                     'catalog_title_id' => $title->id,
                     'relations_attached' => $attached,
@@ -206,6 +211,10 @@ class SeasonvarCatalogMetadataBackfill
                 $result['failed']++;
                 $this->reportFailure($progress, 'seasonvar-metadata-title-failed', $title->id, $exception);
             }
+        }
+
+        if ($updatedTitleIds !== []) {
+            $this->searchIndexer->synchronizeTitleIds(array_keys($updatedTitleIds));
         }
 
         $this->report($progress, 'seasonvar-metadata-backfill-complete', $result);

@@ -80,7 +80,9 @@ final readonly class CatalogTitlesCriteria
             letter: $request->letter(),
             view: $request->view(),
             perPage: $request->perPage(),
-            sort: $request->sort(),
+            sort: ! $request->query->has('sort') && $search->isReady()
+                ? CatalogSort::Relevance
+                : $request->sort(),
             titleContextId: $titleContextId,
             invalidTitleContext: $invalidTitleContext,
             selectedTaxonomyIds: [],

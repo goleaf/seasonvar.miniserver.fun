@@ -2,6 +2,8 @@
 
 ## 2026-07-13
 
+- Added a single documentation ownership map for Livewire, catalog queries and URL state, domain visibility/navigation/user progress, playback authorization, importer/queues, cache invalidation, security, verification and deployment; README and code standards now link to topic owners instead of repeating the full workflow.
+- Strengthened the versioned Git guards with explicit unresolved-conflict, temporary/debug-file and environment/credential-path checks on commit and push, plus a dependency-free `composer hooks:install` command wired into project setup; all failures are read-only and explain how to recover.
 - Added Russian/English catalog translation domains and framework pluralization for result, season, episode, rating, importer, and viewing-history counts; newly touched Livewire/Blade UI no longer embeds interface copy in component code.
 - Hardened title SSR metadata with plain-text sanitization, locale-aware HTML/Open Graph/WebPage language, verified-content fallbacks, initial-response title/description rendering, and no inferred `TVSeries.inLanguage` from UI or media labels.
 - Canonicalized complex/search catalog URLs to the unfiltered catalog while retaining indexable taxonomy/year routes, and added additive historical-slug redirects that survive admin edits and importer duplicate merges without bypassing publication access.

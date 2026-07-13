@@ -277,4 +277,42 @@ class CatalogSearchPageTest extends TestCase
             ->assertOk()
             ->assertSee('href="'.route('titles.show', $title).'"', false);
     }
+
+    public function test_true_zero_renders_typo_suggestions_without_changing_the_result_count(): void
+    {
+        $title = CatalogTitle::factory()->create(['title' => 'Шерлок']);
+        app(CatalogSearchIndexer::class)->indexTitleIds([$title->id]);
+        CatalogSearchIndexState::query()->findOrFail(CatalogSearchIndexState::SINGLETON_ID)->update([
+            'version' => CatalogSearchIndexer::INDEX_VERSION,
+            'status' => CatalogSearchIndexStatus::Ready,
+            'source_count' => 1,
+            'document_count' => 1,
+            'completed_at' => now(),
+        ]);
+
+        $this->get(route('titles.index', ['q' => 'шерлокк']))
+            ->assertOk()
+            ->assertSeeText('Найдено сейчас: 0')
+            ->assertSeeText('Возможно, подойдет')
+            ->assertSee(route('titles.index', ['sort' => 'relevance', 'q' => 'Шерлок']))
+            ->assertDontSee('href="'.route('titles.show', $title).'"', false);
+    }
+
+    public function test_filter_only_zero_does_not_render_a_typo_suggestion(): void
+    {
+        $title = CatalogTitle::factory()->create(['title' => 'Шерлок', 'year' => 2019]);
+        app(CatalogSearchIndexer::class)->indexTitleIds([$title->id]);
+        CatalogSearchIndexState::query()->findOrFail(CatalogSearchIndexState::SINGLETON_ID)->update([
+            'version' => CatalogSearchIndexer::INDEX_VERSION,
+            'status' => CatalogSearchIndexStatus::Ready,
+            'source_count' => 1,
+            'document_count' => 1,
+            'completed_at' => now(),
+        ]);
+
+        $this->get(route('titles.index', ['q' => 'Шерлок', 'year' => 2020]))
+            ->assertOk()
+            ->assertSeeText('Найдено сейчас: 0')
+            ->assertDontSeeText('Возможно, подойдет');
+    }
 }

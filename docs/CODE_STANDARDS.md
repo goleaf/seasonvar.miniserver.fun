@@ -6,23 +6,9 @@
 
 Каждое будущее изменение кода должно обновлять этот набор документации, если меняет архитектуру, правила импортера, компоненты интерфейса, связи, команды или запросы.
 
-Git-работа ведется только в существующей ветке `main`: не создавать feature branches, worktree-ветки, временные ветки или дополнительные `main`-подобные ветки без прямого нового указания пользователя. Перед commit/push нужно проверять `git status --short --branch` и не продолжать, если текущая ветка не `main`. Рабочее дерево должно оставаться закоммиченным после задачи; версионируемые хуки `.githooks/pre-commit` и `.githooks/pre-push` через `core.hooksPath=.githooks` блокируют частичные коммиты с unstaged/untracked файлами и push с dirty tree.
+Единственная карта владельцев документации находится в [`docs/README.md`](README.md). Обновляйте основной документ изменённой темы и добавляйте ссылки вместо копирования длинного контракта. Git workflow, единственная рабочая ветка `main` и hooks определены в [`docs/development.md`](development.md#git-workflow).
 
-Обновлять вместе, когда это относится к изменению:
-
-- `docs/CODE_STANDARDS.md` для правил кода и архитектуры.
-- `docs/architecture.md` для текущего деления контроллеров, page-builder сервисов, запросов и SEO.
-- `docs/UI_STANDARDS.md` для правил интерфейса и Blade-компонентов.
-- `docs/views.md` для правил Blade-шаблонов и view-model/view-data слоя.
-- `docs/forms.md` для Form Request, old input, ошибок и компонентных правил форм.
-- `docs/storage.md` для upload-дисков, file validation, visibility и cleanup-правил.
-- `docs/notifications.md` для email/notification каналов, queue-правил и operational alerts.
-- `docs/authorization.md` для gates, policies, middleware и правил доступа к служебным страницам.
-- `docs/validation.md` для Form Request-классов, правил ввода и reusable validation rules.
-- `docs/DATA_RELATIONS.md` для полей импортера, Eloquent-связей, фильтров и смысла данных.
-- `docs/models.md` для правил Eloquent-связей, casts, scopes и query usage.
-- `docs/performance.md` для query patterns, N+1-рисков, sitemap/feed и агрегированных счетчиков.
-- `docs/MAINTENANCE_LOG.md` для короткого датированного описания важных изменений.
+`CODE_STANDARDS.md` владеет правилами PHP/Laravel и именования. Архитектурные boundaries принадлежат `architecture.md`, интерфейсные правила — `UI_STANDARDS.md`, а эксплуатационная история — `MAINTENANCE_LOG.md`.
 
 ## Правила Laravel
 

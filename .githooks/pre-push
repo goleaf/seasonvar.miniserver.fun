@@ -11,4 +11,6 @@ cd "$repo_root"
 source "$repo_root/.githooks/lib/git-guard.sh"
 
 seasonvar_git_guard_require_main
+seasonvar_git_guard_require_no_conflicts
+seasonvar_git_guard_require_safe_paths tracked
 seasonvar_git_guard_require_clean_tree

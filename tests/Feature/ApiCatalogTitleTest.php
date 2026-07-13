@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\PublicationStatus;
+use App\Models\Actor;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\Genre;
@@ -213,5 +214,70 @@ class ApiCatalogTitleTest extends TestCase
             ->getJson('/api/titles?per_page=200&page=0')
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['per_page', 'page']);
+    }
+
+    public function test_people_lookup_returns_only_public_actor_options_with_counts_and_no_internal_fields(): void
+    {
+        $actor = Actor::query()->create([
+            'name' => 'Иван Поисковый',
+            'slug' => 'ivan-poiskovyi',
+            'source_url' => 'https://seasonvar.ru/private-actor-source',
+        ]);
+        $hiddenOnlyActor = Actor::query()->create([
+            'name' => 'Иван Скрытый',
+            'slug' => 'ivan-skrytyi',
+        ]);
+        $publicTitle = CatalogTitle::factory()->create();
+        $hiddenTitle = CatalogTitle::factory()->create([
+            'publication_status' => PublicationStatus::Hidden,
+            'is_published' => false,
+        ]);
+        $publicTitle->actors()->attach($actor);
+        $hiddenTitle->actors()->attach([$actor->id, $hiddenOnlyActor->id]);
+
+        $this->getJson('/api/catalog/people?type=actor&q=Иван')
+            ->assertOk()
+            ->assertJson(fn (AssertableJson $json): AssertableJson => $json
+                ->has('data', 1)
+                ->has('data.0', fn (AssertableJson $json): AssertableJson => $json
+                    ->where('type', 'actor')
+                    ->where('slug', 'ivan-poiskovyi')
+                    ->where('name', 'Иван Поисковый')
+                    ->where('count', 1)
+                    ->missing('id')
+                    ->missing('source_url')));
+    }
+
+    public function test_people_lookup_validates_type_query_shape_and_length_as_json(): void
+    {
+        $this->getJson('/api/catalog/people?type=genre&q=Иван')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['type']);
+        $this->getJson('/api/catalog/people?type=actor&q=Я')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['q']);
+        $this->getJson('/api/catalog/people?type=director&q='.str_repeat('а', 81))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['q']);
+        $this->getJson('/api/catalog/people?type[]=actor&q[]=Иван')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['type', 'q']);
+    }
+
+    public function test_people_lookup_is_hard_limited_to_twenty_options(): void
+    {
+        $title = CatalogTitle::factory()->create();
+
+        foreach (range(1, 25) as $index) {
+            $actor = Actor::query()->create([
+                'name' => sprintf('Общий актёр %02d', $index),
+                'slug' => sprintf('obshchii-akter-%02d', $index),
+            ]);
+            $title->actors()->attach($actor);
+        }
+
+        $this->getJson('/api/catalog/people?type=actor&q=Общий')
+            ->assertOk()
+            ->assertJsonCount(20, 'data');
     }
 }

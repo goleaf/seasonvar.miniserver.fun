@@ -15,6 +15,7 @@ Laravel-приложение для локального каталога сер
 
 ```bash
 composer install
+composer hooks:install
 composer setup
 composer dev
 npm install
@@ -31,7 +32,7 @@ npm run dev
 npm run build
 ```
 
-Полная локальная установка, MCP и правила разработки описаны в `docs/development.md` и `docs/mcp.md`. Внешние интеграции с Google, GitHub и другими MCP/app connectors документируются в `docs/integrations/`.
+Единая карта проектной документации находится в [`docs/README.md`](docs/README.md). Полная локальная установка, MCP и правила разработки описаны в [`docs/development.md`](docs/development.md) и [`docs/mcp.md`](docs/mcp.md). Внешние интеграции документируются в [`docs/integrations/google.md`](docs/integrations/google.md) и [`docs/integrations/mcp-catalog.md`](docs/integrations/mcp-catalog.md).
 
 ## Импорт
 
@@ -210,7 +211,7 @@ GitHub Actions проверяет Composer, npm build, тесты, Pint, depende
 
 ## Git workflow
 
-Работа ведется только в существующей ветке `main`. Не создавайте feature branches, временные ветки, worktree-ветки, PR-ветки или дополнительные `main`-подобные ветки без прямого нового указания пользователя. Перед commit/push проверяйте `git status --short --branch` и не отправляйте изменения из веток, отличных от `main`. Рабочее дерево должно оставаться закоммиченным: версионируемые хуки `.githooks/pre-commit` и `.githooks/pre-push` через `core.hooksPath=.githooks` блокируют частичные коммиты с unstaged/untracked файлами и push с dirty tree.
+Единственная рабочая ветка проекта — существующая `main`. Установите версионируемые Git hooks командой `composer hooks:install`; полный workflow и поведение проверок описаны в [`docs/development.md`](docs/development.md#git-workflow).
 
 <!-- project-docs:start -->
 ## Автоматически обновляемое состояние

@@ -86,8 +86,6 @@ return [
         'same_year' => 'From :year',
         'recommendations_missing' => 'No similar series are available yet.',
         'questions' => 'Series questions',
-        'relations' => 'Catalog relations',
-        'relations_missing' => 'No relations are listed.',
         'series_type' => 'series',
     ],
 

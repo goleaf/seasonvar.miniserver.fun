@@ -38,7 +38,7 @@ HTTP query-параметр `q` проходит через `CatalogTitlesReques
 
 ## Сортировка, ввод и пагинация
 
-Публичный `sort` принимает только значения `CatalogSort`: `updated`, `year_desc`, `year_asc`, `episodes_desc`, `seasons_desc`, `with_video`, `title_asc`, `title_desc`, `kinopoisk_desc`, `imdb_desc`, `popularity_desc`. Направление уже закодировано в выбранном ключе; отдельный query-параметр `direction` не используется. Неподдерживаемый или array-shaped `sort` нормализуется к `updated`, а пользовательское значение никогда не передается как column name в `orderBy()`.
+Публичный `sort` принимает только значения `CatalogSort`: `relevance`, `updated`, `year_desc`, `year_asc`, `episodes_desc`, `seasons_desc`, `with_video`, `title_asc`, `title_desc`, `kinopoisk_desc`, `imdb_desc`, `popularity_desc`. При активном поиске без явно заданной сортировки используется `relevance`; без поиска — `updated`. Направление уже закодировано в выбранном ключе; отдельный query-параметр `direction` не используется. Неподдерживаемый или array-shaped `sort` нормализуется к безопасному default, а пользовательское значение никогда не передается как column name в `orderBy()`.
 
 Все ветки сортировки заканчиваются `catalog_titles.id DESC`, поэтому равные основные поля не меняют порядок между страницами. Search/filter/sort update сбрасывает страницу к 1. Livewire 4 приводит нечисловую, array-shaped, нулевую или отрицательную страницу к 1; если положительный `page` больше последней страницы после изменения числа результатов, компонент после count query перенаправляет на последнюю допустимую страницу. Такой redirect одновременно канонизирует browser-visible URL. Поисковое поле использует `wire:model.live.debounce.650ms`: быстрый набор группируется в один update, а обычная GET-отправка формы остается fallback без JavaScript.
 
@@ -67,8 +67,18 @@ php artisan catalog:search-rebuild --chunk=200
 
 Команда отказывается работать при `queued` или `running` import run. Состояние становится `ready` только при совпадении source/document counts и успешном FTS5 external-content integrity check. Ошибка сохраняется в sanitized виде, checkpoint остаётся для resume, а публичный поиск продолжает legacy path.
 
-## Ограничения rollout
+## Ranked driver и синхронизация
 
-Нормализатор и парсер уже подключены к текущему Eloquent legacy-поиску. Migration `2026_07_12_230000_add_catalog_alias_search_index` добавляет covering lookup `(name_hash, catalog_title_id)` для exact alias branch. Ranked BM25 driver, write-boundary synchronization, people lookup и typo suggestions включаются отдельными следующими этапами; до состояния `ready` неполный FTS5 никогда не ограничивает публичную выдачу.
+При `ready`-состоянии совпадающей версии `CatalogTitleSearch` строит параметризованный FTS5 candidate subquery. Точное основное название, original title и алиас имеют отдельные ранги перед weighted BM25; затем используются `indexed_at DESC` и ID как стабильные tie-breaker. При `building`, `stale`, `failed`, несовпадающей версии или неполных counts запрос автоматически использует исправленный legacy driver, поэтому незавершённый индекс не скрывает тайтлы.
+
+Importer индексирует только изменившийся тайтл после завершения его записей; metadata backfill отправляет один bounded batch изменённых ID; merger после commit переиндексирует canonical title, а duplicate document удаляется FK cascade и FTS trigger. Административные изменения тайтла и relations также синхронизируют документ. Ошибка incremental sync не откатывает доменную запись: индекс помечается `stale`, публичный портал немедленно переходит на legacy fallback.
+
+## People lookup и typo suggestions
+
+`GET /api/catalog/people?type=actor&q=Иван` принимает только `actor` или `director`, нормализованную строку 2–80 символов и возвращает через API Resource максимум 20 публичных вариантов: `type`, `slug`, `name`, `count`. Внутренние ID, publication state и source fields не сериализуются. Клиентский combobox использует debounce 300 мс, отменяет предыдущий `fetch` через `AbortController`, поддерживает стрелки, Enter и Escape; выбранный slug добавляется в обычный GET query.
+
+`CatalogSearchSuggestion` работает только при готовом FTS и истинном нуле: если исходный FTS candidate существует, подсказки не строятся даже при конфликтующем фильтре. SQL по параметризованным общим триграммам отбирает не более 60 search documents, Dice similarity отбрасывает слабые совпадения, а UI показывает не более трёх ссылок в отдельном блоке `Возможно, подойдет`. Подсказки не входят в paginator, result count, canonical URL или SEO-утверждение о совпадениях.
+
+## Production rollout
 
 На SQLite создание индекса кратковременно блокирует schema writes. Deployment order: дождаться terminal состояния importer/finalizer, выполнить согласованный WAL checkpoint и backup, запустить `php artisan migrate --force`, затем `php artisan catalog:search-rebuild --chunk=200`, проверить state/counts/integrity и только после этого включать ranked driver и возвращать workers. Migration и rebuild не выполняются параллельно активному bulk import.

@@ -14,7 +14,19 @@
                 </div>
             </div>
         @endif
-        <aside id="catalog-filters" class="order-2 scroll-mt-24 space-y-4 lg:sticky lg:top-24 lg:order-1 lg:max-h-[calc(100vh-7rem)] lg:self-start lg:overflow-y-auto lg:pr-1">
+        <dialog
+            id="catalog-filters"
+            aria-labelledby="catalog-filter-dialog-title"
+            data-catalog-filter-dialog
+            wire:ignore.self
+            class="fixed inset-0 m-0 h-dvh max-h-dvh w-full max-w-none overflow-y-auto border-0 bg-slate-50 p-3 backdrop:bg-slate-900/40 lg:sticky lg:inset-auto lg:top-24 lg:order-1 lg:block lg:h-auto lg:max-h-[calc(100vh-7rem)] lg:w-auto lg:self-start lg:bg-transparent lg:p-0 lg:pr-1"
+        >
+            <div class="sticky top-0 z-20 mb-3 flex items-center justify-between gap-3 rounded-control bg-white p-2 shadow-panel lg:hidden">
+                <h2 id="catalog-filter-dialog-title" class="min-w-0 break-words text-base font-bold text-slate-800">Фильтры каталога</h2>
+                <button type="button" data-catalog-filter-dialog-close class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-control bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700" aria-label="Закрыть фильтры">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
             <x-ui.panel title="Фильтры каталога" icon="fa-solid fa-sliders">
                 <form method="GET" action="{{ route('titles.index') }}" wire:submit="applyFilters" class="space-y-5">
                     @foreach ($filterView->filterFormState() as $stateKey => $stateValue)
@@ -136,19 +148,27 @@
                                 @endif
                             </div>
                             @if (in_array($filterType, ['actor', 'director'], true))
-                                <label class="sr-only" for="catalog-filter-search-{{ $filterType }}">Найти в группе {{ $label }}</label>
-                                <div data-focus-frame class="mb-2 flex min-h-11 items-center gap-2 rounded-control border border-transparent bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                                    <i class="fa-solid fa-magnifying-glass shrink-0 text-slate-400" aria-hidden="true"></i>
-                                    <input
-                                        id="catalog-filter-search-{{ $filterType }}"
-                                        type="search"
-                                        autocomplete="off"
-                                        maxlength="80"
-                                        placeholder="Введите имя (от 2 знаков)"
-                                        wire:model.live.debounce.350ms="optionSearch.{{ $filterType }}"
-                                        class="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 placeholder:text-slate-400 focus:outline-none"
-                                    >
-                                    <i wire:loading wire:target="optionSearch.{{ $filterType }}" class="fa-solid fa-spinner fa-spin shrink-0 text-emerald-700" aria-hidden="true"></i>
+                                <div data-catalog-people-combobox data-people-type="{{ $filterType }}" data-people-endpoint="{{ url('/api/catalog/people') }}" class="relative mb-2">
+                                    <label class="sr-only" for="catalog-filter-search-{{ $filterType }}">Найти в группе {{ $label }}</label>
+                                    <div data-focus-frame class="flex min-h-11 items-center gap-2 rounded-control border border-transparent bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                                        <i class="fa-solid fa-magnifying-glass shrink-0 text-slate-400" aria-hidden="true"></i>
+                                        <input
+                                            id="catalog-filter-search-{{ $filterType }}"
+                                            type="search"
+                                            role="combobox"
+                                            aria-autocomplete="list"
+                                            aria-expanded="false"
+                                            aria-controls="catalog-people-options-{{ $filterType }}"
+                                            autocomplete="off"
+                                            maxlength="80"
+                                            placeholder="Введите имя (от 2 знаков)"
+                                            data-catalog-people-input
+                                            class="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 placeholder:text-slate-400 focus:outline-none"
+                                        >
+                                        <i data-catalog-people-loading class="fa-solid fa-spinner fa-spin hidden shrink-0 text-emerald-700" aria-hidden="true"></i>
+                                    </div>
+                                    <div id="catalog-people-options-{{ $filterType }}" role="listbox" data-catalog-people-options class="absolute inset-x-0 top-full z-30 mt-1 hidden max-h-72 overflow-y-auto rounded-control border border-slate-200 bg-white p-1 shadow-panel"></div>
+                                    <p data-catalog-people-status class="sr-only" aria-live="polite"></p>
                                 </div>
                             @elseif ($filterTaxonomies->get($filterType, collect())->count() > 8)
                                 <label class="sr-only" for="catalog-filter-search-{{ $filterType }}">Найти в группе {{ $label }}</label>
@@ -198,7 +218,7 @@
                     </div>
                 </form>
             </x-ui.panel>
-        </aside>
+        </dialog>
 
         <div class="order-1 min-w-0 space-y-5 lg:order-2">
             <x-ui.panel>
@@ -210,9 +230,9 @@
                         </h1>
                         <p class="mt-2 text-sm text-slate-500">{{ $seo['lead'] ?? 'Поиск по названиям, описаниям, актерам, жанрам и связям каталога.' }}</p>
 
-                        <a href="#catalog-filters" class="mt-3 inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 lg:hidden">
+                        <a href="#catalog-filters" data-catalog-filter-dialog-open aria-controls="catalog-filters" aria-haspopup="dialog" class="mt-3 inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 lg:hidden">
                             <i class="fa-solid fa-sliders" aria-hidden="true"></i>
-                            <span>К фильтрам</span>
+                            <span>Фильтры · {{ $filterView->activeFilterCount() }}</span>
                         </a>
 
                         @if ($search !== '' || $filterView->hasActiveFilters() || $excludedTaxonomies->isNotEmpty() || $titleContext !== null || $invalidYear)
@@ -281,7 +301,7 @@
                         @endif
                     </div>
 
-                    <form method="GET" action="{{ route('titles.index') }}" wire:submit="applySearch" class="flex w-full max-w-md flex-col gap-2 sm:flex-row">
+                    <form method="GET" action="{{ route('titles.index') }}" wire:submit="applySearch" role="search" aria-label="{{ $filterView->hasActiveFilters() ? 'Искать в выбранной подборке' : 'Поиск по каталогу' }}" class="flex w-full max-w-md flex-col gap-2 sm:flex-row">
                         @foreach ($filterView->searchFormState() as $stateKey => $stateValue)
                             @if (is_array($stateValue))
                                 @foreach ($stateValue as $stateItem)
@@ -333,7 +353,7 @@
 
                 <div class="mt-4 flex flex-wrap gap-2">
                     @foreach ($filterView->sortLabels as $sortKey => $sortLabel)
-                        <a data-catalog-sort-option href="{{ route('titles.index', $filterView->sortQuery($sortKey)) }}" wire:click.prevent="sortBy('{{ $sortKey }}')" @class([
+                        <a data-catalog-sort-option href="{{ route('titles.index', $filterView->sortQuery($sortKey)) }}" wire:click.prevent="sortBy('{{ $sortKey }}')" @if ($filterView->isActiveSort($sortKey)) aria-current="true" @endif @class([
                             'inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold',
                             'bg-emerald-50 text-emerald-700' => $filterView->isActiveSort($sortKey),
                             'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveSort($sortKey),
@@ -534,6 +554,22 @@
                                     <p class="mt-1 text-sm text-slate-500">Измените или сбросьте выбранные фильтры.</p>
                                 @endif
                             </div>
+                            @if ($searchSuggestions->isNotEmpty())
+                                <div aria-labelledby="catalog-search-suggestions-title" class="rounded-control bg-emerald-50 p-3">
+                                    <div id="catalog-search-suggestions-title" class="text-sm font-bold text-emerald-800">Возможно, подойдет</div>
+                                    <div class="mt-2 flex flex-wrap gap-2">
+                                        @foreach ($searchSuggestions as $suggestion)
+                                            <a
+                                                href="{{ route('titles.index', array_merge($filterView->withoutSearchQuery, ['q' => $suggestion->suggestion_name])) }}"
+                                                class="inline-flex min-h-11 max-w-full items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+                                            >
+                                                <i class="fa-solid fa-wand-magic-sparkles shrink-0" aria-hidden="true"></i>
+                                                <span class="min-w-0 break-words">{{ $suggestion->suggestion_name }}</span>
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
                             <div class="flex flex-wrap gap-2">
                                 @if ($search !== '')
                                     <a href="{{ route('titles.index', $filterView->withoutSearchQuery) }}" wire:click.prevent="clearSearch" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">

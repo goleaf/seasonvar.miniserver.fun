@@ -12,6 +12,7 @@ use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\Catalog\Search\CatalogSearchIndexer;
 use App\Services\Media\PlaybackSourceUrlGuard;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
@@ -62,6 +63,7 @@ final class CatalogAdministrationService
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogStatsSnapshotCache $statsSnapshots,
         private readonly PlaybackSourceUrlGuard $playbackUrls,
+        private readonly CatalogSearchIndexer $searchIndexer,
     ) {}
 
     /** @param array<string, mixed> $attributes */
@@ -442,6 +444,7 @@ final class CatalogAdministrationService
             ->where('catalog_title_id', $title->id)
             ->orWhere('recommended_title_id', $title->id)
             ->delete();
+        $this->searchIndexer->synchronizeTitleIds([$title->id]);
         $this->statsSnapshots->forget();
     }
 

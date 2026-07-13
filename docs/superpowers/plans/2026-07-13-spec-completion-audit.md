@@ -269,9 +269,9 @@
 - Admin metadata/relation changes reindex the affected title after successful transaction.
 - Incremental failure marks state stale and never hides titles because search falls back to legacy.
 
-- [ ] Add RED tests for importer/direct/merge/admin synchronization and unchanged-page no-op.
-- [ ] Implement after-commit/batch indexing at existing service boundaries; do not add observers.
-- [ ] Add failure test proving stale state plus legacy visibility.
+- [x] Add RED tests for importer/direct/metadata-backfill/merge/admin synchronization and unchanged-page no-op.
+- [x] Implement post-transaction/batch indexing at existing service boundaries; do not add observers.
+- [x] Add failure test proving sanitized stale state plus legacy visibility.
 - [ ] Run catalog/admin/importer focused suites and Pint.
 - [ ] Commit incremental synchronization.
 
@@ -295,10 +295,10 @@
 - Ranking order is exact normalized title, original title, alias, weighted BM25, `indexed_at DESC`, ID DESC.
 - Default sort with active query is `relevance`; explicit sorts remain deterministic.
 
-- [ ] Add RED ranking corpus tests for title/original/alias/person/taxonomy/description/year/short/punctuation/transliteration.
-- [ ] Add RED stale/building/failed fallback tests and shared-facet candidate tests.
-- [ ] Implement parameterized FTS expression and BM25 weights without raw user SQL.
-- [ ] Inspect `EXPLAIN QUERY PLAN` and eliminate duplicate/materialized candidate collections.
+- [x] Add RED ranking corpus tests for title/original/alias/person/taxonomy/description/year/short/punctuation/transliteration.
+- [x] Add RED stale/building/failed fallback tests and shared-facet candidate tests.
+- [x] Implement parameterized FTS expression and BM25 weights without raw user SQL.
+- [x] Inspect `EXPLAIN QUERY PLAN`; candidate IDs remain a SQL subquery and use the FTS virtual-table index without PHP materialization.
 - [ ] Run search/facet/request/page tests and Pint.
 - [ ] Commit ranked FTS activation.
 

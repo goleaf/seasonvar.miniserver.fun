@@ -12,6 +12,7 @@ use App\Services\Catalog\Search\CatalogSearchIndexer;
 use App\Services\Catalog\Search\CatalogSearchQueryParser;
 use App\Services\Catalog\Search\CatalogTitleSearch;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class CatalogTitleSearchTest extends TestCase
@@ -132,6 +133,23 @@ class CatalogTitleSearchTest extends TestCase
         $search->forgetState();
 
         $this->assertNull($search->candidateQuery($query));
+    }
+
+    public function test_candidate_subquery_uses_the_fts_virtual_table_plan_without_php_id_materialization(): void
+    {
+        $title = CatalogTitle::factory()->create(['title' => 'План полнотекстового поиска']);
+        app(CatalogSearchIndexer::class)->indexTitleIds([$title->id]);
+        $this->markReady(1);
+        $query = app(CatalogTitleSearch::class)->candidateQuery(
+            app(CatalogSearchQueryParser::class)->parse('полнотекстового поиска'),
+        );
+
+        $this->assertNotNull($query);
+        $plan = DB::select('EXPLAIN QUERY PLAN '.$query->toSql(), $query->getBindings());
+        $details = collect($plan)->pluck('detail')->implode("\n");
+
+        $this->assertStringContainsString('VIRTUAL TABLE INDEX', $details);
+        $this->assertStringContainsString('catalog_title_search_documents', $query->toSql());
     }
 
     private function markReady(int $count): void

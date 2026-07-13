@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\Catalog\Search\CatalogSearchNormalizer;
 use App\Services\Catalog\Search\CatalogSearchQuery;
 use App\Services\Catalog\Search\CatalogSearchState;
+use App\Services\Catalog\Search\CatalogTitleSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -23,6 +24,9 @@ use Illuminate\Support\Str;
 
 class CatalogTitleQuery
 {
+    /** @var array<int, string> */
+    private array $rankedSearchAliases = [];
+
     /** @var array<string, bool> */
     private array $exactMatchExistsCache = [];
 
@@ -33,6 +37,7 @@ class CatalogTitleQuery
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogSearchNormalizer $searchNormalizer,
         private readonly CatalogEntitlementService $entitlements,
+        private readonly CatalogTitleSearch $titleSearch,
     ) {}
 
     /**
@@ -98,19 +103,28 @@ class CatalogTitleQuery
      */
     public function sorted(Builder $query, CatalogSort $sort): Builder
     {
-        return match ($sort) {
-            CatalogSort::YearDesc => $query->orderByDesc('year')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::YearAsc => $query->orderBy('year')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::EpisodesDesc => $query->orderByDesc('episodes_count')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::SeasonsDesc => $query->orderByDesc('seasons_count')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::TitleAsc => $query->orderBy('title')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::TitleDesc => $query->orderByDesc('title')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::VideoDesc => $query->orderByDesc('published_media_count')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::KinopoiskRating => $query->orderByDesc('kinopoisk_rating')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::ImdbRating => $query->orderByDesc('imdb_rating')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::Popularity => $query->orderByDesc('published_media_count')->orderByDesc('episodes_count')->latest('indexed_at')->orderByDesc('catalog_titles.id'),
-            CatalogSort::Updated => $query->latest('indexed_at')->orderByDesc('catalog_titles.id'),
+        match ($sort) {
+            CatalogSort::YearDesc => $query->orderByDesc('year'),
+            CatalogSort::YearAsc => $query->orderBy('year'),
+            CatalogSort::EpisodesDesc => $query->orderByDesc('episodes_count'),
+            CatalogSort::SeasonsDesc => $query->orderByDesc('seasons_count'),
+            CatalogSort::TitleAsc => $query->orderBy('title'),
+            CatalogSort::TitleDesc => $query->orderByDesc('title'),
+            CatalogSort::VideoDesc => $query->orderByDesc('published_media_count'),
+            CatalogSort::KinopoiskRating => $query->orderByDesc('kinopoisk_rating'),
+            CatalogSort::ImdbRating => $query->orderByDesc('imdb_rating'),
+            CatalogSort::Popularity => $query->orderByDesc('published_media_count')->orderByDesc('episodes_count'),
+            CatalogSort::Relevance, CatalogSort::Updated => $query,
         };
+
+        if ($alias = $this->rankedSearchAliases[spl_object_id($query)] ?? null) {
+            $query->orderBy($alias.'.exact_title_rank')
+                ->orderBy($alias.'.exact_original_title_rank')
+                ->orderBy($alias.'.exact_alias_rank')
+                ->orderBy($alias.'.bm25_score');
+        }
+
+        return $query->latest('indexed_at')->orderByDesc('catalog_titles.id');
     }
 
     /**
@@ -247,6 +261,22 @@ class CatalogTitleQuery
         }
 
         if ($search->terms === []) {
+            return;
+        }
+
+        $rankedCandidates = $this->titleSearch->candidateQuery($search);
+
+        if ($rankedCandidates !== null) {
+            $alias = 'catalog_search_candidates';
+            $query->joinSub(
+                $rankedCandidates,
+                $alias,
+                $alias.'.catalog_title_id',
+                '=',
+                'catalog_titles.id',
+            );
+            $this->rankedSearchAliases[spl_object_id($query)] = $alias;
+
             return;
         }
 

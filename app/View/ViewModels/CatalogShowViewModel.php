@@ -36,11 +36,6 @@ class CatalogShowViewModel
     ];
 
     /**
-     * @var Collection<string, Collection<int, mixed>>
-     */
-    public Collection $taxonomyGroups;
-
-    /**
      * @var Collection<int, mixed>
      */
     public Collection $genres;
@@ -192,7 +187,6 @@ class CatalogShowViewModel
         $this->displayTitle = PlainText::clean($titleAttributes['title'] ?? '');
         $this->displayOriginalTitle = PlainText::clean($titleAttributes['original_title'] ?? '');
         $this->displayDescription = PlainText::clean($titleAttributes['description'] ?? '', 20000);
-        $this->taxonomyGroups = $this->taxonomiesByType;
         $this->genres = $this->taxonomies('genre');
         $this->countries = $this->taxonomies('country');
         $this->actors = $this->taxonomies('actor');

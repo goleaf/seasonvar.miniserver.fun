@@ -4,6 +4,7 @@ namespace App\Enums;
 
 enum CatalogSort: string
 {
+    case Relevance = 'relevance';
     case Updated = 'updated';
     case YearDesc = 'year_desc';
     case YearAsc = 'year_asc';
@@ -19,6 +20,7 @@ enum CatalogSort: string
     public function label(): string
     {
         return match ($this) {
+            self::Relevance => 'По релевантности',
             self::Updated => 'Недавно обновленные',
             self::YearDesc => 'Год: новые сначала',
             self::YearAsc => 'Год: старые сначала',
@@ -36,6 +38,7 @@ enum CatalogSort: string
     public function icon(): string
     {
         return match ($this) {
+            self::Relevance => 'fa-solid fa-arrow-down-wide-short',
             self::Updated => 'fa-solid fa-clock-rotate-left',
             self::YearDesc => 'fa-solid fa-calendar-days',
             self::YearAsc => 'fa-regular fa-calendar',

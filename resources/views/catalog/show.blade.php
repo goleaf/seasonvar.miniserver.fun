@@ -318,28 +318,6 @@
                 </x-ui.panel>
             @endif
 
-            <x-ui.panel :title="__('catalog.title.relations')" icon="fa-solid fa-diagram-project">
-                <div class="space-y-3">
-                    @forelse ($taxonomyGroups as $taxonomyType => $taxonomies)
-                        <div>
-                            <div class="mb-2 flex items-center justify-between gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                                <span class="inline-flex items-center gap-2">
-                                    <i class="{{ $taxonomyIcons[$taxonomyType] ?? 'fa-solid fa-tag' }} text-slate-400" aria-hidden="true"></i>
-                                    <span>{{ $taxonomyLabels[$taxonomyType] ?? $taxonomyType }}</span>
-                                </span>
-                                <span class="rounded-full bg-slate-50 px-2 py-0.5 text-slate-500">{{ $taxonomies->count() }}</span>
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                                @foreach ($taxonomies as $taxonomy)
-                                    <x-ui.taxonomy-chip :taxonomy="$taxonomy" />
-                                @endforeach
-                            </div>
-                        </div>
-                    @empty
-                        <span class="text-sm text-slate-500">{{ __('catalog.title.relations_missing') }}</span>
-                    @endforelse
-                </div>
-            </x-ui.panel>
         </div>
     </section>
 @endsection

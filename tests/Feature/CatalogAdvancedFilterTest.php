@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Enums\CatalogSearchIndexStatus;
 use App\Enums\ContentAudience;
 use App\Enums\PublicationStatus;
 use App\Http\Requests\CatalogTitlesRequest;
 use App\Models\Actor;
+use App\Models\CatalogSearchIndexState;
 use App\Models\CatalogTitle;
 use App\Models\Country;
 use App\Models\Episode;
@@ -15,6 +17,7 @@ use App\Models\Season;
 use App\Models\Translation;
 use App\Models\User;
 use App\Services\Catalog\CatalogTitlesPageBuilder;
+use App\Services\Catalog\Search\CatalogSearchIndexer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -433,6 +436,38 @@ class CatalogAdvancedFilterTest extends TestCase
             ->assertOk()
             ->assertSeeText('Ничего не найдено.')
             ->assertDontSeeText('Не должен появиться');
+    }
+
+    public function test_ready_fts_candidates_are_shared_by_results_and_contextual_facets(): void
+    {
+        $actor = Actor::query()->create(['name' => 'Поисковый Актер', 'slug' => 'poiskovyi-akter']);
+        $drama = Genre::query()->create(['name' => 'Поисковая драма', 'slug' => 'poiskovaia-drama']);
+        $thriller = Genre::query()->create(['name' => 'Поисковый триллер', 'slug' => 'poiskovyi-triller']);
+        $outside = Genre::query()->create(['name' => 'Вне поиска', 'slug' => 'vne-poiska']);
+        $first = CatalogTitle::factory()->create(['title' => 'Первый результат']);
+        $first->actors()->attach($actor);
+        $first->genres()->attach($drama);
+        $second = CatalogTitle::factory()->create(['title' => 'Второй результат']);
+        $second->actors()->attach($actor);
+        $second->genres()->attach($thriller);
+        $unmatched = CatalogTitle::factory()->create(['title' => 'Посторонний результат']);
+        $unmatched->genres()->attach($outside);
+        app(CatalogSearchIndexer::class)->indexTitleIds([$first->id, $second->id, $unmatched->id]);
+        CatalogSearchIndexState::query()->findOrFail(CatalogSearchIndexState::SINGLETON_ID)->update([
+            'version' => CatalogSearchIndexer::INDEX_VERSION,
+            'status' => CatalogSearchIndexStatus::Ready,
+            'source_count' => 3,
+            'document_count' => 3,
+            'completed_at' => now(),
+        ]);
+
+        $data = $this->catalogData(['q' => 'Поисковый Актер']);
+        $genres = $data['filterTaxonomies']->get('genre')->keyBy('slug');
+
+        $this->assertSame(2, $data['titles']->total());
+        $this->assertSame(1, $genres->get('poiskovaia-drama')->context_titles_count);
+        $this->assertSame(1, $genres->get('poiskovyi-triller')->context_titles_count);
+        $this->assertFalse($genres->has('vne-poiska'));
     }
 
     /** @return array<string, mixed> */

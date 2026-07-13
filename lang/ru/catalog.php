@@ -86,8 +86,6 @@ return [
         'same_year' => 'За :year год',
         'recommendations_missing' => 'Похожие сериалы пока не подобраны.',
         'questions' => 'Вопросы о сериале',
-        'relations' => 'Связи каталога',
-        'relations_missing' => 'Связи не указаны.',
         'series_type' => 'сериал',
     ],
 

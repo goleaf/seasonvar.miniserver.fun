@@ -7,6 +7,7 @@ use App\Http\Requests\CatalogTitlesRequest;
 use App\Models\CatalogTitle;
 use App\Services\Catalog\Search\CatalogSearchQueryParser;
 use App\Services\Catalog\Search\CatalogSearchState;
+use App\Services\Catalog\Search\CatalogSearchSuggestion;
 use App\View\ViewModels\CatalogTitlesViewModel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -35,6 +36,7 @@ class CatalogTitlesPageBuilder
         private readonly CatalogFacetQuery $facets,
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogSearchQueryParser $searchParser,
+        private readonly CatalogSearchSuggestion $searchSuggestions,
     ) {}
 
     /**
@@ -181,6 +183,9 @@ class CatalogTitlesPageBuilder
         }
         $this->query->sorted($catalogTitles, $sortOption);
         $catalogTitles = $catalogTitles->paginate($perPage)->appends($paginationQuery);
+        $suggestions = $catalogTitles->total() === 0 && ! $invalidInput && $titleContext === null
+            ? $this->searchSuggestions->forQuery($searchQuery, $request->user())
+            : collect();
         $seoRequest = $this->sanitizedSeoRequest($request, $paginationQuery, (int) $catalogTitles->currentPage());
 
         $filterLimits = collect($filterTypes)
@@ -263,6 +268,7 @@ class CatalogTitlesPageBuilder
             'invalidYear' => $invalidYear,
             'searchState' => $searchQuery->state->value,
             'insufficientSearch' => $searchQuery->state === CatalogSearchState::Insufficient && $titleContext === null,
+            'searchSuggestions' => $suggestions,
             'titleContext' => $titleContext,
             'selectedTaxonomy' => $activeTaxonomies->first(),
             'activeTaxonomies' => $activeTaxonomies,
