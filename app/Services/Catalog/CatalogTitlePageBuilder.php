@@ -6,6 +6,7 @@ use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
 use App\Models\User;
 use App\Services\Media\ExternalMediaMetadata;
+use App\Support\CatalogTitleDisplayName;
 use App\View\ViewModels\CatalogShowViewModel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -32,6 +33,11 @@ class CatalogTitlePageBuilder
             'aliases:id,catalog_title_id,name',
             'ratings:id,catalog_title_id,provider,rating,votes',
         ], $this->taxonomies->relationSummaryLoads()));
+        $displayName = CatalogTitleDisplayName::from($catalogTitle->title, $catalogTitle->original_title);
+        $aliases = $catalogTitle->aliases
+            ->unique(fn ($alias): string => CatalogTitleDisplayName::comparisonKey($alias->name))
+            ->reject(fn ($alias): bool => $displayName->contains($alias->name))
+            ->values();
         $taxonomiesByType = collect($this->taxonomies->relations())
             ->mapWithKeys(fn (array $config, string $filterType): array => [$filterType => $catalogTitle->{$config['relation']}->values()]);
         $seasons = $this->playback->seasonSummaries($catalogTitle, $user);
@@ -88,7 +94,7 @@ class CatalogTitlePageBuilder
             'taxonomyCount' => $taxonomyCount,
             'parsedSeasonCount' => $parsedSeasonCount,
             'mediaCount' => $mediaCount,
-            'aliases' => $catalogTitle->aliases,
+            'aliases' => $aliases,
             'ratings' => $catalogTitle->ratings,
             'topTaxonomies' => $showView->topTaxonomies,
             'showView' => $showView,

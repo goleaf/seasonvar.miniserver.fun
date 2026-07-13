@@ -412,4 +412,27 @@ class SeasonvarCatalogParserTest extends TestCase
                 ->all(),
         );
     }
+
+    public function test_it_does_not_emit_aliases_that_repeat_the_displayed_title_or_original_name(): void
+    {
+        $parser = app(SeasonvarCatalogParser::class);
+
+        $data = $parser->parse(
+            <<<'HTML'
+            <html>
+                <head><title>Пандора (2019)/Pandora смотреть онлайн</title></head>
+                <body>
+                    <h1>Пандора (2019)/Pandora</h1>
+                    <div class="pgs-sinfo_list">
+                        Оригинал: Pandora
+                        Альтернативное название: Pandora, Пандора (2019)
+                    </div>
+                </body>
+            </html>
+            HTML,
+            'https://seasonvar.ru/serial-22653-Pandora_2019.html',
+        );
+
+        $this->assertSame([], $data['aliases']);
+    }
 }

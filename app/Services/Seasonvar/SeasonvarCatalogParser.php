@@ -3,6 +3,7 @@
 namespace App\Services\Seasonvar;
 
 use App\Services\Catalog\CatalogRelationNameSanitizer;
+use App\Support\CatalogTitleDisplayName;
 use DOMDocument;
 use DOMNode;
 use DOMXPath;
@@ -691,6 +692,7 @@ class SeasonvarCatalogParser
     private function aliases(array $infoFields, string $title, ?string $originalTitle): array
     {
         $aliases = [];
+        $displayName = CatalogTitleDisplayName::from($title, $originalTitle);
 
         if ($originalTitle !== null) {
             $this->addAlias($aliases, $originalTitle, 'original', 'info');
@@ -704,7 +706,10 @@ class SeasonvarCatalogParser
             $this->addAlias($aliases, $name, 'source_title', 'title');
         }
 
-        return array_values($aliases);
+        return collect($aliases)
+            ->reject(fn (array $alias): bool => $displayName->contains($alias['name']))
+            ->values()
+            ->all();
     }
 
     /**
@@ -718,7 +723,12 @@ class SeasonvarCatalogParser
             return;
         }
 
-        $key = $type.'|'.Str::lower($name);
+        $key = CatalogTitleDisplayName::comparisonKey($name);
+
+        if (isset($aliases[$key])) {
+            return;
+        }
+
         $aliases[$key] = [
             'name' => $name,
             'type' => $type,

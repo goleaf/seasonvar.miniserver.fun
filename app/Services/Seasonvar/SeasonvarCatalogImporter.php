@@ -35,6 +35,7 @@ use App\Services\Media\MediaSourceHealthManager;
 use App\Services\Seasonvar\PageHandlers\SeasonvarPageHandler;
 use App\Services\Seasonvar\PageHandlers\SeasonvarPassivePageHandler;
 use App\Services\Seasonvar\PageHandlers\SeasonvarSerialPageHandler;
+use App\Support\CatalogTitleDisplayName;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -708,14 +709,20 @@ class SeasonvarCatalogImporter
     private function syncCatalogAliases(CatalogTitle $catalogTitle, array $aliases, ?callable $progress = null): void
     {
         $now = now();
+        $displayName = CatalogTitleDisplayName::from($catalogTitle->title, $catalogTitle->original_title);
         $rows = collect($aliases)
             ->filter(fn (array $alias): bool => $this->isValidAliasName($alias['name']))
-            ->mapWithKeys(function (array $alias) use ($catalogTitle, $now): array {
+            ->map(function (array $alias) use ($catalogTitle, $displayName, $now): ?array {
                 $name = Str::squish($alias['name']);
-                $type = Str::substr(Str::slug($alias['type']) ?: 'alternative', 0, 32);
-                $nameHash = hash('sha256', Str::lower($name));
 
-                return [$type.'|'.$nameHash => [
+                if ($displayName->contains($name)) {
+                    return null;
+                }
+
+                $type = Str::substr(Str::slug($alias['type']) ?: 'alternative', 0, 32);
+                $nameHash = CatalogTitleDisplayName::nameHash($name);
+
+                return [
                     'catalog_title_id' => $catalogTitle->id,
                     'name' => $name,
                     'name_hash' => $nameHash,
@@ -723,14 +730,26 @@ class SeasonvarCatalogImporter
                     'source' => Str::substr($alias['source'], 0, 64),
                     'created_at' => $now,
                     'updated_at' => $now,
-                ]];
-            });
+                ];
+            })
+            ->filter()
+            ->reduce(function (Collection $rows, array $row): Collection {
+                $existing = $rows->get($row['name_hash']);
+                $priority = ['original' => 3, 'alternative' => 2, 'source-title' => 1];
+
+                if (! is_array($existing)
+                    || ($priority[$row['type']] ?? 0) > ($priority[$existing['type']] ?? 0)) {
+                    $rows->put($row['name_hash'], $row);
+                }
+
+                return $rows;
+            }, collect());
 
         if ($rows->isNotEmpty()) {
             CatalogTitleAlias::query()->upsert(
                 $rows->values()->all(),
-                ['catalog_title_id', 'type', 'name_hash'],
-                ['name', 'source', 'updated_at'],
+                ['catalog_title_id', 'name_hash'],
+                ['name', 'type', 'source', 'updated_at'],
             );
         }
 

@@ -37,11 +37,13 @@ use App\Services\Catalog\CatalogStatsPageBuilder;
 use App\Services\Catalog\CatalogStatsPosterUrlGuard;
 use App\Services\Catalog\CatalogTaxonomyRegistry;
 use App\Services\Catalog\CatalogUserStateService;
+use App\Support\CatalogTitleDisplayName;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheVersionRegistry;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -1656,6 +1658,58 @@ class CatalogPageTest extends TestCase
             ->assertOk()
             ->assertSeeText('The Witcher')
             ->assertDontSeeText('Другой фэнтези сериал');
+    }
+
+    public function test_title_page_hides_aliases_that_repeat_displayed_names(): void
+    {
+        $title = CatalogTitle::factory()->create([
+            'title' => 'Пандора (2019)/Pandora',
+            'original_title' => 'Pandora',
+            'slug' => 'pandora-2019pandora',
+        ]);
+        CatalogTitleAlias::query()->create([
+            'catalog_title_id' => $title->id,
+            'name' => 'Pandora',
+            'name_hash' => CatalogTitleDisplayName::nameHash('Pandora'),
+            'type' => 'original',
+            'source' => 'info',
+        ]);
+        CatalogTitleAlias::query()->create([
+            'catalog_title_id' => $title->id,
+            'name' => 'Пандора (2019)',
+            'name_hash' => CatalogTitleDisplayName::nameHash('Пандора (2019)'),
+            'type' => 'source-title',
+            'source' => 'title',
+        ]);
+
+        $this->get(route('titles.show', $title))
+            ->assertOk()
+            ->assertDontSeeText('Другие названия')
+            ->assertSee('"alternateName":["Pandora"]', false);
+    }
+
+    public function test_alias_name_is_unique_for_a_title_independently_of_type(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $hash = CatalogTitleDisplayName::nameHash('Pandora');
+
+        CatalogTitleAlias::query()->create([
+            'catalog_title_id' => $title->id,
+            'name' => 'Pandora',
+            'name_hash' => $hash,
+            'type' => 'original',
+            'source' => 'info',
+        ]);
+
+        $this->expectException(QueryException::class);
+
+        CatalogTitleAlias::query()->create([
+            'catalog_title_id' => $title->id,
+            'name' => 'Pandora',
+            'name_hash' => $hash,
+            'type' => 'source-title',
+            'source' => 'title',
+        ]);
     }
 
     public function test_catalog_search_keeps_taxonomy_name_matches_after_query_optimization(): void

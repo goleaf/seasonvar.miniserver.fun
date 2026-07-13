@@ -28,4 +28,24 @@ class CatalogTitleDisplayNameTest extends TestCase
         $this->assertSame('Friends', $duplicate->primary);
         $this->assertNull($duplicate->original);
     }
+
+    public function test_it_compares_aliases_independently_of_case_spacing_and_apostrophe_style(): void
+    {
+        $name = CatalogTitleDisplayName::from(
+            "Королевские гонки РуПола/RuPaul's Drag Race",
+            "RuPaul's Drag Race",
+        );
+
+        $this->assertSame(
+            CatalogTitleDisplayName::comparisonKey(" RuPaul’s   Drag Race "),
+            CatalogTitleDisplayName::comparisonKey("rupaul's drag race"),
+        );
+        $this->assertSame(
+            CatalogTitleDisplayName::nameHash(" RuPaul’s   Drag Race "),
+            CatalogTitleDisplayName::nameHash("rupaul's drag race"),
+        );
+        $this->assertTrue($name->contains(" RuPaul’s   Drag Race "));
+        $this->assertTrue($name->contains('Королевские гонки РуПола'));
+        $this->assertFalse($name->contains('Drag Race Untucked'));
+    }
 }

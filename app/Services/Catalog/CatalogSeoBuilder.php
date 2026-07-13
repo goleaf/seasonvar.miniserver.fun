@@ -5,6 +5,7 @@ namespace App\Services\Catalog;
 use App\DTOs\CatalogDirectoryDefinition;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
+use App\Support\CatalogTitleDisplayName;
 use App\Support\PlainText;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -274,11 +275,17 @@ class CatalogSeoBuilder
             $pageTitle .= __('catalog.seo.title_year_suffix', ['year' => $catalogTitle->year]);
         }
 
-        $alternateNames = collect([$catalogTitle->original_title])
-            ->merge($catalogTitle->relationLoaded('aliases') ? $catalogTitle->aliases->pluck('name') : [])
+        $displayName = CatalogTitleDisplayName::from($catalogTitle->title, $catalogTitle->original_title);
+        $visibleAliases = $catalogTitle->relationLoaded('aliases')
+            ? $catalogTitle->aliases
+                ->pluck('name')
+                ->reject(fn (mixed $name): bool => $displayName->contains($name))
+            : collect();
+        $alternateNames = collect([$displayName->original])
+            ->merge($visibleAliases)
             ->map(fn (mixed $name): string => PlainText::clean($name))
             ->filter()
-            ->unique()
+            ->unique(fn (string $name): string => CatalogTitleDisplayName::comparisonKey($name))
             ->values();
         $rating = $catalogTitle->relationLoaded('ratings')
             ? $catalogTitle->ratings->first(fn ($rating): bool => $rating->rating !== null)

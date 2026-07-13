@@ -97,8 +97,34 @@ class SeasonvarCatalogPreparedApplyTest extends TestCase
         $this->assertSame(1, $comparison['local_only']);
     }
 
+    public function test_alias_import_keeps_one_highest_priority_row_across_types(): void
+    {
+        Http::preventStrayRequests();
+        $source = $this->seasonvarSource();
+        [$page, $prepared] = $this->preparedSeason($source, 1, 1, [
+            ['name' => 'Альфа', 'type' => 'source_title', 'source' => 'title'],
+            ['name' => ' альфа ', 'type' => 'alternative', 'source' => 'info'],
+            ['name' => 'АЛЬФА', 'type' => 'original', 'source' => 'info'],
+        ]);
+        $canonical = CatalogTitle::factory()->for($source)->create([
+            'source_page_id' => $page->id,
+            'external_id' => '24212',
+            'slug' => 'ryzaia-8',
+            'title' => 'Рыжая',
+            'source_url' => $page->url,
+            'source_url_hash' => hash('sha256', $page->url),
+        ]);
+
+        app(SeasonvarCatalogImporter::class)->applyPreparedPage($page, $prepared, $canonical);
+
+        $alias = $canonical->aliases()->sole();
+
+        $this->assertSame('original', $alias->type);
+        $this->assertSame('АЛЬФА', $alias->name);
+    }
+
     /** @return array{SourcePage, SeasonvarPreparedCatalogPage} */
-    private function preparedSeason(Source $source, int $seasonNumber, int $episodeCount): array
+    private function preparedSeason(Source $source, int $seasonNumber, int $episodeCount, array $aliases = []): array
     {
         $url = sprintf(
             'https://seasonvar.ru/serial-24212-Ryzhaya_psbdtie-%d-season.html',
@@ -143,7 +169,7 @@ class SeasonvarCatalogPreparedApplyTest extends TestCase
             'taxonomies' => [],
             'ratings' => [],
             'recommendation_signals' => [],
-            'aliases' => [],
+            'aliases' => $aliases,
             'reviews' => [],
             'parse_meta' => [
                 'has_info_list' => true,

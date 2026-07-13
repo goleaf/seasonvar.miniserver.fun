@@ -51,12 +51,27 @@ final readonly class CatalogTitleDisplayName
         return new self($primary, $original);
     }
 
+    public function contains(mixed $candidate): bool
+    {
+        $candidateKey = self::comparisonKey($candidate);
+
+        return $candidateKey !== '' && in_array($candidateKey, array_filter([
+            self::comparisonKey($this->primary),
+            self::comparisonKey($this->original),
+        ]), true);
+    }
+
+    public static function nameHash(mixed $value): string
+    {
+        return hash('sha256', self::comparisonKey($value));
+    }
+
     private static function equivalent(string $left, string $right): bool
     {
         return self::comparisonKey($left) === self::comparisonKey($right);
     }
 
-    private static function comparisonKey(string $value): string
+    public static function comparisonKey(mixed $value): string
     {
         return Str::lower(str_replace(['’', '‘', '`', '´'], "'", PlainText::clean($value)));
     }
