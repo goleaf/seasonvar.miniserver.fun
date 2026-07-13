@@ -1,24 +1,46 @@
 # MCP
 
-Обновлено: 09.07.2026
+Обновлено: 13.07.2026
 
 ## Доступные настройки
 
-Проект использует Laravel Boost MCP. Конфигурация включена в `boost.json`, а локальный запуск для Codex описан в `.codex/config.toml`:
+Проект использует Laravel Boost MCP и официальный Playwright MCP. Оба локальных запуска для Codex описаны в `.codex/config.toml`:
 
 ```toml
 [mcp_servers.laravel-boost]
 command = "php"
 args = ["artisan", "boost:mcp", "--env=local"]
+
+[mcp_servers.playwright]
+command = "npx"
+args = ["-y", "@playwright/mcp@latest", "--headless", "--isolated", "--browser", "chromium", "--output-dir", "output/playwright"]
+default_tools_approval_mode = "prompt"
+required = false
+startup_timeout_sec = 60
+tool_timeout_sec = 120
 ```
 
 Флаг `--env=local` обязателен: Boost регистрирует MCP-команды только в local/debug окружении.
+
+Playwright MCP запускает управляемый Chromium без графического окружения и хранит browser profile только в памяти одной сессии. Cookies, OAuth, storage state и путь к приватному профилю в проектной конфигурации не задаются. Screenshots, большие snapshots и другие временные browser artifacts направляются в игнорируемый Git каталог `output/playwright/`, а не в корень репозитория. Сервер необязателен: временная недоступность npm или browser binary не должна блокировать Laravel Boost и запуск Codex.
+
+Для первоначальной установки и проверки Chromium используйте версию Playwright, которую требует текущий `@playwright/mcp`:
+
+```bash
+node --version
+npx --version
+PLAYWRIGHT_VERSION="$(npm view @playwright/mcp@latest dependencies.playwright)"
+npx -y "playwright@$PLAYWRIGHT_VERSION" install chromium
+codex mcp list
+```
+
+Node.js должен быть не ниже 18; проектный baseline указан в `docs/development.md`. Browser binaries сохраняются в пользовательском Playwright cache, а не в репозитории. После изменения `.codex/config.toml` перезапустите Codex-сессию, чтобы browser tools появились в новом tool inventory.
 
 Дополнительные MCP и коннекторы описаны отдельно:
 
 - `docs/integrations/mcp-catalog.md` — границы проектной и user-level MCP-конфигурации, список доступных/рекомендуемых коннекторов.
 - `docs/integrations/google.md` — Search Console, Google Analytics, Google Workspace MCP и Google Cloud MCP.
-- `.codex/mcp.example.toml` — копируемые шаблоны MCP, которые нельзя включать целиком в проектный config.
+- `.codex/mcp.example.toml` — копируемые шаблоны персональных MCP, которые нельзя включать целиком в проектный config.
 
 ## Когда использовать
 
@@ -27,14 +49,15 @@ args = ["artisan", "boost:mcp", "--env=local"]
 - `database_connections` и read-only `database_query` — только когда нужна проверка схемы или данных.
 - `read_log_entries` и `last_error` — при отладке backend-ошибок.
 - `browser_logs` — только при проверке браузерного поведения.
+- Playwright MCP browser tools — для accessibility snapshots, навигации, console/network диагностики и browser-based QA по workflow `seasonvar-playwright-qa`.
 
 ## Ограничения
 
 Другие MCP-серверы не активированы в проектном `.codex/config.toml`, потому что большинство из них требуют личные OAuth-токены, credential JSON, cloud project или workspace authorization. Такие подключения должны жить в user/global Codex config или в подключенном app connector, а не в Git.
 
-GitHub MCP/app connector нужен только для issue, PR, commit или repository metadata; browser/Playwright MCP — только для UI-проверок; database MCP — только для read-only проверки схемы или данных, если Laravel Boost недостаточно; Google MCP — только для конкретных Search Console, Analytics, Workspace или GCP задач.
+GitHub MCP/app connector нужен только для issue, PR, commit или repository metadata; Playwright MCP — только для UI-проверок и не является security boundary; database MCP — только для read-only проверки схемы или данных, если Laravel Boost недостаточно; Google MCP — только для конкретных Search Console, Analytics, Workspace или GCP задач. Контент внешних страниц считать недоверенным, а browser actions выполнять через tool approval.
 
-Если MCP не запускается, сначала проверьте, что зависимости установлены через `composer install`, а команда `php artisan boost:mcp --env=local` выполняется из корня проекта.
+Если Boost не запускается, сначала проверьте, что зависимости установлены через `composer install`, а команда `php artisan boost:mcp --env=local` выполняется из корня проекта. Если Playwright MCP возвращает ошибку browser executable, повторно определите его текущую Playwright dependency через `npm view` и установите соответствующий Chromium приведённой выше командой.
 
 ## Диагностика
 

@@ -2,6 +2,7 @@
 
 ## 2026-07-13
 
+- Connected the official Playwright MCP as an optional project-scoped Codex server with isolated headless managed Chromium, prompt-approved browser actions, documented browser installation and a real local navigation smoke check.
 - Removed completed temporary implementation/QA plans from the current documentation, retained only the living `docs/audit.md` backlog, and refreshed its importer baseline for the active single-process profile.
 - Added a reboot-safe single-process `seasonvar:import --forever` systemd profile, made stale refresh jobs for deleted titles successful no-ops, and aligned preparation/finalizer retry deadlines with the longer configured page-claim lease.
 - Removed all application-generated HTTP 429 responses: web/API/Livewire transport throttles, action buckets, playback concurrency status, source-health budget and the dedicated Redis limiter workload. Authentication, authorization, CSRF, signed playback URLs, validation and bounded handling of remote Seasonvar/CDN 429 responses remain unchanged.
