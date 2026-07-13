@@ -2,6 +2,7 @@
 
 ## 2026-07-13
 
+- Reused the authorized, ordered active-season episode collection for previous/next playback navigation, eliminating both repeated watchable scans inside one season while retaining one fully authorized keyset query at a real season boundary. Five-run production-scale SQLite medians reduced playback SQL by 73.3% and server render by 26.2%; 20-request HTTP p95 fell from 1638.8 to 1037.9 ms with an unchanged response payload.
 - Added `seasonvar:import --inventory-only` as a non-catalog sitemap parity mode with typed URL classification, recursive XML/gzip discovery, robots.txt/crawl-delay enforcement, blocked/malformed/unknown accounting, idempotent `SourcePage` storage, import-run/event snapshots, isolated test storage, a single capability registry, and managed `docs/SOURCE_PARITY.md` reporting.
 - Fixed infrastructure readiness reporting so a missing queue-worker heartbeat produces an explicit degraded state instead of a false all-clear while database and transport readiness remain available.
 - Added browser-initiated background refresh on series pages: SSR stays side-effect free, then one unique queued job updates the canonical page and all known seasons no more often than every 15 minutes, while the complete Livewire title view reflects new metadata, seasons, episodes and media every three seconds without resetting a valid playback selection.
