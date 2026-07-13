@@ -3,6 +3,7 @@
 namespace App\Services\Catalog;
 
 use Illuminate\Support\Str;
+use Normalizer;
 
 class CatalogRelationNameSanitizer
 {
@@ -83,7 +84,45 @@ class CatalogRelationNameSanitizer
 
     public function normalize(string $name): string
     {
-        return Str::squish(html_entity_decode($name, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $name = html_entity_decode($name, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $normalized = Normalizer::normalize($name, Normalizer::FORM_KC);
+
+        return Str::squish($normalized === false ? $name : $normalized);
+    }
+
+    public function canonicalKey(string $type, string $name): string
+    {
+        $name = $this->normalize($name);
+        $identityName = in_array($type, ['actor', 'director'], true)
+            ? Str::transliterate($name, 'en')
+            : $name;
+        $slug = Str::slug($identityName);
+
+        return $slug !== ''
+            ? $slug
+            : Str::substr(hash('sha256', $type.'|'.Str::lower($name)), 0, 32);
+    }
+
+    public function preferredName(string $type, string $current, string $incoming): string
+    {
+        $current = $this->normalize($current);
+        $incoming = $this->normalize($incoming);
+
+        if ($current === '') {
+            return $incoming;
+        }
+
+        if ($incoming === '' || $this->canonicalKey($type, $current) !== $this->canonicalKey($type, $incoming)) {
+            return $current;
+        }
+
+        if (in_array($type, ['actor', 'director'], true)
+            && preg_match('/\p{Cyrillic}/u', $current) !== 1
+            && preg_match('/\p{Cyrillic}/u', $incoming) === 1) {
+            return $incoming;
+        }
+
+        return $current;
     }
 
     public function isValid(string $type, string $name): bool
@@ -95,6 +134,7 @@ class CatalogRelationNameSanitizer
         }
 
         return match ($type) {
+            'actor', 'director' => $this->isValidPersonName($name),
             'age_rating' => preg_match('/^\d{1,2}\+?$/u', $name) === 1,
             'country' => $this->isCountryName($name),
             'status' => in_array($name, ['Выходит', 'Завершён', 'Анонсирован', 'Приостановлен', 'Отменён'], true),
@@ -116,6 +156,17 @@ class CatalogRelationNameSanitizer
         return Str::length($name) <= 80
             && preg_match('/[\pL]/u', $name) === 1
             && preg_match('/[!?]|(?:главн|добро пожаловать|типичная жизнь|финал сезона|\bсер(?:ия|ии|ий)\b)/iu', $name) !== 1;
+    }
+
+    private function isValidPersonName(string $name): bool
+    {
+        if (preg_match('/[\pL]/u', $name) !== 1) {
+            return false;
+        }
+
+        return preg_match('/^(?:>{2,}|(?:сериал|serial|series)\s+)/iu', $name) !== 1
+            && preg_match('/(?:\bсерия\s+из\b|\bсерий\s+из\b|сериал\s+полностью|добавлен\w*\s+сезон|season\s+finale)/iu', $name) !== 1
+            && preg_match('/\b\d{1,2}\.\d{1,2}\.\d{4}\b.*\b(?:сер(?:ия|ии|ий)|сезон|season)\b/iu', $name) !== 1;
     }
 
     private function isValidTranslationName(string $name): bool

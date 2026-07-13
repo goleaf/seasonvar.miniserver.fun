@@ -383,4 +383,33 @@ class SeasonvarCatalogParserTest extends TestCase
             $this->assertSame($expectedType, $url->pageType($sourceUrl), $sourceUrl);
         }
     }
+
+    public function test_it_does_not_treat_serial_urls_with_person_tokens_as_people(): void
+    {
+        $parser = app(SeasonvarCatalogParser::class);
+
+        $data = $parser->parse(
+            <<<'HTML'
+            <html>
+                <head><title>Тестовый сериал смотреть онлайн</title></head>
+                <body>
+                    <h1>Тестовый сериал</h1>
+                    <a href="/serial-248327-Serial_Akter_2024Actor.html">&gt;&gt;&gt; Сериал Актер (2024)/Actor</a>
+                    <a href="/serial-239968-The_Doll_Factory.html">Сериал Фабрика кукол/The Doll Factory</a>
+                    <a href="/actor/Adam%20Ian%20Cohen">Adam Ian Cohen</a>
+                </body>
+            </html>
+            HTML,
+            'https://seasonvar.ru/serial-50000-Test.html',
+        );
+
+        $this->assertSame(
+            ['Adam Ian Cohen'],
+            collect($data['taxonomies'])
+                ->where('type', 'actor')
+                ->pluck('name')
+                ->values()
+                ->all(),
+        );
+    }
 }

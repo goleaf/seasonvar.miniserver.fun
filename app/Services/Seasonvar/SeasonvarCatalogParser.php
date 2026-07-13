@@ -1381,14 +1381,7 @@ class SeasonvarCatalogParser
                 continue;
             }
 
-            $normalizedHref = Str::lower($href);
-            $type = match (true) {
-                Str::contains($normalizedHref, ['genre', 'janr', 'zhanr']) => 'genre',
-                Str::contains($normalizedHref, ['country', 'strana']) => 'country',
-                Str::contains($normalizedHref, ['actor', 'akter']) => 'actor',
-                Str::contains($normalizedHref, ['director', 'rezhisser']) => 'director',
-                default => null,
-            };
+            $type = $this->relationTypeFromHref($href);
 
             if ($type === null) {
                 continue;
@@ -1412,6 +1405,20 @@ class SeasonvarCatalogParser
         }
 
         return array_values($items);
+    }
+
+    private function relationTypeFromHref(string $href): ?string
+    {
+        $path = Str::lower(rawurldecode((string) parse_url($href, PHP_URL_PATH)));
+        $path = '/'.ltrim($path, '/');
+
+        return match (true) {
+            preg_match('~^/(?:genre|janr|zhanr)(?:/|-)~u', $path) === 1 => 'genre',
+            preg_match('~^/(?:country|strana)(?:/|-)~u', $path) === 1 => 'country',
+            preg_match('~^/(?:actor|akter)(?:/|-)~u', $path) === 1 => 'actor',
+            preg_match('~^/(?:director|rezhisser)(?:/|-)~u', $path) === 1 => 'director',
+            default => null,
+        };
     }
 
     /**
