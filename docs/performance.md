@@ -80,6 +80,13 @@
 
 ## Измерения и планы SQLite
 
+### Livewire response budgets
+
+- Детерминированный fixture из 24 карточек и 24 вариантов actor-фасета ограничивает public catalog responses: initial HTML — не более 220 000 bytes и 7 запросов; deferred `catalog-live` island — не более 275 000 bytes и 11 запросов; последующее изменение сортировки — не более 275 000 bytes и 7 запросов. Контрольные значения при введении gate: 193 940 / 246 223 / 247 198 bytes.
+- Title detail fixture с 12 публичными рекомендациями ограничивает Livewire shell: initial response — не более 100 000 bytes и 29 запросов; повторный refresh update — не более 95 000 bytes и 23 запросов. Контрольные значения при введении gate: 86 547 / 83 041 bytes.
+- Бюджеты измеряют полное HTTP-тело, включая Livewire snapshot/effects, и запрещают сериализацию `CatalogTitle` collection и provider `source_url`. Это regression ceilings на bounded fixtures, а не production p95/SLA.
+- Независимый facet gate сохраняет 11 запросов полного page-builder при росте actor options с 1 до 20; title gate выполняется на максимальной публичной recommendation collection, поэтому query ceilings не растут на каждый видимый элемент.
+
 - Production-like localhost baseline до tiered-cache на 34 319 опубликованных тайтлах: первый `GET /` — 24,731 s, `/titles` — 3,265 s, одна title page — 0,785 s. Это одиночные cold observations, не p95.
 - После version bump без предварительного warm: `GET /` — 3,836 s (−84,5% к исходному cold observation), `/titles` — 2,819 s (−13,7%), title page — 0,886 s. Title detail намеренно не включён в shared application cache; небольшая разница считается runtime variance, а не regression proof.
 - После `cache:warm-catalog`, 20 последовательных localhost requests: homepage mean 244 ms, p50 217 ms, p95 361 ms, max/p99 sample 404 ms; catalog mean 314 ms, p50 286 ms, p95 454 ms, max 491 ms; title mean 718 ms, p50 670 ms, p95 977 ms, max 1014 ms.
