@@ -1,0 +1,10 @@
+/www/wwwroot/seasonvar.miniserver.fun/storage/logs/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    su www www
+}

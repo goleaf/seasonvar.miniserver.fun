@@ -17,9 +17,15 @@ CACHE_HOT_STORE=memcached-hot
 CACHE_DOMAIN_STORE=redis-domain
 CACHE_LOCK_STORE=redis-locks
 CACHE_VERSION_STORE=redis-locks
+LOG_CHANNEL=stack
+LOG_STACK=daily
+LOG_LEVEL=warning
+LOG_DAILY_DAYS=14
 ```
 
 Production также обязан включить HTTPS-only session cookie, корректные domain/path/SameSite, секретный `APP_KEY`, warning-or-higher structured log policy и реальные credentials через secret manager/process environment. Эти значения не должны попадать в Git.
+
+Versioned-профиль `deploy/logrotate/seasonvar` ежедневно ротирует все `storage/logs/*.log`, хранит 14 архивов и сжимает их. Установить его можно командой `sudo install -m 0644 deploy/logrotate/seasonvar /etc/logrotate.d/seasonvar`; проверка без ротации выполняется через `sudo logrotate --debug /etc/logrotate.d/seasonvar`. Профиль использует `copytruncate`, поэтому PHP-FPM и постоянный импортёр продолжают писать без остановки.
 
 ## Redis workloads
 
@@ -41,10 +47,12 @@ Standalone default DBs: cache 1, queues 2, sessions 3, locks 5, broadcasting 6. 
 
 ```bash
 php artisan config:cache
-php artisan about --only=environment,cache,drivers
+php artisan about --only=environment
 php artisan app:health --json
 php artisan cache:warm-catalog --queue --refresh
 php artisan cache:metrics --json
 ```
+
+После пересборки config cache нужно выполнить graceful reload PHP-FPM тем способом, которым он управляется на сервере, и проверить `seasonvar-import-forever.service`. Сам импортёр нельзя дублировать вторым процессом.
 
 Не используйте `optimize:clear` или `cache:clear` как обычную реакцию на configuration error: default store может быть общим Redis application cache.

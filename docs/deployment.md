@@ -240,6 +240,20 @@ Sitemap-тесты используют отдельный каталог `stora
 
 ## Проверки деплоя
 
+### Production runtime и журналы
+
+Перед возвратом трафика установите versioned-профиль ротации, пересоберите config cache и выполните graceful reload PHP-FPM. `copytruncate` не требует остановки PHP-процессов и не удаляет текущий журнал:
+
+```bash
+sudo install -m 0644 deploy/logrotate/seasonvar /etc/logrotate.d/seasonvar
+sudo logrotate --debug /etc/logrotate.d/seasonvar
+php artisan config:cache
+php artisan about --only=environment
+systemctl --no-pager --full status seasonvar-import-forever.service
+```
+
+Команда reload зависит от process manager сервера: для systemd используется `sudo systemctl reload <php-fpm-unit>`, а для отдельного PHP-FPM master — сигнал `USR2` его master PID. Не запускайте второй importer во время проверки. После reload выполните гостевой HTTP GET, `php artisan app:health --json` и убедитесь, что `seasonvar-import-forever.service` остаётся единственным активным импортёром.
+
 Запускать при деплое после установки зависимостей и настройки environment-значений:
 
 ```bash
