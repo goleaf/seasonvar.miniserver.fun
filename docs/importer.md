@@ -37,6 +37,14 @@ Taxonomy parser сохраняет только каноническое имя,
 
 Для controlled rollout задаются `SEASONVAR_PAGE_<TYPE>_ENABLED`, `..._AUTOMATIC`, `..._REFRESH_HOURS`, `..._CHUNK_SIZE` и для публикуемых типов `..._PUBLICATION_AUTHORIZED`. После изменения environment нужно пересобрать config cache и перезапустить workers. Пример ручной проверки уже разрешённого типа: `php artisan seasonvar:import --no-discovery --page-type=actor`.
 
+## Режимы длительного запуска
+
+Репозиторий поддерживает два взаимоисключающих production-профиля. `seasonvar-import-forever.service` непрерывно выполняет sitemap discovery и весь sync pipeline одним PHP-процессом. Redis queued-профиль использует cron dispatcher и отдельные import/title-refresh workers для параллельной обработки. Одновременный запуск профилей запрещён: command lock предотвратит часть дублей, но нарушит операционный контракт и оставит непредсказуемый backlog.
+
+Удалённый после dispatch `CatalogTitle` считается нормальным устаревшим targeted job: refresh state очищается, import group не создаётся, exception и retry не нужны. Absolute retry deadline preparation и group finalizer jobs равен максимуму configured retry window и page claim lease; поэтому живой 24-часовой claim не переживает job, который должен его дождаться или завершить группу.
+
+Установка и безопасное переключение systemd-профилей описаны в [`deployment.md`](deployment.md), queue lifecycle — в [`queues.md`](queues.md).
+
 ## Queue coordinator и статусы
 
 `/admin/imports` вызывает `SeasonvarImportAdminService`, который под Redis lock создаёт один `queued` run и отправляет `StartSeasonvarQueuedImport` только с scalar run ID. Coordinator имеет 3 attempts, backoff 60/300/900 секунд, timeout 900 секунд и unique lock на run. Transient network/408/425/429/5xx/SQLite-lock ошибки возвращают run в `queued` для retry; permanent validation/provider errors переводят его в `failed` без бесполезного повтора.

@@ -51,7 +51,11 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
     public function __construct(public readonly int $groupId)
     {
         $this->timeout = max(60, (int) config('seasonvar.queue.worker_timeout', 900));
-        $retryWindow = max(300, (int) config('seasonvar.queue.retry_window_seconds', 21_600));
+        $retryWindow = max(
+            300,
+            (int) config('seasonvar.queue.retry_window_seconds', 21_600),
+            (int) config('seasonvar.queue.claim_seconds', 86_400),
+        );
         $this->uniqueFor = $retryWindow + 300;
         $this->retryUntilTimestamp = now()->addSeconds($retryWindow)->getTimestamp();
         $this->onConnection((string) config('seasonvar.queue.connection', 'redis'));

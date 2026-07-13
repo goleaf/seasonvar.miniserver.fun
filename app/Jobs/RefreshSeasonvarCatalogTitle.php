@@ -52,7 +52,14 @@ final class RefreshSeasonvarCatalogTitle implements ShouldBeUnique, ShouldQueue
         SeasonvarUrl $urls,
         CatalogTitleRefreshStateStore $states,
     ): void {
-        $catalogTitle = CatalogTitle::query()->findOrFail($this->catalogTitleId);
+        $catalogTitle = CatalogTitle::query()->find($this->catalogTitleId);
+
+        if ($catalogTitle === null) {
+            $states->forget($this->catalogTitleId);
+
+            return;
+        }
+
         $url = $urls->normalize((string) $catalogTitle->source_url);
 
         if (! $urls->isAllowed($url)) {

@@ -270,7 +270,7 @@ class SeasonvarParallelImportTest extends TestCase
         $this->assertSame('partial', $partial->completionStatus());
     }
 
-    public function test_page_job_retry_deadline_covers_the_longer_retry_or_claim_window(): void
+    public function test_page_and_title_group_job_deadlines_cover_the_longer_retry_or_claim_window(): void
     {
         $this->travelTo('2026-07-13 12:00:00');
 
@@ -280,8 +280,14 @@ class SeasonvarParallelImportTest extends TestCase
         ]);
 
         $claimBoundJob = new ImportSeasonvarSourcePage(1, 1, 'claim-token', 'seasonvar-title:1');
+        $claimBoundPreparation = new PrepareSeasonvarImportTitlePage(1);
+        $claimBoundFinalizer = new FinalizeSeasonvarImportTitleGroup(1);
 
         $this->assertSame(now()->addDay()->getTimestamp(), $claimBoundJob->retryUntil()->getTimestamp());
+        $this->assertSame(now()->addDay()->getTimestamp(), $claimBoundPreparation->retryUntil()->getTimestamp());
+        $this->assertSame(86400, $claimBoundPreparation->uniqueFor);
+        $this->assertSame(now()->addDay()->getTimestamp(), $claimBoundFinalizer->retryUntil()->getTimestamp());
+        $this->assertSame(86700, $claimBoundFinalizer->uniqueFor);
 
         config([
             'seasonvar.queue.retry_window_seconds' => 172800,
@@ -289,8 +295,14 @@ class SeasonvarParallelImportTest extends TestCase
         ]);
 
         $retryBoundJob = new ImportSeasonvarSourcePage(1, 1, 'claim-token', 'seasonvar-title:1');
+        $retryBoundPreparation = new PrepareSeasonvarImportTitlePage(1);
+        $retryBoundFinalizer = new FinalizeSeasonvarImportTitleGroup(1);
 
         $this->assertSame(now()->addDays(2)->getTimestamp(), $retryBoundJob->retryUntil()->getTimestamp());
+        $this->assertSame(now()->addDays(2)->getTimestamp(), $retryBoundPreparation->retryUntil()->getTimestamp());
+        $this->assertSame(172800, $retryBoundPreparation->uniqueFor);
+        $this->assertSame(now()->addDays(2)->getTimestamp(), $retryBoundFinalizer->retryUntil()->getTimestamp());
+        $this->assertSame(173100, $retryBoundFinalizer->uniqueFor);
     }
 
     public function test_page_claim_is_atomic_owned_and_recoverable_after_expiry(): void

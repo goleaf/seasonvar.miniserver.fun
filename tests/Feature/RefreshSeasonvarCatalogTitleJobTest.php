@@ -100,6 +100,24 @@ class RefreshSeasonvarCatalogTitleJobTest extends TestCase
         );
     }
 
+    public function test_it_forgets_refresh_state_and_finishes_when_the_title_was_deleted(): void
+    {
+        $title = $this->refreshableTitle('https://seasonvar.ru/serial-43-Test-1-season.html');
+        $titleId = $title->id;
+        $states = app(CatalogTitleRefreshStateStore::class);
+        $states->queued($titleId);
+        $title->delete();
+
+        (new RefreshSeasonvarCatalogTitle($titleId))->handle(
+            app(SeasonvarImportTitleGroupDispatcher::class),
+            app(SeasonvarUrl::class),
+            $states,
+        );
+
+        $this->assertNull($states->read($titleId)->status);
+        Queue::assertNothingPushed();
+    }
+
     public function test_terminal_failure_updates_only_sanitized_refresh_state(): void
     {
         Log::spy();

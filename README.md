@@ -74,6 +74,17 @@ php artisan seasonvar:import "https://seasonvar.ru/serial-615--Bez_sleda_pssmtlk
 php artisan seasonvar:import --forever
 ```
 
+Для постоянного однопоточного профиля после перезагрузки используйте отдельный unit:
+
+```bash
+sudo cp deploy/systemd/seasonvar-import-forever.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now seasonvar-import-forever.service
+systemctl status seasonvar-import-forever.service
+```
+
+Этот профиль циклически перечитывает XML sitemap и обрабатывает каталог одним PHP-процессом. Он взаимоисключающий с Redis queued-профилем ниже: import/title-refresh workers и cron с `seasonvar:import --queued` должны быть отключены, иначе процессов будет больше одного. Подробный порядок переключения описан в [`docs/deployment.md`](docs/deployment.md).
+
 ### Параллельный импорт и обновление открытых тайтлов
 
 Для production используется `php artisan seasonvar:import --queued`. Команда находит и закрепляет подходящие страницы и ставит jobs в Redis. Десять workers обслуживают общий `seasonvar-import`, а отдельный IO-bound пул обслуживает browser-triggered `seasonvar-title-refresh`.

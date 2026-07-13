@@ -2,6 +2,7 @@
 
 ## 2026-07-13
 
+- Added a reboot-safe single-process `seasonvar:import --forever` systemd profile, made stale refresh jobs for deleted titles successful no-ops, and aligned preparation/finalizer retry deadlines with the longer configured page-claim lease.
 - Removed all application-generated HTTP 429 responses: web/API/Livewire transport throttles, action buckets, playback concurrency status, source-health budget and the dedicated Redis limiter workload. Authentication, authorization, CSRF, signed playback URLs, validation and bounded handling of remote Seasonvar/CDN 429 responses remain unchanged.
 - Closed the `/titles` crawl trap with `noindex,nofollow`, nofollow UI-state links, ClaudeBot/query robots rules and a Redis-backed query limiter while leaving canonical catalog and card links crawlable.
 - Reversed ranked SQLite search to start from materialized FTS candidates and paginated IDs before hydrating only visible cards. Contextual facets now load automatically in a deferred Livewire island, reuse one integer-only `json_each` match set and update linked results live without a «Показать фильтры» step. No search package or database replacement was added.

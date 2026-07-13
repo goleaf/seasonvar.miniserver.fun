@@ -149,6 +149,26 @@ Google-интеграции по умолчанию выключены. Если
 
 В коде приложения эти значения читаются через `config('seasonvar.*')`, `config('queue.*')`, `config('database.*')` и другие config-файлы, а не через прямой `env()`.
 
+## Постоянный однопоточный импорт Seasonvar
+
+Для сервера, где все XML sitemap и catalog pages должны непрерывно обновляться строго одним PHP-процессом, используется `deploy/systemd/seasonvar-import-forever.service`. Unit запускает единственную публичную команду `seasonvar:import --forever`, после завершения или сбоя поднимает её снова и автоматически стартует после reboot.
+
+Последовательный и Redis queued-профили взаимоисключающие. Перед включением однопоточного профиля дождитесь текущих jobs, затем отключите import/title-refresh worker instances и удалите или закомментируйте cron-строку `seasonvar:import --queued`. Failed jobs и Redis backlog при переключении не очищаются.
+
+```bash
+sudo systemctl disable --now 'seasonvar-import-worker@*.service'
+sudo systemctl disable --now 'seasonvar-title-refresh-worker@*.service'
+sudo cp deploy/systemd/seasonvar-import-forever.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now seasonvar-import-forever.service
+systemctl --no-pager --full status seasonvar-import-forever.service
+journalctl -u seasonvar-import-forever.service -f
+```
+
+Пауза между циклами задаётся `SEASONVAR_IMPORT_SLEEP_SECONDS`, default — 60 секунд. Один sync process самостоятельно выполняет discovery sitemap, parsing, catalog write и обслуживание производных данных. Он не обрабатывает `seasonvar-title-refresh` queue: открытая карточка всё равно получает изменения от следующего полного цикла через Livewire polling, но отдельный browser-triggered job останется в очереди до возврата queued-профиля.
+
+Для возврата к параллельному профилю сначала остановите и отключите `seasonvar-import-forever.service`, затем включите нужное число worker instances и верните queued cron. Одновременно оба профиля не запускаются.
+
 ## Пулы workers импорта Seasonvar
 
 Перед запуском примените additive migrations и проверьте Redis:

@@ -9,6 +9,26 @@ use Tests\TestCase;
 
 class TitleBackgroundRefreshDocumentationTest extends TestCase
 {
+    public function test_single_thread_forever_import_has_a_persistent_systemd_profile(): void
+    {
+        $service = File::get(base_path('deploy/systemd/seasonvar-import-forever.service'));
+
+        $this->assertStringContainsString(
+            'ExecStart=/usr/bin/php -d memory_limit=256M artisan seasonvar:import --forever',
+            $service,
+        );
+        $this->assertStringContainsString('Restart=always', $service);
+        $this->assertStringNotContainsString('queue:work', $service);
+        $this->assertStringContainsString(
+            'seasonvar-import-forever.service',
+            File::get(base_path('docs/deployment.md')),
+        );
+        $this->assertStringContainsString(
+            'взаимоисключ',
+            File::get(base_path('docs/queues.md')),
+        );
+    }
+
     public function test_project_docs_describe_the_title_background_refresh_contract(): void
     {
         $this->assertStringContainsString('15 минут', File::get(base_path('docs/importer.md')));

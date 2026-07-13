@@ -1,0 +1,18 @@
+[Unit]
+Description=Seasonvar continuous single-thread catalog import
+Wants=network-online.target
+After=network-online.target redis.service
+
+[Service]
+Type=simple
+User=www
+Group=www
+WorkingDirectory=/www/wwwroot/seasonvar.miniserver.fun
+ExecStart=/usr/bin/php -d memory_limit=256M artisan seasonvar:import --forever
+Restart=always
+RestartSec=5
+TimeoutStopSec=1200
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

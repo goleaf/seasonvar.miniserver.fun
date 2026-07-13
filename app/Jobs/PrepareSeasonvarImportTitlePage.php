@@ -45,7 +45,11 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
     public function __construct(public readonly int $preparedPageId)
     {
         $this->timeout = max(60, (int) config('seasonvar.queue.worker_timeout', 900));
-        $this->uniqueFor = max(300, (int) config('seasonvar.queue.retry_window_seconds', 21_600));
+        $this->uniqueFor = max(
+            300,
+            (int) config('seasonvar.queue.retry_window_seconds', 21_600),
+            (int) config('seasonvar.queue.claim_seconds', 86_400),
+        );
         $this->retryUntilTimestamp = now()->addSeconds($this->uniqueFor)->getTimestamp();
         $this->onConnection((string) config('seasonvar.queue.connection', 'redis'));
     }
