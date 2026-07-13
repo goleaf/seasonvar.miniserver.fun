@@ -10,6 +10,7 @@ use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\Catalog\CatalogEntitlementService;
 use App\Services\Catalog\CatalogPlaybackSourceResolver;
 use App\Services\Media\ExternalPlaylistImporter;
 use App\Services\Media\PlaybackSourceUrlGuard;
@@ -98,16 +99,64 @@ class SecurityHardeningTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_playback_availability_only_exposes_states_backed_by_the_current_access_model(): void
+    public function test_access_status_has_structured_current_and_future_entitlement_denials(): void
     {
         $this->assertSame([
             'ready',
             'authentication_required',
+            'plan_required',
+            'region_blocked',
+            'profile_restricted',
+            'concurrency_exceeded',
             'not_yet_published',
             'expired',
             'temporarily_unavailable',
             'not_found',
         ], array_column(PlaybackAvailability::cases(), 'value'));
+    }
+
+    public function test_entitlement_service_is_the_structured_boundary_for_queries_and_loaded_releases(): void
+    {
+        $user = User::factory()->create();
+        $public = CatalogTitle::factory()->create();
+        $authenticated = CatalogTitle::factory()->create([
+            'audience' => ContentAudience::Authenticated,
+        ]);
+        $future = CatalogTitle::factory()->create([
+            'available_from' => now()->addMinute(),
+        ]);
+        $expired = CatalogTitle::factory()->create([
+            'available_until' => now()->subMinute(),
+        ]);
+        $hidden = CatalogTitle::factory()->create([
+            'publication_status' => 'hidden',
+        ]);
+        $entitlements = app(CatalogEntitlementService::class);
+
+        $this->assertTrue($entitlements->decide(null, $public)->isAllowed());
+        $guestDecision = $entitlements->decide(null, $authenticated);
+        $this->assertSame(
+            PlaybackAvailability::AuthenticationRequired,
+            $guestDecision->status,
+        );
+        $this->assertSame('Для просмотра необходимо войти.', $guestDecision->message);
+        $this->assertTrue($entitlements->decide($user, $authenticated)->isAllowed());
+        $this->assertSame(PlaybackAvailability::NotYetPublished, $entitlements->decide($user, $future)->status);
+        $this->assertSame(PlaybackAvailability::Expired, $entitlements->decide($user, $expired)->status);
+        $this->assertSame(PlaybackAvailability::NotFound, $entitlements->decide($user, $hidden)->status);
+
+        $this->assertEqualsCanonicalizing(
+            [$public->id],
+            CatalogTitle::query()->availableTo(null)->pluck('id')->all(),
+        );
+        $this->assertEqualsCanonicalizing(
+            [$public->id, $authenticated->id],
+            CatalogTitle::query()->availableTo($user)->pluck('id')->all(),
+        );
+
+        $this->actingAs($user)
+            ->get(route('titles.show', $hidden))
+            ->assertNotFound();
     }
 
     public function test_playback_source_rechecks_parent_and_media_availability_on_direct_access(): void

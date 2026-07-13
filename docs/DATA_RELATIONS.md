@@ -55,7 +55,7 @@
 
 - `CatalogStatus` через `catalog_status_catalog_title` описывает production status источника (`выходит`, `завершён` и подобные значения) и не управляет публичной видимостью.
 - `publication_status` у `CatalogTitle`, `Season` и `Episode` использует `draft`, `published` или `hidden`; публичный scope дополнительно проверяет `available_from`, `available_until`, `audience` и `deleted_at`.
-- `audience=public` доступна гостю, `audience=authenticated` — только переданному в `availableTo(User)` пользователю. Модели подписок и территориальных лицензий пока отсутствуют и не симулируются.
+- `audience=public` доступна гостю, `audience=authenticated` — только текущему `User`. Оба SQL scope и решение для загруженной модели формирует `CatalogEntitlementService`. Модели профилей/детских ограничений/PIN, ролей, подписок, покупок, trial, территориальных лицензий и concurrent streams отсутствуют и не симулируются; отдельной строки profile preferences для языка, субтитров или autoplay также нет.
 - `CatalogTitle.is_published` временно сохраняется как legacy-совместимый второй защитный флаг. Публичный тайтл обязан одновременно иметь `is_published=true` и `publication_status=published`.
 - Обычные сезоны и серии имеют `kind=regular`, спецвыпуски — `kind=special`. Unique-ключи `(catalog_title_id, kind, number)` и `(season_id, kind, number)` разрешают специальный и обычный выпуск с одним номером, но запрещают дубли внутри вида.
 - Порядок сезонов и серий детерминирован: `kind`, `sort_order`, `number`, `id`; обычные выпуски идут до специальных и не перенумеровываются из-за specials.

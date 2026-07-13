@@ -26,6 +26,8 @@ Additive migration `2026_07_12_235500_create_catalog_user_state_tables` созд
 
 Progress policy настраивается через `PLAYBACK_PROGRESS_SESSION_TTL_SECONDS`, `PLAYBACK_PROGRESS_MAX_DURATION_SECONDS`, `PLAYBACK_PROGRESS_POSITION_TOLERANCE_SECONDS`, `PLAYBACK_PROGRESS_COMPLETION_PERCENT` и `PLAYBACK_PROGRESS_COMPLETION_REMAINING_SECONDS`. Менять completion thresholds нужно согласованно на всех web workers после `config:cache`.
 
+Централизация entitlement boundary от 13.07.2026 не добавляет миграций и не меняет данные: текущая схема по-прежнему поддерживает только `public/authenticated` audience и текущего `User` как активный профиль. Deploy выполняется обычным обновлением кода и cache warmup. Нельзя включать plan/region/profile/concurrency решения конфигурацией: сначала нужны отдельные additive schema/data migrations, backfill, ownership constraints и только затем подключение источника решения к `CatalogEntitlementService`.
+
 ## Окружение
 
 Production-значения должны задаваться сервером, process manager или зашифрованным environment-файлом. Нельзя коммитить `.env` и настоящие секреты.

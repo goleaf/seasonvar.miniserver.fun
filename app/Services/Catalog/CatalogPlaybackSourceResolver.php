@@ -6,9 +6,7 @@ namespace App\Services\Catalog;
 
 use App\DTOs\PlaybackPreferencesData;
 use App\DTOs\PlaybackSourceData;
-use App\Enums\ContentAudience;
 use App\Enums\PlaybackAvailability;
-use App\Enums\PublicationStatus;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
@@ -27,6 +25,7 @@ class CatalogPlaybackSourceResolver
     public function __construct(
         private readonly PlaybackSourceUrlGuard $urls,
         private readonly ExternalMediaMetadata $mediaMetadata,
+        private readonly CatalogEntitlementService $entitlements,
     ) {}
 
     public function resolve(
@@ -36,7 +35,7 @@ class CatalogPlaybackSourceResolver
         ?int $requestedMediaId,
         PlaybackPreferencesData $preferences,
     ): PlaybackSourceData {
-        $titleStatus = $this->releaseStatus($catalogTitle, $user);
+        $titleStatus = $this->entitlements->decide($user, $catalogTitle)->status;
 
         if ($titleStatus !== PlaybackAvailability::Ready) {
             return PlaybackSourceData::blocked($titleStatus);
@@ -50,7 +49,7 @@ class CatalogPlaybackSourceResolver
             }
 
             foreach ([$episode->season, $episode] as $release) {
-                $status = $this->releaseStatus($release, $user);
+                $status = $this->entitlements->decide($user, $release)->status;
 
                 if ($status !== PlaybackAvailability::Ready) {
                     return PlaybackSourceData::blocked($status);
@@ -93,6 +92,10 @@ class CatalogPlaybackSourceResolver
         $statuses = $evaluated->pluck('source.status');
         $status = collect([
             PlaybackAvailability::AuthenticationRequired,
+            PlaybackAvailability::PlanRequired,
+            PlaybackAvailability::RegionBlocked,
+            PlaybackAvailability::ProfileRestricted,
+            PlaybackAvailability::ConcurrencyExceeded,
             PlaybackAvailability::NotYetPublished,
             PlaybackAvailability::Expired,
             PlaybackAvailability::TemporarilyUnavailable,
@@ -140,7 +143,7 @@ class CatalogPlaybackSourceResolver
         }
 
         foreach ($this->parentReleases($media) as $release) {
-            $status = $this->releaseStatus($release, $user);
+            $status = $this->entitlements->decide($user, $release)->status;
 
             if ($status !== PlaybackAvailability::Ready) {
                 return $this->sourceResult($status);
@@ -180,50 +183,7 @@ class CatalogPlaybackSourceResolver
             return PlaybackAvailability::TemporarilyUnavailable;
         }
 
-        if ($media->status !== 'published') {
-            return PlaybackAvailability::NotFound;
-        }
-
-        if ($media->published_at !== null && $media->published_at->isFuture()) {
-            return PlaybackAvailability::NotYetPublished;
-        }
-
-        $status = $this->releaseStatus($media, $user);
-
-        if ($status !== PlaybackAvailability::Ready) {
-            return $status;
-        }
-
-        return PlaybackAvailability::Ready;
-    }
-
-    private function releaseStatus(CatalogTitle|Season|Episode|LicensedMedia $release, ?User $user): PlaybackAvailability
-    {
-        if ($release->deleted_at !== null) {
-            return PlaybackAvailability::NotFound;
-        }
-
-        if ($release instanceof CatalogTitle) {
-            if (! $release->is_published || $release->publication_status !== PublicationStatus::Published) {
-                return PlaybackAvailability::NotFound;
-            }
-        } elseif (! $release instanceof LicensedMedia && $release->publication_status !== PublicationStatus::Published) {
-            return PlaybackAvailability::NotFound;
-        }
-
-        if ($release->available_from !== null && $release->available_from->isFuture()) {
-            return PlaybackAvailability::NotYetPublished;
-        }
-
-        if ($release->available_until !== null && $release->available_until->isPast()) {
-            return PlaybackAvailability::Expired;
-        }
-
-        if ($release->audience === ContentAudience::Authenticated && $user === null) {
-            return PlaybackAvailability::AuthenticationRequired;
-        }
-
-        return PlaybackAvailability::Ready;
+        return $this->entitlements->decide($user, $media)->status;
     }
 
     private function relationshipsMatch(LicensedMedia $media): bool

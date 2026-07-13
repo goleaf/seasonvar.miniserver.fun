@@ -17,6 +17,8 @@
 
 ## 2026-07-13
 
+- Publication/audience/window проверки каталога, поиска, route binding, рекомендаций, policies и playback сведены в `CatalogEntitlementService`: SQL scopes и loaded release возвращают согласованную границу, а signed direct playback повторяет решение для каждого parent/media.
+- Решение различает authentication/plan/region/profile/concurrency отказы, но продукт по-прежнему реализует только publication window и `public/authenticated` audience. Профили, PIN, roles/admin preview, billing/territory и stream sessions намеренно не добавлялись; текущий `User` остаётся владельцем progress/history/watchlist/rating.
 - Список просмотра карточки переведён с race-prone toggle на explicit desired-state insert-or-ignore и conditional update под unique `(user_id, catalog_title_id)`; одинаковый retry не меняет даже `updated_at`, очистка отсутствующего состояния не создаёт строку, browser не передаёт user/profile ID, а policy теперь применяется внутри общего write-сервиса.
 - «Избранное» закреплено как название того же списка просмотра без второй таблицы. Диапазон внутренних оценок централизован в `config/catalog.php`; count/average обновляются одним conditional aggregate и не смешиваются с импортными provider ratings.
 - Livewire-плеер карточки тайтла получил кнопки предыдущей/следующей доступной серии. Навигация использует keyset-запросы по `sort_order`, номеру и ID, переходит между видимыми сезонами, пропускает hidden/expired/source-less записи и не смешивает обычные выпуски со спецвыпусками.

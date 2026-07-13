@@ -291,9 +291,4 @@ class CatalogTitle extends Model
             'indexed_at' => 'datetime',
         ];
     }
-
-    protected function usesLegacyPublicationFlag(): bool
-    {
-        return true;
-    }
 }

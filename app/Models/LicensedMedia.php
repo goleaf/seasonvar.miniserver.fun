@@ -143,19 +143,4 @@ class LicensedMedia extends Model
             'checked_at' => 'datetime',
         ];
     }
-
-    protected function publicationStatusColumn(): string
-    {
-        return 'status';
-    }
-
-    protected function publishedStatusValue(): string
-    {
-        return 'published';
-    }
-
-    protected function usesPublishedAtGate(): bool
-    {
-        return true;
-    }
 }

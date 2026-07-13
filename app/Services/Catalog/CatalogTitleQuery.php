@@ -32,6 +32,7 @@ class CatalogTitleQuery
     public function __construct(
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogSearchNormalizer $searchNormalizer,
+        private readonly CatalogEntitlementService $entitlements,
     ) {}
 
     /**
@@ -48,7 +49,7 @@ class CatalogTitleQuery
      */
     public function constrainVisible(Builder $query, ?User $user): Builder
     {
-        return $query->availableTo($user);
+        return $this->entitlements->constrain($query, $user);
     }
 
     /**
