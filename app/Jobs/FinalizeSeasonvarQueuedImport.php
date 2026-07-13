@@ -28,6 +28,8 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
     use Queueable;
     use SerializesModels;
 
+    public const GLOBAL_LOCK_KEY = 'seasonvar-import-finalizer';
+
     public int $tries = 0;
 
     public int $timeout = 900;
@@ -37,6 +39,7 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
     public function __construct(public readonly int $importRunId)
     {
         $this->retryUntilTimestamp = now()->addDays(2)->getTimestamp();
+        $this->timeout = max(60, (int) config('seasonvar.queue.worker_timeout', 900));
         $this->onConnection((string) config('seasonvar.queue.connection', 'redis'));
         $this->onQueue((string) config('seasonvar.queue.queue', 'seasonvar-import'));
     }
@@ -55,13 +58,39 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
 
         if ($claims->outstandingForRun($run->id) > 0) {
             $runs->heartbeat($run->id);
-            $this->release(max(1, (int) config('seasonvar.queue.finalizer_delay_seconds', 60)));
+            $this->release($this->releaseDelay());
 
             return;
         }
 
-        $pipeline->finalizeQueuedRun($run);
-        $statsSnapshots->refresh();
+        $lock = $this->uniqueVia()->lock(self::GLOBAL_LOCK_KEY, $this->timeout + 300);
+
+        if (! $lock->get()) {
+            $runs->heartbeat($run->id);
+            $this->release($this->releaseDelay());
+
+            return;
+        }
+
+        try {
+            $run->refresh();
+
+            if ($run->status !== 'running' || $run->execution_mode !== 'queue') {
+                return;
+            }
+
+            if ($claims->outstandingForRun($run->id) > 0) {
+                $runs->heartbeat($run->id);
+                $this->release($this->releaseDelay());
+
+                return;
+            }
+
+            $pipeline->finalizeQueuedRun($run);
+            $statsSnapshots->refresh();
+        } finally {
+            $lock->release();
+        }
     }
 
     /**
@@ -85,6 +114,11 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
     public function uniqueVia(): Repository
     {
         return Cache::store((string) config('seasonvar.queue.lock_store', 'redis'));
+    }
+
+    private function releaseDelay(): int
+    {
+        return max(1, (int) config('seasonvar.queue.finalizer_delay_seconds', 60));
     }
 
     public function failed(?Throwable $exception): void

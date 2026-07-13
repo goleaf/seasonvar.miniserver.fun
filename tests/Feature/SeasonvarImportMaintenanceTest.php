@@ -188,6 +188,45 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $this->assertStringNotContainsString('media.example.com', (string) json_encode($event->context));
     }
 
+    public function test_it_limits_external_media_health_checks_per_import_cycle(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake([
+            'media.example.com/*' => Http::response('', 206),
+        ]);
+        config([
+            'seasonvar.media_check.max_per_cycle' => 2,
+            'seasonvar.media_check.retries' => 1,
+        ]);
+
+        $catalogTitle = CatalogTitle::factory()->create();
+
+        collect(range(1, 4))->each(function (int $episodeNumber) use ($catalogTitle): void {
+            LicensedMedia::factory()->create([
+                'catalog_title_id' => $catalogTitle->id,
+                'playback_url' => "https://media.example.com/video/s01e{$episodeNumber}.mp4",
+                'path' => "https://media.example.com/video/s01e{$episodeNumber}.mp4",
+                'status' => 'draft',
+                'check_status' => null,
+                'checked_at' => null,
+                'next_check_at' => null,
+            ]);
+        });
+
+        $this->artisan('seasonvar:import', ['--no-discovery' => true])
+            ->assertExitCode(0);
+
+        $this->assertSame(2, LicensedMedia::query()->whereNotNull('checked_at')->count());
+        $this->assertSame(2, LicensedMedia::query()->whereNull('checked_at')->count());
+        Http::assertSentCount(2);
+
+        $event = SeasonvarImportEvent::query()
+            ->where('event', 'seasonvar-media-backlog-started')
+            ->firstOrFail();
+
+        $this->assertSame(2, $event->context['max_per_cycle']);
+    }
+
     public function test_media_availability_checks_reject_unsafe_urls_and_do_not_follow_redirects(): void
     {
         Http::preventStrayRequests();

@@ -570,6 +570,7 @@ class SeasonvarParallelImportTest extends TestCase
 
     public function test_finalizer_waits_while_run_has_live_claims(): void
     {
+        config(['seasonvar.queue.lock_store' => 'array']);
         $run = $this->queuedRun();
         $page = SourcePage::factory()->create();
         $claims = app(SeasonvarPageClaimManager::class);
@@ -585,8 +586,35 @@ class SeasonvarParallelImportTest extends TestCase
         $job->assertReleased(delay: 60);
     }
 
+    public function test_finalizer_waits_while_another_catalog_finalization_holds_the_global_lock(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        $run = $this->queuedRun();
+        $lock = Cache::store('array')->lock(FinalizeSeasonvarQueuedImport::GLOBAL_LOCK_KEY, 1200);
+        $this->assertTrue($lock->get());
+        $pipeline = Mockery::mock(SeasonvarImportPipeline::class);
+        $pipeline->shouldNotReceive('finalizeQueuedRun');
+        $stats = Mockery::mock(CatalogStatsSnapshotCache::class);
+        $stats->shouldNotReceive('refresh');
+        $job = (new FinalizeSeasonvarQueuedImport($run->id))->withFakeQueueInteractions();
+
+        try {
+            $job->handle(
+                app(SeasonvarPageClaimManager::class),
+                $pipeline,
+                $stats,
+                app(SeasonvarImportRunRecorder::class),
+            );
+
+            $job->assertReleased(delay: 60);
+        } finally {
+            $lock->release();
+        }
+    }
+
     public function test_finalizer_completes_run_after_all_claims_are_released(): void
     {
+        config(['seasonvar.queue.lock_store' => 'array']);
         $run = $this->queuedRun();
         $completed = $run->replicate();
         $completed->id = $run->id;
@@ -606,7 +634,9 @@ class SeasonvarParallelImportTest extends TestCase
             app(SeasonvarImportRunRecorder::class),
         );
 
-        $this->assertTrue(true);
+        $releasedLock = Cache::store('array')->lock(FinalizeSeasonvarQueuedImport::GLOBAL_LOCK_KEY, 1200);
+        $this->assertTrue($releasedLock->get());
+        $releasedLock->release();
     }
 
     public function test_queued_command_dispatches_pages_without_discovery(): void

@@ -721,6 +721,7 @@ class SeasonvarImportPipeline
         }
 
         $chunkSize = $this->mediaCheckChunkSize();
+        $maxPerCycle = $this->mediaCheckMaxPerCycle();
         $mediaQuery = LicensedMedia::query()
             ->whereIn('health_status', [
                 MediaHealthStatus::Active->value,
@@ -738,6 +739,7 @@ class SeasonvarImportPipeline
 
         $progress('seasonvar-media-backlog-started', [
             'chunk_size' => $chunkSize,
+            'max_per_cycle' => $maxPerCycle,
         ]);
 
         $result = [
@@ -749,7 +751,7 @@ class SeasonvarImportPipeline
             'media_failed' => 0,
         ];
 
-        foreach ($mediaQuery->lazyById($chunkSize)->chunk($chunkSize) as $mediaItems) {
+        foreach ($mediaQuery->lazyById($chunkSize)->take($maxPerCycle)->chunk($chunkSize) as $mediaItems) {
             $mediaItems = $mediaItems instanceof Collection ? $mediaItems : $mediaItems->collect();
             $result['selected'] += $mediaItems->count();
 
@@ -1108,6 +1110,11 @@ class SeasonvarImportPipeline
     private function mediaCheckChunkSize(): int
     {
         return max(1, (int) config('seasonvar.media_check.chunk_size', 25));
+    }
+
+    private function mediaCheckMaxPerCycle(): int
+    {
+        return max(1, (int) config('seasonvar.media_check.max_per_cycle', 20));
     }
 
     private function mediaMetadataChunkSize(): int

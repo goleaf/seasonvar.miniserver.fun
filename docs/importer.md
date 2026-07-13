@@ -20,13 +20,15 @@
 
 `/admin/imports` вызывает `SeasonvarImportAdminService`, который под Redis lock создаёт один `queued` run и отправляет `StartSeasonvarQueuedImport` только с scalar run ID. Coordinator имеет 3 attempts, backoff 60/300/900 секунд, timeout 900 секунд и unique lock на run. Transient network/408/425/429/5xx/SQLite-lock ошибки возвращают run в `queued` для retry; permanent validation/provider errors переводят его в `failed` без бесполезного повтора.
 
-Page jobs принимают только IDs, lease token, canonical group key и force flag. Provider HTML/JSON, credentials и URLs в payload не кладутся. После всех claims finalizer сохраняет `completed`, а при ненулевых page/media failures — `partial`. Все queue exception details проходят общий sanitizer, который убирает credentials, URLs и filesystem paths.
+Page jobs принимают только IDs, lease token, canonical group key и force flag. Provider HTML/JSON, credentials и URLs в payload не кладутся. После всех claims finalizer сохраняет `completed`, а при ненулевых page/media failures — `partial`. Per-run unique lock не допускает дубликат одного finalizer job, а отдельный глобальный Redis lock `seasonvar-import-finalizer` сериализует catalog-wide cleanup, media maintenance, merge и recommendation rebuild между разными runs. Занятый lock не меняет итоговый статус: job обновляет heartbeat и возвращается в очередь с `SEASONVAR_QUEUE_FINALIZER_DELAY_SECONDS`. Все queue exception details проходят общий sanitizer, который убирает credentials, URLs и filesystem paths.
 
 Счётчики admin UI — операционные: `created` объединяет новые source pages и media rows, `updated` — успешно обработанные source pages и обновлённые media, `skipped` — необработанные выбранные pages и пропущенные media, `failed` — page/media failures. Это не точное число созданных Eloquent entities: текущая pipeline не хранит entity-level deltas, а выдавать их приближённо было бы некорректно.
 
 ## Здоровье видеоисточников
 
 `SeasonvarMediaAvailabilityChecker` возвращает нормализованный результат без provider body/URL, а `MediaSourceHealthManager` атомарно применяет его к одной строке `licensed_media`. Health-check не выполняется внутри catalog transaction. В queued-режиме due backlog обрабатывается finalizer job; отдельного Laravel scheduler для этого нет, потому что production cron уже запускает единый dispatcher `seasonvar:import --queued` десять раз в сутки.
+
+Один full cycle или queued finalizer проверяет не больше `SEASONVAR_MEDIA_CHECK_MAX_PER_CYCLE` due-строк в стабильном порядке `id`; default `20` оставляет запас внутри 900-секундного worker timeout даже при трёх 10-секундных попытках на URL. `SEASONVAR_MEDIA_CHECK_CHUNK_SIZE` управляет только размером чтения и памяти, а не снимает hard cap. Непроверенный остаток сохраняет `next_check_at` и остаётся due для следующих запусков. Увеличивать cap следует только после измерения provider latency и вместе с проверкой worker timeout/retry policy.
 
 - `active` — последняя проверка успешна; источник участвует в playback и counts.
 - `degraded` — временная ошибка ещё не достигла порога; источник остаётся кандидатом, а resolver может выбрать резервный вариант.

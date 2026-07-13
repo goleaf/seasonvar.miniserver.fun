@@ -47,6 +47,7 @@
 - Queued-режим пишет задания в Redis-очередь `seasonvar-import`; десять workers не резервируют jobs в SQLite и выполняют внешние HTTP-запросы вне catalog transactions.
 - Диспетчер может запускаться десять раз в сутки, но живые lease и 24-часовой freshness interval не позволяют повторно ставить или скачивать свежую страницу при каждом cron tick.
 - Импорт одного URL выполняет только targeted page/season pipeline и не запускает глобальные relation cleanup, media metadata/source-key backlog, merge и rebuild рекомендаций. Эти maintenance-операции остаются в full/sitemap cycle и queued finalizer.
+- Catalog-wide queued finalization сериализована отдельным Redis lock `seasonvar-import-finalizer`: разные runs не выполняют одновременно cleanup, media backlog, merge и recommendation rebuild. TTL lock равен job timeout плюс 300 секунд; успешный или исключительный выход освобождает lock через `finally`, а аварийно убитый worker не оставляет вечную блокировку.
 - Исключение сделано для ограниченного recovery-пакета: каждый запуск берёт не более `SEASONVAR_IMPORT_CHUNK_SIZE` старейших claimable-страниц `missing_data`. Живые claims отфильтровываются до limit, а после попытки обновлённые timestamps перемещают страницы в конец ротации, поэтому тысячи проблемных страниц не скачиваются одновременно.
 - После импорта более поздней страницы сезона устаревшие title-level missing-data flags ранней страницы синхронизируются bounded database update без повторного HTTP-запроса. Pending, failed и claimed страницы сохраняют собственный lifecycle и не получают состояние соседней страницы.
 - Страницы сезонов одного сериала используют общий Redis lock по canonical slug. Ключ вычисляется worker во время обработки, поэтому старые jobs с numeric key в сериализованном payload также не создают параллельные записи одного тайтла.
@@ -62,6 +63,7 @@
 - После завершения `seasonvar:import` команда принудительно обновляет stats snapshot, чтобы следующий Livewire poll показывал финальные счетчики запуска.
 - `/admin/imports` выбирает только отображаемые поля 20 последних запусков. Health totals и due total выполняются одним `UNION ALL` round trip по covering `licensed_media_health_due_idx`; active-state проверяется через `exists()`. Контрольный dashboard render ограничен пятью запросами.
 - Backlog здоровья перечисляет конечные состояния `active/degraded/unavailable`, а не использует `health_status != disabled`: SQLite поэтому выбирает `licensed_media_health_due_idx` вместо full table scan.
+- Health finalizer читает due backlog через `lazyById()`, но останавливает lazy stream после `SEASONVAR_MEDIA_CHECK_MAX_PER_CYCLE` строк. Default `20` ограничивает худший HTTP budget примерно 600 секундами при трёх попытках по 10 секунд; `chunk_size` остаётся независимой memory/query настройкой, а остаток переносится на следующие циклы.
 - Регрессия закрыта тестом `SeasonvarImportMaintenanceTest::test_it_updates_import_run_counters_after_each_processed_page_chunk`.
 
 ## Измерения и планы SQLite
