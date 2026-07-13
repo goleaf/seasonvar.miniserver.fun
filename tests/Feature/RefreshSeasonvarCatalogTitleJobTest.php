@@ -32,6 +32,7 @@ class RefreshSeasonvarCatalogTitleJobTest extends TestCase
             'seasonvar.queue.connection' => 'redis',
             'seasonvar.queue.queue' => 'seasonvar-import',
             'seasonvar.queue.lock_store' => 'array',
+            'seasonvar.queue.retry_window_seconds' => 21_600,
             'seasonvar.queue.worker_timeout' => 900,
             'seasonvar.title_refresh.active_seconds' => 21_900,
             'seasonvar.title_refresh.state_ttl_seconds' => 86_400,
@@ -42,6 +43,7 @@ class RefreshSeasonvarCatalogTitleJobTest extends TestCase
 
     public function test_it_is_unique_per_title_and_runs_the_forced_targeted_pipeline_on_the_import_queue(): void
     {
+        $this->freezeTime();
         $url = 'https://seasonvar.ru/serial-42-Test-1-season.html';
         $title = $this->refreshableTitle($url);
         $run = SeasonvarImportRun::query()->create([
@@ -80,6 +82,7 @@ class RefreshSeasonvarCatalogTitleJobTest extends TestCase
         $this->assertSame('redis', $job->connection);
         $this->assertSame('seasonvar-import', $job->queue);
         $this->assertSame('catalog-title-refresh:'.$title->id, $job->uniqueId());
+        $this->assertSame(now()->addSeconds(21_600)->getTimestamp(), $job->retryUntil()->getTimestamp());
         $this->assertSame([60, 300, 900], $job->backoff());
         $this->assertSame('completed', $state->status?->value);
         $this->assertSame($run->id, $state->importRunId);

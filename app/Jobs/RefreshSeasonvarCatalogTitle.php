@@ -42,7 +42,9 @@ final class RefreshSeasonvarCatalogTitle implements ShouldBeUnique, ShouldQueue
     {
         $this->timeout = max(60, (int) config('seasonvar.queue.worker_timeout', 900));
         $this->uniqueFor = max(300, (int) config('seasonvar.title_refresh.active_seconds', 21_900));
-        $this->retryUntilTimestamp = now()->addSeconds($this->uniqueFor)->getTimestamp();
+        $this->retryUntilTimestamp = now()
+            ->addSeconds(max(300, (int) config('seasonvar.queue.retry_window_seconds', 21_600)))
+            ->getTimestamp();
         $this->onConnection((string) config('seasonvar.queue.connection', 'redis'));
         $this->onQueue((string) config('seasonvar.queue.queue', 'seasonvar-import'));
     }
