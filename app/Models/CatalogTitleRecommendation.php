@@ -47,6 +47,33 @@ class CatalogTitleRecommendation extends Model
     ];
 
     /**
+     * @var array<string, string>
+     */
+    private const THEME_REASON_LABELS = [
+        'theme_romance' => 'Романтика',
+        'theme_relationships' => 'Отношения',
+        'theme_friendship' => 'Дружба',
+        'theme_youth' => 'Молодые герои',
+        'theme_family' => 'Семья',
+        'theme_workplace' => 'Работа',
+        'theme_school' => 'Учёба',
+        'theme_medical' => 'Медицина',
+        'theme_legal' => 'Право',
+        'theme_crime' => 'Преступление',
+        'theme_mystery' => 'Тайна',
+        'theme_fantasy' => 'Фэнтези',
+        'theme_supernatural' => 'Сверхъестественное',
+        'theme_science_fiction' => 'Фантастика',
+        'theme_historical' => 'История',
+        'theme_military' => 'Военная тема',
+        'theme_adventure' => 'Приключения',
+        'theme_sports' => 'Спорт',
+        'theme_music' => 'Музыка',
+        'theme_show_business' => 'Шоу-бизнес',
+        'theme_everyday_life' => 'Повседневная жизнь',
+    ];
+
+    /**
      * @return BelongsTo<CatalogTitle, $this>
      */
     public function catalogTitle(): BelongsTo
@@ -70,10 +97,17 @@ class CatalogTitleRecommendation extends Model
         $reasons = is_array($this->reasons) ? $this->reasons : [];
 
         return collect($reasons)
-            ->keys()
-            ->filter(fn (string $reason): bool => $reason !== 'type')
-            ->map(fn (string $reason): ?string => self::REASON_LABELS[$reason] ?? null)
+            ->map(fn (mixed $details, string $reason): array => [
+                'reason' => $reason,
+                'score' => is_array($details) ? (int) ($details['score'] ?? 0) : 0,
+            ])
+            ->reject(fn (array $item): bool => $item['reason'] === 'type')
+            ->sortByDesc('score')
+            ->map(fn (array $item): ?string => self::THEME_REASON_LABELS[$item['reason']]
+                ?? self::REASON_LABELS[$item['reason']]
+                ?? null)
             ->filter()
+            ->unique()
             ->take(4)
             ->values()
             ->all();

@@ -1787,7 +1787,7 @@ class CatalogPageTest extends TestCase
             ->assertDontSeeText('Видимый сериал');
     }
 
-    public function test_title_page_uses_readable_related_lists_without_country_section(): void
+    public function test_title_page_uses_one_readable_related_list_without_country_section(): void
     {
         $catalogTitle = CatalogTitle::factory()->create([
             'title' => 'Черная лагуна',
@@ -1844,11 +1844,14 @@ class CatalogPageTest extends TestCase
         $response
             ->assertOk()
             ->assertSeeText('Советуем посмотреть')
-            ->assertSeeText('По похожим жанрам')
-            ->assertSeeText('За 2007 год')
+            ->assertSeeText('Похожий жанр')
+            ->assertSeeText('Тот же год')
             ->assertSeeText('Очень длинное название похожего сериала с переносом текста')
             ->assertSeeText('Long Original Related Series Title')
+            ->assertSee('data-recommendation-list', false)
             ->assertSee('break-words', false)
+            ->assertDontSeeText('По похожим жанрам')
+            ->assertDontSeeText('За 2007 год')
             ->assertDontSeeText('Похожие сериалы пока не подобраны')
             ->assertDontSeeText('Еще из жанра')
             ->assertDontSeeText('Еще из страны')
@@ -1908,8 +1911,10 @@ class CatalogPageTest extends TestCase
         $response
             ->assertOk()
             ->assertSeeText('Советуем посмотреть')
-            ->assertSeeText('Ближайшие совпадения')
+            ->assertSeeText('Совет № 1')
             ->assertSeeText('Жанр')
+            ->assertSee('data-recommendation-list', false)
+            ->assertDontSeeText('Ближайшие совпадения')
             ->assertDontSeeText('По жанрам')
             ->assertSeeTextInOrder([
                 'Первый точный совет',

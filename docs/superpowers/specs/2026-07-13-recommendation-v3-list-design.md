@@ -89,7 +89,7 @@ Relation/theme contribution умножается на bounded inverse-frequency 
 - одна строка на рекомендацию, порядок DOM равен `rank`;
 - широкий poster frame слева: около 112 px на телефоне и 176–192 px начиная с `sm`;
 - landscape frame заполняется по ширине через `object-cover`, без 2% overscan; допустима обрезка только по высоте;
-- справа: номер, название, original title, год/type, до четырёх причин и короткое двухстрочное описание;
+- справа: номер, название, original title, год/type, до четырёх причин и полное читаемое описание без CSS-обрезания;
 - строки разделяются обычным `divide-y`, без отдельных card borders, shadow и nested panels;
 - на узком телефоне сохраняется двухколоночная строка, поэтому список не превращается обратно в grid;
 - весь row имеет один основной stretched link; taxonomy links в recommendation row не выводятся, чтобы не создавать конкурирующие tab stops.

@@ -14,6 +14,7 @@ class PosterFrame extends Component
         public string $alt = '',
         public string $emptyLabel = 'Нет постера',
         string $loading = 'lazy',
+        public bool $overscan = true,
     ) {
         $this->loading = in_array($loading, ['lazy', 'eager'], true) ? $loading : 'lazy';
     }

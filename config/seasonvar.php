@@ -127,5 +127,6 @@ return [
         'max_per_title' => (int) env('SEASONVAR_RECOMMENDATION_MAX_PER_TITLE', 12),
         'candidate_limit' => (int) env('SEASONVAR_RECOMMENDATION_CANDIDATE_LIMIT', 120),
         'candidate_scan_per_feature' => (int) env('SEASONVAR_RECOMMENDATION_CANDIDATE_SCAN_PER_FEATURE', 60),
+        'diversity_penalty' => (int) env('SEASONVAR_RECOMMENDATION_DIVERSITY_PENALTY', 120),
     ],
 ];

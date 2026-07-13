@@ -431,6 +431,10 @@ class SeasonvarImportMaintenanceTest extends TestCase
             'name' => 'Детектив',
             'slug' => 'detektiv',
         ]);
+        $actor = Actor::query()->create([
+            'name' => 'Общий актер',
+            'slug' => 'obshii-akter-rekomendacij',
+        ]);
         $catalogTitle = CatalogTitle::factory()->create([
             'title' => 'Импортный главный сериал',
             'slug' => 'importnyi-glavnyi-serial',
@@ -443,6 +447,8 @@ class SeasonvarImportMaintenanceTest extends TestCase
         ]);
         $catalogTitle->genres()->attach($genre->id);
         $recommendedTitle->genres()->attach($genre->id);
+        $catalogTitle->actors()->attach($actor->id);
+        $recommendedTitle->actors()->attach($actor->id);
         LicensedMedia::factory()->create([
             'catalog_title_id' => $recommendedTitle->id,
             'status' => 'published',
@@ -460,9 +466,9 @@ class SeasonvarImportMaintenanceTest extends TestCase
 
         $this->assertNotNull($recommendation);
         $this->assertSame(1, $recommendation->rank);
-        $this->assertSame('v2', $recommendation->algorithm_version);
+        $this->assertSame('v3', $recommendation->algorithm_version);
         $this->assertSame('full', $run->summary['last_recommendations']['mode']);
-        $this->assertSame('v2', $run->summary['last_recommendations']['algorithm_version']);
+        $this->assertSame('v3', $run->summary['last_recommendations']['algorithm_version']);
         $this->assertSame(2, $run->summary['last_recommendations']['titles']);
         $this->assertSame(1, $run->summary['last_recommendations']['titles_with_recommendations']);
         $this->assertSame(1, $run->summary['last_recommendations']['titles_without_recommendations']);

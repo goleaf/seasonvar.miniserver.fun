@@ -438,14 +438,24 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringNotContainsString('ring-1 ring-slate-200', $html);
     }
 
-    public function test_title_recommendation_columns_do_not_stretch_the_featured_card(): void
+    public function test_recommendation_poster_disables_overscan_for_the_wide_crop(): void
+    {
+        $html = Blade::render(
+            '<x-ui.poster-frame src="https://media.example.com/poster.jpg" alt="Постер" :overscan="false" class="aspect-[16/10]" />',
+        );
+
+        $this->assertStringContainsString('aspect-[16/10]', $html);
+        $this->assertStringContainsString('object-cover object-center', $html);
+        $this->assertStringNotContainsString('scale-[1.02]', $html);
+    }
+
+    public function test_title_recommendations_use_one_divided_list_instead_of_columns(): void
     {
         $detail = File::get(resource_path('views/livewire/catalog-title-detail.blade.php'));
 
-        $this->assertStringContainsString(
-            'grid items-start gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]',
-            $detail,
-        );
+        $this->assertStringContainsString('data-recommendation-list', $detail);
+        $this->assertStringContainsString('divide-y divide-slate-200', $detail);
+        $this->assertStringNotContainsString('lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]', $detail);
     }
 
     public function test_title_player_keeps_personal_controls_below_the_full_width_player(): void

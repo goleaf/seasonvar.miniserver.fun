@@ -9,9 +9,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
-class CatalogTitleRecommendationBuilder
+final class CatalogTitleRecommendationBuilder
 {
-    private const ALGORITHM_VERSION = 'v2';
+    private const ALGORITHM_VERSION = 'v3';
 
     private const DEFAULT_MIN_SCORE = 600;
 
@@ -36,36 +36,59 @@ class CatalogTitleRecommendationBuilder
      * @var array<string, int>
      */
     private const MATCH_WEIGHTS = [
-        'genre' => 520,
-        'tag' => 280,
-        'director' => 180,
-        'actor' => 140,
-        'network' => 120,
-        'studio' => 120,
-        'translation' => 80,
-        'status' => 70,
-        'country' => 55,
-        'age_rating' => 25,
+        'genre' => 180,
+        'tag' => 220,
+        'director' => 280,
+        'actor' => 230,
+        'network' => 200,
+        'studio' => 200,
+        'translation' => 45,
+        'status' => 35,
+        'country' => 80,
+        'age_rating' => 20,
     ];
 
     /**
      * @var array<string, int>
      */
-    private const MATCH_CAPS = [
-        'genre' => 1560,
-        'tag' => 840,
-        'director' => 540,
-        'actor' => 560,
-        'network' => 360,
-        'studio' => 360,
-        'translation' => 160,
-        'status' => 140,
-        'country' => 110,
-        'age_rating' => 50,
+    private const THEME_WEIGHTS = [
+        'romance' => 260,
+        'relationships' => 240,
+        'friendship' => 160,
+        'family' => 150,
+        'youth' => 100,
+    ];
+
+    private const DEFAULT_THEME_WEIGHT = 180;
+
+    /** @var list<string> */
+    private const SOURCE_SIGNAL_TYPES = [
+        'provider_recommendation',
+        'related_title',
+    ];
+
+    /** @var list<string> */
+    private const STRONG_RELATION_TYPES = [
+        'tag',
+        'director',
+        'actor',
+        'network',
+        'studio',
     ];
 
     /** @var array<string, array<int, string>> */
     private array $candidateFeatureMap = [];
+
+    /** @var array<string, string> */
+    private array $candidateThemeMap = [];
+
+    /** @var array<string, array<int, int>> */
+    private array $featureDocumentCounts = [];
+
+    /** @var array<string, int> */
+    private array $themeDocumentCounts = [];
+
+    private int $profileCount = 0;
 
     /** @var list<string> */
     private array $profileRelationTypes = [];
@@ -73,6 +96,7 @@ class CatalogTitleRecommendationBuilder
     public function __construct(
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogTitleQuery $titles,
+        private readonly CatalogRecommendationThemeExtractor $themes,
     ) {}
 
     /**
@@ -85,6 +109,10 @@ class CatalogTitleRecommendationBuilder
             return $this->performRebuild($progress);
         } finally {
             $this->candidateFeatureMap = [];
+            $this->candidateThemeMap = [];
+            $this->featureDocumentCounts = [];
+            $this->themeDocumentCounts = [];
+            $this->profileCount = 0;
         }
     }
 
@@ -175,21 +203,30 @@ class CatalogTitleRecommendationBuilder
     {
         $profiles = [];
         $featureMap = $this->sharedCandidateFeatureMap();
+        $themeMap = [];
         $publicCounts = $this->titles->publicCardCounts(null);
         $this->profileRelationTypes = array_keys($this->taxonomies->relations());
 
         $this->titles->visibleTo(null)
-            ->select(['id', 'type', 'year'])
+            ->select(['id', 'title', 'original_title', 'description', 'type', 'year'])
             ->with(array_merge($this->taxonomies->relationNames(), [
                 'ratings:id,catalog_title_id,rating',
-                'recommendationSignals' => fn ($query) => $query->positive(),
+                'recommendationSignals' => fn ($query) => $query
+                    ->positive()
+                    ->whereIn('signal_type', self::SOURCE_SIGNAL_TYPES),
             ]))
             ->withCount([
                 'reviews',
                 'licensedMedia as published_media_count' => $publicCounts['licensedMedia as published_media_count'],
             ])
             ->lazyById($chunkSize)
-            ->each(function (CatalogTitle $title) use (&$featureMap, &$profiles): void {
+            ->each(function (CatalogTitle $title) use (&$featureMap, &$profiles, &$themeMap): void {
+                $relations = $this->profileRelations($title);
+                $themes = array_keys($this->themes->extract(
+                    $title->title,
+                    $title->original_title,
+                    $title->description,
+                ));
                 $profile = [
                     'id' => (int) $title->id,
                     'type' => (string) $title->type,
@@ -197,13 +234,17 @@ class CatalogTitleRecommendationBuilder
                     'published_media_count' => (int) $title->published_media_count,
                     'reviews_count' => (int) $title->reviews_count,
                     'best_rating' => $this->bestRating($title),
-                    'signal_score' => $this->signalScore($title),
                     'signals' => $this->profileSignals($title),
-                    'relations' => $this->profileRelations($title),
+                    'relations' => $relations,
+                    'themes' => $themes,
                 ];
                 $profiles[$title->id] = $this->encodeProfile($profile);
 
                 foreach ($profile['relations'] as $filterType => $ids) {
+                    foreach ($ids as $id) {
+                        $this->featureDocumentCounts[$filterType][$id] = ($this->featureDocumentCounts[$filterType][$id] ?? 0) + 1;
+                    }
+
                     if (! in_array($filterType, self::CANDIDATE_FEATURE_TYPES, true)) {
                         continue;
                     }
@@ -214,11 +255,34 @@ class CatalogTitleRecommendationBuilder
                         }
                     }
                 }
+
+                foreach ($themes as $theme) {
+                    $this->themeDocumentCounts[$theme] = ($this->themeDocumentCounts[$theme] ?? 0) + 1;
+                    $this->appendPackedTitleId($themeMap, 'theme:'.$theme, $profile['id']);
+
+                    foreach ($relations['country'] ?? [] as $countryId) {
+                        $this->appendPackedTitleId($themeMap, 'theme:'.$theme.'|country:'.$countryId, $profile['id']);
+                    }
+
+                    foreach ($relations['genre'] ?? [] as $genreId) {
+                        $this->appendPackedTitleId($themeMap, 'theme:'.$theme.'|genre:'.$genreId, $profile['id']);
+                    }
+                }
             });
 
         $this->candidateFeatureMap = $featureMap;
+        $this->candidateThemeMap = $themeMap;
+        $this->profileCount = count($profiles);
 
         return $profiles;
+    }
+
+    /**
+     * @param  array<string, string>  $map
+     */
+    private function appendPackedTitleId(array &$map, string $key, int $titleId): void
+    {
+        $map[$key] = ($map[$key] ?? '').pack('V', $titleId);
     }
 
     /**
@@ -292,26 +356,21 @@ class CatalogTitleRecommendationBuilder
     private function profileSignals(CatalogTitle $title): array
     {
         return $title->recommendationSignals
+            ->filter(fn ($signal): bool => in_array($signal->signal_type, self::SOURCE_SIGNAL_TYPES, true))
             ->mapWithKeys(fn ($signal): array => [
                 $signal->signal_type.':'.$signal->signal_key => (int) $signal->weight,
             ])
             ->all();
     }
 
-    private function signalScore(CatalogTitle $title): int
-    {
-        return (int) $title->recommendationSignals
-            ->sum(fn ($signal): int => max(0, (int) $signal->weight));
-    }
-
     /**
-     * @param  array{id: int, type: string, year: int|null, published_media_count: int, reviews_count: int, best_rating: float|null, signal_score: int, signals: array<string, int>, relations: array<string, list<int>>}  $source
+     * @param  array{id: int, type: string, year: int|null, published_media_count: int, reviews_count: int, best_rating: float|null, signals: array<string, int>, relations: array<string, list<int>>, themes: list<string>}  $source
      * @param  array<int, string>  $profiles
      * @return list<array<string, mixed>>
      */
     private function recommendationRows(array $source, array $profiles, int $minScore, int $maxPerTitle, Carbon $computedAt): array
     {
-        $rowsByDiversity = [];
+        $rows = [];
 
         foreach ($this->candidateIds($source) as $candidateId) {
             $encodedCandidate = $profiles[$candidateId] ?? null;
@@ -328,7 +387,7 @@ class CatalogTitleRecommendationBuilder
                 continue;
             }
 
-            $this->retainDiversityCandidate($rowsByDiversity, [
+            $rows[] = [
                 'catalog_title_id' => $source['id'],
                 'recommended_title_id' => $candidate['id'],
                 'score' => $scored['score'],
@@ -338,15 +397,9 @@ class CatalogTitleRecommendationBuilder
                 'source_score' => $scored['source_score'],
                 'quality_score' => $scored['quality_score'],
                 'reasons' => $scored['reasons'],
-                'diversity_key' => $scored['diversity_key'],
+                'diversity_features' => $scored['diversity_features'],
                 'computed_at' => $computedAt,
-            ], $maxPerTitle);
-        }
-
-        $rows = [];
-
-        foreach ($rowsByDiversity as $diversityRows) {
-            array_push($rows, ...$diversityRows);
+            ];
         }
 
         return $this->rankRows($rows, $maxPerTitle);
@@ -373,7 +426,7 @@ class CatalogTitleRecommendationBuilder
     }
 
     /**
-     * @param  array{id: int, relations: array<string, list<int>>}  $source
+     * @param  array{id: int, relations: array<string, list<int>>, themes: list<string>}  $source
      * @return list<int>
      */
     private function candidateIds(array $source): array
@@ -413,6 +466,41 @@ class CatalogTitleRecommendationBuilder
             }
         }
 
+        foreach ($source['themes'] as $theme) {
+            $this->accumulateThemeCandidates(
+                $candidateScores,
+                $source['id'],
+                'theme:'.$theme,
+                220,
+                $scanPerFeature,
+            );
+
+            foreach ($source['relations']['country'] ?? [] as $countryId) {
+                $this->accumulateThemeCandidates(
+                    $candidateScores,
+                    $source['id'],
+                    'theme:'.$theme.'|country:'.$countryId,
+                    340,
+                    $scanPerFeature,
+                );
+            }
+
+            foreach ($source['relations']['genre'] ?? [] as $genreId) {
+                $this->accumulateThemeCandidates(
+                    $candidateScores,
+                    $source['id'],
+                    'theme:'.$theme.'|genre:'.$genreId,
+                    380,
+                    $scanPerFeature,
+                );
+            }
+
+            if (count($candidateScores) > $retainedPoolSize * 2) {
+                arsort($candidateScores, SORT_NUMERIC);
+                $candidateScores = array_slice($candidateScores, 0, $retainedPoolSize, true);
+            }
+        }
+
         arsort($candidateScores, SORT_NUMERIC);
 
         return array_map(
@@ -421,12 +509,35 @@ class CatalogTitleRecommendationBuilder
         );
     }
 
+    /**
+     * @param  array<int, int>  $candidateScores
+     */
+    private function accumulateThemeCandidates(
+        array &$candidateScores,
+        int $sourceId,
+        string $key,
+        int $weight,
+        int $limit,
+    ): void {
+        $packedTitleIds = $this->candidateThemeMap[$key] ?? null;
+
+        if ($packedTitleIds === null) {
+            return;
+        }
+
+        foreach ($this->sampledFeatureTitleIds($packedTitleIds, $sourceId, 'theme', $key, $limit) as $candidateId) {
+            if ($candidateId !== $sourceId) {
+                $candidateScores[$candidateId] = ($candidateScores[$candidateId] ?? 0) + $weight;
+            }
+        }
+    }
+
     /** @return iterable<int> */
     private function sampledFeatureTitleIds(
         string $packedTitleIds,
         int $sourceId,
         string $filterType,
-        int $featureId,
+        int|string $featureId,
         int $limit,
     ): iterable {
         $titleCount = intdiv(strlen($packedTitleIds), 4);
@@ -446,7 +557,7 @@ class CatalogTitleRecommendationBuilder
     }
 
     /**
-     * @return array{id: int, type: string, year: int|null, published_media_count: int, reviews_count: int, best_rating: float|null, signal_score: int, signals: array<string, int>, relations: array<string, list<int>>}
+     * @return array{id: int, type: string, year: int|null, published_media_count: int, reviews_count: int, best_rating: float|null, signals: array<string, int>, relations: array<string, list<int>>, themes: list<string>}
      */
     private function decodeProfile(string $profile): array
     {
@@ -459,14 +570,14 @@ class CatalogTitleRecommendationBuilder
             'published_media_count' => (int) $decoded[3],
             'reviews_count' => (int) $decoded[4],
             'best_rating' => $decoded[5] !== null ? (float) $decoded[5] : null,
-            'signal_score' => (int) $decoded[6],
-            'signals' => (array) $decoded[7],
-            'relations' => array_combine($this->profileRelationTypes, (array) $decoded[8]),
+            'signals' => (array) $decoded[6],
+            'relations' => array_combine($this->profileRelationTypes, (array) $decoded[7]),
+            'themes' => array_values((array) $decoded[8]),
         ];
     }
 
     /**
-     * @param  array{id: int, type: string, year: int|null, published_media_count: int, reviews_count: int, best_rating: float|null, signal_score: int, signals: array<string, int>, relations: array<string, list<int>>}  $profile
+     * @param  array{id: int, type: string, year: int|null, published_media_count: int, reviews_count: int, best_rating: float|null, signals: array<string, int>, relations: array<string, list<int>>, themes: list<string>}  $profile
      */
     private function encodeProfile(array $profile): string
     {
@@ -477,16 +588,16 @@ class CatalogTitleRecommendationBuilder
             $profile['published_media_count'],
             $profile['reviews_count'],
             $profile['best_rating'],
-            $profile['signal_score'],
             $profile['signals'],
             array_values($profile['relations']),
+            $profile['themes'],
         ], JSON_THROW_ON_ERROR);
     }
 
     /**
-     * @param  array{type: string, year: int|null, signals: array<string, int>, relations: array<string, list<int>>}  $source
-     * @param  array{id: int, type: string, year: int|null, published_media_count: int, reviews_count: int, best_rating: float|null, signal_score: int, signals: array<string, int>, relations: array<string, list<int>>}  $candidate
-     * @return array{score: int, metadata_score: int, source_score: int, quality_score: int, matched_features_count: int, reasons: array<string, array<string, int|float|string>>, diversity_key: string}|null
+     * @param  array{type: string, year: int|null, signals: array<string, int>, relations: array<string, list<int>>, themes: list<string>}  $source
+     * @param  array{id: int, type: string, year: int|null, published_media_count: int, reviews_count: int, best_rating: float|null, signals: array<string, int>, relations: array<string, list<int>>, themes: list<string>}  $candidate
+     * @return array{score: int, metadata_score: int, source_score: int, quality_score: int, matched_features_count: int, reasons: array<string, array<string, int|float|string>>, diversity_features: list<string>}|null
      */
     private function score(array $source, array $candidate, int $minScore): ?array
     {
@@ -498,7 +609,8 @@ class CatalogTitleRecommendationBuilder
         $sourceScore = 0;
         $qualityScore = 0;
         $reasons = [];
-        $diversityKey = 'other';
+        $diversityFeatures = [];
+        $hasStrongMatch = false;
 
         foreach (self::MATCH_WEIGHTS as $filterType => $weight) {
             $shared = array_values(array_intersect(
@@ -511,16 +623,40 @@ class CatalogTitleRecommendationBuilder
                 continue;
             }
 
-            $reasonScore = min($sharedCount * $weight, self::MATCH_CAPS[$filterType] ?? $sharedCount * $weight);
+            $contributions = array_map(
+                fn (int $id): int => (int) round(
+                    $weight * $this->rarityMultiplier($this->featureDocumentCounts[$filterType][$id] ?? 1),
+                ),
+                $shared,
+            );
+            rsort($contributions, SORT_NUMERIC);
+            $reasonScore = array_sum(array_slice($contributions, 0, 3));
             $metadataScore += $reasonScore;
             $reasons[$filterType] = [
                 'count' => $sharedCount,
                 'score' => $reasonScore,
             ];
 
-            if ($diversityKey === 'other' && in_array($filterType, ['genre', 'tag', 'director', 'actor', 'network', 'studio'], true)) {
-                $diversityKey = $filterType.':'.$shared[0];
+            if (in_array($filterType, self::CANDIDATE_FEATURE_TYPES, true)) {
+                foreach ($shared as $id) {
+                    $diversityFeatures[] = $filterType.':'.$id;
+                }
             }
+
+            if (in_array($filterType, self::STRONG_RELATION_TYPES, true)) {
+                $hasStrongMatch = true;
+            }
+        }
+
+        foreach (array_values(array_intersect($source['themes'], $candidate['themes'])) as $theme) {
+            $reasonScore = (int) round(
+                (self::THEME_WEIGHTS[$theme] ?? self::DEFAULT_THEME_WEIGHT)
+                * $this->rarityMultiplier($this->themeDocumentCounts[$theme] ?? 1),
+            );
+            $metadataScore += $reasonScore;
+            $reasons['theme_'.$theme] = ['score' => $reasonScore];
+            $diversityFeatures[] = 'theme:'.$theme;
+            $hasStrongMatch = true;
         }
 
         if ($source['type'] !== '' && $source['type'] === $candidate['type']) {
@@ -535,9 +671,13 @@ class CatalogTitleRecommendationBuilder
             $reasons['year'] = ['score' => $yearScore];
         }
 
-        $sourceScore += $this->sourceSignalScore($source['signals'], $candidate['signals'], $candidate['signal_score'], $reasons);
+        $sourceScore += $this->sourceSignalScore($source['signals'], $candidate['signals'], $reasons);
 
-        $mediaScore = 100 + min(100, (int) floor(log($candidate['published_media_count'] + 1) * 35));
+        if (! $hasStrongMatch || ($metadataScore + $sourceScore) < $minScore) {
+            return null;
+        }
+
+        $mediaScore = 60 + min(40, (int) floor(log($candidate['published_media_count'] + 1) * 15));
         $qualityScore += $mediaScore;
         $reasons['published_media'] = [
             'count' => $candidate['published_media_count'],
@@ -545,7 +685,7 @@ class CatalogTitleRecommendationBuilder
         ];
 
         if ($candidate['best_rating'] !== null) {
-            $ratingScore = (int) round(min(10.0, max(0.0, $candidate['best_rating'])) * 7);
+            $ratingScore = (int) round(min(10.0, max(0.0, $candidate['best_rating'])) * 5);
             $qualityScore += $ratingScore;
             $reasons['rating'] = [
                 'value' => $candidate['best_rating'],
@@ -554,7 +694,7 @@ class CatalogTitleRecommendationBuilder
         }
 
         if ($candidate['reviews_count'] > 0) {
-            $reviewScore = min(60, (int) floor(log($candidate['reviews_count'] + 1) * 20));
+            $reviewScore = min(30, (int) floor(log($candidate['reviews_count'] + 1) * 10));
             $qualityScore += $reviewScore;
             $reasons['reviews'] = [
                 'count' => $candidate['reviews_count'],
@@ -564,18 +704,14 @@ class CatalogTitleRecommendationBuilder
 
         $score = $metadataScore + $sourceScore + $qualityScore;
 
-        if ($score < $minScore) {
-            return null;
-        }
-
         return [
             'score' => $score,
             'metadata_score' => $metadataScore,
             'source_score' => $sourceScore,
             'quality_score' => $qualityScore,
-            'matched_features_count' => count(array_diff(array_keys($reasons), ['type', 'published_media'])),
+            'matched_features_count' => count(array_diff(array_keys($reasons), ['type', 'published_media', 'rating', 'reviews'])),
             'reasons' => $reasons,
-            'diversity_key' => $diversityKey,
+            'diversity_features' => array_values(array_unique($diversityFeatures)),
         ];
     }
 
@@ -584,7 +720,7 @@ class CatalogTitleRecommendationBuilder
      * @param  array<string, int>  $candidateSignals
      * @param  array<string, array<string, int|float|string>>  $reasons
      */
-    private function sourceSignalScore(array $sourceSignals, array $candidateSignals, int $candidateSignalScore, array &$reasons): int
+    private function sourceSignalScore(array $sourceSignals, array $candidateSignals, array &$reasons): int
     {
         $sharedScore = 0;
         $sharedCount = 0;
@@ -600,7 +736,7 @@ class CatalogTitleRecommendationBuilder
             $sharedCount++;
         }
 
-        $score = min(220, (int) floor($sharedScore / 2)) + min(120, (int) floor($candidateSignalScore / 4));
+        $score = min(220, (int) floor($sharedScore / 2));
 
         if ($score > 0) {
             $reasons['source_signal'] = [
@@ -610,6 +746,17 @@ class CatalogTitleRecommendationBuilder
         }
 
         return $score;
+    }
+
+    private function rarityMultiplier(int $documentCount): float
+    {
+        if ($this->profileCount <= 1) {
+            return 1.0;
+        }
+
+        $catalogToDocumentRatio = $this->profileCount / max(1, $documentCount);
+
+        return 1.0 + min(1.5, log10(1.0 + $catalogToDocumentRatio));
     }
 
     private function yearScore(?int $sourceYear, ?int $candidateYear): int
@@ -634,32 +781,95 @@ class CatalogTitleRecommendationBuilder
      */
     private function rankRows(array $rows, int $maxPerTitle): array
     {
-        $diversityUsage = [];
+        $remaining = array_values($rows);
+        $selected = [];
+        $diversityPenalty = max(0, (int) config('seasonvar.recommendations.diversity_penalty', 120));
 
-        return collect($rows)
-            ->sortByDesc('score')
-            ->values()
-            ->map(function (array $row) use (&$diversityUsage): array {
-                $key = (string) $row['diversity_key'];
-                $usage = $diversityUsage[$key] ?? 0;
-                $diversityUsage[$key] = $usage + 1;
-                $row['ranking_score'] = (int) $row['score'] - ($usage * 40);
+        while ($remaining !== [] && count($selected) < $maxPerTitle) {
+            $bestIndex = null;
+            $bestRankingScore = PHP_INT_MIN;
+            $bestRawScore = PHP_INT_MIN;
+            $bestTitleId = PHP_INT_MAX;
 
-                return $row;
-            })
-            ->sortByDesc('ranking_score')
-            ->values()
-            ->take($maxPerTitle)
-            ->map(function (array $row, int $index): array {
-                unset($row['diversity_key'], $row['ranking_score']);
+            foreach ($remaining as $index => $row) {
+                $features = $this->rowDiversityFeatures($row);
+                $maximumOverlap = 0.0;
+
+                foreach ($selected as $selectedRow) {
+                    $maximumOverlap = max(
+                        $maximumOverlap,
+                        $this->jaccardOverlap($features, $this->rowDiversityFeatures($selectedRow)),
+                    );
+                }
+
+                $rawScore = (int) $row['score'];
+                $rankingScore = $rawScore - (int) round($diversityPenalty * $maximumOverlap);
+                $titleId = (int) ($row['recommended_title_id'] ?? PHP_INT_MAX);
+
+                if (
+                    $rankingScore > $bestRankingScore
+                    || ($rankingScore === $bestRankingScore && $rawScore > $bestRawScore)
+                    || ($rankingScore === $bestRankingScore && $rawScore === $bestRawScore && $titleId < $bestTitleId)
+                ) {
+                    $bestIndex = $index;
+                    $bestRankingScore = $rankingScore;
+                    $bestRawScore = $rawScore;
+                    $bestTitleId = $titleId;
+                }
+            }
+
+            if ($bestIndex === null) {
+                break;
+            }
+
+            $selected[] = $remaining[$bestIndex];
+            unset($remaining[$bestIndex]);
+            $remaining = array_values($remaining);
+        }
+
+        $timestamp = now();
+
+        return collect($selected)
+            ->map(function (array $row, int $index) use ($timestamp): array {
+                unset($row['diversity_features'], $row['diversity_key']);
                 $row['rank'] = $index + 1;
-                $row['reasons'] = json_encode($row['reasons'], JSON_UNESCAPED_UNICODE);
-                $row['created_at'] = now();
-                $row['updated_at'] = now();
+                $row['reasons'] = json_encode($row['reasons'] ?? [], JSON_UNESCAPED_UNICODE);
+                $row['created_at'] = $timestamp;
+                $row['updated_at'] = $timestamp;
 
                 return $row;
             })
             ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @return list<string>
+     */
+    private function rowDiversityFeatures(array $row): array
+    {
+        $features = $row['diversity_features'] ?? [];
+
+        if ($features === [] && isset($row['diversity_key'])) {
+            $features = [(string) $row['diversity_key']];
+        }
+
+        return array_values(array_unique(array_map('strval', (array) $features)));
+    }
+
+    /**
+     * @param  list<string>  $left
+     * @param  list<string>  $right
+     */
+    private function jaccardOverlap(array $left, array $right): float
+    {
+        $union = array_unique([...$left, ...$right]);
+
+        if ($union === []) {
+            return 0.0;
+        }
+
+        return count(array_intersect($left, $right)) / count($union);
     }
 
     /**
@@ -672,6 +882,28 @@ class CatalogTitleRecommendationBuilder
             $deleted = CatalogTitleRecommendation::query()
                 ->where('catalog_title_id', $titleId)
                 ->delete();
+
+            if (! $this->titles->visibleTo(null)->whereKey($titleId)->exists()) {
+                return [
+                    'stored' => 0,
+                    'deleted' => $deleted,
+                ];
+            }
+
+            $visibleCandidateIds = $this->titles->visibleTo(null)
+                ->whereKey(collect($rows)->pluck('recommended_title_id'))
+                ->pluck('id')
+                ->map(fn (mixed $id): int => (int) $id)
+                ->all();
+            $rows = collect($rows)
+                ->filter(fn (array $row): bool => in_array((int) $row['recommended_title_id'], $visibleCandidateIds, true))
+                ->values()
+                ->map(function (array $row, int $index): array {
+                    $row['rank'] = $index + 1;
+
+                    return $row;
+                })
+                ->all();
 
             foreach (array_chunk($rows, 500) as $chunk) {
                 CatalogTitleRecommendation::query()->insert($chunk);

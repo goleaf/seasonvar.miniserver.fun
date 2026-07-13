@@ -9,6 +9,7 @@
             :alt="$alt"
             :empty-label="$emptyLabel"
             :loading="$loading"
+            :overscan="$layout !== 'recommendation'"
             class="h-full w-full"
         />
     </div>

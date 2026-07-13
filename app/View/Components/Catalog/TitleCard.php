@@ -11,7 +11,7 @@ use Illuminate\View\Component;
 
 class TitleCard extends Component
 {
-    private const LAYOUTS = ['grid', 'horizontal', 'compact'];
+    private const LAYOUTS = ['grid', 'horizontal', 'compact', 'recommendation'];
 
     public int $seasonsCount;
 
@@ -33,6 +33,9 @@ class TitleCard extends Component
         string $layout = 'grid',
         public bool $showDescription = true,
         public bool $readable = false,
+        public ?int $rank = null,
+        /** @var list<string> */
+        public array $reasonLabels = [],
     ) {
         $this->layout = in_array($layout, self::LAYOUTS, true) ? $layout : 'grid';
         $this->seasonsCount = (int) ($title->seasons_count ?? ($title->relationLoaded('seasons') ? $title->seasons->count() : 0));
@@ -50,8 +53,10 @@ class TitleCard extends Component
 
     public function render(): View
     {
-        return view($this->layout === 'grid'
-            ? 'components.catalog.title-card-grid'
-            : 'components.catalog.title-card-horizontal');
+        return view(match ($this->layout) {
+            'grid' => 'components.catalog.title-card-grid',
+            'recommendation' => 'components.catalog.title-card-recommendation',
+            default => 'components.catalog.title-card-horizontal',
+        });
     }
 }

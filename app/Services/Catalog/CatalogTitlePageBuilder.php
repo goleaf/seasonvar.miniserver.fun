@@ -2,6 +2,7 @@
 
 namespace App\Services\Catalog;
 
+use App\DTOs\CatalogRecommendationListItem;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
 use App\Models\User;
@@ -46,19 +47,7 @@ class CatalogTitlePageBuilder
         $parsedSeasonCount = $seasons->filter(fn ($season): bool => (int) $season->available_episodes_count > 0)->count();
         $mediaCount = $this->playback->availableMedia($catalogTitle, $user)->count();
         $genreIds = $taxonomiesByType->get('genre', collect())->pluck('id')->unique()->values();
-        $genreRecommendations = $this->relatedTitleSummaryQuery($catalogTitle, $user)
-            ->when($genreIds->isNotEmpty(), fn (Builder $query): Builder => $query->whereHas('genres', fn (Builder $query): Builder => $query->whereKey($genreIds)))
-            ->when($genreIds->isEmpty(), fn (Builder $query): Builder => $query->whereRaw('1 = 0'))
-            ->latest('indexed_at')
-            ->limit(8)
-            ->get();
-        $yearRecommendations = $catalogTitle->year
-            ? $this->relatedTitleSummaryQuery($catalogTitle, $user)
-                ->where('year', $catalogTitle->year)
-                ->latest('indexed_at')
-                ->limit(8)
-                ->get()
-            : collect();
+        $recommendationItems = $this->recommendationItems($catalogTitle, $user, $genreIds);
 
         $showView = new CatalogShowViewModel(
             title: $catalogTitle,
@@ -73,7 +62,6 @@ class CatalogTitlePageBuilder
             parsedSeasonCount: $parsedSeasonCount,
             mediaCount: $mediaCount,
         );
-        $recommendedTitleRecommendations = $this->recommendedTitleRecommendations($catalogTitle, $user);
 
         return [
             'title' => $catalogTitle,
@@ -98,11 +86,77 @@ class CatalogTitlePageBuilder
             'ratings' => $catalogTitle->ratings,
             'topTaxonomies' => $showView->topTaxonomies,
             'showView' => $showView,
-            'recommendedTitleRecommendations' => $recommendedTitleRecommendations,
-            'genreRecommendations' => $genreRecommendations,
-            'yearRecommendations' => $yearRecommendations,
+            'recommendationItems' => $recommendationItems,
             'seo' => $this->seo->title($catalogTitle, $taxonomiesByType, $seasons, $episodeCount, $mediaCount, null, null),
         ];
+    }
+
+    /**
+     * @param  Collection<int, int>  $genreIds
+     * @return Collection<int, CatalogRecommendationListItem>
+     */
+    private function recommendationItems(CatalogTitle $catalogTitle, ?User $user, Collection $genreIds): Collection
+    {
+        $precomputed = $this->recommendedTitleRecommendations($catalogTitle, $user);
+
+        if ($precomputed->isNotEmpty()) {
+            return $precomputed
+                ->values()
+                ->map(fn (CatalogTitleRecommendation $recommendation, int $index): CatalogRecommendationListItem => new CatalogRecommendationListItem(
+                    title: $recommendation->recommendedTitle,
+                    rank: $index + 1,
+                    reasonLabels: $recommendation->reasonLabels(),
+                    score: (int) $recommendation->score,
+                ));
+        }
+
+        return $this->fallbackRecommendationItems($catalogTitle, $user, $genreIds);
+    }
+
+    /**
+     * @param  Collection<int, int>  $genreIds
+     * @return Collection<int, CatalogRecommendationListItem>
+     */
+    private function fallbackRecommendationItems(CatalogTitle $catalogTitle, ?User $user, Collection $genreIds): Collection
+    {
+        $genreRecommendations = $this->relatedTitleSummaryQuery($catalogTitle, $user)
+            ->when($genreIds->isNotEmpty(), fn (Builder $query): Builder => $query->whereHas('genres', fn (Builder $query): Builder => $query->whereKey($genreIds)))
+            ->when($genreIds->isEmpty(), fn (Builder $query): Builder => $query->whereRaw('1 = 0'))
+            ->latest('indexed_at')
+            ->limit(8)
+            ->get();
+        $yearRecommendations = $catalogTitle->year
+            ? $this->relatedTitleSummaryQuery($catalogTitle, $user)
+                ->where('year', $catalogTitle->year)
+                ->latest('indexed_at')
+                ->limit(8)
+                ->get()
+            : collect();
+        $titles = [];
+        $labels = [];
+
+        foreach ([
+            'Похожий жанр' => $genreRecommendations,
+            'Тот же год' => $yearRecommendations,
+        ] as $label => $recommendations) {
+            foreach ($recommendations as $recommendedTitle) {
+                $titles[$recommendedTitle->id] ??= $recommendedTitle;
+                $labels[$recommendedTitle->id] ??= [];
+
+                if (! in_array($label, $labels[$recommendedTitle->id], true)) {
+                    $labels[$recommendedTitle->id][] = $label;
+                }
+            }
+        }
+
+        return collect(array_values($titles))
+            ->take($this->recommendationDisplayLimit())
+            ->values()
+            ->map(fn (CatalogTitle $recommendedTitle, int $index): CatalogRecommendationListItem => new CatalogRecommendationListItem(
+                title: $recommendedTitle,
+                rank: $index + 1,
+                reasonLabels: $labels[$recommendedTitle->id],
+            ));
     }
 
     /** @return array<string, mixed> */

@@ -211,121 +211,31 @@
             </x-ui.panel>
 
             <x-ui.panel :title="__('catalog.title.recommendations')" icon="fa-solid fa-thumbs-up" :pad="false">
-                @if ($recommendedTitleRecommendations->first()?->recommendedTitle)
-                    <div class="space-y-3 p-3">
-                        <div class="grid items-start gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-                            <div class="min-w-0">
-                                <x-catalog.title-card :title="$recommendedTitleRecommendations->first()->recommendedTitle" />
-
-                                @if ($recommendedTitleRecommendations->first()->reasonLabels() !== [])
-                                    <div class="mt-2 flex flex-wrap gap-1 text-xs font-bold">
-                                        @foreach ($recommendedTitleRecommendations->first()->reasonLabels() as $reasonLabel)
-                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
-                                                <x-ui.icon name="fa-solid fa-check text-[0.8em]" />
-                                                <span>{{ $reasonLabel }}</span>
-                                            </span>
-                                        @endforeach
-                                    </div>
-                                @endif
-                            </div>
-
-                            @if ($recommendedTitleRecommendations->skip(1)->take(4)->isNotEmpty())
-                                <div class="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
-                                    <div class="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">
-                                        <x-ui.icon name="fa-solid fa-ranking-star text-emerald-700" />
-                                        <span>{{ __('catalog.title.closest_matches') }}</span>
-                                    </div>
-                                    <div class="divide-y divide-slate-200">
-                                        @foreach ($recommendedTitleRecommendations->skip(1)->take(4) as $recommendation)
-                                            <div>
-                                                <x-catalog.title-card :title="$recommendation->recommendedTitle" layout="compact" :show-description="false" />
-
-                                                @if ($recommendation->reasonLabels() !== [])
-                                                    <div class="flex flex-wrap gap-1 px-3 pb-3 text-xs font-bold">
-                                                        @foreach ($recommendation->reasonLabels() as $reasonLabel)
-                                                            <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-600">
-                                                                <x-ui.icon name="fa-solid fa-check text-[0.8em] text-emerald-700" />
-                                                                <span>{{ $reasonLabel }}</span>
-                                                            </span>
-                                                        @endforeach
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            @endif
-                        </div>
-
-                        @if ($recommendedTitleRecommendations->skip(5)->isNotEmpty())
-                            <div class="grid auto-rows-fr gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                                @foreach ($recommendedTitleRecommendations->skip(5) as $recommendation)
-                                    <div class="min-w-0">
-                                        <x-catalog.title-card :title="$recommendation->recommendedTitle" />
-
-                                        @if ($recommendation->reasonLabels() !== [])
-                                            <div class="mt-2 flex flex-wrap gap-1 text-xs font-bold">
-                                                @foreach ($recommendation->reasonLabels() as $reasonLabel)
-                                                    <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-600">
-                                                        <x-ui.icon name="fa-solid fa-check text-[0.8em] text-emerald-700" />
-                                                        <span>{{ $reasonLabel }}</span>
-                                                    </span>
-                                                @endforeach
-                                            </div>
-                                        @endif
-                                    </div>
-                                @endforeach
-                            </div>
-                        @endif
-                    </div>
+                @if ($recommendationItems->isNotEmpty())
+                    <ol class="divide-y divide-slate-200" data-recommendation-list>
+                        @foreach ($recommendationItems as $recommendationItem)
+                            <li
+                                wire:key="title-recommendation-{{ $title->id }}-{{ $recommendationItem->title->id }}"
+                                data-recommendation-row
+                            >
+                                <x-catalog.title-card
+                                    :title="$recommendationItem->title"
+                                    layout="recommendation"
+                                    :rank="$recommendationItem->rank"
+                                    :reason-labels="$recommendationItem->reasonLabels"
+                                />
+                            </li>
+                        @endforeach
+                    </ol>
                 @else
-                    @if ($genreRecommendations->isNotEmpty() || $yearRecommendations->isNotEmpty())
-                        <div class="grid min-w-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                            @if ($genreRecommendations->isNotEmpty())
-                                <section @class([
-                                    'min-w-0',
-                                    'lg:border-r lg:border-slate-200' => $yearRecommendations->isNotEmpty(),
-                                ])>
-                                    <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
-                                        <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
-                                            <x-ui.icon name="fa-solid fa-tags text-emerald-700" />
-                                            <span>{{ __('catalog.title.similar_genres') }}</span>
-                                        </div>
-                                    </div>
-                                    <div class="divide-y divide-slate-200">
-                                        @foreach ($genreRecommendations->take(6) as $recommendedTitle)
-                                            <x-catalog.title-card :title="$recommendedTitle" layout="horizontal" readable :show-description="false" />
-                                        @endforeach
-                                    </div>
-                                </section>
-                            @endif
-
-                            @if ($yearRecommendations->isNotEmpty())
-                                <section class="min-w-0">
-                                    <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
-                                        <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
-                                            <x-ui.icon name="fa-solid fa-calendar-days text-emerald-700" />
-                                            <span>{{ __('catalog.title.same_year', ['year' => $title->year]) }}</span>
-                                        </div>
-                                    </div>
-                                    <div class="divide-y divide-slate-200">
-                                        @foreach ($yearRecommendations->take(6) as $recommendedTitle)
-                                            <x-catalog.title-card :title="$recommendedTitle" layout="horizontal" readable :show-description="false" />
-                                        @endforeach
-                                    </div>
-                                </section>
-                            @endif
-                        </div>
-                    @else
-                        <div class="p-3">
-                            <div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                                <div class="inline-flex items-center gap-2">
-                                    <x-ui.icon name="fa-solid fa-circle-info text-slate-400" />
-                                    <span>{{ __('catalog.title.recommendations_missing') }}</span>
-                                </div>
+                    <div class="p-3">
+                        <div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                            <div class="inline-flex items-center gap-2">
+                                <x-ui.icon name="fa-solid fa-circle-info text-slate-400" />
+                                <span>{{ __('catalog.title.recommendations_missing') }}</span>
                             </div>
                         </div>
-                    @endif
+                    </div>
                 @endif
             </x-ui.panel>
 
