@@ -22,6 +22,7 @@
 - `App\View\ViewModels\CatalogTitlesViewModel` готовит состояние multi-select формы фильтров: скрытые поля для поиска/сортировки/буквы, выбранные годы и активные relation-значения. Для блока «Точный подбор» ViewModel также готовит точный active count, GET reset query и максимальный календарный год; вычисления в Blade не дублируются.
 - Шаблон `resources/views/catalog/titles.blade.php` может добавлять `data-catalog-filter-*` атрибуты для локального client-side поиска внутри уже отрендеренных групп фильтров; база данных из Blade не запрашивается.
 - `App\View\ViewModels\CatalogShowViewModel` готовит состояние страницы тайтла: группы таксономий, выбранную серию, варианты медиа, MIME-тип видео, бейджи сезонов и подпись playback-профиля для каждой видимой серии.
+- `resources/views/catalog/show.blade.php` остаётся компактной layout/SEO точкой входа. Полную SSR и динамическую разметку тайтла рендерит `resources/views/livewire/catalog-title-detail.blade.php`; Blade читает уже подготовленные page-builder данные и безопасное refresh state без запросов к cache или базе.
 - `App\Livewire\CatalogTitlePlayer` передаёт в свой Blade только render-local summaries, серии одного сезона, media и `CatalogShowViewModel`; публичные properties ограничены locked title ID и небольшими URL-скалярами.
 - Layout использует `x-layout.site-header` и `x-layout.site-footer`, один `<main>` и skip-link к основному содержимому.
 

@@ -2,7 +2,6 @@
 
 namespace App\Services\Catalog;
 
-use App\Http\Requests\CatalogShowRequest;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
 use App\Models\User;
@@ -27,7 +26,7 @@ class CatalogTitlePageBuilder
     /**
      * @return array<string, mixed>
      */
-    public function data(CatalogShowRequest $request, CatalogTitle $catalogTitle): array
+    public function data(CatalogTitle $catalogTitle, ?User $user): array
     {
         $catalogTitle->load(array_merge([
             'aliases:id,catalog_title_id,name',
@@ -35,20 +34,20 @@ class CatalogTitlePageBuilder
         ], $this->taxonomies->relationSummaryLoads()));
         $taxonomiesByType = collect($this->taxonomies->relations())
             ->mapWithKeys(fn (array $config, string $filterType): array => [$filterType => $catalogTitle->{$config['relation']}->values()]);
-        $seasons = $this->playback->seasonSummaries($catalogTitle, $request->user());
+        $seasons = $this->playback->seasonSummaries($catalogTitle, $user);
         $episodeCount = (int) $seasons->sum('available_episodes_count');
         $taxonomyCount = $taxonomiesByType->sum(fn (Collection $items): int => $items->count());
         $parsedSeasonCount = $seasons->filter(fn ($season): bool => (int) $season->available_episodes_count > 0)->count();
-        $mediaCount = $this->playback->availableMedia($catalogTitle, $request->user())->count();
+        $mediaCount = $this->playback->availableMedia($catalogTitle, $user)->count();
         $genreIds = $taxonomiesByType->get('genre', collect())->pluck('id')->unique()->values();
-        $genreRecommendations = $this->relatedTitleSummaryQuery($catalogTitle, $request->user())
+        $genreRecommendations = $this->relatedTitleSummaryQuery($catalogTitle, $user)
             ->when($genreIds->isNotEmpty(), fn (Builder $query): Builder => $query->whereHas('genres', fn (Builder $query): Builder => $query->whereKey($genreIds)))
             ->when($genreIds->isEmpty(), fn (Builder $query): Builder => $query->whereRaw('1 = 0'))
             ->latest('indexed_at')
             ->limit(8)
             ->get();
         $yearRecommendations = $catalogTitle->year
-            ? $this->relatedTitleSummaryQuery($catalogTitle, $request->user())
+            ? $this->relatedTitleSummaryQuery($catalogTitle, $user)
                 ->where('year', $catalogTitle->year)
                 ->latest('indexed_at')
                 ->limit(8)
@@ -68,7 +67,7 @@ class CatalogTitlePageBuilder
             parsedSeasonCount: $parsedSeasonCount,
             mediaCount: $mediaCount,
         );
-        $recommendedTitleRecommendations = $this->recommendedTitleRecommendations($catalogTitle, $request->user());
+        $recommendedTitleRecommendations = $this->recommendedTitleRecommendations($catalogTitle, $user);
 
         return [
             'title' => $catalogTitle,
@@ -98,6 +97,30 @@ class CatalogTitlePageBuilder
             'yearRecommendations' => $yearRecommendations,
             'seo' => $this->seo->title($catalogTitle, $taxonomiesByType, $seasons, $episodeCount, $mediaCount, null, null),
         ];
+    }
+
+    /** @return array<string, mixed> */
+    public function seo(CatalogTitle $catalogTitle, ?User $user): array
+    {
+        $catalogTitle->load(array_merge([
+            'aliases:id,catalog_title_id,name',
+            'ratings:id,catalog_title_id,provider,rating,votes',
+        ], $this->taxonomies->relationSummaryLoads()));
+        $taxonomiesByType = collect($this->taxonomies->relations())
+            ->mapWithKeys(fn (array $config, string $filterType): array => [$filterType => $catalogTitle->{$config['relation']}->values()]);
+        $seasons = $this->playback->seasonSummaries($catalogTitle, $user);
+        $episodeCount = (int) $seasons->sum('available_episodes_count');
+        $mediaCount = $this->playback->availableMedia($catalogTitle, $user)->count();
+
+        return $this->seo->title(
+            $catalogTitle,
+            $taxonomiesByType,
+            $seasons,
+            $episodeCount,
+            $mediaCount,
+            null,
+            null,
+        );
     }
 
     /**

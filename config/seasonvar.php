@@ -34,6 +34,12 @@ return [
         'busy_log_seconds' => (int) env('SEASONVAR_QUEUE_BUSY_LOG_SECONDS', 3600),
         'stale_after_minutes' => (int) env('SEASONVAR_QUEUE_STALE_AFTER_MINUTES', 120),
     ],
+    'title_refresh' => [
+        'fresh_minutes' => (int) env('SEASONVAR_TITLE_REFRESH_FRESH_MINUTES', 15),
+        'state_ttl_seconds' => (int) env('SEASONVAR_TITLE_REFRESH_STATE_TTL_SECONDS', 86400),
+        'active_seconds' => (int) env('SEASONVAR_TITLE_REFRESH_ACTIVE_SECONDS', 21900),
+        'dispatch_lock_seconds' => (int) env('SEASONVAR_TITLE_REFRESH_DISPATCH_LOCK_SECONDS', 10),
+    ],
     'media_check' => [
         'enabled' => filter_var(env('SEASONVAR_MEDIA_CHECK_ENABLED', true), FILTER_VALIDATE_BOOL),
         'retries' => (int) env('SEASONVAR_MEDIA_CHECK_RETRIES', 3),

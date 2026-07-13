@@ -7,7 +7,7 @@
 - Vite 8 и `laravel-vite-plugin` 3 собирают фронтенд.
 - Tailwind CSS 4 подключается через `@tailwindcss/vite` и `resources/css/app.css`.
 - FontAwesome, Plyr и HLS подключаются из локальных npm-пакетов, без CDN.
-- Livewire 4 используется для интерактивного каталога `/titles`, playback-island карточки `/titles/{slug}`, личной страницы `/watching` и live-страницы `/stats`; ассеты Livewire подключаются явно через layout.
+- Livewire 4 используется для интерактивного каталога `/titles`, полной динамической оболочки и playback-island карточки `/titles/{slug}`, личной страницы `/watching` и live-страницы `/stats`; ассеты Livewire подключаются явно через layout.
 - Volt не установлен и не используется. Все Livewire-компоненты conventional class-based, а Blade остаётся presentation-only без PHP tags, database/cache/service calls.
 
 ## Команды
@@ -36,6 +36,7 @@ composer dev
 - Серверное состояние `/titles` ведёт `CatalogSeries`: строка поиска обновляется с debounce 650 мс, checkbox/расширенные поля применяются по submit, а сортировка, вид, размер страницы, алфавит и пагинация обновляются отдельными Livewire actions. Для всех форм сохранён обычный GET fallback; malformed и out-of-range `page` канонизируется redirect-ом, чтобы адресная строка не сохраняла stale границу.
 - «Точный подбор» группирует `year_*`/`updated`, `seasons_*`/`episodes_*`, `rating_*`/`votes_min` и `video`/`quality` без изменения query keys. `resetAdvancedFilters` сбрасывает только этот набор, а `CatalogTitlesViewModel::advancedFiltersResetQuery()` даёт эквивалентный GET fallback. Мобильная панель выдачи переиспользует `setView`/`setPerPage` и те же query builders, что desktop, без нового client state.
 - `CatalogTitlePlayer` использует scoped Livewire loading states для смены media-варианта: `selectMedia` подсвечивает только player island, варианты просмотра и список серий. Ссылки вариантов и серий сохраняют обычный `href` fallback и обновляют URL-профиль `variant`/`quality`/`format`.
+- `CatalogTitleDetail` во время активного targeted refresh обновляет всю видимую оболочку через `wire:poll.3s.visible="refreshCatalog"`. После `completed` или `failed` poll-атрибут исчезает. Каждый poll отправляет scoped событие вложенному `CatalogTitlePlayer`, который очищает только render-кэши и сохраняет валидные `season`/`episode`/`media`/profile URL-параметры.
 - `/watching` не сериализует Eloquent collections в публичное состояние: Continue Watching и paginator истории строятся только внутри render. Удаление использует `wire:confirm`, полная очистка — `wire:confirm.prompt`, а `historyPage` остаётся отдельным URL-параметром Livewire pagination.
 - `/admin/imports` опрашивает сервер через `wire:poll.5s.visible` только пока есть active run. После terminal state poll-attribute исчезает; run models и collections не хранятся в public snapshot, а rows имеют stable `wire:key`.
 - Для HLS используется `hls.js/light`: он сохраняет воспроизведение HLS-плейлистов и не тянет модули субтитров, DRM и расширенной аналитики, которые сейчас не используются интерфейсом.
@@ -50,7 +51,7 @@ composer dev
 - Каталожные постеры используют `object-cover` и один внешний frame карточки: свободная полоса над изображением и двойная внутренняя рамка не допускаются.
 - Основная зона видео занимает всю ширину playback-панели; блок «Ваш сериал» расположен следующей адаптивной строкой под плеером.
 - Новые пользовательские строки Blade/Livewire добавляются в `lang/{locale}/catalog.php`; plural counts выводятся через `trans_choice()`. Интерфейсная locale управляет только UI и page metadata и не подменяет перевод, язык аудио или субтитров.
-- Essential title metadata остаётся в статическом Blade response. `CatalogShowViewModel` передаёт presentation-safe plain text, а Livewire player не становится источником `<h1>`, description, canonical или Open Graph.
+- Essential title metadata остаётся в первом server-rendered HTML через `CatalogTitleDetail`. `CatalogShowViewModel` передаёт presentation-safe plain text; canonical и Open Graph по-прежнему готовит controller SEO shell, а вложенный Livewire player не становится их источником.
 - Ссылки сортировки, вида, размера страницы, алфавита, фильтров и быстрого доступа используют плоские состояния без декоративной border/ring-обводки и сохраняют touch-target не менее 44 пикселей. Рамки остаются у форм, alert, player/media frames и структурных карточек.
 - Общий `focus-visible` определен в `resources/css/app.css`; составной `x-form.search-field` и локальные поиски фильтров используют `data-focus-frame`, чтобы клавиатурный focus охватывал весь control без двойного контура.
 - Глобальный cursor affordance также задан в `resources/css/app.css`: ссылки, кнопки, summary, связанные label, select/input controls, `[role="button"]` и `[data-catalog-history]` получают pointer, disabled/aria-disabled controls — not-allowed, scoped loading nodes — wait.

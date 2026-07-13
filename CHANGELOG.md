@@ -2,6 +2,7 @@
 
 ## 2026-07-13
 
+- Added automatic background refresh on series pages: one unique queued job updates the canonical page and all known seasons no more often than every 15 minutes, while the complete Livewire title view reflects new metadata, seasons, episodes and media every three seconds without resetting a valid playback selection.
 - Replaced the oversized flat advanced catalog form with the compact «Точный подбор» groups for period, series length, rating and video, including explanatory copy, proportional controls, an exact active-count/reset boundary, a preserved GET fallback, and mobile access to view and page-size controls.
 - Unified public poster rendering around one fill frame: catalog, title, viewing-history and stats images now use `object-cover`, tolerate a small side crop and no longer add a second inner border/ring. Title-level playback now marks its guaranteed-null episode relation as loaded, preventing strict Eloquent lazy-loading failures when several title-level sources are evaluated.
 - Removed the redundant `/titles` summary cards, added reduced-motion-aware smooth pagination return to the result boundary, widened the title player to the full panel and moved the responsive “Ваш сериал” controls below it. Public display accessors now separate a matching `/original_title` suffix while preserving the source/search data and unrelated slash names.

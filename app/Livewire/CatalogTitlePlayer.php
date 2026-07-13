@@ -25,6 +25,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Renderless;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -95,6 +96,18 @@ class CatalogTitlePlayer extends Component
     {
         $this->catalogTitleId = $catalogTitleId;
         $this->normalizeInitialSelection();
+    }
+
+    #[On('catalog-title-refreshed')]
+    public function refreshCatalogData(int $catalogTitleId): void
+    {
+        if ($catalogTitleId !== $this->catalogTitleId) {
+            return;
+        }
+
+        $this->resolvedTitle = null;
+        $this->resolvedEpisode = null;
+        $this->resolvedSeasons = null;
     }
 
     public function playPrimary(): void

@@ -56,6 +56,17 @@ class FrontendAssetContractTest extends TestCase
         $this->assertStringContainsString('reducedMotionQuery.matches', $app);
     }
 
+    public function test_title_detail_uses_the_complete_livewire_refresh_shell(): void
+    {
+        $detail = File::get(resource_path('views/livewire/catalog-title-detail.blade.php'));
+        $show = File::get(resource_path('views/catalog/show.blade.php'));
+
+        $this->assertStringContainsString('wire:poll.3s.visible="refreshCatalog"', $detail);
+        $this->assertStringContainsString('data-livewire-catalog-title-detail', $detail);
+        $this->assertStringContainsString('data-title-refresh-status', $detail);
+        $this->assertStringContainsString('<livewire:catalog-title-detail', $show);
+    }
+
     public function test_player_assets_define_one_cleanup_safe_livewire_session_lifecycle(): void
     {
         $app = File::get(resource_path('js/app.js'));

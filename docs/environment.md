@@ -28,6 +28,8 @@ Shared defaults задают `REDIS_URL` либо `REDIS_HOST`, `REDIS_PORT`, `R
 
 Standalone default DBs: cache 1, queues 2, sessions 3, limiter 4, locks 5, broadcasting 6. При managed Redis/Cluster используйте отдельные endpoints и prefixes; DB numbers не считаются HA boundary.
 
+`SEASONVAR_TITLE_REFRESH_FRESH_MINUTES` задаёт успешное окно targeted refresh (по умолчанию 15 минут). `SEASONVAR_TITLE_REFRESH_STATE_TTL_SECONDS`, `SEASONVAR_TITLE_REFRESH_ACTIVE_SECONDS` и `SEASONVAR_TITLE_REFRESH_DISPATCH_LOCK_SECONDS` ограничивают operational state, stale-active recovery и atomic dispatch lock; job использует существующие `SEASONVAR_QUEUE_*` connection/queue/lock-store настройки.
+
 ## Memcached и application cache
 
 `MEMCACHED_HOST[_2|_3]`, ports и weights описывают hot pool. `MEMCACHED_HOT_PREFIX` обязан различать application/environment. Timeouts, failed-server removal, binary protocol и consistent distribution задаются отдельными переменными из `.env.example`; eviction допустим и не должен нарушать корректность.

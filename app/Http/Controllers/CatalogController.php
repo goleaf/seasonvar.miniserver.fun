@@ -33,7 +33,10 @@ class CatalogController extends Controller
             return redirect()->route('titles.show', $catalogTitle, 301);
         }
 
-        return view('catalog.show', $this->titlePage->data($request, $catalogTitle));
+        return view('catalog.show', [
+            'title' => $catalogTitle,
+            'seo' => $this->titlePage->seo($catalogTitle, $request->user()),
+        ]);
     }
 
     public function stats(): View

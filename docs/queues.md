@@ -17,6 +17,7 @@
 ## Jobs
 
 - `App\Jobs\RunSeasonvarImport` — внутренний queued wrapper для тяжелого импорта Seasonvar. Публичной командой остается `php artisan seasonvar:import`.
+- `RefreshSeasonvarCatalogTitle` — уникальный по `catalog_title_id` targeted job в очереди `seasonvar-import`. Он принимает только ID, читает и валидирует сохранённый URL, использует тот же `SeasonvarImportGroupKey` lock, что page jobs, и запускает forced pipeline в пределах настроенного retry window. Redis/cache state содержит только статус, timestamps и import run ID; URL и exception message в UI state/log context не попадают.
 - `StartSeasonvarQueuedImport` — короткий coordinator для `/admin/imports`: payload содержит только `seasonvar_import_runs.id`, затем job вызывает тот же `SeasonvarQueuedImportDispatcher`, что CLI `--queued`.
 - Coordinator ограничен 3 attempts, timeout 900 секунд и backoff 60/300/900; `ShouldBeUnique` держит lock на ID run. Page/finalizer jobs ограничены absolute retry window, согласованным с claim lease.
 - `SeasonvarImportFailureClassifier` разделяет temporary и permanent failures. Первые повторяют coordinator, вторые сразу фиксируют `failed`; queue logs и persisted error fields проходят `SeasonvarImportErrorSanitizer`.
