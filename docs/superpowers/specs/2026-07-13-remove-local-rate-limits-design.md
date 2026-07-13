@@ -22,6 +22,8 @@ Livewire update route продолжает использовать middleware `
 
 `RequestRateLimitKey` удаляется как неиспользуемый класс. Настройки query rate limit удаляются из `config/catalog.php`.
 
+Выделенные только для limiter counters `cache.limiter`, store `redis-limiter` и Redis connection `limiter` также удаляются. Readiness больше не проверяет неиспользуемое соединение `redis_limiter`; Redis cache, sessions, queues и locks остаются отдельными проверяемыми workloads.
+
 ## Действия приложения
 
 `SensitiveActionRateLimiter` удаляется вместе с dependency injection и вызовами в:
@@ -35,7 +37,7 @@ Livewire update route продолжает использовать middleware `
 
 После удаления limiter все перечисленные действия продолжают проходить текущую валидацию, авторизацию и доменные сервисы. Проверка доступности media source больше не возвращает `not_checked` только из-за исчерпанного локального bucket и выполняет обычную внешнюю проверку.
 
-Массив `security.rate_limits`, переменные `RATE_LIMIT_*` из `.env.example` и соответствующие эксплуатационные инструкции удаляются.
+Массив `security.rate_limits`, переменные `RATE_LIMIT_*`, `CACHE_LIMITER_*` и `REDIS_LIMITER_*` из `.env.example` и соответствующие эксплуатационные инструкции удаляются.
 
 ## Playback
 
@@ -53,7 +55,7 @@ Livewire update route продолжает использовать middleware `
 
 ## Документация
 
-Обновляются основные тематические документы из `docs/README.md`: security/architecture, administration, deployment и importer/media contracts там, где они описывают локальные budgets. Исторические design specs и implementation plans не переписываются: они сохраняют историю решений.
+Обновляются основные тематические документы из `docs/README.md`: security/authorization, architecture, API, catalog search, caching/performance, environment/testing, administration, deployment и importer/media contracts там, где они описывают локальные budgets или выделенный limiter workload. Исторические design specs, implementation plans и maintenance log не переписываются: они сохраняют историю решений.
 
 ## Тестирование
 
@@ -62,12 +64,14 @@ Livewire update route продолжает использовать middleware `
 - повторные catalog/user/admin actions не блокируются локальным bucket;
 - media health check не пропускается из-за локального rate limit;
 - playback enum больше не содержит локальной concurrency-причины `429`;
+- cache/Redis/readiness tests подтверждают отсутствие выделенного limiter workload;
 - importer tests подтверждают, что внешний HTTP `429` по-прежнему transient;
 - focused PHPUnit, Pint, полный PHPUnit-набор и frontend build выполняются по правилам проекта.
 
 ## Критерии приёмки
 
 - ни один маршрут или action приложения не использует Laravel rate limiter;
+- конфигурация и readiness не содержат отдельный limiter store/connection/component;
 - код приложения не вызывает `abort(429)` и не сопоставляет локальный доменный статус с `429`;
 - поиск, фильтры, Livewire, API, playback, пользовательские и административные действия доступны без минутного бюджета;
 - authentication, authorization, validation, signed URL, CSRF и importer locks не ослаблены;

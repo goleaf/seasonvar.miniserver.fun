@@ -283,9 +283,15 @@ git commit -m "feat: remove action rate limits"
 - Modify: `app/Services/Seasonvar/SeasonvarMediaAvailabilityChecker.php`
 - Modify: `app/Services/Catalog/CatalogPlaybackSourceResolver.php`
 - Modify: `app/Enums/PlaybackAvailability.php`
+- Modify: `app/Services/Operations/InfrastructureHealthCheck.php`
 - Modify: `config/security.php`
 - Modify: `config/catalog.php`
+- Modify: `config/cache.php`
+- Modify: `config/database.php`
 - Modify: `.env.example`
+- Modify: `tests/Unit/CacheArchitectureTest.php`
+- Modify: `tests/Feature/CacheInfrastructureIntegrationTest.php`
+- Modify: `tests/Feature/RedisWorkloadIntegrationTest.php`
 - Delete: `app/Support/RateLimiting/RequestRateLimitKey.php`
 - Delete: `tests/Unit/RequestRateLimitKeyTest.php`
 
@@ -332,6 +338,24 @@ public function test_playback_has_no_local_too_many_requests_status(): void
 }
 ```
 
+In `CacheArchitectureTest`, change the named-store test so the desired configuration has no limiter workload:
+
+```php
+$this->assertNull(config('cache.limiter'));
+$this->assertNull(config('cache.stores.redis-limiter'));
+$this->assertNull(config('database.redis.limiter'));
+
+foreach (['cache', 'sessions', 'queues', 'locks', 'broadcasting'] as $connection) {
+    $this->assertIsArray(config('database.redis.'.$connection));
+}
+```
+
+Delete `test_throttle_middleware_uses_the_dedicated_limiter_store()` and the two `ThrottleRequests` imports. In the readiness integration test, remove `redis_limiter` from `assertJsonStructure()` and add:
+
+```php
+$response->assertJsonMissingPath('components.redis_limiter');
+```
+
 - [ ] **Step 2: Run the new expectations and verify RED**
 
 Run:
@@ -339,9 +363,11 @@ Run:
 ```bash
 php artisan test tests/Feature/SeasonvarImportMaintenanceTest.php --filter=media_health_checks_are_not_skipped_by_a_local_request_budget
 php artisan test tests/Feature/LocalRateLimitRemovalTest.php --filter=playback_has_no_local_too_many_requests_status
+php artisan test tests/Unit/CacheArchitectureTest.php --filter=named_stores_and_redis_workload_connections_are_explicit
+php artisan test tests/Feature/CacheInfrastructureIntegrationTest.php --filter=readiness_endpoint
 ```
 
-Expected: the old source-health limiter skips the second request, and `ConcurrencyExceeded` still maps to `429`.
+Expected: the old source-health limiter skips the second request, `ConcurrencyExceeded` maps to `429`, limiter config still exists, and readiness still exposes `redis_limiter`.
 
 - [ ] **Step 3: Remove the final runtime and configuration remnants**
 
@@ -368,12 +394,16 @@ return [
 ];
 ```
 
-Delete `query_rate_limit` from `config/catalog.php`. Delete all `.env.example` lines beginning with `RATE_LIMIT_`. Delete the now-unused `RequestRateLimitKey` class and its unit test.
+Delete `query_rate_limit` from `config/catalog.php`. From `config/cache.php`, delete the top-level `limiter` option and the `redis-limiter` store. From `config/database.php`, delete the Redis `limiter` connection. From `InfrastructureHealthCheck`, delete the `redis_limiter` component and remove it from the critical component list.
+
+Delete `.env.example` lines beginning with `RATE_LIMIT_`, `CACHE_LIMITER_`, or `REDIS_LIMITER_`. Delete the now-unused `RequestRateLimitKey` class and its unit test.
+
+Delete `RedisWorkloadIntegrationTest::test_dedicated_redis_limiter_store_is_atomic_and_isolated_from_domain_cache()`. Rename `CacheInfrastructureIntegrationTest::test_session_queue_and_limiter_connections_are_isolated()` to `test_session_and_queue_connections_are_isolated()` and retain only the `sessions` and `queues` writes/assertions/cleanup.
 
 Verify no local limiter remains while remote-response handling is retained:
 
 ```bash
-rg -n "RateLimiter|SensitiveActionRateLimiter|throttle:|abort\(429|ConcurrencyExceeded|RATE_LIMIT_" app bootstrap config routes .env.example tests
+rg -n "RateLimiter|SensitiveActionRateLimiter|throttle:|abort\(429|ConcurrencyExceeded|RATE_LIMIT_|CACHE_LIMITER|REDIS_LIMITER|redis-limiter|redis_limiter|connection\('limiter'\)" app bootstrap config routes .env.example tests
 rg -n "\[408, 425, 429\]|status === 429" app/Services/Seasonvar
 ```
 
@@ -384,9 +414,9 @@ Expected: the first command has no application/config/route matches; the second 
 Run:
 
 ```bash
-php artisan test tests/Feature/LocalRateLimitRemovalTest.php tests/Feature/SecurityHardeningTest.php tests/Feature/SeasonvarImportMaintenanceTest.php tests/Unit/SeasonvarImportFailureClassifierTest.php
+php artisan test tests/Feature/LocalRateLimitRemovalTest.php tests/Feature/SecurityHardeningTest.php tests/Feature/SeasonvarImportMaintenanceTest.php tests/Unit/SeasonvarImportFailureClassifierTest.php tests/Unit/CacheArchitectureTest.php tests/Feature/CacheInfrastructureIntegrationTest.php tests/Feature/RedisWorkloadIntegrationTest.php
 ./vendor/bin/pint --dirty --format agent
-php artisan test tests/Feature/LocalRateLimitRemovalTest.php tests/Feature/SecurityHardeningTest.php tests/Feature/SeasonvarImportMaintenanceTest.php tests/Unit/SeasonvarImportFailureClassifierTest.php
+php artisan test tests/Feature/LocalRateLimitRemovalTest.php tests/Feature/SecurityHardeningTest.php tests/Feature/SeasonvarImportMaintenanceTest.php tests/Unit/SeasonvarImportFailureClassifierTest.php tests/Unit/CacheArchitectureTest.php tests/Feature/CacheInfrastructureIntegrationTest.php tests/Feature/RedisWorkloadIntegrationTest.php
 ```
 
 Expected: focused tests pass before and after formatting; the external `429` classifier test remains green.
@@ -405,6 +435,14 @@ git commit -m "refactor: remove rate limit infrastructure"
 - Modify: `docs/architecture.md`
 - Modify: `docs/administration.md`
 - Modify: `docs/deployment.md`
+- Modify: `docs/authorization.md`
+- Modify: `docs/api.md`
+- Modify: `docs/catalog-search.md`
+- Modify: `docs/caching.md`
+- Modify: `docs/environment.md`
+- Modify: `docs/performance.md`
+- Modify: `docs/testing.md`
+- Modify: `docs/audit.md`
 - Modify: `CHANGELOG.md`
 
 **Interfaces:**
@@ -423,11 +461,21 @@ public function test_current_documentation_does_not_advertise_local_rate_limits(
         base_path('docs/architecture.md'),
         base_path('docs/administration.md'),
         base_path('docs/deployment.md'),
+        base_path('docs/authorization.md'),
+        base_path('docs/api.md'),
+        base_path('docs/catalog-search.md'),
+        base_path('docs/caching.md'),
+        base_path('docs/environment.md'),
+        base_path('docs/performance.md'),
+        base_path('docs/testing.md'),
+        base_path('docs/audit.md'),
     ] as $path) {
         $contents = file_get_contents($path);
 
         $this->assertStringNotContainsString('RATE_LIMIT_', $contents, $path);
         $this->assertStringNotContainsString('throttle:', $contents, $path);
+        $this->assertStringNotContainsString('redis-limiter', $contents, $path);
+        $this->assertStringNotContainsString('redis_limiter', $contents, $path);
     }
 }
 ```
@@ -450,7 +498,7 @@ In current thematic docs, remove local budget variables and middleware claims. A
 Локальные HTTP- и action-level rate limits отключены по решению владельца проекта. Authentication, authorization, CSRF, signed playback URL, validation, URL allowlists и bounded importer retries остаются обязательными границами. HTTP 429 от Seasonvar/CDN считается внешней transient-ошибкой и не является ограничением входящих запросов приложения.
 ```
 
-Update `docs/architecture.md` so `/stats`, Livewire, API, catalog query, health, and playback route descriptions no longer claim a limiter. Update `docs/administration.md` and `docs/deployment.md` to remove `RATE_LIMIT_CATALOG_ADMIN` deployment guidance. Add a dated `CHANGELOG.md` entry summarizing removal of local request/action limits and preservation of remote `429` retry behavior.
+Update `docs/architecture.md` so `/stats`, Livewire, API, catalog query, health, and playback route descriptions no longer claim a limiter. Update `docs/administration.md` and `docs/deployment.md` to remove `RATE_LIMIT_CATALOG_ADMIN` deployment guidance. Remove the unused limiter workload from `docs/authorization.md`, `docs/api.md`, `docs/catalog-search.md`, `docs/caching.md`, `docs/environment.md`, `docs/performance.md`, `docs/testing.md`, and current `docs/audit.md`. Add a dated `CHANGELOG.md` entry summarizing removal of local request/action limits and preservation of remote `429` retry behavior.
 
 Do not edit historical files under `docs/superpowers/specs` or `docs/superpowers/plans` other than checkbox progress in this plan.
 
@@ -460,7 +508,7 @@ Run:
 
 ```bash
 php artisan project:docs-refresh --check
-php artisan test tests/Feature/LocalRateLimitRemovalTest.php tests/Feature/SecurityHardeningTest.php tests/Feature/SeasonvarImportMaintenanceTest.php tests/Unit/SeasonvarImportFailureClassifierTest.php
+php artisan test tests/Feature/LocalRateLimitRemovalTest.php tests/Feature/SecurityHardeningTest.php tests/Feature/SeasonvarImportMaintenanceTest.php tests/Unit/SeasonvarImportFailureClassifierTest.php tests/Unit/CacheArchitectureTest.php
 ./vendor/bin/pint --dirty --format agent
 npm run build
 php artisan test
@@ -473,7 +521,7 @@ Expected: docs check, focused tests, Pint, build, and full PHPUnit suite pass. T
 Run:
 
 ```bash
-rg -n "RateLimiter|SensitiveActionRateLimiter|throttle:|abort\(429|ConcurrencyExceeded|RATE_LIMIT_" app bootstrap config routes .env.example tests docs/security.md docs/architecture.md docs/administration.md docs/deployment.md
+rg -n "RateLimiter|SensitiveActionRateLimiter|throttle:|abort\(429|ConcurrencyExceeded|RATE_LIMIT_|CACHE_LIMITER|REDIS_LIMITER|redis-limiter|redis_limiter" app bootstrap config routes .env.example tests docs/security.md docs/architecture.md docs/administration.md docs/deployment.md docs/authorization.md docs/api.md docs/catalog-search.md docs/caching.md docs/environment.md docs/performance.md docs/testing.md docs/audit.md
 rg -n "429" app/Services/Seasonvar tests/Unit/SeasonvarImportFailureClassifierTest.php docs/importer.md docs/performance.md
 git diff --check
 git status --short --branch
@@ -484,7 +532,7 @@ Expected: the first search returns no local limiter contracts; the second return
 Commit:
 
 ```bash
-git add CHANGELOG.md docs/security.md docs/architecture.md docs/administration.md docs/deployment.md tests/Feature/LocalRateLimitRemovalTest.php docs/superpowers/plans/2026-07-13-remove-local-rate-limits.md
+git add CHANGELOG.md docs/security.md docs/architecture.md docs/administration.md docs/deployment.md docs/authorization.md docs/api.md docs/catalog-search.md docs/caching.md docs/environment.md docs/performance.md docs/testing.md docs/audit.md tests/Feature/LocalRateLimitRemovalTest.php docs/superpowers/plans/2026-07-13-remove-local-rate-limits.md
 git commit -m "docs: document unrestricted request handling"
 ```
 
