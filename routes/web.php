@@ -49,16 +49,13 @@ Route::middleware('public.cache:documents')
     });
 Route::get('/health/ready', InfrastructureHealthController::class)
     ->withoutMiddleware($publicDocumentMiddleware)
-    ->middleware('throttle:infrastructure-health')
     ->name('health.ready');
 Route::get('/stats', [CatalogController::class, 'stats'])
-    ->middleware('throttle:catalog-stats')
     ->name('stats');
 Route::get('/stats/poster/{catalogTitle:slug}', [CatalogController::class, 'statsPoster'])
-    ->middleware('throttle:catalog-stats')
     ->name('stats.poster');
 Route::get('/playback/{licensedMedia}', PlaybackSourceController::class)
-    ->middleware(['signed', 'throttle:playback-source'])
+    ->middleware('signed')
     ->whereNumber('licensedMedia')
     ->name('playback.source');
 
@@ -72,7 +69,6 @@ foreach (CatalogDirectoryRegistry::routeMap() as $directory => $config) {
 }
 
 Route::get('/titles', CatalogSeries::class)
-    ->middleware('throttle:catalog-query')
     ->name('titles.index');
 Route::get('/watching', ViewingActivity::class)->name('viewing-activity');
 Route::get('/admin/imports', SeasonvarImportManager::class)
@@ -82,11 +78,9 @@ Route::get('/admin/catalog', CatalogAdministrationManager::class)
     ->middleware('can:manage-catalog')
     ->name('admin.catalog');
 Route::get('/titles/year/{year}', CatalogSeries::class)
-    ->middleware('throttle:catalog-query')
     ->where('year', '(?:19|20)\d{2}')
     ->name('titles.year');
 Route::get('/titles/{type}/{taxonomy}', CatalogSeries::class)
-    ->middleware('throttle:catalog-query')
     ->where('type', CatalogFilterType::routePattern())
     ->where('taxonomy', '[a-z0-9][a-z0-9-]*')
     ->name('titles.taxonomy');

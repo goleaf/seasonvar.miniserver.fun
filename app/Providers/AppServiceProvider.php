@@ -4,20 +4,16 @@ namespace App\Providers;
 
 use App\Models\User;
 use App\Support\Cache\CacheEventReporter;
-use App\Support\RateLimiting\RequestRateLimitKey;
 use App\View\ViewData\AppLayoutData;
 use Illuminate\Cache\Events\CacheFailedOver;
 use Illuminate\Cache\Events\CacheHit;
 use Illuminate\Cache\Events\CacheMissed;
 use Illuminate\Cache\Events\KeyForgotten;
 use Illuminate\Cache\Events\KeyWritten;
-use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View as ViewFacade;
 use Illuminate\Support\ServiceProvider;
@@ -32,7 +28,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        config()->set('livewire.temporary_file_upload.middleware', 'web');
     }
 
     /**
@@ -57,43 +53,10 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-seasonvar-imports', $catalogAdministrator);
         Gate::define('manage-catalog', $catalogAdministrator);
 
-        RateLimiter::for('catalog-stats', fn (Request $request): Limit => Limit::perMinute(180)
-            ->by(app(RequestRateLimitKey::class)->actor($request)));
-        RateLimiter::for('catalog-query', function (Request $request): Limit {
-            if ($request->query->count() === 0) {
-                return Limit::none();
-            }
-
-            $isCrawler = preg_match('/(?:bot|crawler|spider|slurp)/i', (string) $request->userAgent()) === 1;
-            $budget = (int) config($isCrawler
-                ? 'catalog.query_rate_limit.bot_per_minute'
-                : 'catalog.query_rate_limit.human_per_minute');
-            $actor = app(RequestRateLimitKey::class)->actor($request);
-
-            return Limit::perMinute(max(1, $budget))
-                ->by($actor.':catalog-query:'.($isCrawler ? 'crawler' : 'human'));
-        });
-        RateLimiter::for('livewire-action', function (Request $request): array {
-            $keys = app(RequestRateLimitKey::class);
-            $actor = $keys->actor($request);
-
-            return [
-                Limit::perMinute(600)->by($actor.':transport'),
-                Limit::perMinute(180)->by($actor.':'.$keys->livewireFeature($request)),
-            ];
-        });
-
         Livewire::setUpdateRoute(function ($handle, string $path) {
             return Route::post($path, $handle)
-                ->middleware(['web', 'throttle:livewire-action']);
+                ->middleware('web');
         });
-
-        RateLimiter::for('catalog-api', fn (Request $request): Limit => Limit::perMinute(60)
-            ->by(app(RequestRateLimitKey::class)->actor($request)));
-        RateLimiter::for('infrastructure-health', fn (Request $request): Limit => Limit::perMinute(30)
-            ->by(app(RequestRateLimitKey::class)->actor($request)));
-        RateLimiter::for('playback-source', fn (Request $request): Limit => Limit::perMinute(120)
-            ->by(app(RequestRateLimitKey::class)->actor($request)));
 
         Model::shouldBeStrict(! $this->app->isProduction());
         DB::prohibitDestructiveCommands($this->app->isProduction());

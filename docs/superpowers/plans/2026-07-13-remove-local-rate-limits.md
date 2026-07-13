@@ -27,12 +27,13 @@
 - Modify: `routes/web.php`
 - Modify: `routes/api.php`
 - Modify: `app/Providers/AppServiceProvider.php`
+- Create: `config/livewire.php`
 
 **Interfaces:**
 - Consumes: Laravel route middleware registration and `Livewire::setUpdateRoute(callable $callback)`.
 - Produces: web, API, and Livewire routes with no middleware string beginning with `throttle:` and no named local limiter registrations.
 
-- [ ] **Step 1: Write the failing route-boundary test**
+- [x] **Step 1: Write the failing route-boundary test**
 
 Create `tests/Feature/LocalRateLimitRemovalTest.php` with route assertions for every currently throttled endpoint and the Livewire update route:
 
@@ -80,16 +81,21 @@ final class LocalRateLimitRemovalTest extends TestCase
 
     public function test_livewire_update_route_has_no_throttle_middleware(): void
     {
-        $route = Route::getRoutes()->match(Request::create('/livewire/update', 'POST'));
+        foreach (['livewire.update', 'livewire.upload-file'] as $routeName) {
+            $route = Route::getRoutes()->getByName($routeName);
 
-        $this->assertSame(
-            [],
-            array_values(array_filter(
-                $route->gatherMiddleware(),
-                static fn (string $middleware): bool => str_starts_with($middleware, 'throttle:'),
-            )),
-        );
-        $this->assertContains('web', $route->gatherMiddleware());
+            $this->assertNotNull($route, "Route [{$routeName}] is not registered.");
+            $this->assertSame(
+                [],
+                array_values(array_filter(
+                    $route->gatherMiddleware(),
+                    static fn (string $middleware): bool => str_starts_with($middleware, 'throttle:')
+                        || str_contains($middleware, 'ThrottleRequests'),
+                )),
+                "Route [{$routeName}] still has throttle middleware.",
+            );
+            $this->assertContains('web', $route->gatherMiddleware());
+        }
     }
 
     public function test_application_registers_no_named_local_rate_limiters(): void
@@ -108,7 +114,7 @@ final class LocalRateLimitRemovalTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run:
 
@@ -118,7 +124,7 @@ php artisan test tests/Feature/LocalRateLimitRemovalTest.php
 
 Expected: failures list existing `throttle:*` middleware or registered named limiters.
 
-- [ ] **Step 3: Remove route middleware and limiter registrations**
+- [x] **Step 3: Remove route middleware and limiter registrations**
 
 In `routes/web.php`, keep route constraints, names, `signed`, authorization, and cache middleware, but remove only these throttle calls:
 
@@ -160,7 +166,19 @@ Livewire::setUpdateRoute(function ($handle, string $path) {
 });
 ```
 
-- [ ] **Step 4: Run the focused test and verify GREEN**
+Create `config/livewire.php` so Livewire's temporary upload endpoint also uses only the web stack instead of its package-default `throttle:60,1`:
+
+```php
+<?php
+
+return [
+    'temporary_file_upload' => [
+        'middleware' => 'web',
+    ],
+];
+```
+
+- [x] **Step 4: Run the focused test and verify GREEN**
 
 Run:
 
@@ -170,10 +188,10 @@ php artisan test tests/Feature/LocalRateLimitRemovalTest.php
 
 Expected: all three tests pass.
 
-- [ ] **Step 5: Commit the route boundary**
+- [x] **Step 5: Commit the route boundary**
 
 ```bash
-git add tests/Feature/LocalRateLimitRemovalTest.php routes/web.php routes/api.php app/Providers/AppServiceProvider.php
+git add tests/Feature/LocalRateLimitRemovalTest.php routes/web.php routes/api.php app/Providers/AppServiceProvider.php config/livewire.php docs/superpowers/specs/2026-07-13-remove-local-rate-limits-design.md docs/superpowers/plans/2026-07-13-remove-local-rate-limits.md
 git commit -m "feat: remove HTTP request throttles"
 ```
 
