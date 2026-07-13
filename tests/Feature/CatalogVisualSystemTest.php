@@ -388,6 +388,17 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('data-catalog-filter-count', $content);
     }
 
+    public function test_catalog_unified_filters_are_open_without_active_filters(): void
+    {
+        CatalogTitle::factory()->create();
+
+        $content = $this->get(route('titles.index'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertMatchesRegularExpression('/<details[^>]*id="catalog-filters"[^>]*open/s', $content);
+    }
+
     public function test_advanced_catalog_filters_use_four_compact_explanatory_groups(): void
     {
         CatalogTitle::factory()->create();

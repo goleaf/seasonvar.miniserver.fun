@@ -98,7 +98,6 @@ test('catalog keeps URL state, unified filters and responsive geometry', async (
 
     const filters = page.locator('#catalog-filters');
 
-    await filters.locator(':scope > summary').click();
     await expect(filters).toHaveAttribute('open', '');
     await expect(page.locator('[data-catalog-filter-groups]')).toBeVisible();
     await expect(page.getByText('Актеры', { exact: true }).first()).toBeVisible();

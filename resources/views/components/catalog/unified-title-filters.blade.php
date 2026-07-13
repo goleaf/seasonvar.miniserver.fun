@@ -1,4 +1,4 @@
-<details id="catalog-filters" data-catalog-advanced-filters data-catalog-unified-filters class="group mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3" @if ($filterView->hasActiveFilters()) open @endif>
+<details id="catalog-filters" data-catalog-advanced-filters data-catalog-unified-filters class="group mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3" open>
     <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-control px-1 text-sm font-bold text-slate-700">
         <span class="inline-flex min-w-0 items-center gap-2">
             <x-ui.icon name="fa-solid fa-sliders text-emerald-700" />
