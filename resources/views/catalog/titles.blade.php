@@ -31,210 +31,20 @@
                 </button>
             </div>
             <x-ui.panel title="Фильтры каталога" icon="fa-solid fa-sliders">
-                @if ($facetsLoaded)
-                <form method="GET" action="{{ route('titles.index') }}" wire:submit="applyFilters" class="space-y-5">
-                    @foreach ($filterView->filterFormState() as $stateKey => $stateValue)
-                        @if (is_array($stateValue))
-                            @foreach ($stateValue as $stateItem)
-                                <input type="hidden" name="{{ $stateKey }}[]" value="{{ $stateItem }}">
-                            @endforeach
-                        @else
-                            <input type="hidden" name="{{ $stateKey }}" value="{{ $stateValue }}">
-                        @endif
-                    @endforeach
-                    <div>
-                        <div class="mb-2 flex items-center justify-between gap-2">
-                            <div class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                                <x-ui.icon name="fa-solid fa-calendar-days text-slate-400" />
-                                <span>Годы</span>
-                            </div>
-                            @if ($filterView->selectedYears() !== [])
-                                <a href="{{ route('titles.index', $filterView->yearQuery(null)) }}" rel="nofollow" wire:click.prevent="resetGroup('year')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <x-ui.icon name="fa-solid fa-rotate-left" />
-                                    <span>Сбросить</span>
-                                </a>
-                            @endif
+                @island(name: 'catalog-live', defer: true)
+                    @placeholder
+                        <div data-catalog-facets-loading aria-live="polite" class="flex min-h-24 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-5 text-sm font-bold text-slate-600">
+                            <x-ui.icon name="fa-solid fa-spinner fa-spin text-emerald-700" />
+                            <span>Загружаем фильтры…</span>
                         </div>
-                        <div class="space-y-1">
-                            @forelse ($yearBuckets as $bucket)
-                                <label @class([
-                                    'flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm transition',
-                                    'bg-emerald-50 font-bold text-emerald-700' => $filterView->isActiveYear($bucket),
-                                    'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveYear($bucket),
-                                ])>
-                                    <span class="inline-flex min-w-0 items-center gap-2">
-                                        <input type="checkbox" wire:model="filters.years" name="year[]" value="{{ $filterView->bucketYear($bucket) }}" class="h-5 w-5 shrink-0 accent-emerald-700" @checked($filterView->isActiveYear($bucket))>
-                                        <x-ui.icon name="fa-solid fa-calendar-days text-[0.85em] text-slate-400" />
-                                        <span class="min-w-0 break-words">{{ $filterView->bucketYear($bucket) }}</span>
-                                    </span>
-                                    <span class="shrink-0 text-xs font-bold tabular-nums">{{ $bucket->context_titles_count }}</span>
-                                </label>
-                            @empty
-                                <p class="text-sm text-slate-500">Годы не указаны.</p>
-                            @endforelse
-                        </div>
-                    </div>
+                    @endplaceholder
 
-                    <div>
-                        <div class="mb-2 flex items-center justify-between gap-2">
-                            <div class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                                <x-ui.icon name="fa-solid fa-clapperboard text-slate-400" />
-                                <span>Тип публикации</span>
-                            </div>
-                            @if ($filterView->listState('publication_type') !== [])
-                                <a href="{{ route('titles.index', $filterView->withoutCatalogState('publication_type')) }}" rel="nofollow" wire:click.prevent="resetGroup('publication_type')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <x-ui.icon name="fa-solid fa-rotate-left" />
-                                    <span>Сбросить</span>
-                                </a>
-                            @endif
-                        </div>
-                        <div class="space-y-1">
-                            @forelse ($publicationTypeOptions as $option)
-                                <label @class([
-                                    'flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm transition',
-                                    'bg-emerald-50 font-bold text-emerald-700' => in_array($option->value, $filterView->listState('publication_type'), true),
-                                    'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! in_array($option->value, $filterView->listState('publication_type'), true),
-                                ])>
-                                    <span class="inline-flex min-w-0 items-center gap-2">
-                                        <input type="checkbox" wire:model="filters.publicationTypes" name="publication_type[]" value="{{ $option->value }}" class="h-5 w-5 shrink-0 accent-emerald-700" @checked(in_array($option->value, $filterView->listState('publication_type'), true))>
-                                        <span class="min-w-0 break-words">{{ $option->label }}</span>
-                                    </span>
-                                    <span class="shrink-0 text-xs font-bold tabular-nums">{{ $option->context_titles_count }}</span>
-                                </label>
-                            @empty
-                                <p class="text-sm text-slate-500">Типы не указаны.</p>
-                            @endforelse
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="mb-2 flex items-center justify-between gap-2">
-                            <div class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                                <x-ui.icon name="fa-solid fa-closed-captioning text-slate-400" />
-                                <span>Субтитры</span>
-                            </div>
-                            @if ($filterView->listState('subtitles') !== [])
-                                <a href="{{ route('titles.index', $filterView->withoutCatalogState('subtitles')) }}" rel="nofollow" wire:click.prevent="resetGroup('subtitles')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <x-ui.icon name="fa-solid fa-rotate-left" />
-                                    <span>Сбросить</span>
-                                </a>
-                            @endif
-                        </div>
-                        <div class="space-y-1">
-                            @foreach ($subtitleOptions as $option)
-                                <label @class([
-                                    'flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm transition',
-                                    'bg-emerald-50 font-bold text-emerald-700' => in_array($option->value, $filterView->listState('subtitles'), true),
-                                    'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! in_array($option->value, $filterView->listState('subtitles'), true),
-                                ])>
-                                    <span class="inline-flex min-w-0 items-center gap-2">
-                                        <input type="checkbox" wire:model="filters.subtitles" name="subtitles[]" value="{{ $option->value }}" class="h-5 w-5 shrink-0 accent-emerald-700" @checked(in_array($option->value, $filterView->listState('subtitles'), true))>
-                                        <span class="min-w-0 break-words">{{ $option->label }}</span>
-                                    </span>
-                                    <span class="shrink-0 text-xs font-bold tabular-nums">{{ $option->context_titles_count }}</span>
-                                </label>
-                            @endforeach
-                        </div>
-                    </div>
-
-                    @foreach ($filterView->typeLabels as $filterType => $label)
-                        <div data-catalog-filter-group>
-                            <div class="mb-2 flex items-center justify-between gap-2">
-                                <div class="inline-flex min-w-0 items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                                    <x-ui.icon name="{{ $filterView->icon($filterType) }} text-slate-400" />
-                                    <span>{{ $label }}</span>
-                                </div>
-                                @if ($selectedTaxonomies->get($filterType, collect())->isNotEmpty())
-                                    <a href="{{ route('titles.index', $filterView->filterQuery($filterType, null)) }}" rel="nofollow" wire:click.prevent="resetGroup('{{ $filterType }}')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                        <x-ui.icon name="fa-solid fa-rotate-left" />
-                                        <span>Сбросить</span>
-                                    </a>
-                                @endif
-                            </div>
-                            @if (in_array($filterType, ['actor', 'director'], true))
-                                <div data-catalog-people-combobox data-people-type="{{ $filterType }}" data-people-endpoint="{{ url('/api/catalog/people') }}" class="relative mb-2">
-                                    <label class="sr-only" for="catalog-filter-search-{{ $filterType }}">Найти в группе {{ $label }}</label>
-                                    <div data-focus-frame class="flex min-h-11 items-center gap-2 rounded-control border border-transparent bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                                        <x-ui.icon name="fa-solid fa-magnifying-glass text-slate-400" />
-                                        <input
-                                            id="catalog-filter-search-{{ $filterType }}"
-                                            type="search"
-                                            role="combobox"
-                                            aria-autocomplete="list"
-                                            aria-expanded="false"
-                                            aria-controls="catalog-people-options-{{ $filterType }}"
-                                            autocomplete="off"
-                                            maxlength="80"
-                                            placeholder="Введите имя (от 2 знаков)"
-                                            data-catalog-people-input
-                                            class="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 placeholder:text-slate-400 focus:outline-none"
-                                        >
-                                        <x-ui.icon name="fa-solid fa-spinner fa-spin hidden text-emerald-700" data-catalog-people-loading />
-                                    </div>
-                                    <div id="catalog-people-options-{{ $filterType }}" role="listbox" data-catalog-people-options class="absolute inset-x-0 top-full z-30 mt-1 hidden rounded-control border border-slate-200 bg-white p-1 shadow-panel"></div>
-                                    <p data-catalog-people-status class="sr-only" aria-live="polite"></p>
-                                </div>
-                            @elseif ($filterTaxonomies->get($filterType, collect())->count() > 8)
-                                <label class="sr-only" for="catalog-filter-search-{{ $filterType }}">Найти в группе {{ $label }}</label>
-                                <div data-focus-frame class="mb-2 flex min-h-11 items-center gap-2 rounded-control border border-transparent bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                                    <x-ui.icon name="fa-solid fa-magnifying-glass text-slate-400" />
-                                    <input
-                                        id="catalog-filter-search-{{ $filterType }}"
-                                        type="search"
-                                        autocomplete="off"
-                                        placeholder="Найти в группе"
-                                        class="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 placeholder:text-slate-400 focus:outline-none"
-                                        data-catalog-filter-search
-                                    >
-                                </div>
-                            @endif
-                            <div class="space-y-1" data-catalog-filter-options>
-                                @forelse ($filterTaxonomies->get($filterType, collect()) as $taxonomy)
-                                    <label data-catalog-filter-option data-catalog-filter-text="{{ mb_strtolower($taxonomy->name.' '.$taxonomy->slug, 'UTF-8') }}" @class([
-                                        'flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm transition',
-                                        'bg-emerald-50 font-bold text-emerald-700' => $filterView->isActiveTaxonomy($filterType, $taxonomy),
-                                        'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveTaxonomy($filterType, $taxonomy),
-                                    ])>
-                                        <span class="inline-flex min-w-0 items-center gap-2">
-                                            <input type="checkbox" wire:model="filters.{{ $filterType }}" name="{{ $filterType }}[]" value="{{ $taxonomy->slug }}" class="h-5 w-5 shrink-0 accent-emerald-700" @checked($filterView->isActiveTaxonomy($filterType, $taxonomy))>
-                                            <x-ui.icon name="{{ $filterView->icon($filterType) }} text-[0.85em] text-slate-400" />
-                                            <span class="min-w-0 break-words">{{ $taxonomy->name }}</span>
-                                        </span>
-                                        <span class="shrink-0 text-xs font-bold tabular-nums">{{ $taxonomy->context_titles_count }}</span>
-                                    </label>
-                                @empty
-                                    <p class="text-sm text-slate-500">{{ in_array($filterType, ['actor', 'director'], true) && mb_strlen($optionSearch[$filterType] ?? '') >= 2 ? 'Ничего не найдено.' : 'Нет данных.' }}</p>
-                                @endforelse
-                            </div>
-                            <p class="hidden px-3 py-2 text-sm text-slate-500" data-catalog-filter-empty>В этой группе ничего не найдено.</p>
-                        </div>
-                    @endforeach
-
-                    <div class="sticky bottom-0 -mx-1 space-y-2 bg-white px-1 pb-1 pt-3">
-                        <button type="submit" wire:loading.attr="disabled" wire:target="applyFilters" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60">
-                            <x-ui.icon name="fa-solid fa-filter" />
-                            <span>Применить выбранное</span>
-                        </button>
-                        <a href="{{ route('titles.index') }}" wire:click.prevent="resetAll" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
-                            <x-ui.icon name="fa-solid fa-filter-circle-xmark" />
-                            <span>Сбросить фильтры</span>
-                        </a>
-                    </div>
-                </form>
-                @else
-                    <div data-catalog-facets-placeholder class="space-y-3 text-sm text-slate-600">
-                        <p>Загрузите варианты только тогда, когда они понадобятся. Результаты поиска уже доступны справа.</p>
-                        <button type="button" wire:click="loadFacets" wire:loading.attr="disabled" wire:target="loadFacets" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 font-bold text-white hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60">
-                            <x-ui.icon name="fa-solid fa-sliders" wire:loading.remove wire:target="loadFacets" />
-                            <x-ui.icon name="fa-solid fa-spinner fa-spin" wire:loading wire:target="loadFacets" />
-                            <span wire:loading.remove wire:target="loadFacets">Показать фильтры</span>
-                            <span wire:loading wire:target="loadFacets">Загружаем фильтры…</span>
-                        </button>
-                    </div>
-                @endif
+                    <x-catalog.title-filters :data="$this->catalogFacets" :option-search="$this->optionSearch" />
+                @endisland
             </x-ui.panel>
         </dialog>
 
+        @island(name: 'catalog-live', with: $this->catalogPage)
         <div class="order-1 min-w-0 space-y-5 lg:order-2">
             <x-ui.panel>
                 <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
@@ -244,7 +54,7 @@
                             <span>{{ $seo['h1'] ?? 'Сериалы' }}</span>
                         </h1>
 
-                        <a href="#catalog-filters" data-catalog-filter-dialog-open wire:click="loadFacets" aria-controls="catalog-filters" aria-haspopup="dialog" class="mt-3 inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 lg:hidden">
+                        <a href="#catalog-filters" data-catalog-filter-dialog-open aria-controls="catalog-filters" aria-haspopup="dialog" class="mt-3 inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 lg:hidden">
                             <x-ui.icon name="fa-solid fa-sliders" />
                             <span>Фильтры · {{ $filterView->activeFilterCount() }}</span>
                         </a>
@@ -509,7 +319,7 @@
                                     </label>
                                     <label class="w-full text-xs font-bold text-slate-600 sm:w-auto">
                                         <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.updated') }}</span>
-                                        <select wire:model="filters.updated" name="updated" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-56">
+                                        <select wire:model.live="filters.updated" name="updated" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-56">
                                             <option value="">{{ __('catalog.catalog.exact_filters.any_time') }}</option>
                                             <option value="day" @selected($filterView->scalarState('updated') === 'day')>{{ __('catalog.catalog.exact_filters.updated_day') }}</option>
                                             <option value="week" @selected($filterView->scalarState('updated') === 'week')>{{ __('catalog.catalog.exact_filters.updated_week') }}</option>
@@ -565,7 +375,7 @@
                                 <div class="mt-3 flex flex-wrap items-end gap-2 sm:gap-3">
                                     <label class="w-full text-xs font-bold text-slate-600 sm:w-auto">
                                         <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.source') }}</span>
-                                        <select wire:model="filters.ratingSource" name="rating_source" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-52">
+                                        <select wire:model.live="filters.ratingSource" name="rating_source" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-52">
                                             <option value="">{{ __('catalog.catalog.exact_filters.any_source') }}</option>
                                             <option value="kinopoisk" @selected($filterView->scalarState('rating_source') === 'kinopoisk')>КиноПоиск</option>
                                             <option value="imdb" @selected($filterView->scalarState('rating_source') === 'imdb')>IMDb</option>
@@ -592,7 +402,7 @@
                                 <p class="mt-1 text-xs leading-5 text-slate-500">{{ __('catalog.catalog.exact_filters.video_description') }}</p>
                                 <label class="mt-3 block text-xs font-bold text-slate-600">
                                     <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.availability') }}</span>
-                                    <select wire:model="filters.video" name="video" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-48">
+                                    <select wire:model.live="filters.video" name="video" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-48">
                                         <option value="">{{ __('catalog.catalog.exact_filters.availability_any') }}</option>
                                         <option value="available" @selected($filterView->scalarState('video') === 'available')>{{ __('catalog.catalog.exact_filters.video_available') }}</option>
                                         <option value="missing" @selected($filterView->scalarState('video') === 'missing')>{{ __('catalog.catalog.exact_filters.video_missing') }}</option>
@@ -607,7 +417,7 @@
                                                 'bg-emerald-50 text-emerald-700' => in_array($quality, $filterView->listState('quality'), true),
                                                 'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! in_array($quality, $filterView->listState('quality'), true),
                                             ])>
-                                                <input type="checkbox" wire:model="filters.qualities" name="quality[]" value="{{ $quality }}" class="h-5 w-5 accent-emerald-700" @checked(in_array($quality, $filterView->listState('quality'), true))>
+                                                <input type="checkbox" wire:model.live="filters.qualities" name="quality[]" value="{{ $quality }}" class="h-5 w-5 accent-emerald-700" @checked(in_array($quality, $filterView->listState('quality'), true))>
                                                 <span>{{ $quality }}</span>
                                             </label>
                                         @endforeach
@@ -730,4 +540,5 @@
                 {{ $titles->links() }}
             </div>
         </div>
+        @endisland
 </section>

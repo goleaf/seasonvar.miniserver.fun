@@ -206,7 +206,6 @@ class CatalogTitlesPageBuilder
             'yearBuckets' => $yearBuckets,
             'publicationTypeOptions' => $publicationTypeOptions,
             'subtitleOptions' => $subtitleOptions,
-            'facetsLoaded' => $includeFacets,
             'seo' => $this->seo->titles(
                 $seoRequest,
                 (int) $catalogTitles->total(),

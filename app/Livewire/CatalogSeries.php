@@ -14,6 +14,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -29,8 +30,6 @@ class CatalogSeries extends Component
         'actor' => '',
         'director' => '',
     ];
-
-    public bool $facetsLoaded = false;
 
     #[Locked]
     public ?int $routeYear = null;
@@ -90,29 +89,14 @@ class CatalogSeries extends Component
             return;
         }
 
-        if ($property === 'filters.search') {
-            $this->facetsLoaded = false;
-        }
-
         $this->validateAndNormalizeState();
         $this->resetPage();
-    }
-
-    public function loadFacets(): void
-    {
-        if ($this->facetsLoaded) {
-            return;
-        }
-
-        $this->rateLimits->enforce('catalog_search', auth()->user());
-        $this->facetsLoaded = true;
     }
 
     public function applySearch(): void
     {
         $this->rateLimits->enforce('catalog_search', auth()->user());
         $this->validateAndNormalizeState();
-        $this->facetsLoaded = false;
         $this->resetPage();
     }
 
@@ -221,7 +205,6 @@ class CatalogSeries extends Component
     public function clearSearch(): void
     {
         $this->filters->search = '';
-        $this->facetsLoaded = false;
         $this->resetErrorBag('q');
         $this->resetPage();
     }
@@ -315,7 +298,7 @@ class CatalogSeries extends Component
 
     public function render(): View
     {
-        $data = $this->pageData();
+        $data = $this->catalogPage;
         $titles = $data['titles'];
 
         if ($titles->currentPage() > $titles->lastPage()) {
@@ -332,15 +315,28 @@ class CatalogSeries extends Component
     }
 
     /** @return array<string, mixed> */
-    private function pageData(): array
+    #[Computed]
+    public function catalogPage(): array
     {
         return $this->pages->data(
             $this->catalogRequest($this->renderInput()),
             $this->routeFilterType,
             $this->routeTaxonomy,
             $this->getErrorBag()->isNotEmpty(),
+            includeFacets: false,
+        );
+    }
+
+    /** @return array<string, mixed> */
+    #[Computed]
+    public function catalogFacets(): array
+    {
+        return $this->pages->facets(
+            $this->catalogRequest($this->renderInput()),
+            $this->routeFilterType,
+            $this->routeTaxonomy,
+            $this->getErrorBag()->isNotEmpty(),
             $this->facetSearch(),
-            $this->facetsLoaded,
         );
     }
 

@@ -277,7 +277,7 @@ class CatalogVisualSystemTest extends TestCase
         );
     }
 
-    public function test_catalog_search_ui_keeps_header_search_with_lazy_native_filter_dialog(): void
+    public function test_catalog_search_ui_automatically_loads_linked_filter_island(): void
     {
         $title = CatalogTitle::factory()->create();
 
@@ -307,9 +307,13 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('wire:click.prevent="setView(\'grid\')"', $content);
         $this->assertStringContainsString('wire:click.prevent="setPerPage(48)"', $content);
         $this->assertStringContainsString('Фильтры · 0', $content);
-        $this->assertStringContainsString('data-catalog-facets-placeholder', $content);
-        $this->assertStringContainsString('wire:click="loadFacets"', $content);
-        $this->assertStringContainsString('Показать фильтры', $content);
+        $this->assertStringContainsString('wire:init="__lazyLoadIsland"', $content);
+        $this->assertStringContainsString('name=catalog-live', $content);
+        $this->assertStringContainsString('data-catalog-facets-loading', $content);
+        $this->assertStringContainsString('Загружаем фильтры', $content);
+        $this->assertStringNotContainsString('data-catalog-facets-placeholder', $content);
+        $this->assertStringNotContainsString('wire:click="loadFacets"', $content);
+        $this->assertStringNotContainsString('Показать фильтры', $content);
         $this->assertStringNotContainsString('Найти в группе', $content);
         $this->assertStringNotContainsString('data-catalog-filter-search', $content);
         $this->assertSame(0, substr_count($content, 'data-catalog-people-combobox'));
@@ -318,6 +322,13 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('aria-current="true"', $content);
         $this->assertStringNotContainsString('Применить выбранное', $content);
         $this->assertLessThan(250_000, strlen($content));
+
+        $filterTemplate = file_get_contents(resource_path('views/components/catalog/title-filters.blade.php'));
+
+        $this->assertIsString($filterTemplate);
+        $this->assertStringContainsString('wire:model.live="filters.{{ $filterType }}"', $filterTemplate);
+        $this->assertStringContainsString('wire:loading.delay', $filterTemplate);
+        $this->assertStringContainsString('Обновляем подборку', $filterTemplate);
     }
 
     public function test_advanced_catalog_filters_use_four_compact_explanatory_groups(): void
@@ -335,6 +346,10 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('Уточните период, объём сериала, рейтинг и доступность видео', $content);
         $this->assertStringContainsString('Показать результаты', $content);
         $this->assertStringContainsString('Сбросить точный подбор', $content);
+        $this->assertStringContainsString('wire:model.live="filters.updated"', $content);
+        $this->assertStringContainsString('wire:model.live="filters.ratingSource"', $content);
+        $this->assertStringContainsString('wire:model.live="filters.video"', $content);
+        $this->assertStringContainsString('wire:model.live="filters.qualities"', $content);
 
         foreach (['year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_min', 'votes_min'] as $name) {
             $this->assertMatchesRegularExpression('/name="'.preg_quote($name, '/').'"[^>]*class="[^"]*w-full[^"]*sm:w-/s', $content);

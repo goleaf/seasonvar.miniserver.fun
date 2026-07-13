@@ -743,35 +743,44 @@ class CatalogPageTest extends TestCase
         $targetTitle = CatalogTitle::factory()->create();
         $targetTitle->actors()->attach($target);
 
-        Livewire::test(CatalogSeries::class)
-            ->call('loadFacets')
-            ->assertDontSee($target->name)
+        $component = Livewire::test(CatalogSeries::class);
+        $initialFacets = $component->instance()->catalogFacets();
+
+        $this->assertFalse(
+            $initialFacets['filterTaxonomies']->get('actor')->contains('name', $target->name),
+        );
+
+        $component
             ->set('optionSearch.actor', 'Искомый редкий')
-            ->assertSee($target->name)
             ->assertSet('paginators.page', 1);
+
+        $searchedFacets = $component->instance()->catalogFacets();
+
+        $this->assertTrue(
+            $searchedFacets['filterTaxonomies']->get('actor')->contains('name', $target->name),
+        );
     }
 
-    public function test_livewire_catalog_loads_filter_facets_only_on_demand(): void
+    public function test_livewire_catalog_keeps_selected_country_live_without_manual_facet_state(): void
     {
-        $genre = Genre::query()->create([
-            'name' => 'Ленивая драма',
-            'slug' => 'lazy-drama',
+        $lithuania = Country::query()->create([
+            'name' => 'Литва',
+            'slug' => 'litva',
         ]);
-        $title = CatalogTitle::factory()->create();
-        $title->genres()->attach($genre);
+        $matching = CatalogTitle::factory()->create(['title' => 'Литовский live-сериал']);
+        $matching->countries()->attach($lithuania);
+        $other = CatalogTitle::factory()->create(['title' => 'Сериал другой страны']);
+        $component = Livewire::test(CatalogSeries::class)
+            ->set('filters.country', ['litva'])
+            ->assertSet('filters.country', ['litva'])
+            ->assertSet('paginators.page', 1);
+        $page = $component->instance()->catalogPage();
 
-        Livewire::test(CatalogSeries::class)
-            ->assertSet('facetsLoaded', false)
-            ->assertSee('Показать фильтры')
-            ->assertDontSeeHtml('name="genre[]" value="lazy-drama"')
-            ->call('loadFacets')
-            ->assertSet('facetsLoaded', true)
-            ->assertSeeHtml('name="genre[]" value="lazy-drama"')
-            ->assertDontSee('Показать фильтры')
-            ->set('filters.search', 'Новый поиск')
-            ->call('applySearch')
-            ->assertSet('facetsLoaded', false)
-            ->assertSee('Показать фильтры');
+        $this->assertFalse(property_exists($component->instance(), 'facetsLoaded'));
+        $this->assertTrue(method_exists($component->instance(), 'catalogPage'));
+        $this->assertTrue(method_exists($component->instance(), 'catalogFacets'));
+        $this->assertSame([$matching->id], $page['titles']->pluck('id')->all());
+        $this->assertNotContains($other->id, $page['titles']->pluck('id')->all());
     }
 
     public function test_livewire_catalog_normalizes_null_empty_url_state_without_uninitializing_the_form(): void
