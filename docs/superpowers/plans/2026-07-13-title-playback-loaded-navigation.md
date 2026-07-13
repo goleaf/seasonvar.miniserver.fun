@@ -370,16 +370,14 @@ Expected: commit contains exactly three declared files; staged importer files re
 - Consumes: stored baseline `/tmp/title-playback-pre-profile.jsonl`, `/tmp/title-playback-pre-http.txt`, Task 1 implementation.
 - Produces: literal post-change evidence, documentation commit, pushed existing `main`.
 
-- [ ] **Step 1: Дождаться отсутствия параллельного PHPUnit/load-test**
+- [ ] **Step 1: Проверить отсутствие параллельного PHPUnit/load-test**
 
 Run:
 
-    while pgrep -af 'phpunit|artisan test' | grep -v "$$"; do
-        sleep 5
-    done
+    pgrep -af 'phpunit|artisan test' || true
     uptime
 
-Expected: process search empty; load average recorded before benchmark. Do not stop user-owned processes.
+Expected: process search empty; load average recorded before benchmark. If a process is active, defer only the benchmark, continue non-load verification and check once more later. Do not wait in an unbounded loop and do not stop user-owned processes.
 
 - [ ] **Step 2: Снять пять post-change in-process профилей**
 
@@ -568,4 +566,3 @@ Run:
     git status --short --branch
 
 Expected: docs commit includes only three owners; push fast-forwards existing `origin/main`. Working tree is declared clean only when concurrent importer/search work has committed its own paths; those changes are never removed by this task.
-
