@@ -29,7 +29,7 @@
 
 ## Audit Baseline
 
-- Инвентаризировано 14 файлов `docs/superpowers/specs/*.md` и 25 файлов `docs/superpowers/plans/*.md`.
+- Текущий инвентарь после появления дополнительных требований во время аудита: 17 файлов `docs/superpowers/specs/*.md` и 29 файлов `docs/superpowers/plans/*.md`.
 - `php artisan test`: 312 tests, 2184 assertions, zero failures.
 - `npm run build`: production build successful; emitted local Plyr SVG and only solid/regular FontAwesome fonts.
 - `php artisan migrate:status`: все существующие migrations применены; pending migrations отсутствуют.
@@ -50,12 +50,15 @@
 | `2026-07-12-parallel-seasonvar-import-design.md` | Код реализован, runtime completion нарушен | Claims, Redis page jobs, title lock, finalizer, status, tests | Finalizer делает unbounded external backlog и параллельное global maintenance; выполнить Tasks 1-2 |
 | `2026-07-12-seasonvar-queue-architecture-design.md` | Реализована, runtime hardening нужен | Typed failure, action, hooks, DTO/status, architecture tests | Устранить 900-second finalizer timeout и concurrent finalizers |
 | `2026-07-12-seasonvar-title-group-lock-design.md` | Реализована | Canonical group key, runtime recompute, SQLite IMMEDIATE, focused tests | Нет |
+| `2026-07-13-home-latest-updates-grid-design.md` | Реализована | Главная без hero, адаптивная сетка последних обновлений и `CatalogVisualSystemTest` | Нет; более новое прямое требование пользователя об удалении hero имеет приоритет над ранней visual-system spec |
+| `2026-07-13-remove-catalog-relations-panel-design.md` | Реализована | Дублирующая панель, panel-only payload и orphaned translations удалены; contextual taxonomy и feature regression сохранены | Нет |
 | `2026-07-13-seasonvar-current-season-gap-design.md` | Реализована | Parser regression и importer test | Нет |
 | `2026-07-13-seasonvar-large-episode-batch-design.md` | Реализована | 50-row upsert chunks, 2600-episode regression | Нет |
 | `2026-07-13-seasonvar-nested-playlist-recovery-design.md` | Реализована, plan checkboxes stale | Recursive `folder` flattening, bounded attention batch, two regressions | Обновить audit status, не переписывая историю RED/GREEN |
 | `2026-07-13-seasonvar-queue-retry-lease-design.md` | Реализована | Retry deadline uses max retry/claim window and two regression branches | Нет |
 | `2026-07-13-seasonvar-queue-status-active-run-design.md` | Реализована | Dominant active run and active count tests | Нет |
 | `2026-07-13-seasonvar-title-page-state-reconciliation-design.md` | Реализована | Synchronizer service, multi-season/lifecycle tests, docs | Нет |
+| `2026-07-13-site-footer-redesign-design.md` | Реализована | Трёхчастный Blade footer, semantic feature test и Playwright 390/1440 | Нет |
 
 ## Implementation Plan Traceability
 
@@ -78,14 +81,18 @@
 | `2026-07-12-seasonvar-queue-architecture.md` | Structural code complete; production finalizer acceptance currently fails |
 | `2026-07-12-seasonvar-stats-poll-hardening-next-plan.md` | Completed pass verified; future section is conditional backlog, not accepted implementation checklist |
 | `2026-07-12-seasonvar-title-group-lock.md` | Complete |
+| `2026-07-13-home-latest-updates-grid.md` | Complete |
 | `2026-07-13-livewire-player-lifecycle.md` | Complete |
 | `2026-07-13-playback-authorization.md` | Complete |
+| `2026-07-13-remove-catalog-relations-panel.md` | Complete; checklist synchronized during this audit |
 | `2026-07-13-seasonvar-current-season-gap.md` | Complete |
 | `2026-07-13-seasonvar-large-episode-batch.md` | Complete |
 | `2026-07-13-seasonvar-nested-playlist-recovery.md` | Complete in code/tests; checklist stale |
 | `2026-07-13-seasonvar-queue-retry-lease.md` | Complete |
 | `2026-07-13-seasonvar-queue-status-active-run.md` | Complete |
 | `2026-07-13-seasonvar-title-page-state-reconciliation.md` | Complete |
+| `2026-07-13-site-footer-redesign.md` | Complete; browser QA and commit are recorded |
+| `2026-07-13-spec-completion-audit.md` | Active closure plan; implementation Tasks 1-9 complete, Task 10 and production runtime acceptance remain |
 
 ---
 
@@ -199,7 +206,7 @@
 - [x] Integrate backfill after retention maintenance and before remote selection/global derived work in sync and queued finalization.
 - [x] Preserve the snapshot selected by latest `captured_at`; preserve minimum relation version during merge.
 - [x] Run metadata tests, importer regression tests, Pint, isolated migrate/rollback/migrate and docs refresh.
-- [ ] Commit the local metadata recovery milestone on `main`.
+- [x] Commit the local metadata recovery milestone on `main` (`a00ed45`, completed integration in `2b868ad`).
 
 ### Task 5: Add Additive FTS5 Schema and Index State
 
@@ -222,7 +229,7 @@
 - [x] Implement reversible migration; `down()` drops triggers and virtual table before ordinary tables.
 - [x] Implement models/enums/casts and relationships.
 - [x] Verify isolated migrate/rollback/migrate, trigger synchronization, cascade delete, focused tests and Pint.
-- [ ] Commit the additive search schema milestone.
+- [x] Commit the additive search schema milestone (`2b868ad`).
 
 ### Task 6: Build Search Documents, Indexer and Resumable Rebuild
 
@@ -247,7 +254,7 @@
 - [x] Add RED command tests for active-import refusal, checkpoint resume, count mismatch, integrity failure and successful ready state.
 - [x] Implement builder, indexer and command with no production backfill in migration.
 - [x] Run focused tests, command on isolated fixture DB, Pint and update search documentation.
-- [ ] Commit the rebuild milestone.
+- [x] Commit the rebuild milestone (`2b868ad`).
 
 ### Task 7: Synchronize Search Index With Catalog Writes
 
@@ -272,8 +279,8 @@
 - [x] Add RED tests for importer/direct/metadata-backfill/merge/admin synchronization and unchanged-page no-op.
 - [x] Implement post-transaction/batch indexing at existing service boundaries; do not add observers.
 - [x] Add failure test proving sanitized stale state plus legacy visibility.
-- [ ] Run catalog/admin/importer focused suites and Pint.
-- [ ] Commit incremental synchronization.
+- [x] Run catalog/admin/importer focused suites and Pint.
+- [x] Commit incremental synchronization (`2b868ad`, expanded regression coverage in `6efa6fd`).
 
 ### Task 8: Use Ranked FTS With Safe Legacy Fallback
 
@@ -299,8 +306,8 @@
 - [x] Add RED stale/building/failed fallback tests and shared-facet candidate tests.
 - [x] Implement parameterized FTS expression and BM25 weights without raw user SQL.
 - [x] Inspect `EXPLAIN QUERY PLAN`; candidate IDs remain a SQL subquery and use the FTS virtual-table index without PHP materialization.
-- [ ] Run search/facet/request/page tests and Pint.
-- [ ] Commit ranked FTS activation.
+- [x] Run search/facet/request/page tests and Pint.
+- [x] Commit ranked FTS activation (`2b868ad`).
 
 ### Task 9: Complete Search UI, People Lookup, Suggestions and QA
 
@@ -329,13 +336,13 @@
 - Suggestions use bounded trigram lookup only on true zero, never change result count/canonical URL, and render under `Возможно, подойдет`.
 - One catalog search landmark, one title tab-stop, 44x44 targets, no overflow at 320px.
 
-- [ ] Add RED API validation/resource/boundary tests.
-- [ ] Add RED UI contract and suggestion-state tests.
-- [ ] Implement lookup, combobox cancellation/debounce/keyboard behavior, native mobile dialog and compact mobile rows.
-- [ ] Implement bounded trigram suggestion service against normalized document names.
-- [ ] Run focused PHP tests, `npm run build`, dependency audits and docs refresh.
-- [ ] Run Playwright at 320x720, 390x844, 768x1024 and 1440x1200 for normal/filtered/insufficient/zero/suggestion/pagination/people lookup/back-forward states.
-- [ ] Commit the search UI milestone.
+- [x] Add RED API validation/resource/boundary tests.
+- [x] Add RED UI contract and suggestion-state tests.
+- [x] Implement lookup, combobox cancellation/debounce/keyboard behavior, native mobile dialog and compact mobile rows.
+- [x] Implement bounded trigram suggestion service against normalized document names.
+- [x] Run focused PHP tests, `npm run build`, dependency audits and docs refresh.
+- [x] Run Playwright at 320x720, 390x844, 768x1024 and 1440x1200 for normal/filtered/insufficient/zero/suggestion/pagination/people lookup/back-forward states; report is stored under ignored `output/playwright/`.
+- [x] Commit the search UI milestone (`6efa6fd`; final compact-mobile refinements in `93e1d8e`).
 
 ### Task 10: Final Cross-Spec Verification and Closure
 
@@ -350,7 +357,7 @@
 - Modify: `docs/MAINTENANCE_LOG.md`
 - Modify: this plan
 
-- [ ] Re-run a requirement-by-requirement audit of all 14 design specs and 25 implementation plans; every remaining item must be marked complete, superseded with an explicit newer source, advisory roadmap, or blocked by an external operational prerequisite.
+- [ ] Re-run a requirement-by-requirement audit of all 17 design specs and 29 implementation plans; every remaining item must be marked complete, superseded with an explicit newer source, advisory roadmap, or blocked by an external operational prerequisite.
 - [ ] Run `./vendor/bin/pint --dirty --format agent`.
 - [ ] Run every focused suite named in Tasks 1-9.
 - [ ] Run `php artisan test` and `./vendor/bin/phpunit`; both must report zero failures.

@@ -77,7 +77,7 @@ Expected: all commands exit successfully.
 
 For both viewports verify HTTP 200, footer visibility, one/three computed columns, no horizontal overflow, no page errors and no failed local requests.
 
-- [ ] **Step 2: Commit and push on `main`**
+- [x] **Step 2: Commit and push on `main`**
 
 ```bash
 git add docs/superpowers/specs/2026-07-13-site-footer-redesign-design.md \
