@@ -14,6 +14,17 @@ final class CatalogTitleSearch
 {
     private ?bool $ready = null;
 
+    public function matchingTitleIdsQuery(CatalogSearchQuery $search): ?Builder
+    {
+        if (! $this->isReady() || $search->ftsExpression === '') {
+            return null;
+        }
+
+        return DB::table('catalog_title_search_fts')
+            ->whereRaw('catalog_title_search_fts MATCH ?', [$search->ftsExpression])
+            ->selectRaw('catalog_title_search_fts.rowid AS catalog_title_id');
+    }
+
     public function candidateQuery(CatalogSearchQuery $search): ?Builder
     {
         if (! $this->isReady() || $search->ftsExpression === '') {
@@ -48,7 +59,8 @@ final class CatalogTitleSearch
             ->orderBy('exact_original_title_rank')
             ->orderBy('exact_alias_rank')
             ->orderBy('bm25_score')
-            ->orderByDesc('catalog_title_search_documents.catalog_title_id');
+            ->orderByDesc('catalog_title_search_documents.catalog_title_id')
+            ->limit(PHP_INT_MAX);
     }
 
     public function isReady(): bool

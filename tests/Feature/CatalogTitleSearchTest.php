@@ -123,6 +123,7 @@ class CatalogTitleSearchTest extends TestCase
             ]);
 
             $this->assertNull($search->candidateQuery($query));
+            $this->assertNull($search->matchingTitleIdsQuery($query));
             $search->forgetState();
         }
 
@@ -133,6 +134,39 @@ class CatalogTitleSearchTest extends TestCase
         $search->forgetState();
 
         $this->assertNull($search->candidateQuery($query));
+        $this->assertNull($search->matchingTitleIdsQuery($query));
+    }
+
+    public function test_filter_only_matching_avoids_rank_columns_and_ranked_candidates_keep_materialization_boundary(): void
+    {
+        $title = CatalogTitle::factory()->create(['title' => 'План полнотекстового поиска']);
+        app(CatalogSearchIndexer::class)->indexTitleIds([$title->id]);
+        $this->markReady(1);
+        $query = app(CatalogSearchQueryParser::class)->parse('полнотекстового поиска');
+        $search = app(CatalogTitleSearch::class);
+
+        $this->assertTrue(
+            method_exists($search, 'matchingTitleIdsQuery'),
+            'CatalogTitleSearch should expose a filter-only FTS query.',
+        );
+
+        $matching = $search->matchingTitleIdsQuery($query);
+        $ranked = $search->candidateQuery($query);
+
+        $this->assertNotNull($matching);
+        $this->assertNotNull($ranked);
+        $this->assertSame([$title->id], $matching->pluck('catalog_title_id')->all());
+
+        $matchingSql = mb_strtolower($matching->toSql());
+        $this->assertStringContainsString('catalog_title_search_fts.rowid as catalog_title_id', $matchingSql);
+        $this->assertStringContainsString('catalog_title_search_fts match ?', $matchingSql);
+        $this->assertStringNotContainsString('catalog_title_search_documents', $matchingSql);
+        $this->assertStringNotContainsString('bm25', $matchingSql);
+        $this->assertStringNotContainsString('order by', $matchingSql);
+
+        $rankedSql = mb_strtolower($ranked->toSql());
+        $this->assertStringContainsString('bm25', $rankedSql);
+        $this->assertStringContainsString('limit 9223372036854775807', $rankedSql);
     }
 
     public function test_candidate_subquery_uses_the_fts_virtual_table_plan_without_php_id_materialization(): void

@@ -320,7 +320,7 @@
                             label="Поиск по каталогу"
                             placeholder="Название, описание или тег"
                             container-class="min-w-0 flex-1"
-                            wire:model.live.debounce.650ms="filters.search"
+                            wire:model="filters.search"
                         />
                         <button type="submit" wire:loading.attr="disabled" wire:target="filters.search,applySearch" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60">
                             <x-ui.icon name="fa-solid fa-arrow-right" />

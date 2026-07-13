@@ -64,6 +64,7 @@ class CatalogTitleQuery
         CatalogTitlesCriteria $criteria,
         ?User $user,
         ?string $exceptTaxonomyType = null,
+        bool $rankSearch = false,
     ): Builder {
         $query = $this->visibleTo($user);
 
@@ -85,7 +86,7 @@ class CatalogTitleQuery
             $query->whereKey($criteria->titleContextId);
         }
 
-        $this->applySearchFilter($query, $criteria->search, $criteria->titleContextId, $user);
+        $this->applySearchFilter($query, $criteria->search, $criteria->titleContextId, $user, $rankSearch);
         $this->applyRelationFilters(
             $query,
             $exceptTaxonomyType,
@@ -157,17 +158,15 @@ class CatalogTitleQuery
     {
         $contextTitles = $this
             ->filteredTitles($criteria->withoutSubtitleAvailability(), $user)
-            ->select('catalog_titles.id');
-        $availableTitles = $this
-            ->publishedMediaTitleIds($user, true)
-            ->groupBy('catalog_title_id');
+            ->select('catalog_titles.id')
+            ->withExists(['licensedMedia as has_available_subtitles' => fn (Builder $query): Builder => $query
+                ->availableTo($user)
+                ->forAvailableReleases($user)
+                ->where('has_subtitles', true)]);
         $counts = DB::query()
             ->fromSub($contextTitles, 'subtitle_context_titles')
-            ->leftJoinSub($availableTitles, 'subtitle_available_titles', function ($join): void {
-                $join->on('subtitle_available_titles.catalog_title_id', '=', 'subtitle_context_titles.id');
-            })
             ->selectRaw('count(*) as total_count')
-            ->selectRaw('count(subtitle_available_titles.catalog_title_id) as available_count')
+            ->selectRaw('coalesce(sum(has_available_subtitles), 0) as available_count')
             ->first();
         $total = (int) ($counts->total_count ?? 0);
         $available = (int) ($counts->available_count ?? 0);
@@ -246,8 +245,13 @@ class CatalogTitleQuery
     /**
      * @param  Builder<CatalogTitle>  $query
      */
-    private function applySearchFilter(Builder $query, CatalogSearchQuery $search, ?int $titleContextId, ?User $user): void
-    {
+    private function applySearchFilter(
+        Builder $query,
+        CatalogSearchQuery $search,
+        ?int $titleContextId,
+        ?User $user,
+        bool $rankSearch,
+    ): void {
         if ($search->state === CatalogSearchState::Empty) {
             return;
         }
@@ -264,9 +268,7 @@ class CatalogTitleQuery
             return;
         }
 
-        $rankedCandidates = $this->titleSearch->candidateQuery($search);
-
-        if ($rankedCandidates !== null) {
+        if ($rankSearch && ($rankedCandidates = $this->titleSearch->candidateQuery($search)) !== null) {
             $alias = 'catalog_search_candidates';
             $query->joinSub(
                 $rankedCandidates,
@@ -276,6 +278,12 @@ class CatalogTitleQuery
                 'catalog_titles.id',
             );
             $this->rankedSearchAliases[spl_object_id($query)] = $alias;
+
+            return;
+        }
+
+        if (($matchingTitleIds = $this->titleSearch->matchingTitleIdsQuery($search)) !== null) {
+            $query->whereIn('catalog_titles.id', $matchingTitleIds);
 
             return;
         }

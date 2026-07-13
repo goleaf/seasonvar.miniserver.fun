@@ -175,7 +175,15 @@ class CatalogTitlesPageBuilder
             $cardColumns[] = 'description';
         }
 
-        $catalogTitles = $this->query->filteredTitles($criteria, $request->user())
+        $rankSearch = $searchQuery->isReady();
+        $catalogTotal = $rankSearch
+            ? $this->query->filteredTitles($criteria, $request->user())->count()
+            : null;
+        $catalogTitles = $this->query->filteredTitles(
+            $criteria,
+            $request->user(),
+            rankSearch: $rankSearch,
+        )
             ->select($cardColumns)
             ->with($view === 'list'
                 ? array_merge([
@@ -188,7 +196,7 @@ class CatalogTitlesPageBuilder
             $catalogTitles->withMax($this->query->ratingAggregates(), 'rating');
         }
         $this->query->sorted($catalogTitles, $sortOption);
-        $catalogTitles = $catalogTitles->paginate($perPage)->appends($paginationQuery);
+        $catalogTitles = $catalogTitles->paginate($perPage, total: $catalogTotal)->appends($paginationQuery);
         $suggestions = $catalogTitles->total() === 0 && ! $invalidInput && $titleContext === null
             ? $this->searchSuggestions->forQuery($searchQuery, $request->user())
             : collect();

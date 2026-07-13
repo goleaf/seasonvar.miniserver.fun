@@ -261,7 +261,9 @@ class CatalogVisualSystemTest extends TestCase
             ->assertOk()
             ->getContent();
 
-        $this->assertStringContainsString('wire:model.live.debounce.650ms="filters.search"', $content);
+        $this->assertStringContainsString('wire:model="filters.search"', $content);
+        $this->assertStringNotContainsString('wire:model.live.debounce.650ms="filters.search"', $content);
+        $this->assertStringContainsString('wire:submit="applySearch"', $content);
         $this->assertStringContainsString('wire:submit="applyFilters"', $content);
         $this->assertStringContainsString('wire:loading.delay', $content);
         $this->assertStringNotContainsString('wire:loading.delay.flex', $content);
