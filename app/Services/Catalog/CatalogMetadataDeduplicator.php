@@ -17,6 +17,7 @@ class CatalogMetadataDeduplicator
     public function __construct(
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogRelationNameSanitizer $names,
+        private readonly CatalogRelationSourceIdentityRegistry $sourceIdentities,
         private readonly CatalogSearchIndexer $search,
     ) {}
 
@@ -98,7 +99,7 @@ class CatalogMetadataDeduplicator
         $this->resetIdentityTable();
 
         $modelClass::query()
-            ->select(['id', 'name', 'source_url'])
+            ->select(['id', 'name', 'slug', 'source_url'])
             ->chunkById($chunkSize, function ($records) use ($type, $modelClass, $pivotTable, $titleKey, $relatedKey, &$result, &$affectedTitleIds): void {
                 $identityRows = [];
                 $invalidIds = [];
@@ -117,6 +118,8 @@ class CatalogMetadataDeduplicator
                     $identityRows[] = [
                         'relation_id' => $recordId,
                         'canonical_key' => $this->names->canonicalKey($type, $name),
+                        'current_key' => $record->slug,
+                        'identity_key' => $record->slug,
                         'normalized_name' => $name,
                         'source_url' => $record->source_url,
                     ];
@@ -163,15 +166,25 @@ class CatalogMetadataDeduplicator
             );
             $sourceUrl = $identities->firstWhere('relation_id', $canonicalId)?->source_url
                 ?? $identities->first(fn (object $identity): bool => $identity->source_url !== null)?->source_url;
+            $canonicalCurrentKey = (string) $identities->firstWhere('relation_id', $canonicalId)?->current_key;
 
             foreach (array_chunk($duplicateIds, $chunkSize) as $ids) {
                 $duplicateMap = array_fill_keys($ids, $canonicalId);
+                $previousCanonicalKeys = $identities
+                    ->whereIn('relation_id', $ids)
+                    ->pluck('current_key')
+                    ->map(fn (mixed $key): string => (string) $key)
+                    ->values()
+                    ->all();
                 $this->mergeDuplicateRecords(
+                    $type,
                     $modelClass,
                     $pivotTable,
                     $titleKey,
                     $relatedKey,
                     $duplicateMap,
+                    $previousCanonicalKeys,
+                    $canonicalCurrentKey,
                     $result,
                     $affectedTitleIds,
                 );
@@ -187,14 +200,26 @@ class CatalogMetadataDeduplicator
         DB::table($modelTable.' as records')
             ->join(self::IDENTITY_TABLE.' as identities', 'identities.relation_id', '=', 'records.id')
             ->whereColumn('records.slug', '!=', 'identities.canonical_key')
-            ->select('records.id as record_id')
+            ->select([
+                'records.id as record_id',
+                'identities.current_key',
+            ])
             ->chunkById($chunkSize, function ($records) use ($type, $modelClass): void {
                 DB::transaction(function () use ($records, $type, $modelClass): void {
                     foreach ($records as $record) {
                         $recordId = (int) $record->record_id;
+                        $identityKey = $this->identityStagingKey($type, $recordId);
                         $modelClass::query()->whereKey($recordId)->update([
                             'slug' => $this->stagingSlug($modelClass, $type, $recordId),
                             'updated_at' => now(),
+                        ]);
+                        $this->sourceIdentities->rebind(
+                            $type,
+                            [(string) $record->current_key],
+                            $identityKey,
+                        );
+                        DB::table(self::IDENTITY_TABLE)->where('relation_id', $recordId)->update([
+                            'identity_key' => $identityKey,
                         ]);
                     }
                 });
@@ -213,29 +238,39 @@ class CatalogMetadataDeduplicator
                 'records.id as record_id',
                 'records.source_url as current_source_url',
                 'identities.canonical_key',
+                'identities.identity_key',
                 'identities.normalized_name',
                 'identities.source_url as identity_source_url',
             ])
-            ->chunkById($chunkSize, function ($records) use ($modelClass, $pivotTable, $titleKey, $relatedKey, &$result, &$affectedTitleIds): void {
-                $recordIds = $records->pluck('record_id')->map(fn (mixed $id): int => (int) $id)->all();
-                $this->rememberAffectedTitles($pivotTable, $titleKey, $relatedKey, $recordIds, $affectedTitleIds);
+            ->chunkById($chunkSize, function ($records) use ($type, $modelClass, $pivotTable, $titleKey, $relatedKey, &$result, &$affectedTitleIds): void {
+                DB::transaction(function () use ($records, $type, $modelClass, $pivotTable, $titleKey, $relatedKey, &$result, &$affectedTitleIds): void {
+                    $recordIds = $records->pluck('record_id')->map(fn (mixed $id): int => (int) $id)->all();
+                    $this->rememberAffectedTitles($pivotTable, $titleKey, $relatedKey, $recordIds, $affectedTitleIds);
 
-                foreach ($records as $record) {
-                    $changes = [
-                        'name' => $record->normalized_name,
-                        'slug' => $record->canonical_key,
-                        'updated_at' => now(),
-                    ];
+                    foreach ($records as $record) {
+                        $changes = [
+                            'name' => $record->normalized_name,
+                            'slug' => $record->canonical_key,
+                            'updated_at' => now(),
+                        ];
 
-                    if ($record->current_source_url === null && $record->identity_source_url !== null) {
-                        $changes['source_url'] = $record->identity_source_url;
+                        if ($record->current_source_url === null && $record->identity_source_url !== null) {
+                            $changes['source_url'] = $record->identity_source_url;
+                        }
+
+                        $result['records_canonicalized'] += $modelClass::query()
+                            ->whereKey((int) $record->record_id)
+                            ->update($changes);
+                        $this->sourceIdentities->rebind(
+                            $type,
+                            [(string) $record->identity_key],
+                            (string) $record->canonical_key,
+                        );
                     }
-
-                    $result['records_canonicalized'] += $modelClass::query()
-                        ->whereKey((int) $record->record_id)
-                        ->update($changes);
-                }
+                });
             }, 'records.id', 'record_id');
+
+        $this->sourceIdentities->pruneMissing($type, $modelTable);
 
         return $result;
     }
@@ -255,6 +290,11 @@ class CatalogMetadataDeduplicator
         return $candidate;
     }
 
+    private function identityStagingKey(string $type, int $recordId): string
+    {
+        return "__catalog_identity_stage__{$type}__{$recordId}__".bin2hex(random_bytes(8));
+    }
+
     /**
      * @param  class-string<Model>  $modelClass
      * @param  array<int, int>  $duplicateMap
@@ -262,15 +302,18 @@ class CatalogMetadataDeduplicator
      * @param  array<int, true>  $affectedTitleIds
      */
     private function mergeDuplicateRecords(
+        string $type,
         string $modelClass,
         string $pivotTable,
         string $titleKey,
         string $relatedKey,
         array $duplicateMap,
+        array $previousCanonicalKeys,
+        string $canonicalKey,
         array &$result,
         array &$affectedTitleIds,
     ): void {
-        DB::transaction(function () use ($modelClass, $pivotTable, $titleKey, $relatedKey, $duplicateMap, &$result, &$affectedTitleIds): void {
+        DB::transaction(function () use ($type, $modelClass, $pivotTable, $titleKey, $relatedKey, $duplicateMap, $previousCanonicalKeys, $canonicalKey, &$result, &$affectedTitleIds): void {
             $duplicateIds = array_keys($duplicateMap);
             $links = DB::table($pivotTable)
                 ->whereIn($relatedKey, $duplicateIds)
@@ -294,6 +337,7 @@ class CatalogMetadataDeduplicator
             $result['duplicate_links_removed'] += $links->count() - $inserted;
             DB::table($pivotTable)->whereIn($relatedKey, $duplicateIds)->delete();
             $result['records_merged'] += $modelClass::query()->whereKey($duplicateIds)->delete();
+            $this->sourceIdentities->rebind($type, $previousCanonicalKeys, $canonicalKey);
         });
     }
 
@@ -320,6 +364,8 @@ class CatalogMetadataDeduplicator
             CREATE TEMPORARY TABLE catalog_metadata_identity_map (
                 relation_id INTEGER PRIMARY KEY,
                 canonical_key TEXT NOT NULL,
+                current_key TEXT NOT NULL,
+                identity_key TEXT NOT NULL,
                 normalized_name TEXT NOT NULL,
                 source_url TEXT NULL
             )

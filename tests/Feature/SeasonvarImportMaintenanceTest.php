@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\DTOs\MediaHealthCheckResultData;
 use App\Models\Actor;
+use App\Models\CatalogRelationSourceIdentity;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
 use App\Models\Country;
@@ -567,6 +568,24 @@ class SeasonvarImportMaintenanceTest extends TestCase
             'name' => 'Сериал Akter 1 сезон полностью',
             'slug' => 'serial-akter-1-season',
         ]);
+        CatalogRelationSourceIdentity::query()->create([
+            'source_id' => $firstTitle->source_id,
+            'relation_type' => 'actor',
+            'source_key_hash' => hash('sha256', 'latin-actor'),
+            'canonical_key' => $latinActor->slug,
+        ]);
+        CatalogRelationSourceIdentity::query()->create([
+            'source_id' => $secondTitle->source_id,
+            'relation_type' => 'actor',
+            'source_key_hash' => hash('sha256', 'cyrillic-actor'),
+            'canonical_key' => $cyrillicActor->slug,
+        ]);
+        CatalogRelationSourceIdentity::query()->create([
+            'source_id' => $firstTitle->source_id,
+            'relation_type' => 'actor',
+            'source_key_hash' => hash('sha256', 'invalid-actor'),
+            'canonical_key' => $invalidActor->slug,
+        ]);
 
         $firstTitle->actors()->attach([$latinActor->id, $cyrillicActor->id, $invalidActor->id]);
         $secondTitle->actors()->attach($cyrillicActor->id);
@@ -581,6 +600,11 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $this->assertSame(1, $result['records_merged']);
         $this->assertSame(1, $result['links_moved']);
         $this->assertSame(1, $result['duplicate_links_removed']);
+        $this->assertDatabaseCount('catalog_relation_source_identities', 2);
+        $this->assertSame(
+            ['atsuko-tanaka'],
+            CatalogRelationSourceIdentity::query()->distinct()->pluck('canonical_key')->all(),
+        );
 
         $secondResult = app(CatalogMetadataDeduplicator::class)->run();
 
@@ -588,10 +612,16 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $this->assertSame(0, $secondResult['records_merged']);
         $this->assertDatabaseCount('actors', 1);
         $this->assertDatabaseCount('catalog_title_actor', 2);
+        $this->assertDatabaseCount('catalog_relation_source_identities', 2);
+        $this->assertSame(
+            ['atsuko-tanaka'],
+            CatalogRelationSourceIdentity::query()->distinct()->pluck('canonical_key')->all(),
+        );
     }
 
     public function test_it_canonicalizes_relation_slugs_without_transient_unique_collisions(): void
     {
+        $source = Source::factory()->create();
         $firstActor = Actor::query()->create([
             'name' => 'Мицуиси Кэн',
             'slug' => 'micuisi-ken',
@@ -600,12 +630,28 @@ class SeasonvarImportMaintenanceTest extends TestCase
             'name' => 'Митсуйши Кен',
             'slug' => 'mitsuisi-ken',
         ]);
+        CatalogRelationSourceIdentity::query()->create([
+            'source_id' => $source->id,
+            'relation_type' => 'actor',
+            'source_key_hash' => hash('sha256', 'first-actor'),
+            'canonical_key' => $firstActor->slug,
+        ]);
+        CatalogRelationSourceIdentity::query()->create([
+            'source_id' => $source->id,
+            'relation_type' => 'actor',
+            'source_key_hash' => hash('sha256', 'second-actor'),
+            'canonical_key' => $secondActor->slug,
+        ]);
 
         app(CatalogMetadataDeduplicator::class)->run();
 
         $this->assertSame('mitsuisi-ken', $firstActor->fresh()->slug);
         $this->assertSame('mitsuishi-ken', $secondActor->fresh()->slug);
         $this->assertDatabaseCount('actors', 2);
+        $this->assertEqualsCanonicalizing(
+            ['mitsuisi-ken', 'mitsuishi-ken'],
+            CatalogRelationSourceIdentity::query()->pluck('canonical_key')->all(),
+        );
     }
 
     public function test_it_processes_all_pending_pages_across_import_chunks(): void
