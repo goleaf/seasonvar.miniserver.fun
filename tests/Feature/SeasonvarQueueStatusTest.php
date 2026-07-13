@@ -117,6 +117,51 @@ class SeasonvarQueueStatusTest extends TestCase
         $this->assertSame($running->id, $status->runId);
     }
 
+    public function test_it_uses_the_newer_run_when_active_runs_have_equal_live_claims(): void
+    {
+        $this->queuedRun();
+        $newerRun = $this->queuedRun([
+            'selected' => 8,
+            'parsed' => 3,
+            'failed' => 1,
+        ]);
+        $this->mockQueue(oldestPendingTimestamp: now()->getTimestamp());
+
+        $status = app(SeasonvarQueueStatus::class)->read();
+
+        $this->assertSame(2, $status->activeRuns);
+        $this->assertSame($newerRun->id, $status->runId);
+        $this->assertSame(8, $status->selected);
+        $this->assertSame(3, $status->parsed);
+        $this->assertSame(1, $status->failed);
+    }
+
+    public function test_it_falls_back_to_the_latest_queued_run_when_no_active_run_exists(): void
+    {
+        $this->queuedRun([
+            'status' => 'completed',
+            'selected' => 50,
+            'parsed' => 50,
+            'failed' => 0,
+        ]);
+        $latestRun = $this->queuedRun([
+            'status' => 'failed',
+            'selected' => 11,
+            'parsed' => 4,
+            'failed' => 7,
+        ]);
+        $this->mockQueue(oldestPendingTimestamp: now()->getTimestamp());
+
+        $status = app(SeasonvarQueueStatus::class)->read();
+
+        $this->assertSame(0, $status->activeRuns);
+        $this->assertSame($latestRun->id, $status->runId);
+        $this->assertSame('failed', $status->runStatus);
+        $this->assertSame(11, $status->selected);
+        $this->assertSame(4, $status->parsed);
+        $this->assertSame(7, $status->failed);
+    }
+
     /**
      * @param  array<string, mixed>  $attributes
      */
