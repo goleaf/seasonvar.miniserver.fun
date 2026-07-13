@@ -233,7 +233,7 @@ class CatalogVisualSystemTest extends TestCase
         );
     }
 
-    public function test_catalog_search_ui_uses_one_landmark_native_mobile_dialog_and_people_comboboxes(): void
+    public function test_catalog_search_ui_keeps_header_search_with_native_mobile_dialog_and_people_comboboxes(): void
     {
         $title = CatalogTitle::factory()->create();
 
@@ -248,9 +248,11 @@ class CatalogVisualSystemTest extends TestCase
 
         $content = $this->get(route('titles.index'))->assertOk()->getContent();
 
-        $this->assertSame(1, substr_count($content, 'role="search"'));
+        $this->assertSame(2, substr_count($content, 'role="search"'));
         $this->assertStringContainsString('aria-label="Поиск по каталогу"', $content);
-        $this->assertStringNotContainsString('aria-label="Поиск по всему каталогу"', $content);
+        $this->assertStringContainsString('aria-label="Поиск по всему каталогу"', $content);
+        $this->assertStringContainsString('id="site-search"', $content);
+        $this->assertStringContainsString('id="catalog-search"', $content);
         $this->assertStringContainsString('<dialog', $content);
         $this->assertStringContainsString('id="catalog-filters"', $content);
         $this->assertStringContainsString('data-catalog-filter-dialog', $content);
