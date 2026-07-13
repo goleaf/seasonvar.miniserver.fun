@@ -8,12 +8,12 @@
 
 - Ветка: только `main`.
 - Runtime: PHP 8.5.8, Laravel 13.19.0, Livewire 4.3.3, PHPUnit 12.5, SQLite 3.46, Vite 8, Tailwind CSS 4.3, Plyr 3.8 и HLS.js 1.6.
-- Production-like база на момент проверки: более 34 тысяч тайтлов, 596 тысяч серий и 655 тысяч media rows; `PRAGMA quick_check` вернул `ok`, foreign-key violations и проверенные дубли identity/hierarchy/pivot/user-state не обнаружены.
-- Из десяти настроенных Redis workers девять работают, а `seasonvar-import-worker@21` остаётся в `failed` после подтверждённого 128-МБ падения старого recommendation builder. На момент проверки Redis queue была пуста; полный ручной repeat import не запускался поверх production-like workers, а идемпотентность проверена существующими PHPUnit-сценариями на SQLite in-memory и `Http::fake()`.
-- Focused end-to-end suite: 117 тестов, 906 assertions, все прошли. Он охватывает каталог, multi-filter, URL state, playback/progress, history/Continue Watching, watchlist/rating, authorization, SSRF и повторный импорт.
+- Production-like база на момент последней read-only сверки: более 34 тысяч тайтлов, 611 тысяч серий и 681 тысяча media rows; предыдущий `PRAGMA quick_check` вернул `ok`, foreign-key violations и проверенные дубли identity/hierarchy/pivot/user-state не обнаружены.
+- Непрерывный sitemap import переведён на один sync-процесс `seasonvar:import --forever`; versioned systemd unit установлен для autostart, а прежние import/title-refresh worker instances отключены. Redis backlog при переключении не очищался.
+- Последний полный PHPUnit: 544 теста, 3813 assertions, 533 passed и 11 штатно пропущенных opt-in infrastructure tests. Набор охватывает каталог, multi-filter, URL state, playback/progress, history/Continue Watching, watchlist/rating, authorization, SSRF и повторный импорт.
 - Реальная browser matrix после исправления URL: HTTP 200 на 390/768/1440 px, два результата для сложной комбинации фильтров, horizontal overflow 0, mobile dialog возвращает focus, title/player shell серверно отрисованы. Media requests в проверке намеренно блокировались.
 - Главная до query-правки собиралась примерно за 16,8 с и 30 SQL queries под активным импортом; замена materialized media subquery снизила тот же builder до примерно 9,7 с. Публичные HTTP timings всё ещё нестабильны из-за SQLite write contention.
-- `storage/logs/laravel.log` достиг примерно 1,2 ГБ. В проверенном хвосте не найдены authorization headers, private keys или явные token/password query values, но текущие `APP_ENV=local`, `APP_DEBUG=true`, `LOG_STACK=single` и `LOG_LEVEL=debug` неприемлемы для production.
+- `storage/logs/laravel.log` достиг 752 649 755 байт. В проверенном хвосте не найдены authorization headers, private keys или явные token/password query values, но текущие `APP_ENV=local`, `APP_DEBUG=true`, `LOG_STACK=single` и `LOG_LEVEL=debug` неприемлемы для production.
 - Laravel Boost был запрошен для application info и versioned docs, но обе попытки завершились `Transport closed`; версии подтверждены Composer/Artisan/npm/vendor metadata.
 
 ## Исправлено в рамках аудита
@@ -47,15 +47,15 @@
 - **Проверка:** безопасный запрос несуществующего маршрута, controlled exception в staging, `php artisan config:show app`, проверка process-manager environment.
 - **Приоритет:** P0, security/deployment.
 
-### AUD-002 — SQLite contention между web и десятью import workers
+### AUD-002 — Проверка SQLite SLO при непрерывном однопоточном импорте
 
-- **Проблема:** production-like SQLite одновременно обслуживает тяжёлые public reads и массовые importer writes; зафиксированы 12–30-секундные ответы и browser timeout.
-- **Влияние:** каталог, статистика и фильтры становятся нестабильными; lock storms могут давать 5xx и задерживать jobs.
-- **Предлагаемое решение:** немедленно ограничить importer concurrency по измеренному write budget, вынести тяжёлые finalizer/backfill окна из пикового трафика и определить порог миграции каталога на PostgreSQL.
-- **Зависимости:** реальные p50/p95/p99, queue wait, SQLite busy/lock metrics и traffic profile.
-- **Риски:** слишком сильное ограничение workers увеличит freshness lag; перенос СУБД требует проверки SQLite-specific SQL/FTS.
-- **Критерии приёмки:** p95 public catalog ниже согласованного SLO при активном импорте, 5xx из-за locks равен нулю, queue lag остаётся в допустимом окне.
-- **Проверка:** контролируемый load test с 0/2/5/10 workers, query timings, lock counters, повторный idempotent import.
+- **Проблема:** importer concurrency уже снижен до одного sync-процесса, но public p95/p99 и SQLite busy/lock metrics после переключения ещё не измерены на репрезентативном трафике.
+- **Влияние:** без повторного замера нельзя подтвердить, что один непрерывный writer укладывается в SLO каталога, статистики и фильтров.
+- **Предлагаемое решение:** измерить public latency и lock counters при активном `seasonvar:import --forever`, вынести тяжёлые maintenance stages из пикового трафика только при подтверждённой необходимости и сохранить порог миграции на PostgreSQL.
+- **Зависимости:** реальные p50/p95/p99, SQLite busy/lock metrics и traffic profile.
+- **Риски:** слишком длинное окно измерения может смешать importer и внешнюю provider latency; перенос СУБД требует проверки SQLite-specific SQL/FTS.
+- **Критерии приёмки:** p95 public catalog ниже согласованного SLO при активном импорте, 5xx из-за locks равен нулю, полный цикл сохраняет допустимое окно свежести.
+- **Проверка:** контролируемый профиль с выключенным и включённым одним sync importer, query timings, lock counters и повторный idempotent import.
 - **Приоритет:** P0, database/performance/importer reliability.
 
 ### AUD-003 — Неограниченный single log и privacy retention
@@ -68,17 +68,6 @@
 - **Критерии приёмки:** ни один app/worker log не превышает установленный размер, старые файлы удаляются по policy, секрет-скан остаётся чистым.
 - **Проверка:** форсированная rotation в staging, проверка владельца/прав, disk alert и выборочный поиск token/password/private URL markers.
 - **Приоритет:** P0, observability/security/maintenance.
-
-### AUD-004 — Незавершённый rollout importer worker unit
-
-- **Проблема:** на финальной проверке активные import workers отсутствуют, а `seasonvar-import-worker@21.service` остаётся в `failed` после старого recommendation OOM. Repository unit уже задаёт `memory_limit=256M`, Laravel recycle `--memory=192` и `Restart=always`, но установленный systemd rollout ещё нужно сверить и безопасно выполнить после deployment.
-- **Влияние:** новые queued imports и browser-инициированные targeted refreshes останутся в Redis до запуска worker; повторный тяжёлый finalizer на не обновлённом unit может снова упасть.
-- **Предлагаемое решение:** после merge/push установить versioned unit, выполнить `systemctl daemon-reload`, безопасно перезапустить все importer instances после опустошения очереди и отдельно восстановить instance 21; не поднимать старый 128-МБ unit поверх текущего кода вручную.
-- **Зависимости:** завершённый deploy этого commit, maintenance window, проверка пустой/reserved queue и свободной памяти для десяти процессов.
-- **Риски:** одновременный restart может прервать активную job; слишком высокий параллельный RSS может создать host-level pressure, поэтому concurrency надо сверить с AUD-002.
-- **Критерии приёмки:** все десять units находятся в `active (running)`, используют `-d memory_limit=256M --memory=192`, повторный finalizer завершается без OOM, failed instance отсутствует.
-- **Проверка:** `systemctl list-units 'seasonvar-import-worker@*.service'`, `systemctl show` для ExecStart/Restart, `queue:monitor`, journal OOM scan и controlled finalizer/recommendation rebuild.
-- **Приоритет:** P0, importer reliability/deployment/operations.
 
 ## P1
 
@@ -126,17 +115,6 @@
 - **Проверка:** real-store integration tests с уникальными prefixes, forced miss/outage test, cold/warm query and latency measurements.
 - **Приоритет:** P1, caching/performance/security.
 
-### AUD-105 — Search index version rollout и quality monitoring
-
-- **Проблема:** изменение normalization/document version требует полного production FTS rebuild после завершения import; старый index обязан безопасно уходить в legacy fallback.
-- **Влияние:** смешанные версии ухудшат recall для `ё/е`, aliases, people и external IDs или скроют новые тайтлы.
-- **Предлагаемое решение:** выполнить checkpointed rebuild в отдельном окне, публиковать ready version только после count/integrity gates и поддерживать acceptance corpus.
-- **Зависимости:** завершённые import runs, свободное место и search command lock.
-- **Риски:** долгий SQLite FTS rebuild конкурирует с web reads; плохой corpus создаёт ложную уверенность.
-- **Критерии приёмки:** document/title counts совпадают, FTS orphan count равен нулю, acceptance precision/recall thresholds выполнены.
-- **Проверка:** `catalog:search-rebuild`, state/version query, existing search acceptance/index/synchronization suites и representative browser queries.
-- **Приоритет:** P1, search/localization/deployment.
-
 ### AUD-106 — CSP и browser security policy
 
 - **Проблема:** базовые security headers есть, но строгая Content-Security-Policy/reporting не подтверждена для Livewire, Vite, Plyr и provider media.
@@ -159,15 +137,15 @@
 - **Проверка:** повторяемый CI run, intentional service outage failure и artifact screenshots/report.
 - **Приоритет:** P1, testing/CI/accessibility/responsive.
 
-### AUD-108 — Атомарный deployment и worker coordination
+### AUD-108 — Атомарный deployment и importer coordination
 
-- **Проблема:** SQLite migrations, FTS rebuild, config changes, cache versions и десять workers требуют единого порядка, иначе процессы читают несовместимую schema/config.
+- **Проблема:** SQLite migrations, FTS rebuild, config changes, cache versions и непрерывный sync importer требуют единого порядка, иначе процессы читают несовместимую schema/config.
 - **Влияние:** partial deploy вызывает 5xx, duplicate work или stale cache/search visibility.
-- **Предлагаемое решение:** оформить executable runbook: drain/stop writers, backup, migrate, optimize, version bump/warm, restart workers/PHP-FPM, health checks, traffic restore.
-- **Зависимости:** AUD-001/003/103/104/105 и process-manager access.
+- **Предлагаемое решение:** оформить executable runbook: дождаться безопасной точки и остановить sync writer, сделать backup, migrate/optimize, version bump/warm, перезапустить importer/PHP-FPM, выполнить health checks и вернуть traffic.
+- **Зависимости:** AUD-001/003/103/104 и process-manager access.
 - **Риски:** maintenance дольше бюджета; rollback к старому коду может быть несовместим с новой schema.
 - **Критерии приёмки:** rehearsal на свежей копии проходит в заданное окно, rollback decision points явны, post-deploy checks автоматизированы.
-- **Проверка:** staging rehearsal с timestamps, schema/cache/search versions, queue heartbeat и HTTP smoke matrix.
+- **Проверка:** staging rehearsal с timestamps, schema/cache/search versions, importer process state и HTTP smoke matrix.
 - **Приоритет:** P1, deployment/maintenance/documentation.
 
 ## P2
@@ -267,7 +245,7 @@
 - **Проблема:** SQLite FTS покрывает текущий поиск, но future typo tolerance/morphology/load могут превысить его возможности.
 - **Влияние:** преждевременный Meilisearch/Typesense добавит distributed consistency; поздний переход ограничит качество поиска.
 - **Предлагаемое решение:** вести quality/latency corpus и запускать architecture decision record только после нарушения threshold.
-- **Зависимости:** AUD-105, traffic/query analytics и operations capacity.
+- **Зависимости:** текущий FTS acceptance corpus, traffic/query analytics и operations capacity.
 - **Риски:** stale external index, visibility leakage и дополнительная production dependency.
 - **Критерии приёмки:** выбранный engine улучшает измеряемые relevance/latency показатели и сохраняет visibility-first semantics.
 - **Проверка:** offline corpus benchmark, failure/fallback test и import/admin synchronization rehearsal.

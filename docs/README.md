@@ -28,7 +28,7 @@
 | Production rollout | [`deployment.md`](deployment.md) | Environment, additive migrations, backup/maintenance order, workers, cache warmup и post-deploy checks. |
 | История изменений | [`CHANGELOG.md`](../CHANGELOG.md) | Пользовательские и архитектурные изменения в установленном формате. |
 | Журнал обслуживания | [`MAINTENANCE_LOG.md`](MAINTENANCE_LOG.md) | Датированные эксплуатационные работы, замеры и диагностика; не заменяет release changelog. |
-| Реестр Markdown-аудита | [`markdown-review-2026-07-13.md`](markdown-review-2026-07-13.md) | Полный список 195 просмотренных project-owned Markdown-файлов: изменённые и неизменённые. |
+| Реестр Markdown-аудита | [`markdown-review-2026-07-13.md`](markdown-review-2026-07-13.md) | Реестр просмотренных project-owned Markdown-файлов; завершённые временные implementation plans сохранены в Git history и удалены из текущей документации. |
 
 ## Как обновлять документацию
 

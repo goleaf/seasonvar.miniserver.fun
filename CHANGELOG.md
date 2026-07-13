@@ -2,6 +2,7 @@
 
 ## 2026-07-13
 
+- Removed completed temporary implementation/QA plans from the current documentation, retained only the living `docs/audit.md` backlog, and refreshed its importer baseline for the active single-process profile.
 - Added a reboot-safe single-process `seasonvar:import --forever` systemd profile, made stale refresh jobs for deleted titles successful no-ops, and aligned preparation/finalizer retry deadlines with the longer configured page-claim lease.
 - Removed all application-generated HTTP 429 responses: web/API/Livewire transport throttles, action buckets, playback concurrency status, source-health budget and the dedicated Redis limiter workload. Authentication, authorization, CSRF, signed playback URLs, validation and bounded handling of remote Seasonvar/CDN 429 responses remain unchanged.
 - Closed the `/titles` crawl trap with `noindex,nofollow`, nofollow UI-state links, ClaudeBot/query robots rules and a Redis-backed query limiter while leaving canonical catalog and card links crawlable.

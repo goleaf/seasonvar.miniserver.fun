@@ -1,6 +1,6 @@
 # Реестр Markdown-аудита 13.07.2026
 
-Проверены все project-owned Markdown-файлы, найденные через tracked и non-ignored untracked inventory. Ignored dependency trees (`vendor`, `node_modules`) не являются документацией репозитория. Всего просмотрено: 195.
+Проверены все project-owned Markdown-файлы, найденные через tracked и non-ignored untracked inventory. Ignored dependency trees (`vendor`, `node_modules`) не являются документацией репозитория. В исходном проходе просмотрено 195 файлов. Завершённые временные implementation/QA plans позднее удалены из текущей документации; их содержимое и первоначальный inventory остаются в Git history.
 
 ## Изменены
 
@@ -22,10 +22,8 @@
 - `docs/frontend.md`
 - `docs/markdown-review-2026-07-13.md`
 - `docs/performance.md`
-- `docs/plans/2026-07-13-cache-performance-architecture.md`
 - `docs/queues.md`
 - `docs/security.md`
-- `docs/superpowers/plans/2026-07-13-spec-completion-audit.md`
 - `docs/testing.md`
 - `docs/upgrade.md`
 - `docs/views.md`
@@ -152,37 +150,7 @@
 - `docs/mcp.md`
 - `docs/models.md`
 - `docs/notifications.md`
-- `docs/recommendations-playwright-plan.md`
 - `docs/storage.md`
-- `docs/superpowers/plans/2026-07-11-stats-issue-rows.md`
-- `docs/superpowers/plans/2026-07-12-all-seasons-catalog.md`
-- `docs/superpowers/plans/2026-07-12-catalog-facets-title-metadata.md`
-- `docs/superpowers/plans/2026-07-12-catalog-multi-value-filters.md`
-- `docs/superpowers/plans/2026-07-12-catalog-search-core.md`
-- `docs/superpowers/plans/2026-07-12-catalog-search-url-pagination.md`
-- `docs/superpowers/plans/2026-07-12-catalog-visual-system.md`
-- `docs/superpowers/plans/2026-07-12-domain-publication-integrity.md`
-- `docs/superpowers/plans/2026-07-12-foundational-stability.md`
-- `docs/superpowers/plans/2026-07-12-livewire-series-catalog.md`
-- `docs/superpowers/plans/2026-07-12-livewire-title-detail.md`
-- `docs/superpowers/plans/2026-07-12-multi-select-catalog-filters-plan.md`
-- `docs/superpowers/plans/2026-07-12-no-outline-ui-polish-plan.md`
-- `docs/superpowers/plans/2026-07-12-parallel-seasonvar-import.md`
-- `docs/superpowers/plans/2026-07-12-seasonvar-queue-architecture.md`
-- `docs/superpowers/plans/2026-07-12-seasonvar-stats-poll-hardening-next-plan.md`
-- `docs/superpowers/plans/2026-07-12-seasonvar-title-group-lock.md`
-- `docs/superpowers/plans/2026-07-13-home-latest-updates-grid.md`
-- `docs/superpowers/plans/2026-07-13-livewire-player-lifecycle.md`
-- `docs/superpowers/plans/2026-07-13-playback-authorization.md`
-- `docs/superpowers/plans/2026-07-13-remove-catalog-relations-panel.md`
-- `docs/superpowers/plans/2026-07-13-responsive-icon-system.md`
-- `docs/superpowers/plans/2026-07-13-seasonvar-current-season-gap.md`
-- `docs/superpowers/plans/2026-07-13-seasonvar-large-episode-batch.md`
-- `docs/superpowers/plans/2026-07-13-seasonvar-nested-playlist-recovery.md`
-- `docs/superpowers/plans/2026-07-13-seasonvar-queue-retry-lease.md`
-- `docs/superpowers/plans/2026-07-13-seasonvar-queue-status-active-run.md`
-- `docs/superpowers/plans/2026-07-13-seasonvar-title-page-state-reconciliation.md`
-- `docs/superpowers/plans/2026-07-13-site-footer-redesign.md`
 - `docs/superpowers/specs/2026-07-11-stats-issue-rows-design.md`
 - `docs/superpowers/specs/2026-07-12-all-seasons-catalog-design.md`
 - `docs/superpowers/specs/2026-07-12-catalog-facets-title-metadata-design.md`
