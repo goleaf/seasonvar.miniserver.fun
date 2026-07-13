@@ -33,11 +33,16 @@ class ProjectDocumentationRefresherTest extends TestCase
             'docs/CODE_STANDARDS.md',
             'docs/UI_STANDARDS.md',
             'docs/DATA_RELATIONS.md',
+            'docs/SOURCE_PARITY.md',
             'docs/MAINTENANCE_LOG.md',
         ], $result->changedFiles);
         $this->assertStringContainsString('<!-- project-docs:start -->', File::get($basePath.'/README.md'));
         $this->assertStringContainsString('`/sitemap-index.xml` (`sitemap.index`)', File::get($basePath.'/docs/CODE_STANDARDS.md'));
         $this->assertStringContainsString('Обновлено: '.now()->format('d.m.Y'), File::get($basePath.'/docs/UI_STANDARDS.md'));
+        $this->assertStringContainsString(
+            '"docs/SOURCE_PARITY.md"',
+            File::get(base_path('scripts/docs-autocommit-push.sh')),
+        );
     }
 
     public function test_check_mode_reports_changes_without_writing_files(): void
@@ -65,6 +70,7 @@ class ProjectDocumentationRefresherTest extends TestCase
             'docs/CODE_STANDARDS.md' => "# Code\n\nОбновлено: 01.01.2000\n",
             'docs/UI_STANDARDS.md' => "# UI\n\nОбновлено: 01.01.2000\n",
             'docs/DATA_RELATIONS.md' => "# Data\n\nОбновлено: 01.01.2000\n",
+            'docs/SOURCE_PARITY.md' => "# Source parity\n\nОбновлено: 01.01.2000\n",
             'docs/MAINTENANCE_LOG.md' => "# Maintenance\n",
         ] as $relativePath => $contents) {
             File::put($this->tempPath.'/'.$relativePath, $contents);

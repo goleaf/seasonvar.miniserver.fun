@@ -92,13 +92,14 @@ class SeasonvarCatalogImporter
         $total = $urls->count();
         $stored = 0;
         $processed = 0;
+        $updated = 0;
 
         $this->report($progress, 'store-discovered-urls-started', [
             'source_id' => $source->id,
             'total' => $total,
         ]);
 
-        $urls->chunk(500)->each(function (Collection $chunk) use ($source, $total, &$stored, &$processed, $progress): void {
+        $urls->chunk(500)->each(function (Collection $chunk) use ($source, $total, &$stored, &$processed, &$updated, $progress): void {
             $now = now();
             $rowsByHash = $chunk->mapWithKeys(function (string $url) use ($source, $now): array {
                 $urlHash = $this->seasonvarUrl->hash($url);
@@ -107,38 +108,53 @@ class SeasonvarCatalogImporter
                     'source_id' => $source->id,
                     'url' => $url,
                     'url_hash' => $urlHash,
-                    'page_type' => $this->seasonvarUrl->pageType($url),
+                    'page_type' => $this->seasonvarUrl->pageType($url)->value,
                     'parse_status' => 'pending',
                     'discovered_from_url' => $this->seasonvarSource->sitemapUrl(),
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]];
             });
-            $existingHashes = SourcePage::query()
+            $existingPages = SourcePage::query()
                 ->whereIn('url_hash', $rowsByHash->keys())
-                ->pluck('url_hash');
-            $stored += $rowsByHash->keys()->diff($existingHashes)->count();
+                ->get(['url_hash', 'source_id', 'url', 'page_type', 'discovered_from_url'])
+                ->keyBy('url_hash');
+            $stored += $rowsByHash->keys()->diff($existingPages->keys())->count();
             $processed += $rowsByHash->count();
+            $changedRows = $rowsByHash->filter(function (array $row, string $hash) use ($existingPages): bool {
+                $existing = $existingPages->get($hash);
 
-            SourcePage::query()->upsert(
-                $rowsByHash->values()->all(),
-                ['url_hash'],
-                ['source_id', 'url', 'page_type', 'discovered_from_url', 'updated_at'],
-            );
+                return $existing === null
+                    || (int) $existing->source_id !== (int) $row['source_id']
+                    || $existing->url !== $row['url']
+                    || $existing->page_type !== $row['page_type']
+                    || $existing->discovered_from_url !== $row['discovered_from_url'];
+            });
+            $updated += $changedRows->count() - $rowsByHash->keys()->diff($existingPages->keys())->count();
+
+            if ($changedRows->isNotEmpty()) {
+                SourcePage::query()->upsert(
+                    $changedRows->values()->all(),
+                    ['url_hash'],
+                    ['source_id', 'url', 'page_type', 'discovered_from_url', 'updated_at'],
+                );
+            }
 
             $this->report($progress, 'store-discovered-urls-chunk-complete', [
                 'processed' => $processed,
                 'total' => $total,
                 'chunk' => $rowsByHash->count(),
                 'stored' => $stored,
-                'updated' => $processed - $stored,
+                'updated' => $updated,
+                'unchanged' => $processed - $stored - $updated,
             ]);
         });
 
         $this->report($progress, 'store-discovered-urls-complete', [
             'total' => $total,
             'stored' => $stored,
-            'updated' => $total - $stored,
+            'updated' => $updated,
+            'unchanged' => $total - $stored - $updated,
         ]);
 
         return $stored;
@@ -216,7 +232,7 @@ class SeasonvarCatalogImporter
         $page->fill([
             'source_id' => $source->id,
             'url' => $url,
-            'page_type' => $this->seasonvarUrl->pageType($url),
+            'page_type' => $this->seasonvarUrl->pageType($url)->value,
             'discovered_from_url' => $this->seasonvarSource->sitemapUrl(),
         ]);
 

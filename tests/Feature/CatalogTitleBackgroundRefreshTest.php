@@ -86,6 +86,32 @@ class CatalogTitleBackgroundRefreshTest extends TestCase
         $this->assertStringNotContainsString('queue unavailable', json_encode($state->toArray(), JSON_THROW_ON_ERROR));
     }
 
+    public function test_different_titles_queue_independent_refresh_jobs_with_separate_unique_keys(): void
+    {
+        $titles = CatalogTitle::factory()->count(5)->create()->each(function (CatalogTitle $title): void {
+            $url = 'https://seasonvar.ru/serial-'.$title->id.'-Test-'.$title->id.'-season.html';
+
+            $title->update([
+                'source_url' => $url,
+                'source_url_hash' => hash('sha256', $url),
+            ]);
+        });
+
+        foreach ($titles as $title) {
+            app(CatalogTitleRefreshCoordinator::class)->request($title->fresh());
+        }
+
+        Queue::assertPushed(RefreshSeasonvarCatalogTitle::class, 5);
+
+        $jobs = Queue::pushed(RefreshSeasonvarCatalogTitle::class);
+
+        $this->assertSame(
+            $titles->modelKeys(),
+            $jobs->pluck('catalogTitleId')->sort()->values()->all(),
+        );
+        $this->assertCount(5, $jobs->map->uniqueId()->unique());
+    }
+
     private function refreshableTitle(array $attributes = []): CatalogTitle
     {
         $url = 'https://seasonvar.ru/serial-42-Test-1-season.html';

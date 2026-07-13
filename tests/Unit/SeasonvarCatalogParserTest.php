@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Enums\SeasonvarPageType;
 use App\Services\Seasonvar\SeasonvarCatalogParser;
 use App\Services\Seasonvar\SeasonvarUrl;
 use Tests\TestCase;
@@ -337,5 +338,49 @@ class SeasonvarCatalogParserTest extends TestCase
 
         $this->assertTrue($url->isAllowed('https://seasonvar.ru/serial-1276--6_kadrov-1-season.html'));
         $this->assertFalse($url->isAllowed('http://seasonvar.ru/serial-1276--6_kadrov-1-season.html'));
+    }
+
+    public function test_source_urls_are_canonicalized_and_classified_with_typed_page_types(): void
+    {
+        $url = app(SeasonvarUrl::class);
+
+        $this->assertSame(
+            'https://seasonvar.ru/genre/drama',
+            $url->normalize('HTTPS://WWW.SEASONVAR.RU//genre/%64rama/?utm_source=audit#fragment'),
+        );
+        $this->assertSame(
+            'https://seasonvar.ru/?mod=login',
+            $url->normalize('https://seasonvar.ru/?token=private&mod=login'),
+        );
+
+        $malformed = $url->normalize(
+            'https://seasonvar.ru/serial-1-Test.html//serial-2-Other.html',
+        );
+
+        $this->assertTrue($url->isMalformedCatalogUrl($malformed));
+        $this->assertFalse($url->isAllowed($malformed));
+
+        $cases = [
+            'https://seasonvar.ru/serial-1-Test.html' => SeasonvarPageType::Serial,
+            'https://seasonvar.ru/actor/ivan-ivanov' => SeasonvarPageType::Actor,
+            'https://seasonvar.ru/director/ivan-ivanov' => SeasonvarPageType::Director,
+            'https://seasonvar.ru/genre/drama' => SeasonvarPageType::Genre,
+            'https://seasonvar.ru/country/rossiya' => SeasonvarPageType::Country,
+            'https://seasonvar.ru/tag/netflix' => SeasonvarPageType::Tag,
+            'https://seasonvar.ru/translation/lostfilm' => SeasonvarPageType::Translation,
+            'https://seasonvar.ru/status/zavershen' => SeasonvarPageType::Status,
+            'https://seasonvar.ru/network/ntv' => SeasonvarPageType::Network,
+            'https://seasonvar.ru/studio/amediateka' => SeasonvarPageType::Studio,
+            'https://seasonvar.ru/st/serials.html' => SeasonvarPageType::StaticPage,
+            'https://seasonvar.ru/' => SeasonvarPageType::StaticPage,
+            'https://seasonvar.ru/rss.php' => SeasonvarPageType::Rss,
+            'https://seasonvar.ru/search/' => SeasonvarPageType::Search,
+            'https://seasonvar.ru/sitemap_index.xml' => SeasonvarPageType::Sitemap,
+            'https://seasonvar.ru/film-1-Test.html' => SeasonvarPageType::Unknown,
+        ];
+
+        foreach ($cases as $sourceUrl => $expectedType) {
+            $this->assertSame($expectedType, $url->pageType($sourceUrl), $sourceUrl);
+        }
     }
 }

@@ -205,6 +205,76 @@ class SeasonvarTitleMergeTest extends TestCase
             ->assertRedirect(route('titles.show', $canonical));
     }
 
+    public function test_global_merge_consolidates_a_verified_season_family_with_different_provider_ids(): void
+    {
+        $source = Source::factory()->create(['code' => 'seasonvar']);
+        $seasonOneUrl = 'https://seasonvar.ru/serial-7780-Mamochka_psxtsdh.html';
+        $seasonTwoUrl = 'https://seasonvar.ru/serial-10781-Mamochka_pszlnxu-2-season.html';
+        $seasonThreeUrl = 'https://seasonvar.ru/serial-12712-Mamochka_psphzei-3-sezon.html';
+
+        $pages = collect([$seasonOneUrl, $seasonTwoUrl, $seasonThreeUrl])
+            ->mapWithKeys(fn (string $url): array => [
+                $url => SourcePage::factory()->create([
+                    'source_id' => $source->id,
+                    'url' => $url,
+                    'url_hash' => hash('sha256', $url),
+                ]),
+            ]);
+
+        $canonical = CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $pages[$seasonOneUrl]->id,
+            'external_id' => '7780',
+            'slug' => 'mamockamom',
+            'title' => 'Мамочка/Mom',
+            'source_url' => $seasonOneUrl,
+            'source_url_hash' => hash('sha256', $seasonOneUrl),
+        ]);
+        $duplicate = CatalogTitle::factory()->create([
+            'source_id' => $source->id,
+            'source_page_id' => $pages[$seasonThreeUrl]->id,
+            'external_id' => '12712',
+            'slug' => 'mamockamom-2',
+            'title' => 'Мамочка/Mom',
+            'source_url' => $seasonThreeUrl,
+            'source_url_hash' => hash('sha256', $seasonThreeUrl),
+        ]);
+
+        foreach ([1 => $seasonOneUrl, 2 => $seasonTwoUrl] as $number => $url) {
+            Season::factory()->create([
+                'catalog_title_id' => $canonical->id,
+                'source_page_id' => $pages[$url]->id,
+                'number' => $number,
+                'source_url' => $url,
+                'source_url_hash' => hash('sha256', $url),
+            ]);
+        }
+
+        foreach ([2 => $seasonTwoUrl, 3 => $seasonThreeUrl] as $number => $url) {
+            $season = Season::factory()->create([
+                'catalog_title_id' => $duplicate->id,
+                'source_page_id' => $pages[$url]->id,
+                'number' => $number,
+                'source_url' => $url,
+                'source_url_hash' => hash('sha256', $url),
+            ]);
+            Episode::factory()->create([
+                'season_id' => $season->id,
+                'source_page_id' => $pages[$url]->id,
+                'number' => 1,
+            ]);
+        }
+
+        $result = app(SeasonvarTitleMerger::class)->merge();
+
+        $this->assertSame(1, $result['groups']);
+        $this->assertSame(1, $result['titles']);
+        $this->assertDatabaseMissing('catalog_titles', ['id' => $duplicate->id]);
+        $canonical->refresh()->load('seasons.episodes');
+        $this->assertSame([1, 2, 3], $canonical->seasons->sortBy('number')->pluck('number')->values()->all());
+        $this->assertSame(2, $canonical->episodes()->count());
+    }
+
     public function test_it_merges_requested_season_family_even_when_provider_ids_differ(): void
     {
         $source = Source::factory()->create(['code' => 'seasonvar']);

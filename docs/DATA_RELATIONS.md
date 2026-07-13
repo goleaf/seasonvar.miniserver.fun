@@ -47,6 +47,7 @@
 - `SourcePage hasMany SourcePageSnapshot`
 - `SourcePage hasMany SeasonvarImportEvent`
 - `SourcePage belongsTo SeasonvarImportRun` через `last_import_run_id`
+- `SourcePage.page_type` хранит строковое значение `SeasonvarPageType`; inventory может добавить разрешённый неизвестный или ещё не разбираемый URL, но никогда не меняет `parse_status`/`import_status` уже существующей строки. Sitemap-документы также хранятся как source pages для полного audit trail и не попадают в serial parser queue.
 - `SeasonvarImportRun hasMany SeasonvarImportEvent`
 - `SeasonvarImportRun hasMany SourcePageSnapshot`
 - `SeasonvarImportRun hasMany SourcePage` через `last_import_run_id`
@@ -160,6 +161,7 @@
 ## Поведение импорта
 
 - Единственная публичная команда Seasonvar: `php artisan seasonvar:import`.
+- `--inventory-only` классифицирует sitemap и source-page URL, записывает import run/event snapshot и обновляет только инфраструктурные `Source`/`SourcePage`; `CatalogTitle`, сезоны, серии, связи и media в этом режиме не читаются для записи и не изменяются.
 - Без аргументов команда читает sitemap Seasonvar, сохраняет все найденные ссылки страниц каталога, затем обрабатывает очередь по одному запросу.
 - С URL-аргументом команда обновляет эту карточку и найденные прямые страницы сезонов.
 - Существующие связи, серии и медиа сохраняются, если они исчезли со страницы источника.

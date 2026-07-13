@@ -10,6 +10,7 @@ use App\Models\SeasonvarImportRun;
 use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
 use App\Services\Seasonvar\SeasonvarImportGroupKey;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
+use App\Services\Seasonvar\SeasonvarTitleMerger;
 use App\Services\Seasonvar\SeasonvarUrl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -35,6 +36,7 @@ class RefreshSeasonvarCatalogTitleJobTest extends TestCase
             'seasonvar.queue.retry_window_seconds' => 21_600,
             'seasonvar.queue.worker_timeout' => 900,
             'seasonvar.title_refresh.active_seconds' => 21_900,
+            'seasonvar.title_refresh.queue' => 'seasonvar-title-refresh',
             'seasonvar.title_refresh.state_ttl_seconds' => 86_400,
         ]);
 
@@ -66,6 +68,16 @@ class RefreshSeasonvarCatalogTitleJobTest extends TestCase
             && ! $forever
             && $sleepSeconds === null
             && ! $discover)->andReturn($run);
+        $merger = Mockery::mock(SeasonvarTitleMerger::class);
+        $merger->shouldReceive('mergeForCanonicalSlug')
+            ->once()
+            ->with($title->slug)
+            ->andReturn([
+                'groups' => 1,
+                'titles' => 2,
+                'seasons' => 3,
+                'episodes' => 4,
+            ]);
 
         $job = new RefreshSeasonvarCatalogTitle($title->id);
         $job->handle(
@@ -73,6 +85,7 @@ class RefreshSeasonvarCatalogTitleJobTest extends TestCase
             app(SeasonvarUrl::class),
             app(SeasonvarImportGroupKey::class),
             app(CatalogTitleRefreshStateStore::class),
+            $merger,
         );
 
         $state = app(CatalogTitleRefreshStateStore::class)->read($title->id);
@@ -80,7 +93,7 @@ class RefreshSeasonvarCatalogTitleJobTest extends TestCase
         $this->assertSame(0, $job->tries);
         $this->assertSame(900, $job->timeout);
         $this->assertSame('redis', $job->connection);
-        $this->assertSame('seasonvar-import', $job->queue);
+        $this->assertSame('seasonvar-title-refresh', $job->queue);
         $this->assertSame('catalog-title-refresh:'.$title->id, $job->uniqueId());
         $this->assertSame(now()->addSeconds(21_600)->getTimestamp(), $job->retryUntil()->getTimestamp());
         $this->assertSame([60, 300, 900], $job->backoff());
@@ -103,7 +116,13 @@ class RefreshSeasonvarCatalogTitleJobTest extends TestCase
             $pipeline->shouldNotReceive('run');
             $job = (new RefreshSeasonvarCatalogTitle($title->id))->withFakeQueueInteractions();
 
-            $job->handle($pipeline, app(SeasonvarUrl::class), $groupKeys, $states);
+            $job->handle(
+                $pipeline,
+                app(SeasonvarUrl::class),
+                $groupKeys,
+                $states,
+                app(SeasonvarTitleMerger::class),
+            );
 
             $job->assertReleased(delay: 30);
             $this->assertSame('queued', $states->read($title->id)->status?->value);
@@ -125,6 +144,7 @@ class RefreshSeasonvarCatalogTitleJobTest extends TestCase
             app(SeasonvarUrl::class),
             app(SeasonvarImportGroupKey::class),
             app(CatalogTitleRefreshStateStore::class),
+            app(SeasonvarTitleMerger::class),
         );
     }
 

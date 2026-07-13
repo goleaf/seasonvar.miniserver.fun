@@ -2,6 +2,7 @@
 
 namespace App\Services\Catalog;
 
+use App\Enums\SeasonvarPageType;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
@@ -15,6 +16,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 use Throwable;
 
 class CatalogStatsPageBuilder
@@ -1788,6 +1790,10 @@ class CatalogStatsPageBuilder
         $key = $table.'.'.$column.'.'.$value;
         $labels = $this->valueLabels();
 
+        if ($table === 'source_pages' && $column === 'page_type' && is_string($value)) {
+            return Str::ucfirst(SeasonvarPageType::tryFrom($value)?->label() ?? (string) $value);
+        }
+
         if (isset($labels[$key])) {
             return $labels[$key];
         }
@@ -1820,16 +1826,6 @@ class CatalogStatsPageBuilder
             'catalog_titles.type.anime' => 'Аниме',
             'catalog_titles.type.documentary' => 'Документальное',
             'catalog_titles.type.unknown' => 'Не определено',
-            'source_pages.page_type.sitemap' => 'Карта сайта',
-            'source_pages.page_type.serial' => 'Страница сериала',
-            'source_pages.page_type.actor' => 'Актер',
-            'source_pages.page_type.genre' => 'Жанр',
-            'source_pages.page_type.country' => 'Страна',
-            'source_pages.page_type.tag' => 'Тег',
-            'source_pages.page_type.static' => 'Служебная страница',
-            'source_pages.page_type.rss' => 'Лента обновлений',
-            'source_pages.page_type.search' => 'Поиск',
-            'source_pages.page_type.unknown' => 'Не определено',
             'source_pages.parse_status.pending' => 'Ожидает сбора',
             'source_pages.parse_status.parsed' => 'Собрано',
             'source_pages.parse_status.failed' => 'Ошибка',

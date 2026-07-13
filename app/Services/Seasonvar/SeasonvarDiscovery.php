@@ -2,6 +2,7 @@
 
 namespace App\Services\Seasonvar;
 
+use App\Enums\SeasonvarPageType;
 use App\Services\Crawler\PoliteHttpClient;
 use RuntimeException;
 use SimpleXMLElement;
@@ -152,19 +153,19 @@ class SeasonvarDiscovery
 
                 $pageType = $this->seasonvarUrl->pageType($url);
 
-                if ($pageType === 'serial') {
+                if ($pageType === SeasonvarPageType::Serial) {
                     $isDuplicate = array_key_exists($url, $discovered);
                     $discovered[$url] = $url;
 
                     $this->report($progress, $isDuplicate ? 'catalog-url-duplicate' : 'catalog-url-discovered', [
                         'url' => $url,
-                        'page_type' => $pageType,
+                        'page_type' => $pageType->value,
                         'discovered' => count($discovered),
                     ]);
                 } else {
                     $this->report($progress, 'catalog-url-skipped', [
                         'reason' => 'не сериал',
-                        'page_type' => $pageType,
+                        'page_type' => $pageType->value,
                         'url' => $url,
                     ]);
                 }

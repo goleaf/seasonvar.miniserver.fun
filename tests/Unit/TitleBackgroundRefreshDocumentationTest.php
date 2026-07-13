@@ -14,5 +14,9 @@ class TitleBackgroundRefreshDocumentationTest extends TestCase
         $this->assertStringContainsString('15 минут', File::get(base_path('docs/importer.md')));
         $this->assertStringContainsString('wire:poll.3s.visible', File::get(base_path('docs/frontend.md')));
         $this->assertStringContainsString('RefreshSeasonvarCatalogTitle', File::get(base_path('docs/queues.md')));
+        $this->assertStringContainsString(
+            '--queue=seasonvar-title-refresh,seasonvar-import',
+            File::get(base_path('deploy/systemd/seasonvar-import-worker@.service')),
+        );
     }
 }

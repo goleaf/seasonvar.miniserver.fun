@@ -2,7 +2,12 @@
 
 namespace App\Services\ProjectDocumentation;
 
+use App\Enums\SeasonvarPageType;
+use App\Models\SeasonvarImportRun;
+use App\Services\Seasonvar\SeasonvarSourceParityRegistry;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -18,14 +23,20 @@ class ProjectDocumentationRefresher
         'docs/CODE_STANDARDS.md',
         'docs/UI_STANDARDS.md',
         'docs/DATA_RELATIONS.md',
+        'docs/SOURCE_PARITY.md',
         'docs/MAINTENANCE_LOG.md',
     ];
 
     private string $basePath;
 
-    public function __construct(?string $basePath = null)
-    {
+    private SeasonvarSourceParityRegistry $sourceParity;
+
+    public function __construct(
+        ?string $basePath = null,
+        ?SeasonvarSourceParityRegistry $sourceParity = null,
+    ) {
         $this->basePath = $basePath ?? base_path();
+        $this->sourceParity = $sourceParity ?? new SeasonvarSourceParityRegistry;
     }
 
     public function refresh(bool $check = false): ProjectDocumentationRefreshResult
@@ -109,6 +120,7 @@ class ProjectDocumentationRefresher
             'docs/CODE_STANDARDS.md' => $this->codeStandardsSection(),
             'docs/UI_STANDARDS.md' => $this->uiStandardsSection(),
             'docs/DATA_RELATIONS.md' => $this->dataRelationsSection(),
+            'docs/SOURCE_PARITY.md' => $this->sourceParitySection(),
             'docs/MAINTENANCE_LOG.md' => $this->maintenanceSection(),
             default => '## Автоматически обновляемое состояние'."\n\n".'Обновлено: '.$this->today().'.',
         };
@@ -171,6 +183,132 @@ class ProjectDocumentationRefresher
             'Хук автокоммита: `.githooks/post-commit` через `scripts/docs-autocommit-push.sh`; отправка в Git включается только через `SEASONVAR_DOCS_AUTO_PUSH=1`.',
             'Основной sitemap для robots и поисковых систем: `https://seasonvar.miniserver.fun/sitemap-index.xml`.',
         ]);
+    }
+
+    private function sourceParitySection(): string
+    {
+        $capabilities = $this->sourceParity->capabilities();
+        $latestAttempt = null;
+        $latestSuccessful = null;
+
+        if (Schema::hasTable('seasonvar_import_runs')) {
+            $latestAttempt = SeasonvarImportRun::query()
+                ->where('mode', 'inventory')
+                ->latest('id')
+                ->first();
+            $latestSuccessful = SeasonvarImportRun::query()
+                ->where('mode', 'inventory')
+                ->where('status', 'completed')
+                ->latest('id')
+                ->first();
+        }
+
+        $inventory = is_array(data_get($latestSuccessful?->summary, 'source_inventory'))
+            ? data_get($latestSuccessful?->summary, 'source_inventory')
+            : [];
+        $counts = is_array($inventory['counts_by_page_type'] ?? null)
+            ? $inventory['counts_by_page_type']
+            : [];
+        $samples = is_array($inventory['sample_urls_by_page_type'] ?? null)
+            ? $inventory['sample_urls_by_page_type']
+            : [];
+        $timestamp = $this->inventoryTimestamp($latestSuccessful, $inventory);
+        $attemptStatus = match ($latestAttempt?->status) {
+            'completed' => 'успешно',
+            'failed' => 'ошибка; новый успешный снимок не создан',
+            'running' => 'выполняется',
+            default => 'не выполнялась',
+        };
+
+        $lines = [
+            '## Управляемый снимок source parity',
+            '',
+            '- Последняя попытка: '.$attemptStatus.'.',
+            '- Последний подтверждённый снимок: '.($timestamp ?? 'нет').'.',
+            '- Команда: `php artisan seasonvar:import --inventory-only`.',
+            '- Карт сайта: '.($inventory['sitemap_count'] ?? '—').'.',
+            '- Нормализованных URL: '.($inventory['total_url_count'] ?? '—').'.',
+            '- Неизвестных URL: '.($inventory['unknown_url_count'] ?? '—').'; некорректных: '.($inventory['malformed_url_count'] ?? '—').'; заблокированных: '.($inventory['blocked_url_count'] ?? '—').'.',
+            '',
+            '| Тип источника | Найдено | Parser | Публичный route | SourcePage | В локальном sitemap | Parser class | Route name |',
+            '| --- | ---: | --- | --- | --- | --- | --- | --- |',
+        ];
+
+        $discoveredTypes = collect(SeasonvarPageType::cases())
+            ->filter(fn (SeasonvarPageType $type): bool => (int) ($counts[$type->value] ?? 0) > 0)
+            ->values();
+
+        if ($discoveredTypes->isEmpty()) {
+            $lines[] = '| _Подтверждённых типов пока нет_ | — | — | — | — | — | — | — |';
+        } else {
+            foreach ($discoveredTypes as $type) {
+                $capability = $capabilities[$type->value];
+                $lines[] = sprintf(
+                    '| `%s` | %d | %s | %s | %s | %s | %s | %s |',
+                    $type->value,
+                    (int) $counts[$type->value],
+                    $this->yesNo($capability['can_parse']),
+                    $this->yesNo($capability['can_publish_local_page']),
+                    $this->yesNo($capability['can_store_source_page']),
+                    $this->yesNo($capability['can_add_to_sitemap']),
+                    $capability['parser_class'] === null ? '—' : '`'.$capability['parser_class'].'`',
+                    $capability['local_route_name'] === null ? '—' : '`'.$capability['local_route_name'].'`',
+                );
+            }
+        }
+
+        $missingParsers = collect($counts)
+            ->filter(fn (mixed $count, string $type): bool => (int) $count > 0 && ! ($capabilities[$type]['can_parse'] ?? false))
+            ->keys()
+            ->values()
+            ->all();
+        $missingPages = collect($counts)
+            ->filter(fn (mixed $count, string $type): bool => (int) $count > 0 && ! ($capabilities[$type]['can_publish_local_page'] ?? false))
+            ->keys()
+            ->values()
+            ->all();
+
+        $lines[] = '';
+        $lines[] = '- Нет parser support: '.($missingParsers === [] ? 'нет' : implode(', ', $missingParsers)).'.';
+        $lines[] = '- Нет локальной публичной страницы: '.($missingPages === [] ? 'нет' : implode(', ', $missingPages)).'.';
+
+        if ($samples !== []) {
+            $lines[] = '- Репрезентативные пути: '.collect($samples)
+                ->map(fn (mixed $paths, string $type): string => '`'.$type.'` '.collect(is_array($paths) ? $paths : [])->take(3)->map(fn (mixed $path): string => '`'.$this->markdownCell((string) $path).'`')->implode(', '))
+                ->filter()
+                ->implode('; ').'.';
+        }
+
+        $lines[] = '- Подтверждённым считается только тип с ненулевым счётчиком последнего успешного inventory. Остальные категории реестра являются возможностями классификатора, а не заявлением о наличии страницы у источника.';
+        $lines[] = '- Инвентаризация хранит только разрешённые публичные metadata URL. Видео, player/playlist URL, cookies, credentials, закрытые ответы и защищённый контент в отчёт не входят; публикация локальной страницы требует отдельного подтверждения прав.';
+
+        return implode("\n", $lines);
+    }
+
+    /** @param array<string, mixed> $inventory */
+    private function inventoryTimestamp(?SeasonvarImportRun $run, array $inventory): ?string
+    {
+        $value = $inventory['completed_at'] ?? $run?->finished_at;
+
+        if ($value === null) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->format('d.m.Y H:i:s');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function yesNo(bool $value): string
+    {
+        return $value ? 'да' : 'нет';
+    }
+
+    private function markdownCell(string $value): string
+    {
+        return str_replace(['|', "\r", "\n"], ['\\|', '', ' '], $value);
     }
 
     /**

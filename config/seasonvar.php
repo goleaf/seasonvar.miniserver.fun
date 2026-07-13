@@ -7,6 +7,7 @@ return [
     ))),
     'base_url' => env('SEASONVAR_BASE_URL', 'https://seasonvar.ru'),
     'sitemap_url' => env('SEASONVAR_SITEMAP_URL', 'https://seasonvar.ru/sitemap_index.xml'),
+    'sitemap_storage_directory' => 'seasonvar/sitemaps',
     'crawl_delay_seconds' => (int) env('SEASONVAR_CRAWL_DELAY', 3),
     'import' => [
         'chunk_size' => (int) env('SEASONVAR_IMPORT_CHUNK_SIZE', 100),
@@ -36,6 +37,7 @@ return [
     ],
     'title_refresh' => [
         'fresh_minutes' => (int) env('SEASONVAR_TITLE_REFRESH_FRESH_MINUTES', 15),
+        'queue' => env('SEASONVAR_TITLE_REFRESH_QUEUE', 'seasonvar-title-refresh'),
         'state_ttl_seconds' => (int) env('SEASONVAR_TITLE_REFRESH_STATE_TTL_SECONDS', 86400),
         'active_seconds' => (int) env('SEASONVAR_TITLE_REFRESH_ACTIVE_SECONDS', 21900),
         'dispatch_lock_seconds' => (int) env('SEASONVAR_TITLE_REFRESH_DISPATCH_LOCK_SECONDS', 10),

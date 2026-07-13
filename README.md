@@ -20,6 +20,7 @@ composer setup
 composer dev
 npm install
 php artisan seasonvar:import
+php artisan seasonvar:import --inventory-only
 php artisan seasonvar:import "https://seasonvar.ru/serial-615--Bez_sleda_pssmtlk-1-season.html" --force
 php artisan seasonvar:import --forever
 php artisan seasonvar:import --queued
@@ -40,6 +41,8 @@ npm run build
 ## Импорт
 
 `seasonvar:import` скачивает карту сайта Seasonvar, сохраняет найденные страницы, обновляет карточки, сезоны, серии, связи, рейтинги, отзывы и видео. Команда продолжает работу после ошибки отдельной страницы, пишет подробные события в базу и может работать постоянно через `--forever`.
+
+`php artisan seasonvar:import --inventory-only` рекурсивно читает только sitemap XML/gzip, типизированно классифицирует разрешённые URL и сохраняет parity-снимок в существующем import run. Режим не разбирает страницы сериалов, не запрашивает player/playlist/video URL, не меняет `catalog_titles` и не публикует новые страницы. Подтверждённые counts, локальные parser/routes и пробелы parity документируются в [`docs/SOURCE_PARITY.md`](docs/SOURCE_PARITY.md).
 
 Граница provider payload, правила стабильной идентичности, владение редакционными полями, поведение частичных snapshots и порядок миграций описаны в `docs/importer.md`.
 

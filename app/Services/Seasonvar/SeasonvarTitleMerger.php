@@ -163,6 +163,17 @@ class SeasonvarTitleMerger
      */
     private function duplicateTitleGroups(): Collection
     {
+        return $this->mergeOverlappingGroups(
+            $this->legacyDuplicateTitleGroups()
+                ->concat($this->duplicateSeasonFamilyGroups()),
+        );
+    }
+
+    /**
+     * @return Collection<int, Collection<int, CatalogTitle>>
+     */
+    private function legacyDuplicateTitleGroups(): Collection
+    {
         return CatalogTitle::query()
             ->whereNull('external_id')
             ->orderBy('source_id')
@@ -175,6 +186,133 @@ class SeasonvarTitleMerger
             ]))
             ->filter(fn (Collection $titles): bool => $titles->count() > 1)
             ->sortByDesc(fn (Collection $titles): int => $titles->count())
+            ->values();
+    }
+
+    /**
+     * Seasonvar gives separate provider IDs to season pages of one series. Only treat titles as
+     * one family when their normalized title/URL family matches and they share an exact season URL.
+     *
+     * @return Collection<int, Collection<int, CatalogTitle>>
+     */
+    private function duplicateSeasonFamilyGroups(): Collection
+    {
+        $duplicateSeasonHashes = DB::table('seasons as duplicate_seasons')
+            ->select('duplicate_seasons.source_url_hash')
+            ->join('catalog_titles as duplicate_titles', 'duplicate_titles.id', '=', 'duplicate_seasons.catalog_title_id')
+            ->whereNull('duplicate_seasons.deleted_at')
+            ->whereNull('duplicate_titles.deleted_at')
+            ->whereNotNull('duplicate_seasons.source_url_hash')
+            ->groupBy('duplicate_seasons.source_url_hash')
+            ->havingRaw('COUNT(DISTINCT duplicate_seasons.catalog_title_id) > 1');
+        $seasonHashesByTitle = DB::table('seasons')
+            ->select(['seasons.catalog_title_id', 'seasons.source_url_hash'])
+            ->join('catalog_titles', 'catalog_titles.id', '=', 'seasons.catalog_title_id')
+            ->whereNull('seasons.deleted_at')
+            ->whereNull('catalog_titles.deleted_at')
+            ->whereIn('seasons.source_url_hash', $duplicateSeasonHashes)
+            ->orderBy('seasons.catalog_title_id')
+            ->get()
+            ->groupBy('catalog_title_id')
+            ->map(fn (Collection $rows): Collection => $rows->pluck('source_url_hash')->filter()->unique()->values());
+
+        if ($seasonHashesByTitle->isEmpty()) {
+            return collect();
+        }
+
+        return CatalogTitle::query()
+            ->select(['id', 'source_id', 'type', 'title', 'source_url', 'source_url_hash'])
+            ->whereKey($seasonHashesByTitle->keys())
+            ->orderBy('source_id')
+            ->orderBy('id')
+            ->get()
+            ->groupBy(fn (CatalogTitle $title): string => implode('|', [
+                $title->source_id,
+                $title->type,
+                $this->normalizedSeriesTitleKey($title->title),
+                $this->groupKeys->forUrl((string) $title->source_url, (string) $title->source_url_hash),
+            ]))
+            ->flatMap(fn (Collection $titles): Collection => $this->connectedSeasonFamilies($titles, $seasonHashesByTitle))
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, CatalogTitle>  $titles
+     * @param  Collection<int, Collection<int, string>>  $seasonHashesByTitle
+     * @return Collection<int, Collection<int, CatalogTitle>>
+     */
+    private function connectedSeasonFamilies(
+        Collection $titles,
+        Collection $seasonHashesByTitle,
+    ): Collection {
+        $remaining = $titles->keyBy('id');
+        $families = collect();
+
+        while ($remaining->isNotEmpty()) {
+            $seed = $remaining->shift();
+
+            if (! $seed instanceof CatalogTitle) {
+                continue;
+            }
+
+            $family = collect([$seed]);
+            $seasonHashes = $seasonHashesByTitle->get($seed->id, collect());
+
+            do {
+                $matches = $remaining->filter(fn (CatalogTitle $title): bool => $seasonHashesByTitle
+                    ->get($title->id, collect())
+                    ->intersect($seasonHashes)
+                    ->isNotEmpty());
+
+                foreach ($matches as $id => $match) {
+                    $family->push($match);
+                    $seasonHashes = $seasonHashes
+                        ->merge($seasonHashesByTitle->get($match->id, collect()))
+                        ->unique();
+                    $remaining->forget($id);
+                }
+            } while ($matches->isNotEmpty());
+
+            if ($family->count() > 1) {
+                $families->push($family->sortBy('id')->values());
+            }
+        }
+
+        return $families;
+    }
+
+    /**
+     * @param  Collection<int, Collection<int, CatalogTitle>>  $groups
+     * @return Collection<int, Collection<int, CatalogTitle>>
+     */
+    private function mergeOverlappingGroups(Collection $groups): Collection
+    {
+        $titlesById = $groups
+            ->flatMap(fn (Collection $group): Collection => $group)
+            ->keyBy('id');
+        $mergedIdGroups = [];
+
+        foreach ($groups as $group) {
+            $ids = $group->pluck('id')->map(fn (mixed $id): int => (int) $id)->values();
+            $overlappingIndexes = collect($mergedIdGroups)
+                ->filter(fn (Collection $existingIds): bool => $existingIds->intersect($ids)->isNotEmpty())
+                ->keys();
+
+            foreach ($overlappingIndexes as $index) {
+                $ids = $ids->merge($mergedIdGroups[$index]);
+                unset($mergedIdGroups[$index]);
+            }
+
+            $mergedIdGroups[] = $ids->unique()->sort()->values();
+        }
+
+        return collect($mergedIdGroups)
+            ->map(fn (Collection $ids): Collection => $ids
+                ->map(fn (int $id): ?CatalogTitle => $titlesById->get($id))
+                ->filter()
+                ->values())
+            ->filter(fn (Collection $group): bool => $group->count() > 1)
+            ->sortByDesc(fn (Collection $group): int => $group->count())
             ->values();
     }
 

@@ -8,6 +8,7 @@ use App\Models\CatalogTitle;
 use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
 use App\Services\Seasonvar\SeasonvarImportGroupKey;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
+use App\Services\Seasonvar\SeasonvarTitleMerger;
 use App\Services\Seasonvar\SeasonvarUrl;
 use DateTimeInterface;
 use Illuminate\Bus\Queueable;
@@ -46,7 +47,7 @@ final class RefreshSeasonvarCatalogTitle implements ShouldBeUnique, ShouldQueue
             ->addSeconds(max(300, (int) config('seasonvar.queue.retry_window_seconds', 21_600)))
             ->getTimestamp();
         $this->onConnection((string) config('seasonvar.queue.connection', 'redis'));
-        $this->onQueue((string) config('seasonvar.queue.queue', 'seasonvar-import'));
+        $this->onQueue((string) config('seasonvar.title_refresh.queue', 'seasonvar-title-refresh'));
     }
 
     public function handle(
@@ -54,6 +55,7 @@ final class RefreshSeasonvarCatalogTitle implements ShouldBeUnique, ShouldQueue
         SeasonvarUrl $urls,
         SeasonvarImportGroupKey $groupKeys,
         CatalogTitleRefreshStateStore $states,
+        SeasonvarTitleMerger $titleMerger,
     ): void {
         $catalogTitle = CatalogTitle::query()->findOrFail($this->catalogTitleId);
         $url = $urls->normalize((string) $catalogTitle->source_url);
@@ -88,6 +90,7 @@ final class RefreshSeasonvarCatalogTitle implements ShouldBeUnique, ShouldQueue
                 throw new RuntimeException('Целевое обновление Seasonvar завершилось без успешного состояния.');
             }
 
+            $titleMerger->mergeForCanonicalSlug($catalogTitle->slug);
             $states->completed($this->catalogTitleId, $run->id);
         } finally {
             $lock->release();

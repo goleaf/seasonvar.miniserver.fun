@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands\Concerns;
 
+use App\Enums\SeasonvarPageType;
 use BackedEnum;
 use DateTimeInterface;
 use Illuminate\Console\Command;
@@ -240,6 +241,9 @@ trait OutputsSeasonvarProgress
             'seasonvar-import-started' => 'Обновление Seasonvar запущено',
             'seasonvar-import-stop-requested' => 'Получен сигнал остановки',
             'seasonvar-import-url-failed' => 'Страница по ссылке завершилась ошибкой',
+            'seasonvar-source-inventory-complete' => 'Инвентаризация страниц источника завершена',
+            'seasonvar-source-inventory-failed' => 'Инвентаризация страниц источника завершилась ошибкой',
+            'seasonvar-source-inventory-started' => 'Инвентаризация страниц источника началась',
             'sitemap-already-visited' => 'Карта сайта уже посещена',
             'sitemap-discovery-blocked' => 'Поиск по карте сайта заблокирован',
             'sitemap-discovery-complete' => 'Поиск по карте сайта завершен',
@@ -397,6 +401,7 @@ trait OutputsSeasonvarProgress
             'selected_for_parse' => 'выбрано_для_разбора',
             'signal' => 'сигнал',
             'sitemap_url' => 'ссылка_карты',
+            'sitemap_count' => 'карт_сайта',
             'sleep_seconds' => 'пауза',
             'slug' => 'адрес',
             'source_id' => 'источник',
@@ -408,6 +413,7 @@ trait OutputsSeasonvarProgress
             'source_url_hash' => 'хеш_ссылки',
             'skipped' => 'пропущено',
             'stored' => 'сохранено',
+            'stored_url_count' => 'новых_ссылок',
             'stored_urls_this_cycle' => 'ссылок_в_цикле',
             'successful' => 'успешно',
             'synced' => 'синхронизировано',
@@ -419,8 +425,12 @@ trait OutputsSeasonvarProgress
             'titles' => 'карточек',
             'total' => 'всего',
             'total_urls' => 'всего_ссылок',
+            'total_url_count' => 'всего_нормализованных_ссылок',
             'type' => 'тип',
             'unmatched' => 'не_найдено',
+            'unknown_url_count' => 'неизвестных_ссылок',
+            'malformed_url_count' => 'некорректных_ссылок',
+            'blocked_url_count' => 'заблокированных_ссылок',
             'unique_urls' => 'уникальных_ссылок',
             'updated' => 'обновлено',
             'url' => 'ссылка',
@@ -441,18 +451,14 @@ trait OutputsSeasonvarProgress
      */
     private static function valueLabels(): array
     {
-        return [
-            'actor' => 'актер',
+        $labels = [
             'age_rating' => 'возраст',
             'ageRatings' => 'возрастные ограничения',
             'actors' => 'актеры',
             'available' => 'доступно',
-            'country' => 'страна',
             'countries' => 'страны',
-            'director' => 'режиссер',
             'directors' => 'режиссеры',
             'failed' => 'ошибка',
-            'genre' => 'жанр',
             'genres' => 'жанры',
             'gone' => 'страница недоступна',
             'id' => 'номер',
@@ -463,19 +469,19 @@ trait OutputsSeasonvarProgress
             'parsed' => 'разобрано',
             'published' => 'опубликовано',
             'remote' => 'удаленное',
-            'search' => 'поиск',
-            'serial' => 'сериал',
-            'sitemap' => 'карта сайта',
-            'static' => 'служебная',
             'unavailable' => 'недоступно',
             'statuses' => 'статусы',
             'studios' => 'студии',
-            'tag' => 'метка',
             'tags' => 'метки',
             'translations' => 'переводы',
-            'unknown' => 'неизвестно',
             'url' => 'ссылка',
             'url-argument' => 'ссылка из аргумента',
         ];
+
+        foreach (SeasonvarPageType::cases() as $type) {
+            $labels[$type->value] = $type->label();
+        }
+
+        return $labels;
     }
 }

@@ -702,6 +702,7 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $actorUrl = 'https://seasonvar.ru/actor/ivan-ivanov';
 
         Http::fake([
+            'seasonvar.ru/robots.txt' => Http::response("User-agent: *\nAllow: /\n"),
             'seasonvar.ru/sitemap_index.xml' => Http::response($this->sitemapIndexXml([
                 'https://seasonvar.ru/nested-index.xml',
                 'https://seasonvar.ru/plain-urlset.xml',

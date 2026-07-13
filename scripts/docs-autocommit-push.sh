@@ -13,6 +13,7 @@ managed_paths=(
     "docs/CODE_STANDARDS.md"
     "docs/UI_STANDARDS.md"
     "docs/DATA_RELATIONS.md"
+    "docs/SOURCE_PARITY.md"
     "docs/MAINTENANCE_LOG.md"
 )
 

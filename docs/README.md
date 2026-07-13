@@ -14,6 +14,7 @@
 | Домен и пользовательское состояние | [`DATA_RELATIONS.md`](DATA_RELATIONS.md) | Видимость, связи, regular/special ordering, episode navigation, watchlist/rating, progress, Continue Watching и Viewing History. |
 | Авторизация и playback access | [`authorization.md`](authorization.md) | Public/profile boundary, policies/gates, entitlement decisions, signed playback route и ограничения отсутствующих product-моделей. |
 | Импорт Seasonvar | [`importer.md`](importer.md) | Response → DTO → identity → transaction/upsert → relation sync → counters/cache/index/UI, идемпотентность и владение полями. |
+| Паритет источника | [`SOURCE_PARITY.md`](SOURCE_PARITY.md) | Последний подтверждённый inventory sitemap, типы source pages, локальные parser/routes и юридические ограничения. |
 | Очереди | [`queues.md`](queues.md) | Queue driver, coordinator/page/finalizer jobs, locks, attempts/backoff/timeout, run states, retry и recovery. |
 | Производительность БД | [`performance.md`](performance.md) | Query budgets, plans/indexes, duplicate-free counts, eager loading и cold-path измерения. |
 | Redis/Memcached и cache lifecycle | [`caching.md`](caching.md) | Stores/connections, keys, TTL, stale, locks, invalidation, warming, health, metrics и failure recovery. |
