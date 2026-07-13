@@ -252,12 +252,29 @@ const initializedPeopleComboboxes = new WeakSet();
 
 const peopleFilterUrl = (type, slug) => {
     const url = new URL(window.location.href);
-    const parameter = `${type}[]`;
+    const indexedParameter = new RegExp(`^${type}\\[(\\d+)]$`);
+    const selected = [];
+    const indices = [];
 
     url.searchParams.delete('page');
+    url.hash = '';
 
-    if (!url.searchParams.getAll(parameter).includes(slug)) {
-        url.searchParams.append(parameter, slug);
+    url.searchParams.forEach((value, key) => {
+        const match = key.match(indexedParameter);
+
+        if (key === type || match) {
+            selected.push(value);
+        }
+
+        if (match) {
+            indices.push(Number.parseInt(match[1], 10));
+        }
+    });
+
+    if (!selected.includes(slug)) {
+        const nextIndex = indices.length === 0 ? 0 : Math.max(...indices) + 1;
+
+        url.searchParams.append(`${type}[${nextIndex}]`, slug);
     }
 
     return url.toString();

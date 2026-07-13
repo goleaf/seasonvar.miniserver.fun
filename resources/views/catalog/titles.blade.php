@@ -237,7 +237,7 @@
 
                         @if ($search !== '' || $filterView->hasActiveFilters() || $excludedTaxonomies->isNotEmpty() || $titleContext !== null || $invalidYear)
                             <div class="mt-3 space-y-3 text-sm">
-                                <div class="flex flex-wrap items-center gap-2">
+                                <div class="hidden flex-wrap items-center gap-2 sm:flex">
                                     @if ($search !== '')
                                         <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutSearchQuery)" wire:click.prevent="clearSearch" active icon="fa-solid fa-magnifying-glass">Поиск: {{ $search }} · очистить</x-ui.taxonomy-chip>
                                     @endif
@@ -276,18 +276,18 @@
                                     @endforeach
                                 </div>
                                 <div class="flex flex-wrap gap-3 text-slate-500">
-                                    <span><i class="fa-solid fa-diagram-project text-slate-400" aria-hidden="true"></i> Активных фильтров: {{ $filterView->activeFilterCount() }}</span>
+                                    <span class="hidden sm:inline"><i class="fa-solid fa-diagram-project text-slate-400" aria-hidden="true"></i> Активных фильтров: {{ $filterView->activeFilterCount() }}</span>
                                     @if ($invalidYear)
-                                        <span><i class="fa-solid fa-calendar-xmark text-amber-600" aria-hidden="true"></i> Ошибочный год: {{ $requestedYear }}</span>
+                                        <span class="hidden sm:inline"><i class="fa-solid fa-calendar-xmark text-amber-600" aria-hidden="true"></i> Ошибочный год: {{ $requestedYear }}</span>
                                     @endif
                                     @if ($filterView->selectedYears() !== [])
-                                        <span><i class="fa-solid fa-calendar-days text-slate-400" aria-hidden="true"></i> Годы: {{ implode(', ', $filterView->selectedYears()) }}</span>
+                                        <span class="hidden sm:inline"><i class="fa-solid fa-calendar-days text-slate-400" aria-hidden="true"></i> Годы: {{ implode(', ', $filterView->selectedYears()) }}</span>
                                     @endif
                                     @if ($titleContext !== null)
-                                        <span><i class="fa-solid fa-clapperboard text-slate-400" aria-hidden="true"></i> Сериал: {{ $titleContext->title }}</span>
+                                        <span class="hidden sm:inline"><i class="fa-solid fa-clapperboard text-slate-400" aria-hidden="true"></i> Сериал: {{ $titleContext->title }}</span>
                                     @endif
                                     <span><i class="fa-solid fa-magnifying-glass text-slate-400" aria-hidden="true"></i> {{ __('catalog.catalog.found_now', ['results' => trans_choice('catalog.counts.results', $titles->total())]) }}</span>
-                                    <a href="{{ route('titles.index') }}" wire:click.prevent="resetAll" class="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-600">
+                                    <a href="{{ route('titles.index') }}" wire:click.prevent="resetAll" class="hidden items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-600 sm:inline-flex">
                                         <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
                                         <span>Сбросить все</span>
                                     </a>
@@ -301,7 +301,7 @@
                         @endif
                     </div>
 
-                    <form method="GET" action="{{ route('titles.index') }}" wire:submit="applySearch" role="search" aria-label="{{ $filterView->hasActiveFilters() ? 'Искать в выбранной подборке' : 'Поиск по каталогу' }}" class="flex w-full max-w-md flex-col gap-2 sm:flex-row">
+                    <form method="GET" action="{{ route('titles.index') }}" wire:submit="applySearch" role="search" aria-label="{{ $filterView->hasActiveFilters() ? 'Искать в выбранной подборке' : 'Поиск по каталогу' }}" class="flex w-full max-w-md min-w-0 gap-2">
                         @foreach ($filterView->searchFormState() as $stateKey => $stateValue)
                             @if (is_array($stateValue))
                                 @foreach ($stateValue as $stateItem)
@@ -327,7 +327,7 @@
                     </form>
                 </div>
 
-                <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                <div class="mt-5 hidden gap-3 sm:grid sm:grid-cols-3">
                     <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                         <div class="text-xs font-bold uppercase tracking-wide text-slate-400">{{ __('catalog.catalog.found_label') }}</div>
                         <div class="mt-1 inline-flex items-center gap-2 text-lg font-black text-slate-700">
@@ -351,7 +351,7 @@
                     </div>
                 </div>
 
-                <div class="mt-4 flex flex-wrap gap-2">
+                <div class="mt-4 hidden flex-wrap gap-2 lg:flex">
                     @foreach ($filterView->sortLabels as $sortKey => $sortLabel)
                         <a data-catalog-sort-option href="{{ route('titles.index', $filterView->sortQuery($sortKey)) }}" wire:click.prevent="sortBy('{{ $sortKey }}')" @if ($filterView->isActiveSort($sortKey)) aria-current="true" @endif @class([
                             'inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold',
@@ -364,7 +364,7 @@
                     @endforeach
                 </div>
 
-                <div class="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold">
+                <div class="mt-3 hidden flex-wrap items-center gap-2 text-xs font-bold lg:flex">
                     <span class="text-slate-400">Вид:</span>
                     @foreach (['grid' => 'Сетка', 'list' => 'Список'] as $viewKey => $viewLabel)
                         <a data-catalog-view-option href="{{ route('titles.index', $filterView->viewQuery($viewKey)) }}" wire:click.prevent="setView('{{ $viewKey }}')" @class([
@@ -383,7 +383,7 @@
                     @endforeach
                 </div>
 
-                <nav class="mt-4 flex flex-wrap items-center gap-1.5" aria-label="Алфавитный переход по названиям">
+                <nav class="mt-4 hidden flex-wrap items-center gap-1.5 lg:flex" aria-label="Алфавитный переход по названиям">
                     <span class="mr-1 text-xs font-bold uppercase tracking-wide text-slate-400">Алфавит:</span>
                     @foreach ($filterView->alphabet as $letter)
                         <a data-catalog-alphabet-option href="{{ route('titles.index', $filterView->alphabetQuery($letter)) }}" wire:click.prevent="setLetter('{{ $letter }}')" @class([
@@ -393,6 +393,37 @@
                         ])>{{ $letter === 'latin' ? 'A–Z' : $letter }}</a>
                     @endforeach
                 </nav>
+
+                <details data-catalog-mobile-output-controls class="group mt-4 rounded-lg bg-slate-50 p-2 lg:hidden">
+                    <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-control px-2 text-sm font-bold text-slate-700">
+                        <span class="inline-flex min-w-0 items-center gap-2">
+                            <i class="{{ $filterView->sortIcon($sort) }} shrink-0 text-amber-700" aria-hidden="true"></i>
+                            <span class="min-w-0 break-words">Сортировка: {{ $filterView->sortLabel($sort) }}</span>
+                        </span>
+                        <i class="fa-solid fa-chevron-down shrink-0 text-slate-400 transition group-open:rotate-180" aria-hidden="true"></i>
+                    </summary>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        @foreach ($filterView->sortLabels as $sortKey => $sortLabel)
+                            <a href="{{ route('titles.index', $filterView->sortQuery($sortKey)) }}" wire:click.prevent="sortBy('{{ $sortKey }}')" @if ($filterView->isActiveSort($sortKey)) aria-current="true" @endif @class([
+                                'inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold',
+                                'bg-emerald-50 text-emerald-700' => $filterView->isActiveSort($sortKey),
+                                'bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveSort($sortKey),
+                            ])>
+                                <i class="{{ $filterView->sortIcon($sortKey) }}" aria-hidden="true"></i>
+                                <span>{{ $sortLabel }}</span>
+                            </a>
+                        @endforeach
+                    </div>
+                    <nav class="mt-3 flex flex-wrap items-center gap-1.5" aria-label="Мобильный алфавитный переход по названиям">
+                        @foreach ($filterView->alphabet as $letter)
+                            <a href="{{ route('titles.index', $filterView->alphabetQuery($letter)) }}" wire:click.prevent="setLetter('{{ $letter }}')" @class([
+                                'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-2 text-xs font-bold',
+                                'bg-emerald-50 text-emerald-700' => $filterView->isActiveLetter($letter),
+                                'bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveLetter($letter),
+                            ])>{{ $letter === 'latin' ? 'A–Z' : $letter }}</a>
+                        @endforeach
+                    </nav>
+                </details>
 
                 <details class="group mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3" @if ($filterView->hasAdvancedFilters()) open @endif>
                     <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-control px-1 text-sm font-bold text-slate-700">
