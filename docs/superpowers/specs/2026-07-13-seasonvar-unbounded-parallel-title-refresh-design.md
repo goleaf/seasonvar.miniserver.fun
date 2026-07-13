@@ -59,7 +59,7 @@ Coordinator не держит group lock во время сетевых запр
 
 ### Parallel page preparation job
 
-Один job обрабатывает одну `SourcePage` и содержит только scalar IDs, claim token и group ID. Job:
+Один job обрабатывает одну `SourcePage` и содержит только scalar prepared-page ID. Claim token получается worker после загрузки server-side group/page state и никогда не сериализуется в Redis payload. Job:
 
 1. Проверяет active run, group и claim до HTTP.
 2. Повторно нормализует URL и ограничивает его `https://seasonvar.ru/`.

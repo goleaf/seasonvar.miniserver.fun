@@ -5,12 +5,15 @@ namespace Tests\Feature;
 use App\Models\Actor;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendationSignal;
+use App\Models\Country;
 use App\Models\Episode;
 use App\Models\Genre;
 use App\Models\LicensedMedia;
 use App\Models\Season;
+use App\Models\SeasonvarImportEvent;
 use App\Models\Source;
 use App\Models\SourcePage;
+use App\Models\Tag;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarDatabaseTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -909,7 +912,7 @@ class SeasonvarParsePageCommandTest extends TestCase
         $importer->parsePage($secondPage);
 
         $this->assertSame(2, CatalogTitle::query()->count());
-        $this->assertSame(2, Actor::query()->where('name', 'Александр Иванов')->count());
+        $this->assertSame(2, Actor::query()->where('name', 'Александр Иванов')->count(), Actor::query()->get()->toJson());
         $this->assertSame([
             'https://seasonvar.ru/actor/1001-aleksandr-ivanov',
             'https://seasonvar.ru/actor/2002-aleksandr-ivanov',
@@ -950,6 +953,216 @@ class SeasonvarParsePageCommandTest extends TestCase
         app(SeasonvarCatalogImporter::class)->parsePage($page);
 
         $this->assertSame('parsed', $page->fresh()->parse_status);
+    }
+
+    public function test_metadata_taxonomy_pages_are_idempotent_and_queue_only_bounded_valid_serial_links(): void
+    {
+        Http::preventStrayRequests();
+        config([
+            'seasonvar.page_types.actor.enabled' => true,
+            'seasonvar.page_types.actor.automatic' => true,
+            'seasonvar.import.max_linked_serial_urls' => 2,
+        ]);
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $url = 'https://seasonvar.ru/actor/1001-aleksandr-ivanov';
+        $otherPersonUrl = 'https://seasonvar.ru/actor/2002-aleksandr-ivanov';
+        Actor::query()->create([
+            'name' => 'Александр Иванов',
+            'slug' => 'aleksandr-ivanov',
+            'source_url' => $otherPersonUrl,
+        ]);
+        $page = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+            'page_type' => 'actor',
+            'parse_status' => 'pending',
+        ]);
+        $html = <<<'HTML'
+            <html>
+                <head>
+                    <title>Александр Иванов — сериалы</title>
+                    <link rel="canonical" href="https://seasonvar.ru/actor/1001-aleksandr-ivanov">
+                </head>
+                <body>
+                    <h1>Александр Иванов</h1>
+                    <div data-source-count="3"></div>
+                    <a href="/serial-100-Pervyj-1-season.html">Первый</a>
+                    <a href="https://www.seasonvar.ru//serial-100-Pervyj-1-season.html#episode">Дубликат</a>
+                    <a href="/serial-200-Vtoroj-1-season.html">Второй</a>
+                    <a href="/serial-300-Tretij-1-season.html">Третий сверх лимита</a>
+                    <a href="https://example.test/serial-400.html">Чужой хост</a>
+                    <a href="/player.php?token=secret">Player</a>
+                </body>
+            </html>
+            HTML;
+        Http::fake([$url => Http::response($html, 200, ['ETag' => '"actor-v1"'])]);
+
+        $importer = app(SeasonvarCatalogImporter::class);
+        $first = $importer->parsePage($page);
+        $this->assertNull($first['catalog_title']);
+        $this->assertSame(2, Actor::query()->where('name', 'Александр Иванов')->count());
+        $this->assertDatabaseHas('actors', [
+            'name' => 'Александр Иванов',
+            'source_url' => $url,
+        ]);
+        $this->assertSame(2, SourcePage::query()->where('page_type', 'serial')->count());
+        $this->assertDatabaseHas('source_pages', [
+            'url' => 'https://seasonvar.ru/serial-100-Pervyj-1-season.html',
+            'parse_status' => 'pending',
+        ]);
+        $this->assertDatabaseHas('source_pages', [
+            'url' => 'https://seasonvar.ru/serial-200-Vtoroj-1-season.html',
+            'parse_status' => 'pending',
+        ]);
+        $this->assertDatabaseMissing('source_pages', [
+            'url' => 'https://seasonvar.ru/serial-300-Tretij-1-season.html',
+        ]);
+
+        Http::fake([$url => Http::response($html, 200, ['ETag' => '"actor-v1"'])]);
+        $importer->parsePage($page->fresh(), force: true);
+
+        $this->assertSame(2, Actor::query()->where('name', 'Александр Иванов')->count());
+        $this->assertSame(2, SourcePage::query()->where('page_type', 'serial')->count());
+        $this->assertDatabaseHas('source_pages', [
+            'id' => $page->id,
+            'parse_status' => 'parsed',
+            'import_status' => 'parsed',
+            'etag' => '"actor-v1"',
+        ]);
+        $this->assertTrue(SeasonvarImportEvent::query()
+            ->where('source_page_id', $page->id)
+            ->where('event', 'seasonvar-taxonomy-created')
+            ->exists());
+    }
+
+    public function test_metadata_taxonomy_identity_normalizes_unicode_case_punctuation_and_preserves_source_url(): void
+    {
+        Http::preventStrayRequests();
+        config([
+            'seasonvar.page_types.genre.enabled' => true,
+            'seasonvar.page_types.country.enabled' => true,
+            'seasonvar.page_types.tag.enabled' => true,
+        ]);
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $cases = [
+            ['genre', Genre::class, 'https://seasonvar.ru/genre/tele-shou', 'ТЁЛЕ — ШОУ!', 'теле шоу'],
+            ['country', Country::class, 'https://seasonvar.ru/country/rossiya', '  РОССИЯ. ', 'россия'],
+            ['tag', Tag::class, 'https://seasonvar.ru/tag/semeynoe', 'СЕМЁЙНОЕ!', 'семейное'],
+        ];
+
+        foreach ($cases as [$type, $modelClass, $url, $incomingName, $existingName]) {
+            $existing = $modelClass::query()->create([
+                'name' => $existingName,
+                'slug' => str_replace(' ', '-', $existingName),
+                'source_url' => $url,
+            ]);
+            $page = SourcePage::factory()->create([
+                'source_id' => $source->id,
+                'url' => $url,
+                'url_hash' => hash('sha256', $url),
+                'page_type' => $type,
+                'parse_status' => 'pending',
+            ]);
+            Http::fake([$url => Http::response("<html><head><title>{$incomingName}</title></head><body><h1>{$incomingName}</h1></body></html>")]);
+
+            app(SeasonvarCatalogImporter::class)->parsePage($page);
+
+            $this->assertSame(1, $modelClass::query()->count());
+            $this->assertSame($existing->id, $modelClass::query()->sole()->id);
+            $this->assertSame($url, $modelClass::query()->sole()->source_url);
+            $this->assertSame('parsed', $page->fresh()->parse_status);
+        }
+    }
+
+    public function test_rss_is_only_a_freshness_signal_and_normalizes_existing_serial_pages(): void
+    {
+        Http::preventStrayRequests();
+        config([
+            'seasonvar.page_types.rss.enabled' => true,
+            'seasonvar.page_types.rss.automatic' => true,
+            'seasonvar.import.max_linked_serial_urls' => 5,
+        ]);
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $serialUrl = 'https://seasonvar.ru/serial-615--Bez_sleda_pssmtlk-1-season.html';
+        $serialPage = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $serialUrl,
+            'url_hash' => hash('sha256', $serialUrl),
+            'page_type' => 'serial',
+            'parse_status' => 'parsed',
+            'import_status' => 'parsed',
+            'retry_after_at' => now()->addDay(),
+        ]);
+        $rssUrl = 'https://seasonvar.ru/rss.php';
+        $rssPage = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $rssUrl,
+            'url_hash' => hash('sha256', $rssUrl),
+            'page_type' => 'rss',
+            'parse_status' => 'pending',
+        ]);
+        $rss = <<<XML
+            <?xml version="1.0" encoding="UTF-8"?>
+            <rss version="2.0"><channel>
+                <item><link>{$serialUrl}?utm_source=rss</link></item>
+                <item><link>https://www.seasonvar.ru//serial-615--Bez_sleda_pssmtlk-1-season.html#fresh</link></item>
+                <item><link>https://example.test/serial-1.html</link></item>
+            </channel></rss>
+            XML;
+        Http::fake([$rssUrl => Http::response($rss, 200, ['Last-Modified' => 'Mon, 13 Jul 2026 10:00:00 GMT'])]);
+
+        app(SeasonvarCatalogImporter::class)->parsePage($rssPage);
+
+        $this->assertDatabaseCount('catalog_titles', 0);
+        $this->assertSame(2, SourcePage::query()->count());
+        $this->assertNull($serialPage->fresh()->retry_after_at);
+        $this->assertSame('pending', $serialPage->fresh()->import_status);
+        $this->assertSame('parsed', $rssPage->fresh()->parse_status);
+    }
+
+    public function test_static_and_search_pages_are_not_requested_or_published_by_metadata_pipeline(): void
+    {
+        Http::preventStrayRequests();
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+
+        foreach ([
+            ['static', 'https://seasonvar.ru/st/online_besplatno.html'],
+            ['search', 'https://seasonvar.ru/search.php'],
+        ] as [$type, $url]) {
+            $page = SourcePage::factory()->create([
+                'source_id' => $source->id,
+                'url' => $url,
+                'url_hash' => hash('sha256', $url),
+                'page_type' => $type,
+                'parse_status' => 'pending',
+            ]);
+
+            $result = app(SeasonvarCatalogImporter::class)->parsePage($page);
+
+            $this->assertNull($result['catalog_title']);
+            $this->assertSame('skipped', $page->fresh()->import_status);
+            $this->assertSame('pending', $page->fresh()->parse_status);
+        }
+
+        $this->assertDatabaseCount('catalog_titles', 0);
+        Http::assertNothingSent();
     }
 
     /**

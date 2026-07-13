@@ -74,6 +74,22 @@ class SeasonvarImportRun extends Model
     }
 
     /**
+     * @return HasMany<SeasonvarImportTitleGroup, $this>
+     */
+    public function titleGroups(): HasMany
+    {
+        return $this->hasMany(SeasonvarImportTitleGroup::class);
+    }
+
+    /**
+     * @return HasMany<SeasonvarImportPreparedPage, $this>
+     */
+    public function preparedPages(): HasMany
+    {
+        return $this->hasMany(SeasonvarImportPreparedPage::class);
+    }
+
+    /**
      * @return HasMany<SourcePage, $this>
      */
     public function lastImportedSourcePages(): HasMany

@@ -11,8 +11,9 @@ class PoliteHttpClient
 
     /**
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @param  array<string, string>  $headers
      */
-    public function get(string $url, int $delaySeconds = 3, ?callable $progress = null): Response
+    public function get(string $url, int $delaySeconds = 3, ?callable $progress = null, array $headers = []): Response
     {
         $this->waitForDelay($delaySeconds, $url, $progress);
 
@@ -23,9 +24,15 @@ class PoliteHttpClient
             'connect_timeout_seconds' => 10,
         ]);
 
+        $safeHeaders = collect($headers)
+            ->only(['If-None-Match', 'If-Modified-Since', 'Accept'])
+            ->filter(fn (mixed $value): bool => is_string($value) && trim($value) !== '')
+            ->map(fn (string $value): string => trim($value))
+            ->all();
         $response = Http::withHeaders([
             'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'User-Agent' => 'SeasonvarCatalog/0.1 (+https://seasonvar.miniserver.fun)',
+            ...$safeHeaders,
         ])
             ->timeout(20)
             ->connectTimeout(10)

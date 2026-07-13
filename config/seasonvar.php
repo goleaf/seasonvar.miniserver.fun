@@ -11,6 +11,8 @@ return [
     'crawl_delay_seconds' => (int) env('SEASONVAR_CRAWL_DELAY', 3),
     'import' => [
         'chunk_size' => (int) env('SEASONVAR_IMPORT_CHUNK_SIZE', 100),
+        'max_linked_serial_urls' => (int) env('SEASONVAR_IMPORT_MAX_LINKED_SERIAL_URLS', 100),
+        'linked_serial_defer_minutes' => (int) env('SEASONVAR_IMPORT_LINKED_SERIAL_DEFER_MINUTES', 5),
         'sleep_seconds' => (int) env('SEASONVAR_IMPORT_SLEEP_SECONDS', 60),
         'refresh_after_hours' => (int) env('SEASONVAR_IMPORT_REFRESH_AFTER_HOURS', 24),
         'missing_data_retry_hours' => (int) env('SEASONVAR_IMPORT_MISSING_DATA_RETRY_HOURS', 24),
@@ -22,6 +24,44 @@ return [
         'event_retention_days' => (int) env('SEASONVAR_IMPORT_EVENT_RETENTION_DAYS', 7),
         'snapshot_retention_days' => (int) env('SEASONVAR_IMPORT_SNAPSHOT_RETENTION_DAYS', 14),
         'maintenance_chunk_size' => (int) env('SEASONVAR_IMPORT_MAINTENANCE_CHUNK_SIZE', 500),
+    ],
+    'page_types' => [
+        'serial' => [
+            'enabled' => filter_var(env('SEASONVAR_PAGE_SERIAL_ENABLED', true), FILTER_VALIDATE_BOOL),
+            'automatic' => filter_var(env('SEASONVAR_PAGE_SERIAL_AUTOMATIC', true), FILTER_VALIDATE_BOOL),
+            'refresh_after_hours' => (int) env('SEASONVAR_PAGE_SERIAL_REFRESH_HOURS', 24),
+            'chunk_size' => (int) env('SEASONVAR_PAGE_SERIAL_CHUNK_SIZE', 100),
+        ],
+        'actor' => [
+            'enabled' => filter_var(env('SEASONVAR_PAGE_ACTOR_ENABLED', false), FILTER_VALIDATE_BOOL),
+            'automatic' => filter_var(env('SEASONVAR_PAGE_ACTOR_AUTOMATIC', false), FILTER_VALIDATE_BOOL),
+            'refresh_after_hours' => (int) env('SEASONVAR_PAGE_ACTOR_REFRESH_HOURS', 168),
+            'chunk_size' => (int) env('SEASONVAR_PAGE_ACTOR_CHUNK_SIZE', 20),
+        ],
+        'genre' => [
+            'enabled' => filter_var(env('SEASONVAR_PAGE_GENRE_ENABLED', false), FILTER_VALIDATE_BOOL),
+            'automatic' => filter_var(env('SEASONVAR_PAGE_GENRE_AUTOMATIC', false), FILTER_VALIDATE_BOOL),
+            'refresh_after_hours' => (int) env('SEASONVAR_PAGE_GENRE_REFRESH_HOURS', 168),
+            'chunk_size' => (int) env('SEASONVAR_PAGE_GENRE_CHUNK_SIZE', 20),
+        ],
+        'country' => [
+            'enabled' => filter_var(env('SEASONVAR_PAGE_COUNTRY_ENABLED', false), FILTER_VALIDATE_BOOL),
+            'automatic' => filter_var(env('SEASONVAR_PAGE_COUNTRY_AUTOMATIC', false), FILTER_VALIDATE_BOOL),
+            'refresh_after_hours' => (int) env('SEASONVAR_PAGE_COUNTRY_REFRESH_HOURS', 168),
+            'chunk_size' => (int) env('SEASONVAR_PAGE_COUNTRY_CHUNK_SIZE', 20),
+        ],
+        'tag' => [
+            'enabled' => filter_var(env('SEASONVAR_PAGE_TAG_ENABLED', false), FILTER_VALIDATE_BOOL),
+            'automatic' => filter_var(env('SEASONVAR_PAGE_TAG_AUTOMATIC', false), FILTER_VALIDATE_BOOL),
+            'refresh_after_hours' => (int) env('SEASONVAR_PAGE_TAG_REFRESH_HOURS', 168),
+            'chunk_size' => (int) env('SEASONVAR_PAGE_TAG_CHUNK_SIZE', 20),
+        ],
+        'rss' => [
+            'enabled' => filter_var(env('SEASONVAR_PAGE_RSS_ENABLED', true), FILTER_VALIDATE_BOOL),
+            'automatic' => filter_var(env('SEASONVAR_PAGE_RSS_AUTOMATIC', true), FILTER_VALIDATE_BOOL),
+            'refresh_after_hours' => (int) env('SEASONVAR_PAGE_RSS_REFRESH_HOURS', 1),
+            'chunk_size' => (int) env('SEASONVAR_PAGE_RSS_CHUNK_SIZE', 5),
+        ],
     ],
     'queue' => [
         'connection' => env('SEASONVAR_QUEUE_CONNECTION', 'redis'),

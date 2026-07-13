@@ -5,11 +5,13 @@ namespace App\Services\Seasonvar;
 use App\Actions\Seasonvar\RecordSeasonvarPageFailure;
 use App\DTOs\MediaHealthCheckResultData;
 use App\DTOs\Seasonvar\SeasonvarCatalogData;
+use App\DTOs\Seasonvar\SeasonvarPageHandlerResult;
 use App\Enums\ContentAudience;
 use App\Enums\MediaHealthStatus;
 use App\Enums\PublicationStatus;
 use App\Enums\ReleaseKind;
 use App\Enums\SeasonvarImportFailureType;
+use App\Enums\SeasonvarPageType;
 use App\Exceptions\Seasonvar\SeasonvarSourceRequestException;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
@@ -20,6 +22,7 @@ use App\Models\CatalogTitleSlug;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
+use App\Models\SeasonvarImportEvent;
 use App\Models\SourcePage;
 use App\Models\SourcePageSnapshot;
 use App\Services\Catalog\Search\CatalogSearchIndexer;
@@ -27,6 +30,9 @@ use App\Services\Crawler\PoliteHttpClient;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\ExternalPlaylistImporter;
 use App\Services\Media\MediaSourceHealthManager;
+use App\Services\Seasonvar\PageHandlers\SeasonvarPageHandler;
+use App\Services\Seasonvar\PageHandlers\SeasonvarPassivePageHandler;
+use App\Services\Seasonvar\PageHandlers\SeasonvarSerialPageHandler;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -41,6 +47,8 @@ class SeasonvarCatalogImporter
         private readonly SeasonvarSource $seasonvarSource,
         private readonly SeasonvarDiscovery $discovery,
         private readonly SeasonvarUrl $seasonvarUrl,
+        private readonly SeasonvarPageHandlerRegistry $pageHandlers,
+        private readonly SeasonvarDiscoveredPageStore $discoveredPages,
         private readonly PoliteHttpClient $httpClient,
         private readonly SeasonvarCatalogParser $parser,
         private readonly SeasonvarCatalogIdentityResolver $identityResolver,
@@ -87,77 +95,11 @@ class SeasonvarCatalogImporter
      */
     public function storeDiscoveredUrls(array $urls, ?callable $progress = null): int
     {
-        $source = $this->seasonvarSource->current();
-        $urls = collect($urls)->unique()->values();
-        $total = $urls->count();
-        $stored = 0;
-        $processed = 0;
-        $updated = 0;
-
-        $this->report($progress, 'store-discovered-urls-started', [
-            'source_id' => $source->id,
-            'total' => $total,
-        ]);
-
-        $urls->chunk(500)->each(function (Collection $chunk) use ($source, $total, &$stored, &$processed, &$updated, $progress): void {
-            $now = now();
-            $rowsByHash = $chunk->mapWithKeys(function (string $url) use ($source, $now): array {
-                $urlHash = $this->seasonvarUrl->hash($url);
-
-                return [$urlHash => [
-                    'source_id' => $source->id,
-                    'url' => $url,
-                    'url_hash' => $urlHash,
-                    'page_type' => $this->seasonvarUrl->pageType($url)->value,
-                    'parse_status' => 'pending',
-                    'discovered_from_url' => $this->seasonvarSource->sitemapUrl(),
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]];
-            });
-            $existingPages = SourcePage::query()
-                ->whereIn('url_hash', $rowsByHash->keys())
-                ->get(['url_hash', 'source_id', 'url', 'page_type', 'discovered_from_url'])
-                ->keyBy('url_hash');
-            $stored += $rowsByHash->keys()->diff($existingPages->keys())->count();
-            $processed += $rowsByHash->count();
-            $changedRows = $rowsByHash->filter(function (array $row, string $hash) use ($existingPages): bool {
-                $existing = $existingPages->get($hash);
-
-                return $existing === null
-                    || (int) $existing->source_id !== (int) $row['source_id']
-                    || $existing->url !== $row['url']
-                    || $existing->page_type !== $row['page_type']
-                    || $existing->discovered_from_url !== $row['discovered_from_url'];
-            });
-            $updated += $changedRows->count() - $rowsByHash->keys()->diff($existingPages->keys())->count();
-
-            if ($changedRows->isNotEmpty()) {
-                SourcePage::query()->upsert(
-                    $changedRows->values()->all(),
-                    ['url_hash'],
-                    ['source_id', 'url', 'page_type', 'discovered_from_url', 'updated_at'],
-                );
-            }
-
-            $this->report($progress, 'store-discovered-urls-chunk-complete', [
-                'processed' => $processed,
-                'total' => $total,
-                'chunk' => $rowsByHash->count(),
-                'stored' => $stored,
-                'updated' => $updated,
-                'unchanged' => $processed - $stored - $updated,
-            ]);
-        });
-
-        $this->report($progress, 'store-discovered-urls-complete', [
-            'total' => $total,
-            'stored' => $stored,
-            'updated' => $updated,
-            'unchanged' => $total - $stored - $updated,
-        ]);
-
-        return $stored;
+        return $this->discoveredPages->store(
+            $urls,
+            $this->seasonvarSource->sitemapUrl(),
+            progress: $progress,
+        );
     }
 
     /**
@@ -399,6 +341,41 @@ class SeasonvarCatalogImporter
         ?int $importRunId = null,
         ?CatalogTitle $preferredCatalogTitle = null,
     ): array {
+        $pageType = SeasonvarPageType::tryFrom((string) $page->page_type) ?? SeasonvarPageType::Unknown;
+        $handler = $this->pageHandlers->handler($pageType);
+        $definition = $this->pageHandlers->definition($pageType);
+
+        $this->report($progress, 'seasonvar-page-handler-selected', [
+            'source_page_id' => $page->id,
+            'page_type' => $pageType->value,
+            'parser' => $definition->parserClass,
+            'importer' => $definition->importerClass,
+            'metadata_only' => $definition->metadataOnly,
+            'retry_behavior' => $definition->retryBehavior,
+            'expected_result_type' => $definition->expectedResultType,
+        ]);
+
+        if ($handler instanceof SeasonvarPassivePageHandler
+            || ! $this->pageHandlers->isEnabled($pageType)
+            || $definition->parserClass === null
+            || $definition->importerClass === null) {
+            $page->update([
+                'import_status' => 'skipped',
+                'last_import_run_id' => $importRunId,
+                'last_imported_at' => now(),
+            ]);
+            $this->recordPageEvent($page, $importRunId, 'seasonvar-page-skipped', [
+                'page_type' => $pageType->value,
+                'reason' => $handler instanceof SeasonvarPassivePageHandler ? 'unsupported_type' : 'page_type_disabled',
+            ]);
+
+            return (new SeasonvarPageHandlerResult)->toLegacyResult();
+        }
+
+        if (! $handler instanceof SeasonvarSerialPageHandler) {
+            return $this->parseMetadataPage($page, $handler, $progress, $importRunId);
+        }
+
         $source = $page->source;
         $crawlDelaySeconds = (int) $source->crawl_delay_seconds;
 
@@ -411,7 +388,37 @@ class SeasonvarCatalogImporter
             'url' => $page->url,
         ]);
 
-        $response = $this->httpClient->get($page->url, $crawlDelaySeconds, $progress);
+        $response = $this->httpClient->get(
+            $page->url,
+            $crawlDelaySeconds,
+            $progress,
+            $this->conditionalRequestHeaders($page),
+        );
+
+        if ($response->status() === 304) {
+            $existingCatalogTitle = $this->findCatalogTitleBySourceUrlHash($page, $this->seasonvarUrl->hash($page->url));
+
+            if ($existingCatalogTitle === null) {
+                throw new RuntimeException('Seasonvar вернул 304 для страницы без ранее импортированного тайтла.');
+            }
+
+            $page->update([
+                'http_status' => 304,
+                'last_crawled_at' => now(),
+                'last_imported_at' => now(),
+                'last_import_run_id' => $importRunId,
+                'failure_count' => 0,
+                'error_message' => null,
+            ]);
+            $this->report($progress, 'page-parse-skipped-not-modified', [
+                'source_page_id' => $page->id,
+                'page_type' => SeasonvarPageType::Serial->value,
+                'catalog_title_id' => $existingCatalogTitle->id,
+            ]);
+
+            return (new SeasonvarPageHandlerResult(catalogTitle: $existingCatalogTitle))->toLegacyResult();
+        }
+
         $body = $response->body();
         $contentHash = hash('sha256', $body);
         $contentChanged = $page->content_hash !== $contentHash;
@@ -1883,6 +1890,141 @@ class SeasonvarCatalogImporter
                 $query->where('status', 'unavailable')
                     ->orWhereIn('health_status', ['unavailable', 'disabled']);
             });
+    }
+
+    /**
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @return array{catalog_title: CatalogTitle|null, media_attached: int, media_updated: int, media_skipped: int, media_failed: int}
+     */
+    private function parseMetadataPage(
+        SourcePage $page,
+        SeasonvarPageHandler $handler,
+        ?callable $progress,
+        ?int $importRunId,
+    ): array {
+        $source = $page->source;
+        $response = $this->httpClient->get(
+            $page->url,
+            (int) $source->crawl_delay_seconds,
+            $progress,
+            $this->conditionalRequestHeaders($page),
+        );
+
+        if ($response->status() === 304) {
+            $page->update([
+                'http_status' => 304,
+                'last_crawled_at' => now(),
+                'last_imported_at' => now(),
+                'last_import_run_id' => $importRunId,
+                'retry_after_at' => now()->addHours($this->pageHandlers->refreshHours(
+                    SeasonvarPageType::tryFrom((string) $page->page_type) ?? SeasonvarPageType::Unknown,
+                )),
+                'failure_count' => 0,
+                'error_message' => null,
+            ]);
+            $this->recordPageEvent($page, $importRunId, 'seasonvar-page-not-modified', [
+                'page_type' => $page->page_type,
+            ]);
+
+            return (new SeasonvarPageHandlerResult)->toLegacyResult();
+        }
+
+        $body = $response->body();
+        $contentHash = hash('sha256', $body);
+        $contentChanged = $page->content_hash !== $contentHash;
+        $page->update([
+            'http_status' => $response->status(),
+            'content_hash' => $contentHash,
+            'etag' => $response->header('ETag') ?: $page->etag,
+            'last_modified_header' => $response->header('Last-Modified') ?: $page->last_modified_header,
+            'last_crawled_at' => now(),
+            'last_changed_at' => $contentChanged ? now() : $page->last_changed_at,
+            'last_import_run_id' => $importRunId,
+        ]);
+
+        if (! $response->successful()) {
+            throw SeasonvarSourceRequestException::forStatus($response->status());
+        }
+
+        $result = $handler->handle($page, $body, $importRunId, $progress);
+        $pageType = SeasonvarPageType::tryFrom((string) $page->page_type) ?? SeasonvarPageType::Unknown;
+        $page->update([
+            'parse_status' => 'parsed',
+            'import_status' => 'parsed',
+            'missing_data_flags' => $result->missingDataFlags,
+            'retry_after_at' => now()->addHours($this->pageHandlers->refreshHours($pageType)),
+            'failure_count' => 0,
+            'error_message' => null,
+            'last_imported_at' => now(),
+            'metadata_parser_version' => 1,
+            'metadata_attempted_version' => 1,
+            'metadata_parsed_at' => now(),
+            'metadata_presence' => collect($result->structuredFields)->mapWithKeys(fn (string $field): array => [$field => 'present'])->all(),
+        ]);
+        $this->storeMetadataSnapshot($page, $result, $contentHash, $response->status(), $importRunId);
+        $this->recordPageEvent($page, $importRunId, 'seasonvar-metadata-page-parsed', [
+            'page_type' => $pageType->value,
+            'parser' => $handler->definition()->parserClass,
+            'structured_fields' => $result->structuredFields,
+            'linked_serial_urls_found' => $result->linkedSerialUrls,
+            'taxonomy_created' => $result->taxonomiesCreated,
+            'taxonomy_updated' => $result->taxonomiesUpdated,
+            'duplicate_prevented' => $result->duplicatesPrevented,
+        ]);
+
+        return $result->toLegacyResult();
+    }
+
+    /** @return array<string, string> */
+    private function conditionalRequestHeaders(SourcePage $page): array
+    {
+        if ($page->parse_status !== 'parsed' || $page->content_hash === null) {
+            return [];
+        }
+
+        return collect([
+            'If-None-Match' => $page->etag,
+            'If-Modified-Since' => $page->last_modified_header,
+        ])->filter(fn (mixed $value): bool => is_string($value) && trim($value) !== '')->all();
+    }
+
+    private function storeMetadataSnapshot(
+        SourcePage $page,
+        SeasonvarPageHandlerResult $result,
+        string $contentHash,
+        int $httpStatus,
+        ?int $importRunId,
+    ): void {
+        $summary = json_encode([
+            'page_type' => $page->page_type,
+            'structured_fields' => $result->structuredFields,
+            'linked_serial_urls_found' => $result->linkedSerialUrls,
+            'missing_data_flags' => $result->missingDataFlags,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        SourcePageSnapshot::query()->updateOrCreate(
+            ['source_page_id' => $page->id, 'content_hash' => $contentHash],
+            [
+                'seasonvar_import_run_id' => $importRunId,
+                'url' => $page->url,
+                'http_status' => $httpStatus,
+                'body_bytes' => mb_strlen($summary, '8bit'),
+                'html' => $summary,
+                'captured_at' => now(),
+            ],
+        );
+    }
+
+    /** @param array<string, mixed> $context */
+    private function recordPageEvent(SourcePage $page, ?int $importRunId, string $event, array $context): void
+    {
+        SeasonvarImportEvent::query()->create([
+            'seasonvar_import_run_id' => $importRunId,
+            'source_page_id' => $page->id,
+            'event' => $event,
+            'level' => str_contains($event, 'failure') ? 'warning' : 'info',
+            'context' => $context,
+        ]);
     }
 
     private function storeSnapshot(SourcePage $page, string $body, string $contentHash, int $httpStatus, ?int $importRunId): void
