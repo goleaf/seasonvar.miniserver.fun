@@ -244,6 +244,8 @@ return [
         'season_empty' => 'В этом сезоне пока нет доступных серий с рабочим источником.',
         'seasons_empty' => 'Доступные сезоны пока не опубликованы.',
         'updating_episodes' => 'Обновляем доступные серии…',
+        'switching_variant' => 'Переключаем вариант…',
+        'updating_variant_episodes' => 'Обновляем серии под выбранный вариант…',
         'variant_not_selected' => 'Вариант не выбран',
         'of_total' => 'из :count',
         'media_season' => 'Сезон :number',

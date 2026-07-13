@@ -244,6 +244,8 @@ return [
         'season_empty' => 'This season has no available episodes with a working source.',
         'seasons_empty' => 'No available seasons have been published yet.',
         'updating_episodes' => 'Updating available episodes…',
+        'switching_variant' => 'Switching variant…',
+        'updating_variant_episodes' => 'Updating episodes for the selected variant…',
         'variant_not_selected' => 'No variant selected',
         'of_total' => 'of :count',
         'media_season' => 'Season :number',

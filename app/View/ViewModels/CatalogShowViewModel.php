@@ -285,6 +285,13 @@ class CatalogShowViewModel
         return $this->episodeMediaItems($episode)->isNotEmpty();
     }
 
+    public function episodeSelectedProfileLabel(Episode $episode): ?string
+    {
+        $media = $this->preferredMediaForEpisode($episode);
+
+        return $media !== null ? $this->playbackLabel($media) : null;
+    }
+
     public function isSelectedEpisode(Episode $episode): bool
     {
         return $this->selectedEpisode?->id === $episode->id;

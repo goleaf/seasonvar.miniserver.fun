@@ -280,4 +280,111 @@ class CatalogBladeComponentTest extends TestCase
             ->assertDontSee('https://media.example.com/big-bang-s01e02-sub.mp4', false)
             ->assertDontSee('https://media.example.com/big-bang-s01e02-voice.mp4', false);
     }
+
+    public function test_title_page_shows_livewire_variant_loading_and_episode_profile_labels(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Бухта вдов',
+            'slug' => 'buxta-vdovwidows-bay',
+            'poster_url' => 'https://media.example.com/widows-bay-poster.jpg',
+        ]);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 1,
+            'title' => 'Сезон 1',
+        ]);
+        $firstEpisode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 1,
+            'title' => 'Первая серия',
+        ]);
+        $secondEpisode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 2,
+            'title' => 'Вторая серия',
+        ]);
+        $selectedMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $firstEpisode->id,
+            'title' => '1 серия RuDub 480p',
+            'path' => 'https://media.example.com/widows-bay-s01e01-rudub-480.mp4',
+            'playback_url' => 'https://media.example.com/widows-bay-s01e01-rudub-480.mp4',
+            'quality' => '480p',
+            'format' => 'mp4',
+            'variant_type' => 'voiceover',
+            'variant_name' => 'RuDub',
+            'variant_key' => 'voiceover-rudub',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $firstEpisode->id,
+            'title' => '1 серия LostFilm 1080p',
+            'path' => 'https://media.example.com/widows-bay-s01e01-lostfilm-1080.mp4',
+            'playback_url' => 'https://media.example.com/widows-bay-s01e01-lostfilm-1080.mp4',
+            'quality' => '1080p',
+            'format' => 'mp4',
+            'variant_type' => 'voiceover',
+            'variant_name' => 'LostFilm',
+            'variant_key' => 'voiceover-lostfilm',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        $secondEpisodePreferredMedia = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $secondEpisode->id,
+            'title' => '2 серия RuDub 1080p',
+            'path' => 'https://media.example.com/widows-bay-s01e02-rudub-1080.mp4',
+            'playback_url' => 'https://media.example.com/widows-bay-s01e02-rudub-1080.mp4',
+            'quality' => '1080p',
+            'format' => 'mp4',
+            'variant_type' => 'voiceover',
+            'variant_name' => 'RuDub',
+            'variant_key' => 'voiceover-rudub',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $secondEpisode->id,
+            'title' => '2 серия LostFilm 480p',
+            'path' => 'https://media.example.com/widows-bay-s01e02-lostfilm-480.mp4',
+            'playback_url' => 'https://media.example.com/widows-bay-s01e02-lostfilm-480.mp4',
+            'quality' => '480p',
+            'format' => 'mp4',
+            'variant_type' => 'voiceover',
+            'variant_name' => 'LostFilm',
+            'variant_key' => 'voiceover-lostfilm',
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $this->get(route('titles.show', [
+            'catalogTitle' => $catalogTitle,
+            'episode' => $firstEpisode->id,
+            'media' => $selectedMedia->id,
+            'variant' => 'voiceover-rudub',
+            'quality' => '480p',
+            'format' => 'mp4',
+        ]))
+            ->assertOk()
+            ->assertSee('wire:loading.delay.flex', false)
+            ->assertSee('wire:target="selectMedia"', false)
+            ->assertSeeText('Переключаем вариант…')
+            ->assertSeeText('Обновляем серии под выбранный вариант…')
+            ->assertSeeText('RuDub / 1080P / MP4')
+            ->assertSee(e(route('titles.show', [
+                'catalogTitle' => $catalogTitle,
+                'episode' => $secondEpisode->id,
+                'media' => $secondEpisodePreferredMedia->id,
+                'variant' => 'voiceover-rudub',
+                'quality' => '1080p',
+                'format' => 'mp4',
+            ]).'#player'), false);
+    }
 }

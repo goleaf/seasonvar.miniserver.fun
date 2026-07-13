@@ -1,6 +1,6 @@
 # Blade-шаблоны
 
-Обновлено: 12.07.2026
+Обновлено: 13.07.2026
 
 ## Правило без inline PHP
 
@@ -21,7 +21,7 @@
 - `App\View\ViewModels\CatalogTitlesViewModel` нормализует scalar/list query-state через `scalarState()` и `listState()`, чтобы шаблоны не читали raw query-параметры напрямую.
 - `App\View\ViewModels\CatalogTitlesViewModel` готовит состояние multi-select формы фильтров: скрытые поля для поиска/сортировки/расширенных параметров, выбранные годы и активные relation-значения.
 - Шаблон `resources/views/catalog/titles.blade.php` может добавлять `data-catalog-filter-*` атрибуты для локального client-side поиска внутри уже отрендеренных групп фильтров; база данных из Blade не запрашивается.
-- `App\View\ViewModels\CatalogShowViewModel` готовит состояние страницы тайтла: группы таксономий, выбранную серию, варианты медиа, MIME-тип видео и бейджи сезонов.
+- `App\View\ViewModels\CatalogShowViewModel` готовит состояние страницы тайтла: группы таксономий, выбранную серию, варианты медиа, MIME-тип видео, бейджи сезонов и подпись playback-профиля для каждой видимой серии.
 - `App\Livewire\CatalogTitlePlayer` передаёт в свой Blade только render-local summaries, серии одного сезона, media и `CatalogShowViewModel`; публичные properties ограничены locked title ID и небольшими URL-скалярами.
 - Layout использует `x-layout.site-header` и `x-layout.site-footer`, один `<main>` и skip-link к основному содержимому.
 
