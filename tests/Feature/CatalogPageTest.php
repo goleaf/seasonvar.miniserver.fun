@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Enums\ReleaseKind;
+use App\Jobs\StartSeasonvarQueuedImport;
 use App\Livewire\CatalogSeries;
 use App\Livewire\CatalogTitlePlayer;
+use App\Livewire\SeasonvarImportManager;
 use App\Livewire\StatsDashboard;
 use App\Livewire\ViewingActivity;
 use App\Models\Actor;
@@ -32,6 +34,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -49,6 +52,69 @@ class CatalogPageTest extends TestCase
         $response->assertDontSeeText('Состояние базы');
         $response->assertSeeText('Сейчас можно смотреть');
         $response->assertDontSeeText('Быстрый выбор');
+    }
+
+    public function test_import_admin_route_is_authorized_and_polls_only_while_a_run_is_active(): void
+    {
+        config([
+            'seasonvar.admin_emails' => ['admin@example.com'],
+            'seasonvar.queue.lock_store' => 'array',
+        ]);
+        Queue::fake();
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        $ordinaryUser = User::factory()->create(['email' => 'viewer@example.com']);
+
+        $this->get(route('admin.imports'))->assertForbidden();
+        $this->actingAs($ordinaryUser)->get(route('admin.imports'))->assertForbidden();
+        $this->actingAs($admin)
+            ->get(route('admin.imports'))
+            ->assertOk()
+            ->assertSeeLivewire('seasonvar-import-manager')
+            ->assertSeeText('Импорт Seasonvar')
+            ->assertDontSee('wire:poll.5s.visible="refreshRuns"', false);
+
+        $component = Livewire::actingAs($admin)
+            ->test(SeasonvarImportManager::class)
+            ->assertDontSeeHtml('wire:poll.5s.visible="refreshRuns"')
+            ->set('force', true)
+            ->set('discover', false)
+            ->call('startImport')
+            ->assertHasNoErrors()
+            ->assertSeeText('Ожидает запуска')
+            ->assertSeeHtml('wire:poll.5s.visible="refreshRuns"');
+
+        Queue::assertPushedTimes(StartSeasonvarQueuedImport::class, 1);
+        $run = SeasonvarImportRun::query()->sole();
+        $run->update([
+            'status' => 'completed',
+            'started_at' => now()->subMinute(),
+            'finished_at' => now(),
+        ]);
+
+        $component
+            ->call('refreshRuns')
+            ->assertSeeText('Завершён')
+            ->assertDontSeeHtml('wire:poll.5s.visible="refreshRuns"');
+    }
+
+    public function test_import_admin_hides_provider_urls_credentials_and_stack_details(): void
+    {
+        config(['seasonvar.admin_emails' => ['admin@example.com']]);
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'failed',
+            'last_error' => 'Bearer private-token https://seasonvar.ru/private?token=secret /var/www/private.php:42',
+            'finished_at' => now(),
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(SeasonvarImportManager::class)
+            ->assertSeeText('Ошибка')
+            ->assertDontSee('private-token')
+            ->assertDontSee('seasonvar.ru/private')
+            ->assertDontSee('/var/www/private.php');
     }
 
     public function test_livewire_catalog_hydrates_url_state_and_filters_results(): void

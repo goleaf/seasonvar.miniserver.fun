@@ -1,6 +1,12 @@
 # Деплой
 
-Обновлено: 09.07.2026
+Обновлено: 13.07.2026
+
+## Admin queue interface от 13.07.2026
+
+Перед deploy дождаться active import jobs и сделать backup SQLite. Затем применить additive `2026_07_13_140000_add_administration_fields_to_seasonvar_import_runs`, задать comma-separated `SEASONVAR_IMPORT_ADMIN_EMAILS`, пересобрать config cache и выполнить `php artisan queue:restart`. Migration добавляет nullable foreign keys/timestamps и indexes; данные не переписывает и backfill не требует.
+
+Production scheduler в этом репозитории — внешний cron ниже, а не Laravel `schedule:run`. Admin UI не заменяет cron: он даёт ручной authorized старт/retry/cancel и recovery для `running` run без heartbeat и live claims. Threshold задаёт `SEASONVAR_QUEUE_STALE_AFTER_MINUTES=120`; перед ручным recovery нужно убедиться, что workers не остановлены на долгую maintenance-паузу.
 
 ## Import identity и editorial baseline от 13.07.2026
 
@@ -84,6 +90,8 @@ Google-интеграции по умолчанию выключены. Если
 - `NOTIFICATIONS_MAIL_QUEUE` — queue для email notification jobs.
 - `SEASONVAR_IMPORT_FAILURE_MAIL_TO` и `SEASONVAR_IMPORT_FAILURE_MAIL_TO_NAME` — optional получатель письма об ошибке queued import; пустое значение отключает отправку.
 - `SEASONVAR_QUEUE_CONNECTION=redis`, `SEASONVAR_QUEUE_NAME=seasonvar-import` и `SEASONVAR_QUEUE_LOCK_STORE=redis` — отдельная очередь и locks параллельного импортера.
+- `SEASONVAR_IMPORT_ADMIN_EMAILS` — comma-separated email allowlist gate `/admin/imports`; пустое значение закрывает страницу для всех.
+- `SEASONVAR_QUEUE_STALE_AFTER_MINUTES` — минимальный возраст stale running run для recovery, не меньше 5 минут в runtime.
 - `SEASONVAR_QUEUE_CLAIM_SECONDS=86400`, `SEASONVAR_QUEUE_WORKER_TIMEOUT=900` и `SEASONVAR_IMPORT_REFRESH_AFTER_HOURS=24` — lease, timeout и период повторной проверки источника.
 - `SEASONVAR_QUEUE_BUSY_THRESHOLD=5000` и `SEASONVAR_QUEUE_BUSY_LOG_SECONDS=3600` — порог backlog и минимальный интервал повторного warning в журнале.
 

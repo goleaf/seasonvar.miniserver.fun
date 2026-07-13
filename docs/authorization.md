@@ -7,7 +7,8 @@
 - Публичные страницы каталога, карточек, sitemap, RSS, OpenSearch и `llms.txt` доступны гостям.
 - Операционные и диагностические write/import-control endpoints не должны оставаться публичными.
 - `/stats` доступен гостям как read-only Livewire-страница состояния каталога; чувствительные raw URLs, stack traces и внутренние технические имена не выводятся.
-- Для будущих write/admin/moderation/import-control endpoints нужно добавлять отдельные gates или policies до публикации маршрута.
+- `/admin/imports` защищён route middleware и gate `manage-seasonvar-imports`; allowlist берётся из `SEASONVAR_IMPORT_ADMIN_EMAILS`. Каждый Livewire action повторно применяет gate и не принимает user ID от browser.
+- В проекте пока нет role/permission и admin-login пакета, поэтому email allowlist — узкая операционная граница, а не новая RBAC-система. Пустой allowlist закрывает доступ всем.
 - Blade-шаблоны не принимают решений авторизации. Допустимы только простые display checks: `@can`, `@cannot`, `@auth`, `@guest`.
 - Список просмотра, user rating и progress карточки доступны только authenticated user и проходят `CatalogTitlePolicy::interact` внутри write-сервиса; policy повторно применяет SQL-ограничение `CatalogEntitlementService` независимо от видимости controls. Идентификатор владельца берётся только из authenticated session. Скрытый, неопубликованный или недоступный тайтл нельзя добавить в список или оценить.
 - `/watching` доступен только authenticated user. `CatalogViewingActivityQuery` начинает обе выборки с `whereBelongsTo($user)`, а `EpisodeViewProgressPolicy` отдельно защищает удаление одной записи и полную очистку; чужой progress ID возвращает 403 и не изменяется.

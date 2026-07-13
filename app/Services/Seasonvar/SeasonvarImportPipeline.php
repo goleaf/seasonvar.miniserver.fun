@@ -43,6 +43,7 @@ class SeasonvarImportPipeline
         private readonly CatalogTitleRecommendationBuilder $recommendations,
         private readonly CatalogRelationNameSanitizer $relationNames,
         private readonly SeasonvarImportStorageMaintenance $storageMaintenance,
+        private readonly SeasonvarImportErrorSanitizer $errors,
     ) {}
 
     /**
@@ -70,6 +71,7 @@ class SeasonvarImportPipeline
             'process_command' => $processCommand,
             'cycles' => 0,
             'started_at' => now(),
+            'last_heartbeat_at' => now(),
         ]);
         $loggedProgress = fn (string $event, array $context = []) => $this->recordProgress($run, $progress, $event, $context);
         $sleepSeconds = max(1, $sleepSeconds ?? (int) config('seasonvar.import.sleep_seconds', 60));
@@ -95,9 +97,10 @@ class SeasonvarImportPipeline
                 $this->sleepBetweenCycles($sleepSeconds, $loggedProgress);
             } while (! $this->stopRequested);
 
-            $run->fill([
-                'status' => 'completed',
+            $run->refresh()->fill([
+                'status' => $run->completionStatus(),
                 'finished_at' => now(),
+                'last_heartbeat_at' => now(),
             ])->save();
 
             $this->recordProgress($run, $progress, 'seasonvar-import-complete', [
@@ -115,13 +118,14 @@ class SeasonvarImportPipeline
         } catch (Throwable $exception) {
             $run->fill([
                 'status' => 'failed',
-                'last_error' => $exception->getMessage(),
+                'last_error' => $this->errors->fromException($exception),
                 'finished_at' => now(),
+                'last_heartbeat_at' => now(),
             ])->save();
 
             $this->recordProgress($run, $progress, 'seasonvar-import-failed', [
                 'exception' => $exception::class,
-                'message' => $exception->getMessage(),
+                'message' => $this->errors->fromException($exception),
             ]);
 
             throw $exception;
@@ -172,17 +176,19 @@ class SeasonvarImportPipeline
                 'last_recommendations' => $recommendationResult,
             ]);
 
-            $run->fill([
-                'status' => 'completed',
+            $run->refresh()->fill([
+                'status' => $run->completionStatus(),
                 'finished_at' => now(),
+                'last_heartbeat_at' => now(),
             ])->save();
 
             return $run->refresh();
         } catch (Throwable $exception) {
             $run->fill([
                 'status' => 'failed',
-                'last_error' => $exception->getMessage(),
+                'last_error' => $this->errors->fromException($exception),
                 'finished_at' => now(),
+                'last_heartbeat_at' => now(),
             ])->save();
 
             throw $exception;
@@ -467,7 +473,7 @@ class SeasonvarImportPipeline
             $progress('seasonvar-import-url-failed', [
                 'url' => $argument,
                 'exception' => $exception::class,
-                'message' => $exception->getMessage(),
+                'message' => $this->errors->fromException($exception),
             ]);
         }
 
@@ -1098,7 +1104,7 @@ class SeasonvarImportPipeline
                     'catalog_title_id' => $catalogTitle->id,
                     'url' => (string) $seasonUrl,
                     'exception' => $exception::class,
-                    'message' => $exception->getMessage(),
+                    'message' => $this->errors->fromException($exception),
                 ]);
             }
         }
@@ -1243,7 +1249,10 @@ class SeasonvarImportPipeline
         try {
             SeasonvarImportRun::query()
                 ->whereKey($run->id)
-                ->update(['updated_at' => $now]);
+                ->update([
+                    'last_heartbeat_at' => $now,
+                    'updated_at' => $now,
+                ]);
             $this->lastRunHeartbeatAt = $now;
         } catch (Throwable) {
             // Отметка активности не должна останавливать обновление каталога.

@@ -66,6 +66,13 @@ class SeasonvarPageClaimManager
             ->update($this->releasedAttributes());
     }
 
+    public function releaseForRun(int $runId): int
+    {
+        return SourcePage::query()
+            ->where('import_claim_run_id', $runId)
+            ->update($this->releasedAttributes());
+    }
+
     public function outstandingForRun(int $runId): int
     {
         return SourcePage::query()

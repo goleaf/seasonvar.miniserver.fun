@@ -4,6 +4,9 @@
 
 ## Основные связи
 
+- `SeasonvarImportRun belongsTo User` через nullable `requested_by_user_id`; CLI/cron runs остаются без requester, а удаление user обнуляет ссылку.
+- `SeasonvarImportRun belongsTo SeasonvarImportRun` через nullable `retry_of_run_id`; retry создаёт новую audit-строку. `last_heartbeat_at` и index `(execution_mode, status, last_heartbeat_at)` питают bounded stale recovery.
+
 - `CatalogTitle belongsTo Source`
 - `CatalogTitle belongsTo SourcePage`
 - `CatalogTitle hasMany Season`

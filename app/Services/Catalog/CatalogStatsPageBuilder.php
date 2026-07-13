@@ -625,7 +625,8 @@ class CatalogStatsPageBuilder
         return match ($status) {
             'completed' => 'text-emerald-700',
             'failed' => 'text-rose-700',
-            'running' => 'text-amber-700',
+            'running', 'partial' => 'text-amber-700',
+            'queued' => 'text-sky-700',
             default => 'text-slate-700',
         };
     }
@@ -635,7 +636,8 @@ class CatalogStatsPageBuilder
         return match ($status) {
             'completed' => 'success',
             'failed' => 'danger',
-            'running' => 'warning',
+            'running', 'partial' => 'warning',
+            'queued' => 'sky',
             default => 'muted',
         };
     }
@@ -1857,8 +1859,11 @@ class CatalogStatsPageBuilder
             'licensed_media.check_status.invalid_url' => 'Некорректная ссылка',
             'licensed_media.storage_disk.external' => 'Внешний источник',
             'seasonvar_import_runs.status.running' => 'Выполняется',
+            'seasonvar_import_runs.status.queued' => 'Ожидает запуска',
             'seasonvar_import_runs.status.completed' => 'Завершено',
+            'seasonvar_import_runs.status.partial' => 'Завершено частично',
             'seasonvar_import_runs.status.failed' => 'Ошибка',
+            'seasonvar_import_runs.status.cancelled' => 'Отменено',
             'seasonvar_import_runs.mode.sitemap' => 'Карта сайта',
             'seasonvar_import_runs.mode.url' => 'Одна страница',
             'seasonvar_import_runs.mode.pending' => 'Ожидающие страницы',

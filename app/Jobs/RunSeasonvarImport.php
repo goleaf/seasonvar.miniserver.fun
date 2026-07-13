@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Services\Notifications\SeasonvarImportFailureNotifier;
+use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -59,7 +60,7 @@ class RunSeasonvarImport implements ShouldBeUnique, ShouldQueue
                 progress: null,
             );
 
-            if ($run->status !== 'completed') {
+            if (! in_array($run->status, ['completed', 'partial'], true)) {
                 throw new RuntimeException('Импорт Seasonvar завершился со статусом '.$run->status.'.');
             }
         } finally {
@@ -87,7 +88,7 @@ class RunSeasonvarImport implements ShouldBeUnique, ShouldQueue
             'force' => $this->force,
             'discover' => $this->discover,
             'exception' => $exception ? get_class($exception) : null,
-            'message' => $exception?->getMessage(),
+            'error' => app(SeasonvarImportErrorSanitizer::class)->fromException($exception),
         ]);
 
         app(SeasonvarImportFailureNotifier::class)->notify(

@@ -2,12 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\Seasonvar\SeasonvarSourceRequestException;
 use App\Jobs\FinalizeSeasonvarQueuedImport;
 use App\Jobs\ImportSeasonvarSourcePage;
+use App\Jobs\StartSeasonvarQueuedImport;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
+use App\Models\User;
 use App\Services\Catalog\CatalogStatsSnapshotCache;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
+use App\Services\Seasonvar\SeasonvarImportAdminService;
+use App\Services\Seasonvar\SeasonvarImportFailureClassifier;
 use App\Services\Seasonvar\SeasonvarImportGroupKey;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use App\Services\Seasonvar\SeasonvarImportRunRecorder;
@@ -61,6 +66,178 @@ class SeasonvarParallelImportTest extends TestCase
         $this->assertSame(86400, config('seasonvar.queue.claim_seconds'));
         $this->assertSame(24, config('seasonvar.import.refresh_after_hours'));
         $this->assertSame('IMMEDIATE', config('database.connections.sqlite.transaction_mode'));
+    }
+
+    public function test_admin_start_is_queued_once_with_safe_scalar_job_payload(): void
+    {
+        config([
+            'seasonvar.admin_emails' => ['admin@example.com'],
+            'seasonvar.queue.lock_store' => 'array',
+        ]);
+        Queue::fake();
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        $imports = app(SeasonvarImportAdminService::class);
+
+        $first = $imports->start($admin, force: true, discover: false);
+        $duplicate = $imports->start($admin, force: true, discover: false);
+
+        $this->assertTrue($first->created);
+        $this->assertFalse($duplicate->created);
+        $this->assertTrue($duplicate->run->is($first->run));
+        $this->assertSame('queued', $first->run->status);
+        $this->assertSame($admin->id, $first->run->requested_by_user_id);
+        $this->assertNull($first->run->started_at);
+        Queue::assertPushedTimes(StartSeasonvarQueuedImport::class, 1);
+        Queue::assertPushed(StartSeasonvarQueuedImport::class, function (StartSeasonvarQueuedImport $job) use ($first): bool {
+            return $job->importRunId === $first->run->id
+                && $job->connection === 'redis'
+                && $job->queue === 'seasonvar-import'
+                && ! str_contains(serialize($job), 'admin@example.com')
+                && ! str_contains(serialize($job), 'seasonvar.ru/');
+        });
+    }
+
+    public function test_admin_can_retry_terminal_run_cancel_active_run_and_recover_stale_run(): void
+    {
+        config([
+            'seasonvar.admin_emails' => ['admin@example.com'],
+            'seasonvar.queue.lock_store' => 'array',
+            'seasonvar.queue.stale_after_minutes' => 60,
+        ]);
+        Queue::fake();
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        $imports = app(SeasonvarImportAdminService::class);
+        $failed = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'failed',
+            'finished_at' => now(),
+        ]);
+
+        $retry = $imports->retry($admin, $failed->id);
+
+        $this->assertTrue($retry->created);
+        $this->assertSame($failed->id, $retry->run->retry_of_run_id);
+        $retry->run->update([
+            'status' => 'running',
+            'started_at' => now(),
+            'last_heartbeat_at' => now(),
+        ]);
+        $page = SourcePage::factory()->create();
+        $claims = app(SeasonvarPageClaimManager::class);
+        $token = $claims->claim($page, $retry->run->id, 3600);
+        $this->assertNotNull($token);
+
+        $cancelled = $imports->cancel($admin, $retry->run->id);
+
+        $this->assertSame('cancelled', $cancelled->status);
+        $this->assertNotNull($cancelled->cancel_requested_at);
+        $this->assertNotNull($cancelled->finished_at);
+        $this->assertFalse($claims->owns($page->id, $retry->run->id, (string) $token));
+
+        $stale = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'running',
+            'started_at' => now()->subHours(2),
+            'last_heartbeat_at' => now()->subHours(2),
+        ]);
+        $live = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'running',
+            'started_at' => now()->subHours(2),
+            'last_heartbeat_at' => now()->subHours(2),
+        ]);
+        $livePage = SourcePage::factory()->create();
+        $this->assertNotNull($claims->claim($livePage, $live->id, 3600));
+
+        $this->assertSame(1, $imports->recoverStale());
+        $this->assertSame('failed', $stale->fresh()->status);
+        $this->assertSame('running', $live->fresh()->status);
+        $this->assertStringNotContainsString('http', (string) $stale->fresh()->last_error);
+    }
+
+    public function test_coordinator_job_retries_transient_failure_and_stops_on_permanent_failure(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        $imports = app(SeasonvarImportAdminService::class);
+        $classifier = app(SeasonvarImportFailureClassifier::class);
+        $transientRun = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'queued',
+        ]);
+        $transientDispatcher = Mockery::mock(SeasonvarQueuedImportDispatcher::class);
+        $transientDispatcher->shouldReceive('dispatchRun')
+            ->once()
+            ->andThrow(SeasonvarSourceRequestException::forStatus(503));
+        $job = new StartSeasonvarQueuedImport($transientRun->id);
+
+        try {
+            $job->handle($transientDispatcher, $imports, $classifier);
+            $this->fail('Transient coordinator failure must be retried.');
+        } catch (SeasonvarSourceRequestException $exception) {
+            $this->assertSame(503, $exception->status);
+        }
+
+        $this->assertSame('queued', $transientRun->fresh()->status);
+        $this->assertSame([60, 300, 900], $job->backoff());
+        $this->assertSame(3, $job->tries);
+        $this->assertSame(900, $job->timeout);
+        $this->assertSame('seasonvar-coordinator:'.$transientRun->id, $job->uniqueId());
+
+        $permanentRun = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'queued',
+        ]);
+        $permanentDispatcher = Mockery::mock(SeasonvarQueuedImportDispatcher::class);
+        $permanentDispatcher->shouldReceive('dispatchRun')
+            ->once()
+            ->andThrow(SeasonvarSourceRequestException::forStatus(404));
+
+        (new StartSeasonvarQueuedImport($permanentRun->id))->handle($permanentDispatcher, $imports, $classifier);
+
+        $this->assertSame('failed', $permanentRun->fresh()->status);
+        $this->assertSame('Seasonvar вернул HTTP 404.', $permanentRun->fresh()->last_error);
+    }
+
+    public function test_cancelled_run_page_job_does_not_call_importer(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        $run = $this->queuedRun();
+        $page = SourcePage::factory()->create();
+        $claims = app(SeasonvarPageClaimManager::class);
+        $token = $claims->claim($page, $run->id, 3600);
+        $run->update(['status' => 'cancelled', 'finished_at' => now()]);
+        $importer = Mockery::mock(SeasonvarCatalogImporter::class);
+        $importer->shouldNotReceive('parsePages');
+
+        (new ImportSeasonvarSourcePage(
+            sourcePageId: $page->id,
+            importRunId: $run->id,
+            claimToken: (string) $token,
+            groupKey: 'seasonvar-title:cancelled',
+        ))->handle(
+            $claims,
+            $importer,
+            app(SeasonvarImportRunRecorder::class),
+            app(SeasonvarImportGroupKey::class),
+        );
+
+        $this->assertFalse($claims->owns($page->id, $run->id, (string) $token));
+        $this->assertSame(0, $run->fresh()->parsed);
+    }
+
+    public function test_run_completion_status_distinguishes_success_and_partial_success(): void
+    {
+        $successful = $this->queuedRun();
+        $partial = $this->queuedRun();
+        $partial->update(['failed' => 1]);
+
+        $this->assertSame('completed', $successful->completionStatus());
+        $this->assertSame('partial', $partial->completionStatus());
     }
 
     public function test_page_job_retry_deadline_covers_the_longer_retry_or_claim_window(): void
@@ -373,7 +550,7 @@ class SeasonvarParallelImportTest extends TestCase
         $stats->shouldNotReceive('refresh');
         $job = (new FinalizeSeasonvarQueuedImport($run->id))->withFakeQueueInteractions();
 
-        $job->handle($claims, $pipeline, $stats);
+        $job->handle($claims, $pipeline, $stats, app(SeasonvarImportRunRecorder::class));
 
         $job->assertReleased(delay: 60);
     }
@@ -396,6 +573,7 @@ class SeasonvarParallelImportTest extends TestCase
             app(SeasonvarPageClaimManager::class),
             $pipeline,
             $stats,
+            app(SeasonvarImportRunRecorder::class),
         );
 
         $this->assertTrue(true);

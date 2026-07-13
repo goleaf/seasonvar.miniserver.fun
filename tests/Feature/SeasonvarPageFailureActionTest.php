@@ -63,7 +63,7 @@ class SeasonvarPageFailureActionTest extends TestCase
         $this->assertSame(200, $page->http_status);
         $this->assertSame(1, $page->failure_count);
         $this->assertSame($run->id, $page->last_import_run_id);
-        $this->assertSame('Connection timed out', $page->error_message);
+        $this->assertSame('Не удалось установить соединение с провайдером.', $page->error_message);
         $this->assertTrue($page->retry_after_at->between(now()->addMinutes(15)->subSecond(), now()->addMinutes(15)->addSecond()));
     }
 

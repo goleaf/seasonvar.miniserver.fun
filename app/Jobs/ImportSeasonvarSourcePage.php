@@ -2,8 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
+use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
 use App\Services\Seasonvar\SeasonvarImportGroupKey;
 use App\Services\Seasonvar\SeasonvarImportRunRecorder;
 use App\Services\Seasonvar\SeasonvarPageClaimManager;
@@ -57,6 +59,18 @@ class ImportSeasonvarSourcePage implements ShouldQueue
         SeasonvarImportRunRecorder $runs,
         SeasonvarImportGroupKey $groupKeys,
     ): void {
+        $runIsActive = SeasonvarImportRun::query()
+            ->whereKey($this->importRunId)
+            ->where('execution_mode', 'queue')
+            ->where('status', 'running')
+            ->exists();
+
+        if (! $runIsActive) {
+            $claims->release($this->sourcePageId, $this->importRunId, $this->claimToken);
+
+            return;
+        }
+
         if (! $claims->owns($this->sourcePageId, $this->importRunId, $this->claimToken)) {
             return;
         }
@@ -69,6 +83,8 @@ class ImportSeasonvarSourcePage implements ShouldQueue
         )) {
             return;
         }
+
+        $runs->heartbeat($this->importRunId);
 
         $page = SourcePage::query()->with('source')->find($this->sourcePageId);
 
@@ -148,7 +164,7 @@ class ImportSeasonvarSourcePage implements ShouldQueue
             'import_run_id' => $this->importRunId,
             'group_key' => $this->groupKey,
             'exception' => $exception ? get_class($exception) : null,
-            'message' => $exception?->getMessage(),
+            'error' => app(SeasonvarImportErrorSanitizer::class)->fromException($exception),
         ]);
     }
 }

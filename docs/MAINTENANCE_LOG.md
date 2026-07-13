@@ -1,5 +1,11 @@
 # Журнал обслуживания
 
+## 13.07.2026 — операционный importer UI и queue coordinator
+
+- Добавлен защищённый gate и Livewire-экран `/admin/imports`; долгий importer не выполняется в HTTP-запросе.
+- Ручной старт создаёт unique coordinator job только с run ID; retry делит temporary/permanent failures, cancel освобождает claims, а stale recovery закрывает running run только без live claims.
+- Проверены duplicate click, retry, permanent failure, cancel-before-worker, partial result, authorization, safe error output и остановка polling после terminal state в существующих feature tests.
+
 ## 13.07.2026 — Централизованная выдача playback source
 
 - Импорт Seasonvar получил проверяемую границу parser → normalized DTO → provider identity → transaction. Name-only merge удалён: тайтлы различаются по provider ID/canonical URL, а одинаковые имена людей с разными стабильными person URL получают разные строки.

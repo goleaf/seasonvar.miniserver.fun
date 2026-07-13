@@ -99,6 +99,24 @@ class SeasonvarQueueStatusTest extends TestCase
         $this->assertSame(3, $status->failed);
     }
 
+    public function test_it_counts_a_queued_coordinator_as_active_without_hiding_a_claimed_run(): void
+    {
+        $running = $this->queuedRun();
+        $page = SourcePage::factory()->create();
+        $this->assertNotNull(app(SeasonvarPageClaimManager::class)->claim($page, $running->id, 3600));
+        SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'queued',
+        ]);
+        $this->mockQueue(oldestPendingTimestamp: now()->getTimestamp());
+
+        $status = app(SeasonvarQueueStatus::class)->read();
+
+        $this->assertSame(2, $status->activeRuns);
+        $this->assertSame($running->id, $status->runId);
+    }
+
     /**
      * @param  array<string, mixed>  $attributes
      */

@@ -12,6 +12,7 @@ class SeasonvarDiscovery
     public function __construct(
         private readonly PoliteHttpClient $httpClient,
         private readonly SeasonvarUrl $seasonvarUrl,
+        private readonly SeasonvarImportErrorSanitizer $errors,
     ) {}
 
     /**
@@ -85,7 +86,7 @@ class SeasonvarDiscovery
             } catch (RuntimeException $exception) {
                 $this->report($progress, 'sitemap-xml-failed', [
                     'url' => $currentUrl,
-                    'message' => $exception->getMessage(),
+                    'message' => $this->errors->fromException($exception),
                 ]);
 
                 if ($currentUrl === $normalizedSitemapUrl) {

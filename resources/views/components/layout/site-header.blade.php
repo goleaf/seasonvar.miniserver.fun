@@ -51,6 +51,16 @@
                     <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
                     <span class="sr-only xl:not-sr-only">Мои просмотры</span>
                 </a>
+                @can('manage-seasonvar-imports')
+                    <a href="{{ route('admin.imports') }}" @class([
+                        'inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2',
+                        'bg-emerald-50 text-emerald-700' => request()->routeIs('admin.imports'),
+                        'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('admin.imports'),
+                    ]) @if (request()->routeIs('admin.imports')) aria-current="page" @endif>
+                        <i class="fa-solid fa-cloud-arrow-down" aria-hidden="true"></i>
+                        <span class="sr-only xl:not-sr-only">Импорт</span>
+                    </a>
+                @endcan
             @endauth
         </nav>
     </div>

@@ -5,6 +5,7 @@ use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogSitemapController;
 use App\Http\Controllers\PlaybackSourceController;
 use App\Livewire\CatalogSeries;
+use App\Livewire\SeasonvarImportManager;
 use App\Livewire\ViewingActivity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -36,6 +37,9 @@ Route::get('/playback/{licensedMedia}', PlaybackSourceController::class)
     ->name('playback.source');
 Route::get('/titles', CatalogSeries::class)->name('titles.index');
 Route::get('/watching', ViewingActivity::class)->name('viewing-activity');
+Route::get('/admin/imports', SeasonvarImportManager::class)
+    ->middleware('can:manage-seasonvar-imports')
+    ->name('admin.imports');
 Route::get('/titles/year/{year}', CatalogSeries::class)
     ->where('year', '(?:19|20)\d{2}')
     ->name('titles.year');

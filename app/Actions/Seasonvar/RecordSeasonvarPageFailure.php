@@ -7,12 +7,16 @@ namespace App\Actions\Seasonvar;
 use App\Enums\SeasonvarImportFailureType;
 use App\Exceptions\Seasonvar\SeasonvarSourceRequestException;
 use App\Models\SourcePage;
+use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
 use App\Services\Seasonvar\SeasonvarImportFailureClassifier;
 use Throwable;
 
 class RecordSeasonvarPageFailure
 {
-    public function __construct(private readonly SeasonvarImportFailureClassifier $classifier) {}
+    public function __construct(
+        private readonly SeasonvarImportFailureClassifier $classifier,
+        private readonly SeasonvarImportErrorSanitizer $errors,
+    ) {}
 
     public function handle(
         SourcePage $page,
@@ -27,7 +31,7 @@ class RecordSeasonvarPageFailure
         $attributes = [
             'parse_status' => 'failed',
             'import_status' => $httpStatus === 404 ? 'gone' : 'failed',
-            'error_message' => $exception->getMessage(),
+            'error_message' => $this->errors->fromException($exception),
             'last_crawled_at' => now(),
             'retry_after_at' => $httpStatus === 404
                 ? now()->addDays(7)

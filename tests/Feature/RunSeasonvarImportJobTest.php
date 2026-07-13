@@ -117,7 +117,7 @@ class RunSeasonvarImportJobTest extends TestCase
                     && $context['force'] === true
                     && $context['discover'] === false
                     && $context['exception'] === RuntimeException::class
-                    && $context['message'] === 'network failed';
+                    && $context['error'] === 'network failed';
             }));
 
         (new RunSeasonvarImport(argument: 'https://seasonvar.ru/serial-1-Test-1-season.html', force: true, discover: false))

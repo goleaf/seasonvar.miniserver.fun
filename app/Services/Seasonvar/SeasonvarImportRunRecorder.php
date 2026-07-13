@@ -39,8 +39,23 @@ class SeasonvarImportRunRecorder
             return;
         }
 
+        $updates['last_heartbeat_at'] = now();
         $updates['updated_at'] = now();
 
-        SeasonvarImportRun::query()->whereKey($runId)->update($updates);
+        SeasonvarImportRun::query()
+            ->whereKey($runId)
+            ->whereIn('status', ['queued', 'running'])
+            ->update($updates);
+    }
+
+    public function heartbeat(int $runId): void
+    {
+        SeasonvarImportRun::query()
+            ->whereKey($runId)
+            ->whereIn('status', ['queued', 'running'])
+            ->update([
+                'last_heartbeat_at' => now(),
+                'updated_at' => now(),
+            ]);
     }
 }

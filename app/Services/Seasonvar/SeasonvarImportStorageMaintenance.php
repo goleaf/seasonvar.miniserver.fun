@@ -106,7 +106,7 @@ class SeasonvarImportStorageMaintenance
 
         SeasonvarImportEvent::query()
             ->where('created_at', '<', $cutoff)
-            ->whereDoesntHave('run', fn ($query) => $query->where('status', 'running'))
+            ->whereDoesntHave('run', fn ($query) => $query->whereIn('status', ['queued', 'running']))
             ->select('id')
             ->chunkById($chunkSize, function ($events) use (&$deleted): void {
                 $deleted += SeasonvarImportEvent::query()
@@ -123,7 +123,7 @@ class SeasonvarImportStorageMaintenance
 
         SourcePageSnapshot::query()
             ->where('captured_at', '<', $cutoff)
-            ->whereDoesntHave('run', fn ($query) => $query->where('status', 'running'))
+            ->whereDoesntHave('run', fn ($query) => $query->whereIn('status', ['queued', 'running']))
             ->select('id')
             ->chunkById($chunkSize, function ($snapshots) use (&$deleted): void {
                 $deleted += SourcePageSnapshot::query()

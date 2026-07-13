@@ -48,6 +48,7 @@ class SeasonvarCatalogImporter
         private readonly SeasonvarDatabaseTransaction $databaseTransaction,
         private readonly RecordSeasonvarPageFailure $recordPageFailure,
         private readonly SeasonvarTitlePageStateSynchronizer $titlePageStateSynchronizer,
+        private readonly SeasonvarImportErrorSanitizer $errors,
     ) {}
 
     /**
@@ -181,7 +182,7 @@ class SeasonvarCatalogImporter
             $this->report($progress, 'url-invalid', [
                 'argument' => $argument,
                 'exception' => $exception::class,
-                'message' => $exception->getMessage(),
+                'message' => $this->errors->fromException($exception),
             ]);
 
             return collect();
@@ -324,14 +325,14 @@ class SeasonvarCatalogImporter
             } catch (Throwable $exception) {
                 $failureType = $this->recordPageFailure->handle($page, $exception, $importRunId);
                 $failed++;
-                $failures[] = "{$page->url} ({$exception->getMessage()})";
+                $failures[] = "{$page->url} ({$this->errors->fromException($exception)})";
 
                 $this->report($progress, 'parse-batch-item-failed', [
                     'index' => $position,
                     'total' => $total,
                     'source_page_id' => $page->id,
                     'exception' => $exception::class,
-                    'message' => $exception->getMessage(),
+                    'message' => $this->errors->fromException($exception),
                     'parsed' => $parsed,
                     'failed' => $failed,
                     'url' => $page->url,
@@ -1388,7 +1389,7 @@ class SeasonvarCatalogImporter
                     'catalog_title_id' => $catalogTitle->id,
                     'url' => $playlistUrl,
                     'exception' => $exception::class,
-                    'message' => $exception->getMessage(),
+                    'message' => $this->errors->fromException($exception),
                 ]);
             }
         }
@@ -1423,7 +1424,7 @@ class SeasonvarCatalogImporter
                     'catalog_title_id' => $catalogTitle->id,
                     'url' => $playlistItem['url'],
                     'exception' => $exception::class,
-                    'message' => $exception->getMessage(),
+                    'message' => $this->errors->fromException($exception),
                 ]);
             }
         }
@@ -1458,7 +1459,7 @@ class SeasonvarCatalogImporter
                     'catalog_title_id' => $catalogTitle->id,
                     'url' => $playlistItem['url'],
                     'exception' => $exception::class,
-                    'message' => $exception->getMessage(),
+                    'message' => $this->errors->fromException($exception),
                 ]);
             }
         }

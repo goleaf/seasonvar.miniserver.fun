@@ -45,6 +45,7 @@
 - Страница карточки показывает summaries всех доступных сезонов, но серии и media загружает только для одного активного сезона через Livewire.
 - Воспроизведение видео использует локальный пакет Plyr/HLS, который инициализируется из `resources/js/app.js`.
 - Служебная статистика `/stats` строится на Livewire 4, обновляется через `wire:poll.15s.visible` и может показывать миниатюры постеров только через внутренний proxy-маршрут, не выводя исходные внешние URL в HTML или Livewire payload.
+- Admin importer использует те же светлые panel/control/status паттерны. Loading и empty state обязательны, cancel/retry требуют confirmation, provider URLs и raw error details не выводятся.
 - Если poster URL не проходит `CatalogStatsPosterUrlGuard`, `/stats` показывает светлую заглушку постера вместо `<img>`, чтобы интерфейс не создавал 404-запросы к proxy.
 
 ## Читаемость

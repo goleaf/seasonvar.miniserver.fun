@@ -16,6 +16,16 @@
 8. Полный sync/queued finalizer пересобирает рекомендации и обновляет stats cache; targeted URL run обновляет stats cache, но намеренно не запускает глобальное обслуживание каталога.
 9. Новый тайтл получает `published/public`, но повторный import не меняет локальные publication status, audience, availability window, soft delete или slug. Публичный интерфейс всё равно повторно применяет `CatalogEntitlementService`.
 
+## Queue coordinator и статусы
+
+`/admin/imports` вызывает `SeasonvarImportAdminService`, который под Redis lock создаёт один `queued` run и отправляет `StartSeasonvarQueuedImport` только с scalar run ID. Coordinator имеет 3 attempts, backoff 60/300/900 секунд, timeout 900 секунд и unique lock на run. Transient network/408/425/429/5xx/SQLite-lock ошибки возвращают run в `queued` для retry; permanent validation/provider errors переводят его в `failed` без бесполезного повтора.
+
+Page jobs принимают только IDs, lease token, canonical group key и force flag. Provider HTML/JSON, credentials и URLs в payload не кладутся. После всех claims finalizer сохраняет `completed`, а при ненулевых page/media failures — `partial`. Все queue exception details проходят общий sanitizer, который убирает credentials, URLs и filesystem paths.
+
+Счётчики admin UI — операционные: `created` объединяет новые source pages и media rows, `updated` — успешно обработанные source pages и обновлённые media, `skipped` — необработанные выбранные pages и пропущенные media, `failed` — page/media failures. Это не точное число созданных Eloquent entities: текущая pipeline не хранит entity-level deltas, а выдавать их приближённо было бы некорректно.
+
+Retry не воскрешает старую строку: создаётся новый run с `retry_of_run_id`, поэтому audit trail и счётчики прошлой попытки не переписываются. Idempotent upsert/identity/lease-границы не дублируют каталог. Cancel освобождает claims и запрещает новым jobs начинать; текущий HTTP/transaction step не прерывается посредине.
+
 ## Идентичность и идемпотентность
 
 - Тайтл: стабильный provider ID внутри `Source`; fallback при отсутствии ID — точный канонический URL hash/source page. Совпадение или похожесть названия не объединяет строки.
@@ -39,9 +49,10 @@ Parser фиксирует признаки `has_info_list`, `has_season_list` и
 ## Порядок деплоя
 
 1. Дождаться завершения активных import jobs и сделать backup SQLite.
-2. Развернуть код.
+2. Применить additive migration `2026_07_13_140000_add_administration_fields_to_seasonvar_import_runs`: она добавляет только nullable requester/retry foreign keys, heartbeat/cancel timestamps и indexes, backfill не требуется.
+3. Развернуть код.
 3. Выполнить `php artisan migrate --force`: сначала nullable JSON `provider_field_values`, затем неуникальные person source URL indexes.
-4. Перезапустить долгоживущие queue workers через `php artisan queue:restart`.
-5. Выполнить targeted repeat import на тестовой/проверочной странице и сверить counts/relations до и после.
+5. Задать `SEASONVAR_IMPORT_ADMIN_EMAILS`, пересобрать config cache и перезапустить queue workers через `php artisan queue:restart`.
+6. Выполнить targeted repeat import на тестовой/проверочной странице и сверить counts/relations до и после.
 
-Обе migrations additive и не делают backfill или удаления. Это намеренно: отсутствие baseline заставляет первый повторный import считать существующее заполненное поле потенциально редакционным.
+Все указанные migrations additive и не делают удалений. Admin fields nullable и не требуют backfill; отсутствие editorial baseline намеренно заставляет первый repeat import считать существующее заполненное поле потенциально редакционным.

@@ -2,6 +2,9 @@
 
 ## 2026-07-13
 
+- Added the authorized `/admin/imports` Livewire operations screen with duplicate-safe queued starts, active-only visible polling, cooperative cancellation, retry audit links, stale-running recovery, bounded counters, and sanitized errors.
+- Added a scalar-payload unique coordinator job with explicit attempts/backoff/timeout, transient/permanent failure classification, queued/running/completed/partial/failed/cancelled status transitions, and heartbeat tracking across coordinator, page, and finalizer jobs.
+- Added nullable requester/retry foreign keys and heartbeat/cancellation indexes to import runs, expanded queue diagnostics to include queued coordinators, and centralized credential/URL/path redaction for persisted and logged importer failures.
 - Added a validated normalized Seasonvar DTO boundary, provider-ID/canonical-URL title identity resolution, stable person-URL disambiguation, and additive lookup indexes without unsafe name-only merging.
 - Preserved editorial title/description/artwork through a three-way provider baseline, kept publication/audience/windows/soft deletes under local ownership, and prevented partial snapshots or repeat imports from restoring/deleting relationships and media.
 - Centralized catalog and playback access in `CatalogEntitlementService`, with one SQL visibility boundary and one structured loaded-release decision reused by search, route binding, recommendations, policies, progress/history, source resolution, and direct signed playback rechecks.

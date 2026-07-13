@@ -4,7 +4,9 @@ namespace App\Jobs;
 
 use App\Models\SeasonvarImportRun;
 use App\Services\Catalog\CatalogStatsSnapshotCache;
+use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
+use App\Services\Seasonvar\SeasonvarImportRunRecorder;
 use App\Services\Seasonvar\SeasonvarPageClaimManager;
 use DateTimeInterface;
 use Illuminate\Bus\Queueable;
@@ -43,6 +45,7 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
         SeasonvarPageClaimManager $claims,
         SeasonvarImportPipeline $pipeline,
         CatalogStatsSnapshotCache $statsSnapshots,
+        SeasonvarImportRunRecorder $runs,
     ): void {
         $run = SeasonvarImportRun::query()->find($this->importRunId);
 
@@ -51,6 +54,7 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
         }
 
         if ($claims->outstandingForRun($run->id) > 0) {
+            $runs->heartbeat($run->id);
             $this->release(max(1, (int) config('seasonvar.queue.finalizer_delay_seconds', 60)));
 
             return;
@@ -85,21 +89,23 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        $message = app(SeasonvarImportErrorSanitizer::class)->fromException($exception);
+
         SeasonvarImportRun::query()
             ->whereKey($this->importRunId)
             ->where('execution_mode', 'queue')
             ->where('status', 'running')
             ->update([
                 'status' => 'failed',
-                'last_error' => $exception?->getMessage() ?? 'Queue finalizer завершился ошибкой.',
+                'last_error' => $message,
                 'finished_at' => now(),
+                'last_heartbeat_at' => now(),
                 'updated_at' => now(),
             ]);
 
         Log::error('Финализация очередного импорта Seasonvar завершилась ошибкой.', [
             'import_run_id' => $this->importRunId,
             'exception' => $exception ? get_class($exception) : null,
-            'message' => $exception?->getMessage(),
         ]);
     }
 }

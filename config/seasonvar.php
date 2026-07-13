@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'admin_emails' => array_values(array_filter(array_map(
+        static fn (string $email): string => mb_strtolower(trim($email)),
+        explode(',', (string) env('SEASONVAR_IMPORT_ADMIN_EMAILS', '')),
+    ))),
     'base_url' => env('SEASONVAR_BASE_URL', 'https://seasonvar.ru'),
     'sitemap_url' => env('SEASONVAR_SITEMAP_URL', 'https://seasonvar.ru/sitemap_index.xml'),
     'crawl_delay_seconds' => (int) env('SEASONVAR_CRAWL_DELAY', 3),
@@ -28,6 +32,7 @@ return [
         'finalizer_delay_seconds' => (int) env('SEASONVAR_QUEUE_FINALIZER_DELAY_SECONDS', 60),
         'busy_threshold' => (int) env('SEASONVAR_QUEUE_BUSY_THRESHOLD', 5000),
         'busy_log_seconds' => (int) env('SEASONVAR_QUEUE_BUSY_LOG_SECONDS', 3600),
+        'stale_after_minutes' => (int) env('SEASONVAR_QUEUE_STALE_AFTER_MINUTES', 120),
     ],
     'media_check' => [
         'enabled' => filter_var(env('SEASONVAR_MEDIA_CHECK_ENABLED', true), FILTER_VALIDATE_BOOL),

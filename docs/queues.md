@@ -1,6 +1,6 @@
 # Очереди и jobs
 
-Обновлено: 09.07.2026
+Обновлено: 13.07.2026
 
 ## Конфигурация
 
@@ -13,6 +13,11 @@
 ## Jobs
 
 - `App\Jobs\RunSeasonvarImport` — внутренний queued wrapper для тяжелого импорта Seasonvar. Публичной командой остается `php artisan seasonvar:import`.
+- `StartSeasonvarQueuedImport` — короткий coordinator для `/admin/imports`: payload содержит только `seasonvar_import_runs.id`, затем job вызывает тот же `SeasonvarQueuedImportDispatcher`, что CLI `--queued`.
+- Coordinator ограничен 3 attempts, timeout 900 секунд и backoff 60/300/900; `ShouldBeUnique` держит lock на ID run. Page/finalizer jobs ограничены absolute retry window, согласованным с claim lease.
+- `SeasonvarImportFailureClassifier` разделяет temporary и permanent failures. Первые повторяют coordinator, вторые сразу фиксируют `failed`; queue logs и persisted error fields проходят `SeasonvarImportErrorSanitizer`.
+- Run states: `queued -> running -> completed|partial|failed`; admin cancel даёт `cancelled`. Heartbeat обновляется coordinator/page/finalizer шагами, а admin service может закрыть `running` run с просроченным heartbeat, если живых claims больше нет. Порог — `SEASONVAR_QUEUE_STALE_AFTER_MINUTES`.
+- Retry из admin UI разрешён только для `partial/failed` и создаёт новую audit-строку. Для старых Laravel failed jobs остаётся `php artisan queue:failed`/`queue:retry <id>`; перед retry нужно сверить run state и claims.
 - Job принимает только scalar-параметры: URL-аргумент, `force` и `discover`. Модели или большие структуры данных в очередь не передаются.
 - Job не поддерживает `forever`-режим: queued import всегда выполняет ограниченный запуск, чтобы worker не занимался бесконечным циклом.
 - Job реализует `ShouldBeUnique`, использует уникальный ключ `seasonvar-import` и дополнительно берет тот же cache lock, что CLI-команда. Если импорт уже идет, job освобождает себя обратно в очередь через 300 секунд.

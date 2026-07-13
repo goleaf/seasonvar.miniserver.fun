@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Log;
 
 class SeasonvarQueueMonitor
 {
+    public function __construct(private readonly SeasonvarImportErrorSanitizer $errors) {}
+
     public function exceptionOccurred(JobExceptionOccurred $event): void
     {
         if (! $this->matches($event->connectionName, $event->job->getQueue())) {
@@ -22,7 +24,7 @@ class SeasonvarQueueMonitor
         Log::warning('Попытка queue job Seasonvar завершилась исключением.', [
             ...$this->jobContext($event->job),
             'exception' => $event->exception::class,
-            'message' => $event->exception->getMessage(),
+            'error' => $this->errors->fromException($event->exception),
         ]);
     }
 
@@ -35,7 +37,7 @@ class SeasonvarQueueMonitor
         Log::error('Queue job Seasonvar окончательно завершилась ошибкой.', [
             ...$this->jobContext($event->job),
             'exception' => $event->exception::class,
-            'message' => $event->exception->getMessage(),
+            'error' => $this->errors->fromException($event->exception),
         ]);
     }
 

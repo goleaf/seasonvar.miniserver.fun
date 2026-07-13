@@ -92,7 +92,7 @@ class ImportSeasonvar extends Command
                 $run->media_updated,
             ));
 
-            return $run->status === 'completed' ? self::SUCCESS : self::FAILURE;
+            return in_array($run->status, ['completed', 'partial'], true) ? self::SUCCESS : self::FAILURE;
         } catch (Throwable $exception) {
             $statsSnapshots->refresh();
             $this->error($exception->getMessage());
