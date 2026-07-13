@@ -8,7 +8,7 @@
     ])>
         <a href="{{ route('home') }}" class="order-1 flex min-w-0 items-center gap-3 rounded-control">
             <span class="grid h-11 w-11 shrink-0 place-items-center rounded-control bg-emerald-50 text-lg text-emerald-700">
-                <i class="fa-solid fa-film" aria-hidden="true"></i>
+                <x-ui.icon name="fa-solid fa-film" />
             </span>
             <span class="min-w-0 break-words text-lg font-black tracking-tight text-slate-800">{{ $siteName }}</span>
         </a>
@@ -25,7 +25,7 @@
                     input-class="min-h-11 min-w-0 flex-1 border-0 bg-transparent px-3 py-2.5 text-sm text-slate-700 outline-none placeholder:text-slate-500"
                 />
                 <button type="submit" class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600">
-                    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-magnifying-glass" />
                     <span class="sr-only sm:not-sr-only">Найти</span>
                 </button>
             </form>
@@ -37,7 +37,7 @@
                 'bg-emerald-50 text-emerald-700' => request()->routeIs('home'),
                 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('home'),
             ]) @if (request()->routeIs('home')) aria-current="page" @endif>
-                <i class="fa-solid fa-house" aria-hidden="true"></i>
+                <x-ui.icon name="fa-solid fa-house" />
                 <span class="sr-only xl:not-sr-only">Главная</span>
             </a>
             <a href="{{ route('titles.index') }}" @class([
@@ -45,7 +45,7 @@
                 'bg-emerald-50 text-emerald-700' => request()->routeIs('titles.*'),
                 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('titles.*'),
             ]) @if (request()->routeIs('titles.*')) aria-current="page" @endif>
-                <i class="fa-solid fa-table-cells-large" aria-hidden="true"></i>
+                <x-ui.icon name="fa-solid fa-table-cells-large" />
                 <span class="sr-only xl:not-sr-only">Каталог</span>
             </a>
             @auth
@@ -54,7 +54,7 @@
                     'bg-emerald-50 text-emerald-700' => request()->routeIs('viewing-activity'),
                     'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('viewing-activity'),
                 ]) @if (request()->routeIs('viewing-activity')) aria-current="page" @endif>
-                    <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-clock-rotate-left" />
                     <span class="sr-only xl:not-sr-only">Мои просмотры</span>
                 </a>
                 @can('manage-seasonvar-imports')
@@ -63,7 +63,7 @@
                         'bg-emerald-50 text-emerald-700' => request()->routeIs('admin.imports'),
                         'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('admin.imports'),
                     ]) @if (request()->routeIs('admin.imports')) aria-current="page" @endif>
-                        <i class="fa-solid fa-cloud-arrow-down" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-cloud-arrow-down" />
                         <span class="sr-only xl:not-sr-only">Импорт</span>
                     </a>
                 @endcan

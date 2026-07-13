@@ -1,7 +1,7 @@
 <a href="{{ $url }}" {{ $attributes->merge($linkAttributes()) }}>
     <div class="flex items-start justify-between gap-2">
         <div class="inline-flex min-w-0 items-center gap-2 font-bold text-slate-700">
-            <i class="fa-solid fa-circle-play text-emerald-700" aria-hidden="true"></i>
+            <x-ui.icon name="fa-solid fa-circle-play text-emerald-700" />
             <span>{{ $episode->number }} серия</span>
         </div>
 

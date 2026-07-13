@@ -9,7 +9,7 @@
 
         @if ($icon)
             <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-emerald-50 text-emerald-700">
-                <i class="{{ $icon }}" aria-hidden="true"></i>
+                <x-ui.icon name="{{ $icon }}" />
             </span>
         @endif
     </div>

@@ -172,7 +172,7 @@
                         @foreach ($breadcrumbs as $breadcrumb)
                             <li class="inline-flex min-w-0 items-center gap-2">
                                 @if (! $loop->first)
-                                    <i class="fa-solid fa-chevron-right shrink-0 text-[0.7em] text-slate-300" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-chevron-right text-[0.7em] text-slate-300" />
                                 @endif
                                 @if ($loop->last)
                                     <span class="break-words font-semibold text-slate-700" aria-current="page">{{ $breadcrumb['name'] }}</span>
@@ -189,14 +189,14 @@
             @if ($seoSections->isNotEmpty())
                 <nav id="table-of-contents" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Содержание страницы" itemscope itemtype="https://schema.org/SiteNavigationElement">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-table-list text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-table-list text-emerald-700" />
                         <span itemprop="name">Содержание страницы</span>
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($seoSections as $section)
                             @continue(($section['id'] ?? null) === 'discovery-signals' && ! request()->routeIs('stats'))
                             <a href="#{{ $section['id'] }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                <i class="fa-solid fa-bookmark text-[0.8em] text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-bookmark text-[0.8em] text-slate-400" />
                                 <span itemprop="name">{{ $section['name'] }}</span>
                             </a>
                         @endforeach
@@ -206,7 +206,7 @@
             @if (! empty($seo['seo_text']) || ! empty($seo['related_links']))
                 <section id="seo-summary" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="SEO описание страницы" data-seo-summary>
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-file-lines text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-file-lines text-emerald-700" />
                         <span>Описание страницы</span>
                     </div>
                     @if (! empty($seo['seo_text']))
@@ -220,7 +220,7 @@
                         <div class="mt-4 flex flex-wrap gap-2">
                             @foreach (collect($seo['related_links'])->filter()->take(14) as $link)
                                 <a href="{{ $link['url'] }}" class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100">
-                                    <i class="fa-solid fa-link text-[0.8em]" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-link text-[0.8em]" />
                                     <span>{{ $link['name'] }}</span>
                                 </a>
                             @endforeach
@@ -231,13 +231,13 @@
             @if ($topicTerms->isNotEmpty())
                 <section id="key-topics" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Ключевые темы" itemscope itemtype="https://schema.org/SiteNavigationElement">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-tags text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-tags text-emerald-700" />
                         <span itemprop="name">Ключевые темы</span>
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($topicTerms as $term)
                             <a href="{{ $seoSearchUrl($term) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 hover:bg-emerald-50 hover:text-emerald-700">
-                                <i class="fa-solid fa-hashtag text-[0.8em] text-amber-500" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-hashtag text-[0.8em] text-amber-500" />
                                 <span itemprop="name">{{ $term }}</span>
                             </a>
                         @endforeach
@@ -247,7 +247,7 @@
             @if ($semanticGlossary->isNotEmpty())
                 <section id="semantic-glossary" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Глоссарий страницы" itemscope itemtype="https://schema.org/DefinedTermSet">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-book-open text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-book-open text-emerald-700" />
                         <span itemprop="name">Глоссарий страницы</span>
                     </div>
                     <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -265,13 +265,13 @@
             @if ($seoIntents->isNotEmpty())
                 <section id="query-navigation" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Навигация по запросам" itemscope itemtype="https://schema.org/SiteNavigationElement">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-route text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-route text-emerald-700" />
                         <span itemprop="name">Навигация по запросам</span>
                     </div>
                     <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                         @foreach ($seoIntents->take(16) as $intent)
                             <a href="{{ $seoSearchUrl($intent) }}" itemprop="url" class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                <i class="fa-solid fa-arrow-up-right-from-square text-[0.8em] text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-arrow-up-right-from-square text-[0.8em] text-slate-400" />
                                 <span itemprop="name">{{ $intent }}</span>
                             </a>
                         @endforeach
@@ -281,13 +281,13 @@
             @if ($longTailQueries->isNotEmpty())
                 <section id="long-tail-queries" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Поисковые формулировки" itemscope itemtype="https://schema.org/SiteNavigationElement">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-keyboard text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-keyboard text-emerald-700" />
                         <span itemprop="name">Поисковые формулировки</span>
                     </div>
                     <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                         @foreach ($longTailQueries->take(24) as $query)
                             <a href="{{ $seoSearchUrl($query) }}" itemprop="url" class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                <i class="fa-solid fa-magnifying-glass text-[0.8em] text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-magnifying-glass text-[0.8em] text-slate-400" />
                                 <span itemprop="name">{{ $query }}</span>
                             </a>
                         @endforeach
@@ -297,14 +297,14 @@
             @if ($relatedCollections->isNotEmpty())
                 <section id="related-collections" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Связанные подборки" itemscope itemtype="https://schema.org/CollectionPage">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-layer-group text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-layer-group text-emerald-700" />
                         <span itemprop="name">Связанные подборки</span>
                     </div>
                     <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                         @foreach ($relatedCollections->take(18) as $collection)
                             <a href="{{ $seoSearchUrl($collection['query']) }}" class="block rounded-lg bg-slate-50 p-3 hover:bg-emerald-50" itemprop="hasPart" itemscope itemtype="https://schema.org/CollectionPage">
                                 <span class="flex items-center gap-2 text-sm font-bold text-slate-800" itemprop="name">
-                                    <i class="fa-solid fa-folder-open text-[0.85em] text-emerald-700" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-folder-open text-[0.85em] text-emerald-700" />
                                     {{ $collection['name'] }}
                                 </span>
                                 <span class="mt-2 block text-xs leading-5 text-slate-600" itemprop="description">{{ $collection['description'] }}</span>
@@ -317,7 +317,7 @@
             @if ($semanticHubs->isNotEmpty())
                 <section id="semantic-hubs" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Тематические хабы">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-sitemap text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-sitemap text-emerald-700" />
                         <span>Тематические хабы</span>
                     </div>
                     <div class="mt-3 grid gap-3 lg:grid-cols-2">
@@ -328,7 +328,7 @@
                                 <div class="mt-3 flex flex-wrap gap-2">
                                     @foreach ($hub['items'] as $item)
                                         <a href="{{ $seoSearchUrl($item['query']) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                            <i class="fa-solid fa-link text-[0.8em] text-slate-400" aria-hidden="true"></i>
+                                            <x-ui.icon name="fa-solid fa-link text-[0.8em] text-slate-400" />
                                             <span>{{ $item['name'] }}</span>
                                         </a>
                                     @endforeach
@@ -341,13 +341,13 @@
             @if ($seoActions->isNotEmpty())
                 <section id="page-actions" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Действия на странице" itemscope itemtype="https://schema.org/SiteNavigationElement">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-bolt text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-bolt text-emerald-700" />
                         <span itemprop="name">Действия на странице</span>
                     </div>
                     <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
                         @foreach ($seoActions->take(16) as $action)
                             <a href="{{ $action['url'] }}" itemprop="url" class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                <i class="fa-solid fa-circle-arrow-right text-[0.85em] text-emerald-700" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-circle-arrow-right text-[0.85em] text-emerald-700" />
                                 <span itemprop="name">{{ $action['label'] ?? $action['name'] }}</span>
                             </a>
                         @endforeach
@@ -357,7 +357,7 @@
             @if ($snippetBlocks->isNotEmpty())
                 <section id="snippet-blocks" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Короткие тезисы страницы">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-quote-left text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-quote-left text-emerald-700" />
                         <span>Короткие тезисы</span>
                     </div>
                     <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -366,7 +366,7 @@
                                 <h2 class="text-sm font-bold text-slate-800">{{ $block['title'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $block['text'] }}</p>
                                 <a href="{{ $seoSearchUrl($block['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <i class="fa-solid fa-magnifying-glass text-[0.8em]" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-magnifying-glass text-[0.8em]" />
                                     <span>Найти: {{ $block['query'] }}</span>
                                 </a>
                             </article>
@@ -377,7 +377,7 @@
             @if ($contentSignals->isNotEmpty())
                 <section id="content-signals" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Сигналы страницы">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-chart-simple text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-chart-simple text-emerald-700" />
                         <span>Сигналы страницы</span>
                     </div>
                     <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -389,7 +389,7 @@
                                 </div>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $signal['description'] }}</p>
                                 <a href="{{ $seoSearchUrl($signal['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <i class="fa-solid fa-arrow-up-right-from-square text-[0.8em]" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-arrow-up-right-from-square text-[0.8em]" />
                                     <span>Открыть связанный поиск</span>
                                 </a>
                             </article>
@@ -400,7 +400,7 @@
             @if ($audiencePaths->isNotEmpty())
                 <section id="audience-paths" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Пути поиска">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-signs-post text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-signs-post text-emerald-700" />
                         <span>Пути поиска</span>
                     </div>
                     <div class="mt-3 grid gap-3 lg:grid-cols-2">
@@ -418,7 +418,7 @@
                                 <div class="mt-3 flex flex-wrap gap-2">
                                     @foreach ($path['items'] as $item)
                                         <a href="{{ $seoSearchUrl($item) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                            <i class="fa-solid fa-compass text-[0.8em] text-slate-400" aria-hidden="true"></i>
+                                            <x-ui.icon name="fa-solid fa-compass text-[0.8em] text-slate-400" />
                                             <span>{{ $item }}</span>
                                         </a>
                                     @endforeach
@@ -431,13 +431,13 @@
             @if ($alsoSearches->isNotEmpty())
                 <section id="also-searches" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Также ищут" itemscope itemtype="https://schema.org/SiteNavigationElement">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-binoculars text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-binoculars text-emerald-700" />
                         <span itemprop="name">Также ищут</span>
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($alsoSearches->take(36) as $query)
                             <a href="{{ $seoSearchUrl($query) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                <i class="fa-solid fa-magnifying-glass-plus text-[0.8em] text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-magnifying-glass-plus text-[0.8em] text-slate-400" />
                                 <span itemprop="name">{{ $query }}</span>
                             </a>
                         @endforeach
@@ -447,7 +447,7 @@
             @if ($discoverySignals->isNotEmpty() && request()->routeIs('stats'))
                 <section id="discovery-signals" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Индексация и обновления">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-satellite-dish text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-satellite-dish text-emerald-700" />
                         <span>Индексация и обновления</span>
                     </div>
                     <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -457,7 +457,7 @@
                                 <p class="mt-1 break-words text-xs font-semibold text-emerald-700">{{ $signal['value'] }}</p>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $signal['description'] }}</p>
                                 <a href="{{ $signal['url'] }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <i class="fa-solid fa-arrow-up-right-from-square text-[0.8em]" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-arrow-up-right-from-square text-[0.8em]" />
                                     <span>Открыть</span>
                                 </a>
                             </article>
@@ -468,7 +468,7 @@
             @if ($queryMatrix->isNotEmpty())
                 <section id="query-matrix" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Матрица запросов">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-table-cells-large text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-table-cells-large text-emerald-700" />
                         <span>Матрица запросов</span>
                     </div>
                     <div class="mt-3 grid gap-3 lg:grid-cols-2">
@@ -479,7 +479,7 @@
                                 <div class="mt-3 flex flex-wrap gap-2">
                                     @foreach ($group['items'] as $query)
                                         <a href="{{ $seoSearchUrl($query) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                            <i class="fa-solid fa-table-cells text-[0.8em] text-slate-400" aria-hidden="true"></i>
+                                            <x-ui.icon name="fa-solid fa-table-cells text-[0.8em] text-slate-400" />
                                             <span>{{ $query }}</span>
                                         </a>
                                     @endforeach
@@ -492,7 +492,7 @@
             @if ($mediaSignals->isNotEmpty())
                 <section id="media-signals" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Медиа и превью">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-photo-film text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-photo-film text-emerald-700" />
                         <span>Медиа и превью</span>
                     </div>
                     <div class="mt-3 grid gap-3 md:grid-cols-2">
@@ -501,7 +501,7 @@
                                 <h2 class="text-sm font-bold text-slate-800">{{ $signal['name'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $signal['description'] }}</p>
                                 <a href="{{ $signal['url'] }}" class="mt-3 inline-flex items-center gap-1 break-all text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <i class="fa-solid fa-arrow-up-right-from-square text-[0.8em]" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-arrow-up-right-from-square text-[0.8em]" />
                                     <span>{{ $signal['type'] === 'video' ? 'Открыть видео' : 'Открыть изображение' }}</span>
                                 </a>
                             </article>
@@ -512,7 +512,7 @@
             @if ($publisherSignals->isNotEmpty())
                 <section id="publisher-trust" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Доверие и индексация">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-shield-halved text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-shield-halved text-emerald-700" />
                         <span>Доверие и индексация</span>
                     </div>
                     <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -522,7 +522,7 @@
                                 <p class="mt-1 break-words text-xs font-semibold text-emerald-700">{{ $signal['value'] }}</p>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $signal['description'] }}</p>
                                 <a href="{{ $signal['url'] }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <i class="fa-solid fa-arrow-up-right-from-square text-[0.8em]" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-arrow-up-right-from-square text-[0.8em]" />
                                     <span>Открыть</span>
                                 </a>
                             </article>
@@ -533,7 +533,7 @@
             @if ($freshnessQueries->isNotEmpty())
                 <section id="freshness-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Актуальные запросы">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-clock-rotate-left text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-clock-rotate-left text-emerald-700" />
                         <span>Актуальные запросы {{ $currentSeoYear }}</span>
                     </div>
                     <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -542,7 +542,7 @@
                                 <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
                                 <a href="{{ $item['url'] }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <i class="fa-solid fa-arrow-up-right-from-square text-[0.8em]" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-arrow-up-right-from-square text-[0.8em]" />
                                     <span>{{ $item['query'] }}</span>
                                 </a>
                             </article>
@@ -553,13 +553,13 @@
             @if ($russianQueryVariants->isNotEmpty())
                 <section id="russian-query-variants" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Русские варианты поиска" itemscope itemtype="https://schema.org/SiteNavigationElement">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-language text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-language text-emerald-700" />
                         <span itemprop="name">Русские варианты поиска</span>
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($russianQueryVariants->take(42) as $query)
                             <a href="{{ $seoSearchUrl($query) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                <i class="fa-solid fa-spell-check text-[0.8em] text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-spell-check text-[0.8em] text-slate-400" />
                                 <span itemprop="name">{{ $query }}</span>
                             </a>
                         @endforeach
@@ -569,7 +569,7 @@
             @if ($catalogDirections->isNotEmpty())
                 <section id="catalog-directions" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Направления каталога">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-compass-drafting text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-compass-drafting text-emerald-700" />
                         <span>Направления каталога</span>
                     </div>
                     <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -578,7 +578,7 @@
                                 <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
                                 <a href="{{ $item['url'] }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <i class="fa-solid fa-arrow-up-right-from-square text-[0.8em]" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-arrow-up-right-from-square text-[0.8em]" />
                                     <span>{{ $item['query'] }}</span>
                                 </a>
                             </article>
@@ -589,7 +589,7 @@
             @if ($comparisonQueries->isNotEmpty())
                 <section id="comparison-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Похожие и сравнения">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-code-compare text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-code-compare text-emerald-700" />
                         <span>Похожие и сравнения</span>
                     </div>
                     <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -598,7 +598,7 @@
                                 <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
                                 <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <i class="fa-solid fa-magnifying-glass text-[0.8em]" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-magnifying-glass text-[0.8em]" />
                                     <span>{{ $item['query'] }}</span>
                                 </a>
                             </article>
@@ -609,7 +609,7 @@
             @if ($episodeIntentQueries->isNotEmpty())
                 <section id="episode-intents" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Серии и сезоны">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-film text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-film text-emerald-700" />
                         <span>Серии и сезоны</span>
                     </div>
                     <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -618,7 +618,7 @@
                                 <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
                                 <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <i class="fa-solid fa-magnifying-glass text-[0.8em]" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-magnifying-glass text-[0.8em]" />
                                     <span>{{ $item['query'] }}</span>
                                 </a>
                             </article>
@@ -629,7 +629,7 @@
             @if ($watchModeQueries->isNotEmpty())
                 <section id="watch-mode-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Способы просмотра">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-display text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-display text-emerald-700" />
                         <span>Способы просмотра</span>
                     </div>
                     <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -638,7 +638,7 @@
                                 <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
                                 <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <i class="fa-solid fa-play text-[0.8em]" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-play text-[0.8em]" />
                                     <span>{{ $item['query'] }}</span>
                                 </a>
                             </article>
@@ -649,7 +649,7 @@
             @if ($translationQueries->isNotEmpty())
                 <section id="translation-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Переводы и озвучки">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-microphone-lines text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-microphone-lines text-emerald-700" />
                         <span>Переводы и озвучки</span>
                     </div>
                     <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -658,7 +658,7 @@
                                 <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
                                 <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <i class="fa-solid fa-language text-[0.8em]" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-language text-[0.8em]" />
                                     <span>{{ $item['query'] }}</span>
                                 </a>
                             </article>
@@ -669,7 +669,7 @@
             @if ($voiceSearchQueries->isNotEmpty())
                 <section id="voice-search-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Голосовые запросы">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-comments text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-comments text-emerald-700" />
                         <span>Голосовые запросы</span>
                     </div>
                     <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -678,7 +678,7 @@
                                 <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
                                 <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <i class="fa-solid fa-magnifying-glass text-[0.8em]" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-magnifying-glass text-[0.8em]" />
                                     <span>{{ $item['query'] }}</span>
                                 </a>
                             </article>
@@ -689,7 +689,7 @@
             @if ($topicAuthoritySignals->isNotEmpty())
                 <section id="topic-authority-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Тематический авторитет">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-award text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-award text-emerald-700" />
                         <span>Тематический авторитет</span>
                     </div>
                     <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -698,7 +698,7 @@
                                 <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
                                 <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <i class="fa-solid fa-magnifying-glass text-[0.8em]" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-magnifying-glass text-[0.8em]" />
                                     <span>{{ $item['query'] }}</span>
                                 </a>
                             </article>
@@ -709,7 +709,7 @@
             @if ($releaseCalendarQueries->isNotEmpty())
                 <section id="release-calendar-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Календарь релизов">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-calendar-days text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-calendar-days text-emerald-700" />
                         <span>Календарь релизов</span>
                     </div>
                     <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -718,7 +718,7 @@
                                 <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
                                 <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
                                 <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <i class="fa-solid fa-clock text-[0.8em]" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-clock text-[0.8em]" />
                                     <span>{{ $item['query'] }}</span>
                                 </a>
                             </article>
@@ -729,7 +729,7 @@
             @if ($quickAnswers->isNotEmpty())
                 <section class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Быстрые ответы" id="quick-answers">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-circle-question text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-circle-question text-emerald-700" />
                         <span>Быстрые ответы</span>
                     </div>
                     <div class="mt-3 grid gap-3 lg:grid-cols-3">
@@ -745,7 +745,7 @@
             @if (! empty($seo['keyword_clusters']))
                 <section id="semantic-clusters" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Семантические кластеры">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-diagram-project text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-diagram-project text-emerald-700" />
                         <span>Семантические подборки</span>
                     </div>
                     <div class="mt-3 grid gap-3 md:grid-cols-3">
@@ -765,13 +765,13 @@
             @if (! empty($seo['search_phrases']))
                 <section id="popular-searches" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Популярные поисковые запросы">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <i class="fa-solid fa-magnifying-glass-chart text-emerald-700" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-magnifying-glass-chart text-emerald-700" />
                         <span>Популярные запросы</span>
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach (collect($seo['search_phrases'])->filter()->unique()->take(18) as $phrase)
                             <a href="{{ $seoSearchUrl($phrase) }}" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
-                                <i class="fa-solid fa-key text-[0.8em] text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-key text-[0.8em] text-slate-400" />
                                 <span>{{ $phrase }}</span>
                             </a>
                         @endforeach

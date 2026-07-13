@@ -41,14 +41,17 @@
                 @disabled(! $primaryAction->isPlayable())
                 class="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
             >
-                <i class="fa-solid fa-play" aria-hidden="true"></i>
+                <x-ui.icon name="fa-solid fa-play" />
                 <span>{{ $primaryAction->label }}</span>
             </button>
         </div>
 
         <div class="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.45fr)]">
             <div class="min-w-0">
-                <h3 class="mb-2 text-sm font-bold text-slate-700">{{ __('catalog.player.current') }}</h3>
+                <h3 class="mb-2 flex items-center gap-2 text-sm font-bold text-slate-700">
+                    <x-ui.icon name="fa-solid fa-circle-play" class="text-emerald-700" />
+                    <span>{{ __('catalog.player.current') }}</span>
+                </h3>
                 <div class="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-600">
                     @if ($selectedEpisode)
                         <x-ui.status-pill icon="fa-solid fa-circle-play" variant="success">
@@ -78,7 +81,7 @@
                             class="flex min-h-11 flex-wrap items-center justify-between gap-2 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800"
                         >
                             <span class="inline-flex items-center gap-2">
-                                <i data-player-status-icon class="fa-solid fa-circle-notch fa-spin text-emerald-700" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-circle-notch fa-spin text-emerald-700" data-player-status-icon />
                                 <span data-player-status-text>{{ __('catalog.player.preparing') }}</span>
                             </span>
                             <button
@@ -87,7 +90,7 @@
                                 hidden
                                 class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
                             >
-                                <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-rotate-right" />
                                 <span>{{ __('catalog.player.retry') }}</span>
                             </button>
                         </div>
@@ -113,7 +116,7 @@
                     <div wire:key="catalog-player-empty" class="mt-3 overflow-hidden rounded-lg border border-amber-200 bg-amber-50">
                         <div class="grid aspect-video place-items-center p-6 text-center text-amber-700">
                             <div>
-                                <i class="fa-solid fa-circle-play text-3xl text-amber-600" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-circle-play text-3xl text-amber-600" />
                                 <div class="mt-3 text-lg font-bold text-amber-800">{{ $playbackSource->message }}</div>
                                 <p class="mt-1 text-sm">{{ __('catalog.player.choose_another') }}</p>
                             </div>
@@ -139,7 +142,7 @@
                             data-catalog-history
                                 class="flex min-h-11 items-center gap-3 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
                             >
-                                <i class="fa-solid fa-arrow-left shrink-0" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-arrow-left" />
                                 <span class="min-w-0">
                                     <span class="block text-xs uppercase tracking-wide text-slate-400">{{ __('catalog.player.previous') }}</span>
                                     <span class="block break-words">{{ $this->episodeDisplayLabel($episodeNavigation->previous) }}</span>
@@ -159,7 +162,7 @@
                                     <span class="block text-xs uppercase tracking-wide text-slate-400">{{ __('catalog.player.next_short') }}</span>
                                     <span class="block break-words">{{ $this->episodeDisplayLabel($episodeNavigation->next) }}</span>
                                 </span>
-                                <i class="fa-solid fa-arrow-right shrink-0" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-arrow-right" />
                             </a>
                         @endif
                     </nav>
@@ -168,7 +171,7 @@
 
             <section class="rounded-lg bg-slate-50 p-4" aria-label="{{ __('catalog.player.personal_state') }}">
                 <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                    <i class="fa-solid fa-user-check text-emerald-700" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-user-check text-emerald-700" />
                     <span>{{ __('catalog.player.your_series') }}</span>
                 </div>
 
@@ -181,8 +184,8 @@
                             wire:target="setWatchlist"
                             class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700"
                         >
-                            <i wire:loading.remove wire:target="setWatchlist" class="{{ $inWatchlist ? 'fa-solid' : 'fa-regular' }} fa-bookmark" aria-hidden="true"></i>
-                            <i wire:loading wire:target="setWatchlist" class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+                            <x-ui.icon name="{{ $inWatchlist ? 'fa-solid' : 'fa-regular' }} fa-bookmark" wire:loading.remove wire:target="setWatchlist" />
+                            <x-ui.icon name="fa-solid fa-spinner fa-spin" wire:loading wire:target="setWatchlist" />
                             <span wire:loading.remove wire:target="setWatchlist">{{ $inWatchlist ? __('catalog.player.in_watchlist') : __('catalog.player.add_watchlist') }}</span>
                             <span wire:loading wire:target="setWatchlist">{{ __('catalog.player.saving') }}</span>
                         </button>
@@ -225,7 +228,10 @@
 
         @if ($selectedEpisode && $selectedEpisode->licensedMedia->count() > 1)
             <div class="mt-4">
-                <div class="text-sm font-bold text-slate-700">{{ __('catalog.player.settings') }}</div>
+                <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
+                    <x-ui.icon name="fa-solid fa-sliders" class="text-emerald-700" />
+                    <span>{{ __('catalog.player.settings') }}</span>
+                </div>
                 <div class="mt-2 text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('catalog.player.variant') }}</div>
                 <div class="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     @foreach ($selectedEpisode->licensedMedia as $episodeMedia)
@@ -278,7 +284,10 @@
             >
                 @if ($activeSeason)
                     <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                        <h3 class="font-bold text-slate-700">{{ $this->seasonDisplayLabel($activeSeason) }}</h3>
+                        <h3 class="flex items-center gap-2 font-bold text-slate-700">
+                            <x-ui.icon name="fa-solid fa-layer-group" class="text-emerald-700" />
+                            <span>{{ $this->seasonDisplayLabel($activeSeason) }}</span>
+                        </h3>
                         <x-ui.status-pill variant="muted">{{ $this->episodeCountLabel($episodes->count()) }}</x-ui.status-pill>
                     </div>
                 @endif
@@ -300,14 +309,14 @@
                         ])
                     >
                         <span class="flex items-start gap-2 font-bold">
-                            <i class="fa-solid fa-circle-play mt-0.5 text-emerald-700" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-circle-play text-emerald-700" align="start" />
                             <span>{{ $this->episodeDisplayLabel($episodeOption) }}</span>
                         </span>
                         @if ($episodeOption->title)
                             <span class="mt-1 block text-xs font-semibold text-slate-500">{{ $episodeOption->title }}</span>
                         @endif
                         <span class="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-slate-400">
-                            <i class="fa-solid fa-file-video" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-file-video" />
                             <span class="tabular-nums">{{ trans_choice('catalog.counts.videos', $showView->episodeMediaItems($episodeOption)->count()) }}</span>
                         </span>
                     </a>
@@ -324,7 +333,7 @@
     </x-ui.panel>
 
     <div wire:loading.delay class="rounded-lg bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700" role="status">
-        <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+        <x-ui.icon name="fa-solid fa-spinner fa-spin" />
         <span>{{ __('catalog.player.updating_episodes') }}</span>
     </div>
 </div>

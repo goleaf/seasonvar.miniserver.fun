@@ -58,12 +58,9 @@ class CatalogHomePageBuilder
             ->get();
         $videoTitles = $this->titleSummaryQuery()
             ->with($this->taxonomies->cardSummaryLoads())
-            ->whereIn('id', LicensedMedia::query()
+            ->whereHas('licensedMedia', fn (Builder $query): Builder => $query
                 ->published()
-                ->forAvailableReleases(null)
-                ->whereNotNull('catalog_title_id')
-                ->select('catalog_title_id'))
-            ->orderByDesc('published_media_count')
+                ->forAvailableReleases(null))
             ->latest('indexed_at')
             ->limit(8)
             ->get();

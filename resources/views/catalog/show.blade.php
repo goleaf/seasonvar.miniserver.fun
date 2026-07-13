@@ -7,7 +7,7 @@
                 <div class="bg-slate-50 px-4 py-3">
                     <div class="flex items-center gap-2">
                         <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-emerald-50 text-emerald-700">
-                            <i class="fa-solid fa-compass" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-compass" />
                         </span>
                         <h2 class="text-sm font-bold text-slate-700">{{ __('catalog.title.quick_access') }}</h2>
                     </div>
@@ -15,17 +15,17 @@
                 <div class="space-y-4 p-4">
                     <nav aria-label="{{ __('catalog.title.quick_navigation') }}" class="-mx-2 grid gap-1">
                         <a data-title-quick-link href="#player" class="relative inline-flex min-h-11 items-center gap-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-black text-emerald-700 before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-full before:bg-emerald-600 hover:bg-emerald-100">
-                            <i class="fa-solid fa-circle-play w-4 text-center" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-circle-play" />
                             <span>{{ __('catalog.title.watch') }}</span>
                         </a>
 
                         <a data-title-quick-link href="#seasons" class="inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-700">
-                            <i class="fa-solid fa-layer-group w-4 text-center text-slate-400" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-layer-group text-slate-400" />
                             <span>{{ __('catalog.title.seasons') }}</span>
                         </a>
 
                         <a data-title-quick-link href="#data-title-reference" class="inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-700">
-                            <i class="fa-solid fa-circle-info w-4 text-center text-slate-400" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-circle-info text-slate-400" />
                             <span>{{ __('catalog.title.about') }}</span>
                         </a>
                     </nav>
@@ -34,7 +34,7 @@
                         <div class="rounded-lg bg-slate-50 px-3 py-2">
                             <div class="flex items-center justify-between gap-2">
                                 <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('catalog.title.seasons') }}</div>
-                                <i class="fa-solid fa-layer-group text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-layer-group text-slate-400" />
                             </div>
                             <div class="mt-1 text-lg font-black tabular-nums text-slate-800">{{ $showView->parsedSeasonCount }}</div>
                         </div>
@@ -42,7 +42,7 @@
                         <div class="rounded-lg bg-slate-50 px-3 py-2">
                             <div class="flex items-center justify-between gap-2">
                                 <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('catalog.title.episodes') }}</div>
-                                <i class="fa-solid fa-list-ol text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-list-ol text-slate-400" />
                             </div>
                             <div class="mt-1 text-lg font-black tabular-nums text-slate-800">{{ $showView->episodeCount }}</div>
                         </div>
@@ -50,7 +50,7 @@
                         <div class="rounded-lg bg-slate-50 px-3 py-2">
                             <div class="flex items-center justify-between gap-2">
                                 <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('catalog.title.video') }}</div>
-                                <i class="fa-solid fa-file-video text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-file-video text-slate-400" />
                             </div>
                             <div class="mt-1 text-lg font-black tabular-nums text-slate-800">{{ $showView->mediaCount }}</div>
                         </div>
@@ -64,7 +64,7 @@
             <x-ui.panel data-title-hero :pad="false" class="overflow-hidden border-emerald-100">
                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
                     <a href="{{ route('titles.index') }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
-                        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-arrow-left" />
                         <span>{{ __('catalog.title.back_to_catalog') }}</span>
                     </a>
                 </div>
@@ -74,7 +74,7 @@
 
                     <div class="min-w-0">
                         <h1 class="flex min-w-0 items-start gap-3 text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">
-                            <i class="fa-solid fa-clapperboard mt-1 text-emerald-700" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-clapperboard text-emerald-700" align="start" />
                             <span class="min-w-0 break-words">{{ $showView->displayTitle }}</span>
                         </h1>
                         @if ($showView->displayOriginalTitle !== '')
@@ -95,7 +95,7 @@
 
                         <section class="mt-5 rounded-control border border-slate-200 bg-white p-4">
                             <h2 class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                                <i class="fa-solid fa-book-open text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-book-open text-slate-400" />
                                 <span>{{ __('catalog.title.description') }}</span>
                             </h2>
                             <p class="mt-2 text-sm leading-6 text-slate-600">{{ $showView->displayDescription !== '' ? $showView->displayDescription : __('catalog.title.description_missing') }}</p>
@@ -111,7 +111,7 @@
                 @if ($actors->isNotEmpty())
                     <div>
                         <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
-                            <i class="fa-solid fa-user-group text-slate-400" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-user-group text-slate-400" />
                             <span>{{ __('catalog.title.cast') }}</span>
                         </div>
                         <div class="mt-2 flex flex-wrap gap-2">
@@ -127,7 +127,7 @@
                         @if ($row['items']->isNotEmpty())
                             <div class="grid gap-2 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
                                 <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
-                                    <i class="{{ $row['icon'] ?? 'fa-solid fa-tag' }} text-slate-400" aria-hidden="true"></i>
+                                    <x-ui.icon name="{{ $row['icon'] ?? 'fa-solid fa-tag' }} text-slate-400" />
                                     <span>{{ $row['label'] }}</span>
                                 </dt>
                                 <dd class="flex flex-wrap gap-1.5">
@@ -141,7 +141,7 @@
                     @if ($aliases->isNotEmpty())
                         <div class="grid gap-2 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
                             <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
-                                <i class="fa-solid fa-signature text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-signature text-slate-400" />
                                 <span>{{ __('catalog.title.other_names') }}</span>
                             </dt>
                             <dd class="flex flex-wrap gap-1.5">
@@ -154,7 +154,7 @@
                     @if ($ratings->isNotEmpty())
                         <div class="grid gap-2 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
                             <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
-                                <i class="fa-solid fa-star text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-star text-slate-400" />
                                 <span>{{ __('catalog.title.ratings') }}</span>
                             </dt>
                             <dd class="flex flex-wrap gap-1.5">
@@ -168,7 +168,10 @@
                     @endif
                     @if ($title->year)
                         <div class="grid gap-2 py-3 sm:grid-cols-[120px_minmax(0,1fr)]">
-                            <dt class="font-bold text-slate-500">{{ __('catalog.title.released') }}</dt>
+                            <dt class="inline-flex items-center gap-2 font-bold text-slate-500">
+                                <x-ui.icon name="fa-solid fa-calendar-days" class="text-slate-400" />
+                                <span>{{ __('catalog.title.released') }}</span>
+                            </dt>
                             <dd><a href="{{ route('titles.year', ['year' => $title->year]) }}" class="font-bold text-emerald-700">{{ $title->year }}</a></dd>
                         </div>
                     @endif
@@ -194,7 +197,7 @@
                                     <div class="mt-2 flex flex-wrap gap-1 text-xs font-bold">
                                         @foreach ($recommendedTitleRecommendations->first()->reasonLabels() as $reasonLabel)
                                             <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
-                                                <i class="fa-solid fa-check text-[0.8em]" aria-hidden="true"></i>
+                                                <x-ui.icon name="fa-solid fa-check text-[0.8em]" />
                                                 <span>{{ $reasonLabel }}</span>
                                             </span>
                                         @endforeach
@@ -205,7 +208,7 @@
                             @if ($recommendedTitleRecommendations->skip(1)->take(4)->isNotEmpty())
                                 <div class="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white">
                                     <div class="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-700">
-                                        <i class="fa-solid fa-ranking-star text-emerald-700" aria-hidden="true"></i>
+                                        <x-ui.icon name="fa-solid fa-ranking-star text-emerald-700" />
                                         <span>{{ __('catalog.title.closest_matches') }}</span>
                                     </div>
                                     <div class="divide-y divide-slate-200">
@@ -217,7 +220,7 @@
                                                     <div class="flex flex-wrap gap-1 px-3 pb-3 text-xs font-bold">
                                                         @foreach ($recommendation->reasonLabels() as $reasonLabel)
                                                             <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-600">
-                                                                <i class="fa-solid fa-check text-[0.8em] text-emerald-700" aria-hidden="true"></i>
+                                                                <x-ui.icon name="fa-solid fa-check text-[0.8em] text-emerald-700" />
                                                                 <span>{{ $reasonLabel }}</span>
                                                             </span>
                                                         @endforeach
@@ -240,7 +243,7 @@
                                             <div class="mt-2 flex flex-wrap gap-1 text-xs font-bold">
                                                 @foreach ($recommendation->reasonLabels() as $reasonLabel)
                                                     <span class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-slate-600">
-                                                        <i class="fa-solid fa-check text-[0.8em] text-emerald-700" aria-hidden="true"></i>
+                                                        <x-ui.icon name="fa-solid fa-check text-[0.8em] text-emerald-700" />
                                                         <span>{{ $reasonLabel }}</span>
                                                     </span>
                                                 @endforeach
@@ -261,7 +264,7 @@
                                 ])>
                                     <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
                                         <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
-                                            <i class="fa-solid fa-tags text-emerald-700" aria-hidden="true"></i>
+                                            <x-ui.icon name="fa-solid fa-tags text-emerald-700" />
                                             <span>{{ __('catalog.title.similar_genres') }}</span>
                                         </div>
                                     </div>
@@ -277,7 +280,7 @@
                                 <section class="min-w-0">
                                     <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
                                         <div class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
-                                            <i class="fa-solid fa-calendar-days text-emerald-700" aria-hidden="true"></i>
+                                            <x-ui.icon name="fa-solid fa-calendar-days text-emerald-700" />
                                             <span>{{ __('catalog.title.same_year', ['year' => $title->year]) }}</span>
                                         </div>
                                     </div>
@@ -293,7 +296,7 @@
                         <div class="p-3">
                             <div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
                                 <div class="inline-flex items-center gap-2">
-                                    <i class="fa-solid fa-circle-info text-slate-400" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-circle-info text-slate-400" />
                                     <span>{{ __('catalog.title.recommendations_missing') }}</span>
                                 </div>
                             </div>
@@ -309,7 +312,7 @@
                             <details class="group px-4 py-3">
                                 <summary class="flex cursor-pointer list-none items-center justify-between gap-3 font-bold text-slate-700">
                                     <span>{{ $faqItem['question'] }}</span>
-                                    <i class="fa-solid fa-chevron-down text-slate-400 transition group-open:rotate-180" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-chevron-down text-slate-400 transition group-open:rotate-180" />
                                 </summary>
                                 <p class="mt-2 text-sm leading-6 text-slate-600">{{ $faqItem['answer'] }}</p>
                             </details>

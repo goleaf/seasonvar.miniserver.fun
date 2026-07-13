@@ -7,7 +7,7 @@
         <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div class="min-w-0">
                 <h1 class="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">
-                    <i class="fa-solid fa-cloud-arrow-down text-emerald-700" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-cloud-arrow-down text-emerald-700" />
                     <span>{{ __('catalog.importer.title') }}</span>
                 </h1>
                 <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
@@ -24,7 +24,7 @@
                     wire:target="recoverStaleImports"
                     class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-amber-50 px-4 py-2.5 text-sm font-bold text-amber-800 hover:bg-amber-100 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
                 >
-                    <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-triangle-exclamation" />
                     <span wire:loading.remove wire:target="recoverStaleImports">{{ __('catalog.importer.recover') }}</span>
                     <span wire:loading wire:target="recoverStaleImports">{{ __('catalog.importer.checking') }}</span>
                 </button>
@@ -34,14 +34,14 @@
 
     @if ($notice)
         <div role="status" class="flex items-start gap-2 rounded-control bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
-            <i class="fa-solid fa-circle-check mt-0.5 shrink-0" aria-hidden="true"></i>
+            <x-ui.icon name="fa-solid fa-circle-check" align="start" />
             <span class="min-w-0 break-words">{{ $notice }}</span>
         </div>
     @endif
 
     @error('run')
         <div role="alert" class="flex items-start gap-2 rounded-control border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
-            <i class="fa-solid fa-circle-exclamation mt-0.5 shrink-0" aria-hidden="true"></i>
+            <x-ui.icon name="fa-solid fa-circle-exclamation" align="start" />
             <span class="min-w-0 break-words">{{ $message }}</span>
         </div>
     @enderror
@@ -51,7 +51,7 @@
             @foreach ($mediaHealth as $health)
                 <div wire:key="media-health-{{ $health['status'] }}" class="rounded-control bg-slate-50 p-3">
                     <div class="flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
-                        <i class="{{ $health['icon'] }} {{ $health['tone'] }}" aria-hidden="true"></i>
+                        <x-ui.icon name="{{ $health['icon'] }} {{ $health['tone'] }}" />
                         <span>{{ $health['label'] }}</span>
                     </div>
                     <div class="mt-1 text-xl font-black tabular-nums text-slate-800">{{ $health['count'] }}</div>
@@ -59,7 +59,7 @@
             @endforeach
         </div>
         <div class="mt-3 flex items-center gap-2 text-sm font-semibold text-slate-600">
-            <i class="fa-solid fa-clock-rotate-left text-sky-700" aria-hidden="true"></i>
+            <x-ui.icon name="fa-solid fa-clock-rotate-left text-sky-700" />
             <span>{{ __('catalog.importer.health_due', ['count' => $mediaDueCount]) }}</span>
         </div>
     </x-ui.panel>
@@ -84,8 +84,8 @@
                 @disabled($hasActiveRun)
                 class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 lg:w-auto"
             >
-                <i wire:loading.remove wire:target="startImport" class="fa-solid fa-play" aria-hidden="true"></i>
-                <i wire:loading wire:target="startImport" class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+                <x-ui.icon name="fa-solid fa-play" wire:loading.remove wire:target="startImport" />
+                <x-ui.icon name="fa-solid fa-spinner fa-spin" wire:loading wire:target="startImport" />
                 <span wire:loading.remove wire:target="startImport">{{ __('catalog.importer.queue') }}</span>
                 <span wire:loading wire:target="startImport">{{ __('catalog.importer.queueing') }}</span>
             </button>
@@ -94,7 +94,7 @@
 
     <x-ui.panel :title="__('catalog.importer.runs')" :subtitle="trans_choice('catalog.counts.import_runs', count($runs))" icon="fa-solid fa-list-check" :pad="false">
         <div wire:loading.flex wire:target="refreshRuns,retryImport,cancelImport" class="min-h-24 items-center justify-center gap-2 px-4 py-8 text-sm font-semibold text-slate-500">
-            <i class="fa-solid fa-spinner fa-spin text-emerald-700" aria-hidden="true"></i>
+            <x-ui.icon name="fa-solid fa-spinner fa-spin text-emerald-700" />
             <span>{{ __('catalog.importer.updating') }}</span>
         </div>
 
@@ -114,17 +114,17 @@
                                     'bg-slate-100 text-slate-600' => $run['tone'] === 'muted',
                                 ])>
                                     @if ($run['status'] === 'running')
-                                        <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+                                        <x-ui.icon name="fa-solid fa-spinner fa-spin" />
                                     @elseif ($run['status'] === 'completed')
-                                        <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                                        <x-ui.icon name="fa-solid fa-circle-check" />
                                     @elseif ($run['status'] === 'failed')
-                                        <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+                                        <x-ui.icon name="fa-solid fa-circle-exclamation" />
                                     @elseif ($run['status'] === 'partial')
-                                        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                                        <x-ui.icon name="fa-solid fa-triangle-exclamation" />
                                     @elseif ($run['status'] === 'cancelled')
-                                        <i class="fa-solid fa-ban" aria-hidden="true"></i>
+                                        <x-ui.icon name="fa-solid fa-ban" />
                                     @else
-                                        <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                                        <x-ui.icon name="fa-solid fa-clock" />
                                     @endif
                                     <span>{{ $run['status_label'] }}</span>
                                 </span>
@@ -156,7 +156,7 @@
                                     wire:target="retryImport({{ $run['id'] }})"
                                     class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-sky-50 px-4 py-2 text-sm font-bold text-sky-700 hover:bg-sky-100 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
                                 >
-                                    <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-rotate-right" />
                                     <span>{{ __('catalog.importer.retry') }}</span>
                                 </button>
                             @endif
@@ -169,7 +169,7 @@
                                     wire:target="cancelImport({{ $run['id'] }})"
                                     class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-rose-50 px-4 py-2 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
                                 >
-                                    <i class="fa-solid fa-ban" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-ban" />
                                     <span>{{ __('catalog.importer.cancel') }}</span>
                                 </button>
                             @endif
@@ -189,7 +189,7 @@
                         ] as $count)
                             <div wire:key="seasonvar-run-{{ $run['id'] }}-{{ $count['label'] }}" class="rounded-control bg-slate-50 p-3">
                                 <div class="flex items-center gap-2 text-xs font-bold uppercase text-slate-400">
-                                    <i class="{{ $count['icon'] }} {{ $count['tone'] }}" aria-hidden="true"></i>
+                                    <x-ui.icon name="{{ $count['icon'] }} {{ $count['tone'] }}" />
                                     <span>{{ $count['label'] }}</span>
                                 </div>
                                 <div class="mt-1 text-xl font-black tabular-nums text-slate-800">{{ $count['value'] }}</div>
@@ -212,7 +212,7 @@
                 </article>
             @empty
                 <div class="px-4 py-10 text-center text-sm text-slate-500">
-                    <i class="fa-solid fa-inbox text-3xl text-slate-300" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-inbox text-3xl text-slate-300" />
                     <p class="mt-3">{{ __('catalog.importer.empty') }}</p>
                 </div>
             @endforelse

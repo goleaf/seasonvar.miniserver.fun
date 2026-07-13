@@ -11,7 +11,7 @@
     @else
         <div class="{{ $emptyClass }}">
             <span class="inline-flex flex-col items-center gap-1">
-                <i class="fa-regular fa-image text-lg text-slate-300" aria-hidden="true"></i>
+                <x-ui.icon name="fa-regular fa-image text-lg text-slate-300" />
                 @if ($emptyLabel !== '')
                     <span>{{ $emptyLabel }}</span>
                 @endif

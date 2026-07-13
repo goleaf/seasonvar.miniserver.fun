@@ -37,19 +37,19 @@
                                         <div class="mt-2 flex flex-wrap gap-1 text-xs font-semibold">
                                             @if ($media->season)
                                                 <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
-                                                    <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                                                    <x-ui.icon name="fa-solid fa-layer-group" />
                                                     <span>Сезон {{ $media->season->number }}</span>
                                                 </span>
                                             @endif
                                             @if ($media->episode)
                                                 <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700">
-                                                    <i class="fa-solid fa-list-ol" aria-hidden="true"></i>
+                                                    <x-ui.icon name="fa-solid fa-list-ol" />
                                                     <span>{{ $media->episode->number }} серия</span>
                                                 </span>
                                             @endif
                                             @if ($media->quality)
                                                 <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700">
-                                                    <i class="fa-solid fa-display" aria-hidden="true"></i>
+                                                    <x-ui.icon name="fa-solid fa-display" />
                                                     <span>{{ strtoupper($media->quality) }}</span>
                                                 </span>
                                             @endif
@@ -84,7 +84,7 @@
                     <div class="divide-y divide-slate-200">
                         @forelse ($latestByDate as $date => $titlesForDate)
                             <div class="flex items-center gap-2 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600">
-                                <i class="fa-solid fa-calendar-days text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-calendar-days text-slate-400" />
                                 <span>{{ $date }}</span>
                             </div>
 
@@ -104,17 +104,17 @@
                 <x-ui.panel title="Навигация" icon="fa-solid fa-compass">
                     <nav class="space-y-2">
                         <a href="{{ route('titles.index') }}" class="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100">
-                            <i class="fa-solid fa-list" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-list" />
                             <span>Все сериалы</span>
                         </a>
                         <a href="{{ route('titles.year', ['year' => now()->year]) }}" class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
-                            <i class="fa-solid fa-star" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-star" />
                             <span>Новинки</span>
                         </a>
                         @if (($subtitleTag?->catalog_titles_count ?? 0) > 0)
                             <a href="{{ route('titles.index', ['tag' => 'subtitry']) }}" class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                                 <span class="inline-flex items-center gap-2">
-                                    <i class="fa-solid fa-closed-captioning" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-closed-captioning" />
                                     <span>С субтитрами</span>
                                 </span>
                                 <span class="text-xs text-slate-400">{{ $subtitleTag->catalog_titles_count }}</span>
@@ -123,7 +123,7 @@
                             <x-ui.taxonomy-chip muted count="0" icon="fa-solid fa-closed-captioning">С субтитрами</x-ui.taxonomy-chip>
                         @endif
                         <a href="{{ route('titles.index', ['genre' => 'otecestvennye']) }}" class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
-                            <i class="fa-solid fa-flag" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-flag" />
                             <span>Отечественные</span>
                         </a>
                     </nav>
@@ -134,7 +134,7 @@
                         @forelse ($countries->take(12) as $country)
                             <a href="{{ route('titles.taxonomy', ['type' => $country->filterType(), 'taxonomy' => $country->slug]) }}" class="flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                                 <span class="inline-flex min-w-0 items-center gap-2">
-                                    <i class="fa-solid fa-earth-europe text-slate-400" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-earth-europe text-slate-400" />
                                     <span class="min-w-0 break-words">{{ $country->name }}</span>
                                 </span>
                                 <span class="shrink-0 text-xs text-slate-500">{{ $country->catalog_titles_count }}</span>
@@ -147,13 +147,13 @@
                         <details class="group mt-3 rounded-control border border-slate-200 bg-slate-50">
                             <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 font-bold text-slate-700">
                                 <span>Показать все страны</span>
-                                <i class="fa-solid fa-chevron-down transition group-open:rotate-180" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-chevron-down transition group-open:rotate-180" />
                             </summary>
                             <div class="grid gap-2 border-t border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-1">
                                 @foreach ($countries->skip(12) as $country)
                                     <a href="{{ route('titles.taxonomy', ['type' => $country->filterType(), 'taxonomy' => $country->slug]) }}" class="flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                                         <span class="inline-flex min-w-0 items-center gap-2">
-                                            <i class="fa-solid fa-earth-europe text-slate-400" aria-hidden="true"></i>
+                                            <x-ui.icon name="fa-solid fa-earth-europe text-slate-400" />
                                             <span class="min-w-0 break-words">{{ $country->name }}</span>
                                         </span>
                                         <span class="shrink-0 text-xs text-slate-500">{{ $country->catalog_titles_count }}</span>
@@ -178,7 +178,7 @@
                     <div class="flex flex-wrap gap-2">
                         @forelse ($yearBuckets as $bucket)
                             <a href="{{ route('titles.year', ['year' => $bucket->year]) }}" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
-                                <i class="fa-solid fa-calendar-days text-[0.8em] text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-calendar-days text-[0.8em] text-slate-400" />
                                 <span>{{ $bucket->year }}</span>
                                 <span class="text-slate-400">{{ $bucket->titles_count }}</span>
                             </a>

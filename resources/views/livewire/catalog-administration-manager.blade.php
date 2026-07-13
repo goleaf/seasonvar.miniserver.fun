@@ -3,13 +3,13 @@
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="min-w-0">
                 <h1 class="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">
-                    <i class="fa-solid fa-screwdriver-wrench text-emerald-700" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-screwdriver-wrench text-emerald-700" />
                     <span>Управление каталогом</span>
                 </h1>
                 <p class="mt-2 text-sm leading-6 text-slate-600">Редакционные поля, публикация, связи, сезоны, серии и разрешённые видеоисточники.</p>
             </div>
             <a href="{{ route('admin.imports') }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                <i class="fa-solid fa-cloud-arrow-down" aria-hidden="true"></i>
+                <x-ui.icon name="fa-solid fa-cloud-arrow-down" />
                 <span>Запуски импорта</span>
             </a>
         </div>
@@ -22,7 +22,7 @@
     @if ($errors->isNotEmpty())
         <div role="alert" class="rounded-control border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
             <div class="flex items-start gap-2">
-                <i class="fa-solid fa-circle-exclamation mt-0.5" aria-hidden="true"></i>
+                <x-ui.icon name="fa-solid fa-circle-exclamation" align="start" />
                 <div class="space-y-1">
                     @foreach ($errors->all() as $message)
                         <p>{{ $message }}</p>
@@ -36,13 +36,13 @@
         <div class="border-b border-slate-200 p-4">
             <label class="block text-sm font-bold text-slate-700" for="catalog-admin-search">Поиск сериала</label>
             <div class="relative mt-2">
-                <i class="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-3.5 text-slate-400" aria-hidden="true"></i>
+                <x-ui.icon name="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-3.5 text-slate-400" />
                 <input id="catalog-admin-search" type="search" wire:model.live.debounce.500ms="search" maxlength="80" class="min-h-11 w-full rounded-control border border-slate-300 bg-white py-2 pl-10 pr-3 text-sm text-slate-700 focus:border-emerald-600 focus:outline-none" placeholder="Название, slug, внешний ID или внутренний ID">
             </div>
         </div>
 
         <div wire:loading.flex wire:target="search,selectTitle" class="min-h-24 items-center justify-center gap-2 p-6 text-sm font-semibold text-slate-500">
-            <i class="fa-solid fa-spinner fa-spin text-emerald-700" aria-hidden="true"></i>
+            <x-ui.icon name="fa-solid fa-spinner fa-spin text-emerald-700" />
             <span>Загружаем каталог…</span>
         </div>
 
@@ -123,10 +123,10 @@
 
                 <div class="flex flex-wrap gap-2">
                     <button type="submit" wire:loading.attr="disabled" wire:target="saveTitle" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:opacity-60">
-                        <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i><span>Сохранить сериал</span>
+                        <x-ui.icon name="fa-solid fa-floppy-disk" /><span>Сохранить сериал</span>
                     </button>
                     <button type="button" wire:click="archiveTitle" wire:confirm="Скрыть сериал? Сезоны, серии, оценки, список просмотра и история останутся в базе." wire:loading.attr="disabled" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-rose-50 px-4 py-2 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-60">
-                        <i class="fa-solid fa-eye-slash" aria-hidden="true"></i><span>Скрыть без удаления</span>
+                        <x-ui.icon name="fa-solid fa-eye-slash" /><span>Скрыть без удаления</span>
                     </button>
                 </div>
             </form>
@@ -143,7 +143,7 @@
                         <div class="mt-2 flex flex-wrap gap-2">
                             @forelse ($group['selected'] as $relation)
                                 <button type="button" wire:key="admin-relation-{{ $type }}-{{ $relation->id }}" wire:click="detachRelation('{{ $type }}', {{ $relation->id }})" wire:confirm="Убрать связь «{{ $relation->name }}»?" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-rose-50 hover:text-rose-700">
-                                    <span>{{ $relation->name }}</span><i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                                    <span>{{ $relation->name }}</span><x-ui.icon name="fa-solid fa-xmark" />
                                 </button>
                             @empty
                                 <span class="text-xs font-semibold text-slate-500">Связей пока нет.</span>
@@ -171,7 +171,7 @@
                     <label class="text-sm font-bold text-slate-700">Slug
                         <input type="text" wire:model="lookupForm.slug" maxlength="255" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 font-normal">
                     </label>
-                    <button type="submit" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600"><i class="fa-solid fa-plus" aria-hidden="true"></i><span>Создать</span></button>
+                    <button type="submit" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600"><x-ui.icon name="fa-solid fa-plus" /><span>Создать</span></button>
                 </form>
             @endif
         </x-ui.panel>
@@ -179,7 +179,7 @@
         <div class="grid gap-5 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
             <x-ui.panel title="Сезоны" subtitle="Обычные сезоны и спецсезоны имеют независимые номера." icon="fa-solid fa-layer-group" :pad="false">
                 <div class="border-b border-slate-200 p-3">
-                    <button type="button" wire:click="newSeason" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"><i class="fa-solid fa-plus" aria-hidden="true"></i><span>Новый сезон</span></button>
+                    <button type="button" wire:click="newSeason" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"><x-ui.icon name="fa-solid fa-plus" /><span>Новый сезон</span></button>
                 </div>
                 @forelse ($seasons as $season)
                     <button type="button" wire:key="admin-season-{{ $season->id }}" wire:click="editSeason({{ $season->id }})" @class([
@@ -222,7 +222,7 @@
         @if ($activeSeason)
             <div class="grid gap-5 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
                 <x-ui.panel title="Серии выбранного сезона" icon="fa-solid fa-list-ol" :pad="false">
-                    <div class="border-b border-slate-200 p-3"><button type="button" wire:click="newEpisode" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"><i class="fa-solid fa-plus" aria-hidden="true"></i><span>Новая серия</span></button></div>
+                    <div class="border-b border-slate-200 p-3"><button type="button" wire:click="newEpisode" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"><x-ui.icon name="fa-solid fa-plus" /><span>Новая серия</span></button></div>
                     @forelse ($episodes as $episode)
                         <button type="button" wire:key="admin-episode-{{ $episode->id }}" wire:click="editEpisode({{ $episode->id }})" @class(['grid w-full gap-1 border-b border-slate-200 px-4 py-3 text-left last:border-b-0', 'bg-emerald-50' => $activeEpisode?->id === $episode->id, 'hover:bg-slate-50' => $activeEpisode?->id !== $episode->id])>
                             <span class="text-sm font-black text-slate-700">{{ $releaseKindLabels[$episode->kind->value] }} {{ $episode->number }} · {{ $episode->title ?: 'Без названия' }}</span>
@@ -259,7 +259,7 @@
         @if ($activeEpisode)
             <div class="grid gap-5 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
                 <x-ui.panel title="Видеоисточники серии" subtitle="Сохранённые provider URL не выводятся; для нового источника разрешён только HTTPS host из playback allowlist." icon="fa-solid fa-circle-play" :pad="false">
-                    <div class="border-b border-slate-200 p-3"><button type="button" wire:click="newMedia" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"><i class="fa-solid fa-plus" aria-hidden="true"></i><span>Новый источник</span></button></div>
+                    <div class="border-b border-slate-200 p-3"><button type="button" wire:click="newMedia" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"><x-ui.icon name="fa-solid fa-plus" /><span>Новый источник</span></button></div>
                     @forelse ($mediaItems as $media)
                         <button type="button" wire:key="admin-media-{{ $media->id }}" wire:click="editMedia({{ $media->id }})" @class(['grid w-full gap-1 border-b border-slate-200 px-4 py-3 text-left last:border-b-0', 'bg-emerald-50' => $editingMediaId === $media->id, 'hover:bg-slate-50' => $editingMediaId !== $media->id])>
                             <span class="text-sm font-black text-slate-700">{{ $media->title }}</span>

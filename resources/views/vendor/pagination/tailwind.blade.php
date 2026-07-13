@@ -9,12 +9,12 @@
         <div class="flex flex-wrap items-center gap-1.5">
             @if ($paginator->onFirstPage())
                 <span aria-disabled="true" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-400">
-                    <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-chevron-left" />
                     <span>{{ __('pagination.previous') }}</span>
                 </span>
             @else
                 <a href="{{ $paginator->previousPageUrl() }}" rel="prev" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
-                    <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-chevron-left" />
                     <span>{{ __('pagination.previous') }}</span>
                 </a>
             @endif
@@ -38,12 +38,12 @@
             @if ($paginator->hasMorePages())
                 <a href="{{ $paginator->nextPageUrl() }}" rel="next" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                     <span>{{ __('pagination.next') }}</span>
-                    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-chevron-right" />
                 </a>
             @else
                 <span aria-disabled="true" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-400">
                     <span>{{ __('pagination.next') }}</span>
-                    <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-chevron-right" />
                 </span>
             @endif
         </div>

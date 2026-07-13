@@ -37,6 +37,23 @@
         content-visibility: auto;
         contain-intrinsic-size: 24rem;
     }
+
+    .ui-icon {
+        display: inline-flex;
+        inline-size: 1.25em;
+        block-size: 1em;
+        flex: 0 0 auto;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    .ui-icon--start {
+        align-self: flex-start;
+        margin-block-start: 0.125em;
+    }
 }
 
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {

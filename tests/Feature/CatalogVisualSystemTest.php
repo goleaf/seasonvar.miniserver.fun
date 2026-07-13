@@ -91,6 +91,16 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertNotContains('auto-rows-fr', $classes);
     }
 
+    public function test_catalog_heading_does_not_repeat_the_generated_collection_explanation(): void
+    {
+        CatalogTitle::factory()->count(2)->create();
+
+        $this->get(route('titles.index'))
+            ->assertOk()
+            ->assertDontSeeText('сериалов в подборке')
+            ->assertDontSeeText('Выдача учитывает названия, оригинальные названия, алиасы, описания, жанры, страны, актеров и режиссеров.');
+    }
+
     public function test_title_page_places_player_before_secondary_reference_metadata(): void
     {
         $title = CatalogTitle::factory()->create();

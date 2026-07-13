@@ -32,6 +32,12 @@ class FrontendAssetContractTest extends TestCase
         $this->assertStringContainsString('textarea,', $styles);
         $this->assertStringContainsString('outline: 2px solid var(--color-emerald-700)', $styles);
         $this->assertStringContainsString('[data-focus-frame]:focus-within', $styles);
+        $this->assertStringContainsString('.ui-icon {', $styles);
+        $this->assertStringContainsString('inline-size: 1.25em', $styles);
+        $this->assertStringContainsString('block-size: 1em', $styles);
+        $this->assertStringContainsString('flex: 0 0 auto', $styles);
+        $this->assertStringContainsString('.ui-icon--start {', $styles);
+        $this->assertStringContainsString('margin-block-start: 0.125em', $styles);
     }
 
     public function test_player_assets_define_one_cleanup_safe_livewire_session_lifecycle(): void

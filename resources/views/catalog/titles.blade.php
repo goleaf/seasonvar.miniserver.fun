@@ -2,7 +2,7 @@
         @if ($errors->any())
             <div role="alert" class="col-span-full rounded-panel border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
                 <div class="flex items-start gap-3">
-                    <i class="fa-solid fa-triangle-exclamation mt-0.5 shrink-0" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-triangle-exclamation" align="start" />
                     <div>
                         <div class="font-bold">Проверьте параметры каталога.</div>
                         <ul class="mt-2 list-disc space-y-1 pl-5">
@@ -22,9 +22,12 @@
             class="fixed inset-0 m-0 h-dvh max-h-dvh w-full max-w-none overflow-y-auto border-0 bg-slate-50 p-3 backdrop:bg-slate-900/40 lg:sticky lg:inset-auto lg:top-24 lg:order-1 lg:block lg:h-auto lg:max-h-[calc(100vh-7rem)] lg:w-auto lg:self-start lg:bg-transparent lg:p-0 lg:pr-1"
         >
             <div class="sticky top-0 z-20 mb-3 flex items-center justify-between gap-3 rounded-control bg-white p-2 shadow-panel lg:hidden">
-                <h2 id="catalog-filter-dialog-title" class="min-w-0 break-words text-base font-bold text-slate-800">Фильтры каталога</h2>
+                <h2 id="catalog-filter-dialog-title" class="flex min-w-0 items-center gap-2 break-words text-base font-bold text-slate-800">
+                    <x-ui.icon name="fa-solid fa-sliders" class="text-emerald-700" />
+                    <span>Фильтры каталога</span>
+                </h2>
                 <button type="button" data-catalog-filter-dialog-close class="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-control bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700" aria-label="Закрыть фильтры">
-                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-xmark" />
                 </button>
             </div>
             <x-ui.panel title="Фильтры каталога" icon="fa-solid fa-sliders">
@@ -41,12 +44,12 @@
                     <div>
                         <div class="mb-2 flex items-center justify-between gap-2">
                             <div class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                                <i class="fa-solid fa-calendar-days text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-calendar-days text-slate-400" />
                                 <span>Годы</span>
                             </div>
                             @if ($filterView->selectedYears() !== [])
                                 <a href="{{ route('titles.index', $filterView->yearQuery(null)) }}" wire:click.prevent="resetGroup('year')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-rotate-left" />
                                     <span>Сбросить</span>
                                 </a>
                             @endif
@@ -60,7 +63,7 @@
                                 ])>
                                     <span class="inline-flex min-w-0 items-center gap-2">
                                         <input type="checkbox" wire:model="filters.years" name="year[]" value="{{ $filterView->bucketYear($bucket) }}" class="h-5 w-5 shrink-0 accent-emerald-700" @checked($filterView->isActiveYear($bucket))>
-                                        <i class="fa-solid fa-calendar-days shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
+                                        <x-ui.icon name="fa-solid fa-calendar-days text-[0.85em] text-slate-400" />
                                         <span class="min-w-0 break-words">{{ $filterView->bucketYear($bucket) }}</span>
                                     </span>
                                     <span class="shrink-0 text-xs font-bold tabular-nums">{{ $bucket->context_titles_count }}</span>
@@ -74,12 +77,12 @@
                     <div>
                         <div class="mb-2 flex items-center justify-between gap-2">
                             <div class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                                <i class="fa-solid fa-clapperboard text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-clapperboard text-slate-400" />
                                 <span>Тип публикации</span>
                             </div>
                             @if ($filterView->listState('publication_type') !== [])
                                 <a href="{{ route('titles.index', $filterView->withoutCatalogState('publication_type')) }}" wire:click.prevent="resetGroup('publication_type')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-rotate-left" />
                                     <span>Сбросить</span>
                                 </a>
                             @endif
@@ -106,12 +109,12 @@
                     <div>
                         <div class="mb-2 flex items-center justify-between gap-2">
                             <div class="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                                <i class="fa-solid fa-closed-captioning text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-closed-captioning text-slate-400" />
                                 <span>Субтитры</span>
                             </div>
                             @if ($filterView->listState('subtitles') !== [])
                                 <a href="{{ route('titles.index', $filterView->withoutCatalogState('subtitles')) }}" wire:click.prevent="resetGroup('subtitles')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-rotate-left" />
                                     <span>Сбросить</span>
                                 </a>
                             @endif
@@ -137,12 +140,12 @@
                         <div data-catalog-filter-group>
                             <div class="mb-2 flex items-center justify-between gap-2">
                                 <div class="inline-flex min-w-0 items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                                    <i class="{{ $filterView->icon($filterType) }} shrink-0 text-slate-400" aria-hidden="true"></i>
+                                    <x-ui.icon name="{{ $filterView->icon($filterType) }} text-slate-400" />
                                     <span>{{ $label }}</span>
                                 </div>
                                 @if ($selectedTaxonomies->get($filterType, collect())->isNotEmpty())
                                     <a href="{{ route('titles.index', $filterView->filterQuery($filterType, null)) }}" wire:click.prevent="resetGroup('{{ $filterType }}')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                                        <x-ui.icon name="fa-solid fa-rotate-left" />
                                         <span>Сбросить</span>
                                     </a>
                                 @endif
@@ -151,7 +154,7 @@
                                 <div data-catalog-people-combobox data-people-type="{{ $filterType }}" data-people-endpoint="{{ url('/api/catalog/people') }}" class="relative mb-2">
                                     <label class="sr-only" for="catalog-filter-search-{{ $filterType }}">Найти в группе {{ $label }}</label>
                                     <div data-focus-frame class="flex min-h-11 items-center gap-2 rounded-control border border-transparent bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                                        <i class="fa-solid fa-magnifying-glass shrink-0 text-slate-400" aria-hidden="true"></i>
+                                        <x-ui.icon name="fa-solid fa-magnifying-glass text-slate-400" />
                                         <input
                                             id="catalog-filter-search-{{ $filterType }}"
                                             type="search"
@@ -165,7 +168,7 @@
                                             data-catalog-people-input
                                             class="min-w-0 flex-1 bg-transparent text-sm font-semibold text-slate-700 placeholder:text-slate-400 focus:outline-none"
                                         >
-                                        <i data-catalog-people-loading class="fa-solid fa-spinner fa-spin hidden shrink-0 text-emerald-700" aria-hidden="true"></i>
+                                        <x-ui.icon name="fa-solid fa-spinner fa-spin hidden text-emerald-700" data-catalog-people-loading />
                                     </div>
                                     <div id="catalog-people-options-{{ $filterType }}" role="listbox" data-catalog-people-options class="absolute inset-x-0 top-full z-30 mt-1 hidden max-h-72 overflow-y-auto rounded-control border border-slate-200 bg-white p-1 shadow-panel"></div>
                                     <p data-catalog-people-status class="sr-only" aria-live="polite"></p>
@@ -173,7 +176,7 @@
                             @elseif ($filterTaxonomies->get($filterType, collect())->count() > 8)
                                 <label class="sr-only" for="catalog-filter-search-{{ $filterType }}">Найти в группе {{ $label }}</label>
                                 <div data-focus-frame class="mb-2 flex min-h-11 items-center gap-2 rounded-control border border-transparent bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                                    <i class="fa-solid fa-magnifying-glass shrink-0 text-slate-400" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-magnifying-glass text-slate-400" />
                                     <input
                                         id="catalog-filter-search-{{ $filterType }}"
                                         type="search"
@@ -193,7 +196,7 @@
                                     ])>
                                         <span class="inline-flex min-w-0 items-center gap-2">
                                             <input type="checkbox" wire:model="filters.{{ $filterType }}" name="{{ $filterType }}[]" value="{{ $taxonomy->slug }}" class="h-5 w-5 shrink-0 accent-emerald-700" @checked($filterView->isActiveTaxonomy($filterType, $taxonomy))>
-                                            <i class="{{ $filterView->icon($filterType) }} shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
+                                            <x-ui.icon name="{{ $filterView->icon($filterType) }} text-[0.85em] text-slate-400" />
                                             <span class="min-w-0 break-words">{{ $taxonomy->name }}</span>
                                         </span>
                                         <span class="shrink-0 text-xs font-bold tabular-nums">{{ $taxonomy->context_titles_count }}</span>
@@ -208,11 +211,11 @@
 
                     <div class="sticky bottom-0 -mx-1 space-y-2 bg-white px-1 pb-1 pt-3">
                         <button type="submit" wire:loading.attr="disabled" wire:target="applyFilters" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60">
-                            <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-filter" />
                             <span>Применить выбранное</span>
                         </button>
                         <a href="{{ route('titles.index') }}" wire:click.prevent="resetAll" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
-                            <i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-filter-circle-xmark" />
                             <span>Сбросить фильтры</span>
                         </a>
                     </div>
@@ -225,13 +228,12 @@
                 <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
                     <div>
                         <h1 class="inline-flex items-center gap-2 text-3xl font-bold text-slate-700">
-                            <i class="fa-solid fa-clapperboard text-emerald-700" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-clapperboard text-emerald-700" />
                             <span>{{ $seo['h1'] ?? 'Сериалы' }}</span>
                         </h1>
-                        <p class="mt-2 text-sm text-slate-500">{{ $seo['lead'] ?? 'Поиск по названиям, описаниям, актерам, жанрам и связям каталога.' }}</p>
 
                         <a href="#catalog-filters" data-catalog-filter-dialog-open aria-controls="catalog-filters" aria-haspopup="dialog" class="mt-3 inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 lg:hidden">
-                            <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-sliders" />
                             <span>Фильтры · {{ $filterView->activeFilterCount() }}</span>
                         </a>
 
@@ -276,26 +278,26 @@
                                     @endforeach
                                 </div>
                                 <div class="flex flex-wrap gap-3 text-slate-500">
-                                    <span class="hidden sm:inline"><i class="fa-solid fa-diagram-project text-slate-400" aria-hidden="true"></i> Активных фильтров: {{ $filterView->activeFilterCount() }}</span>
+                                    <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-diagram-project text-slate-400" /> Активных фильтров: {{ $filterView->activeFilterCount() }}</span>
                                     @if ($invalidYear)
-                                        <span class="hidden sm:inline"><i class="fa-solid fa-calendar-xmark text-amber-600" aria-hidden="true"></i> Ошибочный год: {{ $requestedYear }}</span>
+                                        <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-calendar-xmark text-amber-600" /> Ошибочный год: {{ $requestedYear }}</span>
                                     @endif
                                     @if ($filterView->selectedYears() !== [])
-                                        <span class="hidden sm:inline"><i class="fa-solid fa-calendar-days text-slate-400" aria-hidden="true"></i> Годы: {{ implode(', ', $filterView->selectedYears()) }}</span>
+                                        <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-calendar-days text-slate-400" /> Годы: {{ implode(', ', $filterView->selectedYears()) }}</span>
                                     @endif
                                     @if ($titleContext !== null)
-                                        <span class="hidden sm:inline"><i class="fa-solid fa-clapperboard text-slate-400" aria-hidden="true"></i> Сериал: {{ $titleContext->title }}</span>
+                                        <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-clapperboard text-slate-400" /> Сериал: {{ $titleContext->title }}</span>
                                     @endif
-                                    <span><i class="fa-solid fa-magnifying-glass text-slate-400" aria-hidden="true"></i> {{ __('catalog.catalog.found_now', ['results' => trans_choice('catalog.counts.results', $titles->total())]) }}</span>
+                                    <span><x-ui.icon name="fa-solid fa-magnifying-glass text-slate-400" /> {{ __('catalog.catalog.found_now', ['results' => trans_choice('catalog.counts.results', $titles->total())]) }}</span>
                                     <a href="{{ route('titles.index') }}" wire:click.prevent="resetAll" class="hidden items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-600 sm:inline-flex">
-                                        <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                                        <x-ui.icon name="fa-solid fa-rotate-left" />
                                         <span>Сбросить все</span>
                                     </a>
                                 </div>
                             </div>
                         @else
                             <div class="mt-3 text-sm text-slate-500">
-                                <i class="fa-solid fa-magnifying-glass text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-magnifying-glass text-slate-400" />
                                 {{ __('catalog.catalog.found', ['results' => trans_choice('catalog.counts.results', $titles->total())]) }}
                             </div>
                         @endif
@@ -321,7 +323,7 @@
                             wire:model.live.debounce.650ms="filters.search"
                         />
                         <button type="submit" wire:loading.attr="disabled" wire:target="filters.search,applySearch" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60">
-                            <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-arrow-right" />
                             <span>Найти</span>
                         </button>
                     </form>
@@ -331,21 +333,21 @@
                     <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                         <div class="text-xs font-bold uppercase tracking-wide text-slate-400">{{ __('catalog.catalog.found_label') }}</div>
                         <div class="mt-1 inline-flex items-center gap-2 text-lg font-black text-slate-700">
-                            <i class="fa-solid fa-magnifying-glass text-emerald-700" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-magnifying-glass text-emerald-700" />
                             <span class="tabular-nums">{{ $titles->total() }}</span>
                         </div>
                     </div>
                     <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                         <div class="text-xs font-bold uppercase tracking-wide text-slate-400">{{ __('catalog.catalog.page_label') }}</div>
                         <div class="mt-1 inline-flex items-center gap-2 text-lg font-black text-slate-700">
-                            <i class="fa-solid fa-table-cells-large text-sky-700" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-table-cells-large text-sky-700" />
                             <span class="tabular-nums">{{ $titles->count() }}</span>
                         </div>
                     </div>
                     <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
                         <div class="text-xs font-bold uppercase tracking-wide text-slate-400">{{ __('catalog.catalog.sort_label') }}</div>
                         <div class="mt-1 inline-flex items-center gap-2 text-lg font-black text-slate-700">
-                            <i class="{{ $filterView->sortIcon($sort) }} text-amber-700" aria-hidden="true"></i>
+                            <x-ui.icon name="{{ $filterView->sortIcon($sort) }} text-amber-700" />
                             <span>{{ $filterView->sortLabel($sort) }}</span>
                         </div>
                     </div>
@@ -358,7 +360,7 @@
                             'bg-emerald-50 text-emerald-700' => $filterView->isActiveSort($sortKey),
                             'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveSort($sortKey),
                         ])>
-                            <i class="{{ $filterView->sortIcon($sortKey) }}" aria-hidden="true"></i>
+                            <x-ui.icon name="{{ $filterView->sortIcon($sortKey) }}" />
                             <span>{{ $sortLabel }}</span>
                         </a>
                     @endforeach
@@ -397,10 +399,10 @@
                 <details data-catalog-mobile-output-controls class="group mt-4 rounded-lg bg-slate-50 p-2 lg:hidden">
                     <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-control px-2 text-sm font-bold text-slate-700">
                         <span class="inline-flex min-w-0 items-center gap-2">
-                            <i class="{{ $filterView->sortIcon($sort) }} shrink-0 text-amber-700" aria-hidden="true"></i>
+                            <x-ui.icon name="{{ $filterView->sortIcon($sort) }} text-amber-700" />
                             <span class="min-w-0 break-words">Сортировка: {{ $filterView->sortLabel($sort) }}</span>
                         </span>
-                        <i class="fa-solid fa-chevron-down shrink-0 text-slate-400 transition group-open:rotate-180" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-chevron-down text-slate-400 transition group-open:rotate-180" />
                     </summary>
                     <div class="mt-2 flex flex-wrap gap-2">
                         @foreach ($filterView->sortLabels as $sortKey => $sortLabel)
@@ -409,7 +411,7 @@
                                 'bg-emerald-50 text-emerald-700' => $filterView->isActiveSort($sortKey),
                                 'bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveSort($sortKey),
                             ])>
-                                <i class="{{ $filterView->sortIcon($sortKey) }}" aria-hidden="true"></i>
+                                <x-ui.icon name="{{ $filterView->sortIcon($sortKey) }}" />
                                 <span>{{ $sortLabel }}</span>
                             </a>
                         @endforeach
@@ -428,10 +430,10 @@
                 <details class="group mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3" @if ($filterView->hasAdvancedFilters()) open @endif>
                     <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-control px-1 text-sm font-bold text-slate-700">
                         <span class="inline-flex min-w-0 items-center gap-2">
-                            <i class="fa-solid fa-sliders shrink-0 text-slate-400" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-sliders text-slate-400" />
                             <span class="min-w-0 break-words">Расширенные фильтры</span>
                         </span>
-                        <i class="fa-solid fa-chevron-down shrink-0 text-slate-400 transition group-open:rotate-180" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-chevron-down text-slate-400 transition group-open:rotate-180" />
                     </summary>
                     <form method="GET" action="{{ route('titles.index') }}" wire:submit="applyFilters" class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                         @if ($titleContext !== null)
@@ -538,7 +540,7 @@
                         </fieldset>
                         <div class="flex items-end sm:col-span-2 xl:col-span-4">
                             <button type="submit" wire:loading.attr="disabled" wire:target="applyFilters" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60">
-                                <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-filter" />
                                 <span>Применить фильтры</span>
                             </button>
                         </div>
@@ -549,7 +551,7 @@
             <div class="relative">
                 <div wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,clearSearch,resetAll,previousPage,nextPage,gotoPage" class="absolute inset-x-0 top-0 z-20 rounded-panel bg-white text-sm font-bold text-emerald-700" role="status" aria-live="polite">
                     <div class="flex min-h-24 items-center justify-center">
-                        <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+                        <x-ui.icon name="fa-solid fa-spinner fa-spin" />
                         <span class="ml-2">Обновляем каталог…</span>
                     </div>
                 </div>
@@ -568,7 +570,7 @@
                         <div class="flex flex-col gap-4">
                             <div>
                                 <div class="inline-flex items-center gap-2 text-base font-bold text-slate-700">
-                                    <i class="fa-solid fa-magnifying-glass text-slate-400" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-magnifying-glass text-slate-400" />
                                     @if ($insufficientSearch)
                                         <span>Запрос «{{ $search }}» слишком общий.</span>
                                     @elseif ($search !== '')
@@ -594,7 +596,7 @@
                                                 href="{{ route('titles.index', array_merge($filterView->withoutSearchQuery, ['q' => $suggestion->suggestion_name])) }}"
                                                 class="inline-flex min-h-11 max-w-full items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
                                             >
-                                                <i class="fa-solid fa-wand-magic-sparkles shrink-0" aria-hidden="true"></i>
+                                                <x-ui.icon name="fa-solid fa-wand-magic-sparkles" />
                                                 <span class="min-w-0 break-words">{{ $suggestion->suggestion_name }}</span>
                                             </a>
                                         @endforeach
@@ -604,18 +606,18 @@
                             <div class="flex flex-wrap gap-2">
                                 @if ($search !== '')
                                     <a href="{{ route('titles.index', $filterView->withoutSearchQuery) }}" wire:click.prevent="clearSearch" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
-                                        <i class="fa-solid fa-magnifying-glass-minus" aria-hidden="true"></i>
+                                        <x-ui.icon name="fa-solid fa-magnifying-glass-minus" />
                                         <span>Очистить поиск</span>
                                     </a>
                                 @endif
                                 @if ($filterView->hasActiveFilters() || $titleContext !== null || $filterView->selectedYears() !== [] || $invalidYear)
                                     <a href="{{ route('titles.index', $filterView->withoutFiltersQuery) }}" wire:click.prevent="resetAll" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
-                                        <i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i>
+                                        <x-ui.icon name="fa-solid fa-filter-circle-xmark" />
                                         <span>Убрать фильтры</span>
                                     </a>
                                 @endif
                                 <a href="{{ route('titles.index') }}" wire:click.prevent="resetAll" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100">
-                                    <i class="fa-solid fa-table-cells-large" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-table-cells-large" />
                                     <span>Показать весь каталог</span>
                                 </a>
                             </div>

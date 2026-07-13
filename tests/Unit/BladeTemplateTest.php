@@ -8,6 +8,35 @@ use Tests\TestCase;
 
 class BladeTemplateTest extends TestCase
 {
+    public function test_shared_icon_component_owns_fontawesome_markup_and_first_line_alignment(): void
+    {
+        $this->assertFileExists(resource_path('views/components/ui/icon.blade.php'));
+
+        $view = $this->blade('<x-ui.icon name="fa-solid fa-circle-info" align="start" data-test-icon />');
+
+        $view
+            ->assertSee('data-ui-icon="true"', false)
+            ->assertSee('data-test-icon', false)
+            ->assertSee('aria-hidden="true"', false)
+            ->assertSee('ui-icon', false)
+            ->assertSee('ui-icon--start', false)
+            ->assertSee('fa-solid fa-circle-info', false);
+    }
+
+    public function test_blade_templates_render_fontawesome_only_through_the_shared_icon_component(): void
+    {
+        $iconComponent = resource_path('views/components/ui/icon.blade.php');
+        $offendingFiles = collect(File::allFiles(resource_path('views')))
+            ->filter(fn (SplFileInfo $file): bool => str_ends_with($file->getFilename(), '.blade.php'))
+            ->reject(fn (SplFileInfo $file): bool => $file->getPathname() === $iconComponent)
+            ->filter(fn (SplFileInfo $file): bool => preg_match('/<i\b/', (string) file_get_contents($file->getPathname())) === 1)
+            ->map(fn (SplFileInfo $file): string => str_replace(base_path().'/', '', $file->getPathname()))
+            ->values()
+            ->all();
+
+        $this->assertSame([], $offendingFiles, 'Blade templates must render decorative FontAwesome icons through x-ui.icon.');
+    }
+
     public function test_blade_templates_do_not_use_inline_php_directives(): void
     {
         $offendingFiles = collect(File::allFiles(resource_path('views')))

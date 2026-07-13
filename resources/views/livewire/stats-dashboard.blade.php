@@ -3,7 +3,7 @@
         <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div class="min-w-0">
                 <h1 class="inline-flex items-center gap-2 text-2xl font-black text-slate-700">
-                    <i class="fa-solid fa-chart-simple text-emerald-700" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-chart-simple text-emerald-700" />
                     <span>Сводка каталога</span>
                 </h1>
                 <p class="mt-2 max-w-5xl text-sm leading-6 text-slate-500">
@@ -17,19 +17,19 @@
                     'bg-amber-50 text-amber-700' => $snapshotMeta['is_stale'] ?? false,
                     'bg-emerald-50 text-emerald-700' => ! ($snapshotMeta['is_stale'] ?? false),
                 ])>
-                    <i @class([
+                    <x-ui.icon @class([
                         'fa-solid',
                         'fa-triangle-exclamation' => $snapshotMeta['is_stale'] ?? false,
                         'fa-arrows-rotate' => ! ($snapshotMeta['is_stale'] ?? false),
-                    ]) aria-hidden="true"></i>
+                    ]) />
                     <span>{{ $snapshotMeta['message'] ?? 'Данные обновляются примерно раз в 15 секунд.' }}</span>
                 </span>
                 <span class="inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-slate-500">
-                    <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-regular fa-clock" />
                     <span>Показано: {{ $snapshotMeta['served_at_display'] ?? '' }}</span>
                 </span>
                 <span class="inline-flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-slate-500">
-                    <i class="fa-solid fa-database" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-database" />
                     <span>Снимок: {{ $snapshotMeta['built_at_display'] ?? '' }}</span>
                 </span>
             </div>
@@ -59,7 +59,7 @@
                         'bg-sky-50 text-sky-700' => $card['tone'] === 'sky',
                         'bg-slate-50 text-slate-600' => in_array($card['tone'], ['slate', 'muted'], true),
                     ])>
-                        <i class="{{ $card['icon'] }}" aria-hidden="true"></i>
+                        <x-ui.icon name="{{ $card['icon'] }}" />
                     </span>
                 </div>
             </article>
@@ -81,7 +81,7 @@
                             @else
                                 <div class="grid h-full place-items-center px-3 text-center text-xs font-semibold text-slate-400">
                                     <span class="inline-flex flex-col items-center gap-2">
-                                        <i class="fa-regular fa-image text-xl text-slate-300" aria-hidden="true"></i>
+                                        <x-ui.icon name="fa-regular fa-image text-xl text-slate-300" />
                                         <span>Нет постера</span>
                                     </span>
                                 </div>
@@ -89,7 +89,7 @@
                         </div>
                         <div class="p-3">
                             <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                                <i class="{{ $title['icon'] }} text-slate-400" aria-hidden="true"></i>
+                                <x-ui.icon name="{{ $title['icon'] }} text-slate-400" />
                                 <span>{{ $title['year'] }}</span>
                             </div>
                             <div class="mt-1 text-sm font-bold leading-5 text-slate-700 group-hover:text-emerald-700">{{ $title['title'] }}</div>
@@ -113,7 +113,7 @@
                                 <img src="{{ $title['poster_src'] }}" alt="Постер {{ $title['title'] }}" loading="lazy" decoding="async" class="h-full w-full object-contain">
                             @else
                                 <div class="grid h-full place-items-center text-slate-300">
-                                    <i class="fa-regular fa-image" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-regular fa-image" />
                                 </div>
                             @endif
                         </div>
@@ -125,7 +125,7 @@
                                     'bg-amber-50 text-amber-700' => $title['tone'] === 'warning',
                                     'bg-slate-50 text-slate-600' => ! in_array($title['tone'], ['danger', 'warning'], true),
                                 ])>
-                                    <i class="{{ $title['icon'] }}" aria-hidden="true"></i>
+                                    <x-ui.icon name="{{ $title['icon'] }}" />
                                 </span>
                                 <span @class([
                                     'text-rose-700' => $title['tone'] === 'danger',
@@ -391,13 +391,13 @@
                                 'bg-amber-50 text-amber-700' => $run['status_tone'] === 'warning',
                                 'bg-slate-50 text-slate-600' => ! in_array($run['status_tone'], ['success', 'danger', 'warning'], true),
                             ])>
-                                <i @class([
+                                <x-ui.icon @class([
                                     'fa-solid',
                                     'fa-circle-check' => $run['status_tone'] === 'success',
                                     'fa-circle-exclamation' => $run['status_tone'] === 'danger',
                                     'fa-spinner' => $run['status_tone'] === 'warning',
                                     'fa-clock' => ! in_array($run['status_tone'], ['success', 'danger', 'warning'], true),
-                                ]) aria-hidden="true"></i>
+                                ]) />
                             </span>
                         </div>
                         <div class="mt-3 grid grid-cols-2 gap-2 text-xs font-semibold text-slate-500">

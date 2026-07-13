@@ -637,6 +637,43 @@ class CatalogPageTest extends TestCase
             ->assertSeeText('Страна 6');
     }
 
+    public function test_home_watchable_titles_are_ordered_by_recent_catalog_updates(): void
+    {
+        $olderTitle = CatalogTitle::factory()->create([
+            'title' => 'Старое доступное видео',
+            'indexed_at' => now()->subDay(),
+        ]);
+        $newerTitle = CatalogTitle::factory()->create([
+            'title' => 'Новое доступное видео',
+            'indexed_at' => now(),
+        ]);
+
+        LicensedMedia::factory()->count(2)->create([
+            'catalog_title_id' => $olderTitle->id,
+            'status' => 'published',
+            'published_at' => now()->subDay(),
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $newerTitle->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $content = $this->get(route('home'))->assertOk()->getContent();
+        $sectionStart = strpos($content, 'Сейчас можно смотреть');
+        $sectionEnd = strpos($content, 'Лента обновлений по датам', $sectionStart ?: 0);
+
+        $this->assertIsInt($sectionStart);
+        $this->assertIsInt($sectionEnd);
+
+        $section = substr($content, $sectionStart, $sectionEnd - $sectionStart);
+
+        $this->assertLessThan(
+            strpos($section, $olderTitle->title),
+            strpos($section, $newerTitle->title),
+        );
+    }
+
     public function test_stats_page_shows_database_statistics_without_raw_source_urls(): void
     {
         $sourceUrl = 'https://seasonvar.ru/serial-777-Skrytyj_url-1-season.html';

@@ -3,7 +3,7 @@
         <div class="flex flex-wrap items-start justify-between gap-4">
             <div class="min-w-0">
                 <h1 class="flex items-center gap-3 text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">
-                    <i class="fa-solid fa-clock-rotate-left text-emerald-700" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-clock-rotate-left text-emerald-700" />
                     <span>{{ __('catalog.viewing.title') }}</span>
                 </h1>
                 <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
@@ -20,7 +20,7 @@
                     wire:target="clearHistory"
                     class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:cursor-wait disabled:opacity-60"
                 >
-                    <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-trash-can" />
                     <span wire:loading.remove wire:target="clearHistory">{{ __('catalog.viewing.clear') }}</span>
                     <span wire:loading wire:target="clearHistory">{{ __('catalog.viewing.clearing') }}</span>
                 </button>
@@ -35,14 +35,14 @@
         :pad="false"
     >
         <div wire:loading.flex wire:target="removeHistoryItem,clearHistory" class="min-h-24 items-center justify-center gap-2 px-4 py-8 text-sm font-semibold text-slate-500">
-            <i class="fa-solid fa-spinner fa-spin text-emerald-700" aria-hidden="true"></i>
+            <x-ui.icon name="fa-solid fa-spinner fa-spin text-emerald-700" />
             <span>{{ __('catalog.viewing.updating') }}</span>
         </div>
 
         <div wire:loading.remove wire:target="removeHistoryItem,clearHistory">
             @if ($continueWatching->isEmpty())
                 <div class="px-4 py-8 text-center">
-                    <i class="fa-regular fa-circle-check text-3xl text-emerald-700" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-regular fa-circle-check text-3xl text-emerald-700" />
                     <p class="mt-3 text-sm font-bold text-slate-700">{{ __('catalog.viewing.continue_empty') }}</p>
                     <p class="mt-1 text-sm leading-6 text-slate-500">{{ __('catalog.viewing.continue_empty_hint') }}</p>
                 </div>
@@ -83,7 +83,7 @@
                                     wire:navigate
                                     class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-600"
                                 >
-                                    <i class="fa-solid fa-play" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-solid fa-play" />
                                     <span>{{ $item->actionLabel }}</span>
                                 </a>
                             </div>
@@ -102,7 +102,7 @@
     >
         @if ($history->isEmpty())
             <div class="px-4 py-10 text-center">
-                <i class="fa-regular fa-clock text-3xl text-slate-400" aria-hidden="true"></i>
+                <x-ui.icon name="fa-regular fa-clock text-3xl text-slate-400" />
                 <p class="mt-3 text-sm font-bold text-slate-700">{{ __('catalog.viewing.history_empty') }}</p>
                 <p class="mt-1 text-sm leading-6 text-slate-500">{{ __('catalog.viewing.history_empty_hint') }}</p>
             </div>
@@ -114,7 +114,7 @@
                             <x-title-poster :title="$progress->catalogTitle" class="hidden aspect-[2/3] w-[4.5rem] rounded-control border border-slate-200 bg-slate-50 sm:block" image-class="h-full w-full object-contain" />
                         @else
                             <div class="hidden aspect-[2/3] w-[4.5rem] place-items-center rounded-control bg-slate-100 text-slate-400 sm:grid">
-                                <i class="fa-solid fa-ban" aria-hidden="true"></i>
+                                <x-ui.icon name="fa-solid fa-ban" />
                             </div>
                         @endif
 
@@ -147,12 +147,12 @@
 
                             <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
                                 <span class="inline-flex items-center gap-1">
-                                    <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                                    <x-ui.icon name="fa-regular fa-clock" />
                                     {{ $progress->last_watched_at->format('d.m.Y H:i') }}
                                 </span>
                                 @if ($progress->completed_at)
                                     <span class="inline-flex items-center gap-1 text-emerald-700">
-                                        <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                                        <x-ui.icon name="fa-solid fa-circle-check" />
                                         {{ __('catalog.viewing.completed') }}
                                     </span>
                                 @elseif ($progress->progress_percent !== null)
@@ -169,7 +169,7 @@
                             wire:target="removeHistoryItem({{ $progress->id }})"
                             class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-wait disabled:opacity-60 sm:w-auto sm:justify-self-end"
                         >
-                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            <x-ui.icon name="fa-solid fa-xmark" />
                             <span>{{ __('catalog.viewing.remove') }}</span>
                         </button>
                     </article>

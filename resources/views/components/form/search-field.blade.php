@@ -23,7 +23,7 @@
     ])>
         @if ($icon !== '')
             <span class="{{ $iconClass }}">
-                <i class="{{ $icon }}" aria-hidden="true"></i>
+                <x-ui.icon name="{{ $icon }}" />
             </span>
         @endif
 

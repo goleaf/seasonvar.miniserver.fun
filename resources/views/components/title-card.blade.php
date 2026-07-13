@@ -5,12 +5,12 @@
     <div class="flex min-w-0 flex-1 flex-col p-3 sm:p-4">
         <div class="flex min-w-0 flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
             <span class="inline-flex min-w-0 items-center gap-1">
-                <i class="fa-solid fa-tv shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
+                <x-ui.icon name="fa-solid fa-tv text-[0.85em] text-slate-400" />
                 <span>{{ $title->type === 'serial' ? __('catalog.title.series_type') : $title->type }}</span>
             </span>
             @if ($title->year)
                 <span class="inline-flex items-center gap-1">
-                    <i class="fa-solid fa-calendar-days shrink-0 text-[0.85em] text-slate-400" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-calendar-days text-[0.85em] text-slate-400" />
                     <span>{{ $title->year }}</span>
                 </span>
             @endif
@@ -22,16 +22,16 @@
         </h3>
         <div class="mt-3 flex flex-wrap gap-1.5 text-xs font-bold">
             <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
-                <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                <x-ui.icon name="fa-solid fa-layer-group" />
                 <span>{{ trans_choice('catalog.counts.seasons', $seasonsCount) }}</span>
             </span>
             <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700">
-                <i class="fa-solid fa-circle-play" aria-hidden="true"></i>
+                <x-ui.icon name="fa-solid fa-circle-play" />
                 <span>{{ trans_choice('catalog.counts.episodes', $episodesCount) }}</span>
             </span>
             @if ($mediaCount > 0)
                 <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700">
-                    <i class="fa-solid fa-file-video" aria-hidden="true"></i>
+                    <x-ui.icon name="fa-solid fa-file-video" />
                     <span>{{ trans_choice('catalog.counts.videos', $mediaCount) }}</span>
                 </span>
             @endif
