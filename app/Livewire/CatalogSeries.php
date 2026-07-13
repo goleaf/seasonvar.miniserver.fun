@@ -30,6 +30,8 @@ class CatalogSeries extends Component
         'director' => '',
     ];
 
+    public bool $facetsLoaded = false;
+
     #[Locked]
     public ?int $routeYear = null;
 
@@ -88,14 +90,29 @@ class CatalogSeries extends Component
             return;
         }
 
+        if ($property === 'filters.search') {
+            $this->facetsLoaded = false;
+        }
+
         $this->validateAndNormalizeState();
         $this->resetPage();
+    }
+
+    public function loadFacets(): void
+    {
+        if ($this->facetsLoaded) {
+            return;
+        }
+
+        $this->rateLimits->enforce('catalog_search', auth()->user());
+        $this->facetsLoaded = true;
     }
 
     public function applySearch(): void
     {
         $this->rateLimits->enforce('catalog_search', auth()->user());
         $this->validateAndNormalizeState();
+        $this->facetsLoaded = false;
         $this->resetPage();
     }
 
@@ -204,6 +221,7 @@ class CatalogSeries extends Component
     public function clearSearch(): void
     {
         $this->filters->search = '';
+        $this->facetsLoaded = false;
         $this->resetErrorBag('q');
         $this->resetPage();
     }
@@ -322,6 +340,7 @@ class CatalogSeries extends Component
             $this->routeTaxonomy,
             $this->getErrorBag()->isNotEmpty(),
             $this->facetSearch(),
+            $this->facetsLoaded,
         );
     }
 

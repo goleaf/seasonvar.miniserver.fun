@@ -277,7 +277,7 @@ class CatalogVisualSystemTest extends TestCase
         );
     }
 
-    public function test_catalog_search_ui_keeps_header_search_with_native_mobile_dialog_and_people_comboboxes(): void
+    public function test_catalog_search_ui_keeps_header_search_with_lazy_native_filter_dialog(): void
     {
         $title = CatalogTitle::factory()->create();
 
@@ -307,14 +307,17 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('wire:click.prevent="setView(\'grid\')"', $content);
         $this->assertStringContainsString('wire:click.prevent="setPerPage(48)"', $content);
         $this->assertStringContainsString('Фильтры · 0', $content);
-        $this->assertStringContainsString('Найти в группе', $content);
-        $this->assertStringContainsString('data-catalog-filter-search', $content);
-        $this->assertSame(2, substr_count($content, 'data-catalog-people-combobox'));
-        $this->assertSame(2, substr_count($content, 'role="combobox"'));
-        $this->assertSame(2, substr_count($content, 'role="listbox"'));
+        $this->assertStringContainsString('data-catalog-facets-placeholder', $content);
+        $this->assertStringContainsString('wire:click="loadFacets"', $content);
+        $this->assertStringContainsString('Показать фильтры', $content);
+        $this->assertStringNotContainsString('Найти в группе', $content);
+        $this->assertStringNotContainsString('data-catalog-filter-search', $content);
+        $this->assertSame(0, substr_count($content, 'data-catalog-people-combobox'));
+        $this->assertSame(0, substr_count($content, 'role="combobox"'));
+        $this->assertSame(0, substr_count($content, 'role="listbox"'));
         $this->assertStringContainsString('aria-current="true"', $content);
-        $this->assertStringContainsString('Применить выбранное', $content);
-        $this->assertStringContainsString('Сбросить фильтры', $content);
+        $this->assertStringNotContainsString('Применить выбранное', $content);
+        $this->assertLessThan(250_000, strlen($content));
     }
 
     public function test_advanced_catalog_filters_use_four_compact_explanatory_groups(): void

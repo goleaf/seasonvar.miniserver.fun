@@ -5,6 +5,7 @@ namespace App\Services\Catalog;
 use App\Enums\CatalogPublicationType;
 use App\Models\CatalogTitle;
 use App\Models\User;
+use App\Services\Catalog\Search\CatalogSearchMatchSet;
 use App\Services\Catalog\Search\CatalogSearchState;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Model;
@@ -35,8 +36,9 @@ class CatalogFacetQuery
         ?User $user = null,
         array $searches = [],
         ?CatalogTitlesCriteria $criteria = null,
+        ?CatalogSearchMatchSet $searchMatches = null,
     ): Collection {
-        $facetQueries = collect($filterTypes)->map(function (string $filterType) use ($criteria, $limits, $searches, $user): QueryBuilder {
+        $facetQueries = collect($filterTypes)->map(function (string $filterType) use ($criteria, $limits, $searches, $user, $searchMatches): QueryBuilder {
             $modelClass = $this->taxonomies->modelClass($filterType);
             $model = new $modelClass;
             $relation = $model->catalogTitles();
@@ -45,7 +47,7 @@ class CatalogFacetQuery
             $catalogTitlePivotKey = $relation->getRelatedPivotKeyName();
             $contextTitles = $criteria === null
                 ? $this->titles->visibleTo($user)
-                : $this->titles->filteredTitles($criteria->withoutRelation($filterType), $user);
+                : $this->titles->filteredTitles($criteria->withoutRelation($filterType), $user, searchMatches: $searchMatches);
             $countsAlias = 'facet_counts_'.preg_replace('/[^a-z0-9_]+/i', '_', $filterType);
             $titlesAlias = 'facet_titles_'.preg_replace('/[^a-z0-9_]+/i', '_', $filterType);
             $counts = DB::table($pivotTable)
@@ -225,11 +227,14 @@ class CatalogFacetQuery
     }
 
     /** @return Collection<int, object{value: string, label: string, context_titles_count: int}> */
-    public function publicationTypes(CatalogTitlesCriteria $criteria, ?User $user = null): Collection
-    {
-        $rebuild = function () use ($criteria, $user): array {
+    public function publicationTypes(
+        CatalogTitlesCriteria $criteria,
+        ?User $user = null,
+        ?CatalogSearchMatchSet $searchMatches = null,
+    ): Collection {
+        $rebuild = function () use ($criteria, $user, $searchMatches): array {
             $counts = $this->titles
-                ->filteredTitles($criteria->withoutPublicationTypes(), $user)
+                ->filteredTitles($criteria->withoutPublicationTypes(), $user, searchMatches: $searchMatches)
                 ->select('type')
                 ->selectRaw('count(*) as context_titles_count')
                 ->groupBy('type')
@@ -257,10 +262,13 @@ class CatalogFacetQuery
     }
 
     /** @return Collection<int, object{value: string, label: string, context_titles_count: int}> */
-    public function subtitleAvailability(CatalogTitlesCriteria $criteria, ?User $user = null): Collection
-    {
-        $rebuild = function () use ($criteria, $user): array {
-            $counts = $this->titles->subtitleContextCounts($criteria, $user);
+    public function subtitleAvailability(
+        CatalogTitlesCriteria $criteria,
+        ?User $user = null,
+        ?CatalogSearchMatchSet $searchMatches = null,
+    ): Collection {
+        $rebuild = function () use ($criteria, $user, $searchMatches): array {
+            $counts = $this->titles->subtitleContextCounts($criteria, $user, $searchMatches);
 
             return [
                 [
@@ -291,9 +299,10 @@ class CatalogFacetQuery
         array $selectedYears,
         int $limit,
         ?User $user = null,
+        ?CatalogSearchMatchSet $searchMatches = null,
     ): Collection {
         $context = $this->titles
-            ->filteredTitles($criteria->withoutYears(), $user)
+            ->filteredTitles($criteria->withoutYears(), $user, searchMatches: $searchMatches)
             ->select('year')
             ->selectRaw('count(*) as context_titles_count')
             ->whereNotNull('year')

@@ -16,7 +16,7 @@ final class CatalogTitleSearch
 
     public function matchingTitleIdsQuery(CatalogSearchQuery $search): ?Builder
     {
-        if (! $this->isReady() || $search->ftsExpression === '') {
+        if ($search->ftsExpression === '' || ! $this->isReady()) {
             return null;
         }
 
@@ -27,7 +27,7 @@ final class CatalogTitleSearch
 
     public function candidateQuery(CatalogSearchQuery $search): ?Builder
     {
-        if (! $this->isReady() || $search->ftsExpression === '') {
+        if ($search->ftsExpression === '' || ! $this->isReady()) {
             return null;
         }
 
@@ -61,6 +61,19 @@ final class CatalogTitleSearch
             ->orderBy('bm25_score')
             ->orderByDesc('catalog_title_search_documents.catalog_title_id')
             ->limit(PHP_INT_MAX);
+    }
+
+    public function materializeMatches(CatalogSearchQuery $search): ?CatalogSearchMatchSet
+    {
+        $matches = $this->matchingTitleIdsQuery($search);
+
+        if ($matches === null) {
+            return null;
+        }
+
+        return new CatalogSearchMatchSet(
+            $matches->pluck('catalog_title_id')->map(fn (mixed $id): int => (int) $id),
+        );
     }
 
     public function isReady(): bool

@@ -178,13 +178,13 @@ PHP hard limit `256M` даёт rebuild рекомендаций запас на�
 sudo cp deploy/systemd/seasonvar-import-worker@.service /etc/systemd/system/
 sudo cp deploy/systemd/seasonvar-title-refresh-worker@.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now seasonvar-import-worker@{1..10}.service
-sudo systemctl enable --now seasonvar-title-refresh-worker@{1..32}.service
+sudo systemctl enable --now seasonvar-import-worker@{1..4}.service
+sudo systemctl enable --now seasonvar-title-refresh-worker@{1..8}.service
 systemctl --no-pager --type=service 'seasonvar-import-worker@*'
 systemctl --no-pager --type=service 'seasonvar-title-refresh-worker@*'
 ```
 
-Import template слушает только `seasonvar-import`; title-refresh template — только `seasonvar-title-refresh`. Пул из 32 процессов является стартовой IO capacity, а не application-level limit: все известные и динамически найденные страницы получают jobs, поэтому capacity расширяется количеством systemd instances без изменения кода. После additive migration `seasonvar_import_title_groups` хранит fan-in состояние, а `seasonvar_import_prepared_pages` — bounded промежуточные payload; старые terminal groups удаляются по `SEASONVAR_IMPORT_PREPARED_RETENTION_DAYS`.
+Import template слушает только `seasonvar-import`; title-refresh template — только `seasonvar-title-refresh`. Для текущего четырёхъядерного SQLite host стартовый production pool ограничен 4 import + 8 title-refresh instances. Все известные и динамически найденные страницы по-прежнему получают jobs; повышать concurrency следует только по измеренной queue latency при отсутствии SQLite writer contention. После additive migration `seasonvar_import_title_groups` хранит fan-in состояние, а `seasonvar_import_prepared_pages` — bounded промежуточные payload; старые terminal groups удаляются по `SEASONVAR_IMPORT_PREPARED_RETENTION_DAYS`.
 
 Управление и диагностика:
 

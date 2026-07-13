@@ -31,6 +31,7 @@
                 </button>
             </div>
             <x-ui.panel title="Фильтры каталога" icon="fa-solid fa-sliders">
+                @if ($facetsLoaded)
                 <form method="GET" action="{{ route('titles.index') }}" wire:submit="applyFilters" class="space-y-5">
                     @foreach ($filterView->filterFormState() as $stateKey => $stateValue)
                         @if (is_array($stateValue))
@@ -48,7 +49,7 @@
                                 <span>Годы</span>
                             </div>
                             @if ($filterView->selectedYears() !== [])
-                                <a href="{{ route('titles.index', $filterView->yearQuery(null)) }}" wire:click.prevent="resetGroup('year')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                <a href="{{ route('titles.index', $filterView->yearQuery(null)) }}" rel="nofollow" wire:click.prevent="resetGroup('year')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
                                     <x-ui.icon name="fa-solid fa-rotate-left" />
                                     <span>Сбросить</span>
                                 </a>
@@ -81,7 +82,7 @@
                                 <span>Тип публикации</span>
                             </div>
                             @if ($filterView->listState('publication_type') !== [])
-                                <a href="{{ route('titles.index', $filterView->withoutCatalogState('publication_type')) }}" wire:click.prevent="resetGroup('publication_type')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                <a href="{{ route('titles.index', $filterView->withoutCatalogState('publication_type')) }}" rel="nofollow" wire:click.prevent="resetGroup('publication_type')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
                                     <x-ui.icon name="fa-solid fa-rotate-left" />
                                     <span>Сбросить</span>
                                 </a>
@@ -113,7 +114,7 @@
                                 <span>Субтитры</span>
                             </div>
                             @if ($filterView->listState('subtitles') !== [])
-                                <a href="{{ route('titles.index', $filterView->withoutCatalogState('subtitles')) }}" wire:click.prevent="resetGroup('subtitles')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                <a href="{{ route('titles.index', $filterView->withoutCatalogState('subtitles')) }}" rel="nofollow" wire:click.prevent="resetGroup('subtitles')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
                                     <x-ui.icon name="fa-solid fa-rotate-left" />
                                     <span>Сбросить</span>
                                 </a>
@@ -144,7 +145,7 @@
                                     <span>{{ $label }}</span>
                                 </div>
                                 @if ($selectedTaxonomies->get($filterType, collect())->isNotEmpty())
-                                    <a href="{{ route('titles.index', $filterView->filterQuery($filterType, null)) }}" wire:click.prevent="resetGroup('{{ $filterType }}')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
+                                    <a href="{{ route('titles.index', $filterView->filterQuery($filterType, null)) }}" rel="nofollow" wire:click.prevent="resetGroup('{{ $filterType }}')" class="inline-flex min-h-11 shrink-0 items-center gap-1 px-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
                                         <x-ui.icon name="fa-solid fa-rotate-left" />
                                         <span>Сбросить</span>
                                     </a>
@@ -220,6 +221,17 @@
                         </a>
                     </div>
                 </form>
+                @else
+                    <div data-catalog-facets-placeholder class="space-y-3 text-sm text-slate-600">
+                        <p>Загрузите варианты только тогда, когда они понадобятся. Результаты поиска уже доступны справа.</p>
+                        <button type="button" wire:click="loadFacets" wire:loading.attr="disabled" wire:target="loadFacets" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 font-bold text-white hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60">
+                            <x-ui.icon name="fa-solid fa-sliders" wire:loading.remove wire:target="loadFacets" />
+                            <x-ui.icon name="fa-solid fa-spinner fa-spin" wire:loading wire:target="loadFacets" />
+                            <span wire:loading.remove wire:target="loadFacets">Показать фильтры</span>
+                            <span wire:loading wire:target="loadFacets">Загружаем фильтры…</span>
+                        </button>
+                    </div>
+                @endif
             </x-ui.panel>
         </dialog>
 
@@ -232,7 +244,7 @@
                             <span>{{ $seo['h1'] ?? 'Сериалы' }}</span>
                         </h1>
 
-                        <a href="#catalog-filters" data-catalog-filter-dialog-open aria-controls="catalog-filters" aria-haspopup="dialog" class="mt-3 inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 lg:hidden">
+                        <a href="#catalog-filters" data-catalog-filter-dialog-open wire:click="loadFacets" aria-controls="catalog-filters" aria-haspopup="dialog" class="mt-3 inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 lg:hidden">
                             <x-ui.icon name="fa-solid fa-sliders" />
                             <span>Фильтры · {{ $filterView->activeFilterCount() }}</span>
                         </a>
@@ -241,38 +253,38 @@
                             <div class="mt-3 space-y-3 text-sm">
                                 <div class="hidden flex-wrap items-center gap-2 sm:flex">
                                     @if ($search !== '')
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutSearchQuery)" wire:click.prevent="clearSearch" active icon="fa-solid fa-magnifying-glass">Поиск по запросу {{ $search }} · очистить</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutSearchQuery)" rel="nofollow" wire:click.prevent="clearSearch" active icon="fa-solid fa-magnifying-glass">Поиск по запросу {{ $search }} · очистить</x-ui.taxonomy-chip>
                                     @endif
                                     @if ($titleContext !== null)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutTitleQuery)" wire:click.prevent="clearTitleContext" active icon="fa-solid fa-clapperboard">Подборка по сериалу {{ $titleContext->display_title }} · убрать</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutTitleQuery)" rel="nofollow" wire:click.prevent="clearTitleContext" active icon="fa-solid fa-clapperboard">Подборка по сериалу {{ $titleContext->display_title }} · убрать</x-ui.taxonomy-chip>
                                     @endif
                                     @foreach ($filterView->selectedYears() as $selectedYear)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->yearQuery($selectedYear))" wire:click.prevent="removeYear({{ $selectedYear }})" active icon="fa-solid fa-calendar-days">Сериалы {{ $selectedYear }} года · убрать</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->yearQuery($selectedYear))" rel="nofollow" wire:click.prevent="removeYear({{ $selectedYear }})" active icon="fa-solid fa-calendar-days">Сериалы {{ $selectedYear }} года · убрать</x-ui.taxonomy-chip>
                                     @endforeach
                                     @if ($invalidYear)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutYearQuery)" wire:click.prevent="resetGroup('year')" active icon="fa-solid fa-calendar-days">Год {{ $requestedYear }} не найден · убрать</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutYearQuery)" rel="nofollow" wire:click.prevent="resetGroup('year')" active icon="fa-solid fa-calendar-days">Год {{ $requestedYear }} не найден · убрать</x-ui.taxonomy-chip>
                                     @endif
                                     @foreach ($selectedTaxonomies as $filterType => $taxonomies)
                                         @foreach ($taxonomies as $taxonomy)
-                                            <x-ui.taxonomy-chip :href="route('titles.index', $filterView->filterQuery($filterType, $taxonomy->slug))" wire:click.prevent="removeTaxonomy('{{ $filterType }}', '{{ $taxonomy->slug }}')" :icon="$filterView->icon($filterType)" active>{{ $filterView->taxonomyContextLabel($filterType, $taxonomy) }} · убрать</x-ui.taxonomy-chip>
+                                            <x-ui.taxonomy-chip :href="route('titles.index', $filterView->filterQuery($filterType, $taxonomy->slug))" rel="nofollow" wire:click.prevent="removeTaxonomy('{{ $filterType }}', '{{ $taxonomy->slug }}')" :icon="$filterView->icon($filterType)" active>{{ $filterView->taxonomyContextLabel($filterType, $taxonomy) }} · убрать</x-ui.taxonomy-chip>
                                         @endforeach
                                     @endforeach
                                     @foreach ($excludedTaxonomies as $filterType => $taxonomies)
                                         @foreach ($taxonomies as $taxonomy)
-                                            <x-ui.taxonomy-chip :href="route('titles.index', $filterView->exclusionQuery($filterType, $taxonomy->slug))" wire:click.prevent="removeExcluded('{{ $filterType }}', '{{ $taxonomy->slug }}')" active icon="fa-solid fa-minus">{{ $filterView->excludedTaxonomyLabel($filterType, $taxonomy) }} · убрать</x-ui.taxonomy-chip>
+                                            <x-ui.taxonomy-chip :href="route('titles.index', $filterView->exclusionQuery($filterType, $taxonomy->slug))" rel="nofollow" wire:click.prevent="removeExcluded('{{ $filterType }}', '{{ $taxonomy->slug }}')" active icon="fa-solid fa-minus">{{ $filterView->excludedTaxonomyLabel($filterType, $taxonomy) }} · убрать</x-ui.taxonomy-chip>
                                         @endforeach
                                     @endforeach
                                     @foreach ($filterView->listState('publication_type') as $publicationType)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('publication_type', $publicationType))" wire:click.prevent="removeChoice('publication_type', '{{ $publicationType }}')" active icon="fa-solid fa-clapperboard">Тип материалов — {{ $filterView->publicationTypeLabel($publicationType) }} · убрать</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('publication_type', $publicationType))" rel="nofollow" wire:click.prevent="removeChoice('publication_type', '{{ $publicationType }}')" active icon="fa-solid fa-clapperboard">Тип материалов — {{ $filterView->publicationTypeLabel($publicationType) }} · убрать</x-ui.taxonomy-chip>
                                     @endforeach
                                     @foreach ($filterView->listState('subtitles') as $subtitleValue)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('subtitles', $subtitleValue))" wire:click.prevent="removeChoice('subtitles', '{{ $subtitleValue }}')" active icon="fa-solid fa-closed-captioning">Субтитры — {{ $filterView->subtitleLabel($subtitleValue) }} · убрать</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('subtitles', $subtitleValue))" rel="nofollow" wire:click.prevent="removeChoice('subtitles', '{{ $subtitleValue }}')" active icon="fa-solid fa-closed-captioning">Субтитры — {{ $filterView->subtitleLabel($subtitleValue) }} · убрать</x-ui.taxonomy-chip>
                                     @endforeach
                                     @foreach ($filterView->listState('quality') as $quality)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('quality', $quality))" wire:click.prevent="removeChoice('quality', '{{ $quality }}')" active icon="fa-solid fa-display">Качество — {{ $quality }} · убрать</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('quality', $quality))" rel="nofollow" wire:click.prevent="removeChoice('quality', '{{ $quality }}')" active icon="fa-solid fa-display">Качество — {{ $quality }} · убрать</x-ui.taxonomy-chip>
                                     @endforeach
                                     @foreach ($filterView->advancedFilterChips() as $chip)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutCatalogState($chip['key']))" wire:click.prevent="resetAdvanced('{{ $chip['key'] }}')" active icon="fa-solid fa-sliders">
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutCatalogState($chip['key']))" rel="nofollow" wire:click.prevent="resetAdvanced('{{ $chip['key'] }}')" active icon="fa-solid fa-sliders">
                                             {{ $chip['label'] }} — {{ $chip['value'] }} · убрать
                                         </x-ui.taxonomy-chip>
                                     @endforeach
@@ -331,7 +343,7 @@
 
                 <div class="mt-4 hidden flex-wrap gap-2 lg:flex">
                     @foreach ($filterView->sortLabels as $sortKey => $sortLabel)
-                        <a data-catalog-sort-option href="{{ route('titles.index', $filterView->sortQuery($sortKey)) }}" wire:click.prevent="sortBy('{{ $sortKey }}')" @if ($filterView->isActiveSort($sortKey)) aria-current="true" @endif @class([
+                        <a data-catalog-sort-option href="{{ route('titles.index', $filterView->sortQuery($sortKey)) }}" rel="nofollow" wire:click.prevent="sortBy('{{ $sortKey }}')" @if ($filterView->isActiveSort($sortKey)) aria-current="true" @endif @class([
                             'inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold',
                             'bg-emerald-50 text-emerald-700' => $filterView->isActiveSort($sortKey),
                             'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveSort($sortKey),
@@ -345,7 +357,7 @@
                 <div class="mt-3 hidden flex-wrap items-center gap-2 text-xs font-bold lg:flex">
                     <span class="text-slate-400">Вид:</span>
                     @foreach (['grid' => 'Сетка', 'list' => 'Список'] as $viewKey => $viewLabel)
-                        <a data-catalog-view-option href="{{ route('titles.index', $filterView->viewQuery($viewKey)) }}" wire:click.prevent="setView('{{ $viewKey }}')" @class([
+                        <a data-catalog-view-option href="{{ route('titles.index', $filterView->viewQuery($viewKey)) }}" rel="nofollow" wire:click.prevent="setView('{{ $viewKey }}')" @class([
                             'inline-flex min-h-11 items-center rounded-full px-3 py-2',
                             'bg-emerald-50 text-emerald-700' => $view === $viewKey,
                             'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $view !== $viewKey,
@@ -353,7 +365,7 @@
                     @endforeach
                     <span class="ml-2 text-slate-400">На странице:</span>
                     @foreach ([24, 48, 96] as $pageSize)
-                        <a data-catalog-page-size-option href="{{ route('titles.index', $filterView->perPageQuery($pageSize)) }}" wire:click.prevent="setPerPage({{ $pageSize }})" @class([
+                        <a data-catalog-page-size-option href="{{ route('titles.index', $filterView->perPageQuery($pageSize)) }}" rel="nofollow" wire:click.prevent="setPerPage({{ $pageSize }})" @class([
                             'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 py-2 tabular-nums',
                             'bg-emerald-50 text-emerald-700' => $perPage === $pageSize,
                             'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $perPage !== $pageSize,
@@ -364,7 +376,7 @@
                 <nav class="mt-4 hidden flex-wrap items-center gap-1.5 lg:flex" aria-label="Алфавитный переход по названиям">
                     <span class="mr-1 text-xs font-bold uppercase tracking-wide text-slate-400">Алфавит:</span>
                     @foreach ($filterView->alphabet as $letter)
-                        <a data-catalog-alphabet-option href="{{ route('titles.index', $filterView->alphabetQuery($letter)) }}" wire:click.prevent="setLetter('{{ $letter }}')" @class([
+                        <a data-catalog-alphabet-option href="{{ route('titles.index', $filterView->alphabetQuery($letter)) }}" rel="nofollow" wire:click.prevent="setLetter('{{ $letter }}')" @class([
                             'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-2 text-xs font-bold transition',
                             'bg-emerald-50 text-emerald-700' => $filterView->isActiveLetter($letter),
                             'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveLetter($letter),
@@ -382,7 +394,7 @@
                     </summary>
                     <div class="mt-2 flex flex-wrap gap-2">
                         @foreach ($filterView->sortLabels as $sortKey => $sortLabel)
-                            <a href="{{ route('titles.index', $filterView->sortQuery($sortKey)) }}" wire:click.prevent="sortBy('{{ $sortKey }}')" @if ($filterView->isActiveSort($sortKey)) aria-current="true" @endif @class([
+                            <a href="{{ route('titles.index', $filterView->sortQuery($sortKey)) }}" rel="nofollow" wire:click.prevent="sortBy('{{ $sortKey }}')" @if ($filterView->isActiveSort($sortKey)) aria-current="true" @endif @class([
                                 'inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold',
                                 'bg-emerald-50 text-emerald-700' => $filterView->isActiveSort($sortKey),
                                 'bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveSort($sortKey),
@@ -396,7 +408,7 @@
                         <div class="text-xs font-black uppercase tracking-wide text-slate-400">{{ __('catalog.catalog.view_label') }}</div>
                         <div class="mt-2 flex flex-wrap gap-2">
                             @foreach (['grid' => __('catalog.catalog.view_grid'), 'list' => __('catalog.catalog.view_list')] as $viewKey => $viewLabel)
-                                <a href="{{ route('titles.index', $filterView->viewQuery($viewKey)) }}" wire:click.prevent="setView('{{ $viewKey }}')" @class([
+                                <a href="{{ route('titles.index', $filterView->viewQuery($viewKey)) }}" rel="nofollow" wire:click.prevent="setView('{{ $viewKey }}')" @class([
                                     'inline-flex min-h-11 items-center rounded-full px-3 py-2 text-xs font-bold',
                                     'bg-emerald-50 text-emerald-700' => $view === $viewKey,
                                     'bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $view !== $viewKey,
@@ -408,7 +420,7 @@
                         <div class="text-xs font-black uppercase tracking-wide text-slate-400">{{ __('catalog.catalog.page_size_label') }}</div>
                         <div class="mt-2 flex flex-wrap gap-2">
                             @foreach ([24, 48, 96] as $pageSize)
-                                <a href="{{ route('titles.index', $filterView->perPageQuery($pageSize)) }}" wire:click.prevent="setPerPage({{ $pageSize }})" @class([
+                                <a href="{{ route('titles.index', $filterView->perPageQuery($pageSize)) }}" rel="nofollow" wire:click.prevent="setPerPage({{ $pageSize }})" @class([
                                     'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 py-2 text-xs font-bold tabular-nums',
                                     'bg-emerald-50 text-emerald-700' => $perPage === $pageSize,
                                     'bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $perPage !== $pageSize,
@@ -418,7 +430,7 @@
                     </div>
                     <nav class="mt-3 flex flex-wrap items-center gap-1.5" aria-label="Мобильный алфавитный переход по названиям">
                         @foreach ($filterView->alphabet as $letter)
-                            <a href="{{ route('titles.index', $filterView->alphabetQuery($letter)) }}" wire:click.prevent="setLetter('{{ $letter }}')" @class([
+                            <a href="{{ route('titles.index', $filterView->alphabetQuery($letter)) }}" rel="nofollow" wire:click.prevent="setLetter('{{ $letter }}')" @class([
                                 'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-2 text-xs font-bold',
                                 'bg-emerald-50 text-emerald-700' => $filterView->isActiveLetter($letter),
                                 'bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveLetter($letter),
@@ -609,7 +621,7 @@
                                 <x-ui.icon name="fa-solid fa-filter" />
                                 <span>{{ __('catalog.catalog.exact_filters.show_results') }}</span>
                             </button>
-                            <a href="{{ route('titles.index', $filterView->advancedFiltersResetQuery()) }}" wire:click.prevent="resetAdvancedFilters" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control px-3 py-2 text-sm font-bold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700">
+                            <a href="{{ route('titles.index', $filterView->advancedFiltersResetQuery()) }}" rel="nofollow" wire:click.prevent="resetAdvancedFilters" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control px-3 py-2 text-sm font-bold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700">
                                 <x-ui.icon name="fa-solid fa-rotate-left" />
                                 <span>{{ __('catalog.catalog.exact_filters.reset') }}</span>
                             </a>
@@ -664,6 +676,7 @@
                                         @foreach ($searchSuggestions as $suggestion)
                                             <a
                                                 href="{{ route('titles.index', array_merge($filterView->withoutSearchQuery, ['q' => $suggestion->suggestion_name])) }}"
+                                                rel="nofollow"
                                                 class="inline-flex min-h-11 max-w-full items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
                                             >
                                                 <x-ui.icon name="fa-solid fa-wand-magic-sparkles" />
@@ -691,13 +704,13 @@
                             @endif
                             <div class="flex flex-wrap gap-2">
                                 @if ($search !== '')
-                                    <a href="{{ route('titles.index', $filterView->withoutSearchQuery) }}" wire:click.prevent="clearSearch" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
+                                    <a href="{{ route('titles.index', $filterView->withoutSearchQuery) }}" rel="nofollow" wire:click.prevent="clearSearch" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                                         <x-ui.icon name="fa-solid fa-magnifying-glass-minus" />
                                         <span>Очистить поиск</span>
                                     </a>
                                 @endif
                                 @if ($filterView->hasActiveFilters() || $titleContext !== null || $filterView->selectedYears() !== [] || $invalidYear)
-                                    <a href="{{ route('titles.index', $filterView->withoutFiltersQuery) }}" wire:click.prevent="resetAll" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
+                                    <a href="{{ route('titles.index', $filterView->withoutFiltersQuery) }}" rel="nofollow" wire:click.prevent="resetAll" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                                         <x-ui.icon name="fa-solid fa-filter-circle-xmark" />
                                         <span>Убрать фильтры</span>
                                     </a>

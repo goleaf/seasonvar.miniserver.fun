@@ -467,13 +467,27 @@ class CatalogAdvancedFilterTest extends TestCase
             'completed_at' => now(),
         ]);
 
-        $data = $this->catalogData(['q' => 'Поисковый Актер']);
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        try {
+            $data = $this->catalogData(['q' => 'Поисковый Актер']);
+            $queries = collect(DB::getQueryLog())
+                ->pluck('query')
+                ->map(fn (string $sql): string => mb_strtolower($sql));
+        } finally {
+            DB::disableQueryLog();
+            DB::flushQueryLog();
+        }
+
         $genres = $data['filterTaxonomies']->get('genre')->keyBy('slug');
 
         $this->assertSame(2, $data['titles']->total());
         $this->assertSame(1, $genres->get('poiskovaia-drama')->context_titles_count);
         $this->assertSame(1, $genres->get('poiskovyi-triller')->context_titles_count);
         $this->assertFalse($genres->has('vne-poiska'));
+        $this->assertCount(3, $queries->filter(fn (string $sql): bool => str_contains($sql, 'catalog_title_search_fts match')));
+        $this->assertGreaterThanOrEqual(4, substr_count($queries->implode("\n"), 'json_each'));
     }
 
     /** @return array<string, mixed> */

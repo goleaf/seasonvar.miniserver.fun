@@ -11,6 +11,7 @@ use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\Catalog\Search\CatalogSearchMatchSet;
 use App\Services\Catalog\Search\CatalogSearchNormalizer;
 use App\Services\Catalog\Search\CatalogSearchQuery;
 use App\Services\Catalog\Search\CatalogSearchState;
@@ -65,8 +66,12 @@ class CatalogTitleQuery
         ?User $user,
         ?string $exceptTaxonomyType = null,
         bool $rankSearch = false,
+        ?CatalogSearchMatchSet $searchMatches = null,
     ): Builder {
-        $query = $this->visibleTo($user);
+        $query = $rankSearch
+            ? $this->rankedSearchQuery($criteria->search, $user)
+            : null;
+        $query ??= $this->visibleTo($user);
 
         if ($criteria->invalidYear || $criteria->invalidTitleContext) {
             $query->whereRaw('1 = 0');
@@ -86,7 +91,9 @@ class CatalogTitleQuery
             $query->whereKey($criteria->titleContextId);
         }
 
-        $this->applySearchFilter($query, $criteria->search, $criteria->titleContextId, $user, $rankSearch);
+        if (! isset($this->rankedSearchAliases[spl_object_id($query)])) {
+            $this->applySearchFilter($query, $criteria->search, $criteria->titleContextId, $user, $searchMatches);
+        }
         $this->applyRelationFilters(
             $query,
             $exceptTaxonomyType,
@@ -94,6 +101,28 @@ class CatalogTitleQuery
             $criteria->excludedTaxonomyIds,
         );
         $this->applyAdvancedFilters($query, $criteria->queryFilters(), $user);
+
+        return $query;
+    }
+
+    /** @return Builder<CatalogTitle>|null */
+    private function rankedSearchQuery(CatalogSearchQuery $search, ?User $user): ?Builder
+    {
+        $rankedCandidates = $this->titleSearch->candidateQuery($search);
+
+        if ($rankedCandidates === null) {
+            return null;
+        }
+
+        $alias = 'catalog_search_candidates';
+        $catalogTitleTable = (new CatalogTitle)->getTable();
+        $query = CatalogTitle::query()
+            ->fromSub($rankedCandidates, $alias)
+            ->crossJoin($catalogTitleTable)
+            ->whereColumn($catalogTitleTable.'.id', $alias.'.catalog_title_id');
+
+        $this->constrainVisible($query, $user);
+        $this->rankedSearchAliases[spl_object_id($query)] = $alias;
 
         return $query;
     }
@@ -154,10 +183,13 @@ class CatalogTitleQuery
     }
 
     /** @return array{available: int, missing: int} */
-    public function subtitleContextCounts(CatalogTitlesCriteria $criteria, ?User $user): array
-    {
+    public function subtitleContextCounts(
+        CatalogTitlesCriteria $criteria,
+        ?User $user,
+        ?CatalogSearchMatchSet $searchMatches = null,
+    ): array {
         $contextTitles = $this
-            ->filteredTitles($criteria->withoutSubtitleAvailability(), $user)
+            ->filteredTitles($criteria->withoutSubtitleAvailability(), $user, searchMatches: $searchMatches)
             ->select('catalog_titles.id')
             ->withExists(['licensedMedia as has_available_subtitles' => fn (Builder $query): Builder => $query
                 ->availableTo($user)
@@ -185,6 +217,7 @@ class CatalogTitleQuery
         Collection $filterTaxonomies,
         CatalogTitlesCriteria $criteria,
         ?User $user,
+        ?CatalogSearchMatchSet $searchMatches = null,
     ): Collection {
         $visibleIdsByType = $filterTaxonomies
             ->map(fn (Collection $items): Collection => $items->pluck('id')->values())
@@ -196,14 +229,14 @@ class CatalogTitleQuery
 
         $catalogTitleTable = (new CatalogTitle)->getTable();
         $contextQueries = $visibleIdsByType
-            ->map(function (Collection $recordIds, string $filterType) use ($criteria, $user, $catalogTitleTable) {
+            ->map(function (Collection $recordIds, string $filterType) use ($criteria, $user, $catalogTitleTable, $searchMatches) {
                 $relationName = $this->taxonomies->relationName($filterType);
                 $catalogTitleRelation = (new CatalogTitle)->{$relationName}();
                 $pivotTable = $catalogTitleRelation->getTable();
                 $titlePivotKey = $catalogTitleRelation->getForeignPivotKeyName();
                 $relatedPivotKey = $catalogTitleRelation->getRelatedPivotKeyName();
                 $filteredTitlesQuery = $this
-                    ->filteredTitles($criteria->withoutRelation($filterType), $user)
+                    ->filteredTitles($criteria->withoutRelation($filterType), $user, searchMatches: $searchMatches)
                     ->select($catalogTitleTable.'.id');
                 $alias = 'filtered_titles_'.preg_replace('/[^a-z0-9_]+/i', '_', $filterType);
 
@@ -250,7 +283,7 @@ class CatalogTitleQuery
         CatalogSearchQuery $search,
         ?int $titleContextId,
         ?User $user,
-        bool $rankSearch,
+        ?CatalogSearchMatchSet $searchMatches,
     ): void {
         if ($search->state === CatalogSearchState::Empty) {
             return;
@@ -268,16 +301,8 @@ class CatalogTitleQuery
             return;
         }
 
-        if ($rankSearch && ($rankedCandidates = $this->titleSearch->candidateQuery($search)) !== null) {
-            $alias = 'catalog_search_candidates';
-            $query->joinSub(
-                $rankedCandidates,
-                $alias,
-                $alias.'.catalog_title_id',
-                '=',
-                'catalog_titles.id',
-            );
-            $this->rankedSearchAliases[spl_object_id($query)] = $alias;
+        if ($searchMatches !== null) {
+            $query->whereIn('catalog_titles.id', $searchMatches->idsQuery());
 
             return;
         }

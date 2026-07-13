@@ -744,10 +744,34 @@ class CatalogPageTest extends TestCase
         $targetTitle->actors()->attach($target);
 
         Livewire::test(CatalogSeries::class)
+            ->call('loadFacets')
             ->assertDontSee($target->name)
             ->set('optionSearch.actor', 'Искомый редкий')
             ->assertSee($target->name)
             ->assertSet('paginators.page', 1);
+    }
+
+    public function test_livewire_catalog_loads_filter_facets_only_on_demand(): void
+    {
+        $genre = Genre::query()->create([
+            'name' => 'Ленивая драма',
+            'slug' => 'lazy-drama',
+        ]);
+        $title = CatalogTitle::factory()->create();
+        $title->genres()->attach($genre);
+
+        Livewire::test(CatalogSeries::class)
+            ->assertSet('facetsLoaded', false)
+            ->assertSee('Показать фильтры')
+            ->assertDontSeeHtml('name="genre[]" value="lazy-drama"')
+            ->call('loadFacets')
+            ->assertSet('facetsLoaded', true)
+            ->assertSeeHtml('name="genre[]" value="lazy-drama"')
+            ->assertDontSee('Показать фильтры')
+            ->set('filters.search', 'Новый поиск')
+            ->call('applySearch')
+            ->assertSet('facetsLoaded', false)
+            ->assertSee('Показать фильтры');
     }
 
     public function test_livewire_catalog_normalizes_null_empty_url_state_without_uninitializing_the_form(): void

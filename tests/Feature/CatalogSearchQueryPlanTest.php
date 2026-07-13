@@ -45,7 +45,9 @@ class CatalogSearchQueryPlanTest extends TestCase
         $rankedSql = mb_strtolower($ranked->toSql());
         $this->assertStringContainsString(' in (select catalog_title_search_fts.rowid as catalog_title_id', $aggregateSql);
         $this->assertStringNotContainsString('bm25', $aggregateSql);
-        $this->assertStringContainsString('inner join (select', $rankedSql);
+        $this->assertStringContainsString('from (select', $rankedSql);
+        $this->assertStringContainsString('as "catalog_search_candidates" cross join "catalog_titles"', $rankedSql);
+        $this->assertStringNotContainsString('from "catalog_titles" inner join (select', $rankedSql);
         $this->assertStringContainsString('bm25', $rankedSql);
         $this->assertStringContainsString('limit 9223372036854775807', $rankedSql);
         $this->assertSame([$title->id], $aggregate->pluck('catalog_titles.id')->all());
@@ -129,6 +131,15 @@ class CatalogSearchQueryPlanTest extends TestCase
         $this->assertCount(1, $paginatorCounts);
         $this->assertStringContainsString('catalog_title_search_fts.rowid as catalog_title_id', $paginatorCounts->first());
         $this->assertStringNotContainsString('bm25', $paginatorCounts->first());
-        $this->assertTrue($queries->contains(fn (string $sql): bool => str_contains($sql, 'bm25')));
+        $rankedQueries = $queries->filter(fn (string $sql): bool => str_contains($sql, 'bm25'));
+        $this->assertCount(1, $rankedQueries);
+        $this->assertStringContainsString('select "catalog_titles"."id" from (select', $rankedQueries->first());
+        $this->assertStringNotContainsString('select count(*) from "seasons"', $rankedQueries->first());
+
+        $cardQuery = $queries->first(fn (string $sql): bool => str_contains($sql, 'from "catalog_titles"')
+            && str_contains($sql, 'where "catalog_titles"."id" in')
+            && str_contains($sql, 'select count(*) from "seasons"'));
+        $this->assertIsString($cardQuery);
+        $this->assertStringNotContainsString('bm25', $cardQuery);
     }
 }

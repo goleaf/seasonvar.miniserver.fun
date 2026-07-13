@@ -8,6 +8,7 @@ use App\Models\CatalogTitle;
 use App\Services\Catalog\Search\CatalogSearchQueryParser;
 use App\Services\Catalog\Search\CatalogSearchState;
 use App\Services\Catalog\Search\CatalogSearchSuggestion;
+use App\Services\Catalog\Search\CatalogTitleSearch;
 use App\View\ViewModels\CatalogTitlesViewModel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -37,6 +38,7 @@ class CatalogTitlesPageBuilder
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogDirectoryRegistry $directories,
         private readonly CatalogSearchQueryParser $searchParser,
+        private readonly CatalogTitleSearch $titleSearch,
         private readonly CatalogSearchSuggestion $searchSuggestions,
     ) {}
 
@@ -49,6 +51,7 @@ class CatalogTitlesPageBuilder
         ?string $taxonomy = null,
         bool $invalidInput = false,
         array $facetSearch = [],
+        bool $includeFacets = true,
     ): array {
         $search = $request->normalizedSearch();
         $searchQuery = $this->searchParser->parse($search);
@@ -180,79 +183,141 @@ class CatalogTitlesPageBuilder
         $catalogTotal = $rankSearch
             ? $this->query->filteredTitles($criteria, $request->user())->count()
             : null;
-        $catalogTitles = $this->query->filteredTitles(
-            $criteria,
-            $request->user(),
-            rankSearch: $rankSearch,
-        )
-            ->select($cardColumns)
-            ->with($view === 'list'
-                ? array_merge([
-                    'latestSeason' => fn ($query) => $query->select(['seasons.id', 'seasons.catalog_title_id', 'seasons.number']),
-                ], $cardLoads)
-                : $cardLoads)
-            ->withCount($this->query->publicCardCounts($request->user()));
+        $cardCounts = $this->query->publicCardCounts($request->user());
+        $cardRelations = $view === 'list'
+            ? array_merge([
+                'latestSeason' => fn ($query) => $query->select(['seasons.id', 'seasons.catalog_title_id', 'seasons.number']),
+            ], $cardLoads)
+            : $cardLoads;
 
-        if (in_array($sortOption, [CatalogSort::KinopoiskRating, CatalogSort::ImdbRating], true)) {
-            $catalogTitles->withMax($this->query->ratingAggregates(), 'rating');
+        if ($rankSearch) {
+            $catalogTitleIds = $this->query->filteredTitles(
+                $criteria,
+                $request->user(),
+                rankSearch: true,
+            )->select('catalog_titles.id');
+
+            $sortCountKeys = match ($sortOption) {
+                CatalogSort::EpisodesDesc => ['episodes'],
+                CatalogSort::SeasonsDesc => ['seasons'],
+                CatalogSort::VideoDesc => ['licensedMedia as published_media_count'],
+                CatalogSort::Popularity => ['episodes', 'licensedMedia as published_media_count'],
+                default => [],
+            };
+
+            if ($sortCountKeys !== []) {
+                $catalogTitleIds->withCount(array_intersect_key($cardCounts, array_flip($sortCountKeys)));
+            }
+
+            if (in_array($sortOption, [CatalogSort::KinopoiskRating, CatalogSort::ImdbRating], true)) {
+                $catalogTitleIds->withMax($this->query->ratingAggregates(), 'rating');
+            }
+
+            $this->query->sorted($catalogTitleIds, $sortOption);
+            $catalogTitles = $catalogTitleIds
+                ->paginate($perPage, total: $catalogTotal)
+                ->appends($paginationQuery);
+            $pageIds = $catalogTitles->getCollection()
+                ->pluck('id')
+                ->map(fn (mixed $id): int => (int) $id)
+                ->values();
+            $cardsById = $pageIds->isEmpty()
+                ? collect()
+                : CatalogTitle::query()
+                    ->select($cardColumns)
+                    ->whereKey($pageIds->all())
+                    ->with($cardRelations)
+                    ->withCount($cardCounts)
+                    ->when(
+                        in_array($sortOption, [CatalogSort::KinopoiskRating, CatalogSort::ImdbRating], true),
+                        fn ($query) => $query->withMax($this->query->ratingAggregates(), 'rating'),
+                    )
+                    ->get()
+                    ->keyBy('id');
+            $catalogTitles->setCollection(
+                $pageIds
+                    ->map(fn (int $id): ?CatalogTitle => $cardsById->get($id))
+                    ->filter()
+                    ->values(),
+            );
+        } else {
+            $catalogTitleQuery = $this->query->filteredTitles($criteria, $request->user())
+                ->select($cardColumns)
+                ->with($cardRelations)
+                ->withCount($cardCounts);
+
+            if (in_array($sortOption, [CatalogSort::KinopoiskRating, CatalogSort::ImdbRating], true)) {
+                $catalogTitleQuery->withMax($this->query->ratingAggregates(), 'rating');
+            }
+
+            $this->query->sorted($catalogTitleQuery, $sortOption);
+            $catalogTitles = $catalogTitleQuery->paginate($perPage)->appends($paginationQuery);
         }
-        $this->query->sorted($catalogTitles, $sortOption);
-        $catalogTitles = $catalogTitles->paginate($perPage, total: $catalogTotal)->appends($paginationQuery);
         $suggestions = $catalogTitles->total() === 0 && ! $invalidInput && $titleContext === null
             ? $this->searchSuggestions->forQuery($searchQuery, $request->user())
             : collect();
         $seoRequest = $this->sanitizedSeoRequest($request, $paginationQuery, (int) $catalogTitles->currentPage());
 
-        $filterLimits = collect($filterTypes)
-            ->mapWithKeys(fn (string $filterType): array => [$filterType => $this->filterLimit($filterType)])
-            ->all();
-        $facetSearches = collect($facetSearch)
-            ->only(['actor', 'director'])
-            ->filter(fn (mixed $search): bool => is_string($search))
-            ->map(fn (string $search): string => $search)
-            ->all();
-        $filterTaxonomies = $this->facets->taxonomyGroups(
-            $filterTypes,
-            $filterLimits,
-            $request->user(),
-            $facetSearches,
-            $criteria,
-        );
-
-        $missingSelectedTaxonomies = collect();
-        $filterTaxonomies = $filterTaxonomies->map(function (Collection $items, string $filterType) use ($selectedTaxonomies, $missingSelectedTaxonomies): Collection {
-            $selected = $selectedTaxonomies->get($filterType, collect());
-            $itemsById = $items->keyBy(fn (Model $record): int => (int) $record->id);
-            $selectedWithContext = $selected->map(function (Model $record) use ($itemsById): Model {
-                return $itemsById->get((int) $record->id, $record);
-            });
-            $missingSelectedTaxonomies->put(
-                $filterType,
-                $selectedWithContext->filter(
-                    fn (Model $record): bool => ! array_key_exists('context_titles_count', $record->getAttributes()),
-                )->values(),
+        if ($includeFacets) {
+            $searchMatches = $this->titleSearch->materializeMatches($searchQuery);
+            $filterLimits = collect($filterTypes)
+                ->mapWithKeys(fn (string $filterType): array => [$filterType => $this->filterLimit($filterType)])
+                ->all();
+            $facetSearches = collect($facetSearch)
+                ->only(['actor', 'director'])
+                ->filter(fn (mixed $search): bool => is_string($search))
+                ->map(fn (string $search): string => $search)
+                ->all();
+            $filterTaxonomies = $this->facets->taxonomyGroups(
+                $filterTypes,
+                $filterLimits,
+                $request->user(),
+                $facetSearches,
+                $criteria,
+                $searchMatches,
             );
-            $selectedIds = $selected->pluck('id')->map(fn (mixed $id): int => (int) $id);
-            $remainingItems = $items
-                ->reject(fn (Model $record): bool => $selectedIds->contains((int) $record->id))
-                ->values();
 
-            return $selectedWithContext->concat($remainingItems)->values();
-        });
+            $missingSelectedTaxonomies = collect();
+            $filterTaxonomies = $filterTaxonomies->map(function (Collection $items, string $filterType) use ($selectedTaxonomies, $missingSelectedTaxonomies): Collection {
+                $selected = $selectedTaxonomies->get($filterType, collect());
+                $itemsById = $items->keyBy(fn (Model $record): int => (int) $record->id);
+                $selectedWithContext = $selected->map(function (Model $record) use ($itemsById): Model {
+                    return $itemsById->get((int) $record->id, $record);
+                });
+                $missingSelectedTaxonomies->put(
+                    $filterType,
+                    $selectedWithContext->filter(
+                        fn (Model $record): bool => ! array_key_exists('context_titles_count', $record->getAttributes()),
+                    )->values(),
+                );
+                $selectedIds = $selected->pluck('id')->map(fn (mixed $id): int => (int) $id);
+                $remainingItems = $items
+                    ->reject(fn (Model $record): bool => $selectedIds->contains((int) $record->id))
+                    ->values();
 
-        $taxonomyContextCounts = $this->query->relationContextCounts($missingSelectedTaxonomies, $criteria, $request->user());
-        $filterTaxonomies = $filterTaxonomies->map(function (Collection $items, string $filterType) use ($taxonomyContextCounts): Collection {
-            return $items->map(function (Model $record) use ($filterType, $taxonomyContextCounts): Model {
-                if (! array_key_exists('context_titles_count', $record->getAttributes())) {
-                    $record->context_titles_count = (int) ($taxonomyContextCounts->get($filterType.'|'.$record->id) ?? 0);
-                }
-
-                return $record;
+                return $selectedWithContext->concat($remainingItems)->values();
             });
-        });
-        $yearBuckets = $this->facets->years($criteria, $years, 20, $request->user());
-        $publicationTypeOptions = $this->facets->publicationTypes($criteria, $request->user());
-        $subtitleOptions = $this->facets->subtitleAvailability($criteria, $request->user());
+
+            $taxonomyContextCounts = $this->query->relationContextCounts($missingSelectedTaxonomies, $criteria, $request->user(), $searchMatches);
+            $filterTaxonomies = $filterTaxonomies->map(function (Collection $items, string $filterType) use ($taxonomyContextCounts): Collection {
+                return $items->map(function (Model $record) use ($filterType, $taxonomyContextCounts): Model {
+                    if (! array_key_exists('context_titles_count', $record->getAttributes())) {
+                        $record->context_titles_count = (int) ($taxonomyContextCounts->get($filterType.'|'.$record->id) ?? 0);
+                    }
+
+                    return $record;
+                });
+            });
+            $yearBuckets = $this->facets->years($criteria, $years, 20, $request->user(), $searchMatches);
+            $publicationTypeOptions = $this->facets->publicationTypes($criteria, $request->user(), $searchMatches);
+            $subtitleOptions = $this->facets->subtitleAvailability($criteria, $request->user(), $searchMatches);
+        } else {
+            $filterTaxonomies = collect($filterTypes)
+                ->mapWithKeys(fn (string $filterType): array => [$filterType => collect()]);
+            $yearBuckets = collect();
+            $publicationTypeOptions = collect();
+            $subtitleOptions = collect();
+        }
 
         $filterView = new CatalogTitlesViewModel(
             search: $search,
@@ -298,6 +363,7 @@ class CatalogTitlesPageBuilder
             'yearBuckets' => $yearBuckets,
             'publicationTypeOptions' => $publicationTypeOptions,
             'subtitleOptions' => $subtitleOptions,
+            'facetsLoaded' => $includeFacets,
             'seo' => $this->seo->titles(
                 $seoRequest,
                 (int) $catalogTitles->total(),

@@ -126,7 +126,7 @@ class CatalogSeoBuilder
         $canonical = $this->catalogCanonicalUrl($request, $activeTaxonomies, $year, $currentPage, $titleContext);
         $robots = $search === '' && $invalidFilterSlugs === [] && ! $invalidYear && $activeTaxonomies->count() <= 1 && ! $this->hasComplexCatalogQuery($request)
             ? $this->indexRobots()
-            : 'noindex,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
+            : 'noindex,nofollow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
         $keywords = collect(['сериалы онлайн', 'каталог сериалов', 'смотреть сериалы'])
             ->when($titleContext !== null, fn (Collection $items): Collection => $items->push($titleContext->display_title))
             ->merge($activeTaxonomies->pluck('name'))
@@ -219,7 +219,7 @@ class CatalogSeoBuilder
             'description' => $this->seoDescription($description),
             'canonical' => $canonical,
             'robots' => $hasInteractiveFilters
-                ? 'noindex,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'
+                ? 'noindex,nofollow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'
                 : $this->indexRobots(),
             'prev' => $previousPageUrl,
             'next' => $nextPageUrl,
