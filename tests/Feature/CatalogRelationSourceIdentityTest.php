@@ -4,9 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Models\Actor;
 use App\Models\CatalogRelationSourceIdentity;
+use App\Models\CatalogTitle;
 use App\Models\Source;
+use App\Services\Catalog\CatalogRelationNameSanitizer;
 use App\Services\Catalog\CatalogRelationSourceIdentityRegistry;
+use App\Services\Catalog\CatalogRelationSyncer;
+use App\Services\Catalog\CatalogTaxonomyRegistry;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -86,5 +92,128 @@ class CatalogRelationSourceIdentityTest extends TestCase
         );
 
         $this->assertDatabaseCount('catalog_relation_source_identities', 0);
+    }
+
+    public function test_stable_external_identity_prevents_renamed_duplicates_for_every_relation_type(): void
+    {
+        $source = Source::factory()->create();
+        $title = CatalogTitle::factory()->create(['source_id' => $source->id]);
+        $syncer = app(CatalogRelationSyncer::class);
+        $taxonomies = app(CatalogTaxonomyRegistry::class);
+        $names = app(CatalogRelationNameSanitizer::class);
+        $cases = [
+            'genre' => ['Драма', 'Мелодрама'],
+            'country' => ['Россия', 'Япония'],
+            'actor' => ['John Smith', 'Johnathan Smith'],
+            'director' => ['Jane Doe', 'Janet Doe'],
+            'age_rating' => ['16+', '18+'],
+            'translation' => ['LostFilm', 'Кубик в кубе'],
+            'status' => ['Выходит', 'Завершён'],
+            'network' => ['HBO', 'Netflix'],
+            'studio' => ['Warner Bros', 'Paramount'],
+            'tag' => ['Семейное', 'Детектив'],
+        ];
+
+        foreach ($cases as $type => [$firstName, $renamedValue]) {
+            $syncer->sync($title, [[
+                'type' => $type,
+                'name' => $firstName,
+                'source_external_id' => 'stable-'.$type,
+            ]]);
+            $syncer->sync($title, [[
+                'type' => $type,
+                'name' => $renamedValue,
+                'source_external_id' => 'stable-'.$type,
+            ]]);
+
+            $modelClass = $taxonomies->modelClass($type);
+            $relation = $taxonomies->relationName($type);
+
+            $this->assertSame(1, $modelClass::query()->count(), $type);
+            $this->assertSame(
+                $names->canonicalKey($type, $firstName),
+                $modelClass::query()->sole()->slug,
+                $type,
+            );
+            $this->assertSame(1, $title->{$relation}()->count(), $type);
+        }
+
+        $this->assertDatabaseCount('catalog_relation_source_identities', count($cases));
+    }
+
+    public function test_equivalent_names_from_different_sources_share_one_record_and_keep_both_identities(): void
+    {
+        $firstSource = Source::factory()->create();
+        $secondSource = Source::factory()->create();
+        $title = CatalogTitle::factory()->create(['source_id' => $firstSource->id]);
+        $syncer = app(CatalogRelationSyncer::class);
+
+        $syncer->sync($title, [[
+            'type' => 'actor',
+            'name' => 'Atsuko Tanaka',
+            'source_external_id' => 'person-1',
+        ]]);
+        $syncer->sync($title, [[
+            'type' => 'actor',
+            'name' => 'Ацуко Танака',
+            'source_id' => $secondSource->id,
+            'source_external_id' => 'actor-77',
+        ]]);
+
+        $actor = Actor::query()->sole();
+
+        $this->assertSame('atsuko-tanaka', $actor->slug);
+        $this->assertSame('Ацуко Танака', $actor->name);
+        $this->assertDatabaseCount('catalog_title_actor', 1);
+        $this->assertDatabaseCount('catalog_relation_source_identities', 2);
+        $this->assertEqualsCanonicalizing(
+            [$firstSource->id, $secondSource->id],
+            CatalogRelationSourceIdentity::query()->pluck('source_id')->all(),
+        );
+    }
+
+    public function test_first_refresh_claims_an_existing_provenance_url_before_a_provider_rename(): void
+    {
+        $source = Source::factory()->create();
+        $title = CatalogTitle::factory()->create(['source_id' => $source->id]);
+        $actor = Actor::query()->create([
+            'name' => 'John Smith',
+            'slug' => 'john-smith',
+            'source_url' => 'https://metadata.example/people/42',
+        ]);
+
+        app(CatalogRelationSyncer::class)->sync($title, [[
+            'type' => 'actor',
+            'name' => 'Johnathan Smith',
+            'source_url' => 'https://metadata.example/people/42',
+        ]]);
+
+        $this->assertDatabaseCount('actors', 1);
+        $this->assertSame($actor->id, Actor::query()->sole()->id);
+        $this->assertSame('john-smith', Actor::query()->sole()->slug);
+        $this->assertDatabaseHas('catalog_relation_source_identities', [
+            'source_id' => $source->id,
+            'relation_type' => 'actor',
+            'canonical_key' => 'john-smith',
+        ]);
+    }
+
+    public function test_relation_sync_rolls_back_lookup_and_identity_when_pivot_write_fails(): void
+    {
+        $source = Source::factory()->create();
+        $title = CatalogTitle::factory()->create(['source_id' => $source->id]);
+        $title->forceDelete();
+
+        try {
+            app(CatalogRelationSyncer::class)->sync($title, [[
+                'type' => 'actor',
+                'name' => 'John Smith',
+                'source_external_id' => 'person-42',
+            ]]);
+            $this->fail('Pivot write for a deleted title must fail.');
+        } catch (QueryException) {
+            $this->assertDatabaseCount('actors', 0);
+            $this->assertDatabaseCount('catalog_relation_source_identities', 0);
+        }
     }
 }

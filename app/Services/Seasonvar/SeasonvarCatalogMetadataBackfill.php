@@ -71,9 +71,9 @@ class SeasonvarCatalogMetadataBackfill
                     'source_page_snapshots.html',
                     'source_page_snapshots.captured_at',
                 ]),
-                'catalogTitle:id,source_page_id,relation_metadata_version',
+                'catalogTitle:id,source_id,source_page_id,relation_metadata_version',
                 'linkedSeasons:id,catalog_title_id,source_url_hash',
-                'linkedSeasons.catalogTitle:id,relation_metadata_version',
+                'linkedSeasons.catalogTitle:id,source_id,relation_metadata_version',
             ])
             ->lazyById($this->pageChunkSize())
             ->take($this->pageLimit());
@@ -171,7 +171,7 @@ class SeasonvarCatalogMetadataBackfill
         }
 
         $titles = CatalogTitle::query()
-            ->select(['id', 'relation_metadata_version'])
+            ->select(['id', 'source_id', 'relation_metadata_version'])
             ->where('relation_metadata_version', '<', SeasonvarCatalogParser::METADATA_VERSION)
             ->when(
                 $attemptedTitleIds !== [],

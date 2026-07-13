@@ -5,21 +5,33 @@ namespace App\Services\Catalog;
 use App\Models\CatalogTitle;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class CatalogRelationSyncer
 {
     public function __construct(
         private readonly CatalogRelationNameSanitizer $relationNames,
+        private readonly CatalogRelationSourceIdentityRegistry $sourceIdentities,
         private readonly CatalogTaxonomyRegistry $taxonomies,
     ) {}
 
     /**
-     * @param  list<array{type: string, name: string, source_url?: string|null}>  $relations
+     * @param  list<array{type: string, name: string, source_id?: int|null, source_external_id?: string|int|null, source_url?: string|null}>  $relations
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return array<string, array{ids: list<int>, count: int, attached_ids: list<int>, attached_count: int}>
      */
     public function sync(CatalogTitle $title, array $relations, ?callable $progress = null): array
+    {
+        return DB::transaction(fn (): array => $this->syncWithinTransaction($title, $relations, $progress));
+    }
+
+    /**
+     * @param  list<array{type: string, name: string, source_id?: int|null, source_external_id?: string|int|null, source_url?: string|null}>  $relations
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @return array<string, array{ids: list<int>, count: int, attached_ids: list<int>, attached_count: int}>
+     */
+    private function syncWithinTransaction(CatalogTitle $title, array $relations, ?callable $progress): array
     {
         $this->report($progress, 'taxonomy-sync-started', [
             'catalog_title_id' => $title->id,
@@ -62,7 +74,7 @@ class CatalogRelationSyncer
     }
 
     /**
-     * @param  Collection<int, array{type: string, name: string, source_url?: string|null}>  $items
+     * @param  Collection<int, array{type: string, name: string, source_id?: int|null, source_external_id?: string|int|null, source_url?: string|null}>  $items
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return list<int>
      */
@@ -72,8 +84,8 @@ class CatalogRelationSyncer
         /** @var class-string<Model> $modelClass */
         $modelClass = $config['model'];
         $now = now();
-        $normalizedItems = $items
-            ->map(function (array $item) use ($type): ?array {
+        $preparedItems = $items
+            ->map(function (array $item) use ($title, $type): ?array {
                 $name = $this->relationNames->normalize($item['name']);
 
                 if ($name === '') {
@@ -82,11 +94,48 @@ class CatalogRelationSyncer
 
                 return [
                     'name' => $name,
-                    'slug' => $this->relationNames->canonicalKey($type, $name),
+                    'fallback_slug' => $this->relationNames->canonicalKey($type, $name),
+                    'source_id' => $this->sourceId($item['source_id'] ?? $title->source_id),
+                    'source_external_id' => $item['source_external_id'] ?? null,
                     'source_url' => $this->safeSourceUrl($item['source_url'] ?? null),
                 ];
             })
+            ->filter();
+
+        if ($preparedItems->isEmpty()) {
+            return [];
+        }
+
+        $sourceUrls = $preparedItems
+            ->pluck('source_url')
             ->filter()
+            ->unique()
+            ->values();
+        $existingBySourceUrl = $sourceUrls->isEmpty()
+            ? collect()
+            : $modelClass::query()
+                ->whereIn('source_url', $sourceUrls)
+                ->get()
+                ->keyBy('source_url');
+        $normalizedItems = $preparedItems
+            ->map(function (array $item) use ($existingBySourceUrl, $type): array {
+                $existing = $item['source_url'] === null
+                    ? null
+                    : $existingBySourceUrl->get($item['source_url']);
+                $candidateKey = $existing?->slug ?: $item['fallback_slug'];
+
+                return [
+                    'name' => $item['name'],
+                    'slug' => $this->sourceIdentities->resolve(
+                        $item['source_id'],
+                        $type,
+                        $item['source_external_id'],
+                        $item['source_url'],
+                        $candidateKey,
+                    ),
+                    'source_url' => $item['source_url'],
+                ];
+            })
             ->reduce(function (Collection $normalized, array $item) use ($type): Collection {
                 $existing = $normalized->get($item['slug']);
 
@@ -100,10 +149,6 @@ class CatalogRelationSyncer
                 return $normalized;
             }, collect())
             ->values();
-
-        if ($normalizedItems->isEmpty()) {
-            return [];
-        }
 
         $existingBySlug = $modelClass::query()
             ->whereIn('slug', $normalizedItems->pluck('slug'))
@@ -161,6 +206,13 @@ class CatalogRelationSyncer
         ]);
 
         return $relationIds;
+    }
+
+    private function sourceId(mixed $sourceId): int
+    {
+        $sourceId = filter_var($sourceId, FILTER_VALIDATE_INT);
+
+        return is_int($sourceId) && $sourceId > 0 ? $sourceId : 0;
     }
 
     private function safeSourceUrl(?string $sourceUrl): ?string

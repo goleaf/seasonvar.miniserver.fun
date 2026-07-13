@@ -15,7 +15,7 @@ class SeasonvarCatalogRelationSyncer
     ) {}
 
     /**
-     * @param  list<array{type: string, name: string, source_url?: string|null}>  $taxonomies
+     * @param  list<array{type: string, name: string, source_id?: int|null, source_external_id?: string|int|null, source_url?: string|null}>  $taxonomies
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return array<string, array{ids: list<int>, count: int, attached_ids: list<int>, attached_count: int}>
      */
