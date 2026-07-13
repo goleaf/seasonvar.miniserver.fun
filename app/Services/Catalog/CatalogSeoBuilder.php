@@ -98,15 +98,12 @@ class CatalogSeoBuilder
         int $firstItemPosition,
         ?CatalogTitle $titleContext,
     ): array {
-        $activeLabels = $activeTaxonomies
-            ->map(fn (Model $record, string $filterType): string => $this->filterTypeLabel($filterType).': '.$record->name)
-            ->values();
-        $filterText = $activeLabels->implode(', ');
+        $filterTitle = $this->catalogFilteredTitle($activeTaxonomies);
         $title = match (true) {
             $search !== '' && $titleContext !== null => 'Поиск "'.$search.'" по сериалу '.$titleContext->display_title,
             $search !== '' => 'Поиск "'.$search.'" - сериалы онлайн',
-            $filterText !== '' && $year !== null => 'Сериалы '.$year.' - '.$filterText,
-            $filterText !== '' => 'Сериалы - '.$filterText,
+            $filterTitle !== '' && $year !== null => $this->catalogFilteredTitle($activeTaxonomies, $year).' онлайн',
+            $filterTitle !== '' => $filterTitle.' онлайн',
             $year !== null => 'Сериалы '.$year.' года онлайн',
             $titleContext !== null => 'Подборка по сериалу '.$titleContext->display_title,
             default => 'Все сериалы онлайн',
@@ -119,9 +116,9 @@ class CatalogSeoBuilder
         $descriptionParts = collect([
             $total.' сериалов найдено в каталоге.',
             $titleContext !== null ? 'Показаны результаты по сериалу '.$titleContext->display_title.'.' : null,
-            $filterText !== '' ? 'Фильтры: '.$filterText.'.' : null,
-            $year !== null ? 'Год выхода: '.$year.'.' : null,
-            $search !== '' ? 'Поисковый запрос: '.$search.'.' : null,
+            $activeTaxonomies->isNotEmpty() ? $this->catalogFilteredDescription($activeTaxonomies) : null,
+            $year !== null ? 'Учитывается год выхода '.$year.'.' : null,
+            $search !== '' ? 'Учитывается поисковый запрос '.$search.'.' : null,
             $invalidYear ? 'Год '.$requestedYear.' не найден.' : null,
             $invalidFilterSlugs !== [] ? 'Часть фильтров не найдена.' : null,
         ])->filter()->implode(' ');
@@ -132,6 +129,7 @@ class CatalogSeoBuilder
         $keywords = collect(['сериалы онлайн', 'каталог сериалов', 'смотреть сериалы'])
             ->when($titleContext !== null, fn (Collection $items): Collection => $items->push($titleContext->display_title))
             ->merge($activeTaxonomies->pluck('name'))
+            ->merge($this->catalogSearchPhrases($search, $year, $activeTaxonomies))
             ->when($year !== null, fn (Collection $items): Collection => $items->push('сериалы '.$year))
             ->filter()
             ->unique()
@@ -425,20 +423,81 @@ class CatalogSeoBuilder
             ->values();
     }
 
-    private function filterTypeLabel(string $filterType): string
+    private function taxonomyRecordName(Model $record): string
     {
-        return [
-            'genre' => 'Жанр',
-            'country' => 'Страна',
-            'actor' => 'Актер',
-            'director' => 'Режиссер',
-            'age_rating' => 'Возраст',
-            'translation' => 'Перевод',
-            'status' => 'Статус',
-            'network' => 'Канал',
-            'studio' => 'Студия',
-            'tag' => 'Тег',
-        ][$filterType] ?? 'Фильтр';
+        $name = $record->getAttribute('name');
+
+        return PlainText::clean(is_scalar($name) ? (string) $name : '');
+    }
+
+    private function taxonomyContextPhrase(string $filterType, Model $record): string
+    {
+        $name = $this->taxonomyRecordName($record);
+
+        if ($name === '') {
+            return 'по выбранному параметру';
+        }
+
+        return match ($filterType) {
+            'genre' => 'в жанре '.$name,
+            'country' => 'по стране производства '.$name,
+            'actor' => 'с актёром '.$name,
+            'director' => 'режиссёра '.$name,
+            'age_rating' => 'с возрастным рейтингом '.$name,
+            'translation' => 'с озвучкой '.$name,
+            'status' => 'со статусом '.$name,
+            'network' => 'телеканала '.$name,
+            'studio' => 'студии '.$name,
+            'tag' => 'по теме '.$name,
+            default => 'по параметру '.$name,
+        };
+    }
+
+    /**
+     * @return Collection<int, string>
+     */
+    private function taxonomyContextPhrases(Collection $activeTaxonomies): Collection
+    {
+        return $activeTaxonomies
+            ->map(fn (Model $record, string $filterType): string => $this->taxonomyContextPhrase($filterType, $record))
+            ->filter()
+            ->values();
+    }
+
+    private function catalogFilteredTitle(Collection $activeTaxonomies, ?int $year = null): string
+    {
+        if ($activeTaxonomies->isEmpty()) {
+            return '';
+        }
+
+        $contexts = $this->taxonomyContextPhrases($activeTaxonomies);
+
+        if ($contexts->isEmpty()) {
+            return $year === null ? 'Сериалы по выбранным параметрам' : 'Сериалы '.$year.' года по выбранным параметрам';
+        }
+
+        if ($contexts->count() === 1) {
+            return $year === null
+                ? 'Сериалы '.$contexts->first()
+                : 'Сериалы '.$year.' года '.$contexts->first();
+        }
+
+        $suffix = $contexts->implode(', ');
+
+        return $year === null
+            ? 'Сериалы по выбранным параметрам — '.$suffix
+            : 'Сериалы '.$year.' года по выбранным параметрам — '.$suffix;
+    }
+
+    private function catalogFilteredDescription(Collection $activeTaxonomies): string
+    {
+        $contexts = $this->taxonomyContextPhrases($activeTaxonomies);
+
+        if ($contexts->isEmpty()) {
+            return 'Показаны сериалы по выбранным параметрам.';
+        }
+
+        return 'Показаны сериалы '.$contexts->implode(', ').'.';
     }
 
     /**
@@ -602,7 +661,7 @@ class CatalogSeoBuilder
             $total.' сериалов найдено в текущей подборке каталога.',
             $year !== null ? 'Подборка сфокусирована на сериалах '.$year.' года.' : null,
             $search !== '' ? 'Поиск учитывает название, оригинальное название, описание, актеров, режиссеров, жанры, страны и другие связи каталога.' : null,
-            $activeTaxonomies->isNotEmpty() ? 'Активные фильтры: '.$activeTaxonomies->pluck('name')->implode(', ').'.' : null,
+            $activeTaxonomies->isNotEmpty() ? $this->catalogFilteredDescription($activeTaxonomies) : null,
         ])->filter()->implode(' ');
 
         return [
@@ -628,13 +687,13 @@ class CatalogSeoBuilder
 
         foreach ($activeTaxonomies as $filterType => $taxonomy) {
             $links->push([
-                'name' => $this->filterTypeLabel($filterType).': '.$taxonomy->name,
+                'name' => $this->catalogFilteredTitle(collect([$filterType => $taxonomy])),
                 'url' => route('titles.taxonomy', ['type' => $filterType, 'taxonomy' => $taxonomy->slug]),
             ]);
         }
 
         if ($search !== '') {
-            $links->push(['name' => 'Поиск: '.$search, 'url' => route('titles.index', ['q' => $search])]);
+            $links->push(['name' => 'Поиск по запросу '.$search, 'url' => route('titles.index', ['q' => $search])]);
         }
 
         return $links
@@ -659,15 +718,15 @@ class CatalogSeoBuilder
     ): array {
         $facts = collect([
             $catalogTitle->year ? 'год выхода '.$catalogTitle->year : null,
-            $genres->isNotEmpty() ? 'жанры: '.$genres->take(5)->implode(', ') : null,
-            $countries->isNotEmpty() ? 'страна: '.$countries->take(3)->implode(', ') : null,
-            $directors->isNotEmpty() ? 'режиссеры: '.$directors->take(4)->implode(', ') : null,
-            $actors->isNotEmpty() ? 'в ролях: '.$actors->take(8)->implode(', ') : null,
+            $genres->isNotEmpty() ? 'жанры '.$genres->take(5)->implode(', ') : null,
+            $countries->isNotEmpty() ? 'страна производства '.$countries->take(3)->implode(', ') : null,
+            $directors->isNotEmpty() ? 'режиссеры '.$directors->take(4)->implode(', ') : null,
+            $actors->isNotEmpty() ? 'в ролях '.$actors->take(8)->implode(', ') : null,
         ])->filter()->implode('; ');
 
         return [
             'Страница сериала '.$catalogTitle->display_title.' автоматически собирает описание, постер, сезоны, серии, связи каталога и доступные видео для просмотра онлайн.',
-            ($facts !== '' ? 'Основная информация: '.$facts.'. ' : '').'Сейчас в базе указано сезонов: '.$seasonCount.', серий: '.$episodeCount.', видео-файлов: '.$mediaCount.'.',
+            ($facts !== '' ? 'Основная информация о сериале — '.$facts.'. ' : '').'Сейчас в базе указано сезонов: '.$seasonCount.', серий: '.$episodeCount.', видео-файлов: '.$mediaCount.'.',
             'SEO-данные этой страницы обновляются из импортированной информации: алиасы, оригинальное название, рейтинги, актеры, жанры, страны, сезоны и серии используются для формирования поисковых фраз.',
         ];
     }
@@ -688,7 +747,7 @@ class CatalogSeoBuilder
         foreach (['genre', 'country', 'actor', 'director', 'age_rating', 'translation'] as $type) {
             foreach ($taxonomiesByType->get($type, collect())->take(3) as $taxonomy) {
                 $links->push([
-                    'name' => $this->filterTypeLabel($type).': '.$taxonomy->name,
+                    'name' => $this->catalogFilteredTitle(collect([$type => $taxonomy])),
                     'url' => route('titles.taxonomy', ['type' => $type, 'taxonomy' => $taxonomy->slug]),
                 ]);
             }
@@ -730,11 +789,13 @@ class CatalogSeoBuilder
             ]);
         }
 
-        foreach ($activeTaxonomies as $taxonomy) {
+        foreach ($activeTaxonomies as $filterType => $taxonomy) {
+            $context = $this->taxonomyContextPhrase($filterType, $taxonomy);
+
             $base = $base->merge([
-                'сериалы '.$taxonomy->name.' онлайн',
-                'смотреть сериалы '.$taxonomy->name,
-                'лучшие сериалы '.$taxonomy->name,
+                'сериалы '.$context.' онлайн',
+                'смотреть сериалы '.$context,
+                'лучшие сериалы '.$context,
             ]);
         }
 
@@ -754,11 +815,11 @@ class CatalogSeoBuilder
         }
 
         if ($activeTaxonomies->isNotEmpty() && $year !== null) {
-            return 'Сериалы '.$year.' года: '.$activeTaxonomies->pluck('name')->implode(', ');
+            return $this->catalogFilteredTitle($activeTaxonomies, $year);
         }
 
         if ($activeTaxonomies->isNotEmpty()) {
-            return 'Сериалы: '.$activeTaxonomies->pluck('name')->implode(', ');
+            return $this->catalogFilteredTitle($activeTaxonomies);
         }
 
         if ($year !== null) {
@@ -772,9 +833,9 @@ class CatalogSeoBuilder
     {
         $parts = collect([
             $total.' сериалов в подборке',
-            $year !== null ? 'год '.$year : null,
-            $search !== '' ? 'поиск: '.$search : null,
-            $activeTaxonomies->isNotEmpty() ? 'фильтры: '.$activeTaxonomies->pluck('name')->implode(', ') : null,
+            $year !== null ? 'за '.$year.' год' : null,
+            $search !== '' ? 'по запросу '.$search : null,
+            $activeTaxonomies->isNotEmpty() ? $this->taxonomyContextPhrases($activeTaxonomies)->implode(', ') : null,
         ])->filter()->implode(', ');
 
         return ucfirst($parts).'. Выдача учитывает названия, оригинальные названия, алиасы, описания, жанры, страны, актеров и режиссеров.';
@@ -1075,7 +1136,7 @@ class CatalogSeoBuilder
      */
     private function catalogKeywordClusters(string $search, ?int $year, Collection $activeTaxonomies): array
     {
-        $taxonomyNames = $activeTaxonomies->pluck('name')->filter()->values();
+        $taxonomyContexts = $this->taxonomyContextPhrases($activeTaxonomies);
 
         return [
             [
@@ -1088,7 +1149,7 @@ class CatalogSeoBuilder
             [
                 'title' => 'Подборки',
                 'items' => collect(['сериалы по жанрам', 'сериалы по странам', 'сериалы по актерам', 'сериалы по режиссерам'])
-                    ->merge($taxonomyNames->map(fn (string $name): string => 'сериалы '.$name.' онлайн'))
+                    ->merge($taxonomyContexts->map(fn (string $context): string => 'сериалы '.$context.' онлайн'))
                     ->values()
                     ->all(),
             ],

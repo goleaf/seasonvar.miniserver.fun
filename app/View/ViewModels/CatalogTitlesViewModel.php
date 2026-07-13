@@ -6,6 +6,7 @@ use App\Enums\CatalogPublicationType;
 use App\Enums\CatalogSort;
 use App\Livewire\Forms\CatalogSeriesFilters;
 use App\Models\CatalogTitle;
+use App\Support\PlainText;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
@@ -146,6 +147,44 @@ class CatalogTitlesViewModel
         }
 
         return $this->typeLabels[$filterType] ?? $filterType;
+    }
+
+    public function taxonomyContextLabel(string $filterType, Model $taxonomy): string
+    {
+        $name = $this->taxonomyName($taxonomy);
+
+        if ($name === '') {
+            return 'по выбранному параметру';
+        }
+
+        return match ($filterType) {
+            'genre' => 'в жанре '.$name,
+            'country' => 'по стране производства '.$name,
+            'actor' => 'с актёром '.$name,
+            'director' => 'режиссёра '.$name,
+            'age_rating' => 'с возрастным рейтингом '.$name,
+            'translation' => 'с озвучкой '.$name,
+            'status' => 'со статусом '.$name,
+            'network' => 'телеканала '.$name,
+            'studio' => 'студии '.$name,
+            'tag' => 'по теме '.$name,
+            default => 'по параметру '.$name,
+        };
+    }
+
+    public function excludedTaxonomyLabel(string $filterType, Model $taxonomy): string
+    {
+        $name = $this->taxonomyName($taxonomy);
+
+        if ($name === '') {
+            return 'без выбранного параметра';
+        }
+
+        return match ($filterType) {
+            'genre' => 'без жанра '.$name,
+            'country' => 'без страны производства '.$name,
+            default => 'без параметра '.$name,
+        };
     }
 
     public function sortIcon(string $sort): string
@@ -473,6 +512,13 @@ class CatalogTitlesViewModel
     public function subtitleLabel(string $value): string
     {
         return $value === 'available' ? 'Есть' : 'Нет';
+    }
+
+    private function taxonomyName(Model $taxonomy): string
+    {
+        $name = $taxonomy->getAttribute('name');
+
+        return PlainText::clean(is_scalar($name) ? (string) $name : '');
     }
 
     /**

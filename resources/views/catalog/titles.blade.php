@@ -241,52 +241,52 @@
                             <div class="mt-3 space-y-3 text-sm">
                                 <div class="hidden flex-wrap items-center gap-2 sm:flex">
                                     @if ($search !== '')
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutSearchQuery)" wire:click.prevent="clearSearch" active icon="fa-solid fa-magnifying-glass">Поиск: {{ $search }} · очистить</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutSearchQuery)" wire:click.prevent="clearSearch" active icon="fa-solid fa-magnifying-glass">Поиск по запросу {{ $search }} · очистить</x-ui.taxonomy-chip>
                                     @endif
                                     @if ($titleContext !== null)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutTitleQuery)" wire:click.prevent="clearTitleContext" active icon="fa-solid fa-clapperboard">Сериал: {{ $titleContext->display_title }} · убрать</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutTitleQuery)" wire:click.prevent="clearTitleContext" active icon="fa-solid fa-clapperboard">Подборка по сериалу {{ $titleContext->display_title }} · убрать</x-ui.taxonomy-chip>
                                     @endif
                                     @foreach ($filterView->selectedYears() as $selectedYear)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->yearQuery($selectedYear))" wire:click.prevent="removeYear({{ $selectedYear }})" active icon="fa-solid fa-calendar-days">Год: {{ $selectedYear }} · убрать</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->yearQuery($selectedYear))" wire:click.prevent="removeYear({{ $selectedYear }})" active icon="fa-solid fa-calendar-days">Сериалы {{ $selectedYear }} года · убрать</x-ui.taxonomy-chip>
                                     @endforeach
                                     @if ($invalidYear)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutYearQuery)" wire:click.prevent="resetGroup('year')" active icon="fa-solid fa-calendar-days">Год: {{ $requestedYear }} не найден · убрать</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutYearQuery)" wire:click.prevent="resetGroup('year')" active icon="fa-solid fa-calendar-days">Год {{ $requestedYear }} не найден · убрать</x-ui.taxonomy-chip>
                                     @endif
                                     @foreach ($selectedTaxonomies as $filterType => $taxonomies)
                                         @foreach ($taxonomies as $taxonomy)
-                                            <x-ui.taxonomy-chip :href="route('titles.index', $filterView->filterQuery($filterType, $taxonomy->slug))" wire:click.prevent="removeTaxonomy('{{ $filterType }}', '{{ $taxonomy->slug }}')" :icon="$filterView->icon($filterType)" active>{{ $filterView->label($filterType) }}: {{ $taxonomy->name }} · убрать</x-ui.taxonomy-chip>
+                                            <x-ui.taxonomy-chip :href="route('titles.index', $filterView->filterQuery($filterType, $taxonomy->slug))" wire:click.prevent="removeTaxonomy('{{ $filterType }}', '{{ $taxonomy->slug }}')" :icon="$filterView->icon($filterType)" active>{{ $filterView->taxonomyContextLabel($filterType, $taxonomy) }} · убрать</x-ui.taxonomy-chip>
                                         @endforeach
                                     @endforeach
                                     @foreach ($excludedTaxonomies as $filterType => $taxonomies)
                                         @foreach ($taxonomies as $taxonomy)
-                                            <x-ui.taxonomy-chip :href="route('titles.index', $filterView->exclusionQuery($filterType, $taxonomy->slug))" wire:click.prevent="removeExcluded('{{ $filterType }}', '{{ $taxonomy->slug }}')" active icon="fa-solid fa-minus">Без {{ $filterView->label($filterType) }}: {{ $taxonomy->name }} · убрать</x-ui.taxonomy-chip>
+                                            <x-ui.taxonomy-chip :href="route('titles.index', $filterView->exclusionQuery($filterType, $taxonomy->slug))" wire:click.prevent="removeExcluded('{{ $filterType }}', '{{ $taxonomy->slug }}')" active icon="fa-solid fa-minus">{{ $filterView->excludedTaxonomyLabel($filterType, $taxonomy) }} · убрать</x-ui.taxonomy-chip>
                                         @endforeach
                                     @endforeach
                                     @foreach ($filterView->listState('publication_type') as $publicationType)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('publication_type', $publicationType))" wire:click.prevent="removeChoice('publication_type', '{{ $publicationType }}')" active icon="fa-solid fa-clapperboard">Тип: {{ $filterView->publicationTypeLabel($publicationType) }} · убрать</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('publication_type', $publicationType))" wire:click.prevent="removeChoice('publication_type', '{{ $publicationType }}')" active icon="fa-solid fa-clapperboard">Тип материалов — {{ $filterView->publicationTypeLabel($publicationType) }} · убрать</x-ui.taxonomy-chip>
                                     @endforeach
                                     @foreach ($filterView->listState('subtitles') as $subtitleValue)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('subtitles', $subtitleValue))" wire:click.prevent="removeChoice('subtitles', '{{ $subtitleValue }}')" active icon="fa-solid fa-closed-captioning">Субтитры: {{ $filterView->subtitleLabel($subtitleValue) }} · убрать</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('subtitles', $subtitleValue))" wire:click.prevent="removeChoice('subtitles', '{{ $subtitleValue }}')" active icon="fa-solid fa-closed-captioning">Субтитры — {{ $filterView->subtitleLabel($subtitleValue) }} · убрать</x-ui.taxonomy-chip>
                                     @endforeach
                                     @foreach ($filterView->listState('quality') as $quality)
-                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('quality', $quality))" wire:click.prevent="removeChoice('quality', '{{ $quality }}')" active icon="fa-solid fa-display">Качество: {{ $quality }} · убрать</x-ui.taxonomy-chip>
+                                        <x-ui.taxonomy-chip :href="route('titles.index', $filterView->choiceQuery('quality', $quality))" wire:click.prevent="removeChoice('quality', '{{ $quality }}')" active icon="fa-solid fa-display">Качество — {{ $quality }} · убрать</x-ui.taxonomy-chip>
                                     @endforeach
                                     @foreach ($filterView->advancedFilterChips() as $chip)
                                         <x-ui.taxonomy-chip :href="route('titles.index', $filterView->withoutCatalogState($chip['key']))" wire:click.prevent="resetAdvanced('{{ $chip['key'] }}')" active icon="fa-solid fa-sliders">
-                                            {{ $chip['label'] }}: {{ $chip['value'] }} · убрать
+                                            {{ $chip['label'] }} — {{ $chip['value'] }} · убрать
                                         </x-ui.taxonomy-chip>
                                     @endforeach
                                 </div>
                                 <div class="flex flex-wrap gap-3 text-slate-500">
-                                    <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-diagram-project text-slate-400" /> Активных фильтров: {{ $filterView->activeFilterCount() }}</span>
+                                    <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-diagram-project text-slate-400" /> Активных фильтров — {{ $filterView->activeFilterCount() }}</span>
                                     @if ($invalidYear)
-                                        <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-calendar-xmark text-amber-600" /> Ошибочный год: {{ $requestedYear }}</span>
+                                        <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-calendar-xmark text-amber-600" /> Ошибочный год — {{ $requestedYear }}</span>
                                     @endif
                                     @if ($filterView->selectedYears() !== [])
-                                        <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-calendar-days text-slate-400" /> Годы: {{ implode(', ', $filterView->selectedYears()) }}</span>
+                                        <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-calendar-days text-slate-400" /> Выбранные годы — {{ implode(', ', $filterView->selectedYears()) }}</span>
                                     @endif
                                     @if ($titleContext !== null)
-                                        <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-clapperboard text-slate-400" /> Сериал: {{ $titleContext->display_title }}</span>
+                                        <span class="hidden sm:inline"><x-ui.icon name="fa-solid fa-clapperboard text-slate-400" /> Подборка по сериалу {{ $titleContext->display_title }}</span>
                                     @endif
                                     <span><x-ui.icon name="fa-solid fa-magnifying-glass text-slate-400" /> {{ __('catalog.catalog.found_now', ['results' => trans_choice('catalog.counts.results', $titles->total())]) }}</span>
                                     <a href="{{ route('titles.index') }}" wire:click.prevent="resetAll" class="hidden items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-600 sm:inline-flex">

@@ -367,12 +367,12 @@
                 <article wire:key="time-window-{{ $loop->index }}" class="rounded-lg bg-slate-50 p-3 text-sm">
                     <div class="font-bold text-slate-700">{{ $row['label'] }}</div>
                     <div class="mt-3 grid gap-2 text-xs font-semibold text-slate-500">
-                        <div>Сериалы: <span class="font-bold text-slate-800">{{ $row['catalog_titles'] }}</span></div>
-                        <div>Серии: <span class="font-bold text-slate-800">{{ $row['episodes'] }}</span></div>
-                        <div>Видео: <span class="font-bold text-slate-800">{{ $row['media'] }}</span></div>
-                        <div>Сбор: <span class="font-bold text-slate-800">{{ $row['crawled'] }}</span></div>
-                        <div>Обновление: <span class="font-bold text-slate-800">{{ $row['imported'] }}</span></div>
-                        <div>Ошибки: <span class="font-bold text-rose-700">{{ $row['import_errors'] }}</span></div>
+                        <div>Сериалы — <span class="font-bold text-slate-800">{{ $row['catalog_titles'] }}</span></div>
+                        <div>Серии — <span class="font-bold text-slate-800">{{ $row['episodes'] }}</span></div>
+                        <div>Видео — <span class="font-bold text-slate-800">{{ $row['media'] }}</span></div>
+                        <div>Сбор — <span class="font-bold text-slate-800">{{ $row['crawled'] }}</span></div>
+                        <div>Обновление — <span class="font-bold text-slate-800">{{ $row['imported'] }}</span></div>
+                        <div>Ошибки — <span class="font-bold text-rose-700">{{ $row['import_errors'] }}</span></div>
                     </div>
                 </article>
             @endforeach

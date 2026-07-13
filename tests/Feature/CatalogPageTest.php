@@ -648,6 +648,37 @@ class CatalogPageTest extends TestCase
             ->assertRedirect(route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => 'drama']));
     }
 
+    public function test_taxonomy_catalog_page_uses_natural_russian_copy_for_actor_context(): void
+    {
+        $actor = Actor::query()->create([
+            'name' => 'Стивен Рут',
+            'slug' => 'stiven-rut',
+        ]);
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Сериал Стивена Рута',
+            'slug' => 'serial-stivena-ruta',
+        ]);
+        $catalogTitle->actors()->attach($actor->id);
+
+        $content = $this->get(route('titles.taxonomy', ['type' => 'actor', 'taxonomy' => $actor->slug]))
+            ->assertOk()
+            ->assertSeeText('Сериалы с актёром Стивен Рут')
+            ->assertSeeText('Сериал Стивена Рута')
+            ->getContent();
+
+        $plainContent = html_entity_decode($content);
+        $lowerPlainContent = Str::lower($plainContent);
+
+        $this->assertStringContainsString('Сериалы с актёром Стивен Рут онлайн', $plainContent);
+        $this->assertStringContainsString('Показаны сериалы с актёром Стивен Рут.', $plainContent);
+        $this->assertStringContainsString('с актёром Стивен Рут · убрать', $plainContent);
+        $this->assertStringContainsString('смотреть сериалы с актёром стивен рут', $lowerPlainContent);
+        $this->assertStringNotContainsString('Сериалы: Стивен Рут', $plainContent);
+        $this->assertStringNotContainsString('Актер: Стивен Рут', $plainContent);
+        $this->assertStringNotContainsString('Актеры: Стивен Рут', $plainContent);
+        $this->assertStringNotContainsString('Фильтры: Актер: Стивен Рут', $plainContent);
+    }
+
     public function test_livewire_catalog_preserves_search_and_filters_when_sorting_changes(): void
     {
         $genre = Genre::query()->create([
