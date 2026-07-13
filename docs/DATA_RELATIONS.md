@@ -44,6 +44,7 @@
 - `LicensedMedia belongsTo Episode`
 - `EpisodeViewProgress belongsTo LicensedMedia` как последний подтверждённый playback source; связь nullable, удаление media не удаляет историю.
 - `SourcePage belongsTo Source`
+- `CatalogRelationSourceIdentity belongsTo Source`; source хранит много таких hash-only наблюдений для десяти явных справочников.
 - `SourcePage hasOne CatalogTitle`
 - `SourcePage hasMany Season`
 - `SourcePage hasMany Episode`
@@ -53,7 +54,7 @@
 - `SourcePage belongsTo SeasonvarImportRun` через `last_import_run_id`
 - `SourcePage.page_type` хранит строковое значение `SeasonvarPageType`; inventory может добавить разрешённый неизвестный или ещё не разбираемый URL, но никогда не меняет `parse_status`/`import_status` уже существующей строки. Sitemap-документы также хранятся как source pages для полного audit trail и не попадают в serial parser queue.
 - `SourcePage.provider_availability_status=region_blocked` означает, что Seasonvar сам вернул сообщение о блокировке сезона правообладателем для региона исходящего сервера. `provider_availability_checked_at` фиксирует время нормализованной проверки; это page-specific provider observation, а не пользовательский `PlaybackAvailability::RegionBlocked` и не доказательство доступности в других странах.
-- Metadata taxonomy provenance не дублируется отдельной таблицей: нормализованный `source_url` справочника однозначно связывается с `SourcePage.url_hash`, а `SourcePage` хранит ETag/Last-Modified, content hash, crawl/import/parse timestamps, missing flags и import events. `SourcePageSnapshot` для non-serial не хранит исходную страницу или описательный текст, а только безопасную hash-сводку; serial snapshot остаётся полным из-за существующего локального metadata-backfill.
+- Crawl provenance metadata-страницы остаётся в `SourcePage`: URL/hash, ETag/Last-Modified, content hash, crawl/import/parse timestamps, missing flags и import events. `catalog_relation_source_identities` отдельно хранит только `(source_id, relation_type, source_key_hash) -> canonical_key`, чтобы повторный provider object после смены подписи возвращался к прежней строке; raw external ID и raw URL туда не записываются. `SourcePageSnapshot` для non-serial не хранит исходную страницу или описательный текст, а только безопасную hash-сводку; serial snapshot остаётся полным из-за существующего локального metadata-backfill.
 - `SeasonvarImportRun hasMany SeasonvarImportEvent`
 - `SeasonvarImportRun hasMany SourcePageSnapshot`
 - `SeasonvarImportRun hasMany SourcePage` через `last_import_run_id`
@@ -73,7 +74,7 @@
 - `CatalogTitle`, `Season`, `Episode` и `LicensedMedia` используют soft delete; merge импортёра применяет физическое удаление только к уже объединённым дублям, чтобы не оставлять конфликтующие provider keys.
 - `catalog_title_slugs.slug` глобально уникален внутри истории. При редакционном изменении текущий slug записывается в историю, при возврате к прежнему адресу его historical row удаляется, а при importer merge slug дубля и его история переносятся к каноническому тайтлу. Исторический URL не обходит publication/access scope и отвечает `301` только на доступную текущую карточку.
 - `CatalogTitle.provider_field_values` хранит только последний baseline импортируемых `title`, `original_title`, `description` и `poster_url`; это не публичная metadata и не источник отображения. Импорт меняет текущее поле лишь пока оно совпадает с предыдущим baseline, поэтому локальное редакционное значение не затирается.
-- Автоматическая identity тайтла — `(source_id, external_id)`, при отсутствии provider ID — точный canonical URL hash/source page. Все десять справочников используют общий canonical slug; для актёров и режиссёров он строится после транслитерации, поэтому эквивалентные кириллическое/латинское написания и разные provider URL не создают вторую строку. URL остаётся provenance, а не identity; отдельные реальные provider IDs потребуют явной source-identity таблицы, а не slug suffix.
+- Автоматическая identity тайтла — `(source_id, external_id)`, при отсутствии provider ID — точный canonical URL hash/source page. Все десять справочников используют общий canonical slug; для актёров и режиссёров он строится после транслитерации, поэтому эквивалентные кириллическое/латинское написания разных источников сходятся в одну строку. Stable external ID или канонический HTTPS URL каждого источника дополнительно закрепляется hash-only строкой `CatalogRelationSourceIdentity`; следующий refresh переиспользует сохранённый canonical key даже после неэквивалентного переименования provider label. Fuzzy matching и slug suffix для provider identity не используются.
 - Admin attaches metadata через `syncWithoutDetaching`, а importer relation sync использует ту же idempotent семантику: локально добавленные pivot rows не отсоединяются частичным или повторным provider import. Concurrent admin writes проверяют fingerprints редактируемых полей и relation IDs под row lock.
 - Публичные медиа проверяют собственный status/window/audience и доступность связанных сезона и серии.
 - Playback дополнительно требует непустой `playback_url` или `path`; пустая опубликованная media row не делает серию доступной и не попадает в counts/primary action.
@@ -125,6 +126,7 @@
 - `licensed_media_health_due_idx` по `health_status, next_check_at, id` нужен для bounded due backlog без полного сканирования media.
 - Уникальная пара `licensed_media.catalog_title_id + source_media_key` нужна для стабильного обновления видео-ссылок.
 - Unique-пары `catalog_titles.source_id + external_id` и `catalog_titles.source_id + source_url_hash` сохраняют стабильную идентичность тайтла у внешнего провайдера.
+- Unique `(source_id, relation_type, source_key_hash)` в `catalog_relation_source_identities` запрещает два canonical решения для одного объекта справочника у одного источника; `(relation_type, canonical_key)` индексирует перенос identity при maintenance.
 - `catalog_title_ratings.catalog_title_id + provider` запрещает второй рейтинг того же провайдера для тайтла.
 - Каждая metadata pivot-таблица имеет составной primary key по `catalog_title_id` и related ID, поэтому одну связь нельзя присоединить дважды.
 - Publication lookup и display-order индексы на тайтлах, сезонах, сериях и медиа обслуживают публичные scopes и упорядоченные relationship loads.
