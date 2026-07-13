@@ -35,3 +35,9 @@
 - Политика выполнения job: `tries=3`, `timeout=900`, backoff `[60, 300, 900]`, `uniqueFor=3600`.
 - Ошибки job логируются через `failed()` с URL-аргументом и флагами запуска; сама pipeline уже помечает созданный `SeasonvarImportRun` как failed.
 - Если задан `SEASONVAR_IMPORT_FAILURE_MAIL_TO`, `RunSeasonvarImport::failed()` отправляет queued on-demand notification `SeasonvarImportFailed` на email получателя. Notification использует queue из `NOTIFICATIONS_MAIL_QUEUE`.
+
+## Безопасная сводка failed jobs
+
+`php artisan app:deployment-check --json` читает `failed_jobs` bounded chunks и выводит только total, allowlisted тип job, категорию очереди и возрастной диапазон. Payload, exception text, URL, аргументы и токены не включаются. Наличие строк помечается warning для обязательной ручной disposition; команда не выполняет retry, forget или очистку.
+
+Перед `queue:retry <id>` оператор отдельно сверяет import run, live claims и причину сбоя. Массовый retry/forget не входит в автоматический deployment flow и никогда не запускается preflight-командой.

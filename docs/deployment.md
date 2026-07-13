@@ -242,6 +242,19 @@ Sitemap-тесты используют отдельный каталог `stora
 
 ## Проверки деплоя
 
+### Read-only deployment preflight
+
+Перед остановкой writers и после возврата процессов запускайте:
+
+```bash
+php artisan app:deployment-check
+php artisan app:deployment-check --json
+```
+
+Команда ничего не мигрирует, не очищает и не перезапускает. Она проверяет production/debug/logging, pending migrations, SQLite quick/FK checks и обязательные индексы, состояние FTS, production cache/session/queue profile, безопасную агрегатную сводку failed jobs и профиль процесса импортёра. Ненулевой exit code означает, что traffic или writers возвращать нельзя. JSON содержит только стабильные имена проверок, статусы, русские сообщения и scalar counts; failed-job payload, exception text, URL и токены не выводятся.
+
+Атомарный порядок maintenance: preflight → дождаться безопасной точки одного `seasonvar:import --forever` и остановить writers → backup SQLite → `migrate:status` и обычный `migrate --force` → при необходимости штатный FTS rebuild/cache warm → `config:cache` → перезапуск PHP-FPM и единственного importer process → повторный preflight, `app:health --json` и гостевой HTTP smoke. `queue:retry`/`queue:forget` остаются отдельным ручным решением после сверки run state и claims; preflight их не вызывает.
+
 ### Production runtime и журналы
 
 Перед возвратом трафика установите versioned-профиль ротации, пересоберите config cache и выполните graceful reload PHP-FPM. `copytruncate` не требует остановки PHP-процессов и не удаляет текущий журнал:
