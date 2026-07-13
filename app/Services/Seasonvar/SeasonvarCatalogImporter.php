@@ -50,6 +50,7 @@ class SeasonvarCatalogImporter
         private readonly SeasonvarPageHandlerRegistry $pageHandlers,
         private readonly SeasonvarDiscoveredPageStore $discoveredPages,
         private readonly PoliteHttpClient $httpClient,
+        private readonly SeasonvarSourcePageFetcher $pageFetcher,
         private readonly SeasonvarCatalogParser $parser,
         private readonly SeasonvarCatalogIdentityResolver $identityResolver,
         private readonly SeasonvarEditorialFieldResolver $editorialFields,
@@ -388,14 +389,9 @@ class SeasonvarCatalogImporter
             'url' => $page->url,
         ]);
 
-        $response = $this->httpClient->get(
-            $page->url,
-            $crawlDelaySeconds,
-            $progress,
-            $this->conditionalRequestHeaders($page),
-        );
+        $fetched = $this->pageFetcher->fetch($page, $importRunId, $progress);
 
-        if ($response->status() === 304) {
+        if ($fetched->notModified) {
             $existingCatalogTitle = $this->findCatalogTitleBySourceUrlHash($page, $this->seasonvarUrl->hash($page->url));
 
             if ($existingCatalogTitle === null) {
@@ -403,12 +399,7 @@ class SeasonvarCatalogImporter
             }
 
             $page->update([
-                'http_status' => 304,
-                'last_crawled_at' => now(),
                 'last_imported_at' => now(),
-                'last_import_run_id' => $importRunId,
-                'failure_count' => 0,
-                'error_message' => null,
             ]);
             $this->report($progress, 'page-parse-skipped-not-modified', [
                 'source_page_id' => $page->id,
@@ -419,50 +410,9 @@ class SeasonvarCatalogImporter
             return (new SeasonvarPageHandlerResult(catalogTitle: $existingCatalogTitle))->toLegacyResult();
         }
 
-        $body = $response->body();
-        $contentHash = hash('sha256', $body);
-        $contentChanged = $page->content_hash !== $contentHash;
-
-        $this->report($progress, 'page-response-received', [
-            'source_page_id' => $page->id,
-            'http_status' => $response->status(),
-            'successful' => $response->successful(),
-            'body_bytes' => mb_strlen($body, '8bit'),
-            'content_hash' => $contentHash,
-            'content_changed' => $contentChanged,
-            'etag' => $response->header('ETag'),
-            'last_modified' => $response->header('Last-Modified'),
-        ]);
-
-        $page->update([
-            'http_status' => $response->status(),
-            'content_hash' => $contentHash,
-            'etag' => $response->header('ETag'),
-            'last_modified_header' => $response->header('Last-Modified'),
-            'last_crawled_at' => now(),
-            'last_changed_at' => $contentChanged ? now() : $page->last_changed_at,
-            'last_import_run_id' => $importRunId,
-        ]);
-        $this->storeSnapshot($page, $body, $contentHash, $response->status(), $importRunId);
-
-        $this->report($progress, 'source-page-crawl-metadata-updated', [
-            'source_page_id' => $page->id,
-            'http_status' => $page->http_status,
-            'content_hash' => $page->content_hash,
-            'content_changed' => $contentChanged,
-            'last_crawled_at' => $page->last_crawled_at,
-            'last_changed_at' => $page->last_changed_at,
-        ]);
-
-        if (! $response->successful()) {
-            $this->report($progress, 'page-parse-failed', [
-                'source_page_id' => $page->id,
-                'http_status' => $response->status(),
-                'url' => $page->url,
-            ]);
-
-            throw SeasonvarSourceRequestException::forStatus($response->status());
-        }
+        $body = $fetched->body;
+        $contentHash = $fetched->contentHash;
+        $contentChanged = $fetched->contentChanged;
 
         $existingCatalogTitle = $this->findCatalogTitleBySourceUrlHash($page, $this->seasonvarUrl->hash($page->url));
         $needsMediaRefresh = $existingCatalogTitle !== null
@@ -2025,24 +1975,6 @@ class SeasonvarCatalogImporter
             'level' => str_contains($event, 'failure') ? 'warning' : 'info',
             'context' => $context,
         ]);
-    }
-
-    private function storeSnapshot(SourcePage $page, string $body, string $contentHash, int $httpStatus, ?int $importRunId): void
-    {
-        SourcePageSnapshot::query()->updateOrCreate(
-            [
-                'source_page_id' => $page->id,
-                'content_hash' => $contentHash,
-            ],
-            [
-                'seasonvar_import_run_id' => $importRunId,
-                'url' => $page->url,
-                'http_status' => $httpStatus,
-                'body_bytes' => mb_strlen($body, '8bit'),
-                'html' => $body,
-                'captured_at' => now(),
-            ],
-        );
     }
 
     /**

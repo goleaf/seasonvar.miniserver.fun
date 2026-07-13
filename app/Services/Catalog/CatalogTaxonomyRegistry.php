@@ -112,6 +112,11 @@ class CatalogTaxonomyRegistry
         return self::FILTER_RELATIONS[$filterType]['relation'];
     }
 
+    public function supports(string $filterType): bool
+    {
+        return isset(self::FILTER_RELATIONS[$filterType]);
+    }
+
     /**
      * @return class-string<Model>
      */

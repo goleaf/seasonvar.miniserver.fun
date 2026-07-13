@@ -2,38 +2,19 @@
 
 namespace App\Services\Seasonvar;
 
-use App\Models\Actor;
-use App\Models\AgeRating;
-use App\Models\CatalogStatus;
 use App\Models\CatalogTitle;
-use App\Models\Country;
-use App\Models\Director;
-use App\Models\Genre;
-use App\Models\Network;
-use App\Models\Studio;
-use App\Models\Tag;
-use App\Models\Translation;
 use App\Services\Catalog\CatalogRelationNameSanitizer;
+use App\Services\Catalog\CatalogTaxonomyRegistry;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class SeasonvarCatalogRelationSyncer
 {
-    private const RELATION_TYPES = [
-        'genre' => ['model' => Genre::class, 'relation' => 'genres'],
-        'country' => ['model' => Country::class, 'relation' => 'countries'],
-        'actor' => ['model' => Actor::class, 'relation' => 'actors'],
-        'director' => ['model' => Director::class, 'relation' => 'directors'],
-        'age_rating' => ['model' => AgeRating::class, 'relation' => 'ageRatings'],
-        'translation' => ['model' => Translation::class, 'relation' => 'translations'],
-        'status' => ['model' => CatalogStatus::class, 'relation' => 'statuses'],
-        'network' => ['model' => Network::class, 'relation' => 'networks'],
-        'studio' => ['model' => Studio::class, 'relation' => 'studios'],
-        'tag' => ['model' => Tag::class, 'relation' => 'tags'],
-    ];
-
-    public function __construct(private readonly CatalogRelationNameSanitizer $relationNames) {}
+    public function __construct(
+        private readonly CatalogRelationNameSanitizer $relationNames,
+        private readonly CatalogTaxonomyRegistry $taxonomies,
+    ) {}
 
     /**
      * @param  list<array{type: string, name: string, source_url?: string|null}>  $taxonomies
@@ -48,13 +29,13 @@ class SeasonvarCatalogRelationSyncer
         ]);
 
         $relationsByType = collect($taxonomies)
-            ->filter(fn (array $item): bool => isset(self::RELATION_TYPES[$item['type']]))
+            ->filter(fn (array $item): bool => $this->taxonomies->supports($item['type']))
             ->filter(fn (array $item): bool => $this->relationNames->isValid($item['type'], $item['name']))
             ->groupBy('type');
         $result = [];
 
         foreach ($relationsByType as $type => $items) {
-            $config = self::RELATION_TYPES[$type];
+            $config = $this->taxonomies->relations()[$type];
             $ids = $this->syncType($title, $type, $items, $progress);
             $changes = $ids === [] ? ['attached' => []] : $title->{$config['relation']}()->syncWithoutDetaching($ids);
             $attachedIds = collect($changes['attached'] ?? [])
@@ -89,7 +70,7 @@ class SeasonvarCatalogRelationSyncer
      */
     private function syncType(CatalogTitle $title, string $type, Collection $items, ?callable $progress): array
     {
-        $config = self::RELATION_TYPES[$type];
+        $config = $this->taxonomies->relations()[$type];
         /** @var class-string<Model> $modelClass */
         $modelClass = $config['model'];
         $now = now();

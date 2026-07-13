@@ -13,6 +13,7 @@ class SeasonvarDiscovery
     public function __construct(
         private readonly PoliteHttpClient $httpClient,
         private readonly SeasonvarUrl $seasonvarUrl,
+        private readonly SeasonvarPageHandlerRegistry $handlers,
         private readonly SeasonvarImportErrorSanitizer $errors,
     ) {}
 
@@ -153,7 +154,7 @@ class SeasonvarDiscovery
 
                 $pageType = $this->seasonvarUrl->pageType($url);
 
-                if ($pageType === SeasonvarPageType::Serial) {
+                if ($this->handlers->definition($pageType)->persistOnDiscovery) {
                     $isDuplicate = array_key_exists($url, $discovered);
                     $discovered[$url] = $url;
 
@@ -164,7 +165,7 @@ class SeasonvarDiscovery
                     ]);
                 } else {
                     $this->report($progress, 'catalog-url-skipped', [
-                        'reason' => 'не сериал',
+                        'reason' => 'тип не разрешён реестром discovery',
                         'page_type' => $pageType->value,
                         'url' => $url,
                     ]);

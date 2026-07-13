@@ -9,6 +9,7 @@ use App\Models\SeasonvarImportRun;
 use App\Services\Catalog\CatalogCacheInvalidator;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use App\Services\Seasonvar\SeasonvarImportProcessInspector;
+use App\Services\Seasonvar\SeasonvarPageHandlerRegistry;
 use App\Services\Seasonvar\SeasonvarQueuedImportDispatcher;
 use App\Services\Seasonvar\SeasonvarQueueStatus;
 use App\Services\Seasonvar\SeasonvarSourceInventory;
@@ -20,7 +21,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Throwable;
 
-#[Signature('seasonvar:import {url? : Ссылка страницы seasonvar.ru для обновления одного сериала} {--force : Обновить данные даже если страница не изменилась} {--forever : Работать циклами без остановки} {--sleep= : Пауза между циклами в секундах} {--no-discovery : Не обновлять карту сайта в этом запуске} {--queued : Поставить подходящие страницы в Redis-очередь для параллельной обработки} {--status : Показать состояние Redis-очереди и последнего запуска без импорта} {--inventory-only : Инвентаризировать типы URL из карты сайта без разбора и изменения каталога}')]
+#[Signature('seasonvar:import {url? : Ссылка страницы seasonvar.ru для обновления одной страницы} {--force : Обновить данные даже если страница не изменилась} {--forever : Работать циклами без остановки} {--sleep= : Пауза между циклами в секундах} {--no-discovery : Не обновлять карту сайта в этом запуске} {--queued : Поставить подходящие страницы в Redis-очередь для параллельной обработки} {--status : Показать состояние Redis-очереди и последнего запуска без импорта} {--inventory-only : Инвентаризировать типы URL из карты сайта без разбора и изменения каталога} {--page-type=* : Обрабатывать только явно включённые типы страниц, например serial или rss}')]
 #[Description('Инвентаризирует страницы seasonvar.ru или обновляет каталог, сезоны, серии и видео одной командой')]
 class ImportSeasonvar extends Command
 {
@@ -41,8 +42,15 @@ class ImportSeasonvar extends Command
         SeasonvarQueuedImportDispatcher $queuedDispatcher,
         SeasonvarQueueStatus $queueStatus,
         SeasonvarSourceInventory $sourceInventory,
+        SeasonvarPageHandlerRegistry $pageHandlers,
         CatalogCacheInvalidator $cacheInvalidator,
     ): int {
+        $pageTypes = $this->validatedPageTypes($pageHandlers);
+
+        if ($pageTypes === false) {
+            return self::FAILURE;
+        }
+
         if ((bool) $this->option('inventory-only') && ! $this->inventoryOptionsAreValid()) {
             return self::FAILURE;
         }
@@ -52,7 +60,7 @@ class ImportSeasonvar extends Command
         }
 
         if ((bool) $this->option('queued')) {
-            return $this->handleQueued($queuedDispatcher);
+            return $this->handleQueued($queuedDispatcher, $pageTypes);
         }
 
         $inventoryOnly = (bool) $this->option('inventory-only');
@@ -102,6 +110,7 @@ class ImportSeasonvar extends Command
                 processHost: $process['host'],
                 processCommand: $process['command'],
                 progress: $this->seasonvarProgress(),
+                pageTypes: $pageTypes,
             );
 
             $cacheInvalidator->catalogChanged();
@@ -228,7 +237,8 @@ class ImportSeasonvar extends Command
         return max(1, (int) $value);
     }
 
-    private function handleQueued(SeasonvarQueuedImportDispatcher $dispatcher): int
+    /** @param list<string>|null $pageTypes */
+    private function handleQueued(SeasonvarQueuedImportDispatcher $dispatcher, ?array $pageTypes): int
     {
         if ($this->argument('url')) {
             $this->error('Опция --queued предназначена только для полного импорта без URL.');
@@ -261,6 +271,7 @@ class ImportSeasonvar extends Command
             $run = $dispatcher->dispatch(
                 force: (bool) $this->option('force'),
                 discover: ! (bool) $this->option('no-discovery'),
+                pageTypes: $pageTypes,
             );
 
             $this->info(sprintf(
@@ -327,6 +338,10 @@ class ImportSeasonvar extends Command
             $conflicts[] = '--sleep';
         }
 
+        if ((array) $this->option('page-type') !== []) {
+            $conflicts[] = '--page-type';
+        }
+
         if ($conflicts === []) {
             return true;
         }
@@ -334,6 +349,46 @@ class ImportSeasonvar extends Command
         $this->error('Опцию --inventory-only нельзя сочетать с: '.implode(', ', $conflicts).'.');
 
         return false;
+    }
+
+    /** @return list<string>|false|null */
+    private function validatedPageTypes(SeasonvarPageHandlerRegistry $handlers): array|false|null
+    {
+        $values = collect((array) $this->option('page-type'))
+            ->map(fn (mixed $value): string => trim((string) $value))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($values->isEmpty()) {
+            return null;
+        }
+
+        foreach ($values as $value) {
+            $type = SeasonvarPageType::tryFrom($value);
+
+            if ($type === null) {
+                $this->error("Неизвестный тип страницы Seasonvar: {$value}.");
+
+                return false;
+            }
+
+            $definition = $handlers->definition($type);
+
+            if ($definition->parserClass === null || $definition->importerClass === null) {
+                $this->error("Тип {$value} можно хранить в inventory, но для него нет разрешённого parser/importer.");
+
+                return false;
+            }
+
+            if (! $handlers->isEnabled($type)) {
+                $this->error("Тип {$value} отключён конфигурацией Seasonvar и не будет обработан.");
+
+                return false;
+            }
+        }
+
+        return $values->all();
     }
 
     private function outputInventoryResult(SeasonvarSourceInventoryResult $result): int

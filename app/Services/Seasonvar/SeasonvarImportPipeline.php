@@ -52,6 +52,7 @@ class SeasonvarImportPipeline
 
     /**
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @param  list<string>|null  $pageTypes
      */
     public function run(
         ?string $argument = null,
@@ -63,6 +64,7 @@ class SeasonvarImportPipeline
         ?string $processHost = null,
         ?string $processCommand = null,
         ?callable $progress = null,
+        ?array $pageTypes = null,
     ): SeasonvarImportRun {
         $run = SeasonvarImportRun::query()->create([
             'mode' => $argument === null ? 'sitemap' : 'url',
@@ -86,12 +88,13 @@ class SeasonvarImportPipeline
             'force' => $force,
             'forever' => $forever,
             'sleep_seconds' => $sleepSeconds,
+            'page_types' => $pageTypes,
         ]);
 
         try {
             do {
                 $cycle = ((int) $run->cycles) + 1;
-                $this->runCycle($run, $cycle, $argument, $force, $discover, $loggedProgress);
+                $this->runCycle($run, $cycle, $argument, $force, $discover, $loggedProgress, $pageTypes);
                 $run->refresh();
 
                 if (! $forever || $this->stopRequested) {
@@ -203,6 +206,7 @@ class SeasonvarImportPipeline
 
     /**
      * @param  callable(string, array<string, mixed>): void  $progress
+     * @param  list<string>|null  $pageTypes
      */
     private function runCycle(
         SeasonvarImportRun $run,
@@ -211,6 +215,7 @@ class SeasonvarImportPipeline
         bool $force,
         bool $discover,
         callable $progress,
+        ?array $pageTypes,
     ): void {
         $progress('seasonvar-import-cycle-started', [
             'cycle' => $cycle,
@@ -240,7 +245,7 @@ class SeasonvarImportPipeline
 
         $earlyRelationCleanupResult = $this->cleanupInvalidCatalogRelations($progress);
         $sourceStatusBackfillResult = $this->backfillParsedSourcePageStatuses($progress);
-        $cycleResult = $this->runSitemapCycle($run, $force, $discover, $progress);
+        $cycleResult = $this->runSitemapCycle($run, $force, $discover, $progress, $pageTypes);
         $mediaMetadataResult = $this->refreshMediaMetadataBacklog($progress);
         $mediaSourceKeyResult = $this->backfillMediaSourceKeys($progress);
         $mediaBacklogResult = $this->refreshMediaBacklog($progress);
@@ -322,6 +327,7 @@ class SeasonvarImportPipeline
 
     /**
      * @param  callable(string, array<string, mixed>): void  $progress
+     * @param  list<string>|null  $pageTypes
      * @return array{selected: int, backfilled: int}
      */
     private function backfillParsedSourcePageStatuses(callable $progress): array
@@ -369,7 +375,13 @@ class SeasonvarImportPipeline
      * @param  callable(string, array<string, mixed>): void  $progress
      * @return array{discovered: int, stored: int, selected: int, parsed: int, failed: int, media_attached: int, media_updated: int, media_skipped: int, media_failed: int, cleaned: int}
      */
-    private function runSitemapCycle(SeasonvarImportRun $run, bool $force, bool $discover, callable $progress): array
+    private function runSitemapCycle(
+        SeasonvarImportRun $run,
+        bool $force,
+        bool $discover,
+        callable $progress,
+        ?array $pageTypes,
+    ): array
     {
         $discovered = 0;
         $stored = 0;
@@ -406,7 +418,7 @@ class SeasonvarImportPipeline
             'media_failed' => 0,
         ];
 
-        foreach ($this->pageChunksForImportCycle($force, $run->id, $progress) as $pages) {
+        foreach ($this->pageChunksForImportCycle($force, $run->id, $progress, $pageTypes) as $pages) {
             $selected += $pages->count();
             $chunkResult = $this->importer->parsePages($pages, $progress, $force, $run->id);
             $chunkCounters = [
@@ -457,6 +469,7 @@ class SeasonvarImportPipeline
 
     /**
      * @param  callable(string, array<string, mixed>): void  $progress
+     * @param  list<string>|null  $pageTypes
      * @return array{discovered: int, stored: int, selected: int, parsed: int, failed: int, media_attached: int, media_updated: int, media_skipped: int, media_failed: int, cleaned: int}
      */
     private function runUrlCycle(SeasonvarImportRun $run, string $argument, bool $force, callable $progress): array
@@ -523,14 +536,19 @@ class SeasonvarImportPipeline
      * @param  callable(string, array<string, mixed>): void  $progress
      * @return iterable<Collection<int, SourcePage>>
      */
-    private function pageChunksForImportCycle(bool $force, ?int $importRunId, callable $progress): iterable
+    private function pageChunksForImportCycle(
+        bool $force,
+        ?int $importRunId,
+        callable $progress,
+        ?array $pageTypes,
+    ): iterable
     {
         $chunkSize = $this->importChunkSize();
         $refreshAfter = now()->subHours(max(1, (int) config('seasonvar.import.refresh_after_hours', 168)));
 
         $chunks = $force
-            ? $this->refreshPlanner->forcedPageChunks($chunkSize, $importRunId, $progress)
-            : $this->refreshPlanner->pageChunksForImportCycle($chunkSize, $refreshAfter, $importRunId, $progress);
+            ? $this->refreshPlanner->forcedPageChunks($chunkSize, $importRunId, $progress, $pageTypes)
+            : $this->refreshPlanner->pageChunksForImportCycle($chunkSize, $refreshAfter, $importRunId, $progress, $pageTypes);
 
         foreach ($chunks as $pages) {
             foreach ($pages as $page) {

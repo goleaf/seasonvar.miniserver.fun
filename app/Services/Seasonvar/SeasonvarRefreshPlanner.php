@@ -2,6 +2,7 @@
 
 namespace App\Services\Seasonvar;
 
+use App\Enums\SeasonvarPageType;
 use App\Models\LicensedMedia;
 use App\Models\SourcePage;
 use Illuminate\Database\Eloquent\Builder;
@@ -10,15 +11,33 @@ use Illuminate\Support\Collection;
 
 class SeasonvarRefreshPlanner
 {
+    public function __construct(private readonly SeasonvarPageHandlerRegistry $handlers) {}
+
     /**
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return iterable<Collection<int, SourcePage>>
      */
-    public function pageChunksForImportCycle(int $chunkSize, Carbon $refreshAfter, ?int $importRunId = null, ?callable $progress = null): iterable
+    public function pageChunksForImportCycle(
+        int $chunkSize,
+        Carbon $refreshAfter,
+        ?int $importRunId = null,
+        ?callable $progress = null,
+        ?array $pageTypes = null,
+    ): iterable
     {
         $chunkSize = max(1, $chunkSize);
         $totalSelected = 0;
         $selectedIds = [];
+        $processingTypes = $this->handlers->processingTypes($pageTypes);
+
+        foreach ($this->metadataPageChunks($processingTypes, $importRunId, false, $progress) as $pages) {
+            $totalSelected += $pages->count();
+            yield $pages;
+        }
+
+        if (! in_array(SeasonvarPageType::Serial->value, $processingTypes, true)) {
+            return;
+        }
 
         $attentionPages = $this->rejectAlreadySelectedPages(
             $this->baseQuery($importRunId)
@@ -83,10 +102,25 @@ class SeasonvarRefreshPlanner
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return iterable<Collection<int, SourcePage>>
      */
-    public function forcedPageChunks(int $chunkSize, ?int $importRunId = null, ?callable $progress = null): iterable
+    public function forcedPageChunks(
+        int $chunkSize,
+        ?int $importRunId = null,
+        ?callable $progress = null,
+        ?array $pageTypes = null,
+    ): iterable
     {
         $chunkSize = max(1, $chunkSize);
         $totalSelected = 0;
+        $processingTypes = $this->handlers->processingTypes($pageTypes);
+
+        foreach ($this->metadataPageChunks($processingTypes, $importRunId, true, $progress) as $pages) {
+            $totalSelected += $pages->count();
+            yield $pages;
+        }
+
+        if (! in_array(SeasonvarPageType::Serial->value, $processingTypes, true)) {
+            return;
+        }
 
         foreach ($this->baseQuery($importRunId)->lazyById($chunkSize)->chunk($chunkSize) as $pages) {
             $pages = $pages instanceof Collection ? $pages : $pages->collect();
@@ -124,6 +158,75 @@ class SeasonvarRefreshPlanner
                 return false;
             })
             ->values();
+    }
+
+    /**
+     * @param  list<string>  $processingTypes
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @return iterable<Collection<int, SourcePage>>
+     */
+    private function metadataPageChunks(array $processingTypes, ?int $importRunId, bool $force, ?callable $progress): iterable
+    {
+        foreach ($processingTypes as $typeValue) {
+            $type = SeasonvarPageType::from($typeValue);
+
+            if ($type === SeasonvarPageType::Serial) {
+                continue;
+            }
+
+            $chunkSize = $this->handlers->chunkSize($type);
+            $refreshAfter = now()->subHours($this->handlers->refreshHours($type));
+            $query = SourcePage::query()
+                ->with('source')
+                ->where('page_type', $type->value)
+                ->where(function (Builder $query): void {
+                    $query->whereNull('import_claim_token')
+                        ->orWhereNull('import_claim_expires_at')
+                        ->orWhere('import_claim_expires_at', '<=', now());
+                })
+                ->when($importRunId !== null, function (Builder $query) use ($importRunId): void {
+                    $query->where(function (Builder $query) use ($importRunId): void {
+                        $query->whereNull('last_import_run_id')
+                            ->orWhere('last_import_run_id', '!=', $importRunId);
+                    });
+                })
+                ->when(! $force, function (Builder $query) use ($refreshAfter): void {
+                    $query->where(function (Builder $query) use ($refreshAfter): void {
+                        $query->where('parse_status', 'pending')
+                            ->orWhere(function (Builder $query): void {
+                                $query->where('parse_status', 'failed')
+                                    ->where(function (Builder $query): void {
+                                        $query->whereNull('retry_after_at')
+                                            ->orWhere('retry_after_at', '<=', now());
+                                    });
+                            })
+                            ->orWhere(function (Builder $query) use ($refreshAfter): void {
+                                $query->where('parse_status', 'parsed')
+                                    ->where(function (Builder $query) use ($refreshAfter): void {
+                                        $query->whereNull('last_imported_at')
+                                            ->orWhere('last_imported_at', '<=', $refreshAfter);
+                                    });
+                            });
+                    })->where(function (Builder $query): void {
+                        $query->whereNull('retry_after_at')
+                            ->orWhere('retry_after_at', '<=', now());
+                    });
+                })
+                ->orderBy('id');
+
+            foreach ($query->lazyById($chunkSize)->chunk($chunkSize) as $pages) {
+                $pages = $pages instanceof Collection ? $pages->values() : $pages->collect()->values();
+
+                $this->report($progress, 'seasonvar-refresh-candidates-selected', [
+                    'reason' => $force ? 'force_metadata' : 'metadata_due',
+                    'page_type' => $type->value,
+                    'selected' => $pages->count(),
+                    'chunk_size' => $chunkSize,
+                ]);
+
+                yield $pages;
+            }
+        }
     }
 
     /**

@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Seasonvar;
 
-use App\Enums\CatalogFilterType;
 use App\Enums\SeasonvarPageType;
 
 final class SeasonvarSourceParityRegistry
 {
+    public function __construct(private readonly SeasonvarPageHandlerRegistry $handlers) {}
+
     /**
      * @return array<string, array{
      *     can_discover: bool,
@@ -22,29 +23,23 @@ final class SeasonvarSourceParityRegistry
      */
     public function capabilities(): array
     {
-        $taxonomyTypes = CatalogFilterType::values();
         $capabilities = [];
 
         foreach (SeasonvarPageType::cases() as $type) {
-            $isTaxonomy = in_array($type->value, $taxonomyTypes, true);
+            $definition = $this->handlers->definition($type);
+            $isTaxonomy = in_array($type, [
+                SeasonvarPageType::Actor,
+                SeasonvarPageType::Genre,
+                SeasonvarPageType::Country,
+                SeasonvarPageType::Tag,
+            ], true);
             $capabilities[$type->value] = [
-                'can_discover' => true,
-                'can_store_source_page' => true,
-                'can_parse' => $type === SeasonvarPageType::Serial,
-                'can_publish_local_page' => $type === SeasonvarPageType::Serial
-                    || $isTaxonomy
-                    || in_array($type, [
-                        SeasonvarPageType::StaticPage,
-                        SeasonvarPageType::Rss,
-                        SeasonvarPageType::Search,
-                        SeasonvarPageType::Sitemap,
-                    ], true),
-                'can_add_to_sitemap' => $type === SeasonvarPageType::Serial
-                    || $isTaxonomy
-                    || in_array($type, [SeasonvarPageType::StaticPage, SeasonvarPageType::Search], true),
-                'parser_class' => $type === SeasonvarPageType::Serial
-                    ? SeasonvarCatalogParser::class
-                    : null,
+                'can_discover' => $definition->persistOnDiscovery,
+                'can_store_source_page' => $definition->persistOnDiscovery,
+                'can_parse' => $definition->parserClass !== null && $definition->importerClass !== null,
+                'can_publish_local_page' => $definition->canGenerateLocalPublicPage,
+                'can_add_to_sitemap' => $definition->canGenerateLocalPublicPage,
+                'parser_class' => $definition->parserClass,
                 'local_route_name' => $this->routeName($type, $isTaxonomy),
             ];
         }

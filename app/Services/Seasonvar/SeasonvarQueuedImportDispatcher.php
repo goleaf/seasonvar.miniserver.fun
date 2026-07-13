@@ -22,7 +22,8 @@ class SeasonvarQueuedImportDispatcher
         private readonly CatalogCacheInvalidator $cacheInvalidator,
     ) {}
 
-    public function dispatch(bool $force = false, bool $discover = true): SeasonvarImportRun
+    /** @param list<string>|null $pageTypes */
+    public function dispatch(bool $force = false, bool $discover = true, ?array $pageTypes = null): SeasonvarImportRun
     {
         $run = SeasonvarImportRun::query()->create([
             'mode' => 'sitemap',
@@ -34,6 +35,7 @@ class SeasonvarQueuedImportDispatcher
             'summary' => [
                 'discover' => $discover,
                 'provider' => 'seasonvar',
+                'page_types' => $pageTypes,
             ],
         ]);
 
@@ -98,7 +100,11 @@ class SeasonvarQueuedImportDispatcher
             return $run->fresh();
         }
 
-        $selected = $this->dispatchEligiblePages($run, (bool) $run->force);
+        $selected = $this->dispatchEligiblePages(
+            $run,
+            (bool) $run->force,
+            is_array(data_get($run->summary, 'page_types')) ? data_get($run->summary, 'page_types') : null,
+        );
         $this->runs->addCounters($run->id, [
             'discovered' => $discovered,
             'stored' => $stored,
@@ -140,13 +146,14 @@ class SeasonvarQueuedImportDispatcher
         return $run->refresh();
     }
 
-    private function dispatchEligiblePages(SeasonvarImportRun $run, bool $force): int
+    /** @param list<string>|null $pageTypes */
+    private function dispatchEligiblePages(SeasonvarImportRun $run, bool $force, ?array $pageTypes): int
     {
         $chunkSize = max(1, (int) config('seasonvar.import.chunk_size', 100));
         $refreshAfter = now()->subHours(max(1, (int) config('seasonvar.import.refresh_after_hours', 24)));
         $chunks = $force
-            ? $this->refreshPlanner->forcedPageChunks($chunkSize, $run->id)
-            : $this->refreshPlanner->pageChunksForImportCycle($chunkSize, $refreshAfter, $run->id);
+            ? $this->refreshPlanner->forcedPageChunks($chunkSize, $run->id, pageTypes: $pageTypes)
+            : $this->refreshPlanner->pageChunksForImportCycle($chunkSize, $refreshAfter, $run->id, pageTypes: $pageTypes);
         $selected = 0;
 
         foreach ($chunks as $pages) {
