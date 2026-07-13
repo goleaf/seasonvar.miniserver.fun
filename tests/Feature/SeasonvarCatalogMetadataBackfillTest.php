@@ -11,6 +11,7 @@ use App\Models\SourcePage;
 use App\Models\SourcePageSnapshot;
 use App\Models\Studio;
 use App\Models\Translation;
+use App\Services\Catalog\CatalogRelationSyncer;
 use App\Services\Seasonvar\SeasonvarCatalogMetadataBackfill;
 use App\Services\Seasonvar\SeasonvarCatalogParser;
 use App\Services\Seasonvar\SeasonvarCatalogRelationSyncer;
@@ -432,6 +433,30 @@ class SeasonvarCatalogMetadataBackfillTest extends TestCase
         $this->assertDatabaseCount('catalog_title_actor', 1);
         $this->assertSame('atsuko-tanaka', $actor->slug);
         $this->assertSame('Ацуко Танака', $actor->name);
+    }
+
+    public function test_catalog_relation_syncer_provides_canonical_identity_for_future_sources(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $syncer = app(CatalogRelationSyncer::class);
+
+        $syncer->sync($title, [[
+            'type' => 'actor',
+            'name' => 'Atsuko Tanaka',
+            'source_url' => 'https://metadata.example/people/atsuko-tanaka',
+        ]]);
+        $syncer->sync($title, [[
+            'type' => 'actor',
+            'name' => 'Ацуко Танака',
+            'source_url' => 'https://another-source.example/actors/42',
+        ]]);
+
+        $actor = Actor::query()->sole();
+
+        $this->assertSame('atsuko-tanaka', $actor->slug);
+        $this->assertSame('Ацуко Танака', $actor->name);
+        $this->assertSame('https://metadata.example/people/atsuko-tanaka', $actor->source_url);
+        $this->assertDatabaseCount('catalog_title_actor', 1);
     }
 
     private function pageWithSnapshot(string $html, int $externalId): SourcePage

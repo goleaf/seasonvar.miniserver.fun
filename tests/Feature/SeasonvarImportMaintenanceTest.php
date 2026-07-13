@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\DTOs\MediaHealthCheckResultData;
+use App\Models\Actor;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
 use App\Models\Country;
@@ -17,6 +18,7 @@ use App\Models\SourcePage;
 use App\Models\SourcePageSnapshot;
 use App\Models\Taxonomy;
 use App\Models\Translation;
+use App\Services\Catalog\CatalogMetadataDeduplicator;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\MediaSourceHealthManager;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
@@ -545,6 +547,47 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $this->assertCount(2, $cleanupEvents);
         $this->assertGreaterThanOrEqual(3, (int) $cleanupEvents->first()->context['records_removed']);
         $this->assertSame(0, (int) $cleanupEvents->last()->context['records_removed']);
+    }
+
+    public function test_it_merges_canonical_catalog_relations_and_preserves_title_links(): void
+    {
+        $firstTitle = CatalogTitle::factory()->create();
+        $secondTitle = CatalogTitle::factory()->create();
+        $latinActor = Actor::query()->create([
+            'name' => 'Atsuko Tanaka',
+            'slug' => 'atsuko-tanaka-source',
+            'source_url' => 'https://seasonvar.ru/actor/Atsuko%20Tanaka',
+        ]);
+        $cyrillicActor = Actor::query()->create([
+            'name' => 'Ацуко Танака',
+            'slug' => 'atsuko-tanaka-cyrillic',
+            'source_url' => 'https://seasonvar.ru/actor/%D0%90%D1%86%D1%83%D0%BA%D0%BE%20%D0%A2%D0%B0%D0%BD%D0%B0%D0%BA%D0%B0',
+        ]);
+        $invalidActor = Actor::query()->create([
+            'name' => 'Сериал Akter 1 сезон полностью',
+            'slug' => 'serial-akter-1-season',
+        ]);
+
+        $firstTitle->actors()->attach([$latinActor->id, $cyrillicActor->id, $invalidActor->id]);
+        $secondTitle->actors()->attach($cyrillicActor->id);
+
+        $result = app(CatalogMetadataDeduplicator::class)->run();
+        $actor = Actor::query()->sole();
+
+        $this->assertSame('atsuko-tanaka', $actor->slug);
+        $this->assertSame('Ацуко Танака', $actor->name);
+        $this->assertEqualsCanonicalizing([$firstTitle->id, $secondTitle->id], $actor->catalogTitles()->pluck('catalog_titles.id')->all());
+        $this->assertSame(1, $result['records_removed']);
+        $this->assertSame(1, $result['records_merged']);
+        $this->assertSame(1, $result['links_moved']);
+        $this->assertSame(1, $result['duplicate_links_removed']);
+
+        $secondResult = app(CatalogMetadataDeduplicator::class)->run();
+
+        $this->assertSame(0, $secondResult['records_removed']);
+        $this->assertSame(0, $secondResult['records_merged']);
+        $this->assertDatabaseCount('actors', 1);
+        $this->assertDatabaseCount('catalog_title_actor', 2);
     }
 
     public function test_it_processes_all_pending_pages_across_import_chunks(): void
