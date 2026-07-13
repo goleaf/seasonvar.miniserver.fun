@@ -738,6 +738,89 @@ class SeasonvarImportMaintenanceTest extends TestCase
         }
     }
 
+    public function test_refresh_planner_respects_automatic_and_explicit_page_type_selection(): void
+    {
+        config([
+            'seasonvar.page_types.actor.enabled' => true,
+            'seasonvar.page_types.actor.automatic' => false,
+            'seasonvar.page_types.genre.enabled' => true,
+            'seasonvar.page_types.genre.automatic' => true,
+            'seasonvar.page_types.genre.chunk_size' => 1,
+        ]);
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $actorPage = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => 'https://seasonvar.ru/actor/1001-aleksandr-ivanov',
+            'url_hash' => hash('sha256', 'https://seasonvar.ru/actor/1001-aleksandr-ivanov'),
+            'page_type' => 'actor',
+            'parse_status' => 'pending',
+        ]);
+        $genrePage = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => 'https://seasonvar.ru/genre/drama',
+            'url_hash' => hash('sha256', 'https://seasonvar.ru/genre/drama'),
+            'page_type' => 'genre',
+            'parse_status' => 'pending',
+        ]);
+
+        $automatic = collect(app(SeasonvarRefreshPlanner::class)->pageChunksForImportCycle(
+            10,
+            now()->subDay(),
+        ))->flatten(1)->pluck('id')->all();
+        $explicitActor = collect(app(SeasonvarRefreshPlanner::class)->pageChunksForImportCycle(
+            10,
+            now()->subDay(),
+            pageTypes: ['actor'],
+        ))->flatten(1)->pluck('id')->all();
+
+        $this->assertSame([$genrePage->id], $automatic);
+        $this->assertSame([$actorPage->id], $explicitActor);
+    }
+
+    public function test_page_type_option_runs_only_an_explicitly_enabled_metadata_handler(): void
+    {
+        Http::preventStrayRequests();
+        config([
+            'seasonvar.media_check.enabled' => false,
+            'seasonvar.page_types.actor.enabled' => true,
+            'seasonvar.page_types.actor.automatic' => false,
+        ]);
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $url = 'https://seasonvar.ru/actor/1001-aleksandr-ivanov';
+        SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+            'page_type' => 'actor',
+            'parse_status' => 'pending',
+        ]);
+        Http::fake([$url => Http::response('<html><head><title>Александр Иванов</title></head><body><h1>Александр Иванов</h1></body></html>')]);
+
+        $this->artisan('seasonvar:import', [
+            '--no-discovery' => true,
+            '--page-type' => ['actor'],
+        ])->assertExitCode(0);
+
+        $this->assertDatabaseHas('actors', [
+            'name' => 'Александр Иванов',
+            'source_url' => $url,
+        ]);
+        $this->artisan('seasonvar:import', [
+            '--no-discovery' => true,
+            '--page-type' => ['static'],
+        ])
+            ->expectsOutputToContain('нет разрешённого parser/importer')
+            ->assertExitCode(1);
+    }
+
     public function test_it_rechecks_recent_parsed_page_when_existing_episode_has_no_video(): void
     {
         $this->travelTo('2026-07-09 12:00:00');

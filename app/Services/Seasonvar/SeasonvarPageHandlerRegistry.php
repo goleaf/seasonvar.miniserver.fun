@@ -141,6 +141,11 @@ final class SeasonvarPageHandlerRegistry
             retryBehavior: $definition->retryBehavior,
             expectedResultType: $definition->expectedResultType,
             canGenerateLocalPublicPage: $definition->canGenerateLocalPublicPage,
+            sourceAccess: $definition->sourceAccess,
+            publicationAuthorized: (bool) config(
+                "seasonvar.page_types.{$definition->pageType->value}.publication_authorized",
+                $definition->publicationAuthorized,
+            ),
         );
     }
 }

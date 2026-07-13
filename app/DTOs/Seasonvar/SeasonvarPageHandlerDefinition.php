@@ -22,5 +22,7 @@ final readonly class SeasonvarPageHandlerDefinition
         public string $retryBehavior,
         public string $expectedResultType,
         public bool $canGenerateLocalPublicPage,
+        public string $sourceAccess,
+        public bool $publicationAuthorized,
     ) {}
 }

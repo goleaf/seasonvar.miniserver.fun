@@ -48,6 +48,7 @@
 - `SourcePage hasMany SeasonvarImportEvent`
 - `SourcePage belongsTo SeasonvarImportRun` через `last_import_run_id`
 - `SourcePage.page_type` хранит строковое значение `SeasonvarPageType`; inventory может добавить разрешённый неизвестный или ещё не разбираемый URL, но никогда не меняет `parse_status`/`import_status` уже существующей строки. Sitemap-документы также хранятся как source pages для полного audit trail и не попадают в serial parser queue.
+- Metadata taxonomy provenance не дублируется отдельной таблицей: нормализованный `source_url` справочника однозначно связывается с `SourcePage.url_hash`, а `SourcePage` хранит ETag/Last-Modified, content hash, crawl/import/parse timestamps, missing flags и import events. `SourcePageSnapshot` для non-serial не хранит исходную страницу или описательный текст, а только безопасную hash-сводку; serial snapshot остаётся полным из-за существующего локального metadata-backfill.
 - `SeasonvarImportRun hasMany SeasonvarImportEvent`
 - `SeasonvarImportRun hasMany SourcePageSnapshot`
 - `SeasonvarImportRun hasMany SourcePage` через `last_import_run_id`
@@ -143,7 +144,7 @@
 - варианты HLS master playlist как отдельные записи `licensed_media`, если варианты качества удается определить
 - трейлеры и анонсы как медиа карточки или сезона, если номер серии отсутствует
 - разобранные значения связей для жанров, стран, актеров, режиссеров, возрастов, переводов, статусов, сетей, студий и меток
-- исходные HTML-снимки для диагностики
+- исходные HTML-снимки serial pages для совместимого metadata-backfill; non-serial snapshots содержат только hash-сводку без provider prose
 
 ## Извлечение связей
 
@@ -162,6 +163,9 @@
 
 - Единственная публичная команда Seasonvar: `php artisan seasonvar:import`.
 - `--inventory-only` классифицирует sitemap и source-page URL, записывает import run/event snapshot и обновляет только инфраструктурные `Source`/`SourcePage`; `CatalogTitle`, сезоны, серии, связи и media в этом режиме не читаются для записи и не изменяются.
+- `--page-type=<type>` допускает только тип с зарегистрированным parser/importer и `enabled=true`; без опции planner использует только `automatic=true`. Значения `refresh_after_hours` и `chunk_size` задаются отдельно для serial, actor, genre, country, tag и RSS.
+- Actor/genre/country/tag handlers записывают только каноническое имя/slug/source URL и bounded ссылки serial. Ссылки получают отложенную первую попытку, поэтому одна taxonomy page не запускает рекурсивный crawl в том же цикле. Stable person URL разделяет одноимённых актёров; справочные genre/country/tag дедуплицируются по Unicode/`е`-`ё`/punctuation-insensitive slug.
+- RSS не владеет данными тайтла: он нормализует только разрешённые serial URL и переводит существующие source pages в freshness queue. Static/search/sitemap/unknown не выбираются automatic planner и не создают локальные страницы.
 - Без аргументов команда читает sitemap Seasonvar, сохраняет все найденные ссылки страниц каталога, затем обрабатывает очередь по одному запросу.
 - С URL-аргументом команда обновляет эту карточку и найденные прямые страницы сезонов.
 - Существующие связи, серии и медиа сохраняются, если они исчезли со страницы источника.

@@ -268,11 +268,16 @@ class ImportSeasonvar extends Command
         }
 
         try {
-            $run = $dispatcher->dispatch(
-                force: (bool) $this->option('force'),
-                discover: ! (bool) $this->option('no-discovery'),
-                pageTypes: $pageTypes,
-            );
+            $run = $pageTypes === null
+                ? $dispatcher->dispatch(
+                    force: (bool) $this->option('force'),
+                    discover: ! (bool) $this->option('no-discovery'),
+                )
+                : $dispatcher->dispatch(
+                    force: (bool) $this->option('force'),
+                    discover: ! (bool) $this->option('no-discovery'),
+                    pageTypes: $pageTypes,
+                );
 
             $this->info(sprintf(
                 'Запуск #%d: поставлено в очередь: %d страниц.',

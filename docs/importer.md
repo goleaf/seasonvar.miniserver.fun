@@ -22,6 +22,21 @@
 
 `SeasonvarPageType` является единственным enum типов, `SeasonvarUrl` канонизирует host/path/query identity и сохраняет неизвестные разрешённые пути как `unknown`, а `SeasonvarSourceParityRegistry` описывает возможности discovery/storage/parser/public route/local sitemap. Результат `SeasonvarSourceInventoryResult` хранится в `SeasonvarImportRun.summary.source_inventory`; события содержат только counts и очищенные ошибки. Повторный запуск не создаёт дубли по `url_hash`, не обновляет неизменённые source rows и не переводит ранее разобранный serial обратно в pending. Подтверждённый снимок и юридическая граница находятся в [`SOURCE_PARITY.md`](SOURCE_PARITY.md).
 
+## Обработчики типов страниц
+
+`SeasonvarPageHandlerRegistry` — единственный runtime registry. Каждый handler объявляет тип, persistence при discovery, automatic parsing, metadata-only режим, parser/importer classes, retry behavior, expected result, возможность локальной страницы, класс доступа к источнику и независимое `publication_authorized`. Planner и `--page-type` читают этот registry; switch по свободным строкам в `SeasonvarCatalogImporter` отсутствует.
+
+- `serial`: включён автоматически, сохраняет совместимый catalog parser/importer, сезоны внутри одного тайтла, additive relations и approved media behavior.
+- `actor`, `genre`, `country`, `tag`: реализованы и покрыты fake-HTTP тестами, но defaults `enabled=false`, `automatic=false`, `publication_authorized=false`, потому что подтверждённый inventory 13.07.2026 не нашёл эти URL. Они не считаются подтверждёнными категориями источника.
+- `rss`: включён как metadata-only freshness signal. Он не создаёт и не обновляет `CatalogTitle`, а только нормализует bounded serial links и делает существующие source pages eligible для следующего цикла.
+- `static`, `search`, `sitemap`, `unknown`, а также неподтверждённые director/translation/status/network/studio: passive storage/audit; HTTP parse и локальная публикация отключены.
+
+Taxonomy parser сохраняет только каноническое имя, source slug/URL, title, букву, безопасный count и ограниченный список serial URL. Большие описания не импортируются. `SeasonvarTaxonomyIdentity` нормализует HTML entities, Unicode, whitespace, punctuation, case и `ё/е`; стабильный person URL не позволяет склеить одноимённых актёров. `CatalogTaxonomyRegistry` остаётся authority model/relation mapping. Provenance хранится через taxonomy `source_url` → `SourcePage.url_hash`, crawl/parser timestamps, content hash, missing flags и события. Metadata/RSS snapshots не содержат исходный HTML/XML prose.
+
+`PoliteHttpClient` принимает только allowlisted conditional headers; `SeasonvarSourcePageFetcher` отправляет ETag/Last-Modified для уже parsed pages и обрабатывает 304 без повторного импорта. Связанные serial URLs ограничены `SEASONVAR_IMPORT_MAX_LINKED_SERIAL_URLS` и получают defer из `SEASONVAR_IMPORT_LINKED_SERIAL_DEFER_MINUTES`, чтобы не создавать рекурсивный crawl в текущем цикле.
+
+Для controlled rollout задаются `SEASONVAR_PAGE_<TYPE>_ENABLED`, `..._AUTOMATIC`, `..._REFRESH_HOURS`, `..._CHUNK_SIZE` и для публикуемых типов `..._PUBLICATION_AUTHORIZED`. После изменения environment нужно пересобрать config cache и перезапустить workers. Пример ручной проверки уже разрешённого типа: `php artisan seasonvar:import --no-discovery --page-type=actor`.
+
 ## Queue coordinator и статусы
 
 `/admin/imports` вызывает `SeasonvarImportAdminService`, который под Redis lock создаёт один `queued` run и отправляет `StartSeasonvarQueuedImport` только с scalar run ID. Coordinator имеет 3 attempts, backoff 60/300/900 секунд, timeout 900 секунд и unique lock на run. Transient network/408/425/429/5xx/SQLite-lock ошибки возвращают run в `queued` для retry; permanent validation/provider errors переводят его в `failed` без бесполезного повтора.

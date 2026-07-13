@@ -36,7 +36,7 @@ class ProjectDocumentationRefresher
         ?SeasonvarSourceParityRegistry $sourceParity = null,
     ) {
         $this->basePath = $basePath ?? base_path();
-        $this->sourceParity = $sourceParity ?? new SeasonvarSourceParityRegistry;
+        $this->sourceParity = $sourceParity ?? app(SeasonvarSourceParityRegistry::class);
     }
 
     public function refresh(bool $check = false): ProjectDocumentationRefreshResult

@@ -26,6 +26,8 @@ final class SeasonvarSerialPageHandler implements SeasonvarPageHandler
             retryBehavior: 'catalog',
             expectedResultType: 'catalog_title',
             canGenerateLocalPublicPage: true,
+            sourceAccess: 'public_metadata',
+            publicationAuthorized: true,
         );
     }
 

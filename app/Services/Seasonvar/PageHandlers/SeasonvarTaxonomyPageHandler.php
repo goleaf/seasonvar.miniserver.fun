@@ -31,6 +31,8 @@ final readonly class SeasonvarTaxonomyPageHandler implements SeasonvarPageHandle
             retryBehavior: 'metadata',
             expectedResultType: 'taxonomy',
             canGenerateLocalPublicPage: true,
+            sourceAccess: 'public_metadata',
+            publicationAuthorized: false,
         );
     }
 

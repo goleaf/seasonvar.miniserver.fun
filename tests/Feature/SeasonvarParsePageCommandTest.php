@@ -1054,16 +1054,16 @@ class SeasonvarParsePageCommandTest extends TestCase
             'crawl_delay_seconds' => 0,
         ]);
         $cases = [
-            ['genre', Genre::class, 'https://seasonvar.ru/genre/tele-shou', 'ТЁЛЕ — ШОУ!', 'теле шоу'],
-            ['country', Country::class, 'https://seasonvar.ru/country/rossiya', '  РОССИЯ. ', 'россия'],
-            ['tag', Tag::class, 'https://seasonvar.ru/tag/semeynoe', 'СЕМЁЙНОЕ!', 'семейное'],
+            ['genre', Genre::class, 'https://seasonvar.ru/genre/tele-shou', 'ТЁЛЕ — ШОУ!', 'теле шоу', null],
+            ['country', Country::class, 'https://seasonvar.ru/country/rossiya', '  РОССИЯ. ', 'россия', 'https://seasonvar.ru/country/rossiya'],
+            ['tag', Tag::class, 'https://seasonvar.ru/tag/semeynoe', 'СЕМЁЙНОЕ!', 'семейное', null],
         ];
 
-        foreach ($cases as [$type, $modelClass, $url, $incomingName, $existingName]) {
+        foreach ($cases as [$type, $modelClass, $url, $incomingName, $existingName, $existingSourceUrl]) {
             $existing = $modelClass::query()->create([
                 'name' => $existingName,
-                'slug' => str_replace(' ', '-', $existingName),
-                'source_url' => $url,
+                'slug' => str($existingName)->replace('ё', 'е')->slug()->toString(),
+                'source_url' => $existingSourceUrl,
             ]);
             $page = SourcePage::factory()->create([
                 'source_id' => $source->id,
@@ -1081,6 +1081,8 @@ class SeasonvarParsePageCommandTest extends TestCase
             $this->assertSame($url, $modelClass::query()->sole()->source_url);
             $this->assertSame('parsed', $page->fresh()->parse_status);
         }
+
+        $this->assertDatabaseCount('catalog_titles', 0);
     }
 
     public function test_rss_is_only_a_freshness_signal_and_normalizes_existing_serial_pages(): void
@@ -1163,6 +1165,50 @@ class SeasonvarParsePageCommandTest extends TestCase
 
         $this->assertDatabaseCount('catalog_titles', 0);
         Http::assertNothingSent();
+    }
+
+    public function test_metadata_pages_use_conditional_requests_without_reimporting_unchanged_taxonomy(): void
+    {
+        Http::preventStrayRequests();
+        config(['seasonvar.page_types.actor.enabled' => true]);
+        $source = Source::factory()->create([
+            'code' => 'seasonvar',
+            'base_url' => 'https://seasonvar.ru',
+            'crawl_delay_seconds' => 0,
+        ]);
+        $url = 'https://seasonvar.ru/actor/1001-aleksandr-ivanov';
+        $page = SourcePage::factory()->create([
+            'source_id' => $source->id,
+            'url' => $url,
+            'url_hash' => hash('sha256', $url),
+            'page_type' => 'actor',
+            'parse_status' => 'pending',
+        ]);
+        $html = '<html><head><title>Александр Иванов</title></head><body><h1>Александр Иванов</h1></body></html>';
+        Http::fake([$url => Http::sequence()
+            ->push($html, 200, [
+                'ETag' => '"actor-v1"',
+                'Last-Modified' => 'Mon, 13 Jul 2026 10:00:00 GMT',
+            ])
+            ->push('', 304)]);
+        $importer = app(SeasonvarCatalogImporter::class);
+        $importer->parsePage($page);
+
+        $this->assertDatabaseCount('actors', 1);
+        $this->assertDatabaseCount('source_page_snapshots', 1);
+        $snapshot = $page->snapshots()->sole();
+        $this->assertStringContainsString('structured_fields', $snapshot->html);
+        $this->assertStringNotContainsString('Александр Иванов', $snapshot->html);
+
+        $importer->parsePage($page->fresh());
+
+        $this->assertDatabaseCount('actors', 1);
+        $this->assertDatabaseCount('source_page_snapshots', 1);
+        $this->assertSame(304, $page->fresh()->http_status);
+        Http::assertSent(function (Request $request): bool {
+            return $request->hasHeader('If-None-Match', '"actor-v1"')
+                && $request->hasHeader('If-Modified-Since', 'Mon, 13 Jul 2026 10:00:00 GMT');
+        });
     }
 
     /**

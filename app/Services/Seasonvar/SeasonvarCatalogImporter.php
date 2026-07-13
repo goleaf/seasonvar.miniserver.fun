@@ -204,16 +204,22 @@ class SeasonvarCatalogImporter
      */
     public function pendingPages(?callable $progress = null): Collection
     {
+        $pageTypes = $this->pageHandlers->processingTypes();
         $this->report($progress, 'pending-pages-query-started', [
             'parse_status' => 'pending',
-            'page_type' => 'serial',
+            'page_types' => $pageTypes,
         ]);
 
         $pages = SourcePage::query()
             ->with('source')
             ->where('parse_status', 'pending')
-            ->where('page_type', 'serial')
-            ->oldest()
+            ->whereIn('page_type', $pageTypes)
+            ->where(function (Builder $query): void {
+                $query->whereNull('retry_after_at')
+                    ->orWhere('retry_after_at', '<=', now());
+            })
+            ->orderBy('id')
+            ->limit(max(1, (int) config('seasonvar.import.chunk_size', 100)))
             ->get();
 
         $this->report($progress, 'pending-pages-query-complete', [
@@ -354,6 +360,8 @@ class SeasonvarCatalogImporter
             'metadata_only' => $definition->metadataOnly,
             'retry_behavior' => $definition->retryBehavior,
             'expected_result_type' => $definition->expectedResultType,
+            'source_access' => $definition->sourceAccess,
+            'publication_authorized' => $definition->publicationAuthorized,
         ]);
 
         if ($handler instanceof SeasonvarPassivePageHandler
@@ -1921,6 +1929,15 @@ class SeasonvarCatalogImporter
             'taxonomy_updated' => $result->taxonomiesUpdated,
             'duplicate_prevented' => $result->duplicatesPrevented,
         ]);
+
+        if ($handler->definition()->canGenerateLocalPublicPage
+            && ! $this->pageHandlers->definition($pageType)->publicationAuthorized) {
+            $this->recordPageEvent($page, $importRunId, 'seasonvar-unauthorized-content-skipped', [
+                'page_type' => $pageType->value,
+                'scope' => 'local_publication',
+                'reason' => 'publication_authorization_required',
+            ]);
+        }
 
         return $result->toLegacyResult();
     }

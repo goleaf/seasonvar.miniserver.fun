@@ -26,6 +26,8 @@ final readonly class SeasonvarRssPageHandler implements SeasonvarPageHandler
             retryBehavior: 'freshness',
             expectedResultType: 'freshness_signal',
             canGenerateLocalPublicPage: false,
+            sourceAccess: 'public_freshness_signal',
+            publicationAuthorized: false,
         );
     }
 

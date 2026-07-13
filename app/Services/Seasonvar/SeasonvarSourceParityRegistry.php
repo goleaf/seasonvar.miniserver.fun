@@ -37,8 +37,8 @@ final class SeasonvarSourceParityRegistry
                 'can_discover' => $definition->persistOnDiscovery,
                 'can_store_source_page' => $definition->persistOnDiscovery,
                 'can_parse' => $definition->parserClass !== null && $definition->importerClass !== null,
-                'can_publish_local_page' => $definition->canGenerateLocalPublicPage,
-                'can_add_to_sitemap' => $definition->canGenerateLocalPublicPage,
+                'can_publish_local_page' => $definition->canGenerateLocalPublicPage && $definition->publicationAuthorized,
+                'can_add_to_sitemap' => $definition->canGenerateLocalPublicPage && $definition->publicationAuthorized,
                 'parser_class' => $definition->parserClass,
                 'local_route_name' => $this->routeName($type, $isTaxonomy),
             ];

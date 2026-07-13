@@ -25,6 +25,12 @@ final readonly class SeasonvarPassivePageHandler implements SeasonvarPageHandler
             retryBehavior: 'none',
             expectedResultType: 'stored_source_page',
             canGenerateLocalPublicPage: false,
+            sourceAccess: match ($this->pageType) {
+                SeasonvarPageType::Search => 'dynamic_non_crawlable',
+                SeasonvarPageType::StaticPage => 'public_metadata_no_republication',
+                default => 'inventory_only',
+            },
+            publicationAuthorized: false,
         );
     }
 
