@@ -631,9 +631,9 @@
             ])>
                 @forelse ($titles as $catalogTitle)
                     @if ($view === 'list')
-                        <x-title-list-row wire:key="catalog-title-{{ $catalogTitle->id }}" :title="$catalogTitle" readable />
+                        <x-catalog.title-card wire:key="catalog-title-{{ $catalogTitle->id }}" :title="$catalogTitle" layout="horizontal" readable />
                     @else
-                        <x-title-card wire:key="catalog-title-{{ $catalogTitle->id }}" :title="$catalogTitle" />
+                        <x-catalog.title-card wire:key="catalog-title-{{ $catalogTitle->id }}" :title="$catalogTitle" />
                     @endif
                 @empty
                     <x-ui.panel class="col-span-full border-dashed">

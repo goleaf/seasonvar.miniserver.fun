@@ -86,7 +86,12 @@
                 </div>
 
                 <article class="grid gap-5 bg-gradient-to-br from-white via-white to-emerald-50 p-4 md:grid-cols-[minmax(150px,220px)_minmax(0,1fr)] md:p-5">
-                    <x-title-poster :title="$title" class="mx-auto aspect-[2/3] w-44 max-w-full shadow-panel sm:w-52 md:w-full" empty-class="grid h-full place-items-center px-6 text-center text-sm text-slate-500" />
+                    <x-ui.poster-frame
+                        :src="$title->poster_url"
+                        alt="Постер {{ $title->display_title }}"
+                        loading="eager"
+                        class="mx-auto aspect-[2/3] w-44 max-w-full rounded-panel shadow-panel sm:w-52 md:w-full"
+                    />
 
                     <div class="min-w-0">
                         <h1 class="flex min-w-0 items-start gap-3 text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">
@@ -208,9 +213,9 @@
             <x-ui.panel :title="__('catalog.title.recommendations')" icon="fa-solid fa-thumbs-up" :pad="false">
                 @if ($recommendedTitleRecommendations->first()?->recommendedTitle)
                     <div class="space-y-3 p-3">
-                        <div class="grid gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                        <div class="grid items-start gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
                             <div class="min-w-0">
-                                <x-title-card :title="$recommendedTitleRecommendations->first()->recommendedTitle" />
+                                <x-catalog.title-card :title="$recommendedTitleRecommendations->first()->recommendedTitle" />
 
                                 @if ($recommendedTitleRecommendations->first()->reasonLabels() !== [])
                                     <div class="mt-2 flex flex-wrap gap-1 text-xs font-bold">
@@ -233,7 +238,7 @@
                                     <div class="divide-y divide-slate-200">
                                         @foreach ($recommendedTitleRecommendations->skip(1)->take(4) as $recommendation)
                                             <div>
-                                                <x-title-list-row :title="$recommendation->recommendedTitle" compact :show-description="false" />
+                                                <x-catalog.title-card :title="$recommendation->recommendedTitle" layout="compact" :show-description="false" />
 
                                                 @if ($recommendation->reasonLabels() !== [])
                                                     <div class="flex flex-wrap gap-1 px-3 pb-3 text-xs font-bold">
@@ -256,7 +261,7 @@
                             <div class="grid auto-rows-fr gap-3 sm:grid-cols-2 xl:grid-cols-3">
                                 @foreach ($recommendedTitleRecommendations->skip(5) as $recommendation)
                                     <div class="min-w-0">
-                                        <x-title-card :title="$recommendation->recommendedTitle" />
+                                        <x-catalog.title-card :title="$recommendation->recommendedTitle" />
 
                                         @if ($recommendation->reasonLabels() !== [])
                                             <div class="mt-2 flex flex-wrap gap-1 text-xs font-bold">
@@ -289,7 +294,7 @@
                                     </div>
                                     <div class="divide-y divide-slate-200">
                                         @foreach ($genreRecommendations->take(6) as $recommendedTitle)
-                                            <x-title-list-row :title="$recommendedTitle" readable :show-description="false" />
+                                            <x-catalog.title-card :title="$recommendedTitle" layout="horizontal" readable :show-description="false" />
                                         @endforeach
                                     </div>
                                 </section>
@@ -305,7 +310,7 @@
                                     </div>
                                     <div class="divide-y divide-slate-200">
                                         @foreach ($yearRecommendations->take(6) as $recommendedTitle)
-                                            <x-title-list-row :title="$recommendedTitle" readable :show-description="false" />
+                                            <x-catalog.title-card :title="$recommendedTitle" layout="horizontal" readable :show-description="false" />
                                         @endforeach
                                     </div>
                                 </section>

@@ -212,8 +212,8 @@ class CatalogVisualSystemTest extends TestCase
         $title->genres()->attach($genre);
         $title->load(['genres', 'countries', 'seasons']);
 
-        $cardHtml = Blade::render('<x-title-card :title="$title" />', ['title' => $title]);
-        $rowHtml = Blade::render('<x-title-list-row :title="$title" />', ['title' => $title]);
+        $cardHtml = Blade::render('<x-catalog.title-card :title="$title" layout="grid" />', ['title' => $title]);
+        $rowHtml = Blade::render('<x-catalog.title-card :title="$title" layout="horizontal" />', ['title' => $title]);
         $showUrl = route('titles.show', $title);
         $genreUrl = route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => $genre->slug]);
 
@@ -387,11 +387,27 @@ class CatalogVisualSystemTest extends TestCase
             'poster_url' => 'https://media.example.com/poster.jpg',
         ]);
 
-        $html = Blade::render('<x-title-poster :title="$title" />', ['title' => $title]);
+        $html = Blade::render(
+            '<x-ui.poster-frame :src="$title->poster_url" :alt="\'Постер \'.$title->display_title" class="aspect-[2/3]" />',
+            ['title' => $title],
+        );
 
+        $this->assertStringContainsString('data-ui-poster-frame', $html);
+        $this->assertStringContainsString('data-ui-poster-image', $html);
         $this->assertStringContainsString('object-cover', $html);
+        $this->assertStringContainsString('scale-[1.02]', $html);
         $this->assertStringNotContainsString('object-contain', $html);
         $this->assertStringNotContainsString('ring-1 ring-slate-200', $html);
+    }
+
+    public function test_title_recommendation_columns_do_not_stretch_the_featured_card(): void
+    {
+        $detail = File::get(resource_path('views/livewire/catalog-title-detail.blade.php'));
+
+        $this->assertStringContainsString(
+            'grid items-start gap-3 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]',
+            $detail,
+        );
     }
 
     public function test_title_player_keeps_personal_controls_below_the_full_width_player(): void

@@ -61,6 +61,9 @@ class CatalogHomePageBuilder
                 'season:id,catalog_title_id,number,kind,sort_order,title',
                 'episode:id,season_id,number,kind,sort_order,title,released_at',
             ]), $snapshot['latest_media_ids'] ?? []);
+        $latestMedia->each(function (LicensedMedia $media): void {
+            $media->setAttribute('card_meta', $this->latestMediaCardMeta($media));
+        });
         $yearBuckets = collect($snapshot['year_buckets'] ?? [])->map(fn (array $attributes): object => (object) $attributes);
         $subtitleTag = null;
 
@@ -92,6 +95,15 @@ class CatalogHomePageBuilder
         return $this->titles->visibleTo(null)
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url', 'indexed_at'])
             ->withCount($this->titles->publicCardCounts(null));
+    }
+
+    private function latestMediaCardMeta(LicensedMedia $media): string
+    {
+        return collect([
+            $media->translation_name,
+            $media->format ? strtoupper($media->format) : null,
+            $media->published_at?->format('d.m.Y'),
+        ])->filter()->implode(' / ') ?: 'Видео сериала';
     }
 
     /**

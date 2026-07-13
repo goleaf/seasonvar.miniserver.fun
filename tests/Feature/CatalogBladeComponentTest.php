@@ -10,6 +10,7 @@ use App\Models\LicensedMedia;
 use App\Models\Season;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class CatalogBladeComponentTest extends TestCase
@@ -35,15 +36,66 @@ class CatalogBladeComponentTest extends TestCase
         $catalogTitle->countries()->attach($country->id);
         $catalogTitle->load(['genres', 'countries', 'seasons']);
 
-        $cardHtml = Blade::render('<x-title-card :title="$title" />', ['title' => $catalogTitle]);
-        $rowHtml = Blade::render('<x-title-list-row :title="$title" />', ['title' => $catalogTitle]);
+        $cardHtml = Blade::render('<x-catalog.title-card :title="$title" layout="grid" />', ['title' => $catalogTitle]);
+        $rowHtml = Blade::render('<x-catalog.title-card :title="$title" layout="horizontal" />', ['title' => $catalogTitle]);
 
         foreach ([$cardHtml, $rowHtml] as $html) {
             $this->assertStringContainsString('<article', $html);
+            $this->assertStringContainsString('data-ui-poster-card', $html);
+            $this->assertStringContainsString('data-ui-poster-frame', $html);
             $this->assertStringContainsString('href="'.route('titles.show', $catalogTitle).'"', $html);
             $this->assertStringContainsString('href="'.route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => $genre->slug]).'"', $html);
             $this->assertStringContainsString('href="'.route('titles.taxonomy', ['type' => 'country', 'taxonomy' => $country->slug]).'"', $html);
         }
+    }
+
+    public function test_title_card_does_not_lazy_load_missing_relations(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->make([
+            'title' => 'Карточка без скрытых запросов',
+        ]);
+        $queries = [];
+        DB::listen(function ($query) use (&$queries): void {
+            $queries[] = $query->sql;
+        });
+
+        Blade::render('<x-catalog.title-card :title="$title" layout="grid" />', ['title' => $catalogTitle]);
+
+        $this->assertSame([], $queries);
+    }
+
+    public function test_latest_media_card_prepares_episode_metadata_outside_blade(): void
+    {
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Новая серия',
+            'poster_url' => 'https://media.example.com/latest.jpg',
+        ]);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 2,
+        ]);
+        $episode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 7,
+        ]);
+        $media = LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'translation_name' => 'Профессиональный перевод',
+            'quality' => '1080p',
+            'format' => 'm3u8',
+            'published_at' => now()->setDate(2026, 7, 13),
+        ])->load(['catalogTitle', 'season', 'episode']);
+        $media->setAttribute('card_meta', 'Профессиональный перевод / M3U8 / 13.07.2026');
+
+        $html = Blade::render('<x-catalog.latest-media-card :media="$media" />', ['media' => $media]);
+
+        $this->assertStringContainsString('data-ui-poster-card', $html);
+        $this->assertStringContainsString('Новая серия', $html);
+        $this->assertStringContainsString('Сезон 2', $html);
+        $this->assertStringContainsString('7 серия', $html);
+        $this->assertStringContainsString('Профессиональный перевод / M3U8 / 13.07.2026', $html);
     }
 
     public function test_public_title_components_separate_matching_original_title_suffix(): void
@@ -55,8 +107,8 @@ class CatalogBladeComponentTest extends TestCase
         ]);
 
         foreach ([
-            Blade::render('<x-title-card :title="$title" />', ['title' => $title]),
-            Blade::render('<x-title-list-row :title="$title" />', ['title' => $title]),
+            Blade::render('<x-catalog.title-card :title="$title" layout="grid" />', ['title' => $title]),
+            Blade::render('<x-catalog.title-card :title="$title" layout="horizontal" />', ['title' => $title]),
         ] as $html) {
             $this->assertStringContainsString('Королевские гонки РуПола', $html);
             $this->assertStringContainsString(e("RuPaul's Drag Race"), $html);
@@ -73,7 +125,7 @@ class CatalogBladeComponentTest extends TestCase
             'title' => 'Мир/Дружба',
             'original_title' => 'World Friendship',
         ]);
-        $slashHtml = Blade::render('<x-title-card :title="$title" />', ['title' => $slashTitle]);
+        $slashHtml = Blade::render('<x-catalog.title-card :title="$title" layout="grid" />', ['title' => $slashTitle]);
 
         $this->assertStringContainsString('Мир/Дружба', $slashHtml);
     }

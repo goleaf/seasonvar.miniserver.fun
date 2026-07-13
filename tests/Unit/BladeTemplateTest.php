@@ -66,6 +66,36 @@ class BladeTemplateTest extends TestCase
         $this->assertSame([], $offendingFiles, 'Blade templates must not contain PHP tags, service resolution, database, Redis, or cache calls.');
     }
 
+    public function test_catalog_artwork_is_emitted_only_by_the_shared_poster_frame(): void
+    {
+        $posterFrame = resource_path('views/components/ui/poster-frame.blade.php');
+        $offendingFiles = collect(File::allFiles(resource_path('views')))
+            ->filter(fn (SplFileInfo $file): bool => str_ends_with($file->getFilename(), '.blade.php'))
+            ->reject(fn (SplFileInfo $file): bool => $file->getPathname() === $posterFrame)
+            ->filter(function (SplFileInfo $file): bool {
+                $contents = (string) file_get_contents($file->getPathname());
+
+                return preg_match('/<img\b[^>]*(?:poster_url|poster_src|Постер)/iu', $contents) === 1;
+            })
+            ->map(fn (SplFileInfo $file): string => str_replace(base_path().'/', '', $file->getPathname()))
+            ->values()
+            ->all();
+
+        $this->assertSame([], $offendingFiles, 'Catalog artwork images must be emitted only by x-ui.poster-frame.');
+    }
+
+    public function test_blade_templates_do_not_reference_legacy_title_poster_components(): void
+    {
+        $offendingFiles = collect(File::allFiles(resource_path('views')))
+            ->filter(fn (SplFileInfo $file): bool => str_ends_with($file->getFilename(), '.blade.php'))
+            ->filter(fn (SplFileInfo $file): bool => preg_match('/<x-title-(?:poster|card|list-row)\b/', (string) file_get_contents($file->getPathname())) === 1)
+            ->map(fn (SplFileInfo $file): string => str_replace(base_path().'/', '', $file->getPathname()))
+            ->values()
+            ->all();
+
+        $this->assertSame([], $offendingFiles, 'Public title artwork must use x-ui.poster-frame, x-ui.poster-card, or x-catalog.title-card.');
+    }
+
     public function test_volt_is_not_installed_or_used(): void
     {
         $composer = strtolower((string) file_get_contents(base_path('composer.json')).(string) file_get_contents(base_path('composer.lock')));
@@ -99,6 +129,50 @@ class BladeTemplateTest extends TestCase
             ->assertSeeText('Готово')
             ->assertSee('fa-solid fa-circle-check', false)
             ->assertSee('bg-emerald-50', false);
+    }
+
+    public function test_poster_frame_covers_and_overscans_without_an_inner_outline(): void
+    {
+        $view = $this->blade('<x-ui.poster-frame src="https://media.example.com/poster.jpg" alt="Постер сериала" class="aspect-[2/3]" />');
+
+        $view
+            ->assertSee('data-ui-poster-frame', false)
+            ->assertSee('data-ui-poster-image', false)
+            ->assertSee('absolute inset-0 h-full w-full scale-[1.02] object-cover object-center', false)
+            ->assertDontSee('object-contain', false);
+
+        $html = (string) $view;
+        preg_match('/<img\b[^>]*data-ui-poster-image[^>]*>/i', $html, $image);
+
+        $this->assertNotEmpty($image);
+        $this->assertDoesNotMatchRegularExpression('/\b(?:border|ring|shadow|rounded|p[trblxy]?)-/', $image[0]);
+    }
+
+    public function test_poster_frame_keeps_the_same_boundary_for_missing_artwork(): void
+    {
+        $this->blade('<x-ui.poster-frame alt="Постер сериала" empty-label="Постер пока не добавлен" class="aspect-[2/3]" />')
+            ->assertSee('data-ui-poster-frame', false)
+            ->assertSee('aspect-[2/3]', false)
+            ->assertSeeText('Постер пока не добавлен')
+            ->assertDontSee('data-ui-poster-image', false);
+    }
+
+    public function test_poster_card_exposes_one_shell_and_strict_layout_markers(): void
+    {
+        foreach (['grid', 'horizontal', 'compact'] as $layout) {
+            $this->blade(
+                '<x-ui.poster-card :layout="$layout" alt="Постер"><p>Описание</p></x-ui.poster-card>',
+                ['layout' => $layout],
+            )
+                ->assertSee('data-ui-poster-card', false)
+                ->assertSee('data-ui-poster-card-media', false)
+                ->assertSee('data-ui-poster-card-body', false)
+                ->assertSee('data-ui-poster-layout="'.$layout.'"', false)
+                ->assertSeeText('Описание');
+        }
+
+        $this->blade('<x-ui.poster-card layout="unsupported" alt="Постер">Описание</x-ui.poster-card>')
+            ->assertSee('data-ui-poster-layout="grid"', false);
     }
 
     public function test_catalog_count_translations_follow_russian_and_english_plural_rules(): void

@@ -49,10 +49,14 @@
             @else
                 <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
                     @foreach ($continueWatching as $item)
-                        <article data-continue-watching-card wire:key="continue-watching-{{ $item->title->id }}" class="grid min-w-0 grid-cols-1 overflow-hidden rounded-panel border border-slate-200 bg-white min-[420px]:grid-cols-[5.5rem_minmax(0,1fr)]">
-                            <x-title-poster :title="$item->title" class="aspect-[16/9] max-h-48 min-h-36 w-full rounded-none bg-slate-50 min-[420px]:aspect-auto min-[420px]:h-full min-[420px]:max-h-none min-[420px]:w-auto" />
-
-                            <div class="flex min-w-0 flex-col p-3">
+                        <x-ui.poster-card
+                            :src="$item->title->poster_url"
+                            alt="Постер {{ $item->title->display_title }}"
+                            layout="horizontal"
+                            data-continue-watching-card
+                            wire:key="continue-watching-{{ $item->title->id }}"
+                        >
+                            <div class="flex min-w-0 flex-col">
                                 <div class="text-xs font-semibold text-slate-500">
                                     @if ($item->episode->season?->number !== null)
                                         {{ __('catalog.release.season', ['number' => $item->episode->season->number]) }}
@@ -90,7 +94,7 @@
                                     <span>{{ $item->actionLabel }}</span>
                                 </a>
                             </div>
-                        </article>
+                        </x-ui.poster-card>
                     @endforeach
                 </div>
             @endif
@@ -110,75 +114,75 @@
                 <p class="mt-1 text-sm leading-6 text-slate-500">{{ __('catalog.viewing.history_empty_hint') }}</p>
             </div>
         @else
-            <div class="divide-y divide-slate-200">
+            <div class="space-y-2 p-4">
                 @foreach ($history as $progress)
-                    <article wire:key="viewing-history-{{ $progress->id }}" class="grid min-w-0 gap-3 p-4 sm:grid-cols-[4.5rem_minmax(0,1fr)_auto] sm:items-center">
-                        @if ($progress->is_accessible && $progress->catalogTitle)
-                            <x-title-poster :title="$progress->catalogTitle" class="hidden aspect-[2/3] w-[4.5rem] rounded-control bg-slate-50 sm:block" />
-                        @else
-                            <div class="hidden aspect-[2/3] w-[4.5rem] place-items-center rounded-control bg-slate-100 text-slate-400 sm:grid">
-                                <x-ui.icon name="fa-solid fa-ban" />
-                            </div>
-                        @endif
-
-                        <div class="min-w-0">
-                            @if ($progress->is_accessible && $progress->catalogTitle && $progress->episode)
-                                <a
-                                    href="{{ route('titles.show', ['catalogTitle' => $progress->catalogTitle, 'season' => $progress->episode->season_id, 'episode' => $progress->episode->id]) }}"
-                                    wire:navigate
-                                    class="break-words text-base font-black text-slate-800 hover:text-emerald-700"
-                                >
-                                    {{ $progress->catalogTitle->display_title }}
-                                </a>
-                                @if ($progress->catalogTitle->display_original_title)
-                                    <p class="mt-0.5 break-words text-xs font-semibold leading-5 text-slate-500">{{ $progress->catalogTitle->display_original_title }}</p>
+                    <x-ui.poster-card
+                        :src="$progress->is_accessible && $progress->catalogTitle ? $progress->catalogTitle->poster_url : null"
+                        :alt="$progress->is_accessible && $progress->catalogTitle ? 'Постер '.$progress->catalogTitle->display_title : __('catalog.viewing.unavailable_episode')"
+                        empty-label=""
+                        layout="compact"
+                        wire:key="viewing-history-{{ $progress->id }}"
+                    >
+                        <div class="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                            <div class="min-w-0">
+                                @if ($progress->is_accessible && $progress->catalogTitle && $progress->episode)
+                                    <a
+                                        href="{{ route('titles.show', ['catalogTitle' => $progress->catalogTitle, 'season' => $progress->episode->season_id, 'episode' => $progress->episode->id]) }}"
+                                        wire:navigate
+                                        class="break-words text-base font-black text-slate-800 hover:text-emerald-700"
+                                    >
+                                        {{ $progress->catalogTitle->display_title }}
+                                    </a>
+                                    @if ($progress->catalogTitle->display_original_title)
+                                        <p class="mt-0.5 break-words text-xs font-semibold leading-5 text-slate-500">{{ $progress->catalogTitle->display_original_title }}</p>
+                                    @endif
+                                    <p class="mt-1 text-sm font-semibold text-slate-600">
+                                        @if ($progress->episode->season?->number !== null)
+                                            {{ __('catalog.release.season', ['number' => $progress->episode->season->number]) }},
+                                        @endif
+                                        @if ($progress->episode->number !== null)
+                                            {{ __('catalog.viewing.episode_number', ['number' => $progress->episode->number]) }}
+                                        @else
+                                            {{ __('catalog.viewing.episode_without_number') }}
+                                        @endif
+                                        @if ($progress->episode->title)
+                                            — {{ $progress->episode->title }}
+                                        @endif
+                                    </p>
+                                @else
+                                    <div class="text-base font-black text-slate-700">{{ __('catalog.viewing.unavailable_episode') }}</div>
+                                    <p class="mt-1 text-sm leading-6 text-slate-500">{{ __('catalog.viewing.unavailable_hint') }}</p>
                                 @endif
-                                <p class="mt-1 text-sm font-semibold text-slate-600">
-                                    @if ($progress->episode->season?->number !== null)
-                                        {{ __('catalog.release.season', ['number' => $progress->episode->season->number]) }},
-                                    @endif
-                                    @if ($progress->episode->number !== null)
-                                        {{ __('catalog.viewing.episode_number', ['number' => $progress->episode->number]) }}
-                                    @else
-                                        {{ __('catalog.viewing.episode_without_number') }}
-                                    @endif
-                                    @if ($progress->episode->title)
-                                        — {{ $progress->episode->title }}
-                                    @endif
-                                </p>
-                            @else
-                                <div class="text-base font-black text-slate-700">{{ __('catalog.viewing.unavailable_episode') }}</div>
-                                <p class="mt-1 text-sm leading-6 text-slate-500">{{ __('catalog.viewing.unavailable_hint') }}</p>
-                            @endif
 
-                            <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
-                                <span class="inline-flex items-center gap-1">
-                                    <x-ui.icon name="fa-regular fa-clock" />
-                                    {{ $progress->last_watched_at->format('d.m.Y H:i') }}
-                                </span>
-                                @if ($progress->completed_at)
-                                    <span class="inline-flex items-center gap-1 text-emerald-700">
-                                        <x-ui.icon name="fa-solid fa-circle-check" />
-                                        {{ __('catalog.viewing.completed') }}
+                                <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
+                                    <span class="inline-flex items-center gap-1">
+                                        <x-ui.icon name="fa-regular fa-clock" />
+                                        {{ $progress->last_watched_at->format('d.m.Y H:i') }}
                                     </span>
-                                @elseif ($progress->progress_percent !== null)
-                                    <span>{{ $progress->progress_percent }}%</span>
-                                @endif
+                                    @if ($progress->completed_at)
+                                        <span class="inline-flex items-center gap-1 text-emerald-700">
+                                            <x-ui.icon name="fa-solid fa-circle-check" />
+                                            {{ __('catalog.viewing.completed') }}
+                                        </span>
+                                    @elseif ($progress->progress_percent !== null)
+                                        <span>{{ $progress->progress_percent }}%</span>
+                                    @endif
+                                </div>
                             </div>
-                        </div>
 
-                        <button
-                            type="button"
-                            wire:click="removeHistoryItem({{ $progress->id }})"
-                            wire:confirm="{{ __('catalog.viewing.remove_confirmation') }}"
-                            wire:loading.attr="disabled"
-                            wire:target="removeHistoryItem({{ $progress->id }})"
-                            class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-wait disabled:opacity-60 sm:w-auto sm:justify-self-end"
-                        >
-                            <x-ui.icon name="fa-solid fa-xmark" />
-                            <span>{{ __('catalog.viewing.remove') }}</span>
-                        </button>
-                    </article>
+                            <button
+                                type="button"
+                                wire:click="removeHistoryItem({{ $progress->id }})"
+                                wire:confirm="{{ __('catalog.viewing.remove_confirmation') }}"
+                                wire:loading.attr="disabled"
+                                wire:target="removeHistoryItem({{ $progress->id }})"
+                                class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-rose-50 hover:text-rose-700 disabled:cursor-wait disabled:opacity-60 sm:w-auto sm:justify-self-end"
+                            >
+                                <x-ui.icon name="fa-solid fa-xmark" />
+                                <span>{{ __('catalog.viewing.remove') }}</span>
+                            </button>
+                        </div>
+                    </x-ui.poster-card>
                 @endforeach
             </div>
 

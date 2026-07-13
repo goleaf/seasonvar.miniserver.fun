@@ -17,7 +17,7 @@
                 <x-ui.panel title="Последние обновления" icon="fa-solid fa-clock-rotate-left" :pad="false">
                     <div data-home-latest-updates-grid class="grid items-start gap-3 p-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 [&>[data-catalog-card]]:h-auto">
                         @forelse ($featuredTitles as $catalogTitle)
-                            <x-title-card :title="$catalogTitle" />
+                            <x-catalog.title-card :title="$catalogTitle" />
                         @empty
                             <div class="col-span-full rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">
                                 Сериалы пока не добавлены.
@@ -29,40 +29,7 @@
                 <x-ui.panel title="Новые серии" icon="fa-solid fa-circle-play" :pad="false">
                     <div class="grid gap-3 p-3 lg:grid-cols-2">
                         @forelse ($latestMedia as $media)
-                            @if ($media->catalogTitle)
-                                <a href="{{ route('titles.show', ['catalogTitle' => $media->catalogTitle, 'episode' => $media->episode_id, 'media' => $media->id]) }}#player" class="group flex min-w-0 gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm shadow-slate-200/60 transition hover:border-emerald-300 hover:bg-emerald-50">
-                                    <x-title-poster :title="$media->catalogTitle" class="h-24 w-16 shrink-0" empty-class="grid h-full place-items-center text-[10px] text-slate-400" />
-                                    <div class="min-w-0 flex-1">
-                                        <div class="font-bold leading-5 text-slate-700 group-hover:text-emerald-700">{{ $media->catalogTitle->display_title }}</div>
-                                        @if ($media->catalogTitle->display_original_title)
-                                            <div class="mt-0.5 break-words text-xs font-semibold text-slate-500">{{ $media->catalogTitle->display_original_title }}</div>
-                                        @endif
-                                        <div class="mt-2 flex flex-wrap gap-1 text-xs font-semibold">
-                                            @if ($media->season)
-                                                <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
-                                                    <x-ui.icon name="fa-solid fa-layer-group" />
-                                                    <span>Сезон {{ $media->season->number }}</span>
-                                                </span>
-                                            @endif
-                                            @if ($media->episode)
-                                                <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700">
-                                                    <x-ui.icon name="fa-solid fa-list-ol" />
-                                                    <span>{{ $media->episode->number }} серия</span>
-                                                </span>
-                                            @endif
-                                            @if ($media->quality)
-                                                <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700">
-                                                    <x-ui.icon name="fa-solid fa-display" />
-                                                    <span>{{ strtoupper($media->quality) }}</span>
-                                                </span>
-                                            @endif
-                                        </div>
-                                        <div class="mt-2 text-xs text-slate-500">
-                                            {{ collect([$media->translation_name, $media->format ? strtoupper($media->format) : null, $media->published_at?->format('d.m.Y')])->filter()->implode(' / ') ?: 'Видео сериала' }}
-                                        </div>
-                                    </div>
-                                </a>
-                            @endif
+                            <x-catalog.latest-media-card :media="$media" />
                         @empty
                             <div class="rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500 lg:col-span-2">
                                 Новых серий пока нет.
@@ -74,7 +41,7 @@
                 <x-ui.panel title="Сейчас можно смотреть" icon="fa-solid fa-file-video" :pad="false">
                     <div class="grid auto-rows-fr gap-3 p-3 sm:grid-cols-2 xl:grid-cols-4">
                         @forelse ($videoTitles as $catalogTitle)
-                            <x-title-card :title="$catalogTitle" />
+                            <x-catalog.title-card :title="$catalogTitle" />
                         @empty
                             <div class="col-span-full rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">
                                 Видео пока нет.
@@ -92,7 +59,7 @@
                             </div>
 
                             @foreach ($titlesForDate->take(8) as $catalogTitle)
-                                <x-title-list-row :title="$catalogTitle" :show-description="false" />
+                                <x-catalog.title-card :title="$catalogTitle" layout="horizontal" :show-description="false" />
                             @endforeach
                         @empty
                             <div class="p-6 text-sm text-slate-500">

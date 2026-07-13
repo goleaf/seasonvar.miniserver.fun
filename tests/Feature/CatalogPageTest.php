@@ -1009,6 +1009,8 @@ class CatalogPageTest extends TestCase
             ->assertSeeText('Поиск')
             ->assertSeeText('Обслуживание')
             ->assertSeeText('Принудительно')
+            ->assertSee('data-ui-poster-card', false)
+            ->assertSee('data-ui-poster-frame', false)
             ->assertSeeText('Статусы страниц: 2 / 3')
             ->assertSeeText('Данные видео: 2 / 3')
             ->assertSeeText('Ключи видео: 1 / 4')
@@ -1221,10 +1223,27 @@ class CatalogPageTest extends TestCase
 
         $response
             ->assertOk()
+            ->assertSee('data-ui-poster-card', false)
+            ->assertSee('data-ui-poster-frame', false)
             ->assertSee('aspect-[2/3]', false)
             ->assertSee('object-cover', false)
+            ->assertSee('scale-[1.02]', false)
             ->assertDontSee('object-contain', false)
             ->assertDontSee('ring-1 ring-slate-200', false);
+    }
+
+    public function test_titles_list_layout_selects_and_renders_the_description(): void
+    {
+        CatalogTitle::factory()->create([
+            'title' => 'Сериал с описанием в списке',
+            'slug' => 'serial-s-opisaniem-v-spiske',
+            'description' => 'Полное описание для горизонтальной карточки.',
+        ]);
+
+        $this->get(route('titles.index', ['view' => 'list']))
+            ->assertOk()
+            ->assertSee('data-ui-poster-layout="horizontal"', false)
+            ->assertSeeText('Полное описание для горизонтальной карточки.');
     }
 
     public function test_title_page_server_renders_safe_localized_metadata_without_inferring_content_language(): void
@@ -2675,6 +2694,8 @@ class CatalogPageTest extends TestCase
             ->test(ViewingActivity::class)
             ->assertSeeText('Продолжаемый сериал')
             ->assertSeeText('Продолжить с 02:00')
+            ->assertSeeHtml('data-ui-poster-card')
+            ->assertSeeHtml('data-ui-poster-frame')
             ->assertSeeHtml('wire:key="continue-watching-'.$continuingTitle->id.'"')
             ->assertDontSeeHtml('wire:key="continue-watching-'.$completedTitle->id.'"')
             ->assertDontSeeHtml('wire:key="continue-watching-'.$mismatchedTitle->id.'"')
@@ -2800,6 +2821,8 @@ class CatalogPageTest extends TestCase
         $this->actingAs($user)
             ->get(route('viewing-activity'))
             ->assertOk()
+            ->assertSee('data-ui-poster-card', false)
+            ->assertSee('data-ui-poster-frame', false)
             ->assertSeeText('История просмотров')
             ->assertDontSeeText('Чужая история')
             ->assertDontSeeText('Только открытая страница');

@@ -169,8 +169,14 @@ class CatalogTitlesPageBuilder
         $paginationQuery = $this->paginationQuery($catalogQueryState, $search, $sort, $titleContext);
 
         $cardLoads = $this->taxonomies->cardSummaryLoads();
+        $cardColumns = ['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'];
+
+        if ($view === 'list') {
+            $cardColumns[] = 'description';
+        }
+
         $catalogTitles = $this->query->filteredTitles($criteria, $request->user())
-            ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'])
+            ->select($cardColumns)
             ->with($view === 'list'
                 ? array_merge([
                     'latestSeason' => fn ($query) => $query->select(['seasons.id', 'seasons.catalog_title_id', 'seasons.number']),
