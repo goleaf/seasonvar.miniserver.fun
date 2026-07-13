@@ -2,6 +2,7 @@
 
 ## 2026-07-13
 
+- Removed duplicate alternate title names and canonicalized all ten catalog relation directories. Alias uniqueness is now independent of alias type; actor/director Cyrillic and Latin equivalents share one record, polluted serial links are rejected, existing pivots are merged by bounded maintenance, and future source adapters reuse the same catalog relation identity boundary.
 - Connected the official Playwright MCP as an optional project-scoped Codex server with isolated headless managed Chromium, prompt-approved browser actions, documented browser installation and a real local navigation smoke check.
 - Removed completed temporary implementation/QA plans from the current documentation, retained only the living `docs/audit.md` backlog, and refreshed its importer baseline for the active single-process profile.
 - Added a reboot-safe single-process `seasonvar:import --forever` systemd profile, made stale refresh jobs for deleted titles successful no-ops, and aligned preparation/finalizer retry deadlines with the longer configured page-claim lease.
