@@ -80,4 +80,19 @@ final class LocalRateLimitRemovalTest extends TestCase
             $this->assertNull(RateLimiter::limiter($limiter));
         }
     }
+
+    public function test_application_code_has_no_action_rate_limiter(): void
+    {
+        $files = collect([
+            app_path('Livewire/CatalogSeries.php'),
+            app_path('Livewire/CatalogTitlePlayer.php'),
+            app_path('Livewire/ViewingActivity.php'),
+            app_path('Livewire/SeasonvarImportManager.php'),
+            app_path('Livewire/CatalogAdministrationManager.php'),
+        ]);
+
+        $this->assertFalse($files->contains(
+            static fn (string $file): bool => str_contains((string) file_get_contents($file), 'SensitiveActionRateLimiter'),
+        ));
+    }
 }

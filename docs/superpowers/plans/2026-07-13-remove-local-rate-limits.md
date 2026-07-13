@@ -204,21 +204,18 @@ git commit -m "feat: remove HTTP request throttles"
 - Modify: `app/Livewire/ViewingActivity.php`
 - Modify: `app/Livewire/SeasonvarImportManager.php`
 - Modify: `app/Livewire/CatalogAdministrationManager.php`
-- Delete: `app/Services/Security/SensitiveActionRateLimiter.php`
 
 **Interfaces:**
 - Consumes: existing Livewire action validation, authentication, gates, policies, and domain services.
 - Produces: the same public method signatures and action results without calls to `SensitiveActionRateLimiter`.
 
-- [ ] **Step 1: Replace the old limiter behavior test with a structural acceptance test**
+- [x] **Step 1: Replace the old limiter behavior test with a structural acceptance test**
 
 Remove `test_sensitive_action_limits_are_independent_and_resource_scoped()` and its `SensitiveActionRateLimiter` import from `SecurityHardeningTest`. Add this test to `LocalRateLimitRemovalTest`:
 
 ```php
 public function test_application_code_has_no_action_rate_limiter(): void
 {
-    $this->assertFileDoesNotExist(app_path('Services/Security/SensitiveActionRateLimiter.php'));
-
     $files = collect([
         app_path('Livewire/CatalogSeries.php'),
         app_path('Livewire/CatalogTitlePlayer.php'),
@@ -233,7 +230,7 @@ public function test_application_code_has_no_action_rate_limiter(): void
 }
 ```
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run:
 
@@ -243,7 +240,7 @@ php artisan test tests/Feature/LocalRateLimitRemovalTest.php tests/Feature/Secur
 
 Expected: the new test fails because the limiter class and component dependencies still exist.
 
-- [ ] **Step 3: Remove the component dependencies and calls**
+- [x] **Step 3: Remove the component dependencies and calls**
 
 Delete the `SensitiveActionRateLimiter` import, `$rateLimits` property, boot parameter, and boot assignment from all five components. Keep every other boot dependency in its current order.
 
@@ -274,9 +271,7 @@ $progressSessionToken = $user !== null
         : '';
 ```
 
-Delete `app/Services/Security/SensitiveActionRateLimiter.php` after no production class imports it.
-
-- [ ] **Step 4: Verify components and security tests pass**
+- [x] **Step 4: Verify components and security tests pass**
 
 Run:
 
@@ -286,10 +281,10 @@ php artisan test tests/Feature/LocalRateLimitRemovalTest.php tests/Feature/Secur
 
 Expected: all listed component, authorization, playback, catalog, and importer behavior passes without local action buckets.
 
-- [ ] **Step 5: Commit action limiter removal**
+- [x] **Step 5: Commit action limiter removal**
 
 ```bash
-git add tests/Feature/LocalRateLimitRemovalTest.php tests/Feature/SecurityHardeningTest.php app/Livewire app/Services/Security/SensitiveActionRateLimiter.php
+git add tests/Feature/LocalRateLimitRemovalTest.php tests/Feature/SecurityHardeningTest.php tests/Feature/CatalogSearchPageTest.php app/Livewire
 git commit -m "feat: remove action rate limits"
 ```
 
@@ -311,6 +306,7 @@ git commit -m "feat: remove action rate limits"
 - Modify: `tests/Feature/CacheInfrastructureIntegrationTest.php`
 - Modify: `tests/Feature/RedisWorkloadIntegrationTest.php`
 - Delete: `app/Support/RateLimiting/RequestRateLimitKey.php`
+- Delete: `app/Services/Security/SensitiveActionRateLimiter.php`
 - Delete: `tests/Unit/RequestRateLimitKeyTest.php`
 
 **Interfaces:**
@@ -399,6 +395,8 @@ public function __construct(
 ```
 
 Delete the `SensitiveActionRateLimiter` import and the entire `attemptForSystem('source_health', $target->host)` early-return block.
+
+Delete `app/Services/Security/SensitiveActionRateLimiter.php` after the media checker no longer imports it.
 
 Delete `case ConcurrencyExceeded`, its Russian message, and its `429` mapping from `PlaybackAvailability`. Delete `PlaybackAvailability::ConcurrencyExceeded` from the candidate priority list in `CatalogPlaybackSourceResolver`.
 

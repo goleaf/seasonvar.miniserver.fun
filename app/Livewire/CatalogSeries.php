@@ -9,7 +9,6 @@ use App\Http\Requests\CatalogTitlesRequest;
 use App\Livewire\Forms\CatalogSeriesFilters;
 use App\Rules\CatalogFilterSlug;
 use App\Services\Catalog\CatalogTitlesPageBuilder;
-use App\Services\Security\SensitiveActionRateLimiter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -42,12 +41,9 @@ class CatalogSeries extends Component
 
     protected CatalogTitlesPageBuilder $pages;
 
-    protected SensitiveActionRateLimiter $rateLimits;
-
-    public function boot(CatalogTitlesPageBuilder $pages, SensitiveActionRateLimiter $rateLimits): void
+    public function boot(CatalogTitlesPageBuilder $pages): void
     {
         $this->pages = $pages;
-        $this->rateLimits = $rateLimits;
     }
 
     public function mount(?int $year = null, ?string $type = null, ?string $taxonomy = null): void
@@ -95,14 +91,12 @@ class CatalogSeries extends Component
 
     public function applySearch(): void
     {
-        $this->rateLimits->enforce('catalog_search', auth()->user());
         $this->validateAndNormalizeState();
         $this->resetPage();
     }
 
     public function applyFilters(): void
     {
-        $this->rateLimits->enforce('catalog_search', auth()->user());
         $this->validateAndNormalizeState();
         $this->resetPage();
     }

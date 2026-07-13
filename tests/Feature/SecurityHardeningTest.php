@@ -14,12 +14,9 @@ use App\Services\Catalog\CatalogEntitlementService;
 use App\Services\Catalog\CatalogPlaybackSourceResolver;
 use App\Services\Media\ExternalPlaylistImporter;
 use App\Services\Media\PlaybackSourceUrlGuard;
-use App\Services\Security\SensitiveActionRateLimiter;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 use InvalidArgumentException;
@@ -38,39 +35,6 @@ class SecurityHardeningTest extends TestCase
             ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
             ->assertHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()')
             ->assertHeader('X-Permitted-Cross-Domain-Policies', 'none');
-    }
-
-    public function test_catalog_stats_route_is_rate_limited(): void
-    {
-        $user = User::factory()->create();
-        $request = Request::create(route('stats'));
-        $request->setUserResolver(fn (): User => $user);
-        $limit = RateLimiter::limiter('catalog-stats')($request);
-        $limiterKey = md5('catalog-stats'.$limit->key);
-
-        foreach (range(1, 180) as $attempt) {
-            RateLimiter::hit($limiterKey, 60);
-        }
-
-        $this
-            ->actingAs($user)
-            ->get(route('stats'))
-            ->assertTooManyRequests();
-    }
-
-    public function test_sensitive_action_limits_are_independent_and_resource_scoped(): void
-    {
-        config([
-            'security.rate_limits.rating' => 1,
-            'security.rate_limits.watchlist' => 1,
-        ]);
-        $user = User::factory()->create();
-        $limits = app(SensitiveActionRateLimiter::class);
-
-        $this->assertTrue($limits->attempt('rating', $user, 10));
-        $this->assertFalse($limits->attempt('rating', $user, 10));
-        $this->assertTrue($limits->attempt('rating', $user, 11));
-        $this->assertTrue($limits->attempt('watchlist', $user, 10));
     }
 
     public function test_local_filesystem_serving_routes_are_disabled_by_default(): void

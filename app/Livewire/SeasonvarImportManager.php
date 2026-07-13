@@ -6,7 +6,6 @@ namespace App\Livewire;
 
 use App\Models\User;
 use App\Services\Seasonvar\SeasonvarImportAdminService;
-use App\Services\Security\SensitiveActionRateLimiter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Component;
@@ -21,12 +20,9 @@ final class SeasonvarImportManager extends Component
 
     protected SeasonvarImportAdminService $imports;
 
-    protected SensitiveActionRateLimiter $rateLimits;
-
-    public function boot(SeasonvarImportAdminService $imports, SensitiveActionRateLimiter $rateLimits): void
+    public function boot(SeasonvarImportAdminService $imports): void
     {
         $this->imports = $imports;
-        $this->rateLimits = $rateLimits;
     }
 
     public function mount(): void
@@ -36,7 +32,6 @@ final class SeasonvarImportManager extends Component
 
     public function startImport(): void
     {
-        $this->rateLimits->enforce('import_admin', $this->user());
         $validated = $this->validate([
             'force' => ['required', 'boolean'],
             'discover' => ['required', 'boolean'],
@@ -59,7 +54,6 @@ final class SeasonvarImportManager extends Component
             return;
         }
 
-        $this->rateLimits->enforce('import_admin', $this->user(), $runId);
         $result = $this->imports->retry($this->user(), $runId);
         $this->notice = $result->created
             ? __('catalog.importer.retry_queued', ['id' => $result->run->id])
@@ -74,7 +68,6 @@ final class SeasonvarImportManager extends Component
             return;
         }
 
-        $this->rateLimits->enforce('import_admin', $this->user(), $runId);
         $run = $this->imports->cancel($this->user(), $runId);
         $this->notice = $run->status === 'cancelled'
             ? __('catalog.importer.cancelled', ['id' => $run->id])
@@ -83,7 +76,6 @@ final class SeasonvarImportManager extends Component
 
     public function recoverStaleImports(): void
     {
-        $this->rateLimits->enforce('import_admin', $this->user());
         Gate::forUser($this->user())->authorize('manage-seasonvar-imports');
         $count = $this->imports->recoverStale();
         $this->notice = $count > 0

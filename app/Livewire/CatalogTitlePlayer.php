@@ -19,7 +19,6 @@ use App\Services\Catalog\CatalogPrimaryActionResolver;
 use App\Services\Catalog\CatalogTitlePlaybackQuery;
 use App\Services\Catalog\CatalogUserStateService;
 use App\Services\Media\ExternalMediaMetadata;
-use App\Services\Security\SensitiveActionRateLimiter;
 use App\View\ViewModels\CatalogShowViewModel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -65,8 +64,6 @@ class CatalogTitlePlayer extends Component
 
     protected ExternalMediaMetadata $mediaMetadata;
 
-    protected SensitiveActionRateLimiter $rateLimits;
-
     protected ?CatalogTitle $resolvedTitle = null;
 
     protected ?Episode $resolvedEpisode = null;
@@ -81,7 +78,6 @@ class CatalogTitlePlayer extends Component
         CatalogPlaybackProgressSession $progressSessions,
         CatalogUserStateService $userState,
         ExternalMediaMetadata $mediaMetadata,
-        SensitiveActionRateLimiter $rateLimits,
     ): void {
         $this->playback = $playback;
         $this->primaryActions = $primaryActions;
@@ -89,7 +85,6 @@ class CatalogTitlePlayer extends Component
         $this->progressSessions = $progressSessions;
         $this->userState = $userState;
         $this->mediaMetadata = $mediaMetadata;
-        $this->rateLimits = $rateLimits;
     }
 
     public function mount(int $catalogTitleId): void
@@ -221,15 +216,12 @@ class CatalogTitlePlayer extends Component
             return;
         }
 
-        $this->rateLimits->enforce('watchlist', $user, $this->catalogTitleId);
         $this->userState->setWatchlist($user, $this->title(), $inWatchlist);
     }
 
     public function setRating(mixed $rating): void
     {
         $user = $this->authenticatedUser();
-        $this->rateLimits->enforce('rating', $user, $this->catalogTitleId);
-
         if ($rating === null || $rating === '') {
             $this->resetErrorBag('rating');
             $this->userState->setRating($user, $this->title(), null);
@@ -274,8 +266,6 @@ class CatalogTitlePlayer extends Component
             || $ended === null) {
             return;
         }
-
-        $this->rateLimits->enforce('progress', $user, $episodeId);
 
         $this->userState->recordProgress(
             $user,
@@ -365,7 +355,6 @@ class CatalogTitlePlayer extends Component
             && $selectedEpisode !== null
             && $selectedMedia !== null
             && $playbackSource->isPlayable()
-            && $this->rateLimits->attempt('playback_session', $user, $selectedEpisode->id)
                 ? $this->progressSessions->issue($user, $title, $selectedEpisode, $selectedMedia)
                 : '';
 

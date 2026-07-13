@@ -7,7 +7,6 @@ namespace App\Livewire;
 use App\Models\User;
 use App\Services\Catalog\CatalogViewingActivityQuery;
 use App\Services\Catalog\CatalogViewingActivityService;
-use App\Services\Security\SensitiveActionRateLimiter;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -20,16 +19,12 @@ final class ViewingActivity extends Component
 
     protected CatalogViewingActivityService $actions;
 
-    protected SensitiveActionRateLimiter $rateLimits;
-
     public function boot(
         CatalogViewingActivityQuery $activity,
         CatalogViewingActivityService $actions,
-        SensitiveActionRateLimiter $rateLimits,
     ): void {
         $this->activity = $activity;
         $this->actions = $actions;
-        $this->rateLimits = $rateLimits;
     }
 
     public function mount(): void
@@ -45,14 +40,12 @@ final class ViewingActivity extends Component
             return;
         }
 
-        $this->rateLimits->enforce('history', $this->user(), $progressId);
         $this->actions->remove($this->user(), $progressId);
         $this->resetPage(pageName: 'historyPage');
     }
 
     public function clearHistory(): void
     {
-        $this->rateLimits->enforce('history', $this->user());
         $this->actions->clear($this->user());
         $this->resetPage(pageName: 'historyPage');
     }

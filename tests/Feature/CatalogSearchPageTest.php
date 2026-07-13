@@ -16,15 +16,14 @@ class CatalogSearchPageTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_catalog_query_gets_are_rate_limited_for_crawlers_without_spending_canonical_budget(): void
+    public function test_repeated_catalog_queries_are_available_to_crawlers_without_a_request_budget(): void
     {
-        config(['catalog.query_rate_limit.bot_per_minute' => 1]);
         $crawler = $this
             ->withServerVariables(['REMOTE_ADDR' => '203.0.113.21'])
             ->withHeader('User-Agent', 'ClaudeBot/1.0');
 
         $crawler->get(route('titles.index', ['q' => 'первый запрос']))->assertOk();
-        $crawler->get(route('titles.index', ['q' => 'второй запрос']))->assertTooManyRequests();
+        $crawler->get(route('titles.index', ['q' => 'второй запрос']))->assertOk();
         $crawler->get(route('titles.index'))->assertOk();
     }
 

@@ -15,7 +15,6 @@ use App\Models\User;
 use App\Services\Catalog\CatalogAdministrationQuery;
 use App\Services\Catalog\CatalogAdministrationService;
 use App\Services\Catalog\CatalogTaxonomyRegistry;
-use App\Services\Security\SensitiveActionRateLimiter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -94,19 +93,15 @@ final class CatalogAdministrationManager extends Component
 
     protected CatalogAdministrationService $administration;
 
-    protected SensitiveActionRateLimiter $rateLimits;
-
     protected CatalogTaxonomyRegistry $taxonomies;
 
     public function boot(
         CatalogAdministrationQuery $query,
         CatalogAdministrationService $administration,
-        SensitiveActionRateLimiter $rateLimits,
         CatalogTaxonomyRegistry $taxonomies,
     ): void {
         $this->query = $query;
         $this->administration = $administration;
-        $this->rateLimits = $rateLimits;
         $this->taxonomies = $taxonomies;
     }
 
@@ -153,7 +148,6 @@ final class CatalogAdministrationManager extends Component
     {
         $user = $this->user();
         $title = $this->selectedTitle();
-        $this->rateLimits->enforce('catalog_admin', $user, $title->id);
         $validated = Validator::make(
             ['titleForm' => $this->normalizedTitleInput()],
             $this->titleRules($title),
@@ -170,7 +164,6 @@ final class CatalogAdministrationManager extends Component
     {
         $user = $this->user();
         $title = $this->selectedTitle();
-        $this->rateLimits->enforce('catalog_admin', $user, $title->id);
         $updated = $this->administration->archiveTitle($user, $title, $this->titleVersion);
 
         $this->fillTitleForm($updated);
@@ -186,7 +179,6 @@ final class CatalogAdministrationManager extends Component
 
         $user = $this->user();
         $title = $this->selectedTitle();
-        $this->rateLimits->enforce('catalog_admin', $user, $title->id);
         $updated = $this->administration->attachRelation(
             $user,
             $title,
@@ -208,7 +200,6 @@ final class CatalogAdministrationManager extends Component
 
         $user = $this->user();
         $title = $this->selectedTitle();
-        $this->rateLimits->enforce('catalog_admin', $user, $title->id);
         $updated = $this->administration->detachRelation($user, $title, $type, $relationId, $this->titleVersion);
 
         $this->fillTitleForm($updated);
@@ -247,7 +238,6 @@ final class CatalogAdministrationManager extends Component
             'lookupForm.slug.regex' => 'Slug справочника имеет неверный формат.',
             'lookupForm.slug.unique' => 'Такой slug справочника уже существует.',
         ])->validate()['lookupForm'];
-        $this->rateLimits->enforce('catalog_admin', $user, $title->id);
         $updated = $this->administration->createLookup(
             $user,
             $title,
@@ -311,7 +301,6 @@ final class CatalogAdministrationManager extends Component
         $season = $this->editingSeasonId !== null ? $this->query->season($title, $this->editingSeasonId) : null;
         $input = $this->normalizedReleaseInput($this->seasonForm, includeTitle: true);
         $validated = Validator::make(['seasonForm' => $input], $this->seasonRules($title, $season), $this->releaseMessages('seasonForm'))->validate()['seasonForm'];
-        $this->rateLimits->enforce('catalog_admin', $user, $title->id);
         $saved = $this->administration->saveSeason($user, $title, $validated, $season, $this->seasonVersion);
 
         $this->activeSeasonId = $saved->id;
@@ -328,7 +317,6 @@ final class CatalogAdministrationManager extends Component
         $user = $this->user();
         $title = $this->selectedTitle();
         $season = $this->query->season($title, $this->editingSeasonId);
-        $this->rateLimits->enforce('catalog_admin', $user, $title->id);
         $saved = $this->administration->archiveSeason($user, $title, $season, $this->seasonVersion);
 
         $this->fillSeasonForm($saved);
@@ -403,7 +391,6 @@ final class CatalogAdministrationManager extends Component
             'summary' => $this->nullableString($this->episodeForm['summary'] ?? null),
         ];
         $validated = Validator::make(['episodeForm' => $input], $this->episodeRules($season, $episode), $this->releaseMessages('episodeForm'))->validate()['episodeForm'];
-        $this->rateLimits->enforce('catalog_admin', $user, $title->id);
         $saved = $this->administration->saveEpisode($user, $title, $season, $validated, $episode, $this->episodeVersion);
 
         $this->activeEpisodeId = $saved->id;
@@ -421,7 +408,6 @@ final class CatalogAdministrationManager extends Component
         $title = $this->selectedTitle();
         $season = $this->activeSeason();
         $episode = $this->query->episode($title, $season, $this->editingEpisodeId);
-        $this->rateLimits->enforce('catalog_admin', $user, $title->id);
         $saved = $this->administration->archiveEpisode($user, $title, $season, $episode, $this->episodeVersion);
 
         $this->fillEpisodeForm($saved);
@@ -483,7 +469,6 @@ final class CatalogAdministrationManager extends Component
             : null;
         $input = $this->normalizedMediaInput();
         $validated = Validator::make(['mediaForm' => $input], $this->mediaRules($title, $media), $this->mediaMessages())->validate()['mediaForm'];
-        $this->rateLimits->enforce('catalog_admin', $user, $title->id);
         $saved = $this->administration->saveMedia($user, $title, $season, $episode, $validated, $media, $this->mediaVersion);
 
         $this->editingMediaId = $saved->id;
@@ -501,7 +486,6 @@ final class CatalogAdministrationManager extends Component
         $season = $this->activeSeason();
         $episode = $this->activeEpisode();
         $media = $this->query->mediaItem($title, $episode, $this->editingMediaId);
-        $this->rateLimits->enforce('catalog_admin', $user, $title->id);
         $saved = $this->administration->archiveMedia($user, $title, $season, $episode, $media, $this->mediaVersion);
 
         $this->fillMediaForm($saved);
