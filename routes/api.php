@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\V1\CatalogTitleController as V1CatalogTitleControll
 use App\Http\Controllers\Api\V1\SearchSuggestionController;
 use App\Http\Controllers\Api\V1\UserLibraryController;
 use App\Http\Controllers\Api\V1\UserTitleStateController;
+use App\Http\Controllers\Api\V1\ViewingActivityController;
 use App\Services\Catalog\CatalogDirectoryRegistry;
 use Illuminate\Support\Facades\Route;
 
@@ -112,6 +113,10 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             ->name('me.watchlist.index');
         Route::get('/me/ratings', [UserLibraryController::class, 'ratings'])
             ->name('me.ratings.index');
+        Route::get('/me/continue-watching', [ViewingActivityController::class, 'continueWatching'])
+            ->name('me.continue-watching.index');
+        Route::get('/me/history', [ViewingActivityController::class, 'history'])
+            ->name('me.history.index');
         Route::get('/me/titles/{catalogTitle:slug}/state', [UserTitleStateController::class, 'show'])
             ->name('me.titles.state.show');
 
@@ -129,6 +134,11 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
                     ->name('me.ratings.store');
                 Route::delete('/me/ratings/{catalogTitle:slug}', [UserTitleStateController::class, 'destroyRating'])
                     ->name('me.ratings.destroy');
+                Route::delete('/me/history/{episodeViewProgress}', [ViewingActivityController::class, 'destroy'])
+                    ->whereNumber('episodeViewProgress')
+                    ->name('me.history.destroy');
+                Route::delete('/me/history', [ViewingActivityController::class, 'clear'])
+                    ->name('me.history.clear');
             });
         });
     });

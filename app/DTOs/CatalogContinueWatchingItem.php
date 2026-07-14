@@ -14,6 +14,7 @@ final readonly class CatalogContinueWatchingItem
         public Episode $episode,
         public string $actionType,
         public string $actionLabel,
+        public int $positionSeconds,
         public ?int $progressPercent,
     ) {}
 }

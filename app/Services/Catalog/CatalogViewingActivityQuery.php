@@ -146,13 +146,32 @@ final class CatalogViewingActivityQuery
         $titles = CatalogTitle::query()
             ->availableTo($user)
             ->whereKey($selected->pluck('catalog_title_id'))
-            ->select(['id', 'slug', 'title', 'type', 'year', 'poster_url'])
+            ->select([
+                'id',
+                'slug',
+                'title',
+                'original_title',
+                'type',
+                'year',
+                'description',
+                'poster_url',
+                'indexed_at',
+            ])
             ->get()
             ->keyBy('id');
         $episodes = Episode::query()
             ->availableTo($user)
             ->whereKey($selected->pluck('episode_id'))
-            ->select(['id', 'season_id', 'number', 'kind', 'sort_order', 'title'])
+            ->select([
+                'id',
+                'season_id',
+                'number',
+                'kind',
+                'sort_order',
+                'title',
+                'released_at',
+                'summary',
+            ])
             ->with([
                 'season' => fn (BelongsTo $query): BelongsTo => $query
                     ->availableTo($user)
@@ -178,13 +197,14 @@ final class CatalogViewingActivityQuery
                 actionLabel: $item['action_type'] === 'continue'
                     ? __('catalog.player.continue_from', ['position' => $this->formatPosition($position)])
                     : __('catalog.player.next'),
+                positionSeconds: $position,
                 progressPercent: $item['progress_percent'],
             );
         })->filter()->values();
     }
 
     /** @return LengthAwarePaginator<int, EpisodeViewProgress> */
-    public function history(User $user, int $perPage = 12): LengthAwarePaginator
+    public function history(User $user, int $perPage = 12, string $pageName = 'historyPage'): LengthAwarePaginator
     {
         $perPage = max(1, min(48, $perPage));
         $history = EpisodeViewProgress::query()
@@ -215,7 +235,7 @@ final class CatalogViewingActivityQuery
             ])
             ->orderByDesc('last_watched_at')
             ->orderByDesc('id')
-            ->paginate($perPage, pageName: 'historyPage');
+            ->paginate($perPage, pageName: $pageName);
 
         $episodeIds = $history->getCollection()->pluck('episode_id')->all();
         $accessibleEpisodeIds = $episodeIds === []
