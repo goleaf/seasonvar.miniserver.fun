@@ -1,0 +1,107 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature\Api\V1;
+
+use App\Enums\ContentAudience;
+use App\Models\CatalogTitle;
+use App\Models\Country;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+final class CatalogTitleIndexTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_v1_titles_support_indexed_and_unindexed_filter_arrays(): void
+    {
+        $turkey = Country::query()->create(['name' => 'Турция', 'slug' => 'turciia']);
+        $matching = CatalogTitle::factory()->create(['slug' => 'turkish-title']);
+        $other = CatalogTitle::factory()->create(['slug' => 'other-title']);
+        $matching->countries()->attach($turkey);
+
+        foreach (['country[]=turciia', 'country[0]=turciia'] as $query) {
+            $this->getJson('/api/v1/titles?'.$query)
+                ->assertOk()
+                ->assertJsonCount(1, 'data')
+                ->assertJsonPath('data.0.slug', $matching->slug)
+                ->assertJsonMissing(['slug' => $other->slug]);
+        }
+    }
+
+    public function test_v1_titles_apply_the_complete_validated_filter_contract(): void
+    {
+        $this->getJson('/api/v1/titles?'.http_build_query([
+            'q' => 'API сериал',
+            'year' => [2024],
+            'year_from' => 2020,
+            'year_to' => 2025,
+            'seasons_min' => 1,
+            'episodes_max' => 100,
+            'rating_source' => 'imdb',
+            'rating_min' => 7.5,
+            'votes_min' => 100,
+            'video' => 'available',
+            'subtitles' => ['available'],
+            'quality' => ['1080p'],
+            'publication_type' => ['serial'],
+            'updated' => 'month',
+            'letter' => 'А',
+            'sort' => 'year_desc',
+            'per_page' => 20,
+        ]))->assertOk()->assertJsonStructure(['data', 'links', 'meta']);
+    }
+
+    public function test_v1_title_list_rejects_invalid_bearer_and_personalizes_authenticated_audience(): void
+    {
+        $user = User::factory()->create();
+        $authenticatedTitle = CatalogTitle::factory()->create([
+            'slug' => 'authenticated-mobile-title',
+            'audience' => ContentAudience::Authenticated,
+        ]);
+
+        $this->getJson('/api/v1/titles')
+            ->assertOk()
+            ->assertJsonMissing(['slug' => $authenticatedTitle->slug]);
+
+        $this->withToken('invalid-token')
+            ->getJson('/api/v1/titles')
+            ->assertUnauthorized();
+
+        $readToken = $user->createToken('iPhone', ['mobile:read'], now()->addDay());
+        $this->withToken($readToken->plainTextToken)
+            ->getJson('/api/v1/titles')
+            ->assertOk()
+            ->assertJsonFragment(['slug' => $authenticatedTitle->slug]);
+
+        $writeOnlyToken = $user->createToken('Old device', ['mobile:write'], now()->addDay());
+        $this->withToken($writeOnlyToken->plainTextToken)
+            ->getJson('/api/v1/titles')
+            ->assertForbidden();
+    }
+
+    public function test_v1_title_list_rejects_invalid_filter_contract_values(): void
+    {
+        $queries = [
+            'page=0',
+            'per_page=51',
+            'year_from=2025&year_to=2020',
+            'country[]=turciia&exclude_country[]=turciia',
+            'sort=unknown',
+            'letter=AB',
+            'quality[]=ultra',
+            http_build_query(['country' => array_map(
+                static fn (int $index): string => 'country-'.$index,
+                range(1, 21),
+            )]),
+        ];
+
+        foreach ($queries as $query) {
+            $this->getJson('/api/v1/titles?'.$query)
+                ->assertUnprocessable()
+                ->assertJsonPath('code', 'validation_failed');
+        }
+    }
+}

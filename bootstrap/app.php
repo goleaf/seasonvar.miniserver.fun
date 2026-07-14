@@ -3,6 +3,7 @@
 use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\AssignApiRequestId;
 use App\Http\Middleware\PublicHttpCacheHeaders;
+use App\Http\Middleware\ResolveOptionalSanctumUser;
 use App\Http\Responses\ApiErrorResponse;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
@@ -15,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\Http\Middleware\CheckAbilities;
 use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -36,6 +38,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'abilities' => CheckAbilities::class,
             'ability' => CheckForAnyAbility::class,
+            'auth.optional.sanctum' => ResolveOptionalSanctumUser::class,
             'public.cache' => PublicHttpCacheHeaders::class,
         ]);
         $middleware->web(append: [
@@ -75,6 +78,18 @@ return Application::configure(basePath: dirname(__DIR__))
             );
         });
         $exceptions->render(function (AuthorizationException $exception, Request $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
+            return app(ApiErrorResponse::class)->make(
+                $request,
+                'forbidden',
+                'Доступ запрещён.',
+                403,
+            );
+        });
+        $exceptions->render(function (AccessDeniedHttpException $exception, Request $request) {
             if (! $request->is('api/*')) {
                 return null;
             }

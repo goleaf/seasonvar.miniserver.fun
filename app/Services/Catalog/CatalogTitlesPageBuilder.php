@@ -53,6 +53,7 @@ class CatalogTitlesPageBuilder
         bool $invalidInput = false,
         array $facetSearch = [],
         bool $includeFacets = true,
+        bool $includeDescription = false,
     ): array {
         $context = $this->context($request, $type, $taxonomy, $invalidInput);
         $search = $context['search'];
@@ -79,7 +80,7 @@ class CatalogTitlesPageBuilder
         $cardLoads = $this->taxonomies->cardSummaryLoads();
         $cardColumns = ['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'];
 
-        if ($view === 'list') {
+        if ($view === 'list' || $includeDescription) {
             $cardColumns[] = 'description';
         }
 
