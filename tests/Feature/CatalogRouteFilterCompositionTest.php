@@ -15,6 +15,26 @@ class CatalogRouteFilterCompositionTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_country_route_pagination_has_a_get_fallback_and_preserves_country_state(): void
+    {
+        $turkey = Country::query()->create(['name' => 'Турция', 'slug' => 'turciia']);
+
+        CatalogTitle::factory()->count(30)->create()->each(
+            fn (CatalogTitle $title) => $title->countries()->attach($turkey),
+        );
+
+        $content = $this->get(route('titles.taxonomy', [
+            'type' => 'country',
+            'taxonomy' => $turkey->slug,
+            'country' => [$turkey->slug],
+        ]))->assertOk()->getContent();
+
+        $this->assertMatchesRegularExpression(
+            '/<a[^>]+href="[^"]*country(?:%5B0%5D|\[0\])=turciia[^"]*page=2"[^>]+wire:click\.prevent="gotoPage\(2, \'page\'\)"/s',
+            html_entity_decode($content),
+        );
+    }
+
     public function test_route_country_and_query_publication_type_can_be_removed_independently(): void
     {
         $russia = Country::query()->create(['name' => 'Россия', 'slug' => 'rossiia']);

@@ -135,7 +135,7 @@
         @endif
     </section>
 
-    <section aria-labelledby="directory-results" class="mt-6">
+    <section data-directory-results aria-labelledby="directory-results" class="mt-6 scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48">
         <div class="flex flex-wrap items-end justify-between gap-3">
             <div>
                 <h2 id="directory-results" class="text-xl font-black text-slate-900">{{ __('catalog.directories.results') }}</h2>
@@ -179,7 +179,7 @@
 
         @if ($items->hasPages())
             <nav class="mt-7" aria-label="{{ __('catalog.directories.pagination') }}">
-                {{ $items->onEachSide(1)->links() }}
+                {{ $items->onEachSide(1)->links(data: ['scrollTo' => '[data-directory-results]']) }}
             </nav>
         @endif
     </section>

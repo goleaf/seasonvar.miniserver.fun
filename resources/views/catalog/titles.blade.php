@@ -314,7 +314,7 @@
             </div>
 
             <div>
-                {{ $titles->links() }}
+                {{ $titles->links(data: ['scrollTo' => '[data-catalog-results]']) }}
             </div>
             @endisland
         </div>

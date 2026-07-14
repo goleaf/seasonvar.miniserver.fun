@@ -32,7 +32,7 @@
         </div>
     @endif
 
-    <x-ui.panel title="Сериалы" subtitle="Поиск по ID, точному внешнему ID, началу slug или названию." icon="fa-solid fa-film" :pad="false">
+    <x-ui.panel data-admin-catalog-results class="scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48" title="Сериалы" subtitle="Поиск по ID, точному внешнему ID, началу slug или названию." icon="fa-solid fa-film" :pad="false">
         <div class="border-b border-slate-200 p-4">
             <label class="block text-sm font-bold text-slate-700" for="catalog-admin-search">Поиск сериала</label>
             <div class="relative mt-2">
@@ -65,7 +65,7 @@
         </div>
     </x-ui.panel>
 
-    {{ $titles->links() }}
+    {{ $titles->links(data: ['scrollTo' => '[data-admin-catalog-results]']) }}
 
     @if ($selectedTitle)
         <x-ui.panel title="Карточка сериала" subtitle="Редакторские title/description/artwork не перезаписываются пустыми provider-значениями при следующем импорте." icon="fa-solid fa-pen-to-square">

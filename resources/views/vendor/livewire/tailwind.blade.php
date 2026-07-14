@@ -13,10 +13,10 @@
                     <span>{{ __('pagination.previous') }}</span>
                 </span>
             @else
-                <button data-catalog-pagination-control type="button" wire:click="previousPage('{{ $paginator->getPageName() }}')" wire:loading.attr="disabled" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
+                <a data-pagination-control data-pagination-scroll-to="{{ $scrollTo ?? '' }}" href="{{ $paginator->previousPageUrl() }}" rel="prev" wire:click.prevent="previousPage('{{ $paginator->getPageName() }}')" wire:loading.attr="inert" wire:loading.class="opacity-60" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                     <x-ui.icon name="fa-solid fa-chevron-left" />
                     <span>{{ __('pagination.previous') }}</span>
-                </button>
+                </a>
             @endif
 
             @foreach ($elements as $element)
@@ -29,17 +29,17 @@
                         @if ($page === $paginator->currentPage())
                             <span wire:key="paginator-{{ $paginator->getPageName() }}-{{ $page }}" aria-current="page" class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control bg-emerald-700 px-3 py-2 text-sm font-black text-white">{{ $page }}</span>
                         @else
-                            <button data-catalog-pagination-control type="button" wire:key="paginator-{{ $paginator->getPageName() }}-{{ $page }}" wire:click="gotoPage({{ $page }}, '{{ $paginator->getPageName() }}')" wire:loading.attr="disabled" aria-label="Страница {{ $page }}" class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">{{ $page }}</button>
+                            <a data-pagination-control data-pagination-scroll-to="{{ $scrollTo ?? '' }}" data-pagination-page="{{ $page }}" href="{{ $url }}" wire:key="paginator-{{ $paginator->getPageName() }}-{{ $page }}" wire:click.prevent="gotoPage({{ $page }}, '{{ $paginator->getPageName() }}')" wire:loading.attr="inert" wire:loading.class="opacity-60" aria-label="Страница {{ $page }}" class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">{{ $page }}</a>
                         @endif
                     @endforeach
                 @endif
             @endforeach
 
             @if ($paginator->hasMorePages())
-                <button data-catalog-pagination-control type="button" wire:click="nextPage('{{ $paginator->getPageName() }}')" wire:loading.attr="disabled" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
+                <a data-pagination-control data-pagination-scroll-to="{{ $scrollTo ?? '' }}" href="{{ $paginator->nextPageUrl() }}" rel="next" wire:click.prevent="nextPage('{{ $paginator->getPageName() }}')" wire:loading.attr="inert" wire:loading.class="opacity-60" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                     <span>{{ __('pagination.next') }}</span>
                     <x-ui.icon name="fa-solid fa-chevron-right" />
-                </button>
+                </a>
             @else
                 <span aria-disabled="true" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-400">
                     <span>{{ __('pagination.next') }}</span>

@@ -46,14 +46,27 @@ class FrontendAssetContractTest extends TestCase
         $this->assertStringContainsString('margin-block-start: 0.125em', $styles);
     }
 
-    public function test_catalog_pagination_scrolls_smoothly_to_the_results_boundary(): void
+    public function test_livewire_pagination_uses_scoped_post_morph_scroll_targets(): void
     {
         $app = File::get(resource_path('js/app.js'));
+        $pagination = File::get(resource_path('views/vendor/livewire/tailwind.blade.php'));
+        $views = collect([
+            resource_path('views/catalog/titles.blade.php'),
+            resource_path('views/livewire/catalog-directory-browser.blade.php'),
+            resource_path('views/livewire/viewing-activity.blade.php'),
+            resource_path('views/livewire/catalog-administration-manager.blade.php'),
+        ])->map(fn (string $path): string => File::get($path))->implode("\n");
 
-        $this->assertStringContainsString('data-catalog-pagination-control', $app);
-        $this->assertStringContainsString('[data-catalog-results]', $app);
+        $this->assertStringContainsString('data-pagination-scroll-to', $pagination);
+        $this->assertStringContainsString('wire:click.prevent="gotoPage', $pagination);
+        $this->assertStringContainsString('href="{{ $url }}"', $pagination);
+        $this->assertStringContainsString('pendingPaginationScrollTo', $app);
+        $this->assertStringContainsString("window.Livewire.hook('morphed'", $app);
         $this->assertStringContainsString('smoothAnchorScroll', $app);
-        $this->assertStringContainsString('reducedMotionQuery.matches', $app);
+        $this->assertStringContainsString('[data-catalog-results]', $views);
+        $this->assertStringContainsString('[data-directory-results]', $views);
+        $this->assertStringContainsString('[data-viewing-history-results]', $views);
+        $this->assertStringContainsString('[data-admin-catalog-results]', $views);
     }
 
     public function test_title_detail_uses_the_complete_livewire_refresh_shell(): void

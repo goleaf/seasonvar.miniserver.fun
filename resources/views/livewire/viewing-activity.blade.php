@@ -102,6 +102,8 @@
     </x-ui.panel>
 
     <x-ui.panel
+        data-viewing-history-results
+        class="scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48"
         :title="__('catalog.viewing.history')"
         :subtitle="__('catalog.viewing.history_description').' '.trans_choice('catalog.counts.history_items', $history->total()).'.'"
         icon="fa-solid fa-list-ul"
@@ -188,7 +190,7 @@
 
             @if ($history->hasPages())
                 <div class="border-t border-slate-200 bg-slate-50 p-4">
-                    {{ $history->links() }}
+                    {{ $history->links(data: ['scrollTo' => '[data-viewing-history-results]']) }}
                 </div>
             @endif
         @endif

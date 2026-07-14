@@ -434,34 +434,49 @@ const loadCatalogPeopleComboboxes = () => {
     });
 };
 
-let catalogPaginationScrollReady = false;
+let paginationScrollReady = false;
+let pendingPaginationScrollTo = null;
 
-const loadCatalogPaginationScroll = () => {
-    if (catalogPaginationScrollReady) {
+const loadPaginationScroll = () => {
+    if (paginationScrollReady) {
         return;
     }
 
-    catalogPaginationScrollReady = true;
+    paginationScrollReady = true;
 
     document.addEventListener('click', (event) => {
         const eventTarget = event.target instanceof Element ? event.target : event.target?.parentElement;
-        const control = eventTarget?.closest('[data-catalog-pagination-control]');
-        const results = document.querySelector('[data-catalog-results]');
+        const control = eventTarget?.closest('[data-pagination-control]');
+        const selector = control?.getAttribute('data-pagination-scroll-to') || '';
 
-        if (!control || !results) {
-            return;
-        }
+        pendingPaginationScrollTo = selector === '' ? null : selector;
+    });
+};
 
-        window.requestAnimationFrame(() => {
-            smoothAnchorScroll(results, { animate: true });
-        });
+const flushPaginationScroll = () => {
+    const selector = pendingPaginationScrollTo;
+
+    pendingPaginationScrollTo = null;
+
+    if (!selector) {
+        return;
+    }
+
+    const target = document.querySelector(selector);
+
+    if (!target) {
+        return;
+    }
+
+    window.requestAnimationFrame(() => {
+        smoothAnchorScroll(target, { animate: true });
     });
 };
 
 const loadCatalogInterfaces = () => {
     loadCatalogFilterSearch();
     loadCatalogPeopleComboboxes();
-    loadCatalogPaginationScroll();
+    loadPaginationScroll();
 };
 
 if (document.readyState === 'loading') {
@@ -480,6 +495,7 @@ document.addEventListener('livewire:init', () => {
     window.Livewire.hook('morphed', () => {
         void loadCatalogPlayers();
         loadCatalogInterfaces();
+        flushPaginationScroll();
     });
     window.Livewire.hook('morph.removing', ({ el }) => {
         destroyCatalogPlayersWithin(el);
@@ -487,6 +503,7 @@ document.addEventListener('livewire:init', () => {
 });
 
 document.addEventListener('livewire:navigating', () => {
+    pendingPaginationScrollTo = null;
     flushCatalogPlayersWithin(document, 'navigation');
     destroyCatalogPlayersWithin(document, { flush: false });
 });
