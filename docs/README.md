@@ -1,6 +1,6 @@
 # Карта документации проекта
 
-Обновлено: 13.07.2026
+Обновлено: 14.07.2026
 
 Этот файл — единый индекс проектной документации. У каждого контракта есть один основной файл-владелец; остальные документы должны ссылаться на него, а не копировать длинные правила. `README.md` остаётся точкой входа, `AGENTS.md` содержит только обязательные инструкции для агентов, а история изменений ведётся только в `CHANGELOG.md`.
 
@@ -10,6 +10,7 @@
 | --- | --- | --- |
 | Обзор и быстрый старт | [`README.md`](../README.md) | Назначение проекта, стек и основные команды. |
 | Границы Laravel/Livewire | [`architecture.md`](architecture.md) | Тонкие контроллеры, page builders, query/services/actions, locked Livewire state и server-rendered оболочки. |
+| JSON и mobile API | [`api.md`](api.md) | Legacy compatibility, `/api` discovery, версионирование `/api/v1`, OpenAPI, error envelope, pagination и публичные поля. |
 | Каталог, поиск, directory hubs и URL state | [`catalog-search.md`](catalog-search.md) | Формат query-параметров, нормализация, OR/AND filters, public directories, allowlisted sorting, pagination и browser history. |
 | Домен и пользовательское состояние | [`DATA_RELATIONS.md`](DATA_RELATIONS.md) | Видимость, связи, regular/special ordering, episode navigation, watchlist/rating, progress, Continue Watching и Viewing History. |
 | Авторизация и playback access | [`authorization.md`](authorization.md) | Public/profile boundary, policies/gates, entitlement decisions, signed playback route и ограничения отсутствующих product-моделей. |

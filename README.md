@@ -5,11 +5,16 @@ Laravel-приложение для локального каталога сер
 ## Версии
 
 - Laravel 13.19 на PHP 8.5.
+- Laravel Sanctum 4.3 хранит expiring hashed tokens для версионированного mobile API.
 - Laravel Boost 2.4 и Laravel MCP 0.8 используются для локальной документации и MCP-подсказок.
 - Livewire 4.3 используется для интерактивного каталога `/titles`, выбора сезона/серии на карточке тайтла и live-страницы статистики `/stats`.
 - Livewire-экран `/admin/imports` доступен только авторизованным users из `SEASONVAR_IMPORT_ADMIN_EMAILS`; он ставит coordinator job в Redis, но не выполняет importer в HTTP-запросе.
 - Livewire-экран `/admin/catalog` использует тот же allowlist для редакционных полей, публикации, связей, сезонов, серий и безопасных видеоисточников; правила конкурентного редактирования и деплоя описаны в `docs/administration.md`.
 - PHPUnit 12.5 используется для тестов; Pest в проекте не установлен.
+
+## Mobile JSON API
+
+`GET /api` публикует discovery для стабильного `/api/v1`, а project-owned OpenAPI доступен по ссылке из манифеста. Foundation уже включает safe config/health, единый request ID/error envelope, 90-дневное Sanctum token storage и fail-closed cache для Bearer requests; legacy JSON API сохраняется без breaking changes. Полный route/version/security contract находится в [`docs/api.md`](docs/api.md).
 
 ## Основные команды
 

@@ -1,11 +1,11 @@
 # Тестирование
 
-Обновлено: 13.07.2026
+Обновлено: 14.07.2026
 
 ## Стек
 
 - Тесты пишутся как PHPUnit-классы в `tests/Feature` и `tests/Unit`; Pest в проекте не установлен.
-- PHPUnit использует SQLite в памяти через `phpunit.xml`, а обычный cache — `array`; локальных request/action limiter counters в приложении нет.
+- PHPUnit использует SQLite в памяти через `phpunit.xml`, обычный cache — `array`, а `APP_ROUTES_CACHE` указывает на отдельный отсутствующий testing artifact, поэтому production `bootstrap/cache/routes-v7.php` не скрывает новые маршруты. Локальных request/action limiter counters в приложении нет.
 - `RUN_CACHE_INFRASTRUCTURE_TESTS=true` включает реальные Redis/Memcached tests: domain read/write, tags, critical version bump, distributed lock, queue workload, session isolation, connection isolation, readiness, Memcached outage и Redis-cache/version-registry outage. Они используют случайные exact keys/run prefixes и не выполняют full-store flush.
 - Параллельный importer проверяется в `SeasonvarParallelImportTest`, `SeasonvarParallelTitleRefreshPersistenceTest`, `SeasonvarCatalogPagePreparationTest`, `SeasonvarCatalogPreparedApplyTest`, `SeasonvarImportTitleGroupDispatcherTest` и `SeasonvarImportTitleGroupFinalizerTest`: тесты фиксируют durable fan-out/fan-in state, отсутствие application-level page limit, динамическое discovery, network-free apply, local-only preservation, partial groups, lease recovery и ожидание групп глобальным finalizer. HTTP-поведение закрыто `Http::fake()` и `Http::preventStrayRequests()`.
 - Фоновое обновление карточки покрывают `CatalogTitleBackgroundRefreshTest`, `RefreshSeasonvarCatalogTitleJobTest` и `CatalogTitleLiveRefreshTest`: atomic dispatch/freshness, пять независимых тайтлов, 15-минутное окно только после `completed`, sanitized failure payload, трёхсекундный visible polling, полный rerender и сохранение валидного player selection. `TitleBackgroundRefreshDocumentationTest` фиксирует отдельные очереди worker pools и отсутствие application-level cap.
@@ -25,6 +25,7 @@
 - Для importer, crawler, playlist и media-check тестов блокировать реальные сетевые вызовы через `Http::preventStrayRequests()` и задавать `Http::fake()` для ожидаемых URL.
 - Если тестируемая логика окажется внутри Blade, сначала перенести ее в request, service, view-model, component class, accessor или enum, а затем тестировать PHP-код.
 - JSON API покрывается feature-тестами через `getJson()` и fluent JSON assertions; тесты ресурсов должны проверять отсутствие приватных source/media/importer полей.
+- Foundation API tests отдельно фиксируют Sanctum token hashing/expiry/prune schedule, `/api` discovery, safe config/health/OpenAPI, request ID/error envelope, legacy route compatibility и fail-closed cache semantics для любого `Authorization` header.
 - Operational notifications тестируются через `Notification::fake()` и direct content tests на `toMail()`; реальные письма в тестах не отправляются.
 - `CatalogSearchPageTest` фиксирует hard-year, short-token, AND-person, exact external ID, duplicate-free totals, unpublished, true-zero и insufficient состояния поиска.
 - `CatalogSearchAcceptanceTest` фиксирует ранжирование полного поискового корпуса: top-1/top-3 для названий, original title, aliases и года, precision@10 для людей, минимум 95% для категорий/жанров/стран и готовый FTS-поиск имён через взаимозаменяемые `е/ё`.

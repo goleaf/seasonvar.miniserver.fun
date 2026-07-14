@@ -1,6 +1,6 @@
 # Авторизация
 
-Обновлено: 13.07.2026
+Обновлено: 14.07.2026
 
 ## Правила
 
@@ -15,6 +15,8 @@
 - `/watching` доступен только authenticated user. `CatalogViewingActivityQuery` начинает обе выборки с `whereBelongsTo($user)`, а `EpisodeViewProgressPolicy` отдельно защищает удаление одной записи и полную очистку; чужой progress ID возвращает 403 и не изменяется.
 - Playable source не является публичным полем модели. Livewire получает только `PlaybackSourceData` с короткоживущим signed URL; `/playback/{licensedMedia}` сверяет подпись, viewer с текущей сессией и повторно получает entitlement decision для всей publication hierarchy, поэтому прямой URL не обходит снятие с публикации или смену audience.
 - Admin source editor также не возвращает сохранённый playback URL в HTML/Livewire snapshot. Новый URL проходит HTTPS/provider allowlist, а существующий может только сменить разрешённые метаданные или reversible publication state.
+- Laravel Sanctum является единственной mobile token boundary. `User` хранит только hashed personal access token, каждый token имеет ограниченные `mobile:read`/`mobile:write` abilities и expiry не более 90 дней; plaintext допустим только в issuance/rotation response и не восстанавливается из базы.
+- Mobile token не получает admin/import abilities и не заменяет существующие gates/policies. Наличие Bearer token не даёт автоматического доступа к authenticated-audience или write операциям: route ability, verification и domain policy проверяются отдельно на соответствующей границе.
 
 ## Реализация
 

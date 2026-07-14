@@ -1,10 +1,12 @@
 # Безопасность
 
-Обновлено: 13.07.2026
+Обновлено: 14.07.2026
 
 ## Правила
 
 - `.env`, ключи, токены, cookies, приватные логи и локальные базы не коммитятся; публично отслеживается только `.env.example` без значений секретов.
+- Mobile personal access tokens хранит Laravel Sanctum только как SHA-256 hashes; expiry ограничен 129600 минутами, а ежедневный prune удаляет просроченные строки. Token plaintext не логируется и после issuance/rotation не возвращается повторно.
+- Все `/api/*` ошибки используют стабильный русскоязычный envelope и request ULID без exception message/stack trace. Ответы с `Authorization`, authenticated user, cookie, error или unsafe method принудительно получают `private, no-store` без shared validators.
 - OAuth client secrets, Google ADC/service-account JSON, refresh tokens, MCP bearer tokens и приватные пути к credential-файлам не хранятся в репозитории.
 - Код приложения читает переменные окружения через `config()`. Прямые `env()` допустимы только в `config/*.php`.
 - Публичные страницы каталога остаются read-only и проходят строгую валидацию query-параметров через Form Request-классы.
