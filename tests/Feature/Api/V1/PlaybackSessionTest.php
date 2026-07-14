@@ -151,6 +151,15 @@ final class PlaybackSessionTest extends TestCase
             ]);
     }
 
+    public function test_openapi_describes_mobile_playback_session_contract(): void
+    {
+        $this->getJson('/api/openapi.json')
+            ->assertOk()
+            ->assertJsonPath('paths./api/v1/titles/{titleSlug}/playback-sessions.post.operationId', 'createMobilePlaybackSession')
+            ->assertJsonPath('components.schemas.CreatePlaybackSessionRequest.properties.quality.type', ['string', 'null'])
+            ->assertJsonMissingPath('components.schemas.PlaybackSession.properties.media.properties.playback_url');
+    }
+
     /** @return array{CatalogTitle, Season, array{Episode, Episode}} */
     private function createGraph(string $slug, ContentAudience $audience = ContentAudience::Public): array
     {

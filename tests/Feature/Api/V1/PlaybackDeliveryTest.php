@@ -109,6 +109,14 @@ final class PlaybackDeliveryTest extends TestCase
             ->assertDontSee($media->playback_url, false);
     }
 
+    public function test_openapi_describes_opaque_signed_delivery(): void
+    {
+        $this->getJson('/api/openapi.json')
+            ->assertOk()
+            ->assertJsonPath('paths./api/v1/playback/{licensedMedia}.get.operationId', 'deliverMobilePlaybackSource')
+            ->assertJsonPath('paths./api/v1/playback/{licensedMedia}.get.parameters.1.name', 'grant');
+    }
+
     /** @return array{CatalogTitle, Episode, LicensedMedia} */
     private function createPlayableGraph(string $slug): array
     {

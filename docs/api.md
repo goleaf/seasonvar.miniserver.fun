@@ -80,6 +80,13 @@
 - `DELETE /api/v1/me/history/{episodeViewProgress}` удаляет только owner-scoped запись и маскирует чужой numeric ID как `not_found`; `DELETE /api/v1/me/history` очищает только фактическую playback activity текущего пользователя.
 - Все private reads требуют Bearer token с `mobile:read`. Mutations дополнительно требуют `mobile:write` и подтверждённый email; unverified пользователь продолжает читать своё состояние, но получает `email_not_verified`/403 при изменении. Все ответы private/no-store и не содержат ETag.
 
+## Playback и progress v1
+
+- `POST /api/v1/titles/{titleSlug}/playback-sessions` принимает необязательные `episode_id`, `media_id`, `variant`, `audio_language`, `quality` и `format`. Гость может создать сессию только для public audience; валидный Bearer token должен иметь `mobile:read`, а недействительный token не откатывается к guest. Ответ `201` содержит безопасный профиль media, тот же origin `playback_url`, срок действия, навигацию серии и, только для verified пользователя, `progress_session_token`.
+- `playback_url` является короткоживущим signed URL `GET /api/v1/playback/{licensedMedia}` с opaque encrypted grant. Mobile-клиент считает URL непрозрачным и не передаёт Bearer token в query string. Endpoint повторно проверяет grant, существование привязанного user, media и всю publication hierarchy, затем использует общий playback resolver; provider URL появляется только как разрешённый redirect и никогда не сериализуется в JSON.
+- `PUT /api/v1/titles/{titleSlug}/episodes/{episode}/progress` требует Bearer token с `mobile:write` и verified email. Тело содержит выданный `playback_session_token`, монотонный `event_sequence`, `position_seconds`, сообщённую длительность и `ended`; каноническая длительность берётся с media на сервере. Устаревший, повторный, чужой или подменённый event отвечает `invalid_playback_progress`/422 и не изменяет позицию.
+- Playback responses всегда `private, no-store`; delivery дополнительно устанавливает `Referrer-Policy: no-referrer` и `X-Content-Type-Options: nosniff`. Domain-отказы сохраняют стабильное соответствие: authentication 401, plan 402, profile 403, not found 404, expired 410, future publication 425, region 451 и temporary source failure 503.
+
 ## Формат ответов
 
 - Eloquent-модели не возвращаются напрямую. JSON готовят Laravel API Resources в `app/Http/Resources`.

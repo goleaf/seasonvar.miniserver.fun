@@ -1365,6 +1365,184 @@
                 }
             }
         },
+        "/api/v1/titles/{titleSlug}/playback-sessions": {
+            "post": {
+                "operationId": "createMobilePlaybackSession",
+                "summary": "Создать короткую mobile playback session",
+                "description": "Выбирает доступный media profile и возвращает только same-origin signed URL. Raw provider URL в JSON не попадает. Guest разрешён только для public audience; Bearer token при наличии требует mobile:read.",
+                "security": [
+                    {},
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/TitleSlug"
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreatePlaybackSessionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Playback session готова",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PlaybackSessionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/ServerError"
+                    }
+                }
+            }
+        },
+        "/api/v1/playback/{licensedMedia}": {
+            "get": {
+                "operationId": "deliverMobilePlaybackSource",
+                "summary": "Доставить источник по opaque signed grant",
+                "description": "Короткоживущая same-origin ссылка повторно проверяет user/media hierarchy и entitlement. Только после этой проверки возможен redirect к разрешённому provider URL.",
+                "parameters": [
+                    {
+                        "name": "licensedMedia",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "grant",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 4096
+                        }
+                    },
+                    {
+                        "name": "expires",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "signature",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Redirect к повторно разрешённому внешнему источнику"
+                    },
+                    "200": {
+                        "description": "Поток с разрешённого локального storage disk"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "410": {
+                        "description": "Доступность релиза истекла"
+                    },
+                    "503": {
+                        "description": "Источник временно недоступен"
+                    }
+                }
+            }
+        },
+        "/api/v1/titles/{titleSlug}/episodes/{episode}/progress": {
+            "put": {
+                "operationId": "recordMobilePlaybackProgress",
+                "summary": "Записать канонический progress серии",
+                "description": "Требует mobile:write и verified email. event_sequence монотонен внутри opaque progress session; duration проверяется по выбранному server media.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/TitleSlug"
+                    },
+                    {
+                        "name": "episode",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RecordProgressRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Актуальный progress",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/EpisodeProgressResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            }
+        },
         "/api/v1/me/titles/{catalogTitle}/state": {
             "get": {
                 "operationId": "getMobileTitleState",
@@ -2362,6 +2540,124 @@
                     "meta": {
                         "type": "object"
                     }
+                }
+            },
+            "CreatePlaybackSessionRequest": {
+                "type": "object",
+                "properties": {
+                    "episode_id": {
+                        "type": ["integer", "null"],
+                        "minimum": 1
+                    },
+                    "media_id": {
+                        "type": ["integer", "null"],
+                        "minimum": 1
+                    },
+                    "variant": {
+                        "type": ["string", "null"],
+                        "maxLength": 120
+                    },
+                    "audio_language": {
+                        "type": ["string", "null"],
+                        "maxLength": 80
+                    },
+                    "quality": {
+                        "type": ["string", "null"],
+                        "enum": [null, "4320p", "2160p", "1440p", "1080p", "720p", "576p", "540p", "480p", "360p", "240p"]
+                    },
+                    "format": {
+                        "type": ["string", "null"],
+                        "enum": [null, "m3u8", "mp4", "m4v", "webm", "mov"]
+                    }
+                }
+            },
+            "PlaybackSession": {
+                "type": "object",
+                "required": ["status", "message", "title", "episode", "media", "playback_url", "mime_type", "expires_at", "navigation"],
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "const": "ready"
+                    },
+                    "message": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "object",
+                        "additionalProperties": false
+                    },
+                    "episode": {
+                        "type": ["object", "null"],
+                        "additionalProperties": false
+                    },
+                    "media": {
+                        "type": "object",
+                        "required": ["id", "translation", "variant", "variant_key", "quality", "format", "duration_seconds"],
+                        "properties": {
+                            "id": {"type": "integer"},
+                            "translation": {"type": ["string", "null"]},
+                            "variant": {"type": ["string", "null"]},
+                            "variant_key": {"type": ["string", "null"]},
+                            "quality": {"type": ["string", "null"]},
+                            "format": {"type": ["string", "null"]},
+                            "duration_seconds": {"type": ["integer", "null"]}
+                        },
+                        "additionalProperties": false
+                    },
+                    "playback_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Opaque same-origin signed URL; не является raw provider URL."
+                    },
+                    "mime_type": {"type": ["string", "null"]},
+                    "expires_at": {"type": "string", "format": "date-time"},
+                    "navigation": {"type": ["object", "null"]},
+                    "progress_session_token": {
+                        "type": "string",
+                        "description": "Выдаётся только verified пользователю и только для episode media."
+                    }
+                }
+            },
+            "PlaybackSessionResponse": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                    "data": {"$ref": "#/components/schemas/PlaybackSession"}
+                }
+            },
+            "RecordProgressRequest": {
+                "type": "object",
+                "required": ["playback_session_token", "event_sequence", "position_seconds", "reported_duration_seconds", "ended"],
+                "properties": {
+                    "playback_session_token": {"type": "string", "maxLength": 2048},
+                    "event_sequence": {"type": "integer", "minimum": 1},
+                    "position_seconds": {"type": "integer", "minimum": 0, "maximum": 86400},
+                    "reported_duration_seconds": {"type": "integer", "minimum": 0, "maximum": 86400},
+                    "ended": {"type": "boolean"}
+                }
+            },
+            "EpisodeProgress": {
+                "type": "object",
+                "required": ["id", "catalog_title_id", "episode_id", "position_seconds", "duration_seconds", "progress_percent", "first_started_at", "last_watched_at", "completed", "completed_at"],
+                "properties": {
+                    "id": {"type": "integer"},
+                    "catalog_title_id": {"type": "integer"},
+                    "episode_id": {"type": "integer"},
+                    "position_seconds": {"type": "integer", "minimum": 0},
+                    "duration_seconds": {"type": "integer", "minimum": 0},
+                    "progress_percent": {"type": ["integer", "null"], "minimum": 0, "maximum": 100},
+                    "first_started_at": {"type": ["string", "null"], "format": "date-time"},
+                    "last_watched_at": {"type": ["string", "null"], "format": "date-time"},
+                    "completed": {"type": "boolean"},
+                    "completed_at": {"type": ["string", "null"], "format": "date-time"}
+                },
+                "additionalProperties": false
+            },
+            "EpisodeProgressResponse": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {
+                    "data": {"$ref": "#/components/schemas/EpisodeProgress"}
                 }
             },
             "AuthTokenResponse": {

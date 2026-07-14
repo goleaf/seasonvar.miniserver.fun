@@ -167,6 +167,15 @@ final class PlaybackProgressTest extends TestCase
             ->assertJsonPath('code', 'email_not_verified');
     }
 
+    public function test_openapi_describes_verified_monotonic_progress_contract(): void
+    {
+        $this->getJson('/api/openapi.json')
+            ->assertOk()
+            ->assertJsonPath('paths./api/v1/titles/{titleSlug}/episodes/{episode}/progress.put.operationId', 'recordMobilePlaybackProgress')
+            ->assertJsonPath('components.schemas.RecordProgressRequest.required.1', 'event_sequence')
+            ->assertJsonMissingPath('components.schemas.EpisodeProgress.properties.playback_session_id');
+    }
+
     /** @return array{User, string, CatalogTitle, Episode} */
     private function createVerifiedSessionGraph(string $slug): array
     {

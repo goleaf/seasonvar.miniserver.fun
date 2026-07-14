@@ -14,6 +14,8 @@
 
 Локализованные записи контента и QoE telemetry отсутствуют как продуктовые возможности, а не являются незавершёнными frontend-задачами. Текущая locale переводит только UI/page metadata и не создаёт отдельные версии названий, описаний, аудио или субтитров; player показывает bounded локальные состояния без отправки пользовательской телеметрии качества воспроизведения. Добавление таких возможностей требует отдельных schema/privacy/retention contracts и измеримого rollout, а не скрытого JavaScript-сбора.
 
+Mobile-клиент создаёт playback session через API и использует выданный same-origin `playback_url` как opaque URL: он следует разрешённому redirect/HLS-потоку, не извлекает и не сохраняет provider URL и не добавляет Bearer token в query. Для progress клиент хранит отдельный `progress_session_token` только на время просмотра и отправляет возрастающий `event_sequence`; server response остаётся единственным каноническим состоянием позиции. Web Plyr/Livewire продолжает использовать существующий signed `/playback/{licensedMedia}` и этим mobile contract не заменяется.
+
 ## Browser baseline 13.07.2026
 
 Read-only проверка выполнена в Chromium на desktop `1440×1200`, tablet `768×1024` и mobile `390×844`. Для визуальных маршрутов проверялись HTTP status, итоговый URL, `h1`, landmarks, горизонтальное переполнение, изображения, alt-текст, duplicate IDs, доступные имена controls, console/page errors и полноэкранные снимки. Интерактивные сценарии повторно запускались на `https://seasonvar.miniserver.fun`, чтобы production secure-cookie и Livewire middleware совпадали с реальным окружением.
