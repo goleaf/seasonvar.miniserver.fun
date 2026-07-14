@@ -3,6 +3,7 @@
 namespace App\Services\Catalog;
 
 use App\DTOs\CatalogDirectoryDefinition;
+use App\Support\CatalogAlphabet;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class CatalogDirectoryPageBuilder
@@ -32,7 +33,7 @@ class CatalogDirectoryPageBuilder
             'itemsByDecade' => $directory->isYear()
                 ? $items->getCollection()->groupBy(fn (object $item): int => (int) floor(((int) $item->year) / 10) * 10)
                 : collect(),
-            'letters' => $letters,
+            'letterGroups' => CatalogAlphabet::availableGroups($letters),
             'decades' => $decades,
             'totalValues' => $summary['values'],
             'totalTitles' => $summary['titles'],

@@ -60,6 +60,29 @@ class CatalogPageTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_catalog_and_people_directories_render_separate_script_groups(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $actors = collect([
+            ['name' => 'Борис Актёр', 'slug' => 'boris-akter'],
+            ['name' => 'Ёлка Актриса', 'slug' => 'elka-aktrisa'],
+            ['name' => 'Alice Actor', 'slug' => 'alice-actor'],
+            ['name' => 'Zed Actor', 'slug' => 'zed-actor'],
+            ['name' => '123 Actor', 'slug' => '123-actor'],
+        ])->map(fn (array $attributes) => Actor::query()->create($attributes));
+        $title->actors()->attach($actors->pluck('id'));
+
+        $catalog = $this->get(route('titles.index'))->assertOk()->getContent();
+        $actorsPage = $this->get(route('actors.index'))->assertOk()->getContent();
+
+        $this->assertStringContainsString('data-catalog-alphabet-group="cyrillic"', $catalog);
+        $this->assertStringContainsString('data-catalog-alphabet-group="latin"', $catalog);
+        $this->assertSame(2, substr_count($catalog, 'data-alphabet-letter="Z"'));
+        $this->assertMatchesRegularExpression('/data-directory-alphabet-group="cyrillic".*Б.*Ё/s', $actorsPage);
+        $this->assertMatchesRegularExpression('/data-directory-alphabet-group="latin".*A.*Z/s', $actorsPage);
+        $this->assertStringContainsString('data-directory-alphabet-symbols', $actorsPage);
+    }
+
     public function test_the_application_returns_a_successful_response(): void
     {
         $response = $this->get('/');

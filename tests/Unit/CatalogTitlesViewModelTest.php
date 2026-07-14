@@ -9,6 +9,27 @@ use Tests\TestCase;
 
 class CatalogTitlesViewModelTest extends TestCase
 {
+    public function test_alphabet_groups_expose_individual_latin_letters_and_legacy_copy(): void
+    {
+        $viewModel = new CatalogTitlesViewModel(
+            search: '',
+            sort: 'updated',
+            year: null,
+            requestedYear: '',
+            invalidYear: false,
+            activeTaxonomies: collect(),
+            selectedTaxonomies: collect(),
+            activeFilterSlugs: [],
+            invalidFilterSlugs: [],
+            titleContext: null,
+            catalogQueryState: ['letter' => 'latin'],
+        );
+
+        $this->assertSame(range('A', 'Z'), $viewModel->alphabetGroups['latin']);
+        $this->assertSame('Латиница A–Z', $viewModel->advancedFilterChips()[0]['value']);
+        $this->assertTrue($viewModel->isActiveLetter('latin'));
+    }
+
     public function test_sort_labels_use_clear_russian_interface_copy(): void
     {
         $viewModel = new CatalogTitlesViewModel(

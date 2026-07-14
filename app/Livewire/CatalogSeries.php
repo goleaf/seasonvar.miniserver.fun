@@ -148,6 +148,13 @@ class CatalogSeries extends Component
 
     public function setLetter(mixed $letter): void
     {
+        if ($letter === '') {
+            $this->filters->letter = '';
+            $this->resetPage();
+
+            return;
+        }
+
         if (! is_string($letter) || preg_match('/^(?:latin|[A-Za-zА-Яа-яЁё]|#)$/u', $letter) !== 1) {
             return;
         }

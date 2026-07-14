@@ -75,16 +75,16 @@
             </div>
         </div>
 
-        @if ($letters->isNotEmpty())
-            <div class="mt-5" aria-label="{{ __('catalog.directories.alphabet') }}">
+        @if ($letterGroups['symbols'] !== [] || $letterGroups['cyrillic'] !== [] || $letterGroups['latin'] !== [])
+            <div data-directory-alphabet-groups class="mt-5" aria-label="{{ __('catalog.directories.alphabet') }}">
                 <p class="text-sm font-bold text-slate-700">{{ __('catalog.directories.alphabet') }}</p>
-                <div class="mt-2 flex flex-wrap gap-1.5">
+                <div data-directory-alphabet-symbols class="mt-2 flex flex-wrap items-center gap-1.5">
                     <button type="button" wire:click="setLetter('')" @class([
                         'inline-flex min-h-11 min-w-11 items-center justify-center rounded-control px-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200',
                         'bg-emerald-700 text-white' => $letter === '',
                         'bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' => $letter !== '',
-                    ])>{{ __('catalog.directories.all') }}</button>
-                    @foreach ($letters as $availableLetter)
+                    ])>{{ __('catalog.catalog.alphabet.all') }}</button>
+                    @foreach ($letterGroups['symbols'] as $availableLetter)
                         <button type="button" wire:key="directory-letter-{{ $availableLetter }}" wire:click="setLetter(@js($availableLetter))" @class([
                             'inline-flex min-h-11 min-w-11 items-center justify-center rounded-control px-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200',
                             'bg-emerald-700 text-white' => $letter === $availableLetter,
@@ -92,6 +92,23 @@
                         ]) aria-pressed="{{ $letter === $availableLetter ? 'true' : 'false' }}">{{ $availableLetter }}</button>
                     @endforeach
                 </div>
+
+                @foreach (['cyrillic', 'latin'] as $group)
+                    @if ($letterGroups[$group] !== [])
+                        <div data-directory-alphabet-group="{{ $group }}" class="mt-3 grid gap-2 sm:grid-cols-[6.5rem_minmax(0,1fr)] sm:items-start">
+                            <span class="py-3 text-xs font-bold text-slate-500">{{ __("catalog.catalog.alphabet.{$group}") }}</span>
+                            <div class="flex flex-wrap gap-1.5">
+                                @foreach ($letterGroups[$group] as $availableLetter)
+                                    <button type="button" wire:key="directory-letter-{{ $availableLetter }}" wire:click="setLetter(@js($availableLetter))" @class([
+                                        'inline-flex min-h-11 min-w-11 items-center justify-center rounded-control px-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200',
+                                        'bg-emerald-700 text-white' => $letter === $availableLetter,
+                                        'bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' => $letter !== $availableLetter,
+                                    ]) aria-pressed="{{ $letter === $availableLetter ? 'true' : 'false' }}">{{ $availableLetter }}</button>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                @endforeach
             </div>
         @endif
 

@@ -79,6 +79,13 @@ return [
         'page_size_label' => 'Cards per page',
         'view_grid' => 'Grid',
         'view_list' => 'List',
+        'alphabet' => [
+            'label' => 'Alphabet',
+            'all' => 'All',
+            'symbols' => 'Symbols',
+            'cyrillic' => 'Cyrillic',
+            'latin' => 'Latin',
+        ],
         'exact_filters' => [
             'title' => 'Exact selection',
             'description' => 'Refine years, type, genres, countries, cast, rating, and video availability.',

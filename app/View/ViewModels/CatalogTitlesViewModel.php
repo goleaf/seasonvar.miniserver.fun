@@ -6,6 +6,7 @@ use App\Enums\CatalogPublicationType;
 use App\Enums\CatalogSort;
 use App\Livewire\Forms\CatalogSeriesFilters;
 use App\Models\CatalogTitle;
+use App\Support\CatalogAlphabet;
 use App\Support\PlainText;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -65,8 +66,8 @@ class CatalogTitlesViewModel
     /** @var Collection<string, Collection<int, Model>> */
     public readonly Collection $excludedTaxonomies;
 
-    /** @var list<string> */
-    public array $alphabet;
+    /** @var array{symbols: list<string>, cyrillic: list<string>, latin: list<string>} */
+    public array $alphabetGroups;
 
     public ?string $activeLetter;
 
@@ -120,7 +121,7 @@ class CatalogTitlesViewModel
         $this->selectedFilterSlugs = $selectedFilterSlugs;
         $this->catalogQueryState = $catalogQueryState;
         $this->excludedTaxonomies = $excludedTaxonomies ?? collect();
-        $this->alphabet = ['#', 'latin', ...mb_str_split('АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ')];
+        $this->alphabetGroups = CatalogAlphabet::titleGroups();
         $letter = $this->catalogQueryState['letter'] ?? null;
         $this->activeLetter = is_scalar($letter) ? mb_strtoupper((string) $letter) : null;
         $this->baseQuery = $this->titleContext === null ? [] : ['title' => $this->titleContext->slug];
@@ -204,6 +205,10 @@ class CatalogTitlesViewModel
 
     public function isActiveLetter(string $letter): bool
     {
+        if ($letter === '') {
+            return $this->activeLetter === null || $this->activeLetter === '';
+        }
+
         return $this->activeLetter === mb_strtoupper($letter);
     }
 
@@ -212,7 +217,7 @@ class CatalogTitlesViewModel
     {
         $query = $this->sortQuery($this->sort);
 
-        if ($this->isActiveLetter($letter)) {
+        if ($letter === '' || $this->isActiveLetter($letter)) {
             unset($query['letter']);
         } else {
             $query['letter'] = $letter;
@@ -484,6 +489,7 @@ class CatalogTitlesViewModel
             },
             'video', 'subtitles' => $value === 'available' ? 'есть' : 'нет',
             'rating_source' => $value === 'kinopoisk' ? 'КиноПоиск' : 'IMDb',
+            'letter' => mb_strtolower((string) $value) === 'latin' ? 'Латиница A–Z' : (string) $value,
             default => (string) $value,
         };
     }

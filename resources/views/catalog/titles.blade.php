@@ -150,16 +150,7 @@
                     @endforeach
                 </div>
 
-                <nav class="mt-4 hidden flex-wrap items-center gap-1.5 lg:flex" aria-label="Алфавитный переход по названиям">
-                    <span class="mr-1 text-xs font-bold uppercase tracking-wide text-slate-600">Алфавит:</span>
-                    @foreach ($filterView->alphabet as $letter)
-                        <a data-catalog-alphabet-option href="{{ route('titles.index', $filterView->alphabetQuery($letter)) }}" rel="nofollow" wire:click.prevent="setLetter('{{ $letter }}')" @class([
-                            'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-2 text-xs font-bold transition',
-                            'bg-emerald-50 text-emerald-700' => $filterView->isActiveLetter($letter),
-                            'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveLetter($letter),
-                        ])>{{ $letter === 'latin' ? 'A–Z' : $letter }}</a>
-                    @endforeach
-                </nav>
+                <x-catalog.alphabet-filter :filter-view="$filterView" class="mt-4 hidden lg:block" />
 
                 <details data-catalog-mobile-output-controls class="group mt-4 rounded-lg bg-slate-50 p-2 lg:hidden">
                     <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-control px-2 text-sm font-bold text-slate-700">
@@ -205,15 +196,7 @@
                             @endforeach
                         </div>
                     </div>
-                    <nav class="mt-3 flex flex-wrap items-center gap-1.5" aria-label="Мобильный алфавитный переход по названиям">
-                        @foreach ($filterView->alphabet as $letter)
-                            <a href="{{ route('titles.index', $filterView->alphabetQuery($letter)) }}" rel="nofollow" wire:click.prevent="setLetter('{{ $letter }}')" @class([
-                                'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-2 text-xs font-bold',
-                                'bg-emerald-50 text-emerald-700' => $filterView->isActiveLetter($letter),
-                                'bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveLetter($letter),
-                            ])>{{ $letter === 'latin' ? 'A–Z' : $letter }}</a>
-                        @endforeach
-                    </nav>
+                    <x-catalog.alphabet-filter :filter-view="$filterView" mobile class="mt-3" />
                 </details>
                 @endisland
 
