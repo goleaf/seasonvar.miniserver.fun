@@ -347,6 +347,164 @@
                     }
                 }
             }
+        },
+        "/api/v1/search/suggestions": {
+            "get": {
+                "operationId": "getSearchSuggestions",
+                "summary": "Получить поисковые подсказки",
+                "security": [
+                    {},
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 80
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "До пяти тайтлов, актёров и режиссёров каждого типа",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data",
+                                        "meta"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "maxItems": 15,
+                                            "items": {
+                                                "$ref": "#/components/schemas/SearchSuggestion"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            }
+        },
+        "/api/v1/titles/{titleSlug}/recommendations": {
+            "get": {
+                "operationId": "getCatalogTitleRecommendations",
+                "summary": "Получить рекомендации тайтла",
+                "security": [
+                    {},
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/TitleSlug"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ранжированные видимые рекомендации без алгоритмических весов",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CatalogRecommendation"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/api/v1/titles/{titleSlug}/reviews": {
+            "get": {
+                "operationId": "getCatalogTitleReviews",
+                "summary": "Получить импортированные отзывы тайтла",
+                "security": [
+                    {},
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/TitleSlug"
+                    },
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Пагинированные публичные тексты отзывов",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data",
+                                        "links",
+                                        "meta"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CatalogReview"
+                                            }
+                                        },
+                                        "links": {
+                                            "type": "object"
+                                        },
+                                        "meta": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -791,6 +949,96 @@
                             "links"
                         ],
                         "additionalProperties": true
+                    }
+                }
+            },
+            "SearchSuggestion": {
+                "type": "object",
+                "required": [
+                    "type",
+                    "label",
+                    "slug",
+                    "title_slug",
+                    "count"
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "title",
+                            "actor",
+                            "director"
+                        ]
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "title_slug": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "count": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                }
+            },
+            "CatalogRecommendation": {
+                "type": "object",
+                "required": [
+                    "rank",
+                    "reasons",
+                    "title"
+                ],
+                "properties": {
+                    "rank": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "reasons": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "title": {
+                        "type": "object",
+                        "additionalProperties": true
+                    }
+                }
+            },
+            "CatalogReview": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "author",
+                    "body",
+                    "published_at"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "author": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "body": {
+                        "type": "string"
+                    },
+                    "published_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
                     }
                 }
             }
