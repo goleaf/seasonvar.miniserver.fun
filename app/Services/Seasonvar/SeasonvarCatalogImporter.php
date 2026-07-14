@@ -27,6 +27,7 @@ use App\Models\Season;
 use App\Models\SeasonvarImportEvent;
 use App\Models\SourcePage;
 use App\Models\SourcePageSnapshot;
+use App\Services\Api\V1\Sync\CatalogSyncChangePublisher;
 use App\Services\Catalog\Search\CatalogSearchIndexer;
 use App\Services\Crawler\PoliteHttpClient;
 use App\Services\Media\ExternalMediaMetadata;
@@ -69,6 +70,7 @@ class SeasonvarCatalogImporter
         private readonly SeasonvarTitlePageStateSynchronizer $titlePageStateSynchronizer,
         private readonly SeasonvarImportErrorSanitizer $errors,
         private readonly CatalogSearchIndexer $searchIndexer,
+        private readonly CatalogSyncChangePublisher $syncChanges,
     ) {}
 
     /**
@@ -556,6 +558,7 @@ class SeasonvarCatalogImporter
         $missingDataFlags = $this->titlePageStateSynchronizer
             ->synchronize($catalogTitle, $page, $importRunId);
         $this->searchIndexer->synchronizeTitleIds([$catalogTitle->id]);
+        $this->syncChanges->publishUpsert($catalogTitle);
 
         $this->report($progress, 'page-parse-complete', [
             'source_page_id' => $page->id,

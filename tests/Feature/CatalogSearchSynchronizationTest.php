@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\PublicationStatus;
+use App\Models\ApiSyncChange;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
 use App\Models\Genre;
@@ -58,6 +59,7 @@ class CatalogSearchSynchronizationTest extends TestCase
         $result = app(SeasonvarCatalogImporter::class)->parsePage($page);
 
         $this->assertTrue($result['catalog_title']?->is($title));
+        $this->assertDatabaseCount('api_sync_changes', 0);
         Http::assertSentCount(1);
     }
 
@@ -98,6 +100,10 @@ class CatalogSearchSynchronizationTest extends TestCase
 
         $this->assertSame('Новое редакторское имя', $document->title);
         $this->assertSame('', $document->taxonomies);
+        $this->assertSame(
+            [ApiSyncChange::OPERATION_UPSERT, ApiSyncChange::OPERATION_UPSERT],
+            ApiSyncChange::query()->orderBy('id')->pluck('operation')->all(),
+        );
     }
 
     public function test_title_merge_cascades_duplicate_document_and_reindexes_canonical_aliases(): void
@@ -150,5 +156,13 @@ class CatalogSearchSynchronizationTest extends TestCase
             'Альтернативное имя дубля',
             (string) $canonical->fresh()->searchDocument?->aliases,
         );
+        $this->assertSame([
+            [$canonical->slug, ApiSyncChange::OPERATION_UPSERT],
+            [$duplicate->slug, ApiSyncChange::OPERATION_DELETE],
+        ], ApiSyncChange::query()
+            ->orderBy('id')
+            ->get()
+            ->map(fn (ApiSyncChange $change): array => [$change->resource_key, $change->operation])
+            ->all());
     }
 }

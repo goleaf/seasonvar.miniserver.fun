@@ -10,6 +10,7 @@ use App\Models\CatalogTitleSlug;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
+use App\Services\Api\V1\Sync\CatalogSyncChangePublisher;
 use App\Services\Catalog\Search\CatalogSearchIndexer;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
@@ -35,6 +36,7 @@ class SeasonvarTitleMerger
     public function __construct(
         private readonly SeasonvarImportGroupKey $groupKeys,
         private readonly CatalogSearchIndexer $searchIndexer,
+        private readonly CatalogSyncChangePublisher $syncChanges,
     ) {}
 
     /**
@@ -62,6 +64,7 @@ class SeasonvarTitleMerger
                 continue;
             }
 
+            $duplicateSlugs = $titles->slice(1)->pluck('slug')->filter()->values();
             $groupResult = DB::transaction(fn (): array => $this->mergeGroup($titles));
             $result['titles'] += $groupResult['titles'];
             $result['seasons'] += $groupResult['seasons'];
@@ -71,6 +74,11 @@ class SeasonvarTitleMerger
 
             if ($canonical !== null) {
                 $this->searchIndexer->synchronizeTitleIds([$canonical->id]);
+                $this->syncChanges->publishUpsert($canonical);
+            }
+
+            foreach ($duplicateSlugs as $duplicateSlug) {
+                $this->syncChanges->publishDelete((string) $duplicateSlug);
             }
 
             $this->report($progress, 'seasonvar-title-merged', [
@@ -136,6 +144,7 @@ class SeasonvarTitleMerger
             return $result;
         }
 
+        $duplicateSlugs = $titles->slice(1)->pluck('slug')->filter()->values();
         $groupResult = DB::transaction(fn (): array => $this->mergeGroup($titles));
 
         $result['titles'] = $groupResult['titles'];
@@ -144,6 +153,11 @@ class SeasonvarTitleMerger
 
         $this->searchIndexer->synchronizeTitleIds($orderedIds);
         $canonical->refresh();
+        $this->syncChanges->publishUpsert($canonical);
+
+        foreach ($duplicateSlugs as $duplicateSlug) {
+            $this->syncChanges->publishDelete((string) $duplicateSlug);
+        }
 
         $this->report($progress, 'seasonvar-title-merged', [
             'catalog_title_id' => $canonical->id,

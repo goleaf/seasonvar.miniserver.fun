@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\DTOs\Seasonvar\SeasonvarCatalogData;
 use App\DTOs\Seasonvar\SeasonvarPreparedCatalogPage;
+use App\Models\ApiSyncChange;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\Source;
@@ -52,6 +53,10 @@ class SeasonvarCatalogPreparedApplyTest extends TestCase
         $this->assertSame(51, $canonical->episodes()->count());
         $this->assertDatabaseCount('catalog_titles', 1);
         $this->assertSame([1, 2, 9], $canonical->seasons()->pluck('number')->all());
+        $this->assertSame(3, ApiSyncChange::query()
+            ->where('operation', ApiSyncChange::OPERATION_UPSERT)
+            ->where('resource_key', 'ryzaia-8')
+            ->count());
     }
 
     public function test_local_only_episode_survives_apply_and_is_reported_by_manifest(): void

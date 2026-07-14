@@ -14,6 +14,7 @@ use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
 use App\Services\Admin\AdminAuditRecorder;
+use App\Services\Api\V1\Sync\CatalogSyncChangePublisher;
 use App\Services\Catalog\Search\CatalogSearchIndexer;
 use App\Services\Media\PlaybackSourceUrlGuard;
 use Closure;
@@ -86,6 +87,7 @@ final class CatalogAdministrationService
         private readonly PlaybackSourceUrlGuard $playbackUrls,
         private readonly CatalogSearchIndexer $searchIndexer,
         private readonly AdminAuditRecorder $auditRecorder,
+        private readonly CatalogSyncChangePublisher $syncChanges,
     ) {}
 
     /** @param array<string, mixed> $attributes */
@@ -182,7 +184,7 @@ final class CatalogAdministrationService
             }, attempts: 3);
         }, 'titleForm', 'Slug или внешний ID уже занят другой записью.');
 
-        $this->invalidate($updated);
+        $this->invalidate($updated, (string) $title->slug);
 
         return $updated;
     }
@@ -680,7 +682,7 @@ final class CatalogAdministrationService
         return array_values(array_intersect($fields, array_keys($attributes)));
     }
 
-    private function invalidate(CatalogTitle $title): void
+    private function invalidate(CatalogTitle $title, ?string $previousSlug = null): void
     {
         CatalogTitleRecommendation::query()
             ->where('catalog_title_id', $title->id)
@@ -688,6 +690,7 @@ final class CatalogAdministrationService
             ->delete();
         $this->searchIndexer->synchronizeTitleIds([$title->id]);
         $this->cacheInvalidator->catalogChanged([(int) $title->id]);
+        $this->syncChanges->publishUpsert($title, $previousSlug);
     }
 
     private function touchTitle(CatalogTitle $title): void

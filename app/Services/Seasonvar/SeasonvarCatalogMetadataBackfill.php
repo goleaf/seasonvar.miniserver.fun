@@ -7,6 +7,7 @@ use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\SourcePage;
+use App\Services\Api\V1\Sync\CatalogSyncChangePublisher;
 use App\Services\Catalog\Search\CatalogSearchIndexer;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -22,6 +23,7 @@ class SeasonvarCatalogMetadataBackfill
         private readonly SeasonvarDatabaseTransaction $databaseTransaction,
         private readonly CatalogSearchIndexer $searchIndexer,
         private readonly SeasonvarEditorialFieldResolver $editorialFields,
+        private readonly CatalogSyncChangePublisher $syncChanges,
     ) {}
 
     /**
@@ -233,6 +235,10 @@ class SeasonvarCatalogMetadataBackfill
 
         if ($updatedTitleIds !== []) {
             $this->searchIndexer->synchronizeTitleIds(array_keys($updatedTitleIds));
+
+            foreach (array_keys($updatedTitleIds) as $titleId) {
+                $this->syncChanges->publishUpsert((int) $titleId);
+            }
         }
 
         $this->report($progress, 'seasonvar-metadata-backfill-complete', $result);

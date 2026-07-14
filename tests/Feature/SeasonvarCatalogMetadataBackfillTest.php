@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Actor;
+use App\Models\ApiSyncChange;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
 use App\Models\Network;
@@ -204,6 +205,10 @@ class SeasonvarCatalogMetadataBackfillTest extends TestCase
         $this->assertGreaterThanOrEqual(3, $result['relations_attached']);
         $this->assertSame(0, $result['failed']);
         $this->assertNotEmpty($events);
+        $this->assertSame(1, ApiSyncChange::query()
+            ->where('resource_key', $title->slug)
+            ->where('operation', ApiSyncChange::OPERATION_UPSERT)
+            ->count());
         Http::assertNothingSent();
 
         $second = app(SeasonvarCatalogMetadataBackfill::class)->run();
@@ -216,6 +221,7 @@ class SeasonvarCatalogMetadataBackfillTest extends TestCase
             'relations_attached' => 0,
             'failed' => 0,
         ], $second);
+        $this->assertDatabaseCount('api_sync_changes', 1);
         Http::assertNothingSent();
     }
 
