@@ -13,9 +13,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'catalog_title_id',
     'in_watchlist',
     'rating',
+    'watchlist_version',
+    'rating_version',
 ])]
 class CatalogTitleUserState extends Model
 {
+    /** @var array<string, int> */
+    protected $attributes = [
+        'watchlist_version' => 0,
+        'rating_version' => 0,
+    ];
+
     /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
@@ -34,6 +42,8 @@ class CatalogTitleUserState extends Model
         return [
             'in_watchlist' => 'boolean',
             'rating' => 'integer',
+            'watchlist_version' => 'integer',
+            'rating_version' => 'integer',
         ];
     }
 }
