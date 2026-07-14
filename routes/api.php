@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\V1\PlaybackProgressController;
 use App\Http\Controllers\Api\V1\PlaybackSessionController;
 use App\Http\Controllers\Api\V1\PlaybackSourceController;
 use App\Http\Controllers\Api\V1\SearchSuggestionController;
+use App\Http\Controllers\Api\V1\SyncController;
 use App\Http\Controllers\Api\V1\UserLibraryController;
 use App\Http\Controllers\Api\V1\UserTitleStateController;
 use App\Http\Controllers\Api\V1\ViewingActivityController;
@@ -70,6 +71,11 @@ Route::middleware('public.cache:api')->group(function (): void {
 });
 
 Route::get('/v1/health', ApiHealthController::class)->name('api.v1.health');
+
+Route::prefix('v1/sync')->name('api.v1.sync.')->group(function (): void {
+    Route::get('/manifest', [SyncController::class, 'manifest'])->name('manifest');
+    Route::get('/changes', [SyncController::class, 'catalog'])->name('changes');
+});
 
 Route::middleware('auth.optional.sanctum')->prefix('v1')->name('api.v1.')->group(function (): void {
     Route::post('/titles/{titleSlug}/playback-sessions', PlaybackSessionController::class)

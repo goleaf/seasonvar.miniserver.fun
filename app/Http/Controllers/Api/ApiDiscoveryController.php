@@ -23,6 +23,7 @@ final class ApiDiscoveryController extends Controller
                     'authentication',
                     'user_state',
                     'playback',
+                    'offline_sync',
                 ],
             ],
         ]);
