@@ -26,6 +26,16 @@ Route::middleware(['auth.optional.sanctum', 'public.cache:api'])->group(function
             ->whereIn('directory', array_keys(CatalogDirectoryRegistry::routeMap()))
             ->name('catalog.directories.show');
         Route::get('/titles', [V1CatalogTitleController::class, 'index'])->name('titles.index');
+        Route::get('/titles/{titleSlug}', [V1CatalogTitleController::class, 'show'])
+            ->where('titleSlug', '[^/]+')
+            ->name('titles.show');
+        Route::get('/titles/{titleSlug}/seasons', [V1CatalogTitleController::class, 'seasons'])
+            ->where('titleSlug', '[^/]+')
+            ->name('titles.seasons');
+        Route::get('/titles/{titleSlug}/seasons/{season}/episodes', [V1CatalogTitleController::class, 'episodes'])
+            ->where('titleSlug', '[^/]+')
+            ->whereNumber('season')
+            ->name('titles.episodes');
     });
 });
 

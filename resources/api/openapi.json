@@ -219,6 +219,134 @@
                     }
                 }
             }
+        },
+        "/api/v1/titles/{titleSlug}": {
+            "get": {
+                "operationId": "getCatalogTitle",
+                "summary": "Получить карточку тайтла",
+                "security": [
+                    {},
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/TitleSlug"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Публичные метаданные и безопасное состояние тайтла",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CatalogTitleResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/api/v1/titles/{titleSlug}/seasons": {
+            "get": {
+                "operationId": "getCatalogTitleSeasons",
+                "summary": "Получить доступные сезоны тайтла",
+                "security": [
+                    {},
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/TitleSlug"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Список доступных сезонов",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Season"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/api/v1/titles/{titleSlug}/seasons/{season}/episodes": {
+            "get": {
+                "operationId": "getCatalogSeasonEpisodes",
+                "summary": "Получить доступные серии сезона",
+                "security": [
+                    {},
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/TitleSlug"
+                    },
+                    {
+                        "name": "season",
+                        "in": "path",
+                        "required": true,
+                        "description": "Идентификатор сезона, принадлежащего выбранному тайтлу",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Список серий и безопасных media-профилей",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Episode"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -247,6 +375,15 @@
                     "minimum": 1,
                     "maximum": 50,
                     "default": 20
+                }
+            },
+            "TitleSlug": {
+                "name": "titleSlug",
+                "in": "path",
+                "required": true,
+                "schema": {
+                    "type": "string",
+                    "minLength": 1
                 }
             }
         },
@@ -478,6 +615,180 @@
                             "year_buckets",
                             "genres",
                             "countries"
+                        ],
+                        "additionalProperties": true
+                    }
+                }
+            },
+            "MediaProfile": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "translation",
+                    "variant",
+                    "variant_key",
+                    "quality",
+                    "format",
+                    "duration_seconds"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "translation": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "variant": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "variant_key": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "quality": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "format": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "duration_seconds": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0
+                    }
+                }
+            },
+            "Season": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "number",
+                    "kind",
+                    "title",
+                    "counts",
+                    "media_profiles",
+                    "links"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "number": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "counts": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        }
+                    },
+                    "media_profiles": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MediaProfile"
+                        }
+                    },
+                    "links": {
+                        "type": "object"
+                    }
+                },
+                "additionalProperties": true
+            },
+            "Episode": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "season_id",
+                    "number",
+                    "kind",
+                    "title",
+                    "counts",
+                    "media_profiles"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "season_id": {
+                        "type": "integer"
+                    },
+                    "number": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "counts": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        }
+                    },
+                    "media_profiles": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MediaProfile"
+                        }
+                    }
+                },
+                "additionalProperties": true
+            },
+            "CatalogTitleResponse": {
+                "type": "object",
+                "required": [
+                    "data"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "required": [
+                            "id",
+                            "slug",
+                            "title",
+                            "aliases",
+                            "ratings",
+                            "rating_summary",
+                            "taxonomies",
+                            "counts",
+                            "primary_action",
+                            "links"
                         ],
                         "additionalProperties": true
                     }
