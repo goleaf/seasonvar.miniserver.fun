@@ -1,6 +1,6 @@
 # Blade-шаблоны
 
-Обновлено: 13.07.2026
+Обновлено: 14.07.2026
 
 ## Правило без inline PHP
 
@@ -17,6 +17,7 @@
 
 - `App\View\ViewData\AppLayoutData` готовит SEO, JSON-LD, метаданные и поисковые блоки для `layouts.app` через view composer в `AppServiceProvider`.
 - `App\View\ViewModels\CatalogTitlesViewModel` готовит подписи фильтров и параметры ссылок каталога.
+- `App\Support\CatalogAlphabet` без запросов к базе задаёт канонический порядок символов, кириллицы и `A`–`Z`; `CatalogTitlesViewModel` и `CatalogDirectoryPageBuilder` передают Blade готовые группы. Query-free компонент `x-catalog.alphabet-filter` только выводит эти группы и готовые query-ссылки каталога.
 - `App\Livewire\CatalogSeries` разделяет render-local данные на computed `catalogPage` и `catalogFacets`; Eloquent-коллекции не хранятся в публичных properties. Связанные Livewire islands `catalog-live` атомарно обновляют фильтры и карточки, а первый SSR не вычисляет facets. Карточки и строки используют `catalog-title-{id}` как стабильный `wire:key`.
 - `App\View\ViewModels\CatalogTitlesViewModel` нормализует scalar/list query-state через `scalarState()` и `listState()`, чтобы шаблоны не читали raw query-параметры напрямую.
 - `App\View\ViewModels\CatalogTitlesViewModel` готовит состояние единой формы фильтров: скрытые поля содержат только параметры без видимого control, поэтому годы, справочники, публикация, субтитры и расширенные поля не дублируются. ViewModel также готовит общий active count и максимальный календарный год; вычисления в Blade не дублируются.
@@ -40,5 +41,5 @@
 - `CatalogTitlePageBuilder` передаёт Blade одну коллекцию `recommendationItems`: precomputed `v3` и объединённый genre/year fallback используют одинаковые строки, последовательные ranks и дедупликацию по ID. Blade не объединяет коллекции и не выполняет запросы.
 - Специализированная карточка новой серии готовит подписи в PHP/page builder и составляет shell через `x-ui.poster-card`; история просмотра и `/stats` также используют общий shell, не передавая туда авторизацию или проверку внешнего URL.
 - Публичное имя тайтла берётся из `CatalogTitle::display_title`: совпадающий суффикс `/original_title` не повторяется в основном заголовке, а `display_original_title` выводится отдельной вторичной строкой. Исходные поля базы и поисковый индекс не изменяются.
-- Стандартный вызов `$paginator->links()` использует русский светлый override `vendor.pagination.tailwind`.
+- Стандартный вызов `$paginator->links()` использует русский светлый override `vendor.pagination.tailwind`; Livewire callers передают scoped `scrollTo` в отдельный override `vendor.livewire.tailwind`.
 - Пустая выдача каталога показывает точный запрос; запрос только из стоп-слов получает отдельное сообщение «слишком общий». Пустое состояние не подменяется ближайшими карточками.

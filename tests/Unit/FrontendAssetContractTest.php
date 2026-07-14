@@ -62,6 +62,7 @@ class FrontendAssetContractTest extends TestCase
         $this->assertStringContainsString('href="{{ $url }}"', $pagination);
         $this->assertStringContainsString('pendingPaginationScrollTo', $app);
         $this->assertStringContainsString("window.Livewire.hook('morphed'", $app);
+        $this->assertStringContainsString("window.Livewire.hook('island.morphed'", $app);
         $this->assertStringContainsString('smoothAnchorScroll', $app);
         $this->assertStringContainsString('[data-catalog-results]', $views);
         $this->assertStringContainsString('[data-directory-results]', $views);

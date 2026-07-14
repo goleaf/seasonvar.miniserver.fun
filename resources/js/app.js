@@ -492,11 +492,14 @@ if (document.readyState === 'loading') {
 }
 
 document.addEventListener('livewire:init', () => {
-    window.Livewire.hook('morphed', () => {
+    const reloadAfterLivewireMorph = () => {
         void loadCatalogPlayers();
         loadCatalogInterfaces();
         flushPaginationScroll();
-    });
+    };
+
+    window.Livewire.hook('morphed', reloadAfterLivewireMorph);
+    window.Livewire.hook('island.morphed', reloadAfterLivewireMorph);
     window.Livewire.hook('morph.removing', ({ el }) => {
         destroyCatalogPlayersWithin(el);
     });

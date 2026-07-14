@@ -17,12 +17,7 @@
             href="{{ route('titles.index', $filterView->alphabetQuery('')) }}"
             rel="nofollow"
             wire:click.prevent="setLetter('')"
-            @class([
-                'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 text-xs font-bold transition',
-                'bg-emerald-50 text-emerald-700' => $filterView->isActiveLetter(''),
-                'bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $mobile && ! $filterView->isActiveLetter(''),
-                'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $mobile && ! $filterView->isActiveLetter(''),
-            ])
+            @if ($filterView->isActiveLetter('')) aria-current="true" @endif
         >{{ __('catalog.catalog.alphabet.all') }}</a>
     </div>
 
@@ -38,12 +33,7 @@
                             href="{{ route('titles.index', $filterView->alphabetQuery($letter)) }}"
                             rel="nofollow"
                             wire:click.prevent="setLetter(@js($letter))"
-                            @class([
-                                'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-2 text-xs font-bold transition',
-                                'bg-emerald-50 text-emerald-700' => $filterView->isActiveLetter($letter),
-                                'bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $mobile && ! $filterView->isActiveLetter($letter),
-                                'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $mobile && ! $filterView->isActiveLetter($letter),
-                            ])
+                            @if ($filterView->isActiveLetter($letter)) aria-current="true" @endif
                         >{{ $letter }}</a>
                     @endforeach
                 </div>

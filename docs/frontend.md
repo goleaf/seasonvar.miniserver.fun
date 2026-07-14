@@ -1,6 +1,6 @@
 # Frontend
 
-Обновлено: 13.07.2026
+Обновлено: 14.07.2026
 
 ## Стек
 
@@ -77,7 +77,7 @@ composer dev
 - Blade-компонент `x-ui.icon` является единственной границей прямой FontAwesome-разметки: он добавляет декоративную семантику, стабильный responsive box в `em`, запрет flex-сжатия и вариант `align="start"` для первой строки многострочного текста. Архитектурный тест не допускает возврат сырых `<i>` в шаблоны.
 - Plyr получает локальный Vite URL из `resources/images/plyr.svg`, а HLS-код загружается только когда браузеру действительно нужен `hls.js/light`.
 - Проектная pagination переопределена в `resources/views/vendor/pagination/tailwind.blade.php`: весь текст русский, тема только светлая, элементы управления имеют высоту не менее 44 пикселей.
-- Livewire pagination каталога переопределена в `resources/views/vendor/livewire/tailwind.blade.php`: русские подписи, стабильные `wire:key`, светлая тема и элементы управления не менее 44 пикселей. Нажатие активной кнопки плавно возвращает к `data-catalog-results` с учетом sticky header и `prefers-reduced-motion`.
+- Общая Livewire pagination переопределена в `resources/views/vendor/livewire/tailwind.blade.php`: русские подписи, стабильные `wire:key`, светлая тема и элементы управления не менее 44 пикселей. Активные элементы остаются реальными ссылками на paginator URL и усиливаются через `wire:click.prevent`, поэтому GET fallback сохраняет фильтры при недоступном JavaScript. Каждый caller передаёт собственный `scrollTo`; после успешного root `morphed` или island `island.morphed` общий handler плавно возвращает к `[data-catalog-results]`, `[data-directory-results]`, `[data-viewing-history-results]` или `[data-admin-catalog-results]`, учитывает sticky header и отключает анимацию при `prefers-reduced-motion`.
 - Все каталожные изображения выводит `x-ui.poster-frame`: абсолютный `object-cover` постер с 2% overscan заполняет frame без верхней полосы, а заглушка сохраняет те же размеры. `x-ui.poster-card` владеет единственным внешним border/rounding/clipping и поддерживает только `grid`, `horizontal`, `compact`; обычные коллекции `CatalogTitle` используют query-free `x-catalog.title-card`.
 - Grid-карточка на телефоне остаётся горизонтальной для быстрого сканирования и становится вертикальной с постером 2:3 начиная с `sm`; horizontal/compact используют явную портретную колонку и `minmax(0,1fr)` для полностью переносимого текста.
 - Страница сериала вызывает `x-ui.poster-frame` напрямую для SEO-критичного eager-постера. Video player сохраняет нативный `poster`-атрибут; защищённые миниатюры `/stats` получают только уже проверенный same-origin proxy URL.

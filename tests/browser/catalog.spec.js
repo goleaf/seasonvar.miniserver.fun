@@ -153,7 +153,10 @@ test('country pagination changes results, scrolls to them and keeps alphabet scr
     await expect(page).toHaveURL(/page=2/);
     await expect(page.locator('[data-catalog-pagination] [aria-current="page"]')).toHaveText('2');
     await expect(page.locator('[data-catalog-card]').first()).not.toHaveText(firstTitle);
-    await expect.poll(() => results.evaluate((element) => Math.round(element.getBoundingClientRect().top))).toBeLessThan(320);
+    const resultTop = () => results.evaluate((element) => Math.round(element.getBoundingClientRect().top));
+
+    await expect.poll(resultTop).toBeGreaterThanOrEqual(0);
+    await expect.poll(resultTop).toBeLessThan(320);
 
     await page.getByRole('link', { name: 'Назад' }).click();
     await expect(page).not.toHaveURL(/page=2/);

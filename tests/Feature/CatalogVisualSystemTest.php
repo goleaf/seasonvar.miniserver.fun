@@ -250,7 +250,8 @@ class CatalogVisualSystemTest extends TestCase
 
         $this->assertStringContainsString('data-catalog-results', $content);
         $this->assertStringContainsString('data-catalog-pagination', $content);
-        $this->assertStringContainsString('data-catalog-pagination-control', $content);
+        $this->assertStringContainsString('data-pagination-control', $content);
+        $this->assertStringContainsString('data-pagination-scroll-to="[data-catalog-results]"', $content);
         $this->assertDoesNotMatchRegularExpression('/<div[^>]*uppercase[^>]*>Найдено<\/div>/', $content);
     }
 
@@ -272,7 +273,7 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll,previousPage,nextPage,gotoPage"', $content);
         $this->assertStringContainsString('wire:loading', $content);
         $this->assertStringContainsString('wire:key="catalog-title-', $content);
-        $this->assertStringContainsString('wire:click="nextPage(\'page\')"', $content);
+        $this->assertStringContainsString('wire:click.prevent="nextPage(\'page\')"', $content);
         $this->assertStringContainsString(
             'wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll,previousPage,nextPage,gotoPage" class="hidden absolute',
             $content,

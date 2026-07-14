@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-14
+
+- Made Livewire pagination portal-wide and resilient: catalog, directory, viewing-history and admin controls now retain real GET links, preserve route/query filters and scroll to their own refreshed results after morph. Split existing alphabet filters into labeled Cyrillic, Latin `A`–`Z` and symbol groups with deterministic desktop/mobile regression coverage.
+
 ## 2026-07-13
 
 - Closed the final bounded repository/runtime backlog: production now runs debug-off with daily warning logs and corrected `www:www` runtime ownership; read-only deployment/failed-job diagnostics, report-only CSP, deterministic Playwright+axe CI, Livewire payload/query budgets, append-only admin audit, Markdown/migration integrity checks and bounded Larastan are implemented. The additive audit migration was rolled out with a verified SQLite backup, all 12 queue workers resumed, health/preflight and public HTTP/CSP smoke passed, and the completed temporary backlog/spec were removed in favor of topic-owner documentation.

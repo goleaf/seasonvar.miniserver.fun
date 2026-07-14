@@ -64,6 +64,30 @@
         contain-intrinsic-size: 24rem;
     }
 
+    [data-catalog-alphabet-option] {
+        @apply inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-2 text-xs font-bold text-slate-600 transition;
+    }
+
+    [data-catalog-alphabet-option][data-alphabet-letter=''] {
+        @apply px-3;
+    }
+
+    [data-catalog-alphabet-option][aria-current='true'] {
+        @apply bg-emerald-50 text-emerald-700;
+    }
+
+    [data-catalog-alphabet-option]:not([aria-current='true']) {
+        @apply bg-white;
+    }
+
+    [data-catalog-desktop-alphabet] [data-catalog-alphabet-option]:not([aria-current='true']) {
+        @apply bg-slate-50;
+    }
+
+    [data-catalog-alphabet-option]:not([aria-current='true']):hover {
+        @apply bg-emerald-50 text-emerald-700;
+    }
+
     .ui-icon {
         display: inline-flex;
         inline-size: 1.25em;
