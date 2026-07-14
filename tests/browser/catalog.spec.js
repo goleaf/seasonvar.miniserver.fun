@@ -141,6 +141,46 @@ test('route country and publication type can be removed independently', async ({
     expect(browserErrors.pageErrors).toEqual([]);
 });
 
+test('country pagination changes results, scrolls to them and keeps alphabet scripts separate', async ({ page, baseURL }) => {
+    const browserErrors = await installNetworkGuard(page, baseURL);
+
+    await page.goto('/titles/country/turciia?country%5B0%5D=turciia');
+    const results = page.locator('[data-catalog-results]');
+    const firstTitle = await page.locator('[data-catalog-card]').first().innerText();
+
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.getByRole('link', { name: 'Страница 2' }).click();
+    await expect(page).toHaveURL(/page=2/);
+    await expect(page.locator('[data-catalog-pagination] [aria-current="page"]')).toHaveText('2');
+    await expect(page.locator('[data-catalog-card]').first()).not.toHaveText(firstTitle);
+    await expect.poll(() => results.evaluate((element) => Math.round(element.getBoundingClientRect().top))).toBeLessThan(320);
+
+    await page.getByRole('link', { name: 'Назад' }).click();
+    await expect(page).not.toHaveURL(/page=2/);
+
+    const mobileControls = page.locator('[data-catalog-mobile-output-controls]');
+    if ((page.viewportSize()?.width || 0) < 1024) {
+        await mobileControls.locator('summary').click();
+    }
+
+    const alphabetRoot = (page.viewportSize()?.width || 0) < 1024
+        ? mobileControls
+        : page.locator('[data-catalog-desktop-alphabet]');
+    await expect(alphabetRoot.locator('[data-catalog-alphabet-group="cyrillic"]')).toBeVisible();
+    await expect(alphabetRoot.locator('[data-catalog-alphabet-group="latin"]')).toBeVisible();
+    await expect(alphabetRoot.locator('[data-alphabet-letter="A"]')).toBeVisible();
+    await expect(alphabetRoot.locator('[data-alphabet-letter="Z"]')).toBeVisible();
+
+    await page.goto('/actors');
+    await expect(page.locator('[data-directory-alphabet-group="cyrillic"]')).toBeVisible();
+    await expect(page.locator('[data-directory-alphabet-group="latin"]')).toBeVisible();
+    await expect(page.locator('[data-directory-alphabet-symbols]')).toBeVisible();
+    await assertPageGeometry(page);
+    expect(browserErrors.localAssetFailures).toEqual([]);
+    expect(browserErrors.consoleErrors).toEqual([]);
+    expect(browserErrors.pageErrors).toEqual([]);
+});
+
 test('title page renders the player shell without local asset failures', async ({ page, baseURL }) => {
     const browserErrors = await installNetworkGuard(page, baseURL);
 

@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Models\Actor;
 use App\Models\CatalogTitle;
 use App\Models\Country;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Facades\Artisan;
 
 require dirname(__DIR__, 2).'/vendor/autoload.php';
@@ -52,6 +54,30 @@ $russia = Country::query()->create([
     'slug' => 'rossiia',
 ]);
 $title->countries()->attach($russia);
+$turkey = Country::query()->create([
+    'name' => 'Турция',
+    'slug' => 'turciia',
+]);
+
+CatalogTitle::factory()->count(30)->sequence(
+    fn (Sequence $sequence): array => [
+        'title' => sprintf('Турецкий браузерный сериал %02d', $sequence->index + 1),
+        'slug' => sprintf('turkish-browser-title-%02d', $sequence->index + 1),
+        'indexed_at' => now()->subMinutes($sequence->index + 1),
+    ],
+)->create()->each(fn (CatalogTitle $catalogTitle) => $catalogTitle->countries()->attach($turkey));
+
+collect([
+    ['name' => 'Борис Актёр', 'slug' => 'boris-akter'],
+    ['name' => 'Ёлка Актриса', 'slug' => 'elka-aktrisa'],
+    ['name' => 'Alice Actor', 'slug' => 'alice-actor'],
+    ['name' => 'Zed Actor', 'slug' => 'zed-actor'],
+    ['name' => '123 Actor', 'slug' => '123-actor'],
+])->each(function (array $attributes) use ($title): void {
+    $actor = Actor::query()->create($attributes);
+    $title->actors()->attach($actor);
+});
+
 $season = Season::factory()->create([
     'catalog_title_id' => $title->id,
     'number' => 1,
