@@ -865,6 +865,505 @@
                     }
                 }
             }
+        },
+        "/api/v1/auth/register": {
+            "post": {
+                "operationId": "registerMobileUser",
+                "summary": "Зарегистрировать мобильный аккаунт",
+                "description": "Создаёт пользователя, отправляет письмо подтверждения и один 90-дневный Sanctum token для указанного устройства.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RegisterRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Аккаунт и token созданы",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthTokenResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/TooManyRequests"
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/login": {
+            "post": {
+                "operationId": "loginMobileUser",
+                "summary": "Войти с нового мобильного устройства",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LoginRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Новый 90-дневный token устройства",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthTokenResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/TooManyRequests"
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/email/verify/{id}/{hash}": {
+            "get": {
+                "operationId": "verifyMobileEmail",
+                "summary": "Подтвердить email по временной signed-ссылке",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "hash",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "minLength": 40,
+                            "maxLength": 40
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Email подтверждён",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/VerificationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/email/verification-notification": {
+            "post": {
+                "operationId": "resendMobileEmailVerification",
+                "summary": "Повторно отправить подтверждение email",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Безопасный статус отправки",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/StatusResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/TooManyRequests"
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/forgot-password": {
+            "post": {
+                "operationId": "requestMobilePasswordReset",
+                "summary": "Запросить восстановление пароля",
+                "description": "Всегда возвращает одинаковый ответ для существующего и отсутствующего email.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ForgotPasswordRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Не перечисляющий пользователей статус",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/StatusResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/TooManyRequests"
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/reset-password": {
+            "post": {
+                "operationId": "resetMobilePassword",
+                "summary": "Установить новый пароль по reset token",
+                "description": "После успеха отзывает все mobile tokens пользователя.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ResetPasswordRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Пароль изменён",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/StatusResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/TooManyRequests"
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/devices": {
+            "get": {
+                "operationId": "listMobileDevices",
+                "summary": "Получить устройства текущего аккаунта",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Безопасные metadata токенов без hashes и abilities",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceTokenListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/devices/{token}": {
+            "delete": {
+                "operationId": "revokeMobileDevice",
+                "summary": "Отозвать принадлежащий пользователю token устройства",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "token",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Устройство отозвано"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/token/refresh": {
+            "post": {
+                "operationId": "refreshMobileToken",
+                "summary": "Атомарно заменить текущий mobile token",
+                "description": "Создаёт новый 90-дневный token с тем же именем/abilities и только затем удаляет старый.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Новый plaintext token; старый уже недействителен",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthTokenResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/TooManyRequests"
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/logout": {
+            "post": {
+                "operationId": "logoutMobileDevice",
+                "summary": "Отозвать текущий mobile token",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Текущий token отозван"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/logout-all": {
+            "post": {
+                "operationId": "logoutAllMobileDevices",
+                "summary": "Отозвать все mobile tokens аккаунта",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Все tokens отозваны"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    }
+                }
+            }
+        },
+        "/api/v1/me": {
+            "get": {
+                "operationId": "getMobileAccount",
+                "summary": "Получить текущий мобильный аккаунт",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Текущий пользователь",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    }
+                }
+            },
+            "patch": {
+                "operationId": "updateMobileAccount",
+                "summary": "Изменить имя или email",
+                "description": "Изменение email сбрасывает verification, удаляет старые reset rows и ставит новое письмо в очередь; endpoint доступен unverified пользователю.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateProfileRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Обновлённый пользователь",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "deleteMobileAccount",
+                "summary": "Удалить текущий аккаунт",
+                "description": "Требует пароль и удаляет пользователя, mobile tokens и связанное приватное состояние каталога.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DeleteAccountRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "Аккаунт удалён"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            }
+        },
+        "/api/v1/me/password": {
+            "patch": {
+                "operationId": "updateMobilePassword",
+                "summary": "Изменить пароль текущего аккаунта",
+                "description": "Требует текущий пароль; удаляет reset token, сохраняет текущий device token и отзывает tokens остальных устройств.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdatePasswordRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Пароль изменён",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/StatusResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -931,6 +1430,339 @@
                                 "type": "string"
                             }
                         }
+                    }
+                }
+            },
+            "User": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "email",
+                    "email_verified",
+                    "email_verified_at",
+                    "created_at",
+                    "updated_at"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "email_verified": {
+                        "type": "boolean"
+                    },
+                    "email_verified_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "created_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    }
+                }
+            },
+            "UserResponse": {
+                "type": "object",
+                "required": [
+                    "data"
+                ],
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/User"
+                    }
+                }
+            },
+            "AuthTokenResponse": {
+                "type": "object",
+                "required": [
+                    "data"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "required": [
+                            "token",
+                            "token_type",
+                            "expires_at"
+                        ],
+                        "properties": {
+                            "user": {
+                                "$ref": "#/components/schemas/User"
+                            },
+                            "token": {
+                                "type": "string",
+                                "description": "Однократно выдаваемый plaintext Sanctum token."
+                            },
+                            "token_type": {
+                                "type": "string",
+                                "const": "Bearer"
+                            },
+                            "expires_at": {
+                                "type": "string",
+                                "format": "date-time"
+                            }
+                        }
+                    }
+                }
+            },
+            "DeviceToken": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "last_used_at",
+                    "expires_at",
+                    "current"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "last_used_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "expires_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "current": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "DeviceTokenListResponse": {
+                "type": "object",
+                "required": [
+                    "data"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DeviceToken"
+                        }
+                    }
+                }
+            },
+            "StatusResponse": {
+                "type": "object",
+                "required": [
+                    "data"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "required": [
+                            "status"
+                        ],
+                        "properties": {
+                            "status": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "VerificationResponse": {
+                "type": "object",
+                "required": [
+                    "data"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "required": [
+                            "email_verified",
+                            "status"
+                        ],
+                        "properties": {
+                            "email_verified": {
+                                "type": "boolean",
+                                "const": true
+                            },
+                            "status": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            },
+            "RegisterRequest": {
+                "type": "object",
+                "required": [
+                    "name",
+                    "email",
+                    "password",
+                    "password_confirmation",
+                    "device_name"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "maxLength": 255
+                    },
+                    "password": {
+                        "type": "string",
+                        "format": "password",
+                        "minLength": 12
+                    },
+                    "password_confirmation": {
+                        "type": "string",
+                        "format": "password"
+                    },
+                    "device_name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                    }
+                }
+            },
+            "LoginRequest": {
+                "type": "object",
+                "required": [
+                    "email",
+                    "password",
+                    "device_name"
+                ],
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "password": {
+                        "type": "string",
+                        "format": "password"
+                    },
+                    "device_name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                    }
+                }
+            },
+            "ForgotPasswordRequest": {
+                "type": "object",
+                "required": [
+                    "email"
+                ],
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    }
+                }
+            },
+            "ResetPasswordRequest": {
+                "type": "object",
+                "required": [
+                    "email",
+                    "token",
+                    "password",
+                    "password_confirmation"
+                ],
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "token": {
+                        "type": "string"
+                    },
+                    "password": {
+                        "type": "string",
+                        "format": "password",
+                        "minLength": 12
+                    },
+                    "password_confirmation": {
+                        "type": "string",
+                        "format": "password"
+                    }
+                }
+            },
+            "UpdateProfileRequest": {
+                "type": "object",
+                "minProperties": 1,
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 120
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "maxLength": 255
+                    }
+                }
+            },
+            "UpdatePasswordRequest": {
+                "type": "object",
+                "required": [
+                    "current_password",
+                    "password",
+                    "password_confirmation"
+                ],
+                "properties": {
+                    "current_password": {
+                        "type": "string",
+                        "format": "password"
+                    },
+                    "password": {
+                        "type": "string",
+                        "format": "password",
+                        "minLength": 12
+                    },
+                    "password_confirmation": {
+                        "type": "string",
+                        "format": "password"
+                    }
+                }
+            },
+            "DeleteAccountRequest": {
+                "type": "object",
+                "required": [
+                    "password"
+                ],
+                "properties": {
+                    "password": {
+                        "type": "string",
+                        "format": "password"
                     }
                 }
             },
@@ -1517,6 +2349,53 @@
                     "application/json": {
                         "schema": {
                             "$ref": "#/components/schemas/ApiError"
+                        },
+                        "examples": {
+                            "default": {
+                                "value": {
+                                    "code": "not_found",
+                                    "message": "Ресурс не найден.",
+                                    "request_id": "01J00000000000000000000000"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "Unauthorized": {
+                "description": "Bearer token отсутствует, недействителен или истёк",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ApiError"
+                        },
+                        "examples": {
+                            "default": {
+                                "value": {
+                                    "code": "unauthenticated",
+                                    "message": "Требуется аутентификация.",
+                                    "request_id": "01J00000000000000000000000"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "Forbidden": {
+                "description": "Token не имеет требуемой ability или signed URL недействителен",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ApiError"
+                        },
+                        "examples": {
+                            "default": {
+                                "value": {
+                                    "code": "forbidden",
+                                    "message": "Доступ запрещён.",
+                                    "request_id": "01J00000000000000000000000"
+                                }
+                            }
                         }
                     }
                 }
@@ -1527,6 +2406,39 @@
                     "application/json": {
                         "schema": {
                             "$ref": "#/components/schemas/ApiError"
+                        },
+                        "examples": {
+                            "default": {
+                                "value": {
+                                    "code": "validation_failed",
+                                    "message": "Переданные данные некорректны.",
+                                    "request_id": "01J00000000000000000000000",
+                                    "errors": {
+                                        "email": [
+                                            "Введите корректный адрес электронной почты."
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "TooManyRequests": {
+                "description": "Исчерпан named budget credential endpoint",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ApiError"
+                        },
+                        "examples": {
+                            "default": {
+                                "value": {
+                                    "code": "rate_limited",
+                                    "message": "Слишком много запросов. Повторите попытку позже.",
+                                    "request_id": "01J00000000000000000000000"
+                                }
+                            }
                         }
                     }
                 }

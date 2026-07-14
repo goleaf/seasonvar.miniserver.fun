@@ -87,7 +87,7 @@
 - `CatalogTitle::resolveRouteBindingQuery()` ограничивает все текущие публичные implicit bindings опубликованными тайтлами. Карточка, API show и `stats.poster` поэтому используют одну publication boundary; query-сервисы дополнительно сохраняют явный `published()` как защиту для вызовов вне HTTP binding.
 - Служебная страница `/stats` тоже доступна как публичная read-only сводка и не раскрывает raw source URLs, приватные media URLs или stack traces.
 - Livewire update и temporary upload endpoints используют стандартный `web` middleware stack без локального request budget. Страница `/stats` использует `wire:poll.15s.visible`, чтобы не держать polling в скрытой вкладке.
-- Приложение не создаёт локальный HTTP 429. Ответ 429 от Seasonvar/CDN остаётся внешней transient-ошибкой с bounded retry/backoff.
+- Публичные web/catalog/API маршруты не создают локальный HTTP 429. Узкие mobile credential endpoints имеют отдельные named budgets из `api.md`; ответ 429 от Seasonvar/CDN остаётся внешней transient-ошибкой с bounded retry/backoff.
 - Новые write/admin/import-control endpoints должны получать отдельный gate или policy до регистрации маршрута.
 - Authenticated действия карточки проходят auto-discovered `CatalogTitlePolicy::interact`; скрытие кнопок в Blade не используется как контроль доступа.
 - `/watching` отклоняет гостя до render. `EpisodeViewProgressPolicy` разрешает удалить только собственную запись и очистить только историю текущего user; чужой числовой ID не превращается в доступ к чужой истории.

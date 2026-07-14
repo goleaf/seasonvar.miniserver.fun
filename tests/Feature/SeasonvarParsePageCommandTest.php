@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Mockery;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use Tests\TestCase;
 
 class SeasonvarParsePageCommandTest extends TestCase
@@ -386,6 +387,7 @@ class SeasonvarParsePageCommandTest extends TestCase
         $this->assertNotContains('seasons_without_episodes', $seasonFourPage->missing_data_flags);
     }
 
+    #[RunInSeparateProcess]
     public function test_it_imports_more_episodes_than_a_single_sqlite_upsert_can_bind(): void
     {
         Http::preventStrayRequests();

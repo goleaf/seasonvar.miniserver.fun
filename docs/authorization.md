@@ -17,12 +17,16 @@
 - Admin source editor также не возвращает сохранённый playback URL в HTML/Livewire snapshot. Новый URL проходит HTTPS/provider allowlist, а существующий может только сменить разрешённые метаданные или reversible publication state.
 - Laravel Sanctum является единственной mobile token boundary. `User` хранит только hashed personal access token, каждый token имеет ограниченные `mobile:read`/`mobile:write` abilities и expiry не более 90 дней; plaintext допустим только в issuance/rotation response и не восстанавливается из базы.
 - Mobile token не получает admin/import abilities и не заменяет существующие gates/policies. Наличие Bearer token не даёт автоматического доступа к authenticated-audience или write операциям: route ability, verification и domain policy проверяются отдельно на соответствующей границе.
+- Mobile self-service не принимает user ID: `/api/v1/me` всегда получает owner из `auth:sanctum`, read требует `mobile:read`, а profile/password/delete и device revocation — также `mobile:write`. Device ID разрешается только через relation текущего пользователя, поэтому чужой ID возвращает 404 и не раскрывает существование token.
+- Email verification не ставится route middleware на `/api/v1/me`: unverified пользователь сохраняет доступ к чтению своего профиля, исправлению email, повторной отправке письма, выходу и удалению аккаунта. Проверку verified нужно добавлять явно к будущему доменному endpoint, если её требует продуктовый контракт.
+- Password reset отзывает все tokens; обычная смена пароля сохраняет только текущий token; rotation удаляет прежний token после успешного создания замены. Logout current/all и owner-scoped device delete имеют разный, зафиксированный тестами охват.
 
 ## Реализация
 
 - Route `/stats` доступен без авторизации, потому что отдаёт только очищенную read-only сводку.
 - Livewire update route для stats-polling использует стандартный `web` middleware stack; отдельная авторизация не добавляется, потому что компонент только читает уже очищенный snapshot.
 - Тесты `AuthorizationTest` покрывают гостевой доступ к основным страницам каталога и странице статистики.
+- `AuthenticationTest`, `EmailVerificationAndPasswordResetTest`, `DeviceTokenManagementTest` и `AccountManagementTest` покрывают Bearer abilities, unverified/verified доступ, token lifecycle, cross-user device ID и self-service side effects.
 - Implicit binding `CatalogTitle` скрывает authenticated-audience карточку от гостя; Livewire дополнительно держит `catalogTitleId` locked и разрешает episode/media IDs только внутри доступной и playable иерархии выбранного тайтла.
 - Текущая схема поддерживает audience `public/authenticated`; текущий `User` является единственным активным профилем, поэтому все private actions используют его напрямую и не принимают profile ID. Отдельных profile ownership/age/PIN, role/admin preview, territory, subscription/purchase/trial и concurrent-stream сущностей пока нет. `CatalogEntitlementDecision` задаёт однозначные user-facing состояния для будущих отказов, но сервис не имитирует отсутствующие правила. Их нужно подключать к нему одновременно с появлением реальной доменной модели; PIN в таком расширении должен храниться только как hash.
 

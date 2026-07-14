@@ -38,7 +38,7 @@
 - Длинный profile snapshot не предполагает неизменяемый каталог: `replaceTitleRecommendations()` получает SQLite write-lock, затем повторно ограничивает source/candidates актуальной public boundary и перенумеровывает surviving rows. Concurrent targeted merge/delete не приводит к FK-ошибке и не требует хранить весь rebuild в одной глобальной transaction.
 - `/stats` обновляет видимую область через Livewire `wire:poll.15s.visible`, но читает серверный snapshot из `CatalogStatsSnapshotCache`. Профиль production-scale SQLite показал 65,074 s прямого полного rebuild, поэтому measured policy хранит fresh snapshot 30 минут и bounded stale copy 24 часа; importer/admin invalidation и плановый warmer обновляют его после authoritative changes. Poll не запускает повторный тяжёлый rebuild каждые 15 секунд.
 - `/stats` не рендерит `poster_src` для poster URL, которые `CatalogStatsPosterUrlGuard` не сможет безопасно проксировать; блок последних постеров берет расширенный набор кандидатов и оставляет только реально proxyable изображения, чтобы убрать лишние браузерные 404-запросы к `stats.poster`.
-- Локальные HTTP/action limiter counters отсутствуют; Redis используется для domain cache, sessions, queues и critical locks.
+- У публичных catalog HTTP/action маршрутов limiter counters отсутствуют. Небольшие named counters mobile credential endpoints изолированы от catalog traffic; Redis по-прежнему используется для domain cache, sessions, queues и critical locks.
 
 ## Sitemap
 

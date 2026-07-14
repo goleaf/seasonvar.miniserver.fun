@@ -6,6 +6,7 @@ namespace Tests\Feature\Api\V1;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
@@ -17,6 +18,11 @@ final class AuthenticationTest extends TestCase
     public function test_user_registers_with_normalized_email_and_receives_one_plain_token(): void
     {
         Notification::fake();
+        DB::table('password_reset_tokens')->insert([
+            'email' => 'ivan@example.com',
+            'token' => Hash::make('orphaned-reset-token'),
+            'created_at' => now(),
+        ]);
 
         $response = $this->postJson('/api/v1/auth/register', [
             'name' => '  Иван   Иванов  ',
@@ -41,6 +47,7 @@ final class AuthenticationTest extends TestCase
             'tokenable_id' => $user->id,
             'name' => 'Pixel 9',
         ]);
+        $this->assertDatabaseMissing('password_reset_tokens', ['email' => 'ivan@example.com']);
     }
 
     public function test_login_uses_one_generic_credential_error_and_records_device(): void
@@ -110,5 +117,44 @@ final class AuthenticationTest extends TestCase
             ->assertTooManyRequests()
             ->assertJsonPath('code', 'rate_limited')
             ->assertHeader('Cache-Control', 'no-store, private');
+    }
+
+    public function test_openapi_describes_the_complete_mobile_authentication_contract(): void
+    {
+        $document = $this->getJson('/api/openapi.json')->assertOk();
+
+        foreach ([
+            'paths./api/v1/auth/register.post.operationId' => 'registerMobileUser',
+            'paths./api/v1/auth/login.post.operationId' => 'loginMobileUser',
+            'paths./api/v1/auth/email/verify/{id}/{hash}.get.operationId' => 'verifyMobileEmail',
+            'paths./api/v1/auth/email/verification-notification.post.operationId' => 'resendMobileEmailVerification',
+            'paths./api/v1/auth/forgot-password.post.operationId' => 'requestMobilePasswordReset',
+            'paths./api/v1/auth/reset-password.post.operationId' => 'resetMobilePassword',
+            'paths./api/v1/auth/devices.get.operationId' => 'listMobileDevices',
+            'paths./api/v1/auth/devices/{token}.delete.operationId' => 'revokeMobileDevice',
+            'paths./api/v1/auth/token/refresh.post.operationId' => 'refreshMobileToken',
+            'paths./api/v1/auth/logout.post.operationId' => 'logoutMobileDevice',
+            'paths./api/v1/auth/logout-all.post.operationId' => 'logoutAllMobileDevices',
+            'paths./api/v1/me.get.operationId' => 'getMobileAccount',
+            'paths./api/v1/me.patch.operationId' => 'updateMobileAccount',
+            'paths./api/v1/me.delete.operationId' => 'deleteMobileAccount',
+            'paths./api/v1/me/password.patch.operationId' => 'updateMobilePassword',
+        ] as $path => $operationId) {
+            $document->assertJsonPath($path, $operationId);
+        }
+
+        $document
+            ->assertJsonPath('paths./api/v1/me.get.security.0.bearerAuth', [])
+            ->assertJsonPath('paths./api/v1/auth/devices.get.security.0.bearerAuth', [])
+            ->assertJsonPath(
+                'paths./api/v1/auth/email/verify/{id}/{hash}.get.responses.200.content.application/json.schema.$ref',
+                '#/components/schemas/VerificationResponse',
+            )
+            ->assertJsonPath('components.schemas.User.type', 'object')
+            ->assertJsonPath('components.schemas.DeviceToken.properties.current.type', 'boolean')
+            ->assertJsonPath('components.schemas.AuthTokenResponse.properties.data.properties.token_type.const', 'Bearer')
+            ->assertJsonPath('components.responses.Unauthorized.content.application/json.examples.default.value.code', 'unauthenticated')
+            ->assertJsonPath('components.responses.Forbidden.content.application/json.examples.default.value.code', 'forbidden')
+            ->assertJsonPath('components.responses.TooManyRequests.content.application/json.examples.default.value.code', 'rate_limited');
     }
 }

@@ -277,18 +277,26 @@ final class CatalogRelatedContentTest extends TestCase
         }
     }
 
-    public function test_openapi_contains_every_public_v1_get_route(): void
+    public function test_openapi_contains_every_v1_route_and_http_method(): void
     {
-        $paths = array_keys((array) $this->getJson('/api/openapi.json')->assertOk()->json('paths'));
-        $publicV1Paths = collect(Route::getRoutes()->getRoutes())
+        $paths = (array) $this->getJson('/api/openapi.json')->assertOk()->json('paths');
+        $v1Routes = collect(Route::getRoutes()->getRoutes())
             ->filter(fn ($route): bool => str_starts_with($route->uri(), 'api/v1/'))
-            ->filter(fn ($route): bool => in_array('GET', $route->methods(), true))
-            ->map(fn ($route): string => '/'.$route->uri())
-            ->unique()
+            ->reject(fn ($route): bool => $route->getName() === 'api.fallback')
             ->values();
 
-        foreach ($publicV1Paths as $path) {
-            $this->assertContains($path, $paths, "OpenAPI не описывает {$path}.");
+        foreach ($v1Routes as $route) {
+            $path = '/'.$route->uri();
+
+            $this->assertArrayHasKey($path, $paths, "OpenAPI не описывает {$path}.");
+
+            foreach (array_diff($route->methods(), ['HEAD']) as $method) {
+                $this->assertArrayHasKey(
+                    strtolower($method),
+                    $paths[$path],
+                    "OpenAPI не описывает {$method} {$path}.",
+                );
+            }
         }
     }
 

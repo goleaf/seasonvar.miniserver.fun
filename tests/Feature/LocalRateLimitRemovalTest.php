@@ -86,6 +86,33 @@ final class LocalRateLimitRemovalTest extends TestCase
         }
     }
 
+    public function test_mobile_credential_routes_use_only_their_named_limiters(): void
+    {
+        $expected = [
+            'api.v1.auth.register' => 'throttle:mobile-register',
+            'api.v1.auth.login' => 'throttle:mobile-login',
+            'api.v1.auth.verification-notification' => 'throttle:mobile-verification',
+            'api.v1.auth.forgot-password' => 'throttle:mobile-forgot-password',
+            'api.v1.auth.reset-password' => 'throttle:mobile-reset-password',
+            'api.v1.auth.token.refresh' => 'throttle:mobile-token-refresh',
+        ];
+
+        foreach ($expected as $routeName => $limiter) {
+            $route = Route::getRoutes()->getByName($routeName);
+
+            $this->assertNotNull($route, "Route [{$routeName}] is not registered.");
+            $this->assertContains($limiter, $route->gatherMiddleware());
+            $this->assertCount(
+                1,
+                array_filter(
+                    $route->gatherMiddleware(),
+                    static fn (string $middleware): bool => str_starts_with($middleware, 'throttle:'),
+                ),
+                "Route [{$routeName}] must have exactly one named limiter.",
+            );
+        }
+    }
+
     public function test_application_code_has_no_action_rate_limiter(): void
     {
         $files = collect([
@@ -149,10 +176,19 @@ final class LocalRateLimitRemovalTest extends TestCase
         ] as $path) {
             $contents = (string) file_get_contents($path);
 
-            $this->assertStringNotContainsString('RATE_LIMIT_', $contents, $path);
-            $this->assertStringNotContainsString('throttle:', $contents, $path);
-            $this->assertStringNotContainsString('redis-limiter', $contents, $path);
-            $this->assertStringNotContainsString('redis_limiter', $contents, $path);
+            foreach ([
+                'RATE_LIMIT_',
+                'throttle:catalog-stats',
+                'throttle:catalog-query',
+                'throttle:livewire-action',
+                'throttle:catalog-api',
+                'throttle:infrastructure-health',
+                'throttle:playback-source',
+                'redis-limiter',
+                'redis_limiter',
+            ] as $removedMarker) {
+                $this->assertStringNotContainsString($removedMarker, $contents, $path);
+            }
         }
     }
 }

@@ -15,14 +15,18 @@ final class MobileAccountService
     /** @param array{name?: string, email?: string} $data */
     public function updateProfile(User $user, array $data): User
     {
+        $oldEmail = Str::lower(Str::squish((string) $user->email));
         $emailChanged = array_key_exists('email', $data)
-            && Str::lower(Str::squish((string) $user->email)) !== $data['email'];
+            && $oldEmail !== $data['email'];
 
-        DB::transaction(function () use ($user, $data, $emailChanged): void {
+        DB::transaction(function () use ($user, $data, $oldEmail, $emailChanged): void {
             $user->fill($data);
 
             if ($emailChanged) {
                 $user->email_verified_at = null;
+                DB::table('password_reset_tokens')
+                    ->whereRaw('lower(email) in (?, ?)', [$oldEmail, $data['email']])
+                    ->delete();
             }
 
             $user->save();
@@ -48,6 +52,9 @@ final class MobileAccountService
                 'password' => Hash::make($new),
                 'remember_token' => Str::random(60),
             ])->save();
+            DB::table('password_reset_tokens')
+                ->whereRaw('lower(email) = ?', [Str::lower((string) $user->email)])
+                ->delete();
 
             $tokens = $user->tokens();
 
@@ -69,6 +76,8 @@ final class MobileAccountService
 
         DB::transaction(function () use ($user): void {
             $user->tokens()->delete();
+            DB::table('password_reset_tokens')->where('email', $user->email)->delete();
+            DB::table('sessions')->where('user_id', $user->getKey())->delete();
             $user->deleteOrFail();
         }, attempts: 3);
     }

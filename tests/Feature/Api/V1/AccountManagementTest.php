@@ -12,8 +12,10 @@ use App\Models\Season;
 use App\Models\User;
 use App\Notifications\VerifyMobileEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 final class AccountManagementTest extends TestCase
@@ -49,6 +51,18 @@ final class AccountManagementTest extends TestCase
             'email_verified_at' => now()->subDay(),
         ]);
         $token = $user->createToken('Pixel 9', ['mobile:read', 'mobile:write'], now()->addDay());
+        DB::table('password_reset_tokens')->insert([
+            [
+                'email' => 'ivan@example.com',
+                'token' => Hash::make('old-email-reset-token'),
+                'created_at' => now(),
+            ],
+            [
+                'email' => 'new@example.com',
+                'token' => Hash::make('new-email-orphan-token'),
+                'created_at' => now(),
+            ],
+        ]);
 
         $this->withToken($token->plainTextToken)
             ->patchJson('/api/v1/me', ['name' => '  Иван   Иванов  '])
@@ -69,6 +83,8 @@ final class AccountManagementTest extends TestCase
         $user->refresh();
         $this->assertSame('new@example.com', $user->email);
         $this->assertNull($user->email_verified_at);
+        $this->assertDatabaseMissing('password_reset_tokens', ['email' => 'ivan@example.com']);
+        $this->assertDatabaseMissing('password_reset_tokens', ['email' => 'new@example.com']);
         Notification::assertSentToTimes($user, VerifyMobileEmail::class, 1);
 
         $this->app['auth']->forgetGuards();
@@ -104,6 +120,11 @@ final class AccountManagementTest extends TestCase
         $current = $user->createToken('Current phone', ['mobile:read', 'mobile:write'], now()->addDay());
         $otherDevice = $user->createToken('Tablet', ['mobile:read', 'mobile:write'], now()->addDay());
         $newPassword = 'New-Very-Strong-Password-43!';
+        DB::table('password_reset_tokens')->insert([
+            'email' => $user->email,
+            'token' => Hash::make('pending-reset-token'),
+            'created_at' => now(),
+        ]);
 
         $this->withToken($current->plainTextToken)
             ->patchJson('/api/v1/me/password', [
@@ -128,6 +149,7 @@ final class AccountManagementTest extends TestCase
         $this->assertTrue(Hash::check($newPassword, $user->fresh()->password));
         $this->assertDatabaseHas('personal_access_tokens', ['id' => $current->accessToken->id]);
         $this->assertDatabaseMissing('personal_access_tokens', ['id' => $otherDevice->accessToken->id]);
+        $this->assertDatabaseMissing('password_reset_tokens', ['email' => $user->email]);
 
         $this->app['auth']->forgetGuards();
         $this->withToken($current->plainTextToken)
@@ -160,6 +182,19 @@ final class AccountManagementTest extends TestCase
             'duration_seconds' => 1200,
             'last_watched_at' => now(),
         ]);
+        DB::table('password_reset_tokens')->insert([
+            'email' => $user->email,
+            'token' => Hash::make('old-reset-token'),
+            'created_at' => now(),
+        ]);
+        DB::table('sessions')->insert([
+            'id' => 'mobile-account-delete-session',
+            'user_id' => $user->id,
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'Account management test',
+            'payload' => 'test-session-payload',
+            'last_activity' => now()->timestamp,
+        ]);
 
         $this->withToken($current->plainTextToken)
             ->deleteJson('/api/v1/me', ['password' => 'wrong-password'])
@@ -176,6 +211,81 @@ final class AccountManagementTest extends TestCase
         $this->assertDatabaseMissing('personal_access_tokens', ['tokenable_id' => $user->id]);
         $this->assertDatabaseMissing('catalog_title_user_states', ['user_id' => $user->id]);
         $this->assertDatabaseMissing('episode_view_progress', ['user_id' => $user->id]);
+        $this->assertDatabaseMissing('password_reset_tokens', ['email' => $user->email]);
+        $this->assertDatabaseMissing('sessions', ['user_id' => $user->id]);
         $this->assertDatabaseHas('catalog_titles', ['id' => $title->id]);
+    }
+
+    public function test_auth_account_privacy_matrix_covers_guest_invalid_unverified_verified_and_cross_user_access(): void
+    {
+        $guest = $this->getJson('/api/v1/me')->assertUnauthorized();
+        $this->assertPrivateApiError($guest);
+
+        $invalidToken = '999999|invalid-mobile-secret-value';
+        $this->app['auth']->forgetGuards();
+        $invalid = $this->withToken($invalidToken)
+            ->getJson('/api/v1/auth/devices')
+            ->assertUnauthorized();
+        $this->assertPrivateApiError($invalid, [$invalidToken]);
+
+        $unverified = User::factory()->unverified()->create();
+        $unverifiedToken = $unverified->createToken(
+            'Unverified phone',
+            ['mobile:read', 'mobile:write'],
+            now()->addDay(),
+        );
+        $this->app['auth']->forgetGuards();
+        $this->withToken($unverifiedToken->plainTextToken)
+            ->getJson('/api/v1/me')
+            ->assertOk()
+            ->assertJsonPath('data.email_verified', false)
+            ->assertHeader('Cache-Control', 'no-store, private');
+
+        $verified = User::factory()->create();
+        $readOnly = $verified->createToken('Read only', ['mobile:read'], now()->addDay());
+        $this->app['auth']->forgetGuards();
+        $this->withToken($readOnly->plainTextToken)
+            ->getJson('/api/v1/me')
+            ->assertOk()
+            ->assertJsonPath('data.email_verified', true);
+        $this->app['auth']->forgetGuards();
+        $forbidden = $this->withToken($readOnly->plainTextToken)
+            ->patchJson('/api/v1/me', ['name' => 'Новое имя'])
+            ->assertForbidden();
+        $this->assertPrivateApiError($forbidden, ['Новое имя']);
+
+        $ownerToken = $verified->createToken('Owner phone', ['mobile:read', 'mobile:write'], now()->addDay());
+        $foreignToken = $unverified->createToken('Foreign phone', ['mobile:read', 'mobile:write'], now()->addDay());
+        $this->app['auth']->forgetGuards();
+        $crossUser = $this->withToken($ownerToken->plainTextToken)
+            ->deleteJson('/api/v1/auth/devices/'.$foreignToken->accessToken->id)
+            ->assertNotFound();
+        $this->assertPrivateApiError($crossUser, [$foreignToken->accessToken->token]);
+        $this->assertDatabaseHas('personal_access_tokens', ['id' => $foreignToken->accessToken->id]);
+    }
+
+    /** @param list<string> $secrets */
+    private function assertPrivateApiError(TestResponse $response, array $secrets = []): void
+    {
+        $response->assertJsonStructure(['code', 'message', 'request_id'])
+            ->assertHeader('X-Request-ID');
+
+        $cacheControl = (string) $response->headers->get('Cache-Control');
+        $requestId = (string) $response->headers->get('X-Request-ID');
+        $content = $response->getContent();
+
+        $this->assertStringContainsString('private', $cacheControl);
+        $this->assertStringContainsString('no-store', $cacheControl);
+        $this->assertSame($requestId, $response->json('request_id'));
+
+        foreach ([
+            ...$secrets,
+            'Illuminate\\',
+            'Stack trace',
+            'select * from',
+            'personal_access_tokens.token',
+        ] as $privateMarker) {
+            $this->assertStringNotContainsString($privateMarker, $content);
+        }
     }
 }
