@@ -154,6 +154,43 @@ final class CatalogRelatedContentTest extends TestCase
             ->assertJsonPath('components.schemas.CatalogReview.required.0', 'id');
     }
 
+    public function test_openapi_describes_complete_offline_sync_contract(): void
+    {
+        $document = $this->getJson('/api/openapi.json')
+            ->assertOk()
+            ->assertJsonPath('paths./api/v1/sync/manifest.get.operationId', 'getSyncManifest')
+            ->assertJsonPath('paths./api/v1/sync/changes.get.operationId', 'getCatalogSyncChanges')
+            ->assertJsonPath('paths./api/v1/me/sync.get.operationId', 'getUserSyncChanges')
+            ->assertJsonPath('paths./api/v1/me/sync.post.operationId', 'pushUserSyncMutations')
+            ->assertJsonPath('components.schemas.SyncPushRequest.properties.operations.maxItems', 50)
+            ->assertJsonPath('components.schemas.SyncMutationResult.properties.status.enum.0', 'applied')
+            ->assertJsonPath('components.schemas.UserTitleState.required.2', 'versions')
+            ->assertJsonPath('components.schemas.UserTitleState.properties.versions.required.0', 'watchlist')
+            ->assertJsonPath('components.responses.SyncCursorExpired.content.application/json.examples.default.value.code', 'sync_cursor_expired')
+            ->assertJsonPath('components.responses.SyncUnavailable.content.application/json.examples.default.value.code', 'sync_unavailable')
+            ->json();
+
+        $pushResponses = $document['paths']['/api/v1/me/sync']['post']['responses'];
+
+        foreach (['200', '401', '403', '422', '503'] as $status) {
+            $this->assertArrayHasKey($status, $pushResponses);
+        }
+
+        $changeResponses = $document['paths']['/api/v1/sync/changes']['get']['responses'];
+
+        foreach (['200', '410', '422', '503'] as $status) {
+            $this->assertArrayHasKey($status, $changeResponses);
+        }
+
+        $progressProperties = $document['components']['schemas']['SyncProgressMutation']['properties'];
+        $resultProperties = $document['components']['schemas']['SyncMutationResult']['properties'];
+
+        foreach (['playback_url', 'source_url', 'licensed_media_id', 'token'] as $privateField) {
+            $this->assertArrayNotHasKey($privateField, $progressProperties);
+            $this->assertArrayNotHasKey($privateField, $resultProperties);
+        }
+    }
+
     public function test_every_public_v1_endpoint_excludes_catalog_source_and_algorithm_internals(): void
     {
         $markers = [

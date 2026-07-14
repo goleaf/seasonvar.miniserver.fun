@@ -43,7 +43,7 @@
 
 - Каждый API request проходит `AssignApiRequestId`. Разрешённый входящий `X-Request-ID` имеет 8-128 символов из безопасного allowlist; иначе сервер создаёт ULID.
 - Ошибка возвращает `code`, русское `message`, тот же `request_id` и необязательный объект `errors` для validation. Заголовок `X-Request-ID` совпадает с полем ответа.
-- Стабильные foundation codes: `validation_failed`, `unauthenticated`, `forbidden`, `not_found`, `rate_limited`, `server_error`. Ответ `server_error` не содержит exception message или stack trace.
+- Стабильные foundation codes: `validation_failed`, `unauthenticated`, `forbidden`, `not_found`, `rate_limited`, `server_error`. Offline-sync дополнительно использует `sync_cursor_expired`/410 и `sync_unavailable`/503. Ответ `server_error` не содержит exception message или stack trace.
 - API errors всегда получают `private, no-store`; неизвестный `/api/*` обрабатывает named API fallback, а неизвестный web URL продолжает редирект на главную.
 - Для `/api/*` guest redirect отключён независимо от заголовка `Accept`: защищённый endpoint всегда отвечает JSON `unauthenticated`/401 и никогда не пытается построить web route `login`.
 
@@ -79,6 +79,18 @@
 - `GET /api/v1/me/continue-watching` принимает `limit` 1–24 и возвращает одно действие `continue` или `next` на тайтл с позицией и процентом. `GET /api/v1/me/history` принимает `page` и `per_page` 1–48; старый скрытый или удалённый релиз остаётся в истории с `is_accessible=false`, но не становится доступным для воспроизведения.
 - `DELETE /api/v1/me/history/{episodeViewProgress}` удаляет только owner-scoped запись и маскирует чужой numeric ID как `not_found`; `DELETE /api/v1/me/history` очищает только фактическую playback activity текущего пользователя.
 - Все private reads требуют Bearer token с `mobile:read`. Mutations дополнительно требуют `mobile:write` и подтверждённый email; unverified пользователь продолжает читать своё состояние, но получает `email_not_verified`/403 при изменении. Все ответы private/no-store и не содержат ETag.
+
+## Offline-синхронизация v1
+
+- `GET /api/v1/sync/manifest` — публичная точка bootstrap. Она возвращает `sync_version=1`, непрозрачный catalog cursor, окна/лимиты и canonical links. Клиент сначала сохраняет cursor, затем постранично загружает текущие Resources каталога и после этого догоняет `GET /api/v1/sync/changes` от сохранённого cursor. Такой порядок закрывает изменения, случившиеся во время полной загрузки.
+- `GET /api/v1/sync/changes` принимает optional `cursor` и `limit` 1–200. Без cursor возвращается пустой `data` и текущий checkpoint; с cursor — упорядоченные `title` invalidations `upsert|delete`. Journal не копирует graph тайтла: актуальные данные клиент получает через `links.self`, а tombstone удаления имеет `self=null`.
+- `GET /api/v1/me/sync` требует `mobile:read` и использует тот же pull contract только для текущего владельца. Initial state по-прежнему загружается из watchlist, ratings, Continue Watching и history; последующие entries имеют типы `title_state`, `progress` и `history` и не содержат `user_id`, email или чужих progress IDs.
+- Cursor является подписанным opaque transport value, привязанным к `catalog` или к конкретному user. Его нельзя разбирать или редактировать на клиенте. Подмена, неверный scope/owner или форма дают `validation_failed`/422. Если cursor вышел за 30-дневное окно журнала, сервер отвечает `sync_cursor_expired`/410, а клиент повторяет полный bootstrap через manifest.
+- `POST /api/v1/me/sync` требует `mobile:read`, `mobile:write` и verified email. Один запрос содержит 1–50 exact-shape операций: `watchlist.set`, `rating.set`, `progress.set`, `history.delete`, `history.clear`. Неизвестные поля/типы, повтор UUID внутри batch и значения вне диапазонов отклоняются до доменной записи.
+- Каждая операция имеет UUID `mutation_id` и выполняется независимо через существующие state/progress/history services. Ответ сохраняет исходный порядок и возвращает `applied`, `duplicate`, `conflict`, `rejected` или `not_found`; ожидаемый отказ одной операции не откатывает соседние. `watchlist.set` и `rating.set` передают `expected_version`; несовпадение с `versions.watchlist|rating` возвращает текущий state и `conflict`, не затирая более новое устройство.
+- Повтор того же UUID и canonical payload возвращает безопасную сохранённую квитанцию как `duplicate` без повторной записи. Тот же UUID с другим payload возвращает `conflict`/`mutation_id_reused`. Квитанции хранятся 90 дней, но не сохраняют request body, playback session, Bearer token, raw media/source URL или importer state.
+- Journal changes хранится 30 дней, mutation receipts — 90 дней. Ежедневная `api:sync-prune` удаляет просроченные строки пачками не более 500 и защищена `withoutOverlapping`/`onOneServer`. Если additive schema ещё не применена, sync endpoints отвечают очищенным `sync_unavailable`/503, publishers и prune безопасно пропускают работу, а остальной `/api/v1` продолжает работать.
+- Offline-sync означает offline-каталог и очередь пользовательского состояния. Скачивание видео, постоянные media URL и offline playback не входят в API: воспроизведение всегда требует текущую короткоживущую session/grant и повторную server-side проверку доступа.
 
 ## Playback и progress v1
 

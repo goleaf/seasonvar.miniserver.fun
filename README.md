@@ -14,7 +14,7 @@ Laravel-приложение для локального каталога сер
 
 ## Mobile JSON API
 
-`GET /api` публикует discovery для стабильного `/api/v1`, а project-owned OpenAPI доступен по ссылке из манифеста. Public v1 включает home, полный фильтрованный каталог, schema-driven filters, 11 directories, карточку тайтла, сезоны/серии с безопасными media profiles, подсказки, рекомендации и read-only отзывы. Mobile auth добавляет регистрацию, login, queued email verification/password reset, 90-дневные device tokens с rotation/logout и self-service `/me`. Private v1 также отдаёт owner-scoped watchlist, оценки, состояние тайтла, Continue Watching и историю: чтение требует `mobile:read`, изменения — `mobile:write` и verified email, все ответы private/no-store. Playback v1 создаёт безопасные same-origin sessions, выдаёт provider source только через короткоживущий signed encrypted grant и записывает verified monotonic progress без раскрытия raw media URL. Полный route/query/response/security contract находится в [`docs/api.md`](docs/api.md).
+`GET /api` публикует discovery для стабильного `/api/v1`, а project-owned OpenAPI доступен по ссылке из манифеста. Public v1 включает home, полный фильтрованный каталог, schema-driven filters, 11 directories, карточку тайтла, сезоны/серии с безопасными media profiles, подсказки, рекомендации и read-only отзывы. Mobile auth добавляет регистрацию, login, queued email verification/password reset, 90-дневные device tokens с rotation/logout и self-service `/me`. Private v1 также отдаёт owner-scoped watchlist, оценки, состояние тайтла, Continue Watching и историю: чтение требует `mobile:read`, изменения — `mobile:write` и verified email, все ответы private/no-store. Offline-sync v1 добавляет manifest/checkpoint, public и owner-scoped incremental pull, а также идемпотентный batch push с optimistic версиями и 30/90-дневным retention. Playback v1 создаёт безопасные same-origin sessions, выдаёт provider source только через короткоживущий signed encrypted grant и записывает verified monotonic progress без раскрытия raw media URL; скачивание/offline playback видео не поддерживается. Полный route/query/response/security contract находится в [`docs/api.md`](docs/api.md).
 
 ## Основные команды
 
@@ -35,6 +35,7 @@ php artisan integrations:doctor
 php artisan app:health
 php artisan cache:warm-catalog
 php artisan cache:metrics
+php artisan api:sync-prune
 php artisan project:docs-refresh
 php artisan test --compact
 vendor/bin/pint --dirty --format agent

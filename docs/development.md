@@ -1,6 +1,6 @@
 # Разработка
 
-Обновлено: 13.07.2026
+Обновлено: 14.07.2026
 
 ## Локальная установка
 
@@ -69,6 +69,7 @@ bash -n .githooks/pre-commit .githooks/pre-push .githooks/post-commit .githooks/
 - `php artisan app:health` — readiness по DB, Redis workloads, Memcached, workers и прогреву.
 - `php artisan cache:warm-catalog` — синхронный bounded warm; `--queue` ставит unique job в `cache-warm`, а `--refresh` планово пересобирает текущие warmable keys под lock, не удаляя читаемый snapshot до успеха.
 - `php artisan cache:metrics` — low-cardinality hit/miss/rebuild/failure snapshot без raw keys.
+- `php artisan api:sync-prune` — bounded очистка transport-журнала offline-sync: changes старше 30 дней и idempotency receipts старше 90 дней; до additive migration завершается безопасным no-op.
 - `php artisan google:search-console:summary` — read-only сводка Search Console, если Google credentials настроены вне Git.
 - `php artisan google:analytics:summary` — read-only сводка GA4, если Google credentials настроены вне Git.
 - `php artisan project:docs-refresh` — обновляет управляемые блоки документации.

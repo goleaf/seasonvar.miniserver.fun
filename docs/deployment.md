@@ -1,6 +1,14 @@
 # Деплой
 
-Обновлено: 13.07.2026
+Обновлено: 14.07.2026
+
+## Mobile offline-sync rollout от 14.07.2026
+
+Миграция `2026_07_14_164423_create_api_sync_tables_and_add_state_versions` additive и обратима: она создаёт append-only `api_sync_changes`, idempotency receipts `api_sync_mutations` и добавляет независимые `watchlist_version`/`rating_version` с default `0`. Backfill не требуется. Код безопасен между deploy и migrate: sync publishers/prune пропускают работу без таблиц, а три sync routes возвращают очищенный `sync_unavailable`/503; остальные маршруты `/api/v1` продолжают работать.
+
+SQLite migration нельзя запускать одновременно с импортом, pending/delayed/reserved jobs или live page claims. Порядок: `seasonvar:import --status` и `app:deployment-check` → дождаться нулевых активных writers/claims и остановить их штатно → backup SQLite → `migrate:status` → `migrate --force` → `config:cache` и `route:cache` → reload PHP-FPM/`queue:restart` → вернуть workers → повторить preflight/health и smoke manifest, public pull, authenticated owner pull/push. Очереди и claims не очищаются ради миграции.
+
+После миграции внешний scheduler должен ежедневно запускать Laravel schedule, чтобы `api:sync-prune` выполнялся в 03:23 с `withoutOverlapping`/`onOneServer`. Changes старше 30 дней и receipts старше 90 дней удаляются пачками до 500; canonical user state/history/catalog эта команда не удаляет. Rollback сначала требует убрать sync routes/publishers из обслуживаемого кода, затем `migrate:rollback` удаляет только transport tables и version columns.
 
 ## Cache/queue rollout от 13.07.2026
 
@@ -258,6 +266,7 @@ php artisan app:deployment-check --json
 ### Владение retention и failed jobs
 
 - Владелец технического retention импортёра — production operator, выполняющий runbook Seasonvar. `SeasonvarImportStorageMaintenance` применяет только существующие окна: import events 7 дней, source snapshots 14 дней и terminal prepared groups 7 дней через `SEASONVAR_IMPORT_*_RETENTION_DAYS`; изменение окон требует capacity/privacy review и обновления `docs/importer.md`.
+- Transport retention mobile offline-sync принадлежит API operator: `api:sync-prune` удаляет только sync invalidations старше 30 дней и idempotency receipts старше 90 дней. Эти окна зафиксированы в `config/mobile-api.php`; изменение требует обновления manifest/OpenAPI, capacity/retry review и recovery contract в `docs/api.md`.
 - Владелец disposition `failed_jobs` — тот же production operator. `app:deployment-check` даёт только безопасную агрегатную сводку; retry/forget выполняются вручную после сверки import run и live claims. Автоматического удаления failed jobs нет.
 - User history/progress/watchlist/rating, admin audit и потенциально юридически значимые строки не имеют автоматического retention/delete job. Их нельзя включать в общий technical prune без утверждённой продуктовой/legal policy, отдельного owner и тестируемой процедуры удаления/экспорта.
 

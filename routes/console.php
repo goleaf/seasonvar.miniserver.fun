@@ -21,3 +21,9 @@ Schedule::command('sanctum:prune-expired --hours=24')
     ->name('sanctum-prune-expired')
     ->withoutOverlapping(10)
     ->onOneServer();
+
+Schedule::command('api:sync-prune')
+    ->dailyAt('03:23')
+    ->name('api-sync-prune')
+    ->withoutOverlapping(10)
+    ->onOneServer();

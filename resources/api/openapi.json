@@ -867,6 +867,161 @@
                 }
             }
         },
+        "/api/v1/sync/manifest": {
+            "get": {
+                "operationId": "getSyncManifest",
+                "summary": "Начать полную offline-синхронизацию каталога",
+                "description": "Сначала сохраните checkpoint, затем загрузите текущий каталог и запросите изменения от сохранённого курсора.",
+                "security": [
+                    {}
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Checkpoint и ограничения offline-sync v1",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SyncManifestResponse"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/SyncUnavailable"
+                    }
+                }
+            }
+        },
+        "/api/v1/sync/changes": {
+            "get": {
+                "operationId": "getCatalogSyncChanges",
+                "summary": "Получить изменения публичного каталога",
+                "description": "Без cursor возвращает пустой набор и текущий checkpoint. Journal содержит только invalidation; актуальный тайтл загружается по links.self.",
+                "security": [
+                    {}
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/SyncCursor"
+                    },
+                    {
+                        "$ref": "#/components/parameters/SyncLimit"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Упорядоченные catalog invalidations и следующий cursor",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SyncChangesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "410": {
+                        "$ref": "#/components/responses/SyncCursorExpired"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/SyncUnavailable"
+                    }
+                }
+            }
+        },
+        "/api/v1/me/sync": {
+            "get": {
+                "operationId": "getUserSyncChanges",
+                "summary": "Получить изменения личного состояния",
+                "description": "Возвращает только invalidations текущего владельца. Требуется ability mobile:read.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/SyncCursor"
+                    },
+                    {
+                        "$ref": "#/components/parameters/SyncLimit"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Owner-scoped invalidations и следующий cursor",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SyncChangesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "410": {
+                        "$ref": "#/components/responses/SyncCursorExpired"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/SyncUnavailable"
+                    }
+                }
+            },
+            "post": {
+                "operationId": "pushUserSyncMutations",
+                "summary": "Применить очередь offline-операций",
+                "description": "Требуются abilities mobile:read/mobile:write и подтверждённый email. Каждый mutation_id идемпотентен; ответ и серверная квитанция никогда не содержат playback session, media/source URL или token.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SyncPushRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Один result на каждую операцию в исходном порядке",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SyncPushResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "503": {
+                        "$ref": "#/components/responses/SyncUnavailable"
+                    }
+                }
+            }
+        },
         "/api/v1/auth/register": {
             "post": {
                 "operationId": "registerMobileUser",
@@ -2020,6 +2175,25 @@
                     "type": "string",
                     "minLength": 1
                 }
+            },
+            "SyncCursor": {
+                "name": "cursor",
+                "in": "query",
+                "description": "Непрозрачный подписанный cursor из предыдущего sync-ответа. Не разбирайте его на клиенте.",
+                "schema": {
+                    "type": "string",
+                    "maxLength": 2048
+                }
+            },
+            "SyncLimit": {
+                "name": "limit",
+                "in": "query",
+                "schema": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 200,
+                    "default": 100
+                }
             }
         },
         "schemas": {
@@ -2048,6 +2222,453 @@
                                 "type": "string"
                             }
                         }
+                    }
+                }
+            },
+            "SyncManifestResponse": {
+                "type": "object",
+                "required": [
+                    "data"
+                ],
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/SyncManifest"
+                    }
+                }
+            },
+            "SyncManifest": {
+                "type": "object",
+                "required": [
+                    "sync_version",
+                    "cursor",
+                    "retention_days",
+                    "max_pull_items",
+                    "max_push_items",
+                    "links",
+                    "bootstrap"
+                ],
+                "properties": {
+                    "sync_version": {
+                        "type": "integer",
+                        "const": 1
+                    },
+                    "cursor": {
+                        "type": "string"
+                    },
+                    "retention_days": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "max_pull_items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 200
+                    },
+                    "max_push_items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 50
+                    },
+                    "links": {
+                        "$ref": "#/components/schemas/SyncManifestLinks"
+                    },
+                    "bootstrap": {
+                        "type": "string"
+                    }
+                }
+            },
+            "SyncManifestLinks": {
+                "type": "object",
+                "required": [
+                    "filters",
+                    "directories",
+                    "titles",
+                    "changes",
+                    "openapi"
+                ],
+                "properties": {
+                    "filters": {
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "directories": {
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "titles": {
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "changes": {
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "openapi": {
+                        "type": "string",
+                        "format": "uri"
+                    }
+                }
+            },
+            "SyncChangesResponse": {
+                "type": "object",
+                "required": [
+                    "data",
+                    "meta"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "maxItems": 200,
+                        "items": {
+                            "$ref": "#/components/schemas/SyncChange"
+                        }
+                    },
+                    "meta": {
+                        "$ref": "#/components/schemas/SyncMeta"
+                    }
+                }
+            },
+            "SyncChange": {
+                "type": "object",
+                "required": [
+                    "type",
+                    "key",
+                    "operation",
+                    "changed_at",
+                    "links"
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "title",
+                            "title_state",
+                            "progress",
+                            "history"
+                        ]
+                    },
+                    "key": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "operation": {
+                        "type": "string",
+                        "enum": [
+                            "upsert",
+                            "delete",
+                            "clear"
+                        ]
+                    },
+                    "changed_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "title_slug": {
+                        "type": "string"
+                    },
+                    "episode_id": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "links": {
+                        "type": "object",
+                        "required": [
+                            "self"
+                        ],
+                        "properties": {
+                            "self": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "format": "uri"
+                            },
+                            "history": {
+                                "type": "string",
+                                "format": "uri"
+                            }
+                        }
+                    }
+                }
+            },
+            "SyncMeta": {
+                "type": "object",
+                "required": [
+                    "cursor",
+                    "has_more",
+                    "limit"
+                ],
+                "properties": {
+                    "cursor": {
+                        "type": "string"
+                    },
+                    "has_more": {
+                        "type": "boolean"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 200
+                    }
+                }
+            },
+            "SyncPushRequest": {
+                "type": "object",
+                "required": [
+                    "operations"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                    "operations": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 50,
+                        "items": {
+                            "oneOf": [
+                                {
+                                    "$ref": "#/components/schemas/SyncWatchlistMutation"
+                                },
+                                {
+                                    "$ref": "#/components/schemas/SyncRatingMutation"
+                                },
+                                {
+                                    "$ref": "#/components/schemas/SyncProgressMutation"
+                                },
+                                {
+                                    "$ref": "#/components/schemas/SyncHistoryDeleteMutation"
+                                },
+                                {
+                                    "$ref": "#/components/schemas/SyncHistoryClearMutation"
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            "SyncWatchlistMutation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "mutation_id",
+                    "type",
+                    "title_slug",
+                    "value",
+                    "expected_version"
+                ],
+                "properties": {
+                    "mutation_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "type": {
+                        "type": "string",
+                        "const": "watchlist.set"
+                    },
+                    "title_slug": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                    },
+                    "value": {
+                        "type": "boolean"
+                    },
+                    "expected_version": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                }
+            },
+            "SyncRatingMutation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "mutation_id",
+                    "type",
+                    "title_slug",
+                    "value",
+                    "expected_version"
+                ],
+                "properties": {
+                    "mutation_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "type": {
+                        "type": "string",
+                        "const": "rating.set"
+                    },
+                    "title_slug": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                    },
+                    "value": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1,
+                        "maximum": 10
+                    },
+                    "expected_version": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                }
+            },
+            "SyncProgressMutation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "mutation_id",
+                    "type",
+                    "title_slug",
+                    "episode_id",
+                    "playback_session",
+                    "event_sequence",
+                    "position_seconds",
+                    "duration_seconds",
+                    "ended"
+                ],
+                "properties": {
+                    "mutation_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "type": {
+                        "type": "string",
+                        "const": "progress.set"
+                    },
+                    "title_slug": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                    },
+                    "episode_id": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "playback_session": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 2048,
+                        "description": "Непрозрачная краткоживущая сессия воспроизведения; сервер не сохраняет её в sync receipt."
+                    },
+                    "event_sequence": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "position_seconds": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "duration_seconds": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "ended": {
+                        "type": "boolean"
+                    }
+                }
+            },
+            "SyncHistoryDeleteMutation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "mutation_id",
+                    "type",
+                    "progress_id"
+                ],
+                "properties": {
+                    "mutation_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "type": {
+                        "type": "string",
+                        "const": "history.delete"
+                    },
+                    "progress_id": {
+                        "type": "integer",
+                        "minimum": 1
+                    }
+                }
+            },
+            "SyncHistoryClearMutation": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "mutation_id",
+                    "type"
+                ],
+                "properties": {
+                    "mutation_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "type": {
+                        "type": "string",
+                        "const": "history.clear"
+                    }
+                }
+            },
+            "SyncPushResponse": {
+                "type": "object",
+                "required": [
+                    "data"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "required": [
+                            "results"
+                        ],
+                        "properties": {
+                            "results": {
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 50,
+                                "items": {
+                                    "$ref": "#/components/schemas/SyncMutationResult"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "SyncMutationResult": {
+                "type": "object",
+                "required": [
+                    "mutation_id",
+                    "status",
+                    "resource_version",
+                    "data"
+                ],
+                "properties": {
+                    "mutation_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "applied",
+                            "duplicate",
+                            "conflict",
+                            "rejected",
+                            "not_found"
+                        ]
+                    },
+                    "resource_version": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0
+                    },
+                    "data": {
+                        "type": "object",
+                        "description": "Только безопасное текущее состояние или код результата; без playback session, raw media/source URL и token.",
+                        "additionalProperties": true
                     }
                 }
             },
@@ -2126,6 +2747,7 @@
                 "required": [
                     "in_watchlist",
                     "rating",
+                    "versions",
                     "aggregate",
                     "rating_range",
                     "primary_action"
@@ -2141,6 +2763,23 @@
                         ],
                         "minimum": 1,
                         "maximum": 10
+                    },
+                    "versions": {
+                        "type": "object",
+                        "required": [
+                            "watchlist",
+                            "rating"
+                        ],
+                        "properties": {
+                            "watchlist": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "rating": {
+                                "type": "integer",
+                                "minimum": 0
+                            }
+                        }
                     },
                     "aggregate": {
                         "type": "object",
@@ -3512,6 +4151,44 @@
             }
         },
         "responses": {
+            "SyncCursorExpired": {
+                "description": "Cursor старше доступного retention window; выполните bootstrap заново",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ApiError"
+                        },
+                        "examples": {
+                            "default": {
+                                "value": {
+                                    "code": "sync_cursor_expired",
+                                    "message": "Курсор синхронизации устарел. Выполните полную загрузку заново.",
+                                    "request_id": "01J00000000000000000000000"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "SyncUnavailable": {
+                "description": "Additive sync-схема ещё не готова или синхронизация временно недоступна",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ApiError"
+                        },
+                        "examples": {
+                            "default": {
+                                "value": {
+                                    "code": "sync_unavailable",
+                                    "message": "Синхронизация временно недоступна.",
+                                    "request_id": "01J00000000000000000000000"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "NotFound": {
                 "description": "Ресурс не найден",
                 "content": {
