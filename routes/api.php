@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\V1\CatalogHomeController;
 use App\Http\Controllers\Api\V1\CatalogRecommendationController;
 use App\Http\Controllers\Api\V1\CatalogReviewController;
 use App\Http\Controllers\Api\V1\CatalogTitleController as V1CatalogTitleController;
+use App\Http\Controllers\Api\V1\PlaybackProgressController;
 use App\Http\Controllers\Api\V1\PlaybackSessionController;
 use App\Http\Controllers\Api\V1\PlaybackSourceController;
 use App\Http\Controllers\Api\V1\SearchSuggestionController;
@@ -100,6 +101,12 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
     Route::post('/auth/reset-password', ResetPasswordController::class)
         ->middleware('throttle:mobile-reset-password')
         ->name('auth.reset-password');
+
+    Route::put('/titles/{titleSlug}/episodes/{episode}/progress', PlaybackProgressController::class)
+        ->where('titleSlug', '[^/]+')
+        ->whereNumber('episode')
+        ->middleware(['auth:sanctum', 'abilities:mobile:write', 'verified.api'])
+        ->name('titles.episodes.progress.update');
 
     Route::middleware(['auth:sanctum', 'abilities:mobile:read'])->group(function (): void {
         Route::get('/auth/devices', [TokenController::class, 'index'])
