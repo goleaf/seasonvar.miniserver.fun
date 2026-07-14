@@ -13,6 +13,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Exceptions\InvalidSignatureException;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\Http\Middleware\CheckAbilities;
 use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
@@ -90,6 +91,18 @@ return Application::configure(basePath: dirname(__DIR__))
             );
         });
         $exceptions->render(function (AccessDeniedHttpException $exception, Request $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
+            return app(ApiErrorResponse::class)->make(
+                $request,
+                'forbidden',
+                'Доступ запрещён.',
+                403,
+            );
+        });
+        $exceptions->render(function (InvalidSignatureException $exception, Request $request) {
             if (! $request->is('api/*')) {
                 return null;
             }

@@ -6,8 +6,12 @@ use App\Http\Controllers\Api\CatalogTitleController;
 use App\Http\Controllers\Api\OpenApiController;
 use App\Http\Controllers\Api\V1\ApiConfigController;
 use App\Http\Controllers\Api\V1\ApiHealthController;
+use App\Http\Controllers\Api\V1\Auth\ForgotPasswordController;
 use App\Http\Controllers\Api\V1\Auth\LoginController;
 use App\Http\Controllers\Api\V1\Auth\RegisterController;
+use App\Http\Controllers\Api\V1\Auth\ResendVerificationController;
+use App\Http\Controllers\Api\V1\Auth\ResetPasswordController;
+use App\Http\Controllers\Api\V1\Auth\VerifyEmailController;
 use App\Http\Controllers\Api\V1\CatalogDirectoryController;
 use App\Http\Controllers\Api\V1\CatalogFilterSchemaController;
 use App\Http\Controllers\Api\V1\CatalogHomeController;
@@ -66,6 +70,19 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
     Route::post('/auth/login', LoginController::class)
         ->middleware('throttle:mobile-login')
         ->name('auth.login');
+    Route::get('/auth/email/verify/{id}/{hash}', VerifyEmailController::class)
+        ->whereNumber('id')
+        ->middleware('signed')
+        ->name('auth.verify');
+    Route::post('/auth/email/verification-notification', ResendVerificationController::class)
+        ->middleware(['auth:sanctum', 'throttle:mobile-verification'])
+        ->name('auth.verification-notification');
+    Route::post('/auth/forgot-password', ForgotPasswordController::class)
+        ->middleware('throttle:mobile-forgot-password')
+        ->name('auth.forgot-password');
+    Route::post('/auth/reset-password', ResetPasswordController::class)
+        ->middleware('throttle:mobile-reset-password')
+        ->name('auth.reset-password');
 });
 
 Route::fallback(static fn () => abort(404))->name('api.fallback');

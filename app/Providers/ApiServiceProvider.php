@@ -22,5 +22,16 @@ final class ApiServiceProvider extends ServiceProvider
 
             return Limit::perMinute(5)->by('login|'.$email.'|'.$request->ip());
         });
+
+        foreach (['mobile-forgot-password', 'mobile-reset-password'] as $limiter) {
+            RateLimiter::for($limiter, function (Request $request) use ($limiter): Limit {
+                $email = Str::lower(Str::squish((string) $request->input('email')));
+
+                return Limit::perMinutes(10, 3)->by($limiter.'|'.$email.'|'.$request->ip());
+            });
+        }
+
+        RateLimiter::for('mobile-verification', fn (Request $request): Limit => Limit::perMinute(3)
+            ->by('verification|'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
     }
 }

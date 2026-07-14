@@ -23,21 +23,15 @@ final class MobileAuthenticationService
      */
     public function register(array $attributes): array
     {
-        $user = DB::transaction(function () use ($attributes): User {
-            $user = User::query()->create([
+        $user = DB::transaction(
+            fn (): User => User::query()->create([
                 'name' => $attributes['name'],
                 'email' => $attributes['email'],
                 'password' => Hash::make($attributes['password']),
-            ]);
-
-            DB::afterCommit(function () use ($user): void {
-                if (method_exists($user, 'sendEmailVerificationNotification')) {
-                    $user->sendEmailVerificationNotification();
-                }
-            });
-
-            return $user;
-        }, attempts: 3);
+            ]),
+            attempts: 3,
+        );
+        $user->sendEmailVerificationNotification();
 
         return $this->issueToken($user, $attributes['device_name']);
     }
