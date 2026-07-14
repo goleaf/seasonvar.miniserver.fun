@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\CatalogRecommendationController;
 use App\Http\Controllers\Api\V1\CatalogReviewController;
 use App\Http\Controllers\Api\V1\CatalogTitleController as V1CatalogTitleController;
 use App\Http\Controllers\Api\V1\SearchSuggestionController;
+use App\Http\Controllers\Api\V1\UserLibraryController;
 use App\Http\Controllers\Api\V1\UserTitleStateController;
 use App\Services\Catalog\CatalogDirectoryRegistry;
 use Illuminate\Support\Facades\Route;
@@ -107,6 +108,10 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
     Route::middleware(['auth:sanctum', 'abilities:mobile:read'])->group(function (): void {
         Route::get('/me', [AccountController::class, 'show'])->name('me.show');
+        Route::get('/me/watchlist', [UserLibraryController::class, 'watchlist'])
+            ->name('me.watchlist.index');
+        Route::get('/me/ratings', [UserLibraryController::class, 'ratings'])
+            ->name('me.ratings.index');
         Route::get('/me/titles/{catalogTitle:slug}/state', [UserTitleStateController::class, 'show'])
             ->name('me.titles.state.show');
 
