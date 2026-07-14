@@ -45,6 +45,7 @@
 - Ошибка возвращает `code`, русское `message`, тот же `request_id` и необязательный объект `errors` для validation. Заголовок `X-Request-ID` совпадает с полем ответа.
 - Стабильные foundation codes: `validation_failed`, `unauthenticated`, `forbidden`, `not_found`, `rate_limited`, `server_error`. Ответ `server_error` не содержит exception message или stack trace.
 - API errors всегда получают `private, no-store`; неизвестный `/api/*` обрабатывает named API fallback, а неизвестный web URL продолжает редирект на главную.
+- Для `/api/*` guest redirect отключён независимо от заголовка `Accept`: защищённый endpoint всегда отвечает JSON `unauthenticated`/401 и никогда не пытается построить web route `login`.
 
 ## HTTP cache
 

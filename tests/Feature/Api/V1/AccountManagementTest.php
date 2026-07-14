@@ -42,6 +42,15 @@ final class AccountManagementTest extends TestCase
             ->assertHeader('Cache-Control', 'no-store, private');
     }
 
+    public function test_api_authentication_returns_json_without_an_accept_header(): void
+    {
+        $this->get('/api/v1/me')
+            ->assertUnauthorized()
+            ->assertHeader('Content-Type', 'application/json')
+            ->assertJsonPath('code', 'unauthenticated')
+            ->assertJsonStructure(['code', 'message', 'request_id']);
+    }
+
     public function test_profile_update_normalizes_fields_and_reverifies_only_after_email_change(): void
     {
         Notification::fake();

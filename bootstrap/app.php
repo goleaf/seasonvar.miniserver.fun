@@ -28,6 +28,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->redirectGuestsTo(
+            fn (Request $request): ?string => $request->is('api/*') ? null : route('login'),
+        );
         $middleware->trustHosts(
             at: fn (): array => array_filter([
                 is_string($host = parse_url((string) config('app.url'), PHP_URL_HOST)) && $host !== ''
