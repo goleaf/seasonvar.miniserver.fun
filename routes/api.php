@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\CatalogRecommendationController;
 use App\Http\Controllers\Api\V1\CatalogReviewController;
 use App\Http\Controllers\Api\V1\CatalogTitleController as V1CatalogTitleController;
 use App\Http\Controllers\Api\V1\PlaybackSessionController;
+use App\Http\Controllers\Api\V1\PlaybackSourceController;
 use App\Http\Controllers\Api\V1\SearchSuggestionController;
 use App\Http\Controllers\Api\V1\UserLibraryController;
 use App\Http\Controllers\Api\V1\UserTitleStateController;
@@ -73,7 +74,7 @@ Route::middleware('auth.optional.sanctum')->prefix('v1')->name('api.v1.')->group
     Route::post('/titles/{titleSlug}/playback-sessions', PlaybackSessionController::class)
         ->where('titleSlug', '[^/]+')
         ->name('titles.playback-sessions.store');
-    Route::get('/playback/{licensedMedia}', static fn () => abort(404))
+    Route::get('/playback/{licensedMedia}', PlaybackSourceController::class)
         ->middleware('signed')
         ->whereNumber('licensedMedia')
         ->name('playback.source');
