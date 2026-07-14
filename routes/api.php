@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\ApiDiscoveryController;
 use App\Http\Controllers\Api\CatalogPeopleLookupController;
 use App\Http\Controllers\Api\CatalogTitleController;
 use App\Http\Controllers\Api\OpenApiController;
+use App\Http\Controllers\Api\V1\AccountController;
 use App\Http\Controllers\Api\V1\ApiConfigController;
 use App\Http\Controllers\Api\V1\ApiHealthController;
 use App\Http\Controllers\Api\V1\Auth\ForgotPasswordController;
@@ -100,6 +101,16 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             Route::delete('/auth/devices/{token}', [TokenController::class, 'destroy'])
                 ->whereNumber('token')
                 ->name('auth.devices.destroy');
+        });
+    });
+
+    Route::middleware(['auth:sanctum', 'abilities:mobile:read'])->group(function (): void {
+        Route::get('/me', [AccountController::class, 'show'])->name('me.show');
+
+        Route::middleware('abilities:mobile:write')->group(function (): void {
+            Route::patch('/me', [AccountController::class, 'update'])->name('me.update');
+            Route::patch('/me/password', [AccountController::class, 'updatePassword'])->name('me.password.update');
+            Route::delete('/me', [AccountController::class, 'destroy'])->name('me.destroy');
         });
     });
 });
