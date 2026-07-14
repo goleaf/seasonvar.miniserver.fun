@@ -7,11 +7,13 @@ namespace App\Http\Controllers\Api\V1;
 use App\Exceptions\ApiSyncCursorException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\SyncPullRequest;
+use App\Http\Requests\Api\V1\SyncPushRequest;
 use App\Http\Resources\Api\V1\SyncChangeResource;
 use App\Http\Responses\ApiErrorResponse;
 use App\Models\ApiSyncChange;
 use App\Models\User;
 use App\Services\Api\V1\Sync\ApiSyncCursorCodec;
+use App\Services\Api\V1\Sync\ApiSyncMutationService;
 use App\Services\Api\V1\Sync\ApiSyncPullQuery;
 use App\Services\Api\V1\Sync\ApiSyncReadiness;
 use Illuminate\Auth\AuthenticationException;
@@ -128,6 +130,32 @@ final class SyncController extends Controller
             ]])
             ->response()
             ->header('Cache-Control', 'private, no-store');
+    }
+
+    public function push(
+        SyncPushRequest $request,
+        ApiSyncReadiness $readiness,
+        ApiSyncMutationService $mutations,
+        ApiErrorResponse $errors,
+    ): JsonResponse {
+        if (! $readiness->available()) {
+            return $this->unavailable($request, $errors);
+        }
+
+        $user = $request->user();
+
+        if (! $user instanceof User) {
+            throw new AuthenticationException;
+        }
+
+        $results = collect($request->operations())
+            ->map(fn (array $operation): array => $mutations->apply($user, $operation)->toArray())
+            ->values()
+            ->all();
+
+        return response()->json([
+            'data' => ['results' => $results],
+        ], headers: ['Cache-Control' => 'private, no-store']);
     }
 
     private function cursorError(

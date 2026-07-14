@@ -152,6 +152,7 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             Route::delete('/me', [AccountController::class, 'destroy'])->name('me.destroy');
 
             Route::middleware('verified.api')->group(function (): void {
+                Route::post('/me/sync', [SyncController::class, 'push'])->name('me.sync.push');
                 Route::put('/me/watchlist/{catalogTitle:slug}', [UserTitleStateController::class, 'storeWatchlist'])
                     ->name('me.watchlist.store');
                 Route::delete('/me/watchlist/{catalogTitle:slug}', [UserTitleStateController::class, 'destroyWatchlist'])

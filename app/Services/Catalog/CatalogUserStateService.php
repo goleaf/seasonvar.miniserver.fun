@@ -76,19 +76,45 @@ class CatalogUserStateService
     {
         $this->authorizeInteraction($user, $catalogTitle);
 
-        return $this->writeState($user, $catalogTitle, ['in_watchlist' => $inWatchlist]);
+        return $this->writeState($user, $catalogTitle, ['in_watchlist' => $inWatchlist], null)['state'];
     }
 
     public function setRating(User $user, CatalogTitle $catalogTitle, ?int $rating): ?CatalogTitleUserState
     {
         $this->authorizeInteraction($user, $catalogTitle);
-        $range = $this->ratingRange();
+        $this->validateRating($rating);
 
-        if ($rating !== null && ($rating < $range['minimum'] || $rating > $range['maximum'])) {
-            throw ValidationException::withMessages(['rating' => $this->ratingValidationMessage()]);
-        }
+        return $this->writeState($user, $catalogTitle, ['rating' => $rating], null)['state'];
+    }
 
-        return $this->writeState($user, $catalogTitle, ['rating' => $rating]);
+    /** @return array{applied: bool, state: CatalogTitleUserState|null, version: int} */
+    public function setWatchlistAtVersion(
+        User $user,
+        CatalogTitle $catalogTitle,
+        bool $inWatchlist,
+        int $expectedVersion,
+    ): array {
+        $this->authorizeInteraction($user, $catalogTitle);
+
+        return $this->writeState(
+            $user,
+            $catalogTitle,
+            ['in_watchlist' => $inWatchlist],
+            $expectedVersion,
+        );
+    }
+
+    /** @return array{applied: bool, state: CatalogTitleUserState|null, version: int} */
+    public function setRatingAtVersion(
+        User $user,
+        CatalogTitle $catalogTitle,
+        ?int $rating,
+        int $expectedVersion,
+    ): array {
+        $this->authorizeInteraction($user, $catalogTitle);
+        $this->validateRating($rating);
+
+        return $this->writeState($user, $catalogTitle, ['rating' => $rating], $expectedVersion);
     }
 
     public function recordProgress(
@@ -212,16 +238,32 @@ class CatalogUserStateService
 
     /**
      * @param  array{in_watchlist: bool}|array{rating: int|null}  $attributes
+     * @return array{applied: bool, state: CatalogTitleUserState|null, version: int}
      */
-    private function writeState(User $user, CatalogTitle $catalogTitle, array $attributes): ?CatalogTitleUserState
-    {
-        return DB::transaction(function () use ($user, $catalogTitle, $attributes): ?CatalogTitleUserState {
+    private function writeState(
+        User $user,
+        CatalogTitle $catalogTitle,
+        array $attributes,
+        ?int $expectedVersion,
+    ): array {
+        return DB::transaction(function () use ($user, $catalogTitle, $attributes, $expectedVersion): array {
             $now = now();
             $column = array_key_first($attributes);
             $value = $attributes[$column];
             $shouldCreate = $column === 'in_watchlist' ? $value === true : $value !== null;
+            $versionColumn = $column === 'in_watchlist' ? 'watchlist_version' : 'rating_version';
+            $state = CatalogTitleUserState::query()
+                ->whereBelongsTo($user)
+                ->whereBelongsTo($catalogTitle)
+                ->lockForUpdate()
+                ->first();
+            $version = (int) ($state?->{$versionColumn} ?? 0);
 
-            if ($shouldCreate) {
+            if ($expectedVersion !== null && $version !== $expectedVersion) {
+                return ['applied' => false, 'state' => $state, 'version' => $version];
+            }
+
+            if ($state === null && $shouldCreate) {
                 CatalogTitleUserState::query()->insertOrIgnore([
                     'user_id' => $user->id,
                     'catalog_title_id' => $catalogTitle->id,
@@ -230,16 +272,21 @@ class CatalogUserStateService
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
+
+                $state = CatalogTitleUserState::query()
+                    ->whereBelongsTo($user)
+                    ->whereBelongsTo($catalogTitle)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+                $version = (int) $state->{$versionColumn};
+
+                if ($expectedVersion !== null && $version !== $expectedVersion) {
+                    return ['applied' => false, 'state' => $state, 'version' => $version];
+                }
             }
 
-            $state = CatalogTitleUserState::query()
-                ->whereBelongsTo($user)
-                ->whereBelongsTo($catalogTitle)
-                ->lockForUpdate()
-                ->first();
-
             if ($state === null) {
-                return null;
+                return ['applied' => true, 'state' => null, 'version' => 0];
             }
 
             $currentValue = $column === 'in_watchlist'
@@ -247,19 +294,28 @@ class CatalogUserStateService
                 : $state->rating;
 
             if ($currentValue === $value) {
-                return $state;
+                return ['applied' => true, 'state' => $state, 'version' => $version];
             }
 
-            $versionColumn = $column === 'in_watchlist' ? 'watchlist_version' : 'rating_version';
+            $version++;
             $state->forceFill([
                 $column => $value,
-                $versionColumn => (int) $state->{$versionColumn} + 1,
+                $versionColumn => $version,
                 'updated_at' => $now,
             ])->save();
             $this->syncChanges->publishTitleState($user, $catalogTitle);
 
-            return $state;
+            return ['applied' => true, 'state' => $state, 'version' => $version];
         }, attempts: 3);
+    }
+
+    private function validateRating(?int $rating): void
+    {
+        $range = $this->ratingRange();
+
+        if ($rating !== null && ($rating < $range['minimum'] || $rating > $range['maximum'])) {
+            throw ValidationException::withMessages(['rating' => $this->ratingValidationMessage()]);
+        }
     }
 
     private function authorizeInteraction(User $user, CatalogTitle $catalogTitle): void
