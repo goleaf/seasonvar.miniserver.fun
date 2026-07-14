@@ -27,6 +27,10 @@ final class UserTitleStateResource extends JsonResource
         return [
             'in_watchlist' => $state?->in_watchlist ?? false,
             'rating' => $state?->rating,
+            'versions' => [
+                'watchlist' => $state?->watchlist_version ?? 0,
+                'rating' => $state?->rating_version ?? 0,
+            ],
             'aggregate' => [
                 'watchlist_count' => $summary->watchlistCount,
                 'rating_count' => $summary->ratingCount,

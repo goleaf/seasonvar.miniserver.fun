@@ -52,6 +52,8 @@ final readonly class UserLibraryQuery
                 'catalog_title_id',
                 'in_watchlist',
                 'rating',
+                'watchlist_version',
+                'rating_version',
                 'updated_at',
             ])
             ->with(['catalogTitle' => fn (BelongsTo $query): BelongsTo => $query

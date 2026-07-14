@@ -134,6 +134,7 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
     Route::middleware(['auth:sanctum', 'abilities:mobile:read'])->group(function (): void {
         Route::get('/me', [AccountController::class, 'show'])->name('me.show');
+        Route::get('/me/sync', [SyncController::class, 'user'])->name('me.sync.show');
         Route::get('/me/watchlist', [UserLibraryController::class, 'watchlist'])
             ->name('me.watchlist.index');
         Route::get('/me/ratings', [UserLibraryController::class, 'ratings'])

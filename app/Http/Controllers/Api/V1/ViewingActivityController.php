@@ -8,7 +8,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\ViewingHistoryIndexRequest;
 use App\Http\Resources\Api\V1\ContinueWatchingResource;
 use App\Http\Resources\Api\V1\ViewingHistoryResource;
-use App\Models\EpisodeViewProgress;
 use App\Models\User;
 use App\Services\Catalog\CatalogViewingActivityQuery;
 use App\Services\Catalog\CatalogViewingActivityService;
@@ -16,7 +15,6 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Gate;
 
 final class ViewingActivityController extends Controller
 {
@@ -38,16 +36,12 @@ final class ViewingActivityController extends Controller
         )->response()->header('Cache-Control', 'private, no-store');
     }
 
-    public function destroy(Request $request, int $episodeViewProgress): Response
-    {
-        $user = $this->user($request);
-        $progress = EpisodeViewProgress::query()
-            ->whereBelongsTo($user)
-            ->whereKey($episodeViewProgress)
-            ->firstOrFail();
-
-        Gate::forUser($user)->authorize('delete', $progress);
-        $progress->delete();
+    public function destroy(
+        Request $request,
+        int $episodeViewProgress,
+        CatalogViewingActivityService $activity,
+    ): Response {
+        $activity->removeOwned($this->user($request), $episodeViewProgress);
 
         return response()->noContent(headers: ['Cache-Control' => 'private, no-store']);
     }

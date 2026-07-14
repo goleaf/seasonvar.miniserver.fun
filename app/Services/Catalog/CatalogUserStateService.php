@@ -9,6 +9,7 @@ use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUserState;
 use App\Models\EpisodeViewProgress;
 use App\Models\User;
+use App\Services\Api\V1\Sync\UserSyncChangePublisher;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -19,6 +20,7 @@ class CatalogUserStateService
         private readonly CatalogTitlePlaybackQuery $playback,
         private readonly CatalogPlaybackProgressSession $progressSessions,
         private readonly CatalogPlaybackCompletionRule $completionRule,
+        private readonly UserSyncChangePublisher $syncChanges,
     ) {}
 
     public function state(User $user, CatalogTitle $catalogTitle): ?CatalogTitleUserState
@@ -202,6 +204,7 @@ class CatalogUserStateService
                 'completed_at' => $completedAt,
                 'last_watched_at' => $now,
             ])->save();
+            $this->syncChanges->publishProgress($user, $catalogTitle, $episode->id);
 
             return $progress;
         }, attempts: 3);
@@ -222,31 +225,40 @@ class CatalogUserStateService
                 CatalogTitleUserState::query()->insertOrIgnore([
                     'user_id' => $user->id,
                     'catalog_title_id' => $catalogTitle->id,
-                    'in_watchlist' => $attributes['in_watchlist'] ?? false,
-                    'rating' => $attributes['rating'] ?? null,
+                    'in_watchlist' => false,
+                    'rating' => null,
                     'created_at' => $now,
                     'updated_at' => $now,
                 ]);
             }
 
-            $update = CatalogTitleUserState::query()
-                ->whereBelongsTo($user)
-                ->whereBelongsTo($catalogTitle);
-
-            if ($value === null) {
-                $update->whereNotNull($column);
-            } else {
-                $update->where(function ($query) use ($column, $value): void {
-                    $query->whereNull($column)->orWhere($column, '!=', $value);
-                });
-            }
-
-            $update->update([$column => $value, 'updated_at' => $now]);
-
-            return CatalogTitleUserState::query()
+            $state = CatalogTitleUserState::query()
                 ->whereBelongsTo($user)
                 ->whereBelongsTo($catalogTitle)
+                ->lockForUpdate()
                 ->first();
+
+            if ($state === null) {
+                return null;
+            }
+
+            $currentValue = $column === 'in_watchlist'
+                ? (bool) $state->in_watchlist
+                : $state->rating;
+
+            if ($currentValue === $value) {
+                return $state;
+            }
+
+            $versionColumn = $column === 'in_watchlist' ? 'watchlist_version' : 'rating_version';
+            $state->forceFill([
+                $column => $value,
+                $versionColumn => (int) $state->{$versionColumn} + 1,
+                'updated_at' => $now,
+            ])->save();
+            $this->syncChanges->publishTitleState($user, $catalogTitle);
+
+            return $state;
         }, attempts: 3);
     }
 

@@ -20,6 +20,8 @@ class ApiSyncChange extends Model
 {
     public const string OPERATION_DELETE = 'delete';
 
+    public const string OPERATION_CLEAR = 'clear';
+
     public const string OPERATION_UPSERT = 'upsert';
 
     public const string SCOPE_CATALOG = 'catalog';

@@ -10,9 +10,11 @@ use App\Http\Requests\Api\V1\SyncPullRequest;
 use App\Http\Resources\Api\V1\SyncChangeResource;
 use App\Http\Responses\ApiErrorResponse;
 use App\Models\ApiSyncChange;
+use App\Models\User;
 use App\Services\Api\V1\Sync\ApiSyncCursorCodec;
 use App\Services\Api\V1\Sync\ApiSyncPullQuery;
 use App\Services\Api\V1\Sync\ApiSyncReadiness;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -68,6 +70,50 @@ final class SyncController extends Controller
         } else {
             try {
                 $cursor = $cursors->decode($encodedCursor, ApiSyncChange::SCOPE_CATALOG, null);
+                $result = $pull->pull($cursor, $request->limit());
+            } catch (ApiSyncCursorException $exception) {
+                return $this->cursorError($request, $errors, $exception);
+            }
+        }
+
+        return SyncChangeResource::collection($result['changes'])
+            ->additional(['meta' => [
+                'cursor' => $cursors->encode($result['cursor']),
+                'has_more' => $result['has_more'],
+                'limit' => $request->limit(),
+            ]])
+            ->response()
+            ->header('Cache-Control', 'private, no-store');
+    }
+
+    public function user(
+        SyncPullRequest $request,
+        ApiSyncReadiness $readiness,
+        ApiSyncPullQuery $pull,
+        ApiSyncCursorCodec $cursors,
+        ApiErrorResponse $errors,
+    ): JsonResponse {
+        if (! $readiness->available()) {
+            return $this->unavailable($request, $errors);
+        }
+
+        $user = $request->user();
+
+        if (! $user instanceof User) {
+            throw new AuthenticationException;
+        }
+
+        $encodedCursor = $request->cursor();
+
+        if ($encodedCursor === null) {
+            $result = [
+                'changes' => collect(),
+                'cursor' => $pull->checkpoint(ApiSyncChange::SCOPE_USER, $user),
+                'has_more' => false,
+            ];
+        } else {
+            try {
+                $cursor = $cursors->decode($encodedCursor, ApiSyncChange::SCOPE_USER, $user->id);
                 $result = $pull->pull($cursor, $request->limit());
             } catch (ApiSyncCursorException $exception) {
                 return $this->cursorError($request, $errors, $exception);
