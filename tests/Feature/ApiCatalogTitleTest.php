@@ -213,7 +213,11 @@ class ApiCatalogTitleTest extends TestCase
         $this
             ->getJson('/api/titles?per_page=200&page=0')
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['per_page', 'page']);
+            ->assertHeader('X-Request-ID')
+            ->assertJsonPath('code', 'validation_failed')
+            ->assertJsonPath('message', 'Переданные данные некорректны.')
+            ->assertJsonValidationErrors(['per_page', 'page'])
+            ->assertJsonStructure(['code', 'message', 'errors', 'request_id']);
     }
 
     public function test_people_lookup_returns_only_public_actor_options_with_counts_and_no_internal_fields(): void

@@ -9,3 +9,5 @@ Route::middleware('public.cache:api')->group(function (): void {
     Route::get('/titles', [CatalogTitleController::class, 'index'])->name('api.titles.index');
     Route::get('/titles/{catalogTitle:slug}', [CatalogTitleController::class, 'show'])->name('api.titles.show');
 });
+
+Route::fallback(static fn () => abort(404))->name('api.fallback');
