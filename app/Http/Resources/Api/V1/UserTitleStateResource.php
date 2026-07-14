@@ -1,0 +1,47 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Resources\Api\V1;
+
+use App\DTOs\CatalogPrimaryAction;
+use App\DTOs\CatalogUserStateSummary;
+use App\Models\CatalogTitleUserState;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+final class UserTitleStateResource extends JsonResource
+{
+    /** @return array<string, mixed> */
+    public function toArray(Request $request): array
+    {
+        /** @var CatalogTitleUserState|null $state */
+        $state = $this->resource['state'];
+        /** @var CatalogUserStateSummary $summary */
+        $summary = $this->resource['summary'];
+        /** @var array{minimum: int, maximum: int} $ratingRange */
+        $ratingRange = $this->resource['rating_range'];
+        /** @var CatalogPrimaryAction $primaryAction */
+        $primaryAction = $this->resource['primary_action'];
+
+        return [
+            'in_watchlist' => $state?->in_watchlist ?? false,
+            'rating' => $state?->rating,
+            'aggregate' => [
+                'watchlist_count' => $summary->watchlistCount,
+                'rating_count' => $summary->ratingCount,
+                'rating_average' => $summary->ratingAverage,
+            ],
+            'rating_range' => $ratingRange,
+            'primary_action' => [
+                'type' => $primaryAction->type,
+                'label' => $primaryAction->label,
+                'season_id' => $primaryAction->seasonId,
+                'episode_id' => $primaryAction->episodeId,
+                'media_id' => $primaryAction->mediaId,
+                'position_seconds' => $primaryAction->positionSeconds,
+                'playable' => $primaryAction->isPlayable(),
+            ],
+        ];
+    }
+}

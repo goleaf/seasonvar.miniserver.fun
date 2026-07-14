@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\CatalogRecommendationController;
 use App\Http\Controllers\Api\V1\CatalogReviewController;
 use App\Http\Controllers\Api\V1\CatalogTitleController as V1CatalogTitleController;
 use App\Http\Controllers\Api\V1\SearchSuggestionController;
+use App\Http\Controllers\Api\V1\UserTitleStateController;
 use App\Services\Catalog\CatalogDirectoryRegistry;
 use Illuminate\Support\Facades\Route;
 
@@ -106,11 +107,24 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
 
     Route::middleware(['auth:sanctum', 'abilities:mobile:read'])->group(function (): void {
         Route::get('/me', [AccountController::class, 'show'])->name('me.show');
+        Route::get('/me/titles/{catalogTitle:slug}/state', [UserTitleStateController::class, 'show'])
+            ->name('me.titles.state.show');
 
         Route::middleware('abilities:mobile:write')->group(function (): void {
             Route::patch('/me', [AccountController::class, 'update'])->name('me.update');
             Route::patch('/me/password', [AccountController::class, 'updatePassword'])->name('me.password.update');
             Route::delete('/me', [AccountController::class, 'destroy'])->name('me.destroy');
+
+            Route::middleware('verified.api')->group(function (): void {
+                Route::put('/me/watchlist/{catalogTitle:slug}', [UserTitleStateController::class, 'storeWatchlist'])
+                    ->name('me.watchlist.store');
+                Route::delete('/me/watchlist/{catalogTitle:slug}', [UserTitleStateController::class, 'destroyWatchlist'])
+                    ->name('me.watchlist.destroy');
+                Route::put('/me/ratings/{catalogTitle:slug}', [UserTitleStateController::class, 'storeRating'])
+                    ->name('me.ratings.store');
+                Route::delete('/me/ratings/{catalogTitle:slug}', [UserTitleStateController::class, 'destroyRating'])
+                    ->name('me.ratings.destroy');
+            });
         });
     });
 });

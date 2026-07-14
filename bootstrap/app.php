@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AddSecurityHeaders;
 use App\Http\Middleware\AssignApiRequestId;
+use App\Http\Middleware\EnsureMobileEmailIsVerified;
 use App\Http\Middleware\PublicHttpCacheHeaders;
 use App\Http\Middleware\ResolveOptionalSanctumUser;
 use App\Http\Responses\ApiErrorResponse;
@@ -44,6 +45,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'ability' => CheckForAnyAbility::class,
             'auth.optional.sanctum' => ResolveOptionalSanctumUser::class,
             'public.cache' => PublicHttpCacheHeaders::class,
+            'verified.api' => EnsureMobileEmailIsVerified::class,
         ]);
         $middleware->web(append: [
             AddSecurityHeaders::class,
