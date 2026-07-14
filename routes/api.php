@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\V1\CatalogHomeController;
 use App\Http\Controllers\Api\V1\CatalogRecommendationController;
 use App\Http\Controllers\Api\V1\CatalogReviewController;
 use App\Http\Controllers\Api\V1\CatalogTitleController as V1CatalogTitleController;
+use App\Http\Controllers\Api\V1\PlaybackSessionController;
 use App\Http\Controllers\Api\V1\SearchSuggestionController;
 use App\Http\Controllers\Api\V1\UserLibraryController;
 use App\Http\Controllers\Api\V1\UserTitleStateController;
@@ -67,6 +68,16 @@ Route::middleware('public.cache:api')->group(function (): void {
 });
 
 Route::get('/v1/health', ApiHealthController::class)->name('api.v1.health');
+
+Route::middleware('auth.optional.sanctum')->prefix('v1')->name('api.v1.')->group(function (): void {
+    Route::post('/titles/{titleSlug}/playback-sessions', PlaybackSessionController::class)
+        ->where('titleSlug', '[^/]+')
+        ->name('titles.playback-sessions.store');
+    Route::get('/playback/{licensedMedia}', static fn () => abort(404))
+        ->middleware('signed')
+        ->whereNumber('licensedMedia')
+        ->name('playback.source');
+});
 
 Route::prefix('v1')->name('api.v1.')->group(function (): void {
     Route::post('/auth/register', RegisterController::class)
