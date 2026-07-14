@@ -15,3 +15,9 @@ Schedule::command('cache:warm-catalog --queue --refresh')
     ->name('catalog-cache-warm')
     ->withoutOverlapping(10)
     ->onOneServer();
+
+Schedule::command('sanctum:prune-expired --hours=24')
+    ->dailyAt('03:41')
+    ->name('sanctum-prune-expired')
+    ->withoutOverlapping(10)
+    ->onOneServer();
