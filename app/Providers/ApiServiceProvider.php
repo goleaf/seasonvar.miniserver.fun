@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\PersonalAccessToken;
 
 final class ApiServiceProvider extends ServiceProvider
 {
@@ -33,5 +34,12 @@ final class ApiServiceProvider extends ServiceProvider
 
         RateLimiter::for('mobile-verification', fn (Request $request): Limit => Limit::perMinute(3)
             ->by('verification|'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+
+        RateLimiter::for('mobile-token-refresh', function (Request $request): Limit {
+            $token = $request->user()?->currentAccessToken();
+            $key = $token instanceof PersonalAccessToken ? $token->getKey() : $request->ip();
+
+            return Limit::perMinute(20)->by('token-refresh|'.$key);
+        });
     }
 }

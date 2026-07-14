@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\Auth\LoginController;
 use App\Http\Controllers\Api\V1\Auth\RegisterController;
 use App\Http\Controllers\Api\V1\Auth\ResendVerificationController;
 use App\Http\Controllers\Api\V1\Auth\ResetPasswordController;
+use App\Http\Controllers\Api\V1\Auth\TokenController;
 use App\Http\Controllers\Api\V1\Auth\VerifyEmailController;
 use App\Http\Controllers\Api\V1\CatalogDirectoryController;
 use App\Http\Controllers\Api\V1\CatalogFilterSchemaController;
@@ -83,6 +84,24 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
     Route::post('/auth/reset-password', ResetPasswordController::class)
         ->middleware('throttle:mobile-reset-password')
         ->name('auth.reset-password');
+
+    Route::middleware(['auth:sanctum', 'abilities:mobile:read'])->group(function (): void {
+        Route::get('/auth/devices', [TokenController::class, 'index'])
+            ->name('auth.devices.index');
+
+        Route::middleware('abilities:mobile:write')->group(function (): void {
+            Route::post('/auth/token/refresh', [TokenController::class, 'refresh'])
+                ->middleware('throttle:mobile-token-refresh')
+                ->name('auth.token.refresh');
+            Route::post('/auth/logout', [TokenController::class, 'logout'])
+                ->name('auth.logout');
+            Route::post('/auth/logout-all', [TokenController::class, 'logoutAll'])
+                ->name('auth.logout-all');
+            Route::delete('/auth/devices/{token}', [TokenController::class, 'destroy'])
+                ->whereNumber('token')
+                ->name('auth.devices.destroy');
+        });
+    });
 });
 
 Route::fallback(static fn () => abort(404))->name('api.fallback');
