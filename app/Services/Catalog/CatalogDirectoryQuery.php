@@ -28,6 +28,7 @@ class CatalogDirectoryQuery
         string $sort,
         ?int $decade,
         ?int $total = null,
+        ?int $perPage = null,
     ): LengthAwarePaginator {
         $query = $directory->isYear()
             ? $this->yearQuery($search, $decade)
@@ -54,9 +55,10 @@ class CatalogDirectoryQuery
         $total = $hasFilters
             ? $this->filteredValueCount($directory, $search, $letter, $decade)
             : ($total ?? $this->summary($directory)['values']);
-        $items = $query->forPage($page, $directory->perPage)->get();
+        $perPage = max(1, min(50, $perPage ?? $directory->perPage));
+        $items = $query->forPage($page, $perPage)->get();
 
-        return new LaravelLengthAwarePaginator($items, $total, $directory->perPage, $page, [
+        return new LaravelLengthAwarePaginator($items, $total, $perPage, $page, [
             'path' => request()->url(),
             'query' => request()->query(),
             'pageName' => 'page',

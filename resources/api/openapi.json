@@ -58,6 +58,167 @@
                     }
                 }
             }
+        },
+        "/api/v1/home": {
+            "get": {
+                "operationId": "getMobileHome",
+                "summary": "Получить главную страницу мобильного каталога",
+                "security": [
+                    {},
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ограниченные публичные подборки каталога",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CatalogHomeResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/catalog/filters": {
+            "get": {
+                "operationId": "getCatalogFilterSchema",
+                "summary": "Получить схему фильтров каталога",
+                "responses": {
+                    "200": {
+                        "description": "Параметры, варианты и ограничения фильтров",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CatalogFilterSchemaResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/catalog/directories": {
+            "get": {
+                "operationId": "getCatalogDirectories",
+                "summary": "Получить список справочников каталога",
+                "responses": {
+                    "200": {
+                        "description": "Доступные справочники",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CatalogDirectory"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/catalog/directories/{directory}": {
+            "get": {
+                "operationId": "getCatalogDirectoryItems",
+                "summary": "Получить элементы справочника каталога",
+                "parameters": [
+                    {
+                        "name": "directory",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "genres",
+                                "countries",
+                                "actors",
+                                "directors",
+                                "age-ratings",
+                                "translations",
+                                "statuses",
+                                "networks",
+                                "studios",
+                                "tags",
+                                "years"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 80
+                        }
+                    },
+                    {
+                        "name": "letter",
+                        "in": "query",
+                        "description": "Одна кириллическая или латинская буква либо #",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 1
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "name_asc",
+                                "count_desc"
+                            ],
+                            "default": "name_asc"
+                        }
+                    },
+                    {
+                        "name": "decade",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "multipleOf": 10
+                        }
+                    },
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Страница элементов справочника",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CatalogDirectoryItemsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -66,6 +227,27 @@
                 "type": "http",
                 "scheme": "bearer",
                 "bearerFormat": "Sanctum"
+            }
+        },
+        "parameters": {
+            "Page": {
+                "name": "page",
+                "in": "query",
+                "schema": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "default": 1
+                }
+            },
+            "PerPage": {
+                "name": "per_page",
+                "in": "query",
+                "schema": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 50,
+                    "default": 20
+                }
             }
         },
         "schemas": {
@@ -96,9 +278,233 @@
                         }
                     }
                 }
+            },
+            "CatalogAlphabet": {
+                "type": "object",
+                "required": [
+                    "cyrillic",
+                    "latin",
+                    "other"
+                ],
+                "properties": {
+                    "cyrillic": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "latin": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "other": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "CatalogDirectory": {
+                "type": "object",
+                "required": [
+                    "key",
+                    "path",
+                    "title",
+                    "supports_alphabet",
+                    "default_per_page",
+                    "links"
+                ],
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "path": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "item_label": {
+                        "type": "string"
+                    },
+                    "filter_type": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "supports_alphabet": {
+                        "type": "boolean"
+                    },
+                    "default_per_page": {
+                        "type": "integer"
+                    },
+                    "links": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string",
+                            "format": "uri"
+                        }
+                    }
+                }
+            },
+            "CatalogDirectoryItem": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "year",
+                    "titles_count"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "slug": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "year": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "titles_count": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                }
+            },
+            "CatalogDirectoryItemsResponse": {
+                "type": "object",
+                "required": [
+                    "data",
+                    "links",
+                    "meta"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CatalogDirectoryItem"
+                        }
+                    },
+                    "links": {
+                        "type": "object"
+                    },
+                    "meta": {
+                        "type": "object",
+                        "required": [
+                            "current_page",
+                            "last_page",
+                            "alphabet"
+                        ],
+                        "properties": {
+                            "current_page": {
+                                "type": "integer"
+                            },
+                            "last_page": {
+                                "type": "integer"
+                            },
+                            "alphabet": {
+                                "$ref": "#/components/schemas/CatalogAlphabet"
+                            }
+                        },
+                        "additionalProperties": true
+                    }
+                }
+            },
+            "CatalogFilterSchemaResponse": {
+                "type": "object",
+                "required": [
+                    "data"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "required": [
+                            "controls",
+                            "sorts",
+                            "alphabet"
+                        ],
+                        "properties": {
+                            "controls": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object"
+                                }
+                            },
+                            "sorts": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object"
+                                }
+                            },
+                            "alphabet": {
+                                "$ref": "#/components/schemas/CatalogAlphabet"
+                            }
+                        },
+                        "additionalProperties": true
+                    }
+                }
+            },
+            "CatalogHomeResponse": {
+                "type": "object",
+                "required": [
+                    "data"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "required": [
+                            "stats",
+                            "latest_titles",
+                            "featured_titles",
+                            "titles_with_video",
+                            "latest_releases",
+                            "year_buckets",
+                            "genres",
+                            "countries"
+                        ],
+                        "additionalProperties": true
+                    }
+                }
             }
         },
         "responses": {
+            "NotFound": {
+                "description": "Ресурс не найден",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ApiError"
+                        }
+                    }
+                }
+            },
+            "ValidationError": {
+                "description": "Ошибка валидации параметров",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/ApiError"
+                        }
+                    }
+                }
+            },
             "ServerError": {
                 "description": "Внутренняя ошибка сервера",
                 "content": {
