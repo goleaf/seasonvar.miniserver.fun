@@ -14,7 +14,7 @@ Laravel-приложение для локального каталога сер
 
 ## Mobile JSON API
 
-`GET /api` публикует discovery для стабильного `/api/v1`, а project-owned OpenAPI доступен по ссылке из манифеста. Public v1 включает home, полный фильтрованный каталог, schema-driven filters, 11 directories, карточку тайтла, сезоны/серии с безопасными media profiles, подсказки, рекомендации и read-only отзывы. Mobile auth добавляет регистрацию, login, queued email verification/password reset, 90-дневные device tokens с rotation/logout и self-service `/me`; abilities и private no-store ошибки не меняют legacy JSON API. Полный route/query/response/security contract находится в [`docs/api.md`](docs/api.md).
+`GET /api` публикует discovery для стабильного `/api/v1`, а project-owned OpenAPI доступен по ссылке из манифеста. Public v1 включает home, полный фильтрованный каталог, schema-driven filters, 11 directories, карточку тайтла, сезоны/серии с безопасными media profiles, подсказки, рекомендации и read-only отзывы. Mobile auth добавляет регистрацию, login, queued email verification/password reset, 90-дневные device tokens с rotation/logout и self-service `/me`. Private v1 также отдаёт owner-scoped watchlist, оценки, состояние тайтла, Continue Watching и историю: чтение требует `mobile:read`, изменения — `mobile:write` и verified email, все ответы private/no-store. Полный route/query/response/security contract находится в [`docs/api.md`](docs/api.md).
 
 ## Основные команды
 

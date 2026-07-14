@@ -2,6 +2,7 @@
 
 ## 2026-07-14
 
+- Exposed mobile owner state across API v1 without duplicating the web domain model: idempotent watchlist/rating desired-state writes, paginated libraries, Continue Watching and viewing history now reuse existing services, policies and visibility rules. Verified-email mutations, cross-user 404 isolation, private no-store responses, fixed-query eager loading and full OpenAPI regressions protect the contract.
 - Completed mobile authentication and account self-service for API v1: normalized registration/login, queued email verification and non-enumerating password recovery, 90-day Sanctum device rotation/revocation, `/me` profile/password/delete flows, ability-scoped private responses, cross-user isolation and complete OpenAPI/privacy/rate-limit regressions.
 - Completed the public mobile catalog API v1: home, full filter parity with indexed/unindexed arrays, schema-driven Cyrillic/Latin alphabets, 11 directories, title details, audience-safe seasons/episodes/media profiles, bounded suggestions, ranked recommendations and paginated imported reviews. OpenAPI now covers every public v1 GET; privacy, N+1 query-delta and guest-ETag versus Bearer-no-store regressions guard the contract.
 - Added the mobile API v1 foundation without breaking legacy JSON routes: `/api` discovery, project-owned OpenAPI 3.1, safe config/health endpoints, stable request-ID error envelopes, 90-day hashed Sanctum tokens with scheduled pruning, and fail-closed private caching for every Authorization request.

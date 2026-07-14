@@ -15,6 +15,33 @@ final class UserTitleStateTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_title_state_requires_a_valid_read_token_and_never_uses_shared_cache(): void
+    {
+        $title = CatalogTitle::factory()->create(['slug' => 'private-state']);
+
+        $this->getJson("/api/v1/me/titles/{$title->slug}/state")
+            ->assertUnauthorized()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertHeaderMissing('ETag');
+        $this->withToken('invalid-mobile-token')
+            ->getJson("/api/v1/me/titles/{$title->slug}/state")
+            ->assertUnauthorized()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertHeaderMissing('ETag');
+
+        Sanctum::actingAs(User::factory()->unverified()->create(), ['mobile:read']);
+
+        $response = $this->withHeader('Authorization', '')
+            ->getJson("/api/v1/me/titles/{$title->slug}/state")
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertHeaderMissing('ETag');
+
+        foreach (['email', 'password', 'token', 'user_id', 'source_url'] as $privateField) {
+            $response->assertDontSee($privateField, false);
+        }
+    }
+
     public function test_unverified_user_reads_existing_state_but_cannot_mutate_it(): void
     {
         $user = User::factory()->unverified()->create();
@@ -44,6 +71,62 @@ final class UserTitleStateTest extends TestCase
             ->assertJsonPath('code', 'email_not_verified');
 
         $this->assertTrue($user->catalogTitleStates()->sole()->in_watchlist);
+    }
+
+    public function test_unverified_user_cannot_use_any_title_state_mutation(): void
+    {
+        $user = User::factory()->unverified()->create();
+        $title = CatalogTitle::factory()->create(['slug' => 'unverified-mutations']);
+        Sanctum::actingAs($user, ['mobile:read', 'mobile:write']);
+
+        $responses = [
+            $this->putJson("/api/v1/me/watchlist/{$title->slug}"),
+            $this->deleteJson("/api/v1/me/watchlist/{$title->slug}"),
+            $this->putJson("/api/v1/me/ratings/{$title->slug}", ['rating' => 7]),
+            $this->deleteJson("/api/v1/me/ratings/{$title->slug}"),
+        ];
+
+        foreach ($responses as $response) {
+            $response
+                ->assertForbidden()
+                ->assertHeader('Cache-Control', 'no-store, private')
+                ->assertHeaderMissing('ETag')
+                ->assertJsonPath('code', 'email_not_verified');
+        }
+
+        $this->assertFalse(CatalogTitleUserState::query()->whereBelongsTo($user)->exists());
+    }
+
+    public function test_title_state_mutations_require_a_valid_write_token(): void
+    {
+        $title = CatalogTitle::factory()->create(['slug' => 'write-token-state']);
+        $requests = [
+            ['PUT', "/api/v1/me/watchlist/{$title->slug}", []],
+            ['DELETE', "/api/v1/me/watchlist/{$title->slug}", []],
+            ['PUT', "/api/v1/me/ratings/{$title->slug}", ['rating' => 7]],
+            ['DELETE', "/api/v1/me/ratings/{$title->slug}", []],
+        ];
+
+        foreach ($requests as [$method, $endpoint, $data]) {
+            $this->json($method, $endpoint, $data)
+                ->assertUnauthorized()
+                ->assertHeader('Cache-Control', 'no-store, private');
+        }
+
+        foreach ($requests as [$method, $endpoint, $data]) {
+            $this->withToken('invalid-mobile-token')
+                ->json($method, $endpoint, $data)
+                ->assertUnauthorized();
+        }
+
+        Sanctum::actingAs(User::factory()->create(), ['mobile:read']);
+
+        foreach ($requests as [$method, $endpoint, $data]) {
+            $this->withHeader('Authorization', '')
+                ->json($method, $endpoint, $data)
+                ->assertForbidden()
+                ->assertJsonPath('code', 'forbidden');
+        }
     }
 
     public function test_verified_user_sets_and_clears_watchlist_idempotently(): void
@@ -130,5 +213,17 @@ final class UserTitleStateTest extends TestCase
             ->assertNotFound();
         $this->putJson("/api/v1/me/watchlist/{$hiddenTitle->slug}")
             ->assertNotFound();
+    }
+
+    public function test_openapi_describes_title_state_and_desired_state_mutations(): void
+    {
+        $this->getJson('/api/openapi.json')
+            ->assertOk()
+            ->assertJsonPath('paths./api/v1/me/titles/{catalogTitle}/state.get.operationId', 'getMobileTitleState')
+            ->assertJsonPath('paths./api/v1/me/watchlist/{catalogTitle}.put.operationId', 'addMobileWatchlistTitle')
+            ->assertJsonPath('paths./api/v1/me/watchlist/{catalogTitle}.delete.operationId', 'removeMobileWatchlistTitle')
+            ->assertJsonPath('paths./api/v1/me/ratings/{catalogTitle}.put.operationId', 'setMobileTitleRating')
+            ->assertJsonPath('paths./api/v1/me/ratings/{catalogTitle}.delete.operationId', 'clearMobileTitleRating')
+            ->assertJsonPath('components.schemas.UserTitleState.properties.rating_range.properties.maximum.maximum', 10);
     }
 }

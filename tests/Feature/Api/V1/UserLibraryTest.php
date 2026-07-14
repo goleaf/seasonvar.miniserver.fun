@@ -8,12 +8,38 @@ use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUserState;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 final class UserLibraryTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_private_libraries_require_a_valid_token_and_disable_shared_cache(): void
+    {
+        foreach (['/api/v1/me/watchlist', '/api/v1/me/ratings'] as $endpoint) {
+            $this->getJson($endpoint)
+                ->assertUnauthorized()
+                ->assertHeader('Cache-Control', 'no-store, private')
+                ->assertHeaderMissing('ETag');
+            $this->withToken('invalid-mobile-token')
+                ->getJson($endpoint)
+                ->assertUnauthorized()
+                ->assertHeader('Cache-Control', 'no-store, private')
+                ->assertHeaderMissing('ETag');
+        }
+
+        Sanctum::actingAs(User::factory()->unverified()->create(), ['mobile:read']);
+
+        foreach (['/api/v1/me/watchlist', '/api/v1/me/ratings'] as $endpoint) {
+            $this->withHeader('Authorization', '')
+                ->getJson($endpoint)
+                ->assertOk()
+                ->assertHeader('Cache-Control', 'no-store, private')
+                ->assertHeaderMissing('ETag');
+        }
+    }
 
     public function test_watchlist_is_paginated_sorted_and_owner_scoped(): void
     {
@@ -111,6 +137,39 @@ final class UserLibraryTest extends TestCase
         }
     }
 
+    public function test_watchlist_query_count_stays_constant_as_the_page_grows(): void
+    {
+        $user = User::factory()->create();
+        $this->createLibraryState($user, 1);
+        Sanctum::actingAs($user, ['mobile:read']);
+
+        $oneItemQueries = $this->captureQueries(
+            fn () => $this->getJson('/api/v1/me/watchlist?per_page=20')->assertOk(),
+        );
+
+        foreach (range(2, 20) as $index) {
+            $this->createLibraryState($user, $index);
+        }
+
+        $twentyItemQueries = $this->captureQueries(
+            fn () => $this->getJson('/api/v1/me/watchlist?per_page=20')
+                ->assertOk()
+                ->assertJsonCount(20, 'data'),
+        );
+
+        $this->assertLessThanOrEqual($oneItemQueries + 1, $twentyItemQueries);
+    }
+
+    public function test_openapi_describes_mobile_watchlist_and_ratings_libraries(): void
+    {
+        $this->getJson('/api/openapi.json')
+            ->assertOk()
+            ->assertJsonPath('paths./api/v1/me/watchlist.get.operationId', 'getMobileWatchlist')
+            ->assertJsonPath('paths./api/v1/me/ratings.get.operationId', 'getMobileRatings')
+            ->assertJsonPath('components.schemas.UserLibraryItem.required.0', 'title')
+            ->assertJsonPath('components.schemas.UserLibraryPageResponse.required.2', 'meta');
+    }
+
     private function createInaccessibleState(
         User $user,
         string $slug,
@@ -128,5 +187,31 @@ final class UserLibraryTest extends TestCase
         ]);
 
         return $title;
+    }
+
+    private function createLibraryState(User $user, int $index): void
+    {
+        $title = CatalogTitle::factory()->create(['slug' => "query-library-title-{$index}"]);
+        CatalogTitleUserState::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $title->id,
+            'in_watchlist' => true,
+            'rating' => $index % 10 + 1,
+        ]);
+    }
+
+    private function captureQueries(callable $callback): int
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        try {
+            $callback();
+
+            return count(DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+            DB::flushQueryLog();
+        }
     }
 }

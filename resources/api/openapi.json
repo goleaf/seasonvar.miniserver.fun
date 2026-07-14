@@ -1364,6 +1364,435 @@
                     }
                 }
             }
+        },
+        "/api/v1/me/titles/{catalogTitle}/state": {
+            "get": {
+                "operationId": "getMobileTitleState",
+                "summary": "Получить личное состояние тайтла",
+                "description": "Read-доступ разрешён также после смены email до повторного подтверждения.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CatalogTitle"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Личное состояние, агрегаты и primary action",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserTitleStateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/api/v1/me/watchlist": {
+            "get": {
+                "operationId": "getMobileWatchlist",
+                "summary": "Получить личный watchlist",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Только видимые тайтлы текущего пользователя",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserLibraryPageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            }
+        },
+        "/api/v1/me/ratings": {
+            "get": {
+                "operationId": "getMobileRatings",
+                "summary": "Получить личные оценки",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Только видимые оценённые тайтлы текущего пользователя",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserLibraryPageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            }
+        },
+        "/api/v1/me/watchlist/{catalogTitle}": {
+            "put": {
+                "operationId": "addMobileWatchlistTitle",
+                "summary": "Добавить тайтл в watchlist",
+                "description": "Идемпотентно устанавливает желаемое состояние in_watchlist=true. Требует подтверждённый email.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CatalogTitle"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Актуальное состояние тайтла",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserTitleStateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "removeMobileWatchlistTitle",
+                "summary": "Удалить тайтл из watchlist",
+                "description": "Идемпотентно устанавливает желаемое состояние in_watchlist=false. Требует подтверждённый email.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CatalogTitle"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Актуальное состояние тайтла",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserTitleStateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/api/v1/me/ratings/{catalogTitle}": {
+            "put": {
+                "operationId": "setMobileTitleRating",
+                "summary": "Установить личную оценку тайтла",
+                "description": "Идемпотентно устанавливает rating в диапазоне 1–10. Требует подтверждённый email.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CatalogTitle"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetRatingRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Актуальное состояние тайтла",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserTitleStateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "clearMobileTitleRating",
+                "summary": "Очистить личную оценку тайтла",
+                "description": "Идемпотентно устанавливает rating=null. Требует подтверждённый email.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/CatalogTitle"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Актуальное состояние тайтла",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserTitleStateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
+        },
+        "/api/v1/me/continue-watching": {
+            "get": {
+                "operationId": "getMobileContinueWatching",
+                "summary": "Получить Continue Watching",
+                "description": "Возвращает по одному актуальному действию continue или next на тайтл.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 24,
+                            "default": 12
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Доступные действия продолжения просмотра",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ContinueWatchingResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            }
+        },
+        "/api/v1/me/history": {
+            "get": {
+                "operationId": "getMobileViewingHistory",
+                "summary": "Получить историю просмотров",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 48,
+                            "default": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Owner-scoped история, включая недоступные старые релизы с is_accessible=false",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ViewingHistoryPageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "clearMobileViewingHistory",
+                "summary": "Очистить историю просмотров",
+                "description": "Удаляет только playback activity текущего пользователя. Требует подтверждённый email.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "История очищена"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    }
+                }
+            }
+        },
+        "/api/v1/me/history/{episodeViewProgress}": {
+            "delete": {
+                "operationId": "deleteMobileViewingHistoryItem",
+                "summary": "Удалить запись истории просмотров",
+                "description": "Owner-scoped удаление; чужой numeric id отвечает 404. Требует подтверждённый email.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "episodeViewProgress",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Запись удалена"
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/NotFound"
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -1398,6 +1827,16 @@
                 "name": "titleSlug",
                 "in": "path",
                 "required": true,
+                "schema": {
+                    "type": "string",
+                    "minLength": 1
+                }
+            },
+            "CatalogTitle": {
+                "name": "catalogTitle",
+                "in": "path",
+                "required": true,
+                "description": "Публичный slug доступного текущему пользователю тайтла.",
                 "schema": {
                     "type": "string",
                     "minLength": 1
@@ -1489,6 +1928,439 @@
                 "properties": {
                     "data": {
                         "$ref": "#/components/schemas/User"
+                    }
+                }
+            },
+            "UserTitleStateResponse": {
+                "type": "object",
+                "required": [
+                    "data"
+                ],
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/UserTitleState"
+                    }
+                }
+            },
+            "UserTitleState": {
+                "type": "object",
+                "required": [
+                    "in_watchlist",
+                    "rating",
+                    "aggregate",
+                    "rating_range",
+                    "primary_action"
+                ],
+                "properties": {
+                    "in_watchlist": {
+                        "type": "boolean"
+                    },
+                    "rating": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1,
+                        "maximum": 10
+                    },
+                    "aggregate": {
+                        "type": "object",
+                        "required": [
+                            "watchlist_count",
+                            "rating_count",
+                            "rating_average"
+                        ],
+                        "properties": {
+                            "watchlist_count": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "rating_count": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "rating_average": {
+                                "type": [
+                                    "number",
+                                    "null"
+                                ],
+                                "minimum": 1,
+                                "maximum": 10
+                            }
+                        }
+                    },
+                    "rating_range": {
+                        "type": "object",
+                        "required": [
+                            "minimum",
+                            "maximum"
+                        ],
+                        "properties": {
+                            "minimum": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 10
+                            },
+                            "maximum": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 10
+                            }
+                        }
+                    },
+                    "primary_action": {
+                        "type": "object",
+                        "required": [
+                            "type",
+                            "label",
+                            "season_id",
+                            "episode_id",
+                            "media_id",
+                            "position_seconds",
+                            "playable"
+                        ],
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "enum": [
+                                    "continue",
+                                    "next",
+                                    "replay",
+                                    "start",
+                                    "title-media",
+                                    "unavailable"
+                                ]
+                            },
+                            "label": {
+                                "type": "string"
+                            },
+                            "season_id": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "episode_id": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "media_id": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "position_seconds": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "playable": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                }
+            },
+            "SetRatingRequest": {
+                "type": "object",
+                "required": [
+                    "rating"
+                ],
+                "properties": {
+                    "rating": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10
+                    }
+                }
+            },
+            "UserLibraryItem": {
+                "type": "object",
+                "required": [
+                    "title",
+                    "state"
+                ],
+                "properties": {
+                    "title": {
+                        "$ref": "#/components/schemas/TitleCard"
+                    },
+                    "state": {
+                        "type": "object",
+                        "required": [
+                            "in_watchlist",
+                            "rating",
+                            "updated_at"
+                        ],
+                        "properties": {
+                            "in_watchlist": {
+                                "type": "boolean"
+                            },
+                            "rating": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ],
+                                "minimum": 1,
+                                "maximum": 10
+                            },
+                            "updated_at": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "format": "date-time"
+                            }
+                        }
+                    }
+                }
+            },
+            "UserLibraryPageResponse": {
+                "type": "object",
+                "required": [
+                    "data",
+                    "links",
+                    "meta"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/UserLibraryItem"
+                        }
+                    },
+                    "links": {
+                        "type": "object"
+                    },
+                    "meta": {
+                        "type": "object"
+                    }
+                }
+            },
+            "ContinueWatchingItem": {
+                "type": "object",
+                "required": [
+                    "action",
+                    "label",
+                    "position_seconds",
+                    "progress_percent",
+                    "title",
+                    "episode"
+                ],
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "continue",
+                            "next"
+                        ]
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "position_seconds": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "progress_percent": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 100
+                    },
+                    "title": {
+                        "$ref": "#/components/schemas/TitleCard"
+                    },
+                    "episode": {
+                        "$ref": "#/components/schemas/Episode"
+                    }
+                }
+            },
+            "ContinueWatchingResponse": {
+                "type": "object",
+                "required": [
+                    "data"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ContinueWatchingItem"
+                        }
+                    }
+                }
+            },
+            "ViewingHistoryItem": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "position_seconds",
+                    "duration_seconds",
+                    "progress_percent",
+                    "completed",
+                    "completed_at",
+                    "first_started_at",
+                    "last_watched_at",
+                    "is_accessible",
+                    "title",
+                    "season",
+                    "episode"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "position_seconds": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "duration_seconds": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "progress_percent": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0,
+                        "maximum": 100
+                    },
+                    "completed": {
+                        "type": "boolean"
+                    },
+                    "completed_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "first_started_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "last_watched_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "is_accessible": {
+                        "type": "boolean"
+                    },
+                    "title": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "slug": {
+                                "type": "string"
+                            },
+                            "title": {
+                                "type": "string"
+                            },
+                            "poster_url": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "deleted": {
+                                "type": "boolean"
+                            }
+                        }
+                    },
+                    "season": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "number": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "title": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "deleted": {
+                                "type": "boolean"
+                            }
+                        }
+                    },
+                    "episode": {
+                        "type": [
+                            "object",
+                            "null"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "season_id": {
+                                "type": "integer"
+                            },
+                            "number": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ]
+                            },
+                            "title": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "deleted": {
+                                "type": "boolean"
+                            }
+                        }
+                    }
+                }
+            },
+            "ViewingHistoryPageResponse": {
+                "type": "object",
+                "required": [
+                    "data",
+                    "links",
+                    "meta"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ViewingHistoryItem"
+                        }
+                    },
+                    "links": {
+                        "type": "object"
+                    },
+                    "meta": {
+                        "type": "object"
                     }
                 }
             },
@@ -2382,7 +3254,7 @@
                 }
             },
             "Forbidden": {
-                "description": "Token не имеет требуемой ability или signed URL недействителен",
+                "description": "Token не имеет требуемой ability, signed URL недействителен или mutation требует повторного подтверждения email",
                 "content": {
                     "application/json": {
                         "schema": {
@@ -2393,6 +3265,13 @@
                                 "value": {
                                     "code": "forbidden",
                                     "message": "Доступ запрещён.",
+                                    "request_id": "01J00000000000000000000000"
+                                }
+                            },
+                            "emailNotVerified": {
+                                "value": {
+                                    "code": "email_not_verified",
+                                    "message": "Подтвердите email, чтобы изменить данные профиля.",
                                     "request_id": "01J00000000000000000000000"
                                 }
                             }

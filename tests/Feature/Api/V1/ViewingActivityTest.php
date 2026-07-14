@@ -11,12 +11,38 @@ use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 final class ViewingActivityTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_viewing_activity_requires_a_valid_token_and_disables_shared_cache(): void
+    {
+        foreach (['/api/v1/me/continue-watching', '/api/v1/me/history'] as $endpoint) {
+            $this->getJson($endpoint)
+                ->assertUnauthorized()
+                ->assertHeader('Cache-Control', 'no-store, private')
+                ->assertHeaderMissing('ETag');
+            $this->withToken('invalid-mobile-token')
+                ->getJson($endpoint)
+                ->assertUnauthorized()
+                ->assertHeader('Cache-Control', 'no-store, private')
+                ->assertHeaderMissing('ETag');
+        }
+
+        Sanctum::actingAs(User::factory()->unverified()->create(), ['mobile:read']);
+
+        foreach (['/api/v1/me/continue-watching', '/api/v1/me/history'] as $endpoint) {
+            $this->withHeader('Authorization', '')
+                ->getJson($endpoint)
+                ->assertOk()
+                ->assertHeader('Cache-Control', 'no-store, private')
+                ->assertHeaderMissing('ETag');
+        }
+    }
 
     public function test_continue_watching_uses_current_and_next_actions_for_owner_only(): void
     {
@@ -154,7 +180,10 @@ final class ViewingActivityTest extends TestCase
         $pageVisit = EpisodeViewProgress::query()->create([
             'user_id' => $user->id,
             'catalog_title_id' => $title->id,
-            'episode_id' => Episode::factory()->create(['season_id' => $episodes[0]->season_id])->id,
+            'episode_id' => Episode::factory()->create([
+                'season_id' => $episodes[0]->season_id,
+                'number' => 99,
+            ])->id,
             'position_seconds' => 0,
             'duration_seconds' => 0,
             'first_started_at' => null,
@@ -181,6 +210,93 @@ final class ViewingActivityTest extends TestCase
             ->assertJsonPath('code', 'email_not_verified');
 
         $this->assertModelExists($progress);
+
+        $this->deleteJson('/api/v1/me/history')
+            ->assertForbidden()
+            ->assertJsonPath('code', 'email_not_verified');
+        $this->assertModelExists($progress);
+    }
+
+    public function test_history_mutations_require_a_valid_write_token(): void
+    {
+        $user = User::factory()->create();
+        [$title, $episodes] = $this->createWatchableTitle('history-write-token');
+        $progress = $this->createProgress($user, $title, $episodes[0], now(), 60, 10);
+        $endpoints = [
+            "/api/v1/me/history/{$progress->id}",
+            '/api/v1/me/history',
+        ];
+
+        foreach ($endpoints as $endpoint) {
+            $this->deleteJson($endpoint)
+                ->assertUnauthorized()
+                ->assertHeader('Cache-Control', 'no-store, private');
+        }
+
+        foreach ($endpoints as $endpoint) {
+            $this->withToken('invalid-mobile-token')
+                ->deleteJson($endpoint)
+                ->assertUnauthorized();
+        }
+
+        Sanctum::actingAs($user, ['mobile:read']);
+
+        foreach ($endpoints as $endpoint) {
+            $this->withHeader('Authorization', '')
+                ->deleteJson($endpoint)
+                ->assertForbidden()
+                ->assertJsonPath('code', 'forbidden');
+        }
+
+        $this->assertModelExists($progress);
+    }
+
+    public function test_history_query_count_stays_constant_as_the_page_grows(): void
+    {
+        $user = User::factory()->create();
+        [$title, $episodes] = $this->createWatchableTitle('history-query-budget');
+        $this->createProgress($user, $title, $episodes[0], now(), 60, 10);
+        Sanctum::actingAs($user, ['mobile:read']);
+
+        $oneItemQueries = $this->captureQueries(
+            fn () => $this->getJson('/api/v1/me/history?per_page=20')->assertOk(),
+        );
+
+        foreach (range(3, 21) as $number) {
+            $episode = Episode::factory()->create([
+                'season_id' => $episodes[0]->season_id,
+                'number' => $number,
+                'sort_order' => $number,
+            ]);
+            LicensedMedia::factory()->create([
+                'catalog_title_id' => $title->id,
+                'season_id' => $episodes[0]->season_id,
+                'episode_id' => $episode->id,
+                'status' => 'published',
+                'published_at' => now(),
+            ]);
+            $this->createProgress($user, $title, $episode, now()->subMinutes($number), 60, 10);
+        }
+
+        $twentyItemQueries = $this->captureQueries(
+            fn () => $this->getJson('/api/v1/me/history?per_page=20')
+                ->assertOk()
+                ->assertJsonCount(20, 'data'),
+        );
+
+        $this->assertLessThanOrEqual($oneItemQueries + 1, $twentyItemQueries);
+    }
+
+    public function test_openapi_describes_continue_watching_and_history_contracts(): void
+    {
+        $this->getJson('/api/openapi.json')
+            ->assertOk()
+            ->assertJsonPath('paths./api/v1/me/continue-watching.get.operationId', 'getMobileContinueWatching')
+            ->assertJsonPath('paths./api/v1/me/history.get.operationId', 'getMobileViewingHistory')
+            ->assertJsonPath('paths./api/v1/me/history/{episodeViewProgress}.delete.operationId', 'deleteMobileViewingHistoryItem')
+            ->assertJsonPath('paths./api/v1/me/history.delete.operationId', 'clearMobileViewingHistory')
+            ->assertJsonPath('components.schemas.ContinueWatchingItem.properties.action.enum.0', 'continue')
+            ->assertJsonPath('components.schemas.ContinueWatchingItem.properties.action.enum.1', 'next');
     }
 
     /** @return array{CatalogTitle, array{Episode, Episode}} */
@@ -233,5 +349,20 @@ final class ViewingActivityTest extends TestCase
             'first_started_at' => $watchedAt,
             'last_watched_at' => $watchedAt,
         ]);
+    }
+
+    private function captureQueries(callable $callback): int
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        try {
+            $callback();
+
+            return count(DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+            DB::flushQueryLog();
+        }
     }
 }

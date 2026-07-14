@@ -71,6 +71,15 @@
 - Read endpoints требуют `mobile:read`, изменения и отзыв tokens — дополнительно `mobile:write`. Credential endpoints имеют отдельные named budgets: register/login — 5 в минуту, resend verification — 3 в минуту, forgot/reset — 3 за 10 минут, refresh — 20 в минуту на текущий token. Публичный каталог не получает эти limits.
 - `VerifyMobileEmail` и `ResetMobilePassword` реализуют queued notifications. В production mail transport, `QUEUE_CONNECTION` и worker настраиваются вне Git; секреты и значения `.env` в документацию/репозиторий не переносятся.
 
+## Личное состояние каталога v1
+
+- `GET /api/v1/me/titles/{catalogTitle}/state` возвращает `in_watchlist`, личную оценку, отдельный aggregate пользовательских оценок, диапазон 1–10 и безопасный primary action. Provider ratings остаются отдельными данными карточки.
+- `PUT`/`DELETE /api/v1/me/watchlist/{catalogTitle}` задают желаемое состояние `true`/`false`, а `PUT`/`DELETE /api/v1/me/ratings/{catalogTitle}` — целую оценку 1–10 или `null`. Повтор одного запроса идемпотентен. Favorites не является второй сущностью: это тот же watchlist.
+- `GET /api/v1/me/watchlist` и `GET /api/v1/me/ratings` возвращают стандартную пагинацию `data`, `links`, `meta`, только строки текущего пользователя и только тайтлы, доступные ему сейчас. Размер страницы — 1–50, порядок — от последнего изменения.
+- `GET /api/v1/me/continue-watching` принимает `limit` 1–24 и возвращает одно действие `continue` или `next` на тайтл с позицией и процентом. `GET /api/v1/me/history` принимает `page` и `per_page` 1–48; старый скрытый или удалённый релиз остаётся в истории с `is_accessible=false`, но не становится доступным для воспроизведения.
+- `DELETE /api/v1/me/history/{episodeViewProgress}` удаляет только owner-scoped запись и маскирует чужой numeric ID как `not_found`; `DELETE /api/v1/me/history` очищает только фактическую playback activity текущего пользователя.
+- Все private reads требуют Bearer token с `mobile:read`. Mutations дополнительно требуют `mobile:write` и подтверждённый email; unverified пользователь продолжает читать своё состояние, но получает `email_not_verified`/403 при изменении. Все ответы private/no-store и не содержат ETag.
+
 ## Формат ответов
 
 - Eloquent-модели не возвращаются напрямую. JSON готовят Laravel API Resources в `app/Http/Resources`.
