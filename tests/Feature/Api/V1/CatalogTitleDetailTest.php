@@ -16,6 +16,7 @@ use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 final class CatalogTitleDetailTest extends TestCase
@@ -205,6 +206,27 @@ final class CatalogTitleDetailTest extends TestCase
             ->assertJsonMissingPath('components.schemas.MediaProfile.properties.source_url');
     }
 
+    public function test_title_detail_query_count_is_constant_as_release_count_grows(): void
+    {
+        $title = CatalogTitle::factory()->create(['slug' => 'detail-budget-title']);
+        $this->createWatchableRelease($title, ContentAudience::Public, 1);
+        $oneReleaseQueries = $this->captureQueries(
+            fn () => $this->getJson('/api/v1/titles/detail-budget-title')->assertOk(),
+        );
+
+        foreach (range(2, 20) as $number) {
+            $this->createWatchableRelease($title, ContentAudience::Public, $number);
+        }
+
+        $twentyReleaseQueries = $this->captureQueries(
+            fn () => $this->getJson('/api/v1/titles/detail-budget-title')
+                ->assertOk()
+                ->assertJsonPath('data.counts.seasons', 20),
+        );
+
+        $this->assertLessThanOrEqual($oneReleaseQueries + 2, $twentyReleaseQueries);
+    }
+
     /** @param array<string, mixed> $seasonAttributes */
     private function createWatchableRelease(
         CatalogTitle $title,
@@ -232,5 +254,20 @@ final class CatalogTitleDetailTest extends TestCase
         ]);
 
         return $season;
+    }
+
+    private function captureQueries(callable $callback): int
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        try {
+            $callback();
+
+            return count(DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+            DB::flushQueryLog();
+        }
     }
 }

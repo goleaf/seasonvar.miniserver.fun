@@ -7,7 +7,10 @@ namespace Tests\Feature\Api\V1;
 use App\Models\Actor;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
+use App\Services\Catalog\CatalogHomeMetricsCache;
+use App\Services\Catalog\CatalogHomeSnapshotCache;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 final class CatalogDiscoveryTest extends TestCase
@@ -111,5 +114,63 @@ final class CatalogDiscoveryTest extends TestCase
             ->assertJsonPath('paths./api/v1/catalog/directories/{directory}.get.operationId', 'getCatalogDirectoryItems')
             ->assertJsonPath('paths./api/v1/catalog/directories/{directory}.get.parameters.0.name', 'directory')
             ->assertJsonPath('components.schemas.CatalogAlphabet.required.0', 'cyrillic');
+    }
+
+    public function test_directory_and_home_query_counts_are_constant_as_results_grow(): void
+    {
+        $directoryTitle = CatalogTitle::factory()->create(['slug' => 'directory-budget-title']);
+        $firstActor = Actor::query()->create(['name' => 'Budget Actor 1', 'slug' => 'budget-actor-1']);
+        $directoryTitle->actors()->attach($firstActor);
+        $oneDirectoryItemQueries = $this->captureQueries(
+            fn () => $this->getJson('/api/v1/catalog/directories/actors?per_page=20')->assertOk(),
+        );
+
+        foreach (range(2, 20) as $index) {
+            $actor = Actor::query()->create([
+                'name' => "Budget Actor {$index}",
+                'slug' => "budget-actor-{$index}",
+            ]);
+            $directoryTitle->actors()->attach($actor);
+        }
+
+        $twentyDirectoryItemQueries = $this->captureQueries(
+            fn () => $this->getJson('/api/v1/catalog/directories/actors?per_page=20')
+                ->assertOk()
+                ->assertJsonCount(20, 'data'),
+        );
+        $this->assertLessThanOrEqual($oneDirectoryItemQueries + 2, $twentyDirectoryItemQueries);
+
+        app(CatalogHomeSnapshotCache::class)->refresh();
+        app(CatalogHomeMetricsCache::class)->refresh();
+        $oneHomeItemQueries = $this->captureQueries(
+            fn () => $this->getJson('/api/v1/home')->assertOk(),
+        );
+
+        foreach (range(2, 20) as $index) {
+            CatalogTitle::factory()->create(['slug' => "home-budget-title-{$index}"]);
+        }
+
+        app(CatalogHomeSnapshotCache::class)->refresh();
+        app(CatalogHomeMetricsCache::class)->refresh();
+        $twentyHomeItemQueries = $this->captureQueries(
+            fn () => $this->getJson('/api/v1/home')->assertOk(),
+        );
+
+        $this->assertLessThanOrEqual($oneHomeItemQueries + 2, $twentyHomeItemQueries);
+    }
+
+    private function captureQueries(callable $callback): int
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        try {
+            $callback();
+
+            return count(DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+            DB::flushQueryLog();
+        }
     }
 }

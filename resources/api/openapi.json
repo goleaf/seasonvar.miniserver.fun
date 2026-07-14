@@ -83,6 +83,366 @@
                 }
             }
         },
+        "/api/v1/titles": {
+            "get": {
+                "operationId": "getCatalogTitles",
+                "summary": "Получить отфильтрованный каталог тайтлов",
+                "description": "Массивы принимаются как повторяющиеся значения, с [] или индексами: country=turciia, country[]=turciia и country[0]=turciia.",
+                "security": [
+                    {},
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 80
+                        }
+                    },
+                    {
+                        "name": "year",
+                        "in": "query",
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "type": "array",
+                            "maxItems": 20,
+                            "items": {
+                                "type": "integer",
+                                "minimum": 1900
+                            }
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "relevance",
+                                "updated",
+                                "year_desc",
+                                "year_asc",
+                                "episodes_desc",
+                                "seasons_desc",
+                                "with_video",
+                                "title_asc",
+                                "title_desc",
+                                "kinopoisk_desc",
+                                "imdb_desc",
+                                "popularity_desc"
+                            ],
+                            "default": "updated"
+                        }
+                    },
+                    {
+                        "name": "letter",
+                        "in": "query",
+                        "description": "Одна буква, # или legacy-группа latin",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "genre",
+                        "in": "query",
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/SlugFilterArray"
+                        }
+                    },
+                    {
+                        "name": "country",
+                        "in": "query",
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/SlugFilterArray"
+                        }
+                    },
+                    {
+                        "name": "actor",
+                        "in": "query",
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/SlugFilterArray"
+                        }
+                    },
+                    {
+                        "name": "director",
+                        "in": "query",
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/SlugFilterArray"
+                        }
+                    },
+                    {
+                        "name": "age_rating",
+                        "in": "query",
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/SlugFilterArray"
+                        }
+                    },
+                    {
+                        "name": "translation",
+                        "in": "query",
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/SlugFilterArray"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/SlugFilterArray"
+                        }
+                    },
+                    {
+                        "name": "network",
+                        "in": "query",
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/SlugFilterArray"
+                        }
+                    },
+                    {
+                        "name": "studio",
+                        "in": "query",
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/SlugFilterArray"
+                        }
+                    },
+                    {
+                        "name": "tag",
+                        "in": "query",
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/SlugFilterArray"
+                        }
+                    },
+                    {
+                        "name": "exclude_country",
+                        "in": "query",
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/SlugFilterArray"
+                        }
+                    },
+                    {
+                        "name": "exclude_genre",
+                        "in": "query",
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "$ref": "#/components/schemas/SlugFilterArray"
+                        }
+                    },
+                    {
+                        "name": "year_from",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1900
+                        }
+                    },
+                    {
+                        "name": "year_to",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1900
+                        }
+                    },
+                    {
+                        "name": "seasons_min",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9999
+                        }
+                    },
+                    {
+                        "name": "seasons_max",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9999
+                        }
+                    },
+                    {
+                        "name": "episodes_min",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 999999
+                        }
+                    },
+                    {
+                        "name": "episodes_max",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 999999
+                        }
+                    },
+                    {
+                        "name": "rating_source",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "imdb",
+                                "kinopoisk"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "rating_min",
+                        "in": "query",
+                        "schema": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 10
+                        }
+                    },
+                    {
+                        "name": "votes_min",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 0
+                        }
+                    },
+                    {
+                        "name": "video",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "available",
+                                "missing"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "subtitles",
+                        "in": "query",
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "type": "array",
+                            "maxItems": 2,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "available",
+                                    "missing"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "quality",
+                        "in": "query",
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "type": "array",
+                            "maxItems": 20,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "2160p",
+                                    "1440p",
+                                    "1080p",
+                                    "720p",
+                                    "480p",
+                                    "360p",
+                                    "240p"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "publication_type",
+                        "in": "query",
+                        "style": "form",
+                        "explode": true,
+                        "schema": {
+                            "type": "array",
+                            "maxItems": 5,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "serial",
+                                    "show",
+                                    "anime",
+                                    "documentary",
+                                    "unknown"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "name": "updated",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "week",
+                                "month",
+                                "year"
+                            ]
+                        }
+                    },
+                    {
+                        "$ref": "#/components/parameters/Page"
+                    },
+                    {
+                        "$ref": "#/components/parameters/PerPage"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Пагинированные безопасные карточки тайтлов",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CatalogTitlePageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    }
+                }
+            }
+        },
         "/api/v1/catalog/filters": {
             "get": {
                 "operationId": "getCatalogFilterSchema",
@@ -571,6 +931,113 @@
                                 "type": "string"
                             }
                         }
+                    }
+                }
+            },
+            "SlugFilterArray": {
+                "type": "array",
+                "maxItems": 20,
+                "uniqueItems": true,
+                "items": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                }
+            },
+            "TitleCard": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "slug",
+                    "title",
+                    "original_title",
+                    "type",
+                    "year",
+                    "description",
+                    "poster_url",
+                    "counts",
+                    "taxonomies",
+                    "links"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "slug": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "original_title": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "year": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ]
+                    },
+                    "description": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "poster_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "indexed_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "counts": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": [
+                                "integer",
+                                "null"
+                            ]
+                        }
+                    },
+                    "taxonomies": {
+                        "type": "object"
+                    },
+                    "links": {
+                        "type": "object"
+                    }
+                }
+            },
+            "CatalogTitlePageResponse": {
+                "type": "object",
+                "required": [
+                    "data",
+                    "links",
+                    "meta"
+                ],
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/TitleCard"
+                        }
+                    },
+                    "links": {
+                        "type": "object"
+                    },
+                    "meta": {
+                        "type": "object"
                     }
                 }
             },

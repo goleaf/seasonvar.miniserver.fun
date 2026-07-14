@@ -9,6 +9,7 @@ use App\Models\CatalogTitle;
 use App\Models\Country;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 final class CatalogTitleIndexTest extends TestCase
@@ -102,6 +103,39 @@ final class CatalogTitleIndexTest extends TestCase
             $this->getJson('/api/v1/titles?'.$query)
                 ->assertUnprocessable()
                 ->assertJsonPath('code', 'validation_failed');
+        }
+    }
+
+    public function test_v1_title_list_query_count_is_constant_as_the_page_grows(): void
+    {
+        CatalogTitle::factory()->create(['slug' => 'budget-title-1']);
+        $oneItemQueries = $this->captureQueries(
+            fn () => $this->getJson('/api/v1/titles?per_page=20')->assertOk(),
+        );
+
+        foreach (range(2, 20) as $index) {
+            CatalogTitle::factory()->create(['slug' => "budget-title-{$index}"]);
+        }
+
+        $twentyItemQueries = $this->captureQueries(
+            fn () => $this->getJson('/api/v1/titles?per_page=20')->assertOk()->assertJsonCount(20, 'data'),
+        );
+
+        $this->assertLessThanOrEqual($oneItemQueries + 2, $twentyItemQueries);
+    }
+
+    private function captureQueries(callable $callback): int
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        try {
+            $callback();
+
+            return count(DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+            DB::flushQueryLog();
         }
     }
 }

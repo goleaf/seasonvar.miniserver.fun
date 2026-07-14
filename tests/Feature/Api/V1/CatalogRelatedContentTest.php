@@ -10,8 +10,14 @@ use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
 use App\Models\CatalogTitleReview;
 use App\Models\Director;
+use App\Models\Episode;
+use App\Models\LicensedMedia;
+use App\Models\Season;
 use App\Models\SourcePage;
+use App\Services\Catalog\CatalogHomeMetricsCache;
+use App\Services\Catalog\CatalogHomeSnapshotCache;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 final class CatalogRelatedContentTest extends TestCase
@@ -146,6 +152,144 @@ final class CatalogRelatedContentTest extends TestCase
             ->assertJsonPath('paths./api/v1/titles/{titleSlug}/reviews.get.operationId', 'getCatalogTitleReviews')
             ->assertJsonPath('components.schemas.SearchSuggestion.required.0', 'type')
             ->assertJsonPath('components.schemas.CatalogReview.required.0', 'id');
+    }
+
+    public function test_every_public_v1_endpoint_excludes_catalog_source_and_algorithm_internals(): void
+    {
+        $markers = [
+            'https://seasonvar.ru/private-v1-title-source',
+            str_repeat('a', 64),
+            'private-v1-external-id',
+            str_repeat('b', 64),
+            'private-v1-storage-disk',
+            'licensed/private-v1-path.mp4',
+            'https://media.example.com/private-v1-playback.m3u8',
+            'https://seasonvar.ru/private-v1-media-source',
+            'private-v1-source-media-key',
+            'private-v1-algorithm-version',
+            'private-v1-reason-marker',
+            str_repeat('c', 64),
+            'https://seasonvar.ru/private-v1-review-source',
+        ];
+        $title = CatalogTitle::factory()->create([
+            'slug' => 'privacy-v1-title',
+            'title' => 'Privacy V1 Title',
+            'source_url' => $markers[0],
+            'source_url_hash' => $markers[1],
+            'external_id' => $markers[2],
+            'content_hash' => $markers[3],
+        ]);
+        $actor = Actor::query()->create([
+            'name' => 'Privacy V1 Actor',
+            'slug' => 'privacy-v1-actor',
+            'source_url' => 'https://seasonvar.ru/private-v1-actor-source',
+        ]);
+        $title->actors()->attach($actor);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $title->id,
+            'source_url' => 'https://seasonvar.ru/private-v1-season-source',
+        ]);
+        $episode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'source_url' => 'https://seasonvar.ru/private-v1-episode-source',
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $title->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'status' => 'published',
+            'storage_disk' => $markers[4],
+            'path' => $markers[5],
+            'playback_url' => $markers[6],
+            'source_url' => $markers[7],
+            'source_media_key' => $markers[8],
+            'health_status' => 'degraded',
+            'last_error_category' => 'timeout',
+            'last_http_status' => 599,
+            'published_at' => now(),
+        ]);
+        $recommended = CatalogTitle::factory()->create(['slug' => 'privacy-v1-recommended']);
+        CatalogTitleRecommendation::query()->create([
+            'catalog_title_id' => $title->id,
+            'recommended_title_id' => $recommended->id,
+            'rank' => 1,
+            'score' => 999,
+            'algorithm_version' => $markers[9],
+            'reasons' => [$markers[10] => ['score' => 999]],
+            'computed_at' => now(),
+        ]);
+        $sourcePage = SourcePage::factory()->create([
+            'url' => $markers[12],
+            'url_hash' => hash('sha256', $markers[12]),
+        ]);
+        CatalogTitleReview::query()->create([
+            'catalog_title_id' => $title->id,
+            'source_page_id' => $sourcePage->id,
+            'author' => 'Публичный автор',
+            'body' => 'Публичный текст отзыва.',
+            'body_hash' => $markers[11],
+            'published_at' => now(),
+        ]);
+
+        app(CatalogHomeSnapshotCache::class)->refresh();
+        app(CatalogHomeMetricsCache::class)->refresh();
+
+        $responses = [
+            $this->getJson('/api/v1/config'),
+            $this->getJson('/api/v1/health'),
+            $this->getJson('/api/v1/home'),
+            $this->getJson('/api/v1/catalog/filters'),
+            $this->getJson('/api/v1/catalog/directories'),
+            $this->getJson('/api/v1/catalog/directories/actors'),
+            $this->getJson('/api/v1/titles?per_page=50'),
+            $this->getJson('/api/v1/titles/privacy-v1-title'),
+            $this->getJson('/api/v1/titles/privacy-v1-title/seasons'),
+            $this->getJson("/api/v1/titles/privacy-v1-title/seasons/{$season->id}/episodes"),
+            $this->getJson('/api/v1/search/suggestions?q=Privacy'),
+            $this->getJson('/api/v1/titles/privacy-v1-title/recommendations'),
+            $this->getJson('/api/v1/titles/privacy-v1-title/reviews'),
+        ];
+
+        foreach ($responses as $response) {
+            $response->assertOk();
+
+            foreach ($markers as $marker) {
+                $response->assertDontSee($marker, false);
+            }
+
+            foreach ([
+                'source_url',
+                'source_url_hash',
+                'content_hash',
+                'external_id',
+                'storage_disk',
+                'playback_url',
+                'source_media_key',
+                'health_status',
+                'last_http_status',
+                'body_hash',
+                'algorithm_version',
+                'metadata_score',
+                'quality_score',
+            ] as $privateField) {
+                $response->assertDontSee($privateField, false);
+            }
+        }
+    }
+
+    public function test_openapi_contains_every_public_v1_get_route(): void
+    {
+        $paths = array_keys((array) $this->getJson('/api/openapi.json')->assertOk()->json('paths'));
+        $publicV1Paths = collect(Route::getRoutes()->getRoutes())
+            ->filter(fn ($route): bool => str_starts_with($route->uri(), 'api/v1/'))
+            ->filter(fn ($route): bool => in_array('GET', $route->methods(), true))
+            ->map(fn ($route): string => '/'.$route->uri())
+            ->unique()
+            ->values();
+
+        foreach ($publicV1Paths as $path) {
+            $this->assertContains($path, $paths, "OpenAPI не описывает {$path}.");
+        }
     }
 
     /** @param array<string, array<string, int>> $reasons */

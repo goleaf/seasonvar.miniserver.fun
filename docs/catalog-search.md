@@ -14,6 +14,8 @@ HTTP query-параметр `q` проходит через `CatalogTitlesReques
 
 Фильтр названий выводит отдельные группы кириллицы и индивидуальных латинских букв `A`–`Z`; выбор латинской буквы передаёт её как обычное значение `letter`. Контракт query-параметра не меняется: `letter=latin` продолжает поддерживаться как legacy-значение всей латиницы, `#` означает названия не с буквы, а кириллическая `Е` по-прежнему охватывает `Е` и `Ё`. Пагинация сохраняет route-контекст и все активные query-фильтры как в Livewire-переходе, так и в обычном GET fallback.
 
+Mobile `GET /api/v1/titles` переиспользует ту же `CatalogTitlesRequest` normalization и `CatalogTitlesPageBuilder`, но не принимает web-only `view`, `type`, `taxonomy`. Его `per_page` равен 20 по умолчанию и ограничен 1–50. Indexed/unindexed PHP-массивы (`country[0]=turciia`, `country[]=turciia`) и повторяемые значения имеют одинаковый смысл. `GET /api/v1/catalog/filters` публикует отдельные `cyrillic`, `latin` и `other`, а directory API применяет тот же `CatalogDirectoryQuery` с отдельным v1 page size без изменения web defaults.
+
 Расширенный UI «Точный подбор» не вводит новых query keys: он группирует существующие `year_from`, `year_to`, `updated`, `seasons_min`, `seasons_max`, `episodes_min`, `episodes_max`, `rating_source`, `rating_min`, `votes_min`, `video` и повторяемый `quality[]`. Групповой сброс удаляет только эти ключи, сохраняя `q`, обычные группы, `letter`, `sort`, `view` и `per_page`. Livewire action и обычный GET reset URL используют один и тот же allowlist из `CatalogSeriesFilters::ADVANCED_REQUEST_PROPERTIES`.
 
 `CatalogSearchQueryParser::parse()` принимает строку и возвращает неизменяемый объект запроса. Он содержит отображаемую строку `raw`, нормализованный ключ `normalized`, не более восьми значимых токенов в исходном порядке, один распознанный год, состояние запроса, безопасное FTS5-выражение и SHA-256-хэши вариантов точного имени.
@@ -99,6 +101,8 @@ Importer индексирует только изменившийся тайтл
 ## People lookup и typo suggestions
 
 `GET /api/catalog/people?type=actor&q=Иван` принимает только `actor` или `director`, нормализованную строку 2–80 символов и возвращает через API Resource максимум 20 публичных вариантов: `type`, `slug`, `name`, `count`. Внутренние ID, publication state и source fields не сериализуются. Клиентский combobox использует debounce 300 мс, отменяет предыдущий `fetch` через `AbortController`, поддерживает стрелки, Enter и Escape; выбранный slug добавляется в обычный GET query.
+
+Mobile `GET /api/v1/search/suggestions` использует тот же parser, FTS candidate order и visibility boundary, но объединяет максимум 5 title, 5 actor и 5 director suggestions. Search score, FTS document и index state не сериализуются.
 
 `CatalogSearchSuggestion` работает только при готовом FTS и истинном нуле: если исходный FTS candidate существует, подсказки не строятся даже при конфликтующем фильтре. SQL по параметризованным общим триграммам отбирает не более 60 search documents, Dice similarity отбрасывает слабые совпадения, а UI показывает не более трёх ссылок в отдельном блоке `Возможно, подойдет`. Подсказки не входят в paginator, result count, canonical URL или SEO-утверждение о совпадениях.
 

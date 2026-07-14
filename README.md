@@ -14,7 +14,7 @@ Laravel-приложение для локального каталога сер
 
 ## Mobile JSON API
 
-`GET /api` публикует discovery для стабильного `/api/v1`, а project-owned OpenAPI доступен по ссылке из манифеста. Foundation уже включает safe config/health, единый request ID/error envelope, 90-дневное Sanctum token storage и fail-closed cache для Bearer requests; legacy JSON API сохраняется без breaking changes. Полный route/version/security contract находится в [`docs/api.md`](docs/api.md).
+`GET /api` публикует discovery для стабильного `/api/v1`, а project-owned OpenAPI доступен по ссылке из манифеста. Public v1 уже включает home, полный фильтрованный каталог, schema-driven filters, 11 directories, карточку тайтла, сезоны/серии с безопасными media profiles, подсказки, рекомендации и read-only отзывы. Единый request ID/error envelope, optional audience personalization, 90-дневное Sanctum token storage и fail-closed cache для Bearer requests не меняют legacy JSON API. Полный route/query/response/security contract находится в [`docs/api.md`](docs/api.md).
 
 ## Основные команды
 

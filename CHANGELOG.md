@@ -2,6 +2,7 @@
 
 ## 2026-07-14
 
+- Completed the public mobile catalog API v1: home, full filter parity with indexed/unindexed arrays, schema-driven Cyrillic/Latin alphabets, 11 directories, title details, audience-safe seasons/episodes/media profiles, bounded suggestions, ranked recommendations and paginated imported reviews. OpenAPI now covers every public v1 GET; privacy, N+1 query-delta and guest-ETag versus Bearer-no-store regressions guard the contract.
 - Added the mobile API v1 foundation without breaking legacy JSON routes: `/api` discovery, project-owned OpenAPI 3.1, safe config/health endpoints, stable request-ID error envelopes, 90-day hashed Sanctum tokens with scheduled pruning, and fail-closed private caching for every Authorization request.
 - Made Livewire pagination portal-wide and resilient: catalog, directory, viewing-history and admin controls now retain real GET links, preserve route/query filters and scroll to their own refreshed results after morph. Split existing alphabet filters into labeled Cyrillic, Latin `A`–`Z` and symbol groups with deterministic desktop/mobile regression coverage.
 

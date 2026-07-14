@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\CatalogTitle;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -95,5 +96,26 @@ final class PublicHttpCacheHeadersTest extends TestCase
         $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
         $this->assertFalse($response->headers->has('ETag'));
         $this->assertFalse($response->headers->has('Last-Modified'));
+    }
+
+    public function test_v1_catalog_guest_supports_304_but_valid_sanctum_response_is_private(): void
+    {
+        CatalogTitle::factory()->create();
+        $guest = $this->getJson('/api/v1/titles')->assertOk()->assertHeader('ETag');
+        $etag = (string) $guest->headers->get('ETag');
+
+        $this->withHeader('If-None-Match', $etag)
+            ->getJson('/api/v1/titles')
+            ->assertStatus(304);
+
+        $user = User::factory()->create();
+        $token = $user->createToken('Cache test', ['mobile:read'], now()->addDay());
+        $authorized = $this->withToken($token->plainTextToken)->getJson('/api/v1/titles');
+
+        $authorized->assertOk()->assertHeader('Cache-Control');
+        $this->assertStringContainsString('private', (string) $authorized->headers->get('Cache-Control'));
+        $this->assertStringContainsString('no-store', (string) $authorized->headers->get('Cache-Control'));
+        $this->assertFalse($authorized->headers->has('ETag'));
+        $this->assertFalse($authorized->headers->has('Last-Modified'));
     }
 }
