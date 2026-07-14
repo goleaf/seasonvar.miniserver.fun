@@ -32,8 +32,12 @@ final class LocalRateLimitRemovalTest extends TestCase
             'titles.year',
             'titles.taxonomy',
             'api.catalog.people',
+            'api.discovery',
+            'api.openapi',
             'api.titles.index',
             'api.titles.show',
+            'api.v1.config',
+            'api.v1.health',
         ] as $routeName) {
             $route = Route::getRoutes()->getByName($routeName);
 

@@ -85,4 +85,15 @@ final class PublicHttpCacheHeadersTest extends TestCase
         $this->assertFalse($response->headers->has('ETag'));
         $this->assertFalse($response->headers->has('Last-Modified'));
     }
+
+    public function test_api_request_with_authorization_header_is_never_shared_cacheable(): void
+    {
+        $response = $this->withToken('invalid-mobile-token')->getJson('/api/v1/config');
+
+        $response->assertHeader('Cache-Control');
+        $this->assertStringContainsString('private', (string) $response->headers->get('Cache-Control'));
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        $this->assertFalse($response->headers->has('ETag'));
+        $this->assertFalse($response->headers->has('Last-Modified'));
+    }
 }

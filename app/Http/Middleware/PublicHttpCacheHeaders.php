@@ -21,9 +21,14 @@ final class PublicHttpCacheHeaders
         $response = $next($request);
 
         if (! $request->isMethodSafe()
+            || $request->headers->has('Authorization')
             || $request->user() !== null
             || $response->getStatusCode() !== Response::HTTP_OK
             || $response->headers->has('Set-Cookie')) {
+            $response->headers->set('Cache-Control', 'private, no-store');
+            $response->headers->remove('ETag');
+            $response->headers->remove('Last-Modified');
+
             return $response;
         }
 
