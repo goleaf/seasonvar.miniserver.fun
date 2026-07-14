@@ -48,12 +48,14 @@ class CatalogSeries extends Component
 
     public function mount(?int $year = null, ?string $type = null, ?string $taxonomy = null): void
     {
+        $normalizedTaxonomy = $taxonomy === null ? null : CatalogFilterSlug::normalize($taxonomy);
+
         abort_if($type !== null && CatalogFilterType::tryFrom($type) === null, 404);
-        abort_if($taxonomy !== null && CatalogFilterSlug::normalize($taxonomy) === null, 404);
+        abort_if($taxonomy !== null && $normalizedTaxonomy === null, 404);
 
         $this->routeYear = $year;
         $this->routeFilterType = $type;
-        $this->routeTaxonomy = $taxonomy;
+        $this->routeTaxonomy = $normalizedTaxonomy;
         $this->validateAndNormalizeState(Arr::except(request()->query->all(), ['page']));
 
         if ($this->initialPageNeedsCanonicalization() || $this->initialQueryUsesUnsupportedArraySyntax()) {
@@ -82,6 +84,12 @@ class CatalogSeries extends Component
         }
 
         if (! str_starts_with($property, 'filters.')) {
+            return;
+        }
+
+        if ($this->routeTaxonomyWasRemoved($property)) {
+            $this->leaveRouteTaxonomyContext();
+
             return;
         }
 
@@ -161,7 +169,10 @@ class CatalogSeries extends Component
         }
 
         if ($group === $this->routeFilterType) {
-            return $this->redirectRoute('titles.index', navigate: true);
+            $this->filters->resetGroup($group);
+            $this->leaveRouteTaxonomyContext();
+
+            return null;
         }
 
         if ($this->filters->resetGroup($group)) {
@@ -237,7 +248,10 @@ class CatalogSeries extends Component
         }
 
         if ($type === $this->routeFilterType && $slug === $this->routeTaxonomy) {
-            return $this->redirectRoute('titles.index', navigate: true);
+            $this->filters->removeTaxonomy($type, $slug);
+            $this->leaveRouteTaxonomyContext();
+
+            return null;
         }
 
         if ($this->filters->removeTaxonomy($type, $slug)) {
@@ -374,7 +388,7 @@ class CatalogSeries extends Component
 
     private function catalogUrl(int $page = 1): string
     {
-        $query = $this->filters->toRequestInput();
+        $query = $this->withoutRouteContext($this->filters->toRequestInput());
 
         if ($page > 1) {
             $query['page'] = $page;
@@ -405,7 +419,9 @@ class CatalogSeries extends Component
     /** @param array<string, mixed>|null $input */
     private function validateAndNormalizeState(?array $input = null): bool
     {
-        $request = $this->catalogRequest($input ?? $this->filters->toRequestInput());
+        $request = $this->catalogRequest(
+            $this->withRouteContext($input ?? $this->filters->toRequestInput()),
+        );
 
         try {
             $request->validateResolved();
@@ -419,6 +435,105 @@ class CatalogSeries extends Component
         $this->resetErrorBag();
 
         return true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function withRouteContext(array $input): array
+    {
+        if ($this->routeYear !== null) {
+            $input['year'] = $this->prependRouteValue($this->routeYear, $input['year'] ?? []);
+        }
+
+        if ($this->routeFilterType !== null
+            && $this->routeTaxonomy !== null
+            && array_key_exists($this->routeFilterType, CatalogSeriesFilters::TAXONOMY_PROPERTIES)) {
+            $input[$this->routeFilterType] = $this->prependRouteValue(
+                $this->routeTaxonomy,
+                $input[$this->routeFilterType] ?? [],
+            );
+        }
+
+        return $input;
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function withoutRouteContext(array $input): array
+    {
+        if ($this->routeYear !== null) {
+            $input = $this->withoutListValue($input, 'year', $this->routeYear);
+        }
+
+        if ($this->routeFilterType !== null && $this->routeTaxonomy !== null) {
+            $input = $this->withoutListValue($input, $this->routeFilterType, $this->routeTaxonomy);
+        }
+
+        return $input;
+    }
+
+    /** @return list<mixed> */
+    private function prependRouteValue(int|string $routeValue, mixed $values): array
+    {
+        $values = is_array($values) ? array_values($values) : [$values];
+
+        return collect([$routeValue, ...$values])->uniqueStrict()->values()->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private function withoutListValue(array $input, string $key, int|string $routeValue): array
+    {
+        $values = is_array($input[$key] ?? null) ? $input[$key] : [];
+        $values = array_values(array_filter(
+            $values,
+            fn (mixed $value): bool => $value !== $routeValue,
+        ));
+
+        if ($values === []) {
+            unset($input[$key]);
+        } else {
+            $input[$key] = $values;
+        }
+
+        return $input;
+    }
+
+    private function routeTaxonomyWasRemoved(string $property): bool
+    {
+        if ($this->routeFilterType === null || $this->routeTaxonomy === null) {
+            return false;
+        }
+
+        $filterProperty = CatalogSeriesFilters::TAXONOMY_PROPERTIES[$this->routeFilterType] ?? null;
+
+        return $filterProperty !== null
+            && $property === 'filters.'.$filterProperty
+            && ! in_array($this->routeTaxonomy, $this->filters->{$filterProperty}, true);
+    }
+
+    private function leaveRouteTaxonomyContext(): void
+    {
+        $routeFilterType = $this->routeFilterType;
+        $routeTaxonomy = $this->routeTaxonomy;
+        $this->routeFilterType = null;
+        $this->routeTaxonomy = null;
+
+        if (! $this->validateAndNormalizeState()) {
+            $this->routeFilterType = $routeFilterType;
+            $this->routeTaxonomy = $routeTaxonomy;
+
+            return;
+        }
+
+        $this->resetPage();
+        $this->redirect($this->catalogUrl(), navigate: true);
     }
 
     /** @return array<string, mixed> */

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\CatalogTitle;
+use App\Models\Country;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
@@ -44,7 +45,13 @@ $title = CatalogTitle::factory()->create([
     'original_title' => 'Browser Smoke Original',
     'description' => 'Детерминированная карточка для локальной проверки браузера.',
     'poster_url' => null,
+    'type' => 'show',
 ]);
+$russia = Country::query()->create([
+    'name' => 'Россия',
+    'slug' => 'rossiia',
+]);
+$title->countries()->attach($russia);
 $season = Season::factory()->create([
     'catalog_title_id' => $title->id,
     'number' => 1,

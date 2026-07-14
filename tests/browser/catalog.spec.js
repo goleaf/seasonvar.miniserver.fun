@@ -110,6 +110,37 @@ test('catalog keeps URL state, unified filters and responsive geometry', async (
     expect(browserErrors.pageErrors).toEqual([]);
 });
 
+test('route country and publication type can be removed independently', async ({ page, baseURL }) => {
+    const browserErrors = await installNetworkGuard(page, baseURL);
+    const routeState = '/titles/country/rossiia?country%5B0%5D=rossiia&publication_type%5B0%5D=show';
+
+    await page.goto(routeState);
+    await expect(page.locator('[data-catalog-filter-groups]')).toBeVisible();
+
+    const country = page.locator('input[type="checkbox"][name="country[]"][value="rossiia"]');
+    const publicationType = page.locator('input[type="checkbox"][name="publication_type[]"][value="show"]');
+
+    await expect(country).toBeChecked();
+    await expect(publicationType).toBeChecked();
+    await publicationType.uncheck();
+    await expect(publicationType).not.toBeChecked();
+    await expect(country).toBeChecked();
+    await expect(page).toHaveURL(/\/titles\/country\/rossiia(?:\?|$)/);
+    await expect(page).not.toHaveURL(/publication_type/);
+
+    await page.goto(routeState);
+    await expect(page.locator('[data-catalog-filter-groups]')).toBeVisible();
+    await expect(country).toBeChecked();
+    await expect(publicationType).toBeChecked();
+    await country.uncheck();
+    await expect(page).toHaveURL(/\/titles\?.*publication_type(?:%5B0%5D|\[0\])=show/);
+    await expect(publicationType).toBeChecked();
+
+    expect(browserErrors.localAssetFailures).toEqual([]);
+    expect(browserErrors.consoleErrors).toEqual([]);
+    expect(browserErrors.pageErrors).toEqual([]);
+});
+
 test('title page renders the player shell without local asset failures', async ({ page, baseURL }) => {
     const browserErrors = await installNetworkGuard(page, baseURL);
 

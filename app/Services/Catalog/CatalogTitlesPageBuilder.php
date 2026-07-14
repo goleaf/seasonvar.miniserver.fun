@@ -289,7 +289,10 @@ class CatalogTitlesPageBuilder
         }
 
         if ($type !== null && in_array($type, $filterTypes, true) && $taxonomy !== null) {
-            $requestedFilterSlugs[$type] = [$taxonomy];
+            $requestedFilterSlugs[$type] = collect([
+                $taxonomy,
+                ...($requestedFilterSlugs[$type] ?? []),
+            ])->unique()->values()->all();
             $routeTaxonomyFilterType = $type;
         }
 
