@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\CatalogTitleController;
 use App\Http\Controllers\Api\OpenApiController;
 use App\Http\Controllers\Api\V1\ApiConfigController;
 use App\Http\Controllers\Api\V1\ApiHealthController;
+use App\Http\Controllers\Api\V1\Auth\LoginController;
+use App\Http\Controllers\Api\V1\Auth\RegisterController;
 use App\Http\Controllers\Api\V1\CatalogDirectoryController;
 use App\Http\Controllers\Api\V1\CatalogFilterSchemaController;
 use App\Http\Controllers\Api\V1\CatalogHomeController;
@@ -56,5 +58,14 @@ Route::middleware('public.cache:api')->group(function (): void {
 });
 
 Route::get('/v1/health', ApiHealthController::class)->name('api.v1.health');
+
+Route::prefix('v1')->name('api.v1.')->group(function (): void {
+    Route::post('/auth/register', RegisterController::class)
+        ->middleware('throttle:mobile-register')
+        ->name('auth.register');
+    Route::post('/auth/login', LoginController::class)
+        ->middleware('throttle:mobile-login')
+        ->name('auth.login');
+});
 
 Route::fallback(static fn () => abort(404))->name('api.fallback');
