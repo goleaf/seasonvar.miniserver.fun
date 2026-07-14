@@ -43,7 +43,7 @@ Mobile `GET /api/v1/titles` переиспользует ту же `CatalogTitle
 
 `CatalogTitlesPageBuilder` вызывает `CatalogSearchQueryParser::parse()` один раз после HTTP-нормализации. Полученный неизменяемый `CatalogSearchQuery` передается в запрос результатов, пакетные счетчики связей и сгруппированные счетчики годов. Повторный разбор строки для отдельных фасетов не выполняется.
 
-Visibility boundary поиска всегда ограничивает publication status, даты публикации, audience и soft delete. Готовый ranked FTS path начинает SQL с materialized FTS candidates, затем делает `CROSS JOIN`/primary-key lookup в `catalog_titles`; legacy fallback начинает с `CatalogTitleQuery::visibleTo()`. Для legacy состояния `ready` полная значимая фраза сначала сравнивается с точным основным и оригинальным названием, точным `external_id`, а алиасы проверяются по `exactNameHashes`. Если точное совпадение существует, широкий текстовый поиск не выполняется. Иначе каждый значимый терм должен совпасть с одним и тем же тайтлом: внешние группы термов соединяются через `AND`, а варианты основного и оригинального названия, описания, slug, внешнего ID, алиасов и имен связанных справочников — актеров, режиссеров, жанров и остальных существующих catalog relations — внутри терма соединяются через `OR`. Модели персонажей в текущей схеме нет, поэтому отдельный character search не заявляется.
+Visibility boundary поиска всегда ограничивает publication status, даты публикации, audience и soft delete. Готовый ranked FTS path начинает SQL с materialized FTS candidates, затем делает `CROSS JOIN`/primary-key lookup в `catalog_titles`; legacy fallback начинает с `CatalogTitleQuery::visibleTo()`. Оба driver ищут только в основном, оригинальном и альтернативных названиях, включая их транслитерацию и варианты `е/ё`. Полная значимая фраза сначала сравнивается с точным основным, оригинальным названием и хэшами алиасов. Если точного совпадения нет, каждый значимый терм должен совпасть с названием одного и того же тайтла. Описание, slug, `external_id`, актеры, режиссеры, жанры, страны и другие relations в `q` не участвуют; для них используются явные фильтры и справочники.
 
 Распознанный в `q` год применяется как обязательный фильтр до текстового сопоставления. Если одновременно передан другой допустимый `year`, запрос получает нулевое условие. Такой конфликт и любой запрос с распознанным годом не заменяются fallback-выдачей.
 
@@ -76,15 +76,15 @@ Visibility boundary поиска всегда ограничивает publicati
 | `смотреть онлайн` | `insufficient`, поскольку оба токена входят в список стоп-слов. |
 | `znakhar` | `ready`, токен `znakhar`; legacy-варианты включают совместимое написание `znaxar`. |
 
-Полный acceptance corpus закреплён в `CatalogSearchAcceptanceTest`: точное название, original title, alias и title+year проверяются на top-1/top-3, поиск актёров и режиссёров — на precision@10, а категории, жанры и страны — на минимальную точность 95%. Отдельная регрессия подтверждает симметричный поиск имён с `е/ё` в готовом FTS.
+Полный acceptance corpus закреплён в `CatalogSearchAcceptanceTest`: точное название, original title, alias и title+year проверяются на top-1/top-3. Отдельные негативные корпусы подтверждают, что имена людей, категории, жанры, страны и описания не входят в результаты `q`; варианты названий с `е/ё` остаются симметричными.
 
 ## FTS5-документы и rebuild
 
 Additive migration `2026_07_13_170000_create_catalog_search_index` создаёт один `catalog_title_search_documents` на тайтл, external-content FTS5 table и три trigger для insert/update/delete. Удаление тайтла каскадно удаляет документ, а delete trigger удаляет FTS row. Миграция не backfill-ит каталог; singleton `catalog_search_index_states` остаётся в `building`, пока отдельная проверенная перестройка не завершится.
 
-`CatalogSearchDocumentBuilder` принимает только заранее загруженный тайтл. Отдельные weighted-поля содержат название, original title, алиасы, людей, остальные справочники, транслитерацию и описание; source URL, media URL, provider ID, snapshot и importer state не копируются. Детерминированный fingerprint не зависит от timestamps и порядка relation rows. Текущая версия документа — `2`; несовпадающая версия состояния немедленно оставляет публичный поиск на legacy fallback до проверенной перестройки.
+`CatalogSearchDocumentBuilder` принимает только заранее загруженный тайтл с алиасами. Поисковый документ содержит основное, оригинальное и альтернативные названия и их транслитерацию. Колонки `people`, `taxonomies` и `description` сохранены только для совместимости текущей схемы и всегда записываются пустыми. Детерминированный fingerprint не зависит от timestamps и порядка alias rows. Текущая версия документа — `3`; несовпадающая версия состояния немедленно оставляет публичный поиск на title-only legacy fallback до проверенной перестройки.
 
-`CatalogSearchIndexer` пакетно загружает алиасы и все десять relations, индексирует только публично видимые тайтлы и выполняет upsert только при изменившемся fingerprint. Полная перестройка использует checkpoint ID и bounded `chunkById`; после каждого пакета checkpoint сохраняется. Команда:
+`CatalogSearchIndexer` пакетно загружает только алиасы, индексирует публично видимые тайтлы и выполняет upsert только при изменившемся fingerprint. Полная перестройка использует checkpoint ID и bounded `chunkById`; после каждого пакета checkpoint сохраняется. Команда:
 
 ```bash
 php artisan catalog:search-rebuild --chunk=200
@@ -102,7 +102,7 @@ Importer индексирует только изменившийся тайтл
 
 `GET /api/catalog/people?type=actor&q=Иван` принимает только `actor` или `director`, нормализованную строку 2–80 символов и возвращает через API Resource максимум 20 публичных вариантов: `type`, `slug`, `name`, `count`. Внутренние ID, publication state и source fields не сериализуются. Клиентский combobox использует debounce 300 мс, отменяет предыдущий `fetch` через `AbortController`, поддерживает стрелки, Enter и Escape; выбранный slug добавляется в обычный GET query.
 
-Mobile `GET /api/v1/search/suggestions` использует тот же parser, FTS candidate order и visibility boundary, но объединяет максимум 5 title, 5 actor и 5 director suggestions. Search score, FTS document и index state не сериализуются.
+Mobile `GET /api/v1/search/suggestions` использует тот же title-only parser, FTS candidate order и visibility boundary для максимума 5 title suggestions. До 5 actor и 5 director options добавляются отдельными типизированными подсказками и не влияют на выдачу `/titles` и `/api/v1/titles`. Search score, FTS document и index state не сериализуются.
 
 `CatalogSearchSuggestion` работает только при готовом FTS и истинном нуле: если исходный FTS candidate существует, подсказки не строятся даже при конфликтующем фильтре. SQL по параметризованным общим триграммам отбирает не более 60 search documents, Dice similarity отбрасывает слабые совпадения, а UI показывает не более трёх ссылок в отдельном блоке `Возможно, подойдет`. Подсказки не входят в paginator, result count, canonical URL или SEO-утверждение о совпадениях.
 

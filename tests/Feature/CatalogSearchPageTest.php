@@ -75,7 +75,71 @@ class CatalogSearchPageTest extends TestCase
             ->assertDontSee('href="'.route('titles.show', 'postoronnii-serial').'"', false);
     }
 
-    public function test_all_person_name_terms_must_match_one_title(): void
+    public function test_legacy_search_matches_only_title_original_and_alias_names(): void
+    {
+        $titleMatch = CatalogTitle::factory()->create([
+            'title' => 'Художник 2: Возвращение',
+            'slug' => 'xudoznik-2-vozvrashhenie',
+        ]);
+        $originalMatch = CatalogTitle::factory()->create([
+            'title' => 'Иностранное название',
+            'original_title' => 'Художник 2: Оригинал',
+            'slug' => 'inostrannoe-nazvanie',
+        ]);
+        $aliasMatch = CatalogTitle::factory()->create([
+            'title' => 'Название по алиасу',
+            'slug' => 'nazvanie-po-aliasu',
+        ]);
+        CatalogTitleAlias::query()->create([
+            'catalog_title_id' => $aliasMatch->id,
+            'name' => 'Художник 2: Альтернативный',
+            'name_hash' => hash('sha256', 'художник 2 альтернативный'),
+            'type' => 'alternative',
+            'source' => 'test',
+        ]);
+        $descriptionNoise = CatalogTitle::factory()->create([
+            'title' => 'Шум из описания',
+            'slug' => 'sum-iz-opisaniia',
+            'description' => 'Художник вернулся во втором сезоне 2.',
+        ]);
+        $actorNoise = CatalogTitle::factory()->create([
+            'title' => 'Шум из актёра',
+            'slug' => 'sum-iz-aktera',
+        ]);
+        $actor = Actor::query()->create(['name' => 'Художник 2', 'slug' => 'xudoznik-2-actor']);
+        $actorNoise->actors()->attach($actor);
+        $taxonomyNoise = CatalogTitle::factory()->create([
+            'title' => 'Шум из жанра',
+            'slug' => 'sum-iz-zanra',
+        ]);
+        $genre = Genre::query()->create(['name' => 'Художник 2', 'slug' => 'xudoznik-2-genre']);
+        $taxonomyNoise->genres()->attach($genre);
+        $slugNoise = CatalogTitle::factory()->create([
+            'title' => 'Шум из адреса',
+            'slug' => 'xudoznik-2',
+        ]);
+        $externalIdNoise = CatalogTitle::factory()->create([
+            'title' => 'Шум из внешнего ID',
+            'slug' => 'sum-iz-vnesnego-id',
+            'external_id' => 'Художник 2',
+        ]);
+
+        $response = $this->get(route('titles.index', ['q' => 'Художник 2']));
+
+        $response
+            ->assertOk()
+            ->assertSee('placeholder="Название сериала"', false)
+            ->assertSee('href="'.route('titles.show', $titleMatch).'"', false)
+            ->assertSee('href="'.route('titles.show', $originalMatch).'"', false)
+            ->assertSee('href="'.route('titles.show', $aliasMatch).'"', false)
+            ->assertDontSee('href="'.route('titles.show', $descriptionNoise).'"', false)
+            ->assertDontSee('href="'.route('titles.show', $actorNoise).'"', false)
+            ->assertDontSee('href="'.route('titles.show', $taxonomyNoise).'"', false)
+            ->assertDontSee('href="'.route('titles.show', $slugNoise).'"', false)
+            ->assertDontSee('href="'.route('titles.show', $externalIdNoise).'"', false);
+    }
+
+    public function test_person_names_do_not_match_titles_through_actor_relations(): void
     {
         $matchingTitle = CatalogTitle::factory()->create([
             'title' => 'Точный актерский результат',
@@ -99,11 +163,11 @@ class CatalogSearchPageTest extends TestCase
 
         $this->get(route('titles.index', ['q' => 'Милли Бобби Браун']))
             ->assertOk()
-            ->assertSee('href="'.route('titles.show', $matchingTitle).'"', false)
+            ->assertDontSee('href="'.route('titles.show', $matchingTitle).'"', false)
             ->assertDontSee('href="'.route('titles.show', $partialTitle).'"', false);
     }
 
-    public function test_person_search_matches_stored_yo_and_excludes_partial_names(): void
+    public function test_person_names_with_yo_do_not_match_titles_through_actor_relations(): void
     {
         $matchingTitle = CatalogTitle::factory()->create([
             'title' => 'Совпадение полного имени',
@@ -137,7 +201,7 @@ class CatalogSearchPageTest extends TestCase
 
         $this->get(route('titles.index', ['q' => 'Федор Лавров']))
             ->assertOk()
-            ->assertSee('href="'.route('titles.show', $matchingTitle).'"', false)
+            ->assertDontSee('href="'.route('titles.show', $matchingTitle).'"', false)
             ->assertDontSee('href="'.route('titles.show', $firstNameOnlyTitle).'"', false)
             ->assertDontSee('href="'.route('titles.show', $lastNameOnlyTitle).'"', false);
     }
@@ -159,7 +223,7 @@ class CatalogSearchPageTest extends TestCase
             ->assertDontSee('href="'.route('titles.show', $broaderTitle).'"', false);
     }
 
-    public function test_exact_external_provider_id_wins_over_broad_text_matches(): void
+    public function test_external_provider_ids_and_descriptions_do_not_enter_title_search(): void
     {
         $exact = CatalogTitle::factory()->create([
             'title' => 'Сериал по внешнему ID',
@@ -175,11 +239,11 @@ class CatalogSearchPageTest extends TestCase
 
         $this->get(route('titles.index', ['q' => '47915']))
             ->assertOk()
-            ->assertSee('href="'.route('titles.show', $exact).'"', false)
+            ->assertDontSee('href="'.route('titles.show', $exact).'"', false)
             ->assertDontSee('href="'.route('titles.show', $broad).'"', false);
     }
 
-    public function test_multiple_matching_people_do_not_duplicate_search_rows_or_totals(): void
+    public function test_multiple_matching_people_do_not_enter_title_search(): void
     {
         $title = CatalogTitle::factory()->create([
             'title' => 'Один сериал с двумя совпадениями',
@@ -195,8 +259,7 @@ class CatalogSearchPageTest extends TestCase
 
         $this->get(route('titles.index', ['q' => 'Иван']))
             ->assertOk()
-            ->assertSeeText('Найдено сейчас: 1')
-            ->assertSee('href="'.route('titles.show', $title).'"', false);
+            ->assertDontSee('href="'.route('titles.show', $title).'"', false);
     }
 
     public function test_unpublished_exact_title_is_absent(): void
@@ -240,7 +303,7 @@ class CatalogSearchPageTest extends TestCase
             ->assertDontSeeText('Посторонний сериал');
     }
 
-    public function test_ready_fts_orders_exact_title_original_alias_and_weighted_fields(): void
+    public function test_ready_fts_matches_only_title_original_and_alias_names(): void
     {
         $exactTitle = CatalogTitle::factory()->create(['title' => 'Ветер', 'description' => null]);
         $originalTitle = CatalogTitle::factory()->create([
@@ -278,7 +341,10 @@ class CatalogSearchPageTest extends TestCase
 
         $this->get(route('titles.index', ['q' => 'Ветер']))
             ->assertOk()
-            ->assertSeeInOrder($titles->pluck('title')->all());
+            ->assertSeeInOrder([$exactTitle->title, $originalTitle->title, $aliasTitle->title])
+            ->assertDontSeeText($personTitle->title)
+            ->assertDontSeeText($taxonomyTitle->title)
+            ->assertDontSeeText($descriptionTitle->title);
     }
 
     public function test_stale_index_uses_legacy_search_and_never_hides_new_title_text(): void

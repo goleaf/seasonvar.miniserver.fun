@@ -21,7 +21,7 @@ final class CatalogTitleSearch
         }
 
         return DB::table('catalog_title_search_fts')
-            ->whereRaw('catalog_title_search_fts MATCH ?', [$search->ftsExpression])
+            ->whereRaw('catalog_title_search_fts MATCH ?', [$this->nameExpression($search)])
             ->selectRaw('catalog_title_search_fts.rowid AS catalog_title_id');
     }
 
@@ -38,7 +38,7 @@ final class CatalogTitleSearch
                 '=',
                 'catalog_title_search_fts.rowid',
             )
-            ->whereRaw('catalog_title_search_fts MATCH ?', [$search->ftsExpression])
+            ->whereRaw('catalog_title_search_fts MATCH ?', [$this->nameExpression($search)])
             ->select('catalog_title_search_documents.catalog_title_id')
             ->selectRaw(
                 'CASE WHEN catalog_title_search_documents.normalized_title_key = ? THEN 0 ELSE 1 END AS exact_title_rank',
@@ -53,7 +53,7 @@ final class CatalogTitleSearch
                 [$search->normalized],
             )
             ->selectRaw(
-                'bm25(catalog_title_search_fts, 12.0, 10.0, 9.0, 7.0, 6.0, 4.5, 1.0) AS bm25_score',
+                'bm25(catalog_title_search_fts, 12.0, 10.0, 9.0, 7.0, 0.0, 0.0, 0.0) AS bm25_score',
             )
             ->orderBy('exact_title_rank')
             ->orderBy('exact_original_title_rank')
@@ -98,5 +98,10 @@ final class CatalogTitleSearch
     public function forgetState(): void
     {
         $this->ready = null;
+    }
+
+    private function nameExpression(CatalogSearchQuery $search): string
+    {
+        return '{title original_title aliases transliteration} : ('.$search->ftsExpression.')';
     }
 }

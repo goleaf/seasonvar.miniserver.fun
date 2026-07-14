@@ -61,7 +61,7 @@ class CatalogSearchSynchronizationTest extends TestCase
         Http::assertSentCount(1);
     }
 
-    public function test_catalog_administration_reindexes_title_and_relation_changes_after_commit(): void
+    public function test_catalog_administration_reindexes_title_without_adding_relation_names(): void
     {
         config(['seasonvar.admin_emails' => ['admin@example.com']]);
         $admin = User::factory()->create(['email' => 'admin@example.com']);
@@ -97,7 +97,7 @@ class CatalogSearchSynchronizationTest extends TestCase
         $document = $updated->searchDocument()->firstOrFail();
 
         $this->assertSame('Новое редакторское имя', $document->title);
-        $this->assertStringContainsString('Редакторский жанр', $document->taxonomies);
+        $this->assertSame('', $document->taxonomies);
     }
 
     public function test_title_merge_cascades_duplicate_document_and_reindexes_canonical_aliases(): void

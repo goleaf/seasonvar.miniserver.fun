@@ -55,6 +55,25 @@ final class CatalogTitleIndexTest extends TestCase
         ]))->assertOk()->assertJsonStructure(['data', 'links', 'meta']);
     }
 
+    public function test_v1_title_search_excludes_description_only_matches(): void
+    {
+        $matching = CatalogTitle::factory()->create([
+            'title' => 'Художник 2: Возвращение',
+            'slug' => 'xudoznik-2-vozvrashhenie',
+        ]);
+        $noise = CatalogTitle::factory()->create([
+            'title' => 'Посторонний сериал',
+            'slug' => 'postoronnii-serial',
+            'description' => 'Художник вернулся во втором сезоне 2.',
+        ]);
+
+        $this->getJson('/api/v1/titles?'.http_build_query(['q' => 'Художник 2']))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.slug', $matching->slug)
+            ->assertJsonMissing(['slug' => $noise->slug]);
+    }
+
     public function test_v1_title_list_rejects_invalid_bearer_and_personalizes_authenticated_audience(): void
     {
         $user = User::factory()->create();

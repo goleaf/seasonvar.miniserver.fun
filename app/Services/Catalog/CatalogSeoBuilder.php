@@ -751,7 +751,7 @@ class CatalogSeoBuilder
         $parts = collect([
             $total.' сериалов найдено в текущей подборке каталога.',
             $year !== null ? 'Подборка сфокусирована на сериалах '.$year.' года.' : null,
-            $search !== '' ? 'Поиск учитывает название, оригинальное название, описание, актеров, режиссеров, жанры, страны и другие связи каталога.' : null,
+            $search !== '' ? 'Поиск учитывает только основное, оригинальное и альтернативные названия.' : null,
             $activeTaxonomies->isNotEmpty() ? $this->catalogFilteredDescription($activeTaxonomies) : null,
         ])->filter()->implode(' ');
 
@@ -929,7 +929,7 @@ class CatalogSeoBuilder
             $activeTaxonomies->isNotEmpty() ? $this->taxonomyContextPhrases($activeTaxonomies)->implode(', ') : null,
         ])->filter()->implode(', ');
 
-        return ucfirst($parts).'. Выдача учитывает названия, оригинальные названия, алиасы, описания, жанры, страны, актеров и режиссеров.';
+        return ucfirst($parts).'. Текстовый поиск проверяет только основное, оригинальное и альтернативные названия; остальные параметры задаются отдельными фильтрами.';
     }
 
     private function titleKeywordCollection(

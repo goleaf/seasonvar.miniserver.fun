@@ -75,14 +75,12 @@ final readonly class CatalogSearchSuggestionQuery
         }
 
         $search = str_replace(['%', '_'], '', $query->raw);
-        $slugSearch = str($search)->slug()->toString();
 
         return $this->titleSummaryQuery($user)
-            ->where(function (Builder $builder) use ($search, $slugSearch): void {
+            ->where(function (Builder $builder) use ($search): void {
                 $builder
                     ->where('title', 'like', "%{$search}%")
                     ->orWhere('original_title', 'like', "%{$search}%")
-                    ->orWhere('slug', 'like', "%{$slugSearch}%")
                     ->orWhereHas('aliases', fn (Builder $query): Builder => $query->where('name', 'like', "%{$search}%"));
             })
             ->orderBy('title')

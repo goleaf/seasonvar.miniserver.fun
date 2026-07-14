@@ -1779,7 +1779,7 @@ class CatalogPageTest extends TestCase
         ]);
     }
 
-    public function test_catalog_search_keeps_taxonomy_name_matches_after_query_optimization(): void
+    public function test_catalog_search_excludes_taxonomy_names_and_descriptions(): void
     {
         $catalogTitle = CatalogTitle::factory()->create([
             'title' => 'Сериал с актером',
@@ -1802,7 +1802,7 @@ class CatalogPageTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertSeeText('Сериал с актером')
+            ->assertDontSeeText('Сериал с актером')
             ->assertDontSeeText('Сериал без актера');
     }
 

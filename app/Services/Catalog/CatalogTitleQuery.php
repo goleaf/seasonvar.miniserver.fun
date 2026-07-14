@@ -18,7 +18,6 @@ use App\Services\Catalog\Search\CatalogSearchState;
 use App\Services\Catalog\Search\CatalogTitleSearch;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -342,17 +341,10 @@ class CatalogTitleQuery
 
             $query->where(function (Builder $query) use ($variants, $catalogTitleTable): void {
                 $variants->each(function (string $variant) use ($query): void {
-                    $this->orWhereCatalogTextMatches($query, $variant);
+                    $this->orWhereCatalogNameMatches($query, $variant);
                 });
 
                 $query->orWhereIn($catalogTitleTable.'.id', $this->aliasSearchTitleIdsSubquery($variants));
-
-                foreach ($this->taxonomies->relationNames() as $relation) {
-                    $query->orWhereIn(
-                        $catalogTitleTable.'.id',
-                        $this->relationTitleIdsByNameSubquery($relation, $variants),
-                    );
-                }
             });
         }
     }
@@ -376,7 +368,6 @@ class CatalogTitleQuery
             ->where(function (Builder $query) use ($catalogTitleTable, $search, $variants): void {
                 $query->whereIn('title', $variants)
                     ->orWhereIn('original_title', $variants)
-                    ->orWhere('external_id', $search->raw)
                     ->orWhereIn(
                         $catalogTitleTable.'.id',
                         CatalogTitleAlias::query()
@@ -428,35 +419,10 @@ class CatalogTitleQuery
     /**
      * @param  Builder<CatalogTitle>  $query
      */
-    private function orWhereCatalogTextMatches(Builder $query, string $variant): void
+    private function orWhereCatalogNameMatches(Builder $query, string $variant): void
     {
         $query->orWhere('title', 'like', "%{$variant}%")
-            ->orWhere('original_title', 'like', "%{$variant}%")
-            ->orWhere('description', 'like', "%{$variant}%")
-            ->orWhere('slug', 'like', "%{$variant}%")
-            ->orWhere('external_id', 'like', "%{$variant}%");
-    }
-
-    /**
-     * @param  Collection<int, string>  $variants
-     */
-    private function relationTitleIdsByNameSubquery(string $relationName, Collection $variants): QueryBuilder
-    {
-        $relation = (new CatalogTitle)->{$relationName}();
-        $pivotTable = $relation->getTable();
-        $relatedTable = $relation->getRelated()->getTable();
-        $relatedKey = $relation->getRelated()->getKeyName();
-        $titlePivotKey = $relation->getForeignPivotKeyName();
-        $relatedPivotKey = $relation->getRelatedPivotKeyName();
-
-        return DB::table($pivotTable)
-            ->select($pivotTable.'.'.$titlePivotKey)
-            ->join($relatedTable, $relatedTable.'.'.$relatedKey, '=', $pivotTable.'.'.$relatedPivotKey)
-            ->where(function (QueryBuilder $query) use ($relatedTable, $variants): void {
-                $variants->each(function (string $variant) use ($query, $relatedTable): void {
-                    $query->orWhere($relatedTable.'.name', 'like', "%{$variant}%");
-                });
-            });
+            ->orWhere('original_title', 'like', "%{$variant}%");
     }
 
     /**

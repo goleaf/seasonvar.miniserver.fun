@@ -68,7 +68,7 @@ class CatalogSearchAcceptanceTest extends TestCase
         $this->assertNotContains($chernobyl1986->id, $this->rankedIds('Чернобыль 2022', 3));
     }
 
-    public function test_people_corpus_has_at_least_ninety_percent_precision_at_ten(): void
+    public function test_people_names_do_not_enter_title_search(): void
     {
         $people = [
             ['query' => 'Милли Бобби Браун', 'stored' => 'Милли Бобби Браун', 'model' => Actor::class, 'relation' => 'actors'],
@@ -82,29 +82,20 @@ class CatalogSearchAcceptanceTest extends TestCase
                 'slug' => 'acceptance-person-'.$personIndex,
             ]);
 
-            foreach (range(1, 10) as $titleIndex) {
+            foreach (range(1, 3) as $titleIndex) {
                 $title = CatalogTitle::factory()->create(['title' => sprintf('Работа актёра %d-%02d', $personIndex, $titleIndex)]);
                 $title->{$person['relation']}()->attach($model);
             }
 
-            foreach (range(1, 3) as $noiseIndex) {
-                CatalogTitle::factory()->create([
-                    'title' => sprintf('Посторонняя работа %d-%02d', $personIndex, $noiseIndex),
-                    'description' => 'В справочном описании упоминается '.$person['stored'].'.',
-                ]);
-            }
+            CatalogTitle::factory()->create([
+                'title' => 'Посторонняя работа '.$personIndex,
+                'description' => 'В справочном описании упоминается '.$person['stored'].'.',
+            ]);
         }
         $this->indexAllTitlesAndMarkReady();
 
-        foreach ($people as $personIndex => $person) {
-            $model = $person['model']::query()->where('slug', 'acceptance-person-'.$personIndex)->firstOrFail();
-            $topTen = collect($this->rankedIds($person['query'], 10));
-
-            $this->assertGreaterThanOrEqual(
-                9,
-                $topTen->intersect($model->catalogTitles()->pluck('catalog_titles.id'))->count(),
-                $person['query'],
-            );
+        foreach ($people as $person) {
+            $this->assertSame([], $this->rankedIds($person['query'], 10), $person['query']);
         }
     }
 
@@ -129,7 +120,7 @@ class CatalogSearchAcceptanceTest extends TestCase
         $this->assertNull(app(CatalogTitleSearch::class)->candidateQuery($insufficient));
     }
 
-    public function test_category_corpus_keeps_at_least_ninety_five_percent_of_the_first_page_relevant(): void
+    public function test_taxonomy_names_do_not_enter_title_search(): void
     {
         $categories = [
             ['query' => 'аниме', 'model' => Genre::class, 'relation' => 'genres'],
@@ -145,7 +136,7 @@ class CatalogSearchAcceptanceTest extends TestCase
                 'slug' => 'acceptance-category-'.$categoryIndex,
             ]);
 
-            foreach (range(1, 24) as $titleIndex) {
+            foreach (range(1, 3) as $titleIndex) {
                 $title = CatalogTitle::factory()->create(['title' => sprintf('Категорийная работа %d-%02d', $categoryIndex, $titleIndex)]);
                 $title->{$category['relation']}()->attach($taxonomy);
             }
@@ -157,11 +148,8 @@ class CatalogSearchAcceptanceTest extends TestCase
         }
         $this->indexAllTitlesAndMarkReady();
 
-        foreach ($categories as $categoryIndex => $category) {
-            $taxonomy = $category['model']::query()->where('slug', 'acceptance-category-'.$categoryIndex)->firstOrFail();
-            $firstPage = collect($this->rankedIds($category['query'], 24));
-
-            $this->assertGreaterThanOrEqual(23, $firstPage->intersect($taxonomy->catalogTitles()->pluck('catalog_titles.id'))->count(), $category['query']);
+        foreach ($categories as $category) {
+            $this->assertSame([], $this->rankedIds($category['query'], 24), $category['query']);
         }
     }
 

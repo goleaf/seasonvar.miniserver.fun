@@ -21,7 +21,8 @@ class CatalogVisualSystemTest extends TestCase
             ->assertOk()
             ->assertSee('href="#main-content"', false)
             ->assertSee('data-site-header', false)
-            ->assertSee('aria-label="Поиск по всему каталогу"', false)
+            ->assertSee('aria-label="Поиск по названию"', false)
+            ->assertSee('placeholder="Название сериала"', false)
             ->assertSee('aria-label="Основная навигация"', false)
             ->assertSee('aria-current="page"', false)
             ->assertSee('data-site-footer', false)
@@ -99,7 +100,7 @@ class CatalogVisualSystemTest extends TestCase
         $this->get(route('titles.index'))
             ->assertOk()
             ->assertDontSeeText('сериалов в подборке')
-            ->assertDontSeeText('Выдача учитывает названия, оригинальные названия, алиасы, описания, жанры, страны, актеров и режиссеров.');
+            ->assertDontSeeText('Текстовый поиск проверяет только основное, оригинальное и альтернативные названия; остальные параметры задаются отдельными фильтрами.');
     }
 
     public function test_title_page_places_player_before_secondary_reference_metadata(): void
@@ -297,7 +298,7 @@ class CatalogVisualSystemTest extends TestCase
 
         $this->assertSame(2, substr_count($content, 'role="search"'));
         $this->assertStringContainsString('aria-label="Поиск по каталогу"', $content);
-        $this->assertStringContainsString('aria-label="Поиск по всему каталогу"', $content);
+        $this->assertStringContainsString('aria-label="Поиск по названию"', $content);
         $this->assertStringContainsString('id="site-search"', $content);
         $this->assertStringContainsString('id="catalog-search"', $content);
         $this->assertStringNotContainsString('<dialog', $content);

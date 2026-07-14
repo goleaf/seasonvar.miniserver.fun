@@ -19,7 +19,7 @@ class CatalogTitleSearchTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_ranked_candidates_prioritize_exact_title_original_alias_and_weighted_fields(): void
+    public function test_ranked_candidates_include_only_title_original_and_alias_names(): void
     {
         $exactTitle = CatalogTitle::factory()->create([
             'title' => 'Северный ветер',
@@ -86,9 +86,6 @@ class CatalogTitleSearchTest extends TestCase
             $exactTitle->id,
             $originalTitle->id,
             $aliasTitle->id,
-            $personTitle->id,
-            $taxonomyTitle->id,
-            $descriptionTitle->id,
         ], $rankedIds);
     }
 

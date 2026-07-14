@@ -7,7 +7,6 @@ namespace App\Services\Catalog\Search;
 use App\Enums\CatalogSearchIndexStatus;
 use App\Models\CatalogSearchIndexState;
 use App\Models\CatalogTitleSearchDocument;
-use App\Services\Catalog\CatalogTaxonomyRegistry;
 use App\Services\Catalog\CatalogTitleQuery;
 use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
 use Illuminate\Support\Collection;
@@ -17,11 +16,10 @@ use Throwable;
 
 class CatalogSearchIndexer
 {
-    public const INDEX_VERSION = 2;
+    public const INDEX_VERSION = 3;
 
     public function __construct(
         private readonly CatalogSearchDocumentBuilder $documents,
-        private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogTitleQuery $titles,
         private readonly SeasonvarImportErrorSanitizer $errors,
     ) {}
@@ -133,13 +131,9 @@ class CatalogSearchIndexer
                 'catalog_titles.id',
                 'catalog_titles.title',
                 'catalog_titles.original_title',
-                'catalog_titles.description',
             ])
             ->whereKey($ids)
-            ->with([
-                'aliases:id,catalog_title_id,name',
-                ...$this->taxonomies->relationSummaryLoads(),
-            ])
+            ->with('aliases:id,catalog_title_id,name')
             ->get();
         $visibleIds = $titles->modelKeys();
         $missingIds = $ids->diff($visibleIds);

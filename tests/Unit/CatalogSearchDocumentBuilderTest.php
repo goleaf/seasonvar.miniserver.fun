@@ -47,11 +47,12 @@ class CatalogSearchDocumentBuilderTest extends TestCase
         $this->assertSame('Знахарь', $document['title']);
         $this->assertSame('Znachor', $document['original_title']);
         $this->assertStringContainsString('Лекарь', $document['aliases']);
-        $this->assertStringContainsString('Фёдор Лавров', $document['people']);
-        $this->assertStringContainsString('Федор Лавров', $document['people']);
-        $this->assertStringContainsString('Анна Волкова', $document['people']);
-        $this->assertStringContainsString('Драма', $document['taxonomies']);
         $this->assertStringContainsString('znakhar', $document['transliteration']);
+        $this->assertStringNotContainsString('fedor', $document['transliteration']);
+        $this->assertStringNotContainsString('drama', $document['transliteration']);
+        $this->assertSame('', $document['people']);
+        $this->assertSame('', $document['taxonomies']);
+        $this->assertSame('', $document['description']);
         $this->assertSame('знахарь', $document['normalized_title_key']);
         $this->assertStringContainsString('лекарь', $document['normalized_alias_keys']);
         $this->assertSame(64, strlen($document['fingerprint']));

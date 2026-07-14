@@ -9,13 +9,13 @@
             <span class="min-w-0 break-words text-lg font-black tracking-tight text-slate-800">{{ $siteName }}</span>
         </a>
 
-        <form action="{{ route('titles.index') }}" method="GET" role="search" aria-label="Поиск по всему каталогу" class="order-3 col-span-2 flex min-w-0 items-start gap-2 lg:order-2 lg:col-span-1 lg:mx-6">
+        <form action="{{ route('titles.index') }}" method="GET" role="search" aria-label="Поиск по названию" class="order-3 col-span-2 flex min-w-0 items-start gap-2 lg:order-2 lg:col-span-1 lg:mx-6">
             <x-form.search-field
                 id="site-search"
                 name="q"
                 :value="$searchQuery"
-                label="Поиск по всему каталогу"
-                placeholder="Название, актер или жанр"
+                label="Поиск по названию"
+                placeholder="Название сериала"
                 container-class="min-w-0 flex-1"
                 input-class="min-h-11 min-w-0 flex-1 border-0 bg-transparent px-3 py-2.5 text-sm text-slate-700 outline-none placeholder:text-slate-500"
             />

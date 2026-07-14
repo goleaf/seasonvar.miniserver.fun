@@ -2,6 +2,7 @@
 
 ## 2026-07-14
 
+- Restricted web and mobile catalog `q` to primary, original and alternate title names only. Descriptions, slugs, provider IDs, people and taxonomy relations no longer enter legacy or FTS results; search document version 3 clears compatibility fields, visible copy states the title-only contract, and production rebuild/tests cover noisy queries such as `Художник 2`.
 - Completed mobile playback API v1 without exposing stored media sources: guest/public and ability-aware session creation returns a short-lived same-origin signed encrypted grant, delivery rechecks user/media/hierarchy entitlement before redirect, and verified monotonic progress reuses the canonical web state service. Private/no-store headers, tamper/expiry/revocation tests and OpenAPI schemas lock the contract.
 - Exposed mobile owner state across API v1 without duplicating the web domain model: idempotent watchlist/rating desired-state writes, paginated libraries, Continue Watching and viewing history now reuse existing services, policies and visibility rules. Verified-email mutations, cross-user 404 isolation, private no-store responses, fixed-query eager loading and full OpenAPI regressions protect the contract.
 - Completed mobile authentication and account self-service for API v1: normalized registration/login, queued email verification and non-enumerating password recovery, 90-day Sanctum device rotation/revocation, `/me` profile/password/delete flows, ability-scoped private responses, cross-user isolation and complete OpenAPI/privacy/rate-limit regressions.

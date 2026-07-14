@@ -479,10 +479,10 @@ class CatalogAdvancedFilterTest extends TestCase
         $drama = Genre::query()->create(['name' => 'Поисковая драма', 'slug' => 'poiskovaia-drama']);
         $thriller = Genre::query()->create(['name' => 'Поисковый триллер', 'slug' => 'poiskovyi-triller']);
         $outside = Genre::query()->create(['name' => 'Вне поиска', 'slug' => 'vne-poiska']);
-        $first = CatalogTitle::factory()->create(['title' => 'Первый результат']);
+        $first = CatalogTitle::factory()->create(['title' => 'Поисковый Актер: первый результат']);
         $first->actors()->attach($actor);
         $first->genres()->attach($drama);
-        $second = CatalogTitle::factory()->create(['title' => 'Второй результат']);
+        $second = CatalogTitle::factory()->create(['title' => 'Поисковый Актер: второй результат']);
         $second->actors()->attach($actor);
         $second->genres()->attach($thriller);
         $unmatched = CatalogTitle::factory()->create(['title' => 'Посторонний результат']);

@@ -106,8 +106,8 @@
                             id="catalog-search"
                             name="q"
                             :value="$search"
-                            label="Поиск по каталогу"
-                            placeholder="Название, описание или тег"
+                            label="Поиск по названию"
+                            placeholder="Название сериала"
                             container-class="min-w-0 flex-1"
                             wire:model="filters.search"
                         />

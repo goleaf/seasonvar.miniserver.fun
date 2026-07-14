@@ -5,7 +5,7 @@
 ## Публичные формы
 
 - Основная форма поиска каталога работает через full-page `App\Livewire\CatalogSeries`, синхронизирует `q` с URL и проверяется через `App\Http\Requests\CatalogTitlesRequest`; без JavaScript она отправляет обычный `GET /titles`.
-- Header search использует тот же маршрут и тот же параметр `q`; значение для layout готовит `App\View\ViewData\AppLayoutData`. На catalog listing routes он скрывается, чтобы страница содержала один search landmark; на остальных страницах доступное имя формы — `Поиск по всему каталогу`.
+- Header search использует тот же маршрут и тот же параметр `q`; значение для layout готовит `App\View\ViewData\AppLayoutData`. Доступное имя формы и placeholder прямо указывают на поиск только по названию.
 - `CatalogSeriesFilters` хранит только нормализуемые scalar/list значения. Livewire actions сбрасывают страницу при изменении поиска, фильтров, сортировки или размера выдачи; скрытые поля сохраняют те же активные параметры для GET fallback.
 - Multi-value свойства используют `#[Url(history: true)]`, поэтому выбранные значения сохраняются при сортировке, пагинации, обновлении страницы и browser back/forward. Удаление одного chip меняет только одно значение, групповой сброс очищает только указанную группу.
 - Empty-state свойства формы допускают `null` на границе Livewire hydration, потому что Laravel преобразует пустые JSON-строки до lifecycle hooks; `CatalogSeriesFilters::toRequestInput()` отбрасывает `null`, а успешная нормализация возвращает UI-default `''`.
