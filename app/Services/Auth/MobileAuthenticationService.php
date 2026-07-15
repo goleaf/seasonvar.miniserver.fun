@@ -6,7 +6,6 @@ namespace App\Services\Auth;
 
 use App\Models\User;
 use Carbon\CarbonInterface;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -17,24 +16,21 @@ final class MobileAuthenticationService
 
     private const TOKEN_DAYS = 90;
 
+    public function __construct(
+        private readonly AccountRegistrationService $accounts,
+    ) {}
+
     /**
      * @param  array{name: string, email: string, password: string, device_name: string}  $attributes
      * @return array{user: User, token: string, expires_at: CarbonInterface}
      */
     public function register(array $attributes): array
     {
-        $user = DB::transaction(function () use ($attributes): User {
-            DB::table('password_reset_tokens')
-                ->whereRaw('lower(email) = ?', [$attributes['email']])
-                ->delete();
-
-            return User::query()->create([
-                'name' => $attributes['name'],
-                'email' => $attributes['email'],
-                'password' => Hash::make($attributes['password']),
-            ]);
-        }, attempts: 3);
-        $user->sendEmailVerificationNotification();
+        $user = $this->accounts->register([
+            'name' => $attributes['name'],
+            'email' => $attributes['email'],
+            'password' => $attributes['password'],
+        ]);
 
         return $this->issueToken($user, $attributes['device_name']);
     }

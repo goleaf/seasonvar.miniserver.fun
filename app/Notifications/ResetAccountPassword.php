@@ -10,7 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Arr;
 
-final class ResetMobilePassword extends ResetPassword implements ShouldQueue
+final class ResetAccountPassword extends ResetPassword implements ShouldQueue
 {
     use Queueable;
 

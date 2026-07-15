@@ -10,7 +10,7 @@ use App\Http\Requests\Api\V1\UpdatePasswordRequest;
 use App\Http\Requests\Api\V1\UpdateProfileRequest;
 use App\Http\Resources\Api\V1\UserResource;
 use App\Models\User;
-use App\Services\Auth\MobileAccountService;
+use App\Services\Auth\AccountService;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,7 +26,7 @@ final class AccountController extends Controller
             ->header('Cache-Control', 'private, no-store');
     }
 
-    public function update(UpdateProfileRequest $request, MobileAccountService $accounts): JsonResponse
+    public function update(UpdateProfileRequest $request, AccountService $accounts): JsonResponse
     {
         $user = $accounts->updateProfile($this->user($request), $request->profileData());
 
@@ -35,7 +35,7 @@ final class AccountController extends Controller
             ->header('Cache-Control', 'private, no-store');
     }
 
-    public function updatePassword(UpdatePasswordRequest $request, MobileAccountService $accounts): JsonResponse
+    public function updatePassword(UpdatePasswordRequest $request, AccountService $accounts): JsonResponse
     {
         $currentToken = $this->user($request)->currentAccessToken();
         $accounts->updatePassword(
@@ -50,7 +50,7 @@ final class AccountController extends Controller
         ]], headers: ['Cache-Control' => 'private, no-store']);
     }
 
-    public function destroy(DeleteAccountRequest $request, MobileAccountService $accounts): Response
+    public function destroy(DeleteAccountRequest $request, AccountService $accounts): Response
     {
         $accounts->delete($this->user($request), $request->password());
 

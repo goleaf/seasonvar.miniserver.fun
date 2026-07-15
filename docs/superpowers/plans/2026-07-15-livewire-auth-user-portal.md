@@ -66,7 +66,7 @@
 - Produces: `AccountPasswordResetService::reset(string,string,string): void`.
 - Produces: `AccountEmailVerificationService::verify(int,string): User`.
 
-- [ ] **Step 1: Write failing service-boundary tests**
+- [x] **Step 1: Write failing service-boundary tests**
 
 Add assertions that API registration resolves `AccountRegistrationService`, account controller resolves `AccountService`, reset revokes every token through `AccountPasswordResetService`, and neutral notification classes replace the mobile-named classes:
 
@@ -88,7 +88,7 @@ public function test_registration_uses_the_shared_account_boundary_and_universal
 }
 ```
 
-- [ ] **Step 2: Run focused tests and confirm RED**
+- [x] **Step 2: Run focused tests and confirm RED**
 
 Run:
 
@@ -98,7 +98,7 @@ php artisan test tests/Feature/Api/V1/AuthenticationTest.php tests/Feature/Api/V
 
 Expected: FAIL because `VerifyAccountEmail` and shared service classes do not exist.
 
-- [ ] **Step 3: Implement the shared services**
+- [x] **Step 3: Implement the shared services**
 
 Use these exact public signatures and invariants:
 
@@ -130,7 +130,7 @@ final class AccountEmailVerificationService
 
 Registration deletes orphaned reset rows case-insensitively, creates the user in a three-attempt transaction and calls `sendEmailVerificationNotification()` after the transaction. Reset uses `Password::reset`, rotates `remember_token`, deletes all Sanctum tokens and dispatches `PasswordReset`. Verification uses `hash_equals`, `markEmailAsVerified()` and dispatches `Verified` once.
 
-- [ ] **Step 4: Migrate API consumers and notification classes**
+- [x] **Step 4: Migrate API consumers and notification classes**
 
 `MobileAuthenticationService::register()` must delegate user creation and only add `device_name` token issuance:
 
@@ -163,7 +163,7 @@ route('password.reset', [
 ]);
 ```
 
-- [ ] **Step 5: Run focused regression tests, format and commit**
+- [x] **Step 5: Run focused regression tests, format and commit**
 
 Run:
 

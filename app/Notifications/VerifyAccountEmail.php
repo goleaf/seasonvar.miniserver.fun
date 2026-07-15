@@ -10,7 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\URL;
 
-final class VerifyMobileEmail extends VerifyEmail implements ShouldQueue
+final class VerifyAccountEmail extends VerifyEmail implements ShouldQueue
 {
     use Queueable;
 

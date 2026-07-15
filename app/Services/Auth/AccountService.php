@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
-final class MobileAccountService
+final class AccountService
 {
     /** @param array{name?: string, email?: string} $data */
     public function updateProfile(User $user, array $data): User

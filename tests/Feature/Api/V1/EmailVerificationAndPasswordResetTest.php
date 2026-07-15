@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Api\V1;
 
 use App\Models\User;
-use App\Notifications\ResetMobilePassword;
-use App\Notifications\VerifyMobileEmail;
+use App\Notifications\ResetAccountPassword;
+use App\Notifications\VerifyAccountEmail;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -33,8 +33,8 @@ final class EmailVerificationAndPasswordResetTest extends TestCase
         ])->assertCreated();
 
         $user = User::query()->where('email', 'verify@example.com')->firstOrFail();
-        Notification::assertSentTo($user, VerifyMobileEmail::class);
-        $this->assertInstanceOf(ShouldQueue::class, new VerifyMobileEmail);
+        Notification::assertSentTo($user, VerifyAccountEmail::class);
+        $this->assertInstanceOf(ShouldQueue::class, new VerifyAccountEmail);
     }
 
     public function test_signed_verification_link_works_without_bearer_and_rejects_invalid_signatures(): void
@@ -82,7 +82,7 @@ final class EmailVerificationAndPasswordResetTest extends TestCase
                 ->assertOk();
         }
 
-        Notification::assertSentToTimes($user, VerifyMobileEmail::class, 3);
+        Notification::assertSentToTimes($user, VerifyAccountEmail::class, 3);
         $this->withToken($token->plainTextToken)
             ->postJson('/api/v1/auth/email/verification-notification')
             ->assertTooManyRequests();
@@ -108,8 +108,8 @@ final class EmailVerificationAndPasswordResetTest extends TestCase
         $resetToken = null;
         Notification::assertSentTo(
             $user,
-            ResetMobilePassword::class,
-            function (ResetMobilePassword $notification) use (&$resetToken): bool {
+            ResetAccountPassword::class,
+            function (ResetAccountPassword $notification) use (&$resetToken): bool {
                 $resetToken = $notification->token;
 
                 return $notification instanceof ShouldQueue;

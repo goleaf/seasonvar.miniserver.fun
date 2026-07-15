@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use App\Notifications\ResetMobilePassword;
-use App\Notifications\VerifyMobileEmail;
+use App\Notifications\ResetAccountPassword;
+use App\Notifications\VerifyAccountEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailBehavior;
 use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
@@ -24,13 +24,13 @@ class User extends Authenticatable implements MustVerifyEmailContract
 
     public function sendEmailVerificationNotification(): void
     {
-        $this->notify((new VerifyMobileEmail)->afterCommit());
+        $this->notify((new VerifyAccountEmail)->afterCommit());
     }
 
     /** @param string $token */
     public function sendPasswordResetNotification($token): void
     {
-        $this->notify((new ResetMobilePassword($token))->afterCommit());
+        $this->notify((new ResetAccountPassword($token))->afterCommit());
     }
 
     /** @return HasMany<CatalogTitleUserState, $this> */

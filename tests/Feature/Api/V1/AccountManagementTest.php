@@ -10,7 +10,7 @@ use App\Models\Episode;
 use App\Models\EpisodeViewProgress;
 use App\Models\Season;
 use App\Models\User;
-use App\Notifications\VerifyMobileEmail;
+use App\Notifications\VerifyAccountEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -94,7 +94,7 @@ final class AccountManagementTest extends TestCase
         $this->assertNull($user->email_verified_at);
         $this->assertDatabaseMissing('password_reset_tokens', ['email' => 'ivan@example.com']);
         $this->assertDatabaseMissing('password_reset_tokens', ['email' => 'new@example.com']);
-        Notification::assertSentToTimes($user, VerifyMobileEmail::class, 1);
+        Notification::assertSentToTimes($user, VerifyAccountEmail::class, 1);
 
         $this->app['auth']->forgetGuards();
         $this->withToken($token->plainTextToken)

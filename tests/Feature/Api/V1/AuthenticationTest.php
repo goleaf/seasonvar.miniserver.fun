@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace Tests\Feature\Api\V1;
 
 use App\Models\User;
+use App\Notifications\VerifyAccountEmail;
+use App\Services\Auth\AccountEmailVerificationService;
+use App\Services\Auth\AccountPasswordResetService;
+use App\Services\Auth\AccountRegistrationService;
+use App\Services\Auth\AccountService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -14,6 +19,18 @@ use Tests\TestCase;
 final class AuthenticationTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_authentication_uses_transport_neutral_account_boundaries(): void
+    {
+        foreach ([
+            AccountRegistrationService::class,
+            AccountService::class,
+            AccountPasswordResetService::class,
+            AccountEmailVerificationService::class,
+        ] as $service) {
+            $this->assertTrue(class_exists($service), "Missing shared account service: {$service}");
+        }
+    }
 
     public function test_user_registers_with_normalized_email_and_receives_one_plain_token(): void
     {
@@ -48,6 +65,7 @@ final class AuthenticationTest extends TestCase
             'name' => 'Pixel 9',
         ]);
         $this->assertDatabaseMissing('password_reset_tokens', ['email' => 'ivan@example.com']);
+        Notification::assertSentTo($user, VerifyAccountEmail::class);
     }
 
     public function test_login_uses_one_generic_credential_error_and_records_device(): void
