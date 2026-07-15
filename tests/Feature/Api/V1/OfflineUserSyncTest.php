@@ -14,8 +14,12 @@ use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
 use App\Services\Api\V1\Sync\ApiSyncCursorCodec;
+use App\Services\Api\V1\Sync\UserSyncChangePublisher;
 use App\Services\Catalog\CatalogPlaybackProgressSession;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Schema;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -106,6 +110,51 @@ final class OfflineUserSyncTest extends TestCase
             ->assertJsonPath('data.0.state.versions.rating', 1);
     }
 
+    public function test_existing_user_state_endpoints_remain_healthy_before_the_sync_migration(): void
+    {
+        Schema::drop('api_sync_mutations');
+        Schema::drop('api_sync_changes');
+        Schema::table('catalog_title_user_states', function (Blueprint $table): void {
+            $table->dropColumn(['watchlist_version', 'rating_version']);
+        });
+
+        $user = User::factory()->create();
+        $title = CatalogTitle::factory()->create(['slug' => 'pre-sync-user-state']);
+        Sanctum::actingAs($user, ['mobile:read', 'mobile:write']);
+
+        $this->getJson('/api/v1/sync/manifest')
+            ->assertServiceUnavailable()
+            ->assertJsonPath('code', 'sync_unavailable');
+        $this->putJson("/api/v1/me/watchlist/{$title->slug}")
+            ->assertOk()
+            ->assertJsonPath('data.in_watchlist', true)
+            ->assertJsonPath('data.versions.watchlist', 0)
+            ->assertJsonPath('data.versions.rating', 0);
+        $this->getJson('/api/v1/me/watchlist')
+            ->assertOk()
+            ->assertJsonPath('data.0.state.in_watchlist', true)
+            ->assertJsonPath('data.0.state.versions.watchlist', 0)
+            ->assertJsonPath('data.0.state.versions.rating', 0);
+        $this->putJson("/api/v1/me/ratings/{$title->slug}", ['rating' => 8])
+            ->assertOk()
+            ->assertJsonPath('data.rating', 8)
+            ->assertJsonPath('data.versions.watchlist', 0)
+            ->assertJsonPath('data.versions.rating', 0);
+        $this->getJson('/api/v1/me/ratings')
+            ->assertOk()
+            ->assertJsonPath('data.0.state.rating', 8)
+            ->assertJsonPath('data.0.state.versions.watchlist', 0)
+            ->assertJsonPath('data.0.state.versions.rating', 0);
+        $this->deleteJson("/api/v1/me/watchlist/{$title->slug}")
+            ->assertOk()
+            ->assertJsonPath('data.in_watchlist', false)
+            ->assertJsonPath('data.versions.watchlist', 0);
+        $this->deleteJson("/api/v1/me/ratings/{$title->slug}")
+            ->assertOk()
+            ->assertJsonPath('data.rating', null)
+            ->assertJsonPath('data.versions.rating', 0);
+    }
+
     public function test_private_pull_is_owner_scoped_and_serializes_only_safe_resource_links(): void
     {
         $owner = User::factory()->unverified()->create();
@@ -162,6 +211,54 @@ final class OfflineUserSyncTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonPath('code', 'validation_failed')
             ->assertJsonValidationErrors('cursor');
+    }
+
+    public function test_old_owner_cursor_expires_after_retention_when_its_journal_is_empty(): void
+    {
+        $owner = User::factory()->create();
+        $removed = $this->change($owner, 'title_state', 'removed-owner-title');
+        $cursor = Crypt::encryptString(json_encode([
+            'v' => 1,
+            's' => ApiSyncChange::SCOPE_USER,
+            'o' => $owner->id,
+            'i' => $removed->id,
+            't' => now()->subDays(31)->getTimestamp(),
+        ], JSON_THROW_ON_ERROR));
+        $initialCursor = Crypt::encryptString(json_encode([
+            'v' => 1,
+            's' => ApiSyncChange::SCOPE_USER,
+            'o' => $owner->id,
+            'i' => 0,
+            't' => now()->subDays(31)->getTimestamp(),
+        ], JSON_THROW_ON_ERROR));
+        $removed->delete();
+        Sanctum::actingAs($owner, ['mobile:read']);
+
+        foreach ([$cursor, $initialCursor] as $expiredCursor) {
+            $this->getJson('/api/v1/me/sync?cursor='.urlencode($expiredCursor))
+                ->assertGone()
+                ->assertJsonPath('code', 'sync_cursor_expired');
+        }
+    }
+
+    public function test_owner_publisher_preserves_domain_maximum_slug_and_composite_progress_key(): void
+    {
+        $slug = str_repeat('a', 255);
+        $owner = User::factory()->create();
+        $title = CatalogTitle::factory()->create(['slug' => $slug]);
+        $publisher = app(UserSyncChangePublisher::class);
+
+        $publisher->publishTitleState($owner, $title);
+        $publisher->publishProgress($owner, $title, 123456789);
+
+        $this->assertSame([
+            $slug,
+            $slug.':123456789',
+        ], ApiSyncChange::query()
+            ->where('user_id', $owner->id)
+            ->orderBy('id')
+            ->pluck('resource_key')
+            ->all());
     }
 
     public function test_progress_history_delete_and_clear_publish_only_effective_owner_changes(): void

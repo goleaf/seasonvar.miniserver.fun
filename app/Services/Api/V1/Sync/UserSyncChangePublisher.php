@@ -50,7 +50,7 @@ final class UserSyncChangePublisher
 
     private function publish(User $user, string $type, ?string $key, string $operation): void
     {
-        if ($user->id === null || ($key !== null && mb_strlen($key) > 191)) {
+        if ($user->id === null || ($key !== null && mb_strlen($key) > ApiSyncChange::MAX_RESOURCE_KEY_LENGTH)) {
             return;
         }
 

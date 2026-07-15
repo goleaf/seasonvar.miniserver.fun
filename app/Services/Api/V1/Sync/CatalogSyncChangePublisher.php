@@ -105,7 +105,7 @@ final class CatalogSyncChangePublisher
 
     private function validSlug(string $slug): bool
     {
-        return $slug !== '' && mb_strlen($slug) <= 191;
+        return $slug !== '' && mb_strlen($slug) <= ApiSyncChange::MAX_TITLE_SLUG_LENGTH;
     }
 
     private function reportFailure(Throwable $exception): void

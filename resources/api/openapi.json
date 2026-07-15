@@ -2366,7 +2366,8 @@
                         "format": "date-time"
                     },
                     "title_slug": {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 255
                     },
                     "episode_id": {
                         "type": "integer",
@@ -2468,6 +2469,7 @@
                     },
                     "title_slug": {
                         "type": "string",
+                        "maxLength": 255,
                         "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
                     },
                     "value": {
@@ -2500,6 +2502,7 @@
                     },
                     "title_slug": {
                         "type": "string",
+                        "maxLength": 255,
                         "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
                     },
                     "value": {
@@ -2541,6 +2544,7 @@
                     },
                     "title_slug": {
                         "type": "string",
+                        "maxLength": 255,
                         "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
                     },
                     "episode_id": {
@@ -2742,6 +2746,23 @@
                     }
                 }
             },
+            "UserStateVersions": {
+                "type": "object",
+                "required": [
+                    "watchlist",
+                    "rating"
+                ],
+                "properties": {
+                    "watchlist": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "rating": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                }
+            },
             "UserTitleState": {
                 "type": "object",
                 "required": [
@@ -2765,21 +2786,7 @@
                         "maximum": 10
                     },
                     "versions": {
-                        "type": "object",
-                        "required": [
-                            "watchlist",
-                            "rating"
-                        ],
-                        "properties": {
-                            "watchlist": {
-                                "type": "integer",
-                                "minimum": 0
-                            },
-                            "rating": {
-                                "type": "integer",
-                                "minimum": 0
-                            }
-                        }
+                        "$ref": "#/components/schemas/UserStateVersions"
                     },
                     "aggregate": {
                         "type": "object",
@@ -2909,6 +2916,7 @@
                         "required": [
                             "in_watchlist",
                             "rating",
+                            "versions",
                             "updated_at"
                         ],
                         "properties": {
@@ -2922,6 +2930,9 @@
                                 ],
                                 "minimum": 1,
                                 "maximum": 10
+                            },
+                            "versions": {
+                                "$ref": "#/components/schemas/UserStateVersions"
                             },
                             "updated_at": {
                                 "type": [

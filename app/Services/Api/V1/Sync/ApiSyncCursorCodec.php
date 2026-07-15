@@ -14,11 +14,14 @@ final class ApiSyncCursorCodec
 {
     public function encode(ApiSyncCursor $cursor): string
     {
+        $issuedAt = $cursor->issuedAt > 0 ? $cursor->issuedAt : now()->getTimestamp();
+
         return Crypt::encryptString(json_encode([
             'v' => 1,
             's' => $cursor->scope,
             'o' => $cursor->ownerId,
             'i' => $cursor->changeId,
+            't' => $issuedAt,
         ], JSON_THROW_ON_ERROR));
     }
 
@@ -51,12 +54,13 @@ final class ApiSyncCursorCodec
             scope: $payload['s'],
             ownerId: $payload['o'],
             changeId: $payload['i'],
+            issuedAt: $payload['t'],
         );
     }
 
     private function validPayload(mixed $payload): bool
     {
-        if (! is_array($payload) || array_keys($payload) !== ['v', 's', 'o', 'i']) {
+        if (! is_array($payload) || array_keys($payload) !== ['v', 's', 'o', 'i', 't']) {
             return false;
         }
 
@@ -64,7 +68,9 @@ final class ApiSyncCursorCodec
             || ! is_string($payload['s'])
             || ! in_array($payload['s'], [ApiSyncChange::SCOPE_CATALOG, ApiSyncChange::SCOPE_USER], true)
             || ! is_int($payload['i'])
-            || $payload['i'] < 0) {
+            || $payload['i'] < 0
+            || ! is_int($payload['t'])
+            || $payload['t'] < 1) {
             return false;
         }
 

@@ -93,11 +93,23 @@ final class OfflineCatalogSyncPublishingTest extends TestCase
 
         $publisher->publishDelete('deleted-title');
         $publisher->publishDelete('');
-        $publisher->publishDelete(str_repeat('x', 192));
+        $publisher->publishDelete(str_repeat('x', ApiSyncChange::MAX_TITLE_SLUG_LENGTH + 1));
 
         $change = ApiSyncChange::query()->sole();
         $this->assertSame('deleted-title', $change->resource_key);
         $this->assertSame(ApiSyncChange::OPERATION_DELETE, $change->operation);
+    }
+
+    public function test_catalog_publisher_preserves_a_domain_maximum_length_slug(): void
+    {
+        $slug = str_repeat('a', 255);
+        $title = CatalogTitle::factory()->create(['slug' => $slug]);
+
+        app(CatalogSyncChangePublisher::class)->publishUpsert($title);
+
+        $change = ApiSyncChange::query()->sole();
+        $this->assertSame($slug, $change->resource_key);
+        $this->assertSame(ApiSyncChange::OPERATION_UPSERT, $change->operation);
     }
 
     public function test_missing_sync_schema_never_breaks_the_completed_domain_write(): void

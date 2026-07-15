@@ -10,5 +10,6 @@ final readonly class ApiSyncCursor
         public string $scope,
         public ?int $ownerId,
         public int $changeId,
+        public int $issuedAt = 0,
     ) {}
 }

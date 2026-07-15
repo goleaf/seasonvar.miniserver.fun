@@ -464,6 +464,7 @@ class SeasonvarCatalogImporter
      * Apply a network-free prepared payload to one canonical catalog title.
      *
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @param  (callable(CatalogTitle): void)|null  $afterCatalogCommit
      * @return array{catalog_title: CatalogTitle, media_attached: int, media_updated: int, media_skipped: int, media_failed: int}
      */
     public function applyPreparedPage(
@@ -472,6 +473,8 @@ class SeasonvarCatalogImporter
         ?CatalogTitle $preferredCatalogTitle = null,
         ?int $importRunId = null,
         ?callable $progress = null,
+        bool $publishSyncChange = true,
+        ?callable $afterCatalogCommit = null,
     ): array {
         if ((int) $page->id !== $prepared->sourcePageId) {
             throw new RuntimeException('Подготовленная страница не соответствует исходной странице Seasonvar.');
@@ -544,6 +547,11 @@ class SeasonvarCatalogImporter
             progress: $progress,
         );
         $catalogTitle = $transactionResult['catalog_title'];
+
+        if ($afterCatalogCommit !== null) {
+            $afterCatalogCommit($catalogTitle);
+        }
+
         $mediaResult = $this->syncParsedMedia(
             $catalogTitle,
             $transactionResult['seasons'],
@@ -558,7 +566,10 @@ class SeasonvarCatalogImporter
         $missingDataFlags = $this->titlePageStateSynchronizer
             ->synchronize($catalogTitle, $page, $importRunId);
         $this->searchIndexer->synchronizeTitleIds([$catalogTitle->id]);
-        $this->syncChanges->publishUpsert($catalogTitle);
+
+        if ($publishSyncChange) {
+            $this->syncChanges->publishUpsert($catalogTitle);
+        }
 
         $this->report($progress, 'page-parse-complete', [
             'source_page_id' => $page->id,

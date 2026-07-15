@@ -13,7 +13,7 @@ return new class extends Migration
             $table->string('scope', 16);
             $table->foreignId('user_id')->nullable()->constrained()->cascadeOnDelete();
             $table->string('resource_type', 32);
-            $table->string('resource_key', 191)->nullable();
+            $table->string('resource_key', 512)->nullable();
             $table->string('operation', 16);
             $table->timestamp('changed_at');
             $table->timestamps();

@@ -14,6 +14,8 @@ use InvalidArgumentException;
 
 final class ApiSyncPullQuery
 {
+    private const int MAXIMUM_RETENTION_DAYS = 3650;
+
     public function checkpoint(string $scope, ?User $owner): ApiSyncCursor
     {
         $ownerId = $this->ownerId($scope, $owner?->id);
@@ -23,6 +25,7 @@ final class ApiSyncPullQuery
             scope: $scope,
             ownerId: $ownerId,
             changeId: (int) ($this->scopeQuery($cursor)->max('id') ?? 0),
+            issuedAt: now()->getTimestamp(),
         );
     }
 
@@ -38,9 +41,10 @@ final class ApiSyncPullQuery
         $scopeQuery = $this->scopeQuery($cursor);
         $oldestRetainedId = (clone $scopeQuery)->min('id');
 
-        if ($cursor->changeId > 0
+        if ($this->expiredByAge($cursor)
+            || ($cursor->changeId > 0
             && $oldestRetainedId !== null
-            && $cursor->changeId < (int) $oldestRetainedId) {
+            && $cursor->changeId < (int) $oldestRetainedId)) {
             throw new ApiSyncCursorException(ApiSyncCursorException::EXPIRED);
         }
 
@@ -60,7 +64,12 @@ final class ApiSyncPullQuery
 
         return [
             'changes' => $changes,
-            'cursor' => new ApiSyncCursor($cursor->scope, $cursor->ownerId, $changeId),
+            'cursor' => new ApiSyncCursor(
+                $cursor->scope,
+                $cursor->ownerId,
+                $changeId,
+                now()->getTimestamp(),
+            ),
             'has_more' => $hasMore,
         ];
     }
@@ -88,5 +97,22 @@ final class ApiSyncPullQuery
         }
 
         throw new InvalidArgumentException('Invalid API sync scope or owner.');
+    }
+
+    private function expiredByAge(ApiSyncCursor $cursor): bool
+    {
+        if ($cursor->issuedAt < 1) {
+            return false;
+        }
+
+        $retentionDays = max(
+            1,
+            min(
+                self::MAXIMUM_RETENTION_DAYS,
+                (int) config('mobile-api.sync.change_retention_days', 30),
+            ),
+        );
+
+        return $cursor->issuedAt < now()->subDays($retentionDays)->getTimestamp();
     }
 }

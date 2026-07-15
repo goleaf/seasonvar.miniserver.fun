@@ -6,6 +6,7 @@ namespace App\Services\Catalog\Api\V1;
 
 use App\Models\CatalogTitleUserState;
 use App\Models\User;
+use App\Services\Api\V1\Sync\ApiSyncReadiness;
 use App\Services\Catalog\CatalogTaxonomyRegistry;
 use App\Services\Catalog\CatalogTitleQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -17,6 +18,7 @@ final readonly class UserLibraryQuery
     public function __construct(
         private CatalogTitleQuery $titles,
         private CatalogTaxonomyRegistry $taxonomies,
+        private ApiSyncReadiness $syncReadiness,
     ) {}
 
     /** @return LengthAwarePaginator<int, CatalogTitleUserState> */
@@ -40,7 +42,7 @@ final readonly class UserLibraryQuery
     /** @return Builder<CatalogTitleUserState> */
     private function base(User $user): Builder
     {
-        return CatalogTitleUserState::query()
+        $query = CatalogTitleUserState::query()
             ->whereBelongsTo($user)
             ->whereIn(
                 'catalog_title_id',
@@ -52,10 +54,16 @@ final readonly class UserLibraryQuery
                 'catalog_title_id',
                 'in_watchlist',
                 'rating',
-                'watchlist_version',
-                'rating_version',
                 'updated_at',
-            ])
+            ]);
+
+        if ($this->syncReadiness->stateVersionsAvailable()) {
+            $query->addSelect(['watchlist_version', 'rating_version']);
+        } else {
+            $query->selectRaw('0 AS watchlist_version, 0 AS rating_version');
+        }
+
+        return $query
             ->with(['catalogTitle' => fn (BelongsTo $query): BelongsTo => $query
                 ->select([
                     'id',

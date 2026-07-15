@@ -25,6 +25,7 @@ final class ApiSyncCursorCodecTest extends TestCase
         $this->assertSame(ApiSyncChange::SCOPE_CATALOG, $decoded->scope);
         $this->assertNull($decoded->ownerId);
         $this->assertSame(42, $decoded->changeId);
+        $this->assertGreaterThan(0, $decoded->issuedAt);
         $this->assertStringNotContainsString('catalog', $encoded);
         $this->assertStringNotContainsString('42', $encoded);
     }

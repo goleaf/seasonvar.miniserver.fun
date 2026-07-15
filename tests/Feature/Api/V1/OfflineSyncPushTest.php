@@ -53,6 +53,11 @@ final class OfflineSyncPushTest extends TestCase
         $invalidPayloads = [
             [[], 'operations'],
             [['operations' => []], 'operations'],
+            [['operations' => ['named' => $this->historyClear()]], 'operations'],
+            [[
+                'operations' => [$this->historyClear()],
+                'unexpected' => true,
+            ], 'unexpected'],
             [['operations' => array_map(fn (int $index): array => [
                 'mutation_id' => (string) Str::uuid(),
                 'type' => 'history.clear',
@@ -91,6 +96,17 @@ final class OfflineSyncPushTest extends TestCase
                 'duration_seconds' => -1,
                 'ended' => 'false',
             ]]], 'operations.0.episode_id'],
+            [['operations' => [[
+                'mutation_id' => (string) Str::uuid(),
+                'type' => 'progress.set',
+                'title_slug' => 'shape-title',
+                'episode_id' => 1,
+                'playback_session' => 'opaque-session',
+                'event_sequence' => 1,
+                'position_seconds' => 0,
+                'duration_seconds' => 60,
+                'ended' => 1,
+            ]]], 'operations.0.ended'],
         ];
 
         foreach ($invalidPayloads as [$payload, $errorKey]) {
@@ -181,6 +197,24 @@ final class OfflineSyncPushTest extends TestCase
         $this->assertSame(1, $state->watchlist_version);
         $this->assertSame(1, $state->rating_version);
         $this->assertDatabaseCount('api_sync_mutations', 3);
+    }
+
+    public function test_push_accepts_the_domain_maximum_title_slug_length(): void
+    {
+        $user = User::factory()->create();
+        $title = CatalogTitle::factory()->create(['slug' => str_repeat('a', 255)]);
+        Sanctum::actingAs($user, ['mobile:read', 'mobile:write']);
+
+        $this->postJson('/api/v1/me/sync', ['operations' => [[
+            'mutation_id' => (string) Str::uuid(),
+            'type' => 'watchlist.set',
+            'title_slug' => $title->slug,
+            'value' => true,
+            'expected_version' => 0,
+        ]]])
+            ->assertOk()
+            ->assertJsonPath('data.results.0.status', 'applied')
+            ->assertJsonPath('data.results.0.data.in_watchlist', true);
     }
 
     public function test_valid_batch_returns_partial_domain_results_without_rolling_back_neighbors(): void

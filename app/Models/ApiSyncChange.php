@@ -18,6 +18,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class ApiSyncChange extends Model
 {
+    public const int MAX_RESOURCE_KEY_LENGTH = 512;
+
+    public const int MAX_TITLE_SLUG_LENGTH = 255;
+
     public const string OPERATION_DELETE = 'delete';
 
     public const string OPERATION_CLEAR = 'clear';

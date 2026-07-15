@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\DTOs\Seasonvar\SeasonvarCatalogData;
 use App\DTOs\Seasonvar\SeasonvarPreparedCatalogPage;
 use App\Jobs\FinalizeSeasonvarImportTitleGroup;
+use App\Models\ApiSyncChange;
 use App\Models\CatalogTitle;
 use App\Models\Season;
 use App\Models\SeasonvarImportPreparedPage;
@@ -15,11 +16,16 @@ use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
 use App\Services\Seasonvar\SeasonvarCatalogParser;
 use App\Services\Seasonvar\SeasonvarImportTitleGroupDispatcher;
 use App\Services\Seasonvar\SeasonvarPageClaimManager;
+use App\Services\Seasonvar\SeasonvarTitleMerger;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Mockery\MockInterface;
+use RuntimeException;
 use Tests\TestCase;
+use Throwable;
 
 class SeasonvarImportTitleGroupFinalizerTest extends TestCase
 {
@@ -98,10 +104,79 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         $this->assertSame(9, data_get($group->run->fresh()->summary, 'title_manifest.added'));
         $this->assertSame(3, data_get($group->run->fresh()->summary, 'title_manifest.unchanged'));
         $this->assertSame(0, data_get($group->run->fresh()->summary, 'title_manifest.failed'));
+        $this->assertSame(1, ApiSyncChange::query()
+            ->where('operation', ApiSyncChange::OPERATION_UPSERT)
+            ->where('resource_key', 'ryzaia-8')
+            ->count());
         $this->assertSame(
             'completed',
             app(CatalogTitleRefreshStateStore::class)->read($title->id)->status?->value,
         );
+    }
+
+    public function test_finalizer_publishes_one_invalidation_when_merge_fails_after_pages_commit(): void
+    {
+        $title = $this->titleWithSeasonUrls([1, 2]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $this->prepareAllRows($group->preparedPages()->with('sourcePage')->get(), [1 => 2, 2 => 2]);
+        $this->mock(SeasonvarTitleMerger::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('mergeForCanonicalSlug')
+                ->once()
+                ->with('ryzaia-8')
+                ->andThrow(new RuntimeException('Merge failed after prepared pages committed.'));
+        });
+
+        try {
+            $this->app->call([
+                (new FinalizeSeasonvarImportTitleGroup($group->id))->withFakeQueueInteractions(),
+                'handle',
+            ]);
+            $this->fail('Finalizer accepted a failed title merge.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Merge failed after prepared pages committed.', $exception->getMessage());
+        }
+
+        $this->assertSame(4, $title->episodes()->count());
+        $this->assertSame(1, ApiSyncChange::query()
+            ->where('operation', ApiSyncChange::OPERATION_UPSERT)
+            ->where('resource_key', 'ryzaia-8')
+            ->count());
+    }
+
+    public function test_finalizer_publishes_one_invalidation_when_the_first_page_fails_after_catalog_commit(): void
+    {
+        $title = $this->titleWithSeasonUrls([1, 2]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $this->prepareAllRows($group->preparedPages()->with('sourcePage')->get(), [1 => 2, 2 => 2]);
+        DB::unprepared(<<<'SQL'
+            CREATE TRIGGER fail_relation_metadata_after_catalog_commit
+            BEFORE UPDATE OF relation_metadata_version ON catalog_titles
+            BEGIN
+                SELECT RAISE(FAIL, 'forced post-commit failure');
+            END
+            SQL);
+
+        try {
+            try {
+                $this->app->call([
+                    (new FinalizeSeasonvarImportTitleGroup($group->id))->withFakeQueueInteractions(),
+                    'handle',
+                ]);
+                $this->fail('Finalizer accepted a post-commit importer failure.');
+            } catch (Throwable $exception) {
+                $this->assertStringContainsString('forced post-commit failure', $exception->getMessage());
+            }
+        } finally {
+            DB::unprepared('DROP TRIGGER IF EXISTS fail_relation_metadata_after_catalog_commit');
+        }
+
+        $this->assertGreaterThan(0, $title->episodes()->count());
+        $this->assertSame(1, ApiSyncChange::query()
+            ->where('operation', ApiSyncChange::OPERATION_UPSERT)
+            ->where('resource_key', 'ryzaia-8')
+            ->count());
     }
 
     public function test_finalizer_marks_group_and_refresh_partial_when_one_page_failed(): void

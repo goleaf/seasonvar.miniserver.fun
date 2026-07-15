@@ -14,6 +14,7 @@ use App\Models\CatalogTitle;
 use App\Models\SeasonvarImportPreparedPage;
 use App\Models\SeasonvarImportRun;
 use App\Models\SeasonvarImportTitleGroup;
+use App\Services\Api\V1\Sync\CatalogSyncChangePublisher;
 use App\Services\Catalog\CatalogCacheInvalidator;
 use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
@@ -74,6 +75,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
         CatalogTitleRefreshStateStore $refreshStates,
         SeasonvarImportRunRecorder $runs,
         CatalogCacheInvalidator $cacheInvalidator,
+        CatalogSyncChangePublisher $syncChanges,
         SeasonvarImportGroupKey $groupKeys,
         SeasonvarUrl $urls,
     ): void {
@@ -102,6 +104,9 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
 
             return;
         }
+
+        $catalogTitleForSync = null;
+        $syncChangePublished = false;
 
         try {
             $group = $this->group();
@@ -148,8 +153,13 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
                     $item['prepared'],
                     $catalogTitle,
                     $group->seasonvar_import_run_id,
+                    publishSyncChange: false,
+                    afterCatalogCommit: static function (CatalogTitle $committedTitle) use (&$catalogTitleForSync): void {
+                        $catalogTitleForSync = $committedTitle;
+                    },
                 );
                 $catalogTitle = $result['catalog_title'];
+                $catalogTitleForSync = $catalogTitle;
                 $media['attached'] += $result['media_attached'];
                 $media['updated'] += $result['media_updated'];
                 $media['skipped'] += $result['media_skipped'];
@@ -160,8 +170,15 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
                 }
             }
 
-            $titleMerger->mergeForCanonicalSlug($catalogTitle->slug);
+            $mergeResult = $titleMerger->mergeForCanonicalSlug($catalogTitle->slug);
             $catalogTitle->refresh();
+            $catalogTitleForSync = $catalogTitle;
+
+            if ($mergeResult['titles'] === 0) {
+                $syncChanges->publishUpsert($catalogTitle);
+            }
+
+            $syncChangePublished = true;
             $comparison = $sourceManifest->comparison(
                 $manifests->fromCatalog($catalogTitle),
                 $localManifestBefore,
@@ -195,6 +212,12 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
                     $refreshStates->partial($catalogTitle->id, $group->seasonvar_import_run_id);
                 }
             }
+        } catch (Throwable $exception) {
+            if (! $syncChangePublished && $catalogTitleForSync !== null) {
+                $syncChanges->publishUpsert($catalogTitleForSync);
+            }
+
+            throw $exception;
         } finally {
             $lock->release();
         }

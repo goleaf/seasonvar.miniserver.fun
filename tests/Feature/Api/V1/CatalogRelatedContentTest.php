@@ -165,7 +165,7 @@ final class CatalogRelatedContentTest extends TestCase
             ->assertJsonPath('components.schemas.SyncPushRequest.properties.operations.maxItems', 50)
             ->assertJsonPath('components.schemas.SyncMutationResult.properties.status.enum.0', 'applied')
             ->assertJsonPath('components.schemas.UserTitleState.required.2', 'versions')
-            ->assertJsonPath('components.schemas.UserTitleState.properties.versions.required.0', 'watchlist')
+            ->assertJsonPath('components.schemas.UserStateVersions.required.0', 'watchlist')
             ->assertJsonPath('components.responses.SyncCursorExpired.content.application/json.examples.default.value.code', 'sync_cursor_expired')
             ->assertJsonPath('components.responses.SyncUnavailable.content.application/json.examples.default.value.code', 'sync_unavailable')
             ->json();
@@ -184,6 +184,17 @@ final class CatalogRelatedContentTest extends TestCase
 
         $progressProperties = $document['components']['schemas']['SyncProgressMutation']['properties'];
         $resultProperties = $document['components']['schemas']['SyncMutationResult']['properties'];
+        $libraryState = $document['components']['schemas']['UserLibraryItem']['properties']['state'];
+
+        $this->assertContains('versions', $libraryState['required']);
+        $this->assertSame(
+            '#/components/schemas/UserStateVersions',
+            $libraryState['properties']['versions']['$ref'] ?? null,
+        );
+        $this->assertSame(
+            '#/components/schemas/UserStateVersions',
+            $document['components']['schemas']['UserTitleState']['properties']['versions']['$ref'] ?? null,
+        );
 
         foreach (['playback_url', 'source_url', 'licensed_media_id', 'token'] as $privateField) {
             $this->assertArrayNotHasKey($privateField, $progressProperties);

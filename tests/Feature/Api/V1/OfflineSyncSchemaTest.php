@@ -125,6 +125,29 @@ final class OfflineSyncSchemaTest extends TestCase
         $this->assertTrue($mutation->user->is($user));
     }
 
+    public function test_sync_migration_is_reversible_and_can_be_applied_again(): void
+    {
+        $migration = require database_path('migrations/2026_07_14_164423_create_api_sync_tables_and_add_state_versions.php');
+
+        $migration->down();
+
+        try {
+            $this->assertFalse(Schema::hasTable('api_sync_changes'));
+            $this->assertFalse(Schema::hasTable('api_sync_mutations'));
+            $this->assertFalse(Schema::hasColumn('catalog_title_user_states', 'watchlist_version'));
+            $this->assertFalse(Schema::hasColumn('catalog_title_user_states', 'rating_version'));
+        } finally {
+            $migration->up();
+        }
+
+        $this->assertTrue(Schema::hasTable('api_sync_changes'));
+        $this->assertTrue(Schema::hasTable('api_sync_mutations'));
+        $this->assertTrue(Schema::hasColumns('catalog_title_user_states', [
+            'watchlist_version',
+            'rating_version',
+        ]));
+    }
+
     /** @return list<string> */
     private function sqliteIndexNames(string $table): array
     {

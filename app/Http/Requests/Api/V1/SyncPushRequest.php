@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Models\ApiSyncChange;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
@@ -30,11 +31,11 @@ final class SyncPushRequest extends FormRequest
         $maximumDuration = max(60, min(604800, (int) config('playback.progress.max_duration_seconds', 86400)));
 
         return [
-            'operations' => ['required', 'array', 'min:1', 'max:50'],
+            'operations' => ['required', 'array', 'list', 'min:1', 'max:50'],
             'operations.*' => ['required', 'array'],
             'operations.*.mutation_id' => ['required', 'uuid', 'distinct:strict'],
             'operations.*.type' => ['required', 'string', Rule::in(self::TYPES)],
-            'operations.*.title_slug' => ['sometimes', 'string', 'max:191', 'regex:/\A[a-z0-9]+(?:-[a-z0-9]+)*\z/'],
+            'operations.*.title_slug' => ['sometimes', 'string', 'max:'.ApiSyncChange::MAX_TITLE_SLUG_LENGTH, 'regex:/\A[a-z0-9]+(?:-[a-z0-9]+)*\z/'],
             'operations.*.value' => ['sometimes'],
             'operations.*.expected_version' => ['sometimes', 'integer', 'min:0'],
             'operations.*.episode_id' => ['sometimes', 'integer', 'min:1'],
@@ -42,7 +43,7 @@ final class SyncPushRequest extends FormRequest
             'operations.*.event_sequence' => ['sometimes', 'integer', 'min:1'],
             'operations.*.position_seconds' => ['sometimes', 'integer', 'min:0', 'max:'.$maximumDuration],
             'operations.*.duration_seconds' => ['sometimes', 'integer', 'min:0', 'max:'.$maximumDuration],
-            'operations.*.ended' => ['sometimes', 'boolean'],
+            'operations.*.ended' => ['sometimes', 'boolean:strict'],
             'operations.*.progress_id' => ['sometimes', 'integer', 'min:1'],
         ];
     }
@@ -53,6 +54,7 @@ final class SyncPushRequest extends FormRequest
         return [
             'operations.required' => 'Передайте операции синхронизации.',
             'operations.array' => 'Операции синхронизации должны быть массивом.',
+            'operations.list' => 'Операции синхронизации должны быть последовательным списком.',
             'operations.min' => 'Передайте хотя бы одну операцию синхронизации.',
             'operations.max' => 'За один запрос можно передать не более 50 операций.',
             'operations.*.mutation_id.required' => 'Для каждой операции нужен mutation_id.',
@@ -68,6 +70,13 @@ final class SyncPushRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator): void {
+            foreach (array_diff(array_keys($this->all()), ['operations']) as $extraKey) {
+                $validator->errors()->add(
+                    (string) $extraKey,
+                    'Поле верхнего уровня не поддерживается.',
+                );
+            }
+
             $operations = $this->input('operations');
 
             if (! is_array($operations)) {

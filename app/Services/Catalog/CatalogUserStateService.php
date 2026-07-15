@@ -9,6 +9,7 @@ use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUserState;
 use App\Models\EpisodeViewProgress;
 use App\Models\User;
+use App\Services\Api\V1\Sync\ApiSyncReadiness;
 use App\Services\Api\V1\Sync\UserSyncChangePublisher;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -20,6 +21,7 @@ class CatalogUserStateService
         private readonly CatalogTitlePlaybackQuery $playback,
         private readonly CatalogPlaybackProgressSession $progressSessions,
         private readonly CatalogPlaybackCompletionRule $completionRule,
+        private readonly ApiSyncReadiness $syncReadiness,
         private readonly UserSyncChangePublisher $syncChanges,
     ) {}
 
@@ -252,12 +254,17 @@ class CatalogUserStateService
             $value = $attributes[$column];
             $shouldCreate = $column === 'in_watchlist' ? $value === true : $value !== null;
             $versionColumn = $column === 'in_watchlist' ? 'watchlist_version' : 'rating_version';
+            $versionsAvailable = $this->syncReadiness->stateVersionsAvailable();
             $state = CatalogTitleUserState::query()
                 ->whereBelongsTo($user)
                 ->whereBelongsTo($catalogTitle)
                 ->lockForUpdate()
                 ->first();
-            $version = (int) ($state?->{$versionColumn} ?? 0);
+            $version = $versionsAvailable ? (int) ($state?->{$versionColumn} ?? 0) : 0;
+
+            if (! $versionsAvailable && $expectedVersion !== null) {
+                return ['applied' => false, 'state' => $state, 'version' => 0];
+            }
 
             if ($expectedVersion !== null && $version !== $expectedVersion) {
                 return ['applied' => false, 'state' => $state, 'version' => $version];
@@ -278,7 +285,7 @@ class CatalogUserStateService
                     ->whereBelongsTo($catalogTitle)
                     ->lockForUpdate()
                     ->firstOrFail();
-                $version = (int) $state->{$versionColumn};
+                $version = $versionsAvailable ? (int) $state->{$versionColumn} : 0;
 
                 if ($expectedVersion !== null && $version !== $expectedVersion) {
                     return ['applied' => false, 'state' => $state, 'version' => $version];
@@ -297,12 +304,16 @@ class CatalogUserStateService
                 return ['applied' => true, 'state' => $state, 'version' => $version];
             }
 
-            $version++;
-            $state->forceFill([
+            $updates = [
                 $column => $value,
-                $versionColumn => $version,
                 'updated_at' => $now,
-            ])->save();
+            ];
+
+            if ($versionsAvailable) {
+                $updates[$versionColumn] = ++$version;
+            }
+
+            $state->forceFill($updates)->save();
             $this->syncChanges->publishTitleState($user, $catalogTitle);
 
             return ['applied' => true, 'state' => $state, 'version' => $version];
