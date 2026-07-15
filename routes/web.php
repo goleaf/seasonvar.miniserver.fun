@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\AccountSettingsSection;
 use App\Enums\CatalogFilterType;
 use App\Http\Controllers\AccountDataExportController;
 use App\Http\Controllers\Auth\VerifyEmailController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\CatalogDirectoryRedirectController;
 use App\Http\Controllers\CatalogSitemapController;
 use App\Http\Controllers\CommentRedirectController;
 use App\Http\Controllers\InfrastructureHealthController;
+use App\Http\Controllers\MigrateAnonymousPreferencesController;
 use App\Http\Controllers\PlaybackSourceController;
 use App\Http\Controllers\ReviewDirectLinkController;
 use App\Livewire\Auth\ConfirmPasswordPage;
@@ -34,6 +36,7 @@ use App\Livewire\Profile\ReviewHistoryPage;
 use App\Livewire\Profile\SecurityPage;
 use App\Livewire\Reviews\ReviewModerationManager;
 use App\Livewire\SeasonvarImportManager;
+use App\Livewire\Settings\AccountSettingsPage;
 use App\Livewire\Tags\PersonalTagManager;
 use App\Livewire\Tags\TagAdministrationManager;
 use App\Services\Catalog\CatalogDirectoryRegistry;
@@ -61,7 +64,7 @@ Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
     ->middleware('signed')
     ->name('verification.verify');
 
-Route::middleware(['auth', 'auth.session'])->group(function (): void {
+Route::middleware(['auth', 'auth.session', 'account.private'])->group(function (): void {
     Route::get('/email/verify', VerifyEmailPage::class)->name('verification.notice');
     Route::get('/confirm-password', ConfirmPasswordPage::class)->name('password.confirm');
     Route::get('/profile', ProfilePage::class)->name('profile.show');
@@ -69,6 +72,17 @@ Route::middleware(['auth', 'auth.session'])->group(function (): void {
     Route::get('/profile/reviews', ReviewHistoryPage::class)->name('profile.reviews');
     Route::get('/notifications', DiscussionPage::class)->name('notifications.index');
     Route::get('/profile/security', SecurityPage::class)->name('profile.security');
+    Route::get('/settings/{section?}', AccountSettingsPage::class)
+        ->whereIn('section', AccountSettingsSection::values())
+        ->name('settings.index');
+    Route::get('/{locale}/settings/{section?}', AccountSettingsPage::class)
+        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->whereIn('section', AccountSettingsSection::values())
+        ->middleware('collection.locale')
+        ->name('localized.settings.index');
+    Route::post('/settings/preferences/migrate', MigrateAnonymousPreferencesController::class)
+        ->middleware('throttle:12,1')
+        ->name('settings.preferences.migrate');
     Route::get('/profile/export', AccountDataExportController::class)
         ->middleware(['password.confirm', 'throttle:6,1'])
         ->name('profile.export');

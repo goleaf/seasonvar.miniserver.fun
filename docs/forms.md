@@ -61,3 +61,9 @@ Title personal selector разделяет persisted assignments и bounded draf
 Global admin form принимает только enum-backed type/visibility/moderation/source, safe canonical label/slug, optional code, one supported translation locale, alias/synonym/provider stable IDs и explicit merge target. Create imported/hidden public, code mutation, lifecycle state spoofing, alias conflict/self synonym/invalid merge блокируются service. Merge/archive/title assignment требуют confirmation/impact и per-action loading state; private personal tags не являются options.
 
 Все видимые strings/errors/confirmations/ARIA находятся в exact-parity `lang/{ru,en}/tags.php`. Form state остаётся небольшим scalar/UUID payload: Eloquent graphs, owner IDs, counts, aliases/translations/provider rows и SEO data формируются server-side query/DTO, не public Livewire properties.
+
+## Формы настроек аккаунта
+
+Appearance, playback, notification и new-collection-default groups имеют единый staged Apply/Cancel pattern: recoverable validation сохраняет draft, success сбрасывает dirty state, failure показывает localized error и не имитирует сохранение. Reset playback и notifications — отдельные подтверждаемые non-GET actions; playback reset не меняет progress/history/library/bookmarks/profile/security.
+
+Простые toggles сохраняются вместе с разделом, а не смешивают optimistic immediate saves с staged forms. Volume preview обновляется локально без request storm. Browser timezone только подставляет предложение в draft; server save обязателен. Profile/password/email/session/export/delete controls вызывают существующие специализированные actions и не входят в generic settings payload.

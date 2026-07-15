@@ -338,6 +338,15 @@ php artisan test --filter=ConfigurationEnvironmentTest
 php artisan project:docs-refresh --check
 ```
 
+## Rollout настроек аккаунта
+
+1. Выполните verified DB backup и deploy code/assets на обычном writer-pause boundary. Примените единственную additive reversible migration `2026_07_16_000000_create_user_account_settings_table.php`; она создаёт one-row-per-user preference table и не backfill-ит/не переписывает users, profile, player, progress/history, library, collections, notification preferences, sessions или account lifecycle data.
+2. Rebuild config/routes/views and `npm run build`, затем graceful-reload PHP-FPM/Livewire/существующие workers. `AccountSettingsSchema` request/job-scoped: code-before-migration читает safe defaults, а write возвращает localized unavailable state; это rolling guard, не разрешение оставлять migration pending.
+3. Проверьте uncached `settings.index`, `localized.settings.index`, `settings.preferences.migrate`; auth/auth.session, no user ID, `private,no-store`, noindex/no social/JSON-LD и отсутствие settings в sitemap. Route cache обязателен к rebuild: старый checked runtime cache может не содержать новые маршруты.
+4. Controlled account проверяет locale redirect с сохранением section, IANA timezone/error/browser suggestion, reduced motion, playback Apply/Cancel/reset, real quality/variant fallback, device volume/mute, notifications, non-retroactive collection default, profile/security/session/export/delete links. Убедитесь, что exact history/progress/library не публикуются и что второй account в том же browser не наследует account-scoped preferences.
+5. Новая queue/cron/scheduler/Supervisor, external OAuth/premium/billing API или email/push infrastructure не требуется. Unsupported provider/premium/media-language/player-style options не включаются через deploy configuration.
+6. До первых preference writes migration может быть rolled back после compatible code rollback. После writes сделайте account export и verified DB snapshot: `down()` удаляет только новую preference table, но теряет новые explicit choices; roll-forward предпочтителен. Не используйте `migrate:fresh`, `db:wipe`, `cache:clear` или global cache flush.
+
 ## Rollout коллекций
 
 Collection rollout состоит из двух additive migrations: `2026_07_15_200000_create_catalog_collections.php` добавляет/backfill `users.public_id` и canonical collection/slug/item/report tables; `2026_07_15_200100_create_catalog_collection_translations.php` добавляет editorial locale rows. Existing watchlist/progress/history/catalog/comment/review data не переписывается. Перед `migrate --force` применяются обычные production backup, writer pause и SQLite integrity rules этого документа.

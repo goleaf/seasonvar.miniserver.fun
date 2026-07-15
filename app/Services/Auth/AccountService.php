@@ -8,8 +8,10 @@ use App\Models\User;
 use App\Services\Collections\CatalogCollectionAccountService;
 use App\Services\Comments\CommentAccountService;
 use App\Services\Reviews\ReviewAccountService;
+use App\Support\UserPlainText;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -24,8 +26,10 @@ final class AccountService
     /** @param array{name?: string, email?: string} $data */
     public function updateProfile(User $user, array $data): User
     {
+        $data = array_intersect_key($data, array_flip(['name', 'email']));
+
         if (array_key_exists('name', $data)) {
-            $data['name'] = Str::squish($data['name']);
+            $data['name'] = UserPlainText::name($data['name']);
         }
 
         if (array_key_exists('email', $data)) {
@@ -66,9 +70,19 @@ final class AccountService
 
     public function updatePassword(User $user, string $current, string $new, ?int $currentTokenId): void
     {
+        $rateKey = 'account-password-change:'.$user->getKey();
+
+        if (RateLimiter::tooManyAttempts($rateKey, 6)) {
+            throw ValidationException::withMessages([
+                'current_password' => [__('settings.security_page.security_rate_limited')],
+            ]);
+        }
+
+        RateLimiter::hit($rateKey, 300);
+
         if (! Hash::check($current, $user->password)) {
             throw ValidationException::withMessages([
-                'current_password' => ['Текущий пароль указан неверно.'],
+                'current_password' => [__('settings.security_page.current_password_invalid')],
             ]);
         }
 
@@ -89,13 +103,25 @@ final class AccountService
 
             $tokens->delete();
         }, attempts: 3);
+
+        RateLimiter::clear($rateKey);
     }
 
     public function delete(User $user, string $password): void
     {
+        $rateKey = 'account-delete:'.$user->getKey();
+
+        if (RateLimiter::tooManyAttempts($rateKey, 4)) {
+            throw ValidationException::withMessages([
+                'password' => [__('settings.security_page.security_rate_limited')],
+            ]);
+        }
+
+        RateLimiter::hit($rateKey, 300);
+
         if (! Hash::check($password, $user->password)) {
             throw ValidationException::withMessages([
-                'password' => ['Не удалось подтвердить пароль.'],
+                'password' => [__('settings.security_page.deletion_password_invalid')],
             ]);
         }
 
@@ -111,5 +137,7 @@ final class AccountService
             DB::table('sessions')->where('user_id', $lockedUser->getKey())->delete();
             $lockedUser->deleteOrFail();
         }, attempts: 3);
+
+        RateLimiter::clear($rateKey);
     }
 }

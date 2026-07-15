@@ -85,12 +85,14 @@ final class AppLayoutData
                     $this->request->routeIs('collections.mine', 'collections.edit'),
                 );
             }
-            $layoutHeaderNavigation[] = $this->headerLink(
-                'profile.show',
-                'fa-solid fa-user',
-                'Профиль',
-                $this->request->routeIs('profile.show'),
-            );
+            if ($this->router->has('settings.index')) {
+                $layoutHeaderNavigation[] = $this->headerLink(
+                    'settings.index',
+                    'fa-solid fa-gear',
+                    __('settings.navigation.settings'),
+                    $this->request->routeIs('settings.*', 'localized.settings.*', 'profile.show', 'profile.security'),
+                );
+            }
             if ($this->router->has('profile.discussions')) {
                 $layoutHeaderNavigation[] = $this->headerLink(
                     'profile.discussions',
@@ -107,13 +109,6 @@ final class AppLayoutData
                     $this->request->routeIs('profile.reviews'),
                 );
             }
-            $layoutHeaderNavigation[] = $this->headerLink(
-                'profile.security',
-                'fa-solid fa-shield-halved',
-                'Безопасность',
-                $this->request->routeIs('profile.security'),
-            );
-
             if ($canManageImports) {
                 $layoutHeaderNavigation[] = $this->headerLink(
                     'admin.imports',

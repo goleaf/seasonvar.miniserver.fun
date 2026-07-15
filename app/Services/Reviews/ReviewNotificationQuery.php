@@ -9,11 +9,18 @@ use App\Enums\ReviewNotificationType;
 use App\Enums\ReviewStatus;
 use App\Models\CatalogTitleReview;
 use App\Models\User;
+use App\Services\Auth\AccountDateTimeFormatter;
+use App\Services\Auth\AccountSettingsService;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Notifications\DatabaseNotification;
 
 final class ReviewNotificationQuery
 {
+    public function __construct(
+        private readonly AccountSettingsService $settings,
+        private readonly AccountDateTimeFormatter $dateTimes,
+    ) {}
+
     /** @return LengthAwarePaginator<int, ReviewNotificationData> */
     public function forUser(User $user): LengthAwarePaginator
     {
@@ -33,8 +40,9 @@ final class ReviewNotificationQuery
             ->whereKey($reviewIds)
             ->get(['id', 'user_id', 'status', 'deleted_at', 'merged_into_id'])
             ->keyBy('id');
+        $accountSettings = $this->settings->resolve($user);
 
-        return $paginator->through(function (DatabaseNotification $notification) use ($reviews): ReviewNotificationData {
+        return $paginator->through(function (DatabaseNotification $notification) use ($reviews, $accountSettings): ReviewNotificationData {
             $data = $notification->data;
             $kind = is_string($data['kind'] ?? null)
                 ? ReviewNotificationType::tryFrom($data['kind'])
@@ -68,7 +76,9 @@ final class ReviewNotificationQuery
                     : null,
                 url: $url,
                 createdAtIso: $notification->created_at?->toAtomString() ?? '',
-                createdAtLabel: $notification->created_at?->translatedFormat('d.m.Y H:i') ?? '',
+                createdAtLabel: $notification->created_at !== null
+                    ? $this->dateTimes->value($notification->created_at, $accountSettings->locale, $accountSettings->timezone)
+                    : '',
             );
         });
     }

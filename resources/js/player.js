@@ -1,11 +1,13 @@
 import 'plyr/dist/plyr.css';
 import plyrIconUrl from '../images/plyr.svg?url';
+import { accountDevicePreferences, persistAccountDevicePreferences } from './settings.js';
 
 const PROGRESS_HEARTBEAT_MS = 30_000;
 const PROGRESS_HEARTBEAT_MIN_DELTA_SECONDS = 10;
 const STABLE_SEEK_DELAY_MS = 750;
 const HLS_RETRY_DELAY_MS = 1_000;
 const MAX_PROGRESS_DURATION_SECONDS = 86_400;
+const DEVICE_PREFERENCE_WRITE_DELAY_MS = 600;
 
 const playerSessions = new WeakMap();
 
@@ -147,6 +149,8 @@ class CatalogPlayerSession {
         this.expired = false;
         this.completed = false;
         this.destroyed = false;
+        this.preferenceTimer = null;
+        this.preferences = this.resolvePreferences();
     }
 
     initialize() {
@@ -169,15 +173,36 @@ class CatalogPlayerSession {
         this.video.addEventListener('waiting', () => this.setStatus('buffering', 'Видео загружается…'), { signal });
         this.video.addEventListener('stalled', () => this.setStatus('buffering', 'Видео загружается…'), { signal });
         this.video.addEventListener('emptied', () => this.setStatus('loading', 'Загружаем видео…'), { signal });
+        this.video.addEventListener('volumechange', () => this.scheduleDevicePreferenceWrite(), { signal });
+        this.video.addEventListener('ratechange', () => this.scheduleDevicePreferenceWrite(), { signal });
         document.addEventListener('visibilitychange', () => this.handleVisibilityChange(), { signal });
         window.addEventListener('orientationchange', () => this.handleOrientationChange(), { signal });
         this.retryButton?.addEventListener('click', () => this.retry(), { signal });
 
         this.initializeHls();
+        this.video.autoplay = this.preferences.autoplay;
+        this.video.volume = this.preferences.volume / 100;
+        this.video.muted = this.preferences.muted;
         this.plyr = new this.Plyr(this.video, {
             controls: playerControls,
             i18n: playerTranslations,
             iconUrl: plyrIconUrl,
+            autoplay: this.preferences.autoplay,
+            volume: this.preferences.volume / 100,
+            muted: this.preferences.muted,
+            speed: {
+                selected: this.preferences.speed,
+                options: [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
+            },
+            captions: {
+                active: this.preferences.subtitlesEnabled,
+                language: 'auto',
+                update: true,
+            },
+            keyboard: {
+                focused: this.preferences.keyboardShortcutsEnabled,
+                global: false,
+            },
         });
     }
 
@@ -206,6 +231,7 @@ class CatalogPlayerSession {
 
     handlePause() {
         this.stopHeartbeat();
+        this.persistDevicePreferences();
 
         if (!this.video.ended) {
             this.flushProgress('pause');
@@ -349,6 +375,65 @@ class CatalogPlayerSession {
         }
     }
 
+    resolvePreferences() {
+        const storageKey = document.body.dataset.accountStorageKey || undefined;
+        const device = accountDevicePreferences(storageKey);
+        const authenticated = this.video.dataset.accountAuthenticated === '1';
+        const accountVersion = Number.parseInt(document.body.dataset.accountSettingsVersion || '1', 10) || 1;
+        const deviceMatchesAccount = !authenticated || Number(device.account_version || 0) >= accountVersion;
+        const serverRememberVolume = this.video.dataset.accountRememberVolume !== '0';
+        const serverVolume = Number.parseInt(this.video.dataset.accountVolume || '70', 10);
+        const server = {
+            autoplay: this.video.dataset.accountAutoplay === '1',
+            rememberVolume: serverRememberVolume,
+            volume: Number.isInteger(serverVolume) ? Math.min(100, Math.max(0, serverVolume)) : 70,
+            muted: this.video.dataset.accountMuted === '1',
+            speed: Number.parseFloat(this.video.dataset.accountSpeed || '1') || 1,
+            subtitlesEnabled: this.video.dataset.accountSubtitles === '1',
+            keyboardShortcutsEnabled: this.video.dataset.accountKeyboard !== '0',
+        };
+        const rememberVolume = authenticated
+            ? server.rememberVolume
+            : (typeof device.remember_volume === 'boolean' ? device.remember_volume : server.rememberVolume);
+
+        return {
+            autoplay: authenticated ? server.autoplay : (device.autoplay ?? server.autoplay),
+            rememberVolume,
+            volume: rememberVolume && deviceMatchesAccount ? (device.volume ?? server.volume) : (rememberVolume ? server.volume : 70),
+            muted: rememberVolume && deviceMatchesAccount ? (device.muted ?? server.muted) : (rememberVolume ? server.muted : false),
+            speed: authenticated ? server.speed : (Number.parseFloat(device.playback_speed) || server.speed),
+            subtitlesEnabled: authenticated ? server.subtitlesEnabled : (device.subtitles_enabled ?? server.subtitlesEnabled),
+            keyboardShortcutsEnabled: authenticated
+                ? server.keyboardShortcutsEnabled
+                : (device.keyboard_shortcuts_enabled ?? server.keyboardShortcutsEnabled),
+        };
+    }
+
+    scheduleDevicePreferenceWrite() {
+        if (!this.preferences.rememberVolume || this.destroyed) {
+            return;
+        }
+
+        window.clearTimeout(this.preferenceTimer);
+        this.preferenceTimer = window.setTimeout(() => {
+            this.preferenceTimer = null;
+            this.persistDevicePreferences();
+        }, DEVICE_PREFERENCE_WRITE_DELAY_MS);
+    }
+
+    persistDevicePreferences() {
+        if (!this.preferences.rememberVolume || this.destroyed) {
+            return;
+        }
+
+        persistAccountDevicePreferences({
+            remember_volume: true,
+            volume: Math.round(this.video.volume * 100),
+            muted: this.video.muted,
+            playback_speed: Number(this.video.playbackRate || 1).toFixed(2),
+        }, document.body.dataset.accountStorageKey || undefined);
+    }
+
     flushProgress(reason = 'flush') {
         this.dispatchProgress(false, true, reason);
     }
@@ -481,9 +566,15 @@ class CatalogPlayerSession {
             this.flushProgress(reason);
         }
 
+        this.persistDevicePreferences();
         this.destroyed = true;
         this.stopHeartbeat();
         this.clearSeekTimer();
+
+        if (this.preferenceTimer !== null) {
+            window.clearTimeout(this.preferenceTimer);
+            this.preferenceTimer = null;
+        }
 
         if (this.recoveryTimer !== null) {
             window.clearTimeout(this.recoveryTimer);

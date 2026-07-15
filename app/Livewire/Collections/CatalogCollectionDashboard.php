@@ -10,6 +10,7 @@ use App\Enums\CatalogCollectionVisibility;
 use App\Livewire\Concerns\InteractsWithCollectionLocale;
 use App\Models\CatalogCollection;
 use App\Models\User;
+use App\Services\Auth\AccountSettingsService;
 use App\Services\Collections\CatalogCollectionCoverService;
 use App\Services\Collections\CatalogCollectionQuery;
 use App\Services\Collections\CatalogCollectionResolver;
@@ -43,10 +44,14 @@ final class CatalogCollectionDashboard extends Component
     #[Locked]
     public string $creationPublicId = '';
 
-    public function mount(): void
+    #[Locked]
+    public string $defaultVisibility = 'private';
+
+    public function mount(AccountSettingsService $settings): void
     {
         $this->setCollectionLocale(null);
-        $this->visibility = (string) config('catalog-collections.default_visibility', 'private');
+        $this->defaultVisibility = $settings->resolve($this->user())->collectionDefaultVisibility;
+        $this->visibility = $this->defaultVisibility;
         $this->creationPublicId = (string) Str::uuid();
         $status = Session::pull('catalog_collection_status');
         $this->status = is_string($status) ? $status : null;
@@ -74,7 +79,7 @@ final class CatalogCollectionDashboard extends Component
         ));
 
         $this->reset(['name', 'description', 'type', 'showCreate']);
-        $this->visibility = (string) config('catalog-collections.default_visibility', 'private');
+        $this->visibility = $this->defaultVisibility;
         Session::flash('catalog_collection_status', __('collections.status.created'));
         $this->redirectRoute('collections.edit', ['collectionPublicId' => $collection->public_id], navigate: true);
     }

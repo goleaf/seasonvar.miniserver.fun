@@ -350,6 +350,17 @@ Account deletion обнуляет `reviews.user_id` и `reports.reporter_id`, у
 - Public count/popularity использует distinct visible title count. Related сначала сохраняет explicit editorial ordering, затем shared visible-title count; current/private/hidden tags исключены. Recommendations используют только eligible global tags как weighted signal; personal assignments не входят в public similarity или explanation.
 - Full provider-set sync идемпотентен: stable mapping/pivot uniqueness, current provenance timestamps и complete-snapshot stale reconciliation не создают повторов. Explicit editorial provenance/suppression survives import; rejected mapping clears only its current provider observations, а pivot удаляется только без remaining current source. Raw provider spelling не становится canonical public label автоматически.
 
+## Настройки аккаунта
+
+- `users` имеет optional `hasOne(UserAccountSetting::class)`. Таблица `user_account_settings` использует `user_id` одновременно как primary/foreign key, поэтому физически допускает ровно одну строку на account без duplicate reconciliation; account deletion удаляет её FK cascade.
+- Nullable columns фиксируют только явный выбор: `locale`, `timezone`, `autoplay`, `remember_volume`, `volume`, `muted`, `playback_speed`, `preferred_quality`, `preferred_variant`, `subtitles_enabled`, `keyboard_shortcuts_enabled`, `reduced_motion`, `collection_default_visibility`. Переведённые labels, media URLs, session/provider secrets, email/password, progress/history и notification matrix сюда не записываются.
+- `settings_version` монотонно увеличивается при material update и участвует в account/device precedence. Invalid legacy locale/timezone/boolean/range/speed/quality/variant/visibility читается как safe default, но не переписывается скрытно; следующий explicit save нормализует только выбранную категорию.
+- Interface locale использует существующий registry `ru|en`; timezone — allowlisted IANA ID, не raw offset. Playback speed берётся из config allowlist, volume — integer `0..100`, quality/variant — bounded stable codes реально доступных `licensed_media`/variant rows. Preferred временно недоступное значение сохраняется, resolver выбирает safe playable fallback.
+- Comment/review preferences остаются в `comment_notification_preferences` и `catalog_title_review_notification_preferences`, потому что delivery services уже читают эти таблицы. Collection default не изменяет `catalog_collections.visibility` существующих rows. Exact viewing history/progress/library остаются в private tables и не превращаются в settings fields.
+- `seasonvar.account-preferences.v1` в local storage — не database relation: anonymous/device state имеет schema version, optional account version и opaque owner scope. После login server принимает только typed allowlist и заполняет nullable account fields; volume/mute могут остаться device-only. Legacy `plyr` key читается совместимо и не удаляется до подтверждённой миграции.
+
+Additive migration `2026_07_16_000000_create_user_account_settings_table.php` не backfill-ит и не переписывает существующие user/player/collection/notification data. До её применения schema guard возвращает defaults для reads и fail-closed `503` для writes; rollback удаляет только новую preference table, поэтому после реальных writes требуется export/backup и предпочтителен roll-forward.
+
 <!-- project-docs:start -->
 ## Публичная индексация
 

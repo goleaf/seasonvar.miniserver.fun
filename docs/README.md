@@ -1,6 +1,6 @@
 # Карта документации проекта
 
-Обновлено: 15.07.2026
+Обновлено: 16.07.2026
 
 Этот файл — единый индекс проектной документации. У каждого контракта есть один основной файл-владелец; остальные документы должны ссылаться на него, а не копировать длинные правила. `README.md` остаётся точкой входа, `AGENTS.md` содержит только обязательные инструкции для агентов, а история изменений ведётся только в `CHANGELOG.md`.
 
@@ -17,6 +17,7 @@
 | Коллекции и редакционные подборки | [`architecture.md`](architecture.md), [`DATA_RELATIONS.md`](DATA_RELATIONS.md) | Канонический service/query/policy contract, identity, visibility, items/order, moderation, locale, privacy, export/delete, SEO/cache и совместимые URL. Живой аудит/acceptance находится только в Task 10 общего плана. |
 | Комментарии и обсуждения | [`architecture.md`](architecture.md), [`DATA_RELATIONS.md`](DATA_RELATIONS.md) | Канонические цели title/season/episode/collection, replies, spoilers, reactions, moderation, privacy, routes, Livewire и schema/index contracts. Живой аудит и acceptance находятся только в Task 12 общего плана. |
 | Отзывы пользователей | [`architecture.md`](architecture.md), [`DATA_RELATIONS.md`](DATA_RELATIONS.md) | Расширение единственной provider-review таблицы: title-only scope, стабильная identity, portal rating, spoilers, helpfulness, moderation, privacy, merge, routes, cache и SEO. Живой аудит и acceptance находятся только в Task 13 общего плана. |
+| Настройки аккаунта | [`architecture.md`](architecture.md), [`DATA_RELATIONS.md`](DATA_RELATIONS.md), [`plans/laravel-video-portal-modernization.md`](plans/laravel-video-portal-modernization.md) | Канонические owner-only разделы, storage и precedence preferences, locale/timezone, player integration, privacy, notifications, collection defaults, sessions, export/delete, anonymous merge, cache/security и полный живой Task 16 audit/acceptance. |
 | Авторизация и playback access | [`authorization.md`](authorization.md) | Public/profile boundary, policies/gates, entitlement decisions, signed playback route и ограничения отсутствующих product-моделей. |
 | Импорт Seasonvar | [`importer.md`](importer.md) | Response → DTO → identity → transaction/upsert → relation sync → counters/cache/index/UI, идемпотентность и владение полями. |
 | Паритет источника | [`SOURCE_PARITY.md`](SOURCE_PARITY.md) | Последний подтверждённый inventory sitemap, типы source pages, локальные parser/routes и юридические ограничения. |

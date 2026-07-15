@@ -191,6 +191,13 @@ Blade и Livewire Blade являются только presentation layer: зап
 - All tag UI labels/ARIA/status/errors live in parity-matched `lang/ru/tags.php` and `lang/en/tags.php`. Original personal content is never translated on locale switch. No Volt, `@php`, inline CSS, raw highlighting, Blade model/service query or large inline business JavaScript belongs in tag templates.
 - Manual responsive acceptance covers phone/landscape/tablet/desktop, 200% zoom, very long Cyrillic/Latin labels, many selected tags, empty/error/restorable states, keyboard focus after Livewire updates, loading locks and browser back/forward for public filters/pagination and private library tag filter.
 
+## Настройки аккаунта
+
+- Settings shell использует существующую светлую palette, panels, buttons и form controls. Mobile navigation остаётся keyboard-доступным горизонтальным списком, active section имеет `aria-current`, desktop layout — bounded sidebar/content grid без загрузки всех sections.
+- Каждый toggle остаётся native labelled checkbox с checked/focus state и touch target; timezone использует labelled input+datalist и явную кнопку browser suggestion, volume — labelled range с output. Notification matrix на узком экране превращается в читаемые stacked rows без horizontal table overflow.
+- Save/Cancel/reset/revoke/delete имеют scoped loading, disabled, localized live status/error и confirmation; destructive actions визуально и структурно отделены. Recoverable failure сохраняет draft/focus, successful Livewire morph повторно инициализирует только display/device helpers.
+- Account reduced-motion override и OS `prefers-reduced-motion` отключают transitions/animations/scroll behavior на application level. Manual acceptance покрывает 320px, landscape, tablet, desktop, 200% zoom, long ru/en timezone labels, keyboard navigation, validation/empty/failure/session/destructive states.
+
 <!-- project-docs:start -->
 ## Документация интерфейса
 

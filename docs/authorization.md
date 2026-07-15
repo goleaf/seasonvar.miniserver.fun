@@ -97,3 +97,16 @@ Private и pending/rejected/hidden/deleted records не дают redirect/canoni
 `UserTagPolicy` derives ownership from `user_tags.user_id`; non-owner view отвечает как not found. Create/update/restore/assign требуют verified email, owner передаётся в service только из current auth context. API/Livewire принимают UUID tags, но полный requested set сравнивается с owner-scoped active query; title повторно проходит `CatalogTitlePolicy::interact`/`visibleTo(user)`. Delete своей записи остаётся explicit non-GET action, repeat delete/remove idempotent; soft-deleted tag нельзя назначить.
 
 Public user tags, unlisted tags, community global assignment, tag reporting и season/episode assignment отсутствуют как policy surface, потому что продукт их не поддерживает. Administrator не получает отдельную UI-выгрузку private personal labels/counts; account export/delete выполняются только существующим current-user account boundary.
+
+## Матрица доступа настроек аккаунта
+
+| Действие | Гость | Авторизованный пользователь | Чужой account / администратор |
+| --- | --- | --- | --- |
+| Открыть `/settings/{section?}` | redirect на login | только own context через `view-account-settings` | user ID в URL отсутствует; impersonation не добавлена |
+| Изменить appearance/playback/collection defaults | нет | `update-account-settings`, typed service allowlist | arbitrary owner/key не принимается |
+| Изменить comment/review notifications | нет | canonical preference actions для current user | чужой `user_id` не принимается |
+| Изменить profile/password/email | нет | существующие `ProfilePage`/`SecurityPage` rules | settings shell не обходит boundary |
+| Просмотреть/отозвать browser session | нет | safe summaries; opaque HMAC token повторно разрешается в own sessions | raw session ID не поступает из UI |
+| Экспортировать/удалить account | нет | current password и canonical export/delete service | другой account path отсутствует |
+
+`AccountSettingsPolicy` регистрирует self-context gates; service повторяет authorization. Normal settings URL никогда не принимает user ID, role, premium state, provider, произвольную notification category/privacy section/column/JSON path. Email, password, provider и session-sensitive actions не объединяются с generic save и продолжают требовать собственную canonical authorization.

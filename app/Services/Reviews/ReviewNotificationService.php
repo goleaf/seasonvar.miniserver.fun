@@ -155,7 +155,8 @@ final class ReviewNotificationService
 
     private function preference(User $user): CatalogTitleReviewNotificationPreference
     {
-        return CatalogTitleReviewNotificationPreference::query()->firstOrCreate(['user_id' => $user->id]);
+        return CatalogTitleReviewNotificationPreference::query()->find($user->id)
+            ?? new CatalogTitleReviewNotificationPreference(['user_id' => $user->id]);
     }
 
     private function deliver(User $recipient, string $key, ReviewActivityNotification $notification): void

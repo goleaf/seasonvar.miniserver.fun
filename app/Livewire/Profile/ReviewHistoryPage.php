@@ -8,7 +8,6 @@ use App\Enums\ReviewSort;
 use App\Enums\ReviewStatus;
 use App\Exceptions\Reviews\ReviewActionException;
 use App\Models\CatalogTitleReview;
-use App\Models\CatalogTitleReviewNotificationPreference;
 use App\Models\User;
 use App\Services\Reviews\CatalogTitleReviewQuery;
 use App\Services\Reviews\ReviewRateLimiter;
@@ -43,12 +42,6 @@ final class ReviewHistoryPage extends Component
     #[Url(as: 'status', except: '', history: true)]
     public string $status = '';
 
-    public bool $helpfulNotifications = true;
-
-    public bool $moderationNotifications = true;
-
-    public bool $reportNotifications = true;
-
     public ?string $statusMessage = null;
 
     public ?string $actionError = null;
@@ -81,28 +74,6 @@ final class ReviewHistoryPage extends Component
         $this->locale = App::getLocale();
         App::setLocale($this->locale);
 
-        if (! $this->schema->notificationsAvailable()) {
-            return;
-        }
-
-        try {
-            $preference = CatalogTitleReviewNotificationPreference::query()
-                ->where('user_id', $this->user()->id)
-                ->first();
-        } catch (Throwable $exception) {
-            report($exception);
-            $this->actionError = __('reviews.errors.action_failed');
-
-            return;
-        }
-
-        if ($preference === null) {
-            return;
-        }
-
-        $this->helpfulNotifications = $preference->helpful_notifications;
-        $this->moderationNotifications = $preference->moderation_notifications;
-        $this->reportNotifications = $preference->report_notifications;
     }
 
     public function updatedSort(): void
@@ -154,28 +125,6 @@ final class ReviewHistoryPage extends Component
             ->values()
             ->all();
         $this->dispatch('review-focus', target: 'spoiler', reviewId: $reviewId);
-    }
-
-    public function savePreferences(): void
-    {
-        try {
-            abort_unless($this->schema->notificationsAvailable(), 404);
-            CatalogTitleReviewNotificationPreference::query()->updateOrCreate(
-                ['user_id' => $this->user()->id],
-                [
-                    'helpful_notifications' => $this->helpfulNotifications,
-                    'moderation_notifications' => $this->moderationNotifications,
-                    'report_notifications' => $this->reportNotifications,
-                ],
-            );
-        } catch (Throwable $exception) {
-            $this->handleFailure($exception);
-
-            return;
-        }
-
-        $this->actionError = null;
-        $this->statusMessage = __('reviews.profile.preferences_saved');
     }
 
     public function render(CatalogTitleReviewQuery $reviews): View

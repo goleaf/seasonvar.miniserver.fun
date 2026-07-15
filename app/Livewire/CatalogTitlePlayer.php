@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\DTOs\AccountSettingsData;
 use App\DTOs\CatalogEpisodeNavigation;
 use App\DTOs\CatalogPrimaryAction;
 use App\DTOs\PlaybackPreferencesData;
@@ -13,6 +14,7 @@ use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\Auth\AccountSettingsService;
 use App\Services\Catalog\CatalogPlaybackProgressSession;
 use App\Services\Catalog\CatalogPlaybackSourceResolver;
 use App\Services\Catalog\CatalogPrimaryActionResolver;
@@ -64,6 +66,10 @@ class CatalogTitlePlayer extends Component
 
     protected ExternalMediaMetadata $mediaMetadata;
 
+    protected AccountSettingsService $accountSettings;
+
+    protected ?AccountSettingsData $resolvedAccountSettings = null;
+
     protected ?CatalogTitle $resolvedTitle = null;
 
     protected ?Episode $resolvedEpisode = null;
@@ -78,6 +84,7 @@ class CatalogTitlePlayer extends Component
         CatalogPlaybackProgressSession $progressSessions,
         CatalogUserStateService $userState,
         ExternalMediaMetadata $mediaMetadata,
+        AccountSettingsService $accountSettings,
     ): void {
         $this->playback = $playback;
         $this->primaryActions = $primaryActions;
@@ -85,6 +92,7 @@ class CatalogTitlePlayer extends Component
         $this->progressSessions = $progressSessions;
         $this->userState = $userState;
         $this->mediaMetadata = $mediaMetadata;
+        $this->accountSettings = $accountSettings;
     }
 
     public function mount(int $catalogTitleId): void
@@ -172,8 +180,8 @@ class CatalogTitlePlayer extends Component
             $title,
             $this->user(),
             $episode,
-            $this->normalizedVariant(),
-            $this->normalizedQuality(),
+            $this->effectiveVariant(),
+            $this->effectiveQuality(),
             $this->normalizedFormat(),
         );
         $this->season = (string) $episode->season_id;
@@ -347,8 +355,8 @@ class CatalogTitlePlayer extends Component
             $selectedEpisode,
             $exactMediaId,
             new PlaybackPreferencesData(
-                variant: $this->normalizedVariant(),
-                quality: $this->normalizedQuality(),
+                variant: $this->effectiveVariant(),
+                quality: $this->effectiveQuality(),
                 format: $this->normalizedFormat(),
             ),
         );
@@ -405,6 +413,15 @@ class CatalogTitlePlayer extends Component
             'ratingMaximum' => $ratingRange['maximum'],
             'isAuthenticated' => $user !== null,
             'canInteract' => $user?->hasVerifiedEmail() === true,
+            'accountPlaybackPreferences' => [
+                'autoplay' => $this->accountPreferences()->autoplay,
+                'rememberVolume' => $this->accountPreferences()->rememberVolume,
+                'volume' => $this->accountPreferences()->volume,
+                'muted' => $this->accountPreferences()->muted,
+                'speed' => $this->accountPreferences()->playbackSpeed,
+                'subtitlesEnabled' => $this->accountPreferences()->subtitlesEnabled,
+                'keyboardShortcutsEnabled' => $this->accountPreferences()->keyboardShortcutsEnabled,
+            ],
         ]);
     }
 
@@ -489,8 +506,8 @@ class CatalogTitlePlayer extends Component
         if ($selectedEpisode !== null) {
             $requestedProfileMedia = $this->playback->preferredMedia(
                 $selectedEpisode->licensedMedia,
-                $this->normalizedVariant(),
-                $this->normalizedQuality(),
+                $this->effectiveVariant(),
+                $this->effectiveQuality(),
                 $this->normalizedFormat(),
             );
 
@@ -554,6 +571,21 @@ class CatalogTitlePlayer extends Component
         return $value !== null && in_array($value, (array) config('playback.allowed_formats', []), true)
             ? $value
             : null;
+    }
+
+    private function effectiveVariant(): ?string
+    {
+        return $this->normalizedVariant() ?? $this->accountPreferences()->preferredVariant;
+    }
+
+    private function effectiveQuality(): ?string
+    {
+        return $this->normalizedQuality() ?? $this->accountPreferences()->preferredQuality;
+    }
+
+    private function accountPreferences(): AccountSettingsData
+    {
+        return $this->resolvedAccountSettings ??= $this->accountSettings->resolve($this->user());
     }
 
     private function resetSelection(): void

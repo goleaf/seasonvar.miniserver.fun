@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Policies\AccountSettingsPolicy;
+use App\Services\Auth\AccountSettingsSchema;
 use App\Services\Collections\CatalogCollectionSchema;
 use App\Services\Comments\CommentSchema;
 use App\Services\Reviews\ReviewSchema;
@@ -35,6 +37,7 @@ class AppServiceProvider extends ServiceProvider
     {
         config()->set('livewire.temporary_file_upload.middleware', 'web');
         $this->app->scopedIf(CatalogCollectionSchema::class);
+        $this->app->scopedIf(AccountSettingsSchema::class);
         $this->app->scopedIf(CommentSchema::class);
         $this->app->scopedIf(ReviewSchema::class);
         $this->app->scopedIf(TagSchema::class);
@@ -63,6 +66,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-catalog', $catalogAdministrator);
         Gate::define('manage-comments', $catalogAdministrator);
         Gate::define('manage-reviews', $catalogAdministrator);
+        Gate::define('view-account-settings', [AccountSettingsPolicy::class, 'view']);
+        Gate::define('update-account-settings', [AccountSettingsPolicy::class, 'update']);
 
         Livewire::setUpdateRoute(function ($handle, string $path) {
             return Route::post($path, $handle)

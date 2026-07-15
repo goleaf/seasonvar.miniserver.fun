@@ -8,6 +8,8 @@ use App\Enums\CatalogPublicationType;
 use App\Livewire\Forms\Library\LibraryFilters;
 use App\Models\CatalogTitle;
 use App\Models\User;
+use App\Services\Auth\AccountDateTimeFormatter;
+use App\Services\Auth\AccountSettingsService;
 use App\Services\Catalog\CatalogTitleQuery;
 use App\Services\Catalog\CatalogUserStateService;
 use App\Services\Catalog\CatalogViewingActivityQuery;
@@ -143,13 +145,18 @@ final class UserLibraryPage extends Component
         $this->status = 'История просмотров очищена.';
     }
 
-    public function render(): View
-    {
+    public function render(
+        AccountSettingsService $settings,
+        AccountDateTimeFormatter $dateTimes,
+    ): View {
         $user = $this->user();
         $summary = $this->summaries->get($user);
+        $accountSettings = $settings->resolve($user);
         $data = [
             'summary' => $summary,
-            'lastWatchedAtLabel' => $summary->lastWatchedAt?->format('d.m.Y H:i'),
+            'lastWatchedAtLabel' => $summary->lastWatchedAt !== null
+                ? $dateTimes->value($summary->lastWatchedAt, $accountSettings->locale, $accountSettings->timezone)
+                : null,
             'publicationTypes' => collect(CatalogPublicationType::cases())
                 ->reject(fn (CatalogPublicationType $type): bool => $type === CatalogPublicationType::Unknown)
                 ->map(fn (CatalogPublicationType $type): array => [

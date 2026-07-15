@@ -14,15 +14,11 @@
     @endif
 
     @if ($notificationsAvailable)
-        <form wire:submit="savePreferences" class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
+        <section class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
             <h2 class="text-lg font-black text-slate-900">{{ __('reviews.profile.preferences') }}</h2>
-            <div class="mt-4 grid gap-3 sm:grid-cols-3">
-                <label class="flex min-h-11 items-center gap-3 rounded-control bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-700"><input type="checkbox" wire:model="helpfulNotifications" class="h-5 w-5 rounded border-slate-300 text-emerald-700">{{ __('reviews.profile.helpful_notifications') }}</label>
-                <label class="flex min-h-11 items-center gap-3 rounded-control bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-700"><input type="checkbox" wire:model="moderationNotifications" class="h-5 w-5 rounded border-slate-300 text-emerald-700">{{ __('reviews.profile.moderation_notifications') }}</label>
-                <label class="flex min-h-11 items-center gap-3 rounded-control bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-700"><input type="checkbox" wire:model="reportNotifications" class="h-5 w-5 rounded border-slate-300 text-emerald-700">{{ __('reviews.profile.report_notifications') }}</label>
-            </div>
-            <button type="submit" wire:loading.attr="disabled" wire:target="savePreferences" class="mt-4 inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:opacity-60"><x-ui.icon name="fa-solid fa-floppy-disk" />{{ __('reviews.profile.save_preferences') }}</button>
-        </form>
+            <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('settings.notifications.description') }}</p>
+            <a href="{{ route('settings.index', ['section' => 'notifications']) }}" wire:navigate class="mt-4 inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600"><x-ui.icon name="fa-solid fa-gear" />{{ __('settings.navigation.notifications') }}</a>
+        </section>
     @endif
 
     <section aria-labelledby="review-history-list-title" class="space-y-4">

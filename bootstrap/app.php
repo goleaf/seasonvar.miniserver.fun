@@ -1,9 +1,11 @@
 <?php
 
 use App\Http\Middleware\AddSecurityHeaders;
+use App\Http\Middleware\ApplyAccountPreferences;
 use App\Http\Middleware\AssignApiRequestId;
 use App\Http\Middleware\CachePublicPage;
 use App\Http\Middleware\EnsureMobileEmailIsVerified;
+use App\Http\Middleware\PrivateAccountResponse;
 use App\Http\Middleware\PublicHttpCacheHeaders;
 use App\Http\Middleware\ResolveCanonicalTagRoute;
 use App\Http\Middleware\ResolveOptionalSanctumUser;
@@ -54,10 +56,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'public.page' => CachePublicPage::class,
             'canonical.tag' => ResolveCanonicalTagRoute::class,
             'collection.locale' => SetInterfaceLocale::class,
+            'account.private' => PrivateAccountResponse::class,
             'verified.api' => EnsureMobileEmailIsVerified::class,
         ]);
         $middleware->web(append: [
             AddSecurityHeaders::class,
+            ApplyAccountPreferences::class,
         ]);
         $middleware->api(
             append: [AddSecurityHeaders::class],

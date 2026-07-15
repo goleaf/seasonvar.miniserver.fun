@@ -126,6 +126,12 @@ class User extends Authenticatable implements MustVerifyEmailContract
         return $this->hasOne(CatalogTitleReviewNotificationPreference::class);
     }
 
+    /** @return HasOne<UserAccountSetting, $this> */
+    public function accountSetting(): HasOne
+    {
+        return $this->hasOne(UserAccountSetting::class);
+    }
+
     protected static function booted(): void
     {
         static::creating(function (self $user): void {

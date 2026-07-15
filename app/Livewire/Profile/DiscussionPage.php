@@ -7,11 +7,9 @@ namespace App\Livewire\Profile;
 use App\Actions\Comments\MarkCommentNotificationRead;
 use App\Actions\Comments\SetUserBlock;
 use App\Actions\Comments\SetUserMute;
-use App\Actions\Comments\UpdateCommentNotificationPreferences;
 use App\Actions\Reviews\MarkReviewNotificationRead;
 use App\Exceptions\Comments\CommentActionException;
 use App\Exceptions\Reviews\ReviewActionException;
-use App\Models\CommentNotificationPreference;
 use App\Models\User;
 use App\Services\Comments\CommentProfileQuery;
 use App\Services\Comments\CommentSchema;
@@ -27,51 +25,9 @@ final class DiscussionPage extends Component
 {
     use WithPagination;
 
-    public bool $replyNotifications = true;
-
-    public bool $reactionNotifications = true;
-
-    public bool $moderationNotifications = true;
-
-    public bool $reportNotifications = true;
-
     public ?string $notice = null;
 
     public ?string $actionError = null;
-
-    public function mount(CommentSchema $schema): void
-    {
-        if (! $schema->notificationsAvailable()) {
-            return;
-        }
-
-        $preference = CommentNotificationPreference::query()
-            ->where('user_id', $this->user()->id)
-            ->first();
-
-        if ($preference === null) {
-            return;
-        }
-
-        $this->replyNotifications = $preference->reply_notifications;
-        $this->reactionNotifications = $preference->reaction_notifications;
-        $this->moderationNotifications = $preference->moderation_notifications;
-        $this->reportNotifications = $preference->report_notifications;
-    }
-
-    public function savePreferences(UpdateCommentNotificationPreferences $preferences): void
-    {
-        $saved = $this->attempt(fn (): CommentNotificationPreference => $preferences->handle($this->user(), [
-            'reply_notifications' => $this->replyNotifications,
-            'reaction_notifications' => $this->reactionNotifications,
-            'moderation_notifications' => $this->moderationNotifications,
-            'report_notifications' => $this->reportNotifications,
-        ]));
-
-        if ($saved instanceof CommentNotificationPreference) {
-            $this->notice = __('comments.notifications.saved');
-        }
-    }
 
     public function markNotificationRead(string $notificationId, MarkCommentNotificationRead $notifications): void
     {
@@ -197,12 +153,6 @@ final class DiscussionPage extends Component
             'reviewNotifications' => $reviewNotificationItems,
             'blocks' => $blocks,
             'mutes' => $mutes,
-            'preferenceOptions' => [
-                'replyNotifications' => __('comments.notifications.reply_preference'),
-                'reactionNotifications' => __('comments.notifications.reaction_preference'),
-                'moderationNotifications' => __('comments.notifications.moderation_preference'),
-                'reportNotifications' => __('comments.notifications.report_preference'),
-            ],
         ])
             ->extends('layouts.app', [
                 'title' => __('comments.profile.title'),

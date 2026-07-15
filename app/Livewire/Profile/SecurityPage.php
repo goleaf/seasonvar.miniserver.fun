@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire\Profile;
 
 use App\Models\User;
+use App\Services\Auth\AccountDateTimeFormatter;
 use App\Services\Auth\AccountService;
+use App\Services\Auth\AccountSettingsService;
 use App\Services\Auth\BrowserSessionService;
 use App\Services\Auth\MobileTokenService;
 use Illuminate\Auth\SessionGuard;
@@ -17,6 +19,7 @@ use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use LogicException;
+use Throwable;
 
 final class SecurityPage extends Component
 {
@@ -32,11 +35,14 @@ final class SecurityPage extends Component
 
     public ?string $sessionStatus = null;
 
+    public ?string $securityError = null;
+
     public function updatePassword(
         AccountService $accounts,
         BrowserSessionService $sessions,
     ): void {
         $this->resetValidation();
+        $this->securityError = null;
 
         try {
             $this->validatePasswordChange();
@@ -54,19 +60,25 @@ final class SecurityPage extends Component
             $this->resetSensitiveProperties();
             $this->addError(
                 'currentPassword',
-                $exception->errors()['current_password'][0] ?? 'Текущий пароль указан неверно.',
+                $exception->errors()['current_password'][0] ?? __('settings.security_page.current_password_invalid'),
             );
+
+            return;
+        } catch (Throwable $exception) {
+            $this->resetSensitiveProperties();
+            $this->fail($exception);
 
             return;
         }
 
         $sessions->synchronizeCurrentPasswordHash($user);
         $this->resetSensitiveProperties();
-        $this->passwordStatus = 'Пароль успешно изменён.';
+        $this->passwordStatus = __('settings.security_page.password_changed');
     }
 
     public function revokeDevice(mixed $tokenId, MobileTokenService $tokens): void
     {
+        $this->securityError = null;
         $tokenId = filter_var($tokenId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 
         if ($tokenId === false) {
@@ -77,20 +89,33 @@ final class SecurityPage extends Component
             $tokens->revoke($this->user(), $tokenId);
         } catch (ModelNotFoundException) {
             abort(404);
+        } catch (Throwable $exception) {
+            $this->fail($exception);
+
+            return;
         }
 
-        $this->deviceStatus = 'Устройство отключено.';
+        $this->deviceStatus = __('settings.security_page.device_revoked');
     }
 
     public function revokeAllDevices(MobileTokenService $tokens): void
     {
-        $tokens->revokeAll($this->user());
-        $this->deviceStatus = 'Все устройства API отключены.';
+        $this->securityError = null;
+
+        try {
+            $tokens->revokeAll($this->user());
+        } catch (Throwable $exception) {
+            $this->fail($exception);
+
+            return;
+        }
+        $this->deviceStatus = __('settings.security_page.devices_revoked');
     }
 
     public function logoutOtherDevices(BrowserSessionService $sessions): void
     {
         $this->resetValidation();
+        $this->securityError = null;
 
         try {
             $this->validateCurrentPassword();
@@ -110,19 +135,54 @@ final class SecurityPage extends Component
             $this->resetSensitiveProperties();
             $this->addError(
                 'currentPassword',
-                $exception->errors()['current_password'][0] ?? 'Текущий пароль указан неверно.',
+                $exception->errors()['current_password'][0] ?? __('settings.security_page.current_password_invalid'),
             );
+
+            return;
+        } catch (Throwable $exception) {
+            $this->resetSensitiveProperties();
+            $this->fail($exception);
 
             return;
         }
 
         $this->resetSensitiveProperties();
-        $this->sessionStatus = 'Другие браузерные сессии завершены.';
+        $this->sessionStatus = __('settings.security_page.other_sessions_revoked');
+    }
+
+    public function revokeBrowserSession(string $sessionToken, BrowserSessionService $sessions): void
+    {
+        $this->resetValidation();
+        $this->securityError = null;
+
+        try {
+            $this->validateCurrentPassword();
+            $sessions->revoke($this->user(), $this->currentPassword, $sessionToken, Session::getId());
+        } catch (ValidationException $exception) {
+            $this->resetSensitiveProperties();
+            $this->addError(
+                isset($exception->errors()['session']) ? 'session' : 'currentPassword',
+                $exception->errors()['session'][0]
+                    ?? $exception->errors()['current_password'][0]
+                    ?? __('settings.security_page.session_not_found'),
+            );
+
+            return;
+        } catch (Throwable $exception) {
+            $this->resetSensitiveProperties();
+            $this->fail($exception);
+
+            return;
+        }
+
+        $this->resetSensitiveProperties();
+        $this->sessionStatus = __('settings.security_page.session_revoked');
     }
 
     public function deleteAccount(AccountService $accounts): void
     {
         $this->resetValidation();
+        $this->securityError = null;
 
         try {
             $this->validateCurrentPassword();
@@ -140,8 +200,13 @@ final class SecurityPage extends Component
             $this->resetSensitiveProperties();
             $this->addError(
                 'currentPassword',
-                $exception->errors()['password'][0] ?? 'Не удалось подтвердить пароль.',
+                $exception->errors()['password'][0] ?? __('settings.security_page.deletion_password_invalid'),
             );
+
+            return;
+        } catch (Throwable $exception) {
+            $this->resetSensitiveProperties();
+            $this->fail($exception);
 
             return;
         }
@@ -158,27 +223,66 @@ final class SecurityPage extends Component
         $this->redirectRoute('home');
     }
 
-    public function render(): View
-    {
-        $devices = $this->user()
-            ->tokens()
-            ->latest('id')
-            ->get()
-            ->map(fn ($token): array => [
-                'id' => (int) $token->getKey(),
-                'name' => (string) $token->name,
-                'last_used_at' => $token->last_used_at?->format('d.m.Y H:i'),
-                'expires_at' => $token->expires_at?->format('d.m.Y H:i'),
-            ]);
+    public function render(
+        BrowserSessionService $sessions,
+        AccountSettingsService $settings,
+        AccountDateTimeFormatter $dateTimes,
+    ): View {
+        $accountSettings = $settings->resolve($this->user());
+        $devicesFailed = false;
+        $sessionsFailed = false;
 
-        return view('livewire.profile.security-page', ['devices' => $devices])
+        try {
+            $devices = $this->user()
+                ->tokens()
+                ->latest('id')
+                ->get()
+                ->map(fn ($token): array => [
+                    'id' => (int) $token->getKey(),
+                    'name' => (string) $token->name,
+                    'last_used_at' => $token->last_used_at !== null
+                        ? $dateTimes->value($token->last_used_at, $accountSettings->locale, $accountSettings->timezone)
+                        : null,
+                    'expires_at' => $token->expires_at !== null
+                        ? $dateTimes->value($token->expires_at, $accountSettings->locale, $accountSettings->timezone)
+                        : null,
+                ]);
+        } catch (Throwable $exception) {
+            report($exception);
+            $devices = collect();
+            $devicesFailed = true;
+        }
+
+        try {
+            $browserSessions = $sessions->summaries(
+                $this->user(),
+                Session::getId(),
+                $accountSettings->locale,
+                $accountSettings->timezone,
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+            $browserSessions = collect();
+            $sessionsFailed = true;
+        }
+
+        return view('livewire.profile.security-page', [
+            'devices' => $devices,
+            'browserSessions' => $browserSessions,
+            'databaseSessionsAvailable' => config('session.driver') === 'database',
+            'devicesFailed' => $devicesFailed,
+            'sessionsFailed' => $sessionsFailed,
+        ])
             ->extends('layouts.app', [
-                'title' => 'Безопасность',
+                'title' => __('settings.security_page.title'),
                 'seo' => [
-                    'title' => 'Безопасность',
-                    'description' => 'Пароль, браузерные сессии и устройства API.',
+                    'title' => __('settings.security_page.title'),
+                    'description' => __('settings.security_page.description'),
                     'robots' => 'noindex, nofollow',
                     'canonical' => route('profile.security'),
+                    'social' => false,
+                    'alternates' => [],
+                    'jsonLd' => [],
                 ],
             ])
             ->section('content');
@@ -191,15 +295,15 @@ final class SecurityPage extends Component
             'password' => ['required', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
             'passwordConfirmation' => ['required', 'same:password'],
         ], [
-            'currentPassword.required' => 'Введите текущий пароль.',
-            'password.required' => 'Введите новый пароль.',
-            'password.min' => 'Пароль должен содержать не менее 12 символов.',
-            'password.letters' => 'Пароль должен содержать буквы.',
-            'password.mixed' => 'Пароль должен содержать строчные и заглавные буквы.',
-            'password.numbers' => 'Пароль должен содержать цифры.',
-            'password.symbols' => 'Пароль должен содержать специальный символ.',
-            'passwordConfirmation.required' => 'Повторите новый пароль.',
-            'passwordConfirmation.same' => 'Подтверждение пароля не совпадает.',
+            'currentPassword.required' => __('settings.security_page.validation.current_password'),
+            'password.required' => __('settings.security_page.validation.new_password'),
+            'password.min' => __('settings.security_page.validation.password_min'),
+            'password.letters' => __('settings.security_page.validation.password_letters'),
+            'password.mixed' => __('settings.security_page.validation.password_mixed'),
+            'password.numbers' => __('settings.security_page.validation.password_numbers'),
+            'password.symbols' => __('settings.security_page.validation.password_symbols'),
+            'passwordConfirmation.required' => __('settings.security_page.validation.password_confirmation'),
+            'passwordConfirmation.same' => __('settings.security_page.validation.password_confirmation_same'),
         ]);
     }
 
@@ -208,13 +312,19 @@ final class SecurityPage extends Component
         $this->validate([
             'currentPassword' => ['required', 'string', 'max:255'],
         ], [
-            'currentPassword.required' => 'Введите текущий пароль.',
+            'currentPassword.required' => __('settings.security_page.validation.current_password'),
         ]);
     }
 
     private function resetSensitiveProperties(): void
     {
         $this->reset('currentPassword', 'password', 'passwordConfirmation');
+    }
+
+    private function fail(Throwable $exception): void
+    {
+        report($exception);
+        $this->securityError = __('settings.security_page.action_failed');
     }
 
     private function user(): User

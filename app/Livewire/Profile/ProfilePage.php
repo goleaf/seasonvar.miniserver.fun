@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire\Profile;
 
 use App\Models\User;
+use App\Services\Auth\AccountDateTimeFormatter;
 use App\Services\Auth\AccountService;
+use App\Services\Auth\AccountSettingsService;
 use App\Services\Catalog\UserLibrarySummaryQuery;
 use App\Services\Collections\CatalogCollectionQuery;
 use Illuminate\Contracts\View\View;
@@ -26,13 +28,16 @@ final class ProfilePage extends Component
 
     public ?string $status = null;
 
-    public function mount(): void
+    public function mount(AccountSettingsService $settings, AccountDateTimeFormatter $dateTimes): void
     {
-        $this->fillFromUser($this->user());
+        $this->fillFromUser($this->user(), $settings, $dateTimes);
     }
 
-    public function saveProfile(AccountService $accounts): void
-    {
+    public function saveProfile(
+        AccountService $accounts,
+        AccountSettingsService $settings,
+        AccountDateTimeFormatter $dateTimes,
+    ): void {
         $this->resetValidation();
         $this->name = Str::squish($this->name);
         $this->email = Str::lower(Str::squish($this->email));
@@ -44,13 +49,13 @@ final class ProfilePage extends Component
                     ->whereKeyNot($user->getKey())
                     ->whereRaw('lower(email) = ?', [$this->email])
                     ->exists()) {
-                    $validator->errors()->add('email', 'Этот адрес электронной почты уже используется.');
+                    $validator->errors()->add('email', __('settings.profile_page.validation.email_unique'));
                 }
             });
         });
 
         $validated = $this->validate([
-            'name' => ['required', 'string', 'min:2', 'max:120'],
+            'name' => ['required', 'string', 'min:2', 'max:120', 'not_regex:/[\p{Cc}\p{Cs}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u'],
             'email' => [
                 'required',
                 'string',
@@ -60,21 +65,22 @@ final class ProfilePage extends Component
                 Rule::unique(User::class, 'email')->ignore($user),
             ],
         ], [
-            'name.required' => 'Введите имя.',
-            'name.min' => 'Имя должно содержать не менее 2 символов.',
-            'name.max' => 'Имя не должно быть длиннее 120 символов.',
-            'email.required' => 'Введите адрес электронной почты.',
-            'email.email' => 'Введите корректный адрес электронной почты.',
-            'email.unique' => 'Этот адрес электронной почты уже используется.',
+            'name.required' => __('settings.profile_page.validation.name_required'),
+            'name.min' => __('settings.profile_page.validation.name_min'),
+            'name.max' => __('settings.profile_page.validation.name_max'),
+            'name.not_regex' => __('settings.profile_page.validation.name_controls'),
+            'email.required' => __('settings.profile_page.validation.email_required'),
+            'email.email' => __('settings.profile_page.validation.email_format'),
+            'email.unique' => __('settings.profile_page.validation.email_unique'),
         ]);
 
         $emailChanged = Str::lower($user->email) !== $validated['email'];
         $updated = $accounts->updateProfile($user, $validated);
 
-        $this->fillFromUser($updated);
+        $this->fillFromUser($updated, $settings, $dateTimes);
         $this->status = $emailChanged
-            ? 'Профиль обновлён. Подтвердите новый адрес электронной почты.'
-            : 'Профиль обновлён.';
+            ? __('settings.profile_page.updated_verify_email')
+            : __('settings.profile_page.updated');
     }
 
     public function render(UserLibrarySummaryQuery $summaries, CatalogCollectionQuery $collections): View
@@ -84,23 +90,32 @@ final class ProfilePage extends Component
             'collectionSummary' => $collections->ownerCounts($this->user()),
         ])
             ->extends('layouts.app', [
-                'title' => 'Профиль',
+                'title' => __('settings.profile_page.title'),
                 'seo' => [
-                    'title' => 'Профиль',
-                    'description' => 'Настройки пользовательского профиля.',
+                    'title' => __('settings.profile_page.title'),
+                    'description' => __('settings.profile_page.description'),
                     'robots' => 'noindex, nofollow',
                     'canonical' => route('profile.show'),
+                    'social' => false,
+                    'alternates' => [],
+                    'jsonLd' => [],
                 ],
             ])
             ->section('content');
     }
 
-    private function fillFromUser(User $user): void
-    {
+    private function fillFromUser(
+        User $user,
+        AccountSettingsService $settings,
+        AccountDateTimeFormatter $dateTimes,
+    ): void {
+        $accountSettings = $settings->resolve($user);
         $this->name = $user->name;
         $this->email = $user->email;
         $this->emailVerified = $user->hasVerifiedEmail();
-        $this->createdAt = $user->created_at?->format('d.m.Y') ?? '';
+        $this->createdAt = $user->created_at !== null
+            ? $dateTimes->value($user->created_at, $accountSettings->locale, $accountSettings->timezone)
+            : '';
     }
 
     private function user(): User

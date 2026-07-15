@@ -73,3 +73,9 @@ Public tag page data готовят `TagPagePresenter`, `TagSeoPresenter` и exi
 `PersonalTagManager`/`PersonalTagSelector` держат public state только в bounded strings, booleans, locked title/UUID/version and draft UUID list. Owner tags/counts/title cards разрешает `PersonalTagLibraryQuery`, writes — `PersonalTagService`; templates loops only prepared rows. Private badge не имеет public link, personal text escaped, stable `wire:key` uses opaque UUID.
 
 Admin view receives bounded query results, enum options and merge impact from `TagAdministrationQuery`; it does not resolve aliases, normalize names, authorize, count usage or query provider mappings in Blade. Loading/empty/error/confirmation state maps to real Livewire action. No tag template introduces Volt, `@php`, raw HTML, inline CSS, inline business JavaScript, DB/facade/service call or complete Eloquent graph public serialization.
+
+## Представление настроек аккаунта
+
+`resources/views/livewire/settings/account-settings-page.blade.php` отображает один active section из подготовленных DTO/options. Blade не читает модели/services/config/database, не вычисляет precedence/privacy/entitlement и не сериализует User, session payload или provider secret. Профиль/security/export/delete остаются canonical отдельными Livewire/routes и открываются из единой navigation.
+
+Section navigation, fieldsets, native checkbox/select/datalist/range, status/error live regions, confirmations и loading locks переиспользуют проектные components/classes. На phone navigation становится горизонтальным overflow-safe списком, forms — одной колонкой; long locale/timezone/notification/provider-unavailable text переносится. Settings/profile/security metadata имеют noindex и не содержат private values/social/JSON-LD.

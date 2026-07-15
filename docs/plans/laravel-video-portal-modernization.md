@@ -859,6 +859,68 @@ Must remain semantically unchanged: provider review bodies/IDs/source/hash/date 
 - [ ] No Volt, new `@php`, inline CSS, business JavaScript, raw review HTML, Blade query, fake control, TODO/debug output, unused class/import or dead route remains.
 - [ ] Allowed diagnostics/build/browser smoke pass without creating/running tests; all relevant docs/changelog are current; final commit is on existing `main` and pushed.
 
+## Task 16: canonical account settings and preferences
+
+### Audit snapshot and integration decision
+
+- [x] The authenticated account surface is currently split across `/profile`, `/profile/security`, `/profile/discussions`, `/profile/reviews`, `/notifications`, `/library`, `/my/collections` and the password-confirmed `/profile/export`. These routes remain canonical for the domain actions they already own; Task 16 adds one private settings navigation and does not copy their write logic.
+- [x] The account has one `users` row plus dedicated comment/review notification-preference rows, database sessions and Sanctum tokens. There is no profile model, username history, avatar/cover/biography store, general preference store, premium/subscription/entitlement store or external-identity/OAuth store.
+- [x] Player choice currently uses explicit URL-backed `variant`, `quality` and `format` values and a typed playback resolver. Plyr owns immediate browser state; no account playback row, documented precedence or anonymous-to-account migration exists.
+- [x] Interface locale currently comes only from supported `ru`/`en` localized collection routes, while application fallback is Russian and application timezone is UTC. No account locale/timezone or browser-timezone persistence exists.
+- [x] Detailed history, progress, watchlist/rating and personal tags are owner-only. Collection visibility already uses stable `private`, `unlisted` and `public` codes with a safe application default of `private`, but no per-account default exists.
+- [x] Actual notification categories are database/in-portal comment reply/reaction/moderation/report and review helpful/moderation/report events. Their delivery services already enforce the dedicated rows. Email/push/update/premium notifications do not exist and will not be represented by dead controls.
+- [x] Premium and linked-provider controls are intentionally omitted until their canonical domains exist. Password/email, Sanctum devices, database sessions, export and deletion continue through the existing authentication services; no billing or OAuth state is inferred from user-editable data.
+- [x] Private routes already require `auth` plus `auth.session`, and their page metadata is noindex. Task 16 adds explicit private/no-store response headers, keeps settings out of sitemap/structured data/social metadata and never accepts a user ID in a settings URL.
+- [x] Existing staged Task 10–13/profile/auth work is the integration base and must remain intact. The new migration is additive, one-row-per-user, nullable for explicit-choice detection and cascade-deleted with the account; it neither backfills guesses nor rewrites legacy browser state.
+
+### Canonical contract
+
+- Storage: profile identity stays on `users`; comment/review notification choices stay in their existing dedicated tables; a new one-to-one `user_account_settings` row owns only validated cross-device interface, timezone, playback, accessibility and new-collection defaults; volume/mute also use a versioned device copy for immediate playback behavior.
+- Precedence: an explicit title URL remains authoritative for source variant/quality/format; authenticated account preference then supplies cross-device defaults; valid versioned device state supplies immediate volume/mute and anonymous defaults; configuration is the final fallback. Anonymous values only fill null/unset account fields and never overwrite an explicit account choice.
+- Validation: locale is limited to the existing supported-locale registry; timezone must be an IANA identifier; booleans remain booleans; volume is clamped server-side to `0..100`; speed and quality use configured allowlists; translation preference uses a canonical available media `variant_key`; collection visibility reuses its enum. Arbitrary preference keys/JSON paths are never accepted.
+- Navigation: stable `profile`, `appearance`, `playback`, `privacy`, `notifications`, `collections`, `security` and `data` sections use owner-only routes without user IDs. Each request renders only the active section; normal links provide browser history and localized equivalents preserve the section.
+- Profile/security reuse: profile settings link to the existing canonical name/email form. Username/avatar/cover/biography are not fabricated while their storage/security/media services do not exist. Password, email verification, sessions, API devices, export and deletion link to or extend the current security boundary.
+- Playback reuse: account quality/variant preferences are passed into the Task 07 resolver only when no explicit URL choice exists. Plyr receives autoplay, remember-volume, safe volume/mute, allowlisted speed, subtitle-enabled, keyboard-shortcut and reduced-motion values; progress/history/bookmarks are never reset with playback settings.
+- Privacy: exact history/progress, private tags, blacklist/mute/block state and private collections remain private. The settings page explains these enforced boundaries and exposes only the real default visibility for newly created collections; changing the default never mutates existing collections.
+- Notifications: the settings matrix edits the existing comment/review rows through dedicated actions. Only the configured in-portal channel and real event categories appear; critical authentication mail remains mandatory and outside optional social notification controls.
+- Sessions: database-session summaries select safe fields only and expose an HMAC-derived opaque action token rather than the raw session ID, user-agent, cookie, payload or exact IP. Revocation verifies current ownership and password; logout-all preserves the current session where the driver permits it.
+- Lifecycle: export is the existing password-confirmed private streamed JSON download and gains the non-secret resolved settings summary. Deletion remains the canonical transactional account workflow and receives the new row through its foreign-key cascade; it is never a GET mutation.
+- Locale/timezone: authenticated locale applies across normal portal requests unless an explicit supported route locale wins. A settings locale change saves first and redirects to the same localized section. Timezone is stored as IANA identity and used by one account formatter for previews/session timestamps without changing media language.
+- Caching/SEO: settings are read directly by user identity rather than placed in shared cache. Responses use `private, no-store`, `X-Robots-Tag: noindex, nofollow`, no social metadata/JSON-LD and no sitemap membership. Mutations therefore require no global flush and cannot poison public catalogue caches.
+- Browser compatibility: `seasonvar.account-preferences.v1` is the only new app-owned local-storage key. Valid legacy Plyr values can seed it without deleting Plyr storage; migration is idempotent and the anonymous key is cleared only after an acknowledged server merge.
+
+### Phased implementation checklist
+
+- [x] Audit routes, middleware, guards, models, tables/indexes, profile/auth/session/export/delete services, player resolver/JavaScript, history/library/collections, notification delivery, localization, cache/SEO and existing documentation.
+- [x] Add the reversible one-to-one settings migration, explicit model/relation, enums/value object, typed DTOs, resolver/update service and account-export integration.
+- [x] Add private response and authenticated preference middleware, canonical/localized settings routes, legacy-safe navigation and application locale/accessibility context.
+- [x] Implement the sectioned Livewire page with per-section staged save/cancel/reset, complete server validation, translated loading/success/error/empty states and no model/service calls from Blade.
+- [x] Integrate account playback defaults with source resolution and the Vite-managed versioned device bridge without changing explicit URL selection, progress/history or unsupported source capabilities.
+- [x] Reuse comment/review preference actions, apply the collection default only to newly created user collections, and enhance safe database-session summaries/revocation through the existing security service.
+- [x] Update architecture, data, authorization, security, frontend/views, caching, notification, account/auth, development and owner-map documentation as applicable; update this plan continuously and the English changelog.
+- [x] Run only static/Pint/route/middleware/schema/translation/cache/security/accessibility/build/browser diagnostics and the manual checklist; do not create or invoke an automated test runner for Task 16.
+- [x] Reread Task 16, inspect all changed and directly related files, confirm clean `main`, commit the complete integrated work and push the configured remote.
+
+### Rollback and protected boundaries
+
+Rollback drops only `user_account_settings` after exporting any user choices created after deployment. Existing user/profile/auth credentials, comment/review preferences, sessions, tokens, collections and browser/Plyr storage remain untouched. Code must tolerate absent optional premium/provider/profile capabilities by omitting their controls, not by storing placeholders. Existing route names, localized collection URLs, preference keys, player URLs, cookie/session names and all Task 07–15 data identities remain unchanged.
+
+### Final manual verification checklist
+
+- [x] Owner-only default/localized section routes, browser history, selected section, no user ID, noindex/no-store/no sitemap/social/structured metadata and no shared-cache leakage.
+- [x] Locale/fallback and IANA timezone validation, same-section locale redirect, date/time preview and strict separation from source/audio/subtitle language.
+- [x] Profile/security links reuse canonical services; no fake username/media/premium/provider/billing control appears.
+- [x] Autoplay, remember volume, `0..100` volume, mute, allowlisted speed/quality/variant, subtitles, keyboard shortcuts and reduced motion apply to the real player with documented precedence and safe unavailable-source fallback.
+- [x] Playback reset removes no progress, history, watchlist, rating, bookmark, collection, profile, credential or notification data.
+- [x] Viewing history/progress/private library remain private; new collection default starts private and never retroactively alters an existing collection.
+- [x] Existing comment/review notification services enforce every displayed category; unsupported email/push/update channels remain absent and security mail remains mandatory.
+- [x] Database sessions show only safe summaries, use opaque owned revocation identities, preserve current session appropriately and never expose raw IDs/payload/user-agent/IP/cookies.
+- [x] Export includes settings but excludes provider/session/token/password secrets; deletion remains strongly confirmed and canonical.
+- [x] Anonymous migration is versioned, allowlisted, idempotent and fills only unset fields; device/account/config precedence is consistent and legacy Plyr storage is not destroyed.
+- [x] Russian/English keys are complete; controls are keyboard/touch/screen-reader accessible, responsive at phone/zoom widths and have loading/success/error/confirmation states.
+- [x] No arbitrary mass assignment/key/category/provider/session value, destructive GET, Volt, new `@php`, Blade query, inline CSS/business JavaScript, debug/TODO/dead control or global cache flush remains.
+- [x] Allowed diagnostics and browser smoke pass without automated tests; owner docs, plan and changelog match implementation; final commit is on `main` and pushed.
+
 ## Deferred product decisions, not hidden defects
 
 - Collection collaborators, smart criteria, collection-level likes and follows require a future reusable product model; Task 12 now supplies the shared collection discussion/reaction/report boundary, so Task 10 embeds it without a second comment architecture.

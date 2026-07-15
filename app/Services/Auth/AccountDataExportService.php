@@ -20,6 +20,7 @@ final class AccountDataExportService
         private readonly CatalogCollectionAccountService $collections,
         private readonly CommentAccountService $comments,
         private readonly ReviewAccountService $reviews,
+        private readonly AccountSettingsService $settings,
     ) {}
 
     /** @return array<string, mixed> */
@@ -52,6 +53,7 @@ final class AccountDataExportService
                 'email_verified_at' => $user->email_verified_at?->toAtomString(),
                 'created_at' => $user->created_at?->toAtomString(),
             ],
+            'settings' => $this->settings->resolve($user)->toExportArray(),
             'collections' => $this->collections->export($user),
             'personal_tags' => $personalTags
                 ->map(fn (UserTag $tag): array => [

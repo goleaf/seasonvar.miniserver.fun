@@ -17,6 +17,10 @@ final class SetInterfaceLocale
         abort_unless(is_string($locale) && in_array($locale, config('catalog-collections.supported_locales', []), true), 404);
         App::setLocale($locale);
 
+        if ($request->hasSession()) {
+            $request->session()->put('interface_locale_route', $locale);
+        }
+
         return $next($request);
     }
 }

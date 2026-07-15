@@ -145,17 +145,8 @@
         @if ($notificationsAvailable)
             <section aria-labelledby="discussion-preferences-title" class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
                 <h2 id="discussion-preferences-title" class="flex items-center gap-2 text-lg font-black text-slate-800"><x-ui.icon name="fa-solid fa-sliders text-emerald-700" />{{ __('comments.notifications.preferences') }}</h2>
-                <form wire:submit="savePreferences" class="mt-4 grid gap-3 sm:grid-cols-2">
-                    @foreach ($preferenceOptions as $property => $label)
-                        <label class="flex min-h-12 items-center gap-3 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700">
-                            <input type="checkbox" wire:model="{{ $property }}" class="h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600">
-                            <span>{{ $label }}</span>
-                        </label>
-                    @endforeach
-                    <div class="sm:col-span-2">
-                        <button type="submit" wire:loading.attr="disabled" wire:target="savePreferences" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:opacity-60 sm:w-auto"><x-ui.icon name="fa-solid fa-floppy-disk" />{{ __('comments.composer.save') }}</button>
-                    </div>
-                </form>
+                <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('settings.notifications.description') }}</p>
+                <a href="{{ route('settings.index', ['section' => 'notifications']) }}" wire:navigate class="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 sm:w-auto"><x-ui.icon name="fa-solid fa-gear" />{{ __('settings.navigation.notifications') }}</a>
             </section>
         @endif
 

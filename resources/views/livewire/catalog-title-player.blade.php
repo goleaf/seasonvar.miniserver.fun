@@ -119,6 +119,14 @@
                                 data-progress-session="{{ $progressSessionToken }}"
                                 data-progress-position="{{ $primaryAction->episodeId === $selectedEpisode?->id ? $primaryAction->positionSeconds : 0 }}"
                                 data-progress-enabled="{{ $canInteract ? '1' : '0' }}"
+                                data-account-autoplay="{{ $accountPlaybackPreferences['autoplay'] ? '1' : '0' }}"
+                                data-account-remember-volume="{{ $accountPlaybackPreferences['rememberVolume'] ? '1' : '0' }}"
+                                data-account-volume="{{ $accountPlaybackPreferences['volume'] }}"
+                                data-account-muted="{{ $accountPlaybackPreferences['muted'] ? '1' : '0' }}"
+                                data-account-speed="{{ $accountPlaybackPreferences['speed'] }}"
+                                data-account-subtitles="{{ $accountPlaybackPreferences['subtitlesEnabled'] ? '1' : '0' }}"
+                                data-account-keyboard="{{ $accountPlaybackPreferences['keyboardShortcutsEnabled'] ? '1' : '0' }}"
+                                data-account-authenticated="{{ $isAuthenticated ? '1' : '0' }}"
                                 @if ($showView->selectedMediaFormat === 'm3u8') data-hls-src="{{ $showView->selectedMediaUrl }}" @endif
                             >
                                 <source src="{{ $showView->selectedMediaUrl }}" @if ($showView->selectedMediaType) type="{{ $showView->selectedMediaType }}" @endif>

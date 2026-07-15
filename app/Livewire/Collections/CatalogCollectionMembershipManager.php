@@ -9,6 +9,7 @@ use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
 use App\Models\CatalogTitle;
 use App\Models\User;
+use App\Services\Auth\AccountSettingsService;
 use App\Services\Catalog\CatalogTitleQuery;
 use App\Services\Collections\CatalogCollectionCreateWithTitleService;
 use App\Services\Collections\CatalogCollectionItemService;
@@ -40,10 +41,17 @@ final class CatalogCollectionMembershipManager extends Component
     #[Locked]
     public string $creationPublicId = '';
 
-    public function mount(int $catalogTitleId): void
+    #[Locked]
+    public string $defaultVisibility = 'private';
+
+    public function mount(int $catalogTitleId, AccountSettingsService $settings): void
     {
         $this->catalogTitleId = $catalogTitleId;
-        $this->newVisibility = (string) config('catalog-collections.default_visibility', 'private');
+        $user = auth()->user();
+        $this->defaultVisibility = $user instanceof User
+            ? $settings->resolve($user)->collectionDefaultVisibility
+            : (string) config('catalog-collections.default_visibility', 'private');
+        $this->newVisibility = $this->defaultVisibility;
         $this->creationPublicId = (string) Str::uuid();
     }
 
@@ -64,7 +72,7 @@ final class CatalogCollectionMembershipManager extends Component
         $this->open = false;
         $this->selectedCollectionPublicIds = [];
         $this->reset(['newName', 'newDescription']);
-        $this->newVisibility = (string) config('catalog-collections.default_visibility', 'private');
+        $this->newVisibility = $this->defaultVisibility;
         $this->creationPublicId = (string) Str::uuid();
         $this->resetValidation();
         $this->dispatch('collection-selector-closed');

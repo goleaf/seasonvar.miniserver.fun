@@ -10,6 +10,8 @@ use App\Models\Episode;
 use App\Models\EpisodeViewProgress;
 use App\Models\Season;
 use App\Models\User;
+use App\Services\Auth\AccountDateTimeFormatter;
+use App\Services\Auth\AccountSettingsService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +21,8 @@ final class CatalogViewingActivityQuery
     public function __construct(
         private readonly CatalogTitlePlaybackQuery $playback,
         private readonly CatalogPlaybackCompletionRule $completionRule,
+        private readonly AccountSettingsService $accountSettings,
+        private readonly AccountDateTimeFormatter $dateTimes,
     ) {}
 
     /** @return Collection<int, CatalogContinueWatchingItem> */
@@ -208,6 +212,7 @@ final class CatalogViewingActivityQuery
     public function history(User $user, int $perPage = 12, string $pageName = 'historyPage'): LengthAwarePaginator
     {
         $perPage = max(1, min(48, $perPage));
+        $accountSettings = $this->accountSettings->resolve($user);
         $history = EpisodeViewProgress::query()
             ->whereBelongsTo($user)
             ->whereNotNull('first_started_at')
@@ -253,9 +258,13 @@ final class CatalogViewingActivityQuery
                 ->pluck((new Episode)->qualifyColumn('id'))
                 ->mapWithKeys(fn (int $episodeId): array => [$episodeId => true]);
 
-        $history->getCollection()->each(function (EpisodeViewProgress $progress) use ($accessibleEpisodeIds): void {
+        $history->getCollection()->each(function (EpisodeViewProgress $progress) use ($accessibleEpisodeIds, $accountSettings): void {
             $progress->setAttribute('is_accessible', $accessibleEpisodeIds->has($progress->episode_id));
-            $progress->setAttribute('last_watched_at_label', $progress->last_watched_at->format('d.m.Y H:i'));
+            $progress->setAttribute('last_watched_at_label', $this->dateTimes->value(
+                $progress->last_watched_at,
+                $accountSettings->locale,
+                $accountSettings->timezone,
+            ));
         });
 
         return $history;

@@ -245,6 +245,12 @@
 - Safety review made votes/reports atomic, preserved merged duplicate IDs through archival aliases, changed self-mutating merge loops to `eachById`, kept owner delete available during disable/restriction, separated viewer state from guest cache and omitted spoiler/body from previews/notifications/SEO. Task 13 did not intentionally migrate or roll back the configured database; the later concurrent Task 11 cached-config rehearsal applied an early in-flight review shape as batch 14 and is disclosed at the top of this log. Read-only comparison found four missing final columns plus non-null report dedup; additive `235100` repairs exactly that drift and remains pending on the configured database. Task 13 explicitly forbids creating or running automated tests, so allowed static/schema/query/route/translation/security/cache/SEO/build/browser evidence belongs to `audits/verification-report.md`.
 - Isolated full-schema browser/service acceptance exercised create/edit/moderate/spoiler/delete/restore, vote changes, reports, temporary/permanent restrictions and expiry, private history, direct focus, filters/pagination/history, shared blocks/mutes, notifications and account export/deletion. It corrected a PHP 8.5 callback incompatibility, propagated the direct review ID through the lazy component boundary, eagerly loaded only direct-link requests and made paginator fallback paths/query criteria canonical; no production data or automated test runner was used.
 
+## 2026-07-16 — canonical account settings
+
+- Прочитаны все project Markdown files; audited current routes, users/profile/security, player/media selection, progress/history/library, collections/privacy, comment/review preferences/delivery, sessions/tokens, export/delete, translations, caches, migrations and Blade/JS. Подтверждены отсутствующие premium/billing/OAuth/public-profile/media-language models, поэтому для них не добавлены fake controls или competing storage.
+- Добавлены owner-only localized settings shell, additive one-row preference schema, typed resolver/service/DTO/timezone boundary, documented precedence, rolling guard, anonymous/device merge, task 07 player integration, private-history explanation, non-retroactive collection defaults, canonical notification matrix, safe session summaries/revocation, export/profile/security integration, ru/en a11y UI and no-store/noindex middleware.
+- Task 16 прямо запретил создание и запуск automated tests. Допустимая acceptance ограничена PHP/Blade/translation/routes/config/schema/security/cache/static inspection, Pint, Vite build, disposable non-production migration rehearsal and controlled browser smoke; production database не мигрируется этой задачей.
+
 <!-- project-docs:start -->
 ## Автоматически обновляемое состояние документации
 
@@ -331,4 +337,5 @@
 - `2026_07_15_235000_add_home_content_addition_indexes.php`
 - `2026_07_15_235100_repair_catalog_title_review_rollout.php`
 - `2026_07_15_235200_add_discussion_relationship_pagination_indexes.php`
+- `2026_07_16_000000_create_user_account_settings_table.php`
 <!-- project-docs:end -->

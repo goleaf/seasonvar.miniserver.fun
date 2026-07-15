@@ -66,10 +66,14 @@
             <script type="application/ld+json">{!! $jsonLd !!}</script>
         @endforeach
         @livewireStyles
+        <meta name="csrf-token" content="{{ csrf_token() }}">
         @stack('head')
         @vite('resources/js/app.js')
     </head>
-    <body class="min-h-screen bg-slate-50 text-slate-700 antialiased">
+    <body @class([
+        'min-h-screen bg-slate-50 text-slate-700 antialiased',
+        'account-reduced-motion' => $accountReducedMotion ?? false,
+    ]) data-account-settings-version="{{ $accountSettingsVersion ?? 1 }}" data-account-storage-key="{{ $accountAnonymousStorageKey ?? '' }}" @if (($accountPreferenceMigrationUrl ?? null) !== null) data-account-migration-url="{{ $accountPreferenceMigrationUrl }}" data-account-migration-scope="{{ $accountPreferenceMigrationScope }}" @endif>
         <a href="#main-content" class="fixed left-3 top-3 z-[100] -translate-y-24 rounded-control bg-emerald-700 px-4 py-3 font-bold text-white shadow-lg transition focus:translate-y-0">
             Перейти к содержанию
         </a>

@@ -4,6 +4,7 @@ import '@fortawesome/fontawesome-free/css/regular.min.css';
 import '../css/app.css';
 import { initializeCollectionInterfaces } from './collections.js';
 import { initializeCommentInterfaces } from './comments.js';
+import { initializeAccountPreferenceMigration, initializeAccountSettings } from './settings.js';
 import './reviews.js';
 
 let catalogPlayerModule = null;
@@ -482,6 +483,8 @@ const loadCatalogInterfaces = () => {
     loadPaginationScroll();
     initializeCollectionInterfaces();
     initializeCommentInterfaces();
+    initializeAccountSettings();
+    initializeAccountPreferenceMigration();
 };
 
 if (document.readyState === 'loading') {
