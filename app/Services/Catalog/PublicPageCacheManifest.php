@@ -6,9 +6,12 @@ namespace App\Services\Catalog;
 
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheKeyFactory;
+use Illuminate\Cache\Repository;
+use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Cache;
+use LogicException;
 use Throwable;
 
 final class PublicPageCacheManifest
@@ -29,14 +32,20 @@ final class PublicPageCacheManifest
         $lock = null;
 
         try {
-            $store = Cache::store($this->store());
+            $repository = $this->repository();
+            $store = $repository->getStore();
+
+            if (! $store instanceof LockProvider) {
+                throw new LogicException('Manifest cache store должен поддерживать atomic locks.');
+            }
+
             $lock = $store->lock($this->keys->lock($this->key()), 5);
 
             if (! $lock->get()) {
                 return;
             }
 
-            $entries = $store->get($this->key(), []);
+            $entries = $repository->get($this->key(), []);
             $entries = is_array($entries) ? $entries : [];
             $latest = collect($entries)
                 ->filter(fn (mixed $seenAt, mixed $url): bool => is_string($url) && is_int($seenAt))
@@ -47,7 +56,7 @@ final class PublicPageCacheManifest
             arsort($latest, SORT_NUMERIC);
             $latest = array_slice($latest, 0, $this->manifestLimit(), true);
 
-            $store->put(
+            $repository->put(
                 $this->key(),
                 $latest,
                 max(60, (int) config('cache-architecture.page_cache.manifest_retention_seconds', 2_592_000)),
@@ -178,5 +187,16 @@ final class PublicPageCacheManifest
     private function store(): string
     {
         return (string) config('cache-architecture.stores.locks', 'redis-locks');
+    }
+
+    private function repository(): Repository
+    {
+        $repository = Cache::store($this->store());
+
+        if (! $repository instanceof Repository) {
+            throw new LogicException('Manifest cache store должен использовать Laravel cache repository.');
+        }
+
+        return $repository;
     }
 }

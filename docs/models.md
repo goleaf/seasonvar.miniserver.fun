@@ -1,6 +1,6 @@
 # Eloquent-модели
 
-Обновлено: 13.07.2026
+Обновлено: 15.07.2026
 
 ## Правила связей
 
@@ -40,3 +40,26 @@
 
 - Blade-шаблоны не должны выполнять relationship-запросы, вызывать `@php`/`@endphp` или собирать бизнес-данные.
 - Если шаблону нужен производный атрибут модели, добавляйте accessor, enum/helper-метод, ViewModel или класс компонента.
+
+## Модели коллекций
+
+- `CatalogCollection` — единственная aggregate root именованного списка. Numeric ID — relational identity, UUID — external identity; global current slug и `CatalogCollectionSlug` history являются mutable URL projection. SoftDeletes сохраняет recovery window.
+- `CatalogCollectionItem` — explicit serial-only child с unique collection/title, position, added-by и timestamps. Он не копирует title/poster/year/genre metadata и не использует morph type.
+- `CatalogCollectionTranslation` применяется только к editorial content; display accessors выбирают уже eager-loaded active/fallback row. User text остаётся в base name/description и не переводится автоматически.
+- `CatalogCollectionReport` сохраняет stable collection UUID/content version даже после nullable target FK; `CatalogCollection::comments()` переиспользует explicit enum-based generic comment target, а не Eloquent morph.
+- `CatalogCollectionQuery` обязан eager-load owner/translations/counts/fallback and paginated title card relations до Blade/Resource. `display_name`, `display_description`, `display_seo_*`, visibility/moderation predicates не выполняют query.
+
+## Модели обсуждений
+
+- `Comment` — единственная aggregate row top-level/reply. `target_type` enum-backed и не Eloquent morph; `target_id` разрешает allowlisted service. `parent()`/`replies()` держат root thread, `replyTo()` — logical context, `author()` nullable для privacy deletion, `catalogTitle()` with-trashed — cache/merge root.
+- `CommentReaction`, `CommentReport`, `CommentRestriction`, `UserBlock`, `UserMute`, `CommentNotificationPreference` имеют explicit foreign keys/casts/relations и stable enum codes. Модель не локализует storage values и не содержит controller/Livewire workflow.
+- `Comment` body всегда plain text; accessor не рендерит HTML. Counts/reaction score не являются model columns. Queries обязаны eager/group load author/reply/reactions/counts/viewer context; Blade не вызывает relations.
+- Provider `CatalogTitleReview` не является `Comment` и не превращается в reply. Season/episode/collection target не получает отдельную comment model/table. Mention/edit-history/premium entities отсутствуют осознанно.
+
+## Модели отзывов
+
+- `CatalogTitleReview` — единая provider/user aggregate с direct `catalogTitle()` target. Numeric ID остаётся stable; `origin`, `status`, deletion/moderation codes cast-ятся enum-ами, booleans/timestamps/version — typed casts. `authorAccount()` nullable для account privacy deletion, а display/provider author text не используется как identity.
+- `CatalogTitleReviewVote`, `CatalogTitleReviewReport`, `CatalogTitleReviewRestriction`, `CatalogTitleReviewNotificationPreference` и `CatalogTitleReviewAlias` имеют explicit foreign keys, enum casts и узкие relations. Это не Eloquent morph domain; произвольный target class не хранится.
+- Rating не является review attribute/relation copy: query соединяет canonical `CatalogTitleUserState` той же пары author/title. Review average/vote totals/current viewer state не являются model columns и готовятся query/presenter.
+- Provider import может сохранять исторические bodies длиннее community limits; model accessor не переписывает и не рендерит HTML. User text проходит value objects при mutation, а Blade получает prepared escaped DTO. Queries eager-load author/title/reports and grouped totals; views не вызывают lazy relations.
+- Merge архивирует duplicate row и сохраняет alias вместо hard delete. Account deletion anonymizes nullable ownership; ordinary review deletion использует explicit `deleted_at` lifecycle, не удаляет canonical portal rating и не меняет user library/progress.

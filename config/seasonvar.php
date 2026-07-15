@@ -1,6 +1,10 @@
 <?php
 
 return [
+    'http' => [
+        'max_response_bytes' => (int) env('SEASONVAR_HTTP_MAX_RESPONSE_BYTES', 8_388_608),
+    ],
+
     'admin_emails' => array_values(array_filter(array_map(
         static fn (string $email): string => mb_strtolower(trim($email)),
         explode(',', (string) env('SEASONVAR_IMPORT_ADMIN_EMAILS', '')),

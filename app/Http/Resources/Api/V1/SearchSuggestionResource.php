@@ -14,6 +14,7 @@ final class SearchSuggestionResource extends JsonResource
     {
         return [
             'type' => (string) data_get($this->resource, 'type'),
+            'public_id' => data_get($this->resource, 'public_id'),
             'label' => (string) data_get($this->resource, 'label'),
             'slug' => (string) data_get($this->resource, 'slug'),
             'title_slug' => data_get($this->resource, 'title_slug'),

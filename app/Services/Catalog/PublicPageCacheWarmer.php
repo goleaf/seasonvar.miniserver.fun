@@ -40,8 +40,7 @@ final class PublicPageCacheWarmer
         $targets = collect($this->criticalUrls())
             ->concat($this->titleUrls($titleIds))
             ->concat($this->manifest->recent($limit))
-            ->filter(fn (mixed $url): bool => is_string($url)
-                && str_starts_with($url, '/')
+            ->filter(fn (string $url): bool => str_starts_with($url, '/')
                 && ! str_starts_with($url, '//'))
             ->unique()
             ->take($limit)
@@ -96,7 +95,7 @@ final class PublicPageCacheWarmer
     private function titleUrls(iterable $titleIds): array
     {
         $ids = collect($titleIds)
-            ->filter(fn (mixed $id): bool => is_int($id) || (is_string($id) && ctype_digit($id)))
+            ->filter(fn (int|string $id): bool => is_int($id) || ctype_digit($id))
             ->map(fn (int|string $id): int => (int) $id)
             ->filter(fn (int $id): bool => $id > 0)
             ->unique()
@@ -142,7 +141,7 @@ final class PublicPageCacheWarmer
         if (! is_array($parts)
             || ! in_array($parts['scheme'] ?? null, ['http', 'https'], true)
             || ! is_string($parts['host'] ?? null)
-            || ($parts['host'] ?? '') === ''
+            || $parts['host'] === ''
             || isset($parts['user'])
             || isset($parts['pass'])
             || isset($parts['query'])
@@ -152,7 +151,7 @@ final class PublicPageCacheWarmer
         }
 
         $scheme = strtolower((string) $parts['scheme']);
-        $host = strtolower((string) $parts['host']);
+        $host = strtolower($parts['host']);
         $port = isset($parts['port']) ? (int) $parts['port'] : null;
         $defaultPort = $scheme === 'https' ? 443 : 80;
 

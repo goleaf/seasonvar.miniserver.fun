@@ -40,3 +40,42 @@
 ## Осознанные границы продукта
 
 Household/детские профили, PIN, billing, подписки/покупки/trial, territory и concurrent-stream enforcement отсутствуют как продуктовые возможности, а не являются скрытым implementation backlog. Их нельзя «включить» новым config flag: каждое расширение требует отдельного владельца продукта, политики хранения/legal review, additive schema, ownership constraints, backfill и тестов authorization boundary.
+
+## Матрица доступа коллекций
+
+`CatalogCollectionPolicy` — единственная authorization boundary коллекций. `view` разрешает approved public/unlisted или owner/admin и иначе отвечает `denyAsNotFound`; private name, count, owner и canonical slug не раскрываются. `create` требует authenticated verified user, `createEditorial`, moderation и feature используют `manage-catalog`; update/delete/restore/force-delete/item/reorder/cover повторно разрешают stable resolved record. System record изменяет только admin, а feature разрешена только approved public editorial collection.
+
+Owner берётся из authenticated actor внутри service; client не передаёт `owner_id`, type/moderation/feature не mass-assignятся из public form. Title ID повторно проходит `CatalogTitlePolicy::interact`/visible query, collection UUID batch сравнивается с полным owner-scoped manageable set, item IDs проверяются внутри locked collection. Report разрешён verified non-owner только для directly public-viewable target и имеет отдельный limiter/deduplication key.
+
+Private и pending/rejected/hidden/deleted records не дают redirect/canonical metadata постороннему: slug history resolution всегда завершается policy до `301`. Covers повторяют ту же policy. Unlisted — direct-link visibility, не access token и не секретное хранилище; owner management всё равно policy-protected. Collaborators/ownership transfer/follows/collection likes отсутствуют, поэтому не симулируются UI-флагами.
+
+## Матрица доступа обсуждений
+
+| Действие | Guest | Authenticated unverified | Verified owner/user | Moderator |
+| --- | --- | --- | --- | --- |
+| Читать published на доступной цели | да | да | да с private overlays | да |
+| Читать own pending/hidden/rejected/spam | нет | только собственный существующий | да | да |
+| Создать comment/reply | нет | нет | да, если нет restriction/block conflict | да на тех же product rules |
+| Edit/delete/restore | нет | только прежняя owner-policy при наличии verified state | own, 30 min edit / 7 day restore | только moderation actions, не подмена owner edit |
+| React/report | нет | нет | verified non-owner, public non-deleted, no block | по policy; moderation отдельно |
+| Block/mute | нет | authenticated actor, self запрещён | да | да как обычный private actor |
+| Moderate/report resolve/restrict | нет | нет | нет | `manage-comments` |
+
+`CommentPolicy` и focused actions остаются единственной mutation boundary. Verified requirement, active temporary/permanent restriction и block relation проверяются server-side даже при подделанном Livewire payload. Mute не является блоком: он скрывает presentation и suppress-ит notifications только для muter. Direct `/comments/{id}` сначала проверяет view/target; inaccessible public state отвечает 404, а moderator-only hidden/deleted context перенаправляется в защищённый `/admin/comments?comment={id}`.
+
+`/profile/discussions`, `/notifications` и `/profile/export` защищены `auth` + `auth.session`; export дополнительно `password.confirm` и throttle. Они всегда используют текущего user и не принимают owner/profile ID. `/admin/comments` имеет route gate и повторный gate/policy в component/actions. Comment-only restriction не влияет на login, library, playback, rating, collection или review access.
+
+## Матрица доступа отзывов
+
+| Действие | Guest | Authenticated unverified | Verified owner/user | Moderator |
+| --- | --- | --- | --- | --- |
+| Читать public review | да на доступном title | да | да, включая own pending overlay | да |
+| Создать/edit/restore | нет | нет | own title review, если review feature active и restriction отсутствует | не подменяет owner action |
+| Удалить own review | нет | authenticated owner может удалить даже при feature disable/restriction | да | moderation remove отдельно |
+| Helpful/report | нет | нет | verified non-owner, public review, no block/restriction | по обычной policy; moderation отдельно |
+| Private history/preferences | нет | только текущий account | только текущий account | только собственное состояние |
+| Moderate/report resolve/restrict | нет | нет | нет | `manage-reviews` |
+
+`CatalogTitleReviewPolicy` и focused actions повторно проверяют actor, origin, ownership, target visibility, status/deletion/merge, email verification, active review-only restriction и shared directional block. Client не выбирает author, target class, moderation status, verified flag или rating owner. Delete intentionally remains available to the owner when review creation is globally disabled or the user becomes restricted, so privacy removal cannot be trapped by a feature flag.
+
+`/profile/reviews` and review preference/history actions use only current authenticated user. `/admin/reviews` has route gate plus component/action policy. Public `/reviews/{review}` accepts only a positive stable ID, resolves alias, reauthorizes review and current title, then redirects; hidden/deleted/blocked state returns safe not-found and cannot be used as an IDOR oracle. Review restriction affects only review create/edit/restore/vote/report and never login, comments, playback, rating, watchlist, progress, collection or account deletion.

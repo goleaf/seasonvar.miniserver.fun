@@ -23,6 +23,14 @@ final class ApiConfigController extends Controller
                     'minimum' => (int) config('catalog.user_rating.minimum', 1),
                     'maximum' => (int) config('catalog.user_rating.maximum', 10),
                 ],
+                'personal_tags' => [
+                    'maximum_tags' => (int) config('tags.personal_tags_per_user', 250),
+                    'maximum_assignments_per_title' => (int) config('tags.personal_assignment_limit', 50),
+                    'maximum_label_length' => (int) config('tags.label_max_length', 80),
+                    'restoration_days' => (int) config('tags.restoration_days', 30),
+                    'content_locales' => array_values((array) config('tags.supported_locales', [])),
+                    'visibility' => 'private',
+                ],
                 'playback' => [
                     'formats' => array_values((array) config('playback.allowed_formats', [])),
                     'qualities' => array_values((array) config('playback.supported_qualities', [])),

@@ -4,15 +4,21 @@ declare(strict_types=1);
 
 namespace App\Services\Catalog\Api\V1;
 
+use App\Enums\ReviewOrigin;
+use App\Enums\ReviewStatus;
 use App\Http\Requests\Api\V1\CatalogReviewIndexRequest;
 use App\Models\CatalogTitleReview;
 use App\Models\User;
 use App\Services\Catalog\CatalogTitleQuery;
+use App\Services\Reviews\ReviewSchema;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 final readonly class CatalogReviewQuery
 {
-    public function __construct(private CatalogTitleQuery $titles) {}
+    public function __construct(
+        private CatalogTitleQuery $titles,
+        private ReviewSchema $schema,
+    ) {}
 
     /** @return LengthAwarePaginator<int, CatalogTitleReview> */
     public function forTitle(
@@ -22,11 +28,16 @@ final readonly class CatalogReviewQuery
     ): LengthAwarePaginator {
         $title = $this->titles->visibleTo($user)->where('slug', $titleSlug)->firstOrFail();
 
-        return $title->reviews()
+        $reviews = $title->reviews()
             ->select(['id', 'catalog_title_id', 'author', 'body', 'published_at'])
+            ->when($this->schema->communityAvailable(), fn ($query) => $query
+                ->where('origin', ReviewOrigin::Provider->value)
+                ->where('status', ReviewStatus::Published->value)
+                ->whereNull('deleted_at')
+                ->whereNull('merged_into_id'))
             ->latest('published_at')
-            ->latest('id')
-            ->paginate($request->perPage())
-            ->withQueryString();
+            ->latest('id');
+
+        return $reviews->paginate($request->perPage())->withQueryString();
     }
 }

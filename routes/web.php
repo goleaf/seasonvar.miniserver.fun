@@ -1,12 +1,17 @@
 <?php
 
 use App\Enums\CatalogFilterType;
+use App\Http\Controllers\AccountDataExportController;
 use App\Http\Controllers\Auth\VerifyEmailController;
+use App\Http\Controllers\CatalogCollectionController;
+use App\Http\Controllers\CatalogCollectionCoverController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogDirectoryRedirectController;
 use App\Http\Controllers\CatalogSitemapController;
+use App\Http\Controllers\CommentRedirectController;
 use App\Http\Controllers\InfrastructureHealthController;
 use App\Http\Controllers\PlaybackSourceController;
+use App\Http\Controllers\ReviewDirectLinkController;
 use App\Livewire\Auth\ConfirmPasswordPage;
 use App\Livewire\Auth\ForgotPasswordPage;
 use App\Livewire\Auth\LoginPage;
@@ -16,10 +21,21 @@ use App\Livewire\Auth\VerifyEmailPage;
 use App\Livewire\CatalogAdministrationManager;
 use App\Livewire\CatalogDirectoryBrowser;
 use App\Livewire\CatalogSeries;
+use App\Livewire\Collections\CatalogCollectionAdministrationManager;
+use App\Livewire\Collections\CatalogCollectionDashboard;
+use App\Livewire\Collections\CatalogCollectionDirectory;
+use App\Livewire\Collections\CatalogCollectionEditor;
+use App\Livewire\Collections\CatalogCollectionProfile;
+use App\Livewire\Comments\CommentAdministrationManager;
 use App\Livewire\Library\UserLibraryPage;
+use App\Livewire\Profile\DiscussionPage;
 use App\Livewire\Profile\ProfilePage;
+use App\Livewire\Profile\ReviewHistoryPage;
 use App\Livewire\Profile\SecurityPage;
+use App\Livewire\Reviews\ReviewModerationManager;
 use App\Livewire\SeasonvarImportManager;
+use App\Livewire\Tags\PersonalTagManager;
+use App\Livewire\Tags\TagAdministrationManager;
 use App\Services\Catalog\CatalogDirectoryRegistry;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -49,13 +65,26 @@ Route::middleware(['auth', 'auth.session'])->group(function (): void {
     Route::get('/email/verify', VerifyEmailPage::class)->name('verification.notice');
     Route::get('/confirm-password', ConfirmPasswordPage::class)->name('password.confirm');
     Route::get('/profile', ProfilePage::class)->name('profile.show');
+    Route::get('/profile/discussions', DiscussionPage::class)->name('profile.discussions');
+    Route::get('/profile/reviews', ReviewHistoryPage::class)->name('profile.reviews');
+    Route::get('/notifications', DiscussionPage::class)->name('notifications.index');
     Route::get('/profile/security', SecurityPage::class)->name('profile.security');
+    Route::get('/profile/export', AccountDataExportController::class)
+        ->middleware(['password.confirm', 'throttle:6,1'])
+        ->name('profile.export');
+    Route::get('/my/collections', CatalogCollectionDashboard::class)->name('collections.mine');
+    Route::get('/my/collections/{collectionPublicId}/edit', CatalogCollectionEditor::class)
+        ->whereUuid('collectionPublicId')
+        ->name('collections.edit');
+    Route::redirect('/my/lists', '/my/collections', 301)->name('legacy.collections.mine');
     Route::get('/library', UserLibraryPage::class)
         ->defaults('section', 'watchlist')
         ->name('library.index');
     Route::get('/library/{section}', UserLibraryPage::class)
         ->whereIn('section', ['watchlist', 'ratings', 'continue-watching', 'history'])
         ->name('library.section');
+    Route::get('/library/tags/manage', PersonalTagManager::class)
+        ->name('personal-tags.index');
     Route::redirect('/watching', '/library/continue-watching')
         ->name('viewing-activity');
 });
@@ -86,6 +115,10 @@ Route::middleware('public.cache:documents')
         Route::get('/opensearch.xml', [CatalogSitemapController::class, 'openSearch'])->name('opensearch');
         Route::get('/llms.txt', [CatalogSitemapController::class, 'llms'])->name('llms');
     });
+Route::get('/sitemap-collections.xml', [CatalogSitemapController::class, 'sitemapCollections'])
+    ->middleware('public.cache:collection_documents')
+    ->withoutMiddleware($publicDocumentMiddleware)
+    ->name('sitemap.collections');
 Route::get('/health/ready', InfrastructureHealthController::class)
     ->withoutMiddleware($publicDocumentMiddleware)
     ->name('health.ready');
@@ -98,6 +131,54 @@ Route::get('/playback/{licensedMedia}', PlaybackSourceController::class)
     ->middleware('signed')
     ->whereNumber('licensedMedia')
     ->name('playback.source');
+
+Route::get('/comments/{comment}', CommentRedirectController::class)
+    ->whereNumber('comment')
+    ->name('comments.show');
+Route::get('/reviews/{review}', ReviewDirectLinkController::class)
+    ->whereNumber('review')
+    ->name('reviews.show');
+
+Route::get('/collections', CatalogCollectionDirectory::class)
+    ->middleware('public.page:collections')
+    ->name('collections.index');
+Route::get('/collections/covers/{publicId}/{version}', CatalogCollectionCoverController::class)
+    ->whereUuid('publicId')
+    ->whereNumber('version')
+    ->name('collections.cover');
+Route::get('/collections/{collectionSlug}', [CatalogCollectionController::class, 'show'])
+    ->where('collectionSlug', '[^/]+')
+    ->name('collections.show');
+Route::get('/profiles/{userPublicId}/collections', CatalogCollectionProfile::class)
+    ->whereUuid('userPublicId')
+    ->middleware('public.page:collections')
+    ->name('profiles.collections');
+
+Route::middleware('collection.locale')->group(function (): void {
+    Route::get('/{locale}/comments/{comment}', CommentRedirectController::class)
+        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->whereNumber('comment')
+        ->name('localized.comments.show');
+    Route::get('/{locale}/collections', CatalogCollectionDirectory::class)
+        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->name('localized.collections.index');
+    Route::get('/{locale}/collections/{collectionSlug}', [CatalogCollectionController::class, 'localizedShow'])
+        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->where('collectionSlug', '[^/]+')
+        ->name('localized.collections.show');
+    Route::get('/{locale}/profiles/{userPublicId}/collections', CatalogCollectionProfile::class)
+        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->whereUuid('userPublicId')
+        ->name('localized.profiles.collections');
+});
+
+Route::redirect('/lists', '/collections', 301)->name('legacy.collections.index');
+Route::get('/lists/{collectionSlug}', [CatalogCollectionController::class, 'legacyShow'])
+    ->where('collectionSlug', '[^/]+')
+    ->name('legacy.collections.show');
+Route::get('/selections/{collectionSlug}', [CatalogCollectionController::class, 'legacyShow'])
+    ->where('collectionSlug', '[^/]+')
+    ->name('legacy.selections.show');
 
 foreach (CatalogDirectoryRegistry::routeMap() as $directory => $config) {
     Route::get('/'.$config['path'], CatalogDirectoryBrowser::class)
@@ -118,14 +199,31 @@ Route::get('/admin/imports', SeasonvarImportManager::class)
 Route::get('/admin/catalog', CatalogAdministrationManager::class)
     ->middleware('can:manage-catalog')
     ->name('admin.catalog');
+Route::get('/admin/collections', CatalogCollectionAdministrationManager::class)
+    ->middleware('can:manage-catalog')
+    ->name('admin.collections');
+Route::get('/admin/comments', CommentAdministrationManager::class)
+    ->middleware('can:manage-comments')
+    ->name('admin.comments');
+Route::get('/admin/reviews', ReviewModerationManager::class)
+    ->middleware('can:manage-reviews')
+    ->name('admin.reviews');
+Route::get('/admin/tags', TagAdministrationManager::class)
+    ->middleware('can:manage-catalog')
+    ->name('admin.tags');
 Route::get('/titles/year/{year}', CatalogSeries::class)
     ->where('year', '(?:19|20)\d{2}')
     ->middleware('public.page:catalog')
     ->name('titles.year');
+Route::get('/tag/{taxonomy}', CatalogSeries::class)
+    ->defaults('type', 'tag')
+    ->where('taxonomy', '[A-Za-z0-9][A-Za-z0-9-]*')
+    ->middleware(['canonical.tag', 'public.page:catalog'])
+    ->name('legacy.tags.show');
 Route::get('/titles/{type}/{taxonomy}', CatalogSeries::class)
     ->where('type', CatalogFilterType::routePattern())
-    ->where('taxonomy', '[a-z0-9][a-z0-9-]*')
-    ->middleware('public.page:catalog')
+    ->where('taxonomy', '[A-Za-z0-9][A-Za-z0-9-]*')
+    ->middleware(['canonical.tag', 'public.page:catalog'])
     ->name('titles.taxonomy');
 Route::get('/titles/{catalogTitle:slug}', [CatalogController::class, 'show'])
     ->middleware('public.page:title')

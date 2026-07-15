@@ -14,6 +14,7 @@ use App\Services\Catalog\CatalogViewingActivityQuery;
 use App\Services\Catalog\CatalogViewingActivityService;
 use App\Services\Catalog\UserLibraryQuery;
 use App\Services\Catalog\UserLibrarySummaryQuery;
+use App\Services\Tags\PersonalTagLibraryQuery;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -44,6 +45,8 @@ final class UserLibraryPage extends Component
 
     protected CatalogTitleQuery $titles;
 
+    protected PersonalTagLibraryQuery $personalTags;
+
     public function boot(
         UserLibraryQuery $library,
         UserLibrarySummaryQuery $summaries,
@@ -51,6 +54,7 @@ final class UserLibraryPage extends Component
         CatalogViewingActivityService $activityActions,
         CatalogUserStateService $userState,
         CatalogTitleQuery $titles,
+        PersonalTagLibraryQuery $personalTags,
     ): void {
         $this->library = $library;
         $this->summaries = $summaries;
@@ -58,6 +62,7 @@ final class UserLibraryPage extends Component
         $this->activityActions = $activityActions;
         $this->userState = $userState;
         $this->titles = $titles;
+        $this->personalTags = $personalTags;
     }
 
     public function mount(string $section = 'watchlist'): void
@@ -147,6 +152,7 @@ final class UserLibraryPage extends Component
                 ->reject(fn (CatalogPublicationType $type): bool => $type === CatalogPublicationType::Unknown),
             'ratingOptions' => $this->userState->ratingOptions(),
             'canInteract' => $user->hasVerifiedEmail(),
+            'personalTags' => $this->personalTags->active($user),
             'watchlist' => null,
             'ratings' => null,
             'continueWatching' => null,

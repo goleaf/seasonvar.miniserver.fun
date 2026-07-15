@@ -138,7 +138,12 @@ class SeasonvarCatalogMetadataBackfill
                 $attached = $this->databaseTransaction->run(
                     function () use ($page, $title, $taxonomies, $presence, $progress, $data): int {
                         $attached = $this->attachedCount(
-                            $this->relationSyncer->sync($title, $taxonomies, $progress),
+                            $this->relationSyncer->sync(
+                                $title,
+                                $taxonomies,
+                                $progress,
+                                completeTagSnapshot: $data->hasCompleteMetadataSnapshot(),
+                            ),
                         );
                         $title->refresh();
                         $publicationType = $data->hasPublicationTypeEvidence()

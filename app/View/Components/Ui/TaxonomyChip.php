@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\View\Components\Ui;
 
 use Illuminate\Contracts\View\View;
@@ -7,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\View\Component;
 use Illuminate\View\ComponentSlot;
 
-class TaxonomyChip extends Component
+final class TaxonomyChip extends Component
 {
     private const ICONS = [
         'genre' => 'fa-solid fa-masks-theater',
@@ -33,7 +35,9 @@ class TaxonomyChip extends Component
 
     public function label(ComponentSlot $slot): string
     {
-        return $this->taxonomy?->name ?? trim((string) $slot);
+        $label = $this->taxonomy?->getAttribute('name');
+
+        return is_string($label) && $label !== '' ? $label : trim((string) $slot);
     }
 
     public function url(): ?string
@@ -44,11 +48,13 @@ class TaxonomyChip extends Component
 
         $type = $this->filterType();
 
-        if ($this->taxonomy === null || $type === null) {
+        $slug = $this->taxonomy?->getAttribute('slug');
+
+        if ($type === null || ! is_string($slug) || $slug === '') {
             return null;
         }
 
-        return route('titles.taxonomy', ['type' => $type, 'taxonomy' => $this->taxonomy->slug]);
+        return route('titles.taxonomy', ['type' => $type, 'taxonomy' => $slug]);
     }
 
     public function iconClass(): ?string
@@ -81,6 +87,14 @@ class TaxonomyChip extends Component
             return null;
         }
 
-        return $this->taxonomy->type ?? (method_exists($this->taxonomy, 'filterType') ? $this->taxonomy->filterType() : null);
+        if (method_exists($this->taxonomy, 'filterType')) {
+            $filterType = $this->taxonomy->filterType();
+
+            return is_string($filterType) ? $filterType : null;
+        }
+
+        $filterType = $this->taxonomy->getAttribute('type');
+
+        return is_string($filterType) ? $filterType : null;
     }
 }

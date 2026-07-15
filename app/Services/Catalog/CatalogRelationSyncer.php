@@ -1,90 +1,152 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Catalog;
 
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleRecommendation;
+use App\Models\Tag;
+use App\Services\Tags\TagCacheInvalidator;
+use App\Services\Tags\TagImportSynchronizer;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use LogicException;
 
-class CatalogRelationSyncer
+/**
+ * @phpstan-type RelationInput array{
+ *     type: string,
+ *     name: string,
+ *     source_id?: int|null,
+ *     source_external_id?: string|int|null,
+ *     source_url?: string|null
+ * }
+ */
+final class CatalogRelationSyncer
 {
     public function __construct(
         private readonly CatalogRelationNameSanitizer $relationNames,
         private readonly CatalogRelationSourceIdentityRegistry $sourceIdentities,
         private readonly CatalogTaxonomyRegistry $taxonomies,
+        private readonly TagImportSynchronizer $tagImports,
+        private readonly TagCacheInvalidator $tagCache,
     ) {}
 
     /**
-     * @param  list<array{type: string, name: string, source_id?: int|null, source_external_id?: string|int|null, source_url?: string|null}>  $relations
+     * @param  list<RelationInput>  $relations
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return array<string, array{ids: list<int>, count: int, attached_ids: list<int>, attached_count: int}>
      */
-    public function sync(CatalogTitle $title, array $relations, ?callable $progress = null): array
-    {
-        return DB::transaction(fn (): array => $this->syncWithinTransaction($title, $relations, $progress));
+    public function sync(
+        CatalogTitle $title,
+        array $relations,
+        ?callable $progress = null,
+        bool $completeTagSnapshot = false,
+    ): array {
+        return DB::transaction(fn (): array => $this->syncWithinTransaction(
+            $title,
+            $relations,
+            $progress,
+            $completeTagSnapshot,
+        ));
     }
 
     /**
-     * @param  list<array{type: string, name: string, source_id?: int|null, source_external_id?: string|int|null, source_url?: string|null}>  $relations
+     * @param  list<RelationInput>  $relations
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return array<string, array{ids: list<int>, count: int, attached_ids: list<int>, attached_count: int}>
      */
-    private function syncWithinTransaction(CatalogTitle $title, array $relations, ?callable $progress): array
-    {
+    private function syncWithinTransaction(
+        CatalogTitle $title,
+        array $relations,
+        ?callable $progress,
+        bool $completeTagSnapshot,
+    ): array {
         $this->report($progress, 'taxonomy-sync-started', [
             'catalog_title_id' => $title->id,
             'total' => count($relations),
         ]);
 
-        $relationsByType = collect($relations)
-            ->filter(fn (array $item): bool => $this->taxonomies->supports($item['type']))
-            ->filter(fn (array $item): bool => $this->relationNames->isValid($item['type'], $item['name']))
-            ->groupBy('type');
+        $relationsByType = $this->supportedRelations($relations);
         $result = [];
+        $usesCanonicalTagSchema = Tag::usesCanonicalSchema();
 
-        foreach ($relationsByType as $type => $items) {
+        foreach ($relationsByType as $type => $relationItems) {
             $config = $this->taxonomies->relations()[$type];
-            $ids = $this->syncType($title, $type, $items, $progress);
-            $changes = $ids === [] ? ['attached' => []] : $title->{$config['relation']}()->syncWithoutDetaching($ids);
-            $attachedIds = collect($changes['attached'] ?? [])
-                ->map(fn (mixed $id): int => (int) $id)
-                ->values()
-                ->all();
+            $tagSync = null;
+            $ids = $type === 'tag' && $usesCanonicalTagSchema
+                ? ($tagSync = $this->tagImports->syncTitle($title, $relationItems, $completeTagSnapshot))->tagIds
+                : $this->syncType($title, $type, $relationItems, $progress);
+            $attachedIds = $this->attach($title, $config['relation'], $ids);
             $result[$type] = [
                 'ids' => $ids,
                 'count' => count($ids),
                 'attached_ids' => $attachedIds,
                 'attached_count' => count($attachedIds),
             ];
+
+            if ($tagSync !== null) {
+                $this->report($progress, 'taxonomy-type-synced', [
+                    'catalog_title_id' => $title->id,
+                    'type' => 'tag',
+                    'relation' => 'tags',
+                    'records' => count($relationItems),
+                    'synced' => count($ids),
+                    'detached' => count($tagSync->detachedTagIds),
+                ]);
+                $this->afterTagChanges(
+                    $title,
+                    $attachedIds,
+                    $tagSync->detachedTagIds,
+                    $tagSync->publicMetadataChanged,
+                );
+            }
         }
 
-        $syncedIds = collect($result)
-            ->flatMap(fn (array $item): array => $item['ids'])
-            ->values();
+        if ($completeTagSnapshot && ! array_key_exists('tag', $relationsByType)) {
+            if ($usesCanonicalTagSchema) {
+                $tagSync = $this->tagImports->syncTitle($title, [], true);
+                $this->afterTagChanges($title, [], $tagSync->detachedTagIds, $tagSync->publicMetadataChanged);
+            }
+
+            $result['tag'] = [
+                'ids' => [],
+                'count' => 0,
+                'attached_ids' => [],
+                'attached_count' => 0,
+            ];
+        }
+
+        $syncedIds = [];
+
+        foreach ($result as $item) {
+            array_push($syncedIds, ...$item['ids']);
+        }
 
         $this->report($progress, 'taxonomy-sync-complete', [
             'catalog_title_id' => $title->id,
-            'synced' => $syncedIds->count(),
-            'taxonomy_ids' => $syncedIds->all(),
+            'synced' => count($syncedIds),
+            'taxonomy_ids' => $syncedIds,
         ]);
 
         return $result;
     }
 
     /**
-     * @param  Collection<int, array{type: string, name: string, source_id?: int|null, source_external_id?: string|int|null, source_url?: string|null}>  $items
+     * @param  list<RelationInput>  $items
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return list<int>
      */
-    private function syncType(CatalogTitle $title, string $type, Collection $items, ?callable $progress): array
+    private function syncType(CatalogTitle $title, string $type, array $items, ?callable $progress): array
     {
         $config = $this->taxonomies->relations()[$type];
         /** @var class-string<Model> $modelClass */
         $modelClass = $config['model'];
         $now = now();
-        $preparedItems = $items
+        $preparedItems = (new Collection($items))
             ->map(function (array $item) use ($title, $type): ?array {
                 $name = $this->relationNames->normalize($item['name']);
 
@@ -110,87 +172,99 @@ class CatalogRelationSyncer
             ->pluck('source_url')
             ->filter()
             ->unique()
-            ->values();
-        $existingBySourceUrl = $sourceUrls->isEmpty()
+            ->values()
+            ->all();
+        $existingBySourceUrl = $sourceUrls === []
             ? collect()
             : $modelClass::query()
                 ->whereIn('source_url', $sourceUrls)
                 ->get()
                 ->keyBy('source_url');
-        $normalizedItems = $preparedItems
-            ->map(function (array $item) use ($existingBySourceUrl, $type): array {
-                $existing = $item['source_url'] === null
-                    ? null
-                    : $existingBySourceUrl->get($item['source_url']);
-                $candidateKey = $existing?->slug ?: $item['fallback_slug'];
+        $normalizedBySlug = [];
 
-                return [
-                    'name' => $item['name'],
-                    'slug' => $this->sourceIdentities->resolve(
-                        $item['source_id'],
-                        $type,
-                        $item['source_external_id'],
-                        $item['source_url'],
-                        $candidateKey,
-                    ),
-                    'source_url' => $item['source_url'],
-                ];
-            })
-            ->reduce(function (Collection $normalized, array $item) use ($type): Collection {
-                $existing = $normalized->get($item['slug']);
+        foreach ($preparedItems as $item) {
+            $existing = $item['source_url'] === null
+                ? null
+                : $existingBySourceUrl->get($item['source_url']);
+            $existingSlug = $existing instanceof Model ? $existing->getAttribute('slug') : null;
+            $candidateKey = is_string($existingSlug) && $existingSlug !== ''
+                ? $existingSlug
+                : $item['fallback_slug'];
+            $slug = $this->sourceIdentities->resolve(
+                $item['source_id'],
+                $type,
+                $item['source_external_id'],
+                $item['source_url'],
+                $candidateKey,
+            );
+            $normalized = [
+                'name' => $item['name'],
+                'slug' => $slug,
+                'source_url' => $item['source_url'],
+            ];
+            $duplicate = $normalizedBySlug[$slug] ?? null;
 
-                if (is_array($existing)) {
-                    $item['name'] = $this->relationNames->preferredName($type, $existing['name'], $item['name']);
-                    $item['source_url'] = $existing['source_url'] ?? $item['source_url'];
-                }
+            if (is_array($duplicate)) {
+                $normalized['name'] = $this->relationNames->preferredName($type, $duplicate['name'], $normalized['name']);
+                $normalized['source_url'] = $duplicate['source_url'] ?? $normalized['source_url'];
+            }
 
-                $normalized->put($item['slug'], $item);
+            $normalizedBySlug[$slug] = $normalized;
+        }
 
-                return $normalized;
-            }, collect())
-            ->values();
+        $normalizedItems = array_values($normalizedBySlug);
 
         $existingBySlug = $modelClass::query()
-            ->whereIn('slug', $normalizedItems->pluck('slug'))
+            ->whereIn('slug', array_column($normalizedItems, 'slug'))
             ->get()
             ->keyBy('slug');
+        $rowsBySlug = [];
 
-        $rowsBySlug = $normalizedItems->mapWithKeys(function (array $item) use ($type, $existingBySlug, $now): array {
+        foreach ($normalizedItems as $item) {
             $existing = $existingBySlug->get($item['slug']);
-            $name = $existing === null
+            $existingName = $existing instanceof Model ? $existing->getAttribute('name') : null;
+            $name = ! is_string($existingName) || $existingName === ''
                 ? $item['name']
-                : $this->relationNames->preferredName($type, $existing->name, $item['name']);
-
-            return [$item['slug'] => [
+                : $this->relationNames->preferredName($type, $existingName, $item['name']);
+            $existingSourceUrl = $existing instanceof Model ? $existing->getAttribute('source_url') : null;
+            $rowsBySlug[$item['slug']] = [
                 'name' => $name,
                 'slug' => $item['slug'],
-                'source_url' => $existing?->source_url ?: $item['source_url'],
+                'source_url' => is_string($existingSourceUrl) && $existingSourceUrl !== ''
+                    ? $existingSourceUrl
+                    : $item['source_url'],
                 'created_at' => $now,
                 'updated_at' => $now,
-            ]];
-        });
+            ];
+        }
 
-        $rowsWithSourceUrl = $rowsBySlug->filter(fn (array $row): bool => $row['source_url'] !== null);
-        $rowsWithoutSourceUrl = $rowsBySlug->filter(fn (array $row): bool => $row['source_url'] === null);
+        $rowsWithSourceUrl = array_values(array_filter(
+            $rowsBySlug,
+            fn (array $row): bool => $row['source_url'] !== null,
+        ));
+        $rowsWithoutSourceUrl = array_values(array_filter(
+            $rowsBySlug,
+            fn (array $row): bool => $row['source_url'] === null,
+        ));
 
-        if ($rowsWithSourceUrl->isNotEmpty()) {
+        if ($rowsWithSourceUrl !== []) {
             $modelClass::query()->upsert(
-                $rowsWithSourceUrl->values()->all(),
+                $rowsWithSourceUrl,
                 ['slug'],
                 ['name', 'source_url', 'updated_at'],
             );
         }
 
-        if ($rowsWithoutSourceUrl->isNotEmpty()) {
+        if ($rowsWithoutSourceUrl !== []) {
             $modelClass::query()->upsert(
-                $rowsWithoutSourceUrl->values()->all(),
+                $rowsWithoutSourceUrl,
                 ['slug'],
                 ['name', 'updated_at'],
             );
         }
 
         $relationIds = $modelClass::query()
-            ->whereIn('slug', $rowsBySlug->keys())
+            ->whereIn('slug', array_keys($rowsBySlug))
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
             ->unique()
@@ -201,11 +275,88 @@ class CatalogRelationSyncer
             'catalog_title_id' => $title->id,
             'type' => $type,
             'relation' => $config['relation'],
-            'records' => $rowsBySlug->count(),
+            'records' => count($rowsBySlug),
             'synced' => count($relationIds),
         ]);
 
         return $relationIds;
+    }
+
+    /**
+     * @param  list<RelationInput>  $relations
+     * @return array<string, list<RelationInput>>
+     */
+    private function supportedRelations(array $relations): array
+    {
+        $supported = [];
+
+        foreach ($relations as $relation) {
+            $type = $relation['type'];
+
+            if (! $this->taxonomies->supports($type)
+                || ! $this->relationNames->isValid($type, $relation['name'])) {
+                continue;
+            }
+
+            $supported[$type][] = $relation;
+        }
+
+        return $supported;
+    }
+
+    /**
+     * @param  list<int>  $ids
+     * @return list<int>
+     */
+    private function attach(CatalogTitle $title, string $relationName, array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $relation = $title->{$relationName}();
+
+        if (! $relation instanceof BelongsToMany) {
+            throw new LogicException(sprintf(
+                'Связь каталога "%s" должна быть belongsToMany.',
+                $relationName,
+            ));
+        }
+
+        $changes = $relation->syncWithoutDetaching($ids);
+        $attached = [];
+
+        foreach ($changes['attached'] as $id) {
+            if (is_int($id)) {
+                $attached[] = $id;
+            } elseif (is_string($id) && ctype_digit($id)) {
+                $attached[] = (int) $id;
+            }
+        }
+
+        return array_values(array_unique($attached));
+    }
+
+    /**
+     * @param  list<int>  $attachedIds
+     * @param  list<int>  $detachedIds
+     */
+    private function afterTagChanges(
+        CatalogTitle $title,
+        array $attachedIds,
+        array $detachedIds,
+        bool $publicMetadataChanged,
+    ): void {
+        if ($attachedIds === [] && $detachedIds === [] && ! $publicMetadataChanged) {
+            return;
+        }
+
+        CatalogTitleRecommendation::query()
+            ->where('catalog_title_id', $title->id)
+            ->orWhere('recommended_title_id', $title->id)
+            ->delete();
+        $title->forceFill(['indexed_at' => now()])->touch();
+        $this->tagCache->publicChanged([$title->id]);
     }
 
     private function sourceId(mixed $sourceId): int

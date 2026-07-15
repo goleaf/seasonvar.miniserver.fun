@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\Cache;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -24,5 +25,7 @@ abstract class TestCase extends BaseTestCase
             'playback.enforce_public_dns' => false,
             'security.external_playlist_enforce_public_dns' => false,
         ]);
+
+        Cache::store('array')->clear();
     }
 }

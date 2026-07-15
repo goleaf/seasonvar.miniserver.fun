@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire;
 
 use App\Services\Catalog\CatalogStatsSnapshotCache;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
-class StatsDashboard extends Component
+final class StatsDashboard extends Component
 {
     protected CatalogStatsSnapshotCache $snapshots;
 
@@ -14,8 +16,6 @@ class StatsDashboard extends Component
     {
         $this->snapshots = $snapshots;
     }
-
-    public function refreshStats(): void {}
 
     public function render(): View
     {

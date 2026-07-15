@@ -5,13 +5,18 @@ namespace App\Services\Seasonvar;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleAlias;
 use App\Models\CatalogTitleRating;
-use App\Models\CatalogTitleReview;
 use App\Models\CatalogTitleSlug;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Services\Api\V1\Sync\CatalogSyncChangePublisher;
+use App\Services\Catalog\CatalogTitleUserDataMerger;
 use App\Services\Catalog\Search\CatalogSearchIndexer;
+use App\Services\Collections\CatalogCollectionItemService;
+use App\Services\Comments\CommentTargetMergeService;
+use App\Services\Reviews\ReviewMergeService;
+use App\Services\Tags\TagCacheInvalidator;
+use App\Services\Tags\TagTitleMergeService;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +42,12 @@ class SeasonvarTitleMerger
         private readonly SeasonvarImportGroupKey $groupKeys,
         private readonly CatalogSearchIndexer $searchIndexer,
         private readonly CatalogSyncChangePublisher $syncChanges,
+        private readonly CatalogCollectionItemService $collectionItems,
+        private readonly CatalogTitleUserDataMerger $userData,
+        private readonly CommentTargetMergeService $comments,
+        private readonly ReviewMergeService $reviews,
+        private readonly TagTitleMergeService $tagTitles,
+        private readonly TagCacheInvalidator $tagCache,
     ) {}
 
     /**
@@ -55,7 +66,7 @@ class SeasonvarTitleMerger
 
         foreach ($groups as $group) {
             $titles = CatalogTitle::query()
-                ->with([...self::CATALOG_RELATIONS, 'aliases', 'ratings', 'reviews', 'seasons.episodes'])
+                ->with([...self::CATALOG_RELATIONS, 'aliases', 'ratings', 'seasons.episodes'])
                 ->whereKey($group->pluck('id'))
                 ->orderBy('id')
                 ->get();
@@ -66,6 +77,7 @@ class SeasonvarTitleMerger
 
             $duplicateSlugs = $titles->slice(1)->pluck('slug')->filter()->values();
             $groupResult = DB::transaction(fn (): array => $this->mergeGroup($titles));
+            $this->tagCache->publicChanged($titles->modelKeys());
             $result['titles'] += $groupResult['titles'];
             $result['seasons'] += $groupResult['seasons'];
             $result['episodes'] += $groupResult['episodes'];
@@ -128,7 +140,7 @@ class SeasonvarTitleMerger
             ->merge($duplicates->modelKeys())
             ->values();
         $titlesById = CatalogTitle::query()
-            ->with([...self::CATALOG_RELATIONS, 'aliases', 'ratings', 'reviews', 'seasons.episodes'])
+            ->with([...self::CATALOG_RELATIONS, 'aliases', 'ratings', 'seasons.episodes'])
             ->whereKey($orderedIds)
             ->get()
             ->keyBy('id');
@@ -146,6 +158,7 @@ class SeasonvarTitleMerger
 
         $duplicateSlugs = $titles->slice(1)->pluck('slug')->filter()->values();
         $groupResult = DB::transaction(fn (): array => $this->mergeGroup($titles));
+        $this->tagCache->publicChanged($titles->modelKeys());
 
         $result['titles'] = $groupResult['titles'];
         $result['seasons'] = $groupResult['seasons'];
@@ -374,6 +387,8 @@ class SeasonvarTitleMerger
         $relationIds = $this->relationIds($canonical);
 
         foreach ($titles->slice(1) as $duplicate) {
+            $this->comments->moveTitle($duplicate, $canonical);
+
             foreach ($this->relationIds($duplicate) as $relation => $ids) {
                 $relationIds[$relation] = array_values(array_unique([
                     ...$relationIds[$relation],
@@ -415,6 +430,7 @@ class SeasonvarTitleMerger
 
                 $movedEpisodes += $this->mergeEpisodes($season, $targetSeason, $canonical);
                 $this->moveMediaForSeason($season->id, $canonical, $targetSeason);
+                $this->comments->moveSeason($season, $targetSeason);
 
                 $season->forceDelete();
                 $mergedSeasons++;
@@ -422,9 +438,12 @@ class SeasonvarTitleMerger
 
             $this->mergeAliases($canonical, $duplicate);
             $this->mergeRatings($canonical, $duplicate);
-            $this->mergeReviews($canonical, $duplicate);
+            $this->reviews->merge($canonical, $duplicate);
+            $this->userData->moveTitle($duplicate, $canonical);
             $this->moveLooseMedia($duplicate, $canonical);
             $this->preservePublicSlugs($canonical, $duplicate);
+            $this->collectionItems->mergeTitle($canonical, $duplicate);
+            $this->tagTitles->moveTitle($canonical, $duplicate);
 
             $duplicate->forceDelete();
             $mergedTitles++;
@@ -483,6 +502,7 @@ class SeasonvarTitleMerger
                 $episode->season_id = $targetSeason->id;
                 $episode->save();
                 $this->moveMediaForEpisode($episode->id, $canonical, $targetSeason, $episode);
+                $this->userData->moveEpisode($episode, $episode, $canonical);
                 $moved++;
 
                 continue;
@@ -498,6 +518,10 @@ class SeasonvarTitleMerger
                 'released_at' => $targetEpisode->released_at ?? $episode->released_at,
                 'summary' => $targetEpisode->summary ?? $episode->summary,
             ])->save();
+
+            $targetEpisode->setRelation('season', $targetSeason);
+            $this->comments->moveEpisode($episode, $targetEpisode);
+            $this->userData->moveEpisode($episode, $targetEpisode, $canonical);
 
             $episode->forceDelete();
             $moved++;
@@ -624,25 +648,6 @@ class SeasonvarTitleMerger
                 ],
             );
             $rating->delete();
-        }
-    }
-
-    private function mergeReviews(CatalogTitle $canonical, CatalogTitle $duplicate): void
-    {
-        foreach ($duplicate->reviews as $review) {
-            CatalogTitleReview::query()->updateOrCreate(
-                [
-                    'catalog_title_id' => $canonical->id,
-                    'body_hash' => $review->body_hash,
-                ],
-                [
-                    'source_page_id' => $review->source_page_id,
-                    'author' => $review->author,
-                    'body' => $review->body,
-                    'published_at' => $review->published_at,
-                ],
-            );
-            $review->delete();
         }
     }
 

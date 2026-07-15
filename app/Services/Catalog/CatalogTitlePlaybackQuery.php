@@ -12,13 +12,23 @@ use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
 use App\Services\Media\ExternalMediaMetadata;
+use Illuminate\Container\Attributes\Scoped;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use LogicException;
 
-class CatalogTitlePlaybackQuery
+#[Scoped]
+final class CatalogTitlePlaybackQuery
 {
+    /** @var array<string, CatalogTitle> */
+    private array $visibleTitles = [];
+
+    /** @var array<string, Collection<int, Season>> */
+    private array $seasonSummaryCollections = [];
+
     public function __construct(
         private readonly CatalogTitleQuery $titles,
         private readonly ExternalMediaMetadata $mediaMetadata,
@@ -26,7 +36,9 @@ class CatalogTitlePlaybackQuery
 
     public function visibleTitle(int $catalogTitleId, ?User $user): CatalogTitle
     {
-        return $this->titles
+        $key = $this->requestKey($catalogTitleId, $user);
+
+        return $this->visibleTitles[$key] ??= $this->titles
             ->visibleTo($user)
             ->select([
                 'id',
@@ -43,15 +55,39 @@ class CatalogTitlePlaybackQuery
             ->findOrFail($catalogTitleId);
     }
 
+    public function rememberVisibleTitle(CatalogTitle $catalogTitle, ?User $user): void
+    {
+        $this->visibleTitles[$this->requestKey($catalogTitle->id, $user)] = $catalogTitle;
+    }
+
+    public function forget(int $catalogTitleId, ?User $user): void
+    {
+        $key = $this->requestKey($catalogTitleId, $user);
+
+        unset($this->visibleTitles[$key], $this->seasonSummaryCollections[$key]);
+    }
+
     /** @return Collection<int, Season> */
     public function seasonSummaries(CatalogTitle $catalogTitle, ?User $user): Collection
     {
+        $key = $this->requestKey($catalogTitle->id, $user);
+
+        if (isset($this->seasonSummaryCollections[$key])) {
+            return $this->seasonSummaryCollections[$key];
+        }
+
         $watchableEpisodeIds = $this->availableMedia($catalogTitle, $user)
             ->whereNotNull('episode_id')
             ->select('episode_id')
             ->groupBy('episode_id');
+        $availableEpisodeIds = Episode::query()
+            ->availableTo($user)
+            ->whereIn((new Episode)->qualifyColumn('id'), clone $watchableEpisodeIds)
+            ->select((new Episode)->qualifyColumn('id'));
+        $availableMediaIds = $this->availableMedia($catalogTitle, $user)
+            ->select((new LicensedMedia)->qualifyColumn('id'));
 
-        return $catalogTitle->seasons()
+        return $this->seasonSummaryCollections[$key] = $catalogTitle->seasons()
             ->availableTo($user)
             ->select([
                 'id',
@@ -72,15 +108,22 @@ class CatalogTitlePlaybackQuery
             ])
             ->withCount([
                 'episodes as available_episodes_count' => fn (Builder $query): Builder => $query
-                    ->availableTo($user)
-                    ->whereIn((new Episode)->qualifyColumn('id'), clone $watchableEpisodeIds),
+                    ->whereIn((new Episode)->qualifyColumn('id'), clone $availableEpisodeIds),
                 'licensedMedia as available_media_count' => fn (Builder $query): Builder => $query
-                    ->availableTo($user)
-                    ->forAvailableReleases($user)
-                    ->withPlaybackLocation()
-                    ->withoutKnownFailures(),
+                    ->whereIn((new LicensedMedia)->qualifyColumn('id'), clone $availableMediaIds),
             ])
             ->get();
+    }
+
+    private function requestKey(int $catalogTitleId, ?User $user): string
+    {
+        if ($user === null) {
+            return $catalogTitleId.'|guest';
+        }
+
+        $userKey = $user->getAuthIdentifier();
+
+        return $catalogTitleId.'|user:'.($userKey !== null ? (string) $userKey : 'object:'.spl_object_id($user));
     }
 
     /** @return Builder<Episode> */
@@ -275,6 +318,8 @@ class CatalogTitlePlaybackQuery
     /** @return Collection<int, Episode> */
     public function episodesForSeason(CatalogTitle $catalogTitle, Season $season, ?User $user): Collection
     {
+        $availableMediaIds = $this->availableMedia($catalogTitle, $user)
+            ->select((new LicensedMedia)->qualifyColumn('id'));
         $episodes = Episode::query()
             ->availableTo($user)
             ->where('season_id', $season->id)
@@ -302,43 +347,46 @@ class CatalogTitlePlaybackQuery
                 'deleted_at',
             ])
             ->with([
-                'licensedMedia' => fn (HasMany $query): HasMany => $query
-                    ->availableTo($user)
-                    ->forAvailableReleases($user)
-                    ->withPlaybackLocation()
-                    ->withoutKnownFailures()
-                    ->where('catalog_title_id', $catalogTitle->id)
-                    ->select([
-                        'id',
-                        'catalog_title_id',
-                        'season_id',
-                        'episode_id',
-                        'title',
-                        'storage_disk',
-                        'path',
-                        'playback_url',
-                        'duration_seconds',
-                        'quality',
-                        'translation_name',
-                        'variant_type',
-                        'variant_name',
-                        'variant_key',
-                        'has_subtitles',
-                        'format',
-                        'source_url',
-                        'status',
-                        'published_at',
-                        'audience',
-                        'available_from',
-                        'available_until',
-                        'check_status',
-                        'health_status',
-                        'last_http_status',
-                        'checked_at',
-                        'deleted_at',
-                    ])
-                    ->latest('published_at')
-                    ->latest(),
+                'licensedMedia' => function (Relation $relation) use ($availableMediaIds, $catalogTitle): void {
+                    if (! $relation instanceof HasMany) {
+                        throw new LogicException('Episode media eager loading requires a has-many relation.');
+                    }
+
+                    $relation
+                        ->whereIn((new LicensedMedia)->qualifyColumn('id'), clone $availableMediaIds)
+                        ->where('catalog_title_id', $catalogTitle->id)
+                        ->select([
+                            'id',
+                            'catalog_title_id',
+                            'season_id',
+                            'episode_id',
+                            'title',
+                            'storage_disk',
+                            'path',
+                            'playback_url',
+                            'duration_seconds',
+                            'quality',
+                            'translation_name',
+                            'variant_type',
+                            'variant_name',
+                            'variant_key',
+                            'has_subtitles',
+                            'format',
+                            'source_url',
+                            'status',
+                            'published_at',
+                            'audience',
+                            'available_from',
+                            'available_until',
+                            'check_status',
+                            'health_status',
+                            'last_http_status',
+                            'checked_at',
+                            'deleted_at',
+                        ])
+                        ->latest('published_at')
+                        ->latest();
+                },
             ])
             ->orderBy('kind')
             ->orderBy('sort_order')
@@ -498,8 +546,7 @@ class CatalogTitlePlaybackQuery
             ["COALESCE({$seasonTable}.number, 0)", (int) ($current->getAttribute('season_order_number') ?? 0)],
             [$seasonTable.'.id', (int) $current->getAttribute('season_order_id')],
             [$episodeTable.'.sort_order', (int) $current->sort_order],
-            ["CASE WHEN {$episodeTable}.number IS NULL THEN 1 ELSE 0 END", $current->number === null ? 1 : 0],
-            ["COALESCE({$episodeTable}.number, 0)", (int) ($current->number ?? 0)],
+            [$episodeTable.'.number', $current->number],
             [$episodeTable.'.id', $current->id],
         ];
         $query = $this->watchableEpisodes($catalogTitle, $user)
@@ -574,8 +621,8 @@ class CatalogTitlePlaybackQuery
 
     private function mediaUrl(LicensedMedia $media): ?string
     {
-        $url = $media->playback_url ?: $media->path;
+        $url = trim($media->playback_url ?: $media->path);
 
-        return is_string($url) && trim($url) !== '' ? $url : null;
+        return $url !== '' ? $url : null;
     }
 }

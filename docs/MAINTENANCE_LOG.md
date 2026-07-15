@@ -1,6 +1,7 @@
 # Журнал обслуживания
 
-- 15.07.2026: реализован гостевой full-response cache главной, catalog/directory, stats и title HTML поверх Redis/Memcached. CSRF и signed playback URL вырезаются из shared envelope и создаются заново на каждом HIT/STALE; warm intent объединяет generations/title IDs, legacy backlog становится no-op, self HTTP ограничен exact origin/лимитами/timeout. Репозиторий не запускал worker и не очищал production queue; rollout оставлен отдельной проверяемой операцией.
+- 15.07.2026: реализован и развёрнут гостевой full-response cache главной, catalog/directory, stats и title HTML поверх Redis/Memcached. CSRF и signed playback URL восстанавливаются на каждом HIT/STALE, а sanitized HTML хранится как bounded gzip payload. Production worker слушает только `cache-warm-v2`; штатный прогрев завершился успешно, health вернул `ready=true`, а все 4 import + 8 title-refresh workers возобновлены. Для пользователя `www` установлен и проверен ежеминутный Laravel scheduler с десятиминутным резервным прогревом. До отдельного rollout pending canonical-tag migrations публичные запросы безопасно используют legacy tag schema. Историческая `cache-warm` очередь с истёкшими envelope deadlines изолирована без массового retry/forget/очистки.
+- 15.07.2026: удалена недостижимая SEO/query matrix, которую `AppLayoutData` строил и затем обнулял при выключенных во всех producer flags. Presenter/layout сокращены с 1 928/783 до 411/96 строк, возвращают только явный prepared contract, а JSON-LD hex-safe кодируется до Blade. На одинаковом 40-term payload за 100 итераций median/p95 сократились с 23,894/25,323 до 0,536/0,834 мс; canonical/Open Graph/builder JSON-LD сохранены и защищены parse/closing-script regression.
 - 13.07.2026: финальный production rollout выполнен без очистки очереди и failed jobs. На остановленных 4 import + 8 title-refresh workers применена additive migration `admin_audit_events` (batch 12); проверенный SQLite snapshot `storage/app/backups/database-after-admin-audit-20260713-220015.sqlite` имеет размер 2 992 537 600 байт и вместе с live DB вернул `PRAGMA quick_check=ok`. Предшествующий 4-КБ файл `database-before-admin-audit-20260713-215954.sqlite` сохранён как непригодный артефакт неудавшейся CLI-команды и не считается backup. После config cache/PHP-FPM reload все 12 enabled workers восстановлены, `app:deployment-check` вернул `ready=true`, `app:health` — `ready=true`; `/`, `/titles`, title, `/age-ratings` и `/api/titles` ответили `200`, report-only CSP присутствовал только у HTML. Владельцы `storage/framework`, `bootstrap/cache` и `storage/logs` исправлены на runtime-пользователя `www:www`; logrotate dry run прошёл.
 - 13.07.2026: финальный backlog pass добавил безопасный deployment preflight/failed-job summary, CSP report-only, Playwright+axe CI, измеримые Livewire/query budgets, append-only admin audit, проверку внутренних Markdown links/migration inventory и bounded Larastan gate без baseline. Владельцы retention/failed-job disposition и отсутствующие product capabilities зафиксированы в тематических документах; speculative DRM/profiles/billing/external-search/PostgreSQL/experimentation код не добавлялся.
 
@@ -219,6 +220,27 @@
 - Команда `seasonvar:import` получила heartbeat активного запуска и автоматическое восстановление зависшей блокировки, если прошлый процесс остановился без завершения.
 - Для SQLite включены `busy_timeout`, WAL-журнал и нормальный synchronous-режим по умолчанию, чтобы импорт устойчивее переживал краткие блокировки базы.
 
+## 2026-07-15 — canonical collections domain
+
+- Выполнен repository/schema/routes/Markdown/privacy/cache/SEO/account/import-merge/UI audit: именованных коллекций и legacy rows до Task 10 не было; watchlist подтверждён как отдельная каноническая personal state.
+- Добавлены additive collection/translation migrations, stable UUID/slugs/history, item uniqueness/order, policy/services/query/Livewire/API/admin/account/title-merge/cache/SEO/sitemap integrations и private covers. Legacy `/lists`/`selections` сохранены aliases.
+- В ходе проверки устранены stale immutable cover risk, per-checkbox membership N+1, report/comment evidence deletion gap, web/API paginator-key conflict и shared-cache stale window collection API/sitemap.
+- По прямому требованию Task 10 automated tests не создавались и не запускались; acceptance ограничена static syntax/routes/schema/query/translation/privacy/cache/SEO/a11y inspection, asset build и browser smoke, результаты фиксируются в `audits/verification-report.md`.
+
+## 2026-07-15 — canonical comments and discussions domain
+
+- Полный Markdown/routes/schema/code/UI/cache/privacy audit подтвердил отсутствие legacy user comments/replies/reactions/reports/mentions/blocks/mutes/restrictions/notification inbox и competing tables; provider `catalog_title_reviews` сохранён отдельным review source.
+- Добавлены additive comment/engagement/relationship/notification migrations, stable identity и allowlisted title/season/episode/collection targets, bounded root replies, plain Unicode validation, server-hidden spoiler/long body, edit/soft-delete/restore/tombstone, up/down, notifications/preferences, blocks/mutes, reports/moderation/restrictions, anti-spam/rate/idempotency, profile/export/account deletion, admin, locale/direct links, title merge и targeted cache integration.
+- Query/UI review устранил author-pending-reply invisibility after reload, unsafe moderation wildcard argument, destination merge cache staleness, moderator dead links for hidden/deleted targets, locale hydration drift и unbounded author-cache invalidation. Public aggregates/cache остаются viewer-independent; private overlays и moderation evidence не раскрываются.
+- Task 12 запретил создание и запуск automated tests. Disposable SQLite подтвердил четыре discussion migrations; uncached route source, PHP syntax/Larastan, translation parity, Blade/security scans, Pint, Vite build, docs check и browser smoke фиксируются в `audits/verification-report.md`. Production database не мигрировалась.
+
+## 2026-07-15 — canonical serial reviews domain
+
+- Read every current project Markdown file and audited routes/schema/models/import/API/title UI/ratings/progress/comments/blocks/mutes/notifications/account/merge/cache/search/recommendations/SEO. Confirmed one title-only provider table with 73 101 rows, no legacy user reviews/votes/reports or duplicate title/body hashes; season/episode review products do not exist.
+- Extended `catalog_title_reviews` additively instead of creating a competing system. Added stable provider/user origin, user title/spoiler/verified/moderation/edit/deletion/ownership/merge state, aliases, helpful votes, reports, review-only restrictions/preferences, policy/actions/query/presenter/notifications/Livewire title/profile/admin UI and Russian/English catalogs.
+- Reused canonical 1–10 portal rating, playback progress evidence, shared blocks/mutes/database notifications, account export/deletion, title merge and targeted cache domains. Provider API/import IDs/body/hash/source/date remain compatible; comments remain separate, and no sentiment, emoji reaction, Markdown, public author directory, season/episode review, search indexing or review JSON-LD was invented.
+- Safety review made votes/reports atomic, preserved merged duplicate IDs through archival aliases, changed self-mutating merge loops to `eachById`, kept owner delete available during disable/restriction, separated viewer state from guest cache and omitted spoiler/body from previews/notifications/SEO. Production database was not migrated; Task 13 explicitly forbids creating or running automated tests, so allowed static/schema/query/route/translation/security/cache/SEO/build/browser evidence belongs to `audits/verification-report.md`.
+
 <!-- project-docs:start -->
 ## Автоматически обновляемое состояние документации
 
@@ -289,4 +311,15 @@
 - `2026_07_14_120408_create_personal_access_tokens_table.php`
 - `2026_07_14_164423_create_api_sync_tables_and_add_state_versions.php`
 - `2026_07_15_000000_add_user_library_query_indexes.php`
+- `2026_07_15_200000_create_catalog_collections.php`
+- `2026_07_15_200100_create_catalog_collection_translations.php`
+- `2026_07_15_210000_create_comments_table.php`
+- `2026_07_15_210100_create_comment_engagement_tables.php`
+- `2026_07_15_210200_create_discussion_preference_tables.php`
+- `2026_07_15_210300_create_notifications_table.php`
+- `2026_07_15_220000_extend_catalog_title_reviews_for_community_reviews.php`
+- `2026_07_15_230000_create_canonical_tag_domain.php`
+- `2026_07_15_230100_backfill_canonical_tag_provider_provenance.php`
+- `2026_07_15_230200_enforce_canonical_tag_name_uniqueness.php`
+- `2026_07_15_235000_add_home_content_addition_indexes.php`
 <!-- project-docs:end -->

@@ -37,6 +37,18 @@ class SecurityHardeningTest extends TestCase
             ->assertHeader('X-Permitted-Cross-Domain-Policies', 'none');
     }
 
+    public function test_api_responses_include_non_html_security_headers(): void
+    {
+        $this->getJson('/api')
+            ->assertOk()
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('X-Frame-Options', 'SAMEORIGIN')
+            ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+            ->assertHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()')
+            ->assertHeader('X-Permitted-Cross-Domain-Policies', 'none')
+            ->assertHeaderMissing('Content-Security-Policy-Report-Only');
+    }
+
     public function test_public_html_receives_a_bounded_report_only_content_security_policy(): void
     {
         config([

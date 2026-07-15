@@ -3,6 +3,7 @@
 namespace App\Services\Seasonvar;
 
 use App\Enums\CatalogPublicationType;
+use App\Enums\SeasonvarPageType;
 use App\Services\Catalog\CatalogRelationNameSanitizer;
 use App\Support\CatalogTitleDisplayName;
 use DOMDocument;
@@ -1634,10 +1635,16 @@ class SeasonvarCatalogParser
                 continue;
             }
 
+            $sourceUrl = $this->normalizeRelative($href, $baseUrl);
+
+            if ($this->seasonvarUrl->pageType($sourceUrl) !== SeasonvarPageType::Tag) {
+                continue;
+            }
+
             $items[Str::lower($name)] = [
                 'type' => 'tag',
                 'name' => $name,
-                'source_url' => $this->normalizeRelative($href, $baseUrl),
+                'source_url' => $sourceUrl,
             ];
         }
 

@@ -5,7 +5,9 @@ use App\Http\Middleware\AssignApiRequestId;
 use App\Http\Middleware\CachePublicPage;
 use App\Http\Middleware\EnsureMobileEmailIsVerified;
 use App\Http\Middleware\PublicHttpCacheHeaders;
+use App\Http\Middleware\ResolveCanonicalTagRoute;
 use App\Http\Middleware\ResolveOptionalSanctumUser;
+use App\Http\Middleware\SetInterfaceLocale;
 use App\Http\Responses\ApiErrorResponse;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
@@ -50,14 +52,17 @@ return Application::configure(basePath: dirname(__DIR__))
             'auth.optional.sanctum' => ResolveOptionalSanctumUser::class,
             'public.cache' => PublicHttpCacheHeaders::class,
             'public.page' => CachePublicPage::class,
+            'canonical.tag' => ResolveCanonicalTagRoute::class,
+            'collection.locale' => SetInterfaceLocale::class,
             'verified.api' => EnsureMobileEmailIsVerified::class,
         ]);
         $middleware->web(append: [
             AddSecurityHeaders::class,
         ]);
-        $middleware->api(prepend: [
-            AssignApiRequestId::class,
-        ]);
+        $middleware->api(
+            append: [AddSecurityHeaders::class],
+            prepend: [AssignApiRequestId::class],
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $invalidVerificationLink = static fn () => response()->view('errors.403', [

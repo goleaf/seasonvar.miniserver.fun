@@ -2,6 +2,9 @@ import '@fortawesome/fontawesome-free/css/fontawesome.min.css';
 import '@fortawesome/fontawesome-free/css/solid.min.css';
 import '@fortawesome/fontawesome-free/css/regular.min.css';
 import '../css/app.css';
+import { initializeCollectionInterfaces } from './collections.js';
+import { initializeCommentInterfaces } from './comments.js';
+import './reviews.js';
 
 let catalogPlayerModule = null;
 let catalogPlayerModulePromise = null;
@@ -477,6 +480,8 @@ const loadCatalogInterfaces = () => {
     loadCatalogFilterSearch();
     loadCatalogPeopleComboboxes();
     loadPaginationScroll();
+    initializeCollectionInterfaces();
+    initializeCommentInterfaces();
 };
 
 if (document.readyState === 'loading') {

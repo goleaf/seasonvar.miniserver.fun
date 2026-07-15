@@ -7,6 +7,7 @@ namespace App\Livewire\Profile;
 use App\Models\User;
 use App\Services\Auth\AccountService;
 use App\Services\Catalog\UserLibrarySummaryQuery;
+use App\Services\Collections\CatalogCollectionQuery;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -76,10 +77,11 @@ final class ProfilePage extends Component
             : 'Профиль обновлён.';
     }
 
-    public function render(UserLibrarySummaryQuery $summaries): View
+    public function render(UserLibrarySummaryQuery $summaries, CatalogCollectionQuery $collections): View
     {
         return view('livewire.profile.profile-page', [
             'librarySummary' => $summaries->get($this->user()),
+            'collectionSummary' => $collections->ownerCounts($this->user()),
         ])
             ->extends('layouts.app', [
                 'title' => 'Профиль',

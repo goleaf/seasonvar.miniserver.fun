@@ -113,3 +113,9 @@ Mobile `GET /api/v1/search/suggestions` использует тот же title-o
 ## Граница текущего продукта
 
 Внешний поисковый сервис, переход с SQLite на PostgreSQL, персонализированное ранжирование и feature experiments отсутствуют как продуктовые возможности, а не являются скрытым implementation backlog. Текущий production-контракт — локальный SQLite FTS5 с детерминированным BM25/точным ранжированием и общими public visibility/filter boundaries. Любая смена движка или ранжирования требует отдельного измеренного design, миграции/rollback, privacy review и acceptance corpus; установка Scout, Meilisearch, Typesense или другого пакета сама по себе не считается реализацией.
+
+## Поиск и фильтры коллекций
+
+Directory `/collections` использует отдельный bounded UGC search по public approved name/description, real active/fallback editorial translations и public owner name; private, unlisted, pending/rejected/hidden/deleted records исключаются до поиска. Это дополнение к title-only FTS, а не расширение его document: collection text не смешивается с `CatalogTitleSearch` и не попадает в title snippets.
+
+Внутри одной коллекции `CatalogCollectionQuery::items()` переиспользует canonical title visibility, title/original/alias normalization и существующие genre/country/status/year relations. Allowlisted sorting и paginator state находятся в URL; любое изменение criteria сбрасывает только `collectionPage`. Unique collection/title pivot и identity-first join предотвращают дубли от aliases/taxonomy translations. Stateful query URL получает clean collection canonical и `noindex`, но остаётся shareable и корректно восстанавливается browser back/forward через Livewire `#[Url(history: true)]`.

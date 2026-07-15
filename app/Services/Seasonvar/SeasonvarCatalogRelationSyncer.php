@@ -19,8 +19,12 @@ class SeasonvarCatalogRelationSyncer
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return array<string, array{ids: list<int>, count: int, attached_ids: list<int>, attached_count: int}>
      */
-    public function sync(CatalogTitle $title, array $taxonomies, ?callable $progress = null): array
-    {
+    public function sync(
+        CatalogTitle $title,
+        array $taxonomies,
+        ?callable $progress = null,
+        bool $completeTagSnapshot = false,
+    ): array {
         $taxonomies = collect($taxonomies)
             ->map(function (array $item): array {
                 $item['source_url'] = $this->safeSourceUrl($item['source_url'] ?? null);
@@ -30,7 +34,7 @@ class SeasonvarCatalogRelationSyncer
             ->values()
             ->all();
 
-        return $this->relations->sync($title, $taxonomies, $progress);
+        return $this->relations->sync($title, $taxonomies, $progress, $completeTagSnapshot);
     }
 
     private function safeSourceUrl(?string $sourceUrl): ?string

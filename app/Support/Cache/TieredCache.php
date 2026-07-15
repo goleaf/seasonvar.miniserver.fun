@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace App\Support\Cache;
 
 use Closure;
+use Illuminate\Cache\Repository;
+use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use LogicException;
 use Throwable;
 
 use function Illuminate\Support\defer;
@@ -71,19 +75,15 @@ final class TieredCache
         $lock = null;
 
         try {
-            $lock = Cache::store($this->lockStore())->lock($this->keys->lock($key), $window->lockSeconds);
+            $lock = $this->lock($this->keys->lock($key), $window->lockSeconds);
 
             if (! $lock->get()) {
-                if ($stale !== null) {
-                    $this->telemetry->increment($domain, 'stale-served');
-
-                    return $this->result($stale, 'stale', stale: true);
-                }
-
                 return $this->waitForRebuild($domain, $key, $window);
             }
         } catch (CacheRebuildTimeout $exception) {
-            throw $exception;
+            $this->reportFailure($domain, 'lock-timeout-fallback', $exception);
+
+            return $this->rebuildWithoutCache($domain, $rebuild);
         } catch (Throwable $exception) {
             $this->reportFailure($domain, 'lock', $exception);
 
@@ -109,7 +109,7 @@ final class TieredCache
             return $this->rebuildOrStale($domain, $key, $staleKey, $window, $rebuild, $cacheNull, $stale);
         } finally {
             try {
-                $lock?->release();
+                $lock->release();
             } catch (Throwable $exception) {
                 $this->reportFailure($domain, 'lock-release', $exception);
             }
@@ -143,7 +143,7 @@ final class TieredCache
 
         $key = $this->keys->data($domain, $resource, $dimensions, $version);
         try {
-            $lock = Cache::store($this->lockStore())->lock($this->keys->lock($key), $window->lockSeconds);
+            $lock = $this->lock($this->keys->lock($key), $window->lockSeconds);
             $deadline = hrtime(true) + ($window->waitMilliseconds * 1_000_000);
 
             while (! $lock->get()) {
@@ -194,7 +194,7 @@ final class TieredCache
         bool $cacheNull,
     ): void {
         try {
-            $lock = Cache::store($this->lockStore())->lock($this->keys->lock($key), $window->lockSeconds);
+            $lock = $this->lock($this->keys->lock($key), $window->lockSeconds);
 
             if (! $lock->get()) {
                 return;
@@ -411,5 +411,22 @@ final class TieredCache
     private function lockStore(): string
     {
         return (string) config('cache-architecture.stores.locks', 'redis-locks');
+    }
+
+    private function lock(string $name, int $seconds): Lock
+    {
+        $repository = Cache::store($this->lockStore());
+
+        if (! $repository instanceof Repository) {
+            throw new LogicException('Cache store блокировок должен использовать Laravel cache repository.');
+        }
+
+        $store = $repository->getStore();
+
+        if (! $store instanceof LockProvider) {
+            throw new LogicException('Cache store блокировок должен поддерживать atomic locks.');
+        }
+
+        return $store->lock($name, $seconds);
     }
 }

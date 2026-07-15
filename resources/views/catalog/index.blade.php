@@ -14,6 +14,20 @@
 
         <section class="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)] 2xl:grid-cols-[320px_minmax(0,1fr)]">
             <div class="min-w-0 space-y-5 xl:order-2">
+                @if ($featuredCollections->isNotEmpty())
+                    <section aria-labelledby="home-featured-collections">
+                        <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+                            <h2 id="home-featured-collections" class="flex items-center gap-2 text-lg font-black text-slate-800"><x-ui.icon name="fa-solid fa-star text-amber-500" />{{ __('collections.home.featured') }}</h2>
+                            <a href="{{ route('collections.index') }}" class="text-sm font-bold text-emerald-700 hover:text-emerald-600">{{ __('collections.navigation.public_collections') }}</a>
+                        </div>
+                        <div class="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            @foreach ($featuredCollections as $featuredCollection)
+                                <x-collections.collection-card :collection="$featuredCollection" />
+                            @endforeach
+                        </div>
+                    </section>
+                @endif
+
                 <x-ui.panel title="Последние обновления" icon="fa-solid fa-clock-rotate-left" :pad="false">
                     <div data-home-latest-updates-list class="divide-y divide-slate-200">
                         @forelse ($latestByDate as $date => $titlesForDate)
@@ -35,8 +49,12 @@
 
                 <x-ui.panel title="Новые серии" icon="fa-solid fa-circle-play" :pad="false">
                     <div class="divide-y divide-slate-200">
-                        @forelse ($latestMedia as $media)
-                            <x-catalog.latest-media-card :media="$media" />
+                        @forelse ($latestReleaseGroups as $releaseGroup)
+                            <x-catalog.latest-media-card
+                                :title="$releaseGroup['title']"
+                                :episodes="$releaseGroup['episodes']"
+                                :media="$releaseGroup['media']"
+                            />
                         @empty
                             <div class="p-6 text-sm text-slate-500">
                                 Новых серий пока нет.

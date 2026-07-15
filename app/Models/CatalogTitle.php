@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Enums\CommentTargetType;
 use App\Enums\ContentAudience;
 use App\Enums\PublicationStatus;
 use App\Enums\ReleaseKind;
 use App\Models\Concerns\HasPublicationAvailability;
 use App\Support\CatalogTitleDisplayName;
+use Carbon\CarbonInterface;
 use Database\Factories\CatalogTitleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,8 +20,29 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use LogicException;
 
+/**
+ * @property int $id
+ * @property string $slug
+ * @property string $title
+ * @property string|null $original_title
+ * @property string $type
+ * @property int|null $year
+ * @property bool $is_published
+ * @property PublicationStatus $publication_status
+ * @property ContentAudience $audience
+ * @property CarbonInterface|null $available_from
+ * @property CarbonInterface|null $available_until
+ * @property CarbonInterface|null $indexed_at
+ * @property CarbonInterface|null $content_added_at
+ * @property CarbonInterface|null $deleted_at
+ * @property int|null $published_media_count
+ * @property-read string $display_title
+ * @property-read string|null $display_original_title
+ */
 #[Fillable([
     'source_id',
     'source_page_id',
@@ -64,7 +87,7 @@ class CatalogTitle extends Model
         return Attribute::get(fn (): string => $this->displayName()->primary);
     }
 
-    /** @return Attribute<string|null, never> */
+    /** @return Attribute<covariant string|null, never> */
     protected function displayOriginalTitle(): Attribute
     {
         return Attribute::get(fn (): ?string => $this->displayName()->original);
@@ -83,12 +106,22 @@ class CatalogTitle extends Model
     /**
      * Keep every current public route binding inside the publication boundary.
      *
-     * @param  Model|Builder<CatalogTitle>|\Illuminate\Database\Eloquent\Relations\Relation<*, *, *>  $query
-     * @return Builder<CatalogTitle>
+     * @param  Model|Builder<static>|\Illuminate\Database\Eloquent\Relations\Relation<*, *, *>  $query
+     * @return Builder<static>
      */
     public function resolveRouteBindingQuery($query, $value, $field = null)
     {
-        return parent::resolveRouteBindingQuery($query, $value, $field)->availableTo(request()->user());
+        $bindingQuery = parent::resolveRouteBindingQuery($query, $value, $field);
+
+        if ($bindingQuery instanceof Relation) {
+            $bindingQuery = $bindingQuery->getQuery();
+        }
+
+        if (! $bindingQuery instanceof Builder) {
+            throw new LogicException('Catalog title route binding requires an Eloquent query builder.');
+        }
+
+        return $this->scopeAvailableTo($bindingQuery, request()->user());
     }
 
     public function resolveRouteBinding($value, $field = null): ?Model
@@ -181,6 +214,19 @@ class CatalogTitle extends Model
         return $this->hasMany(CatalogTitleReview::class);
     }
 
+    /** @return HasMany<Comment, $this> */
+    public function discussionComments(): HasMany
+    {
+        return $this->hasMany(Comment::class);
+    }
+
+    /** @return HasMany<Comment, $this> */
+    public function titleComments(): HasMany
+    {
+        return $this->hasMany(Comment::class, 'target_id')
+            ->where('target_type', CommentTargetType::Title->value);
+    }
+
     /**
      * @return HasMany<CatalogTitleAlias, $this>
      */
@@ -213,6 +259,12 @@ class CatalogTitle extends Model
     public function userStates(): HasMany
     {
         return $this->hasMany(CatalogTitleUserState::class);
+    }
+
+    /** @return HasMany<CatalogCollectionItem, $this> */
+    public function collectionItems(): HasMany
+    {
+        return $this->hasMany(CatalogCollectionItem::class);
     }
 
     /** @return HasMany<EpisodeViewProgress, $this> */
@@ -331,6 +383,14 @@ class CatalogTitle extends Model
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class, 'catalog_title_tag');
+    }
+
+    /** @return BelongsToMany<UserTag, $this> */
+    public function personalTags(): BelongsToMany
+    {
+        return $this->belongsToMany(UserTag::class, 'catalog_title_user_tag')
+            ->withPivot('position')
+            ->withTimestamps();
     }
 
     /**

@@ -127,7 +127,7 @@ Blade и Livewire Blade являются только presentation layer: зап
 - Использовать `minmax(0, 1fr)` в многоколоночных сетках страниц, чтобы избежать горизонтального переполнения.
 - Планшетные раскладки не должны принудительно включать три плотные колонки до `xl`.
 - Списки серий должны оставаться читаемыми на мобильных экранах и могут использовать две или три колонки только начиная со средних широких экранов.
-- Главная страница начинается со счётчиков каталога; «Последние обновления» выводит единственный сгруппированный по датам список всех свежих тайтлов, а «Новые серии» и «Сейчас можно смотреть» используют такие же одноколоночные строки. Дублирующая лента обновлений не создаётся.
+- Главная страница начинается со счётчиков каталога; «Последние обновления» выводит сгруппированный по датам список только тех тайтлов, где добавилась доступная серия или опубликованный видеовариант. В «Новых сериях» один сериал занимает одну одноколоночную карточку: внутри перечисляются все добавленные за его последнюю дату обновления серии и все их видеоварианты с метаданными. «Сейчас можно смотреть» использует такие же одноколоночные строки, а дублирующая лента обновлений не создаётся.
 - Страница сериала должна поднимать блок просмотра выше справочных SEO-секций; выбор сезона и серии должен оставаться крупным и удобным для телефона, планшета и ТВ.
 - Primary action карточки должен явно показывать continue/next/start/unavailable state; проигрыватель занимает полную ширину панели, authenticated watchlist/rating controls идут отдельной адаптивной строкой «Ваш сериал» под видео, а прогресс не раскрывается в URL или публичном Livewire state.
 - Если `title` заканчивается на `/original_title`, в основном публичном заголовке выводится только часть до разделителя, а оригинальное название — отдельной вторичной строкой. Несовпадающие названия со слешем сохраняются полностью; исходные данные базы не переписываются.
@@ -157,6 +157,29 @@ Blade и Livewire Blade являются только presentation layer: зап
 - Общий `focus-visible` использует двухпиксельный emerald-контур со светлой внешней зоной; составные поисковые поля подсвечивают всю рамку через `data-focus-frame`, не дублируя контур внутри input.
 - Поисковая выдача не показывает посторонние карточки при нулевом совпадении. Для поиска, фильтров и полного каталога используются отдельные понятные действия сброса: «Очистить поиск», «Убрать фильтры» и «Показать весь каталог».
 - Livewire-dashboard `/stats` должен оставаться в одну колонку на телефонах, переходить к двум колонкам на планшетах и использовать плотные сетки только на `xl`/шире; широкие таблицы заменяются адаптивными строками или карточками.
+
+## Коллекции
+
+- Collection directory/cards, owner dashboard, editor и public page используют существующие `x-ui.panel`, `x-ui.poster-frame`, `x-catalog.title-card`, form/status/pagination components и светлую палитру; отдельный visual system не вводится.
+- Long user names/descriptions переносятся, cover сохраняет `16:9`, missing cover использует безопасный fallback, а structural grids переходят в один столбец на узком экране без horizontal overflow.
+- Все action targets не меньше 44px. Visibility radio, selector checkboxes, report dialog, delete confirmation, locale links и reorder up/down доступны keyboard; drag/hover/color не являются единственным способом действия.
+- Loading/success/error содержат localized live/status regions, destructive controls отделены цветом и текстом, а unavailable item не раскрывает internal removal reason.
+
+## Обсуждения
+
+- Discussion region, scope selector, composer, sorting, comment list, replies, report dialog и moderation page переиспользуют светлые panels, status pills, buttons, textarea и pagination проекта; произвольная тема/радиусы/тени/inline CSS не добавляются.
+- На телефоне reply indentation остаётся одним компактным border/padding level; long username/body/link wrap-ятся через `break-words`/`overflow-wrap:anywhere`, reactions/actions естественно переносятся и не создают horizontal scroll. Все controls имеют минимум 44px touch target и не требуют hover.
+- Spoiler скрывается семантически: unrevealed body отсутствует, warning и reveal/hide button имеют translated text/ARIA. Long body использует доступные show more/less controls. Deleted, blocked/muted и unavailable parent показывают нейтральный tombstone без color-only смысла или утечки причины.
+- Focused direct comment получает programmatic focus/highlight и `scroll-margin`; dialog/reply/edit восстанавливают focus. Smooth scroll отключается при `prefers-reduced-motion`. Live regions объявляют loading/success/error, controls имеют `aria-pressed`, time `datetime`, pagination label и keyboard path без traps.
+- Empty/disabled/guest/unverified/restricted/query-failure/no-replies/end-of-replies states имеют локализованное объяснение и только допустимые действия. Composer text сохраняется при recoverable error; мелкое действие не очищает весь discussion. Desktop/tablet/phone/200% zoom должны сохранять heading order, readable line length и отделение destructive controls.
+
+## Отзывы
+
+- Review region, complete-serial scope label, composer, sort/filter, cards, spoiler warning, report dialog, self history and admin queue reuse existing light panels/forms/status/buttons/pagination; no dark marketing theme, arbitrary gradient/radius/shadow or inline style is introduced.
+- Long Unicode title/body/name/plain URL wrap without horizontal overflow. Composer/filter/action rows collapse to one column on narrow phones; every button/select/radio has at least 44px touch target, visible label/focus and no hover/color-only meaning. Rating remains a keyboard/touch usable labelled 1–10 select with selected value after validation failure.
+- Whole-review spoiler title and body are semantically absent until reveal. Reveal/hide exposes `aria-expanded`/`aria-controls`; verified, edited, rating, status and dates have readable text. Direct review receives focus/highlight with scroll margin and reduced-motion-safe behavior; pagination/sort/filter preserve browser URL state.
+- Create/edit/delete/restore/vote/report/moderation use localized live regions, loading locks, confirmation and recoverable failure without blanking the whole list. Empty/filtered-empty/disabled/guest/unverified/restricted/pending/rejected/deleted/unavailable/end-of-results states show only authorized actions. Session draft clears only after successful create/update.
+- Manual responsive inspection covers 320px phone, landscape, tablet, desktop and 200% zoom with long translations, spoiler, missing avatar, large vote counts and moderation messages. Focus order follows heading→composer/filter→list; dialogs have no keyboard trap and destructive controls remain separated.
 
 <!-- project-docs:start -->
 ## Документация интерфейса

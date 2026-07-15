@@ -1,21 +1,32 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Catalog;
 
 use App\DTOs\CatalogRecommendationListItem;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
+use App\Models\Season;
 use App\Models\User;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Support\CatalogTitleDisplayName;
 use App\View\ViewModels\CatalogShowViewModel;
+use Illuminate\Container\Attributes\Scoped;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
+use LogicException;
 
-class CatalogTitlePageBuilder
+#[Scoped]
+final class CatalogTitlePageBuilder
 {
     private ?bool $recommendationsTableExists = null;
+
+    /** @var array<string, array<string, mixed>> */
+    private array $preparedPages = [];
 
     public function __construct(
         private readonly CatalogSeoBuilder $seo,
@@ -31,6 +42,13 @@ class CatalogTitlePageBuilder
      */
     public function data(CatalogTitle $catalogTitle, ?User $user): array
     {
+        $key = $this->requestKey($catalogTitle->id, $user);
+
+        if (isset($this->preparedPages[$key])) {
+            return $this->preparedPages[$key];
+        }
+
+        $this->playback->rememberVisibleTitle($catalogTitle, $user);
         $catalogTitle->load(array_merge([
             'aliases:id,catalog_title_id,name',
             'ratings:id,catalog_title_id,provider,rating,votes',
@@ -45,8 +63,10 @@ class CatalogTitlePageBuilder
         $seasons = $this->playback->seasonSummaries($catalogTitle, $user);
         $episodeCount = (int) $seasons->sum('available_episodes_count');
         $taxonomyCount = $taxonomiesByType->sum(fn (Collection $items): int => $items->count());
-        $parsedSeasonCount = $seasons->filter(fn ($season): bool => (int) $season->available_episodes_count > 0)->count();
-        $mediaCount = $this->playback->availableMedia($catalogTitle, $user)->count();
+        $parsedSeasonCount = $seasons
+            ->filter(fn (Season $season): bool => (int) $season->getAttribute('available_episodes_count') > 0)
+            ->count();
+        $mediaCount = (int) $seasons->sum('available_media_count');
         $genreIds = $taxonomiesByType->get('genre', collect())->pluck('id')->unique()->values();
         $recommendationItems = $this->recommendationItems($catalogTitle, $user, $genreIds);
         $this->cardStates->load($recommendationItems->pluck('title'), $user);
@@ -65,7 +85,7 @@ class CatalogTitlePageBuilder
             mediaCount: $mediaCount,
         );
 
-        return [
+        return $this->preparedPages[$key] = [
             'title' => $catalogTitle,
             'taxonomiesByType' => $taxonomiesByType,
             'genres' => $showView->genres,
@@ -91,6 +111,27 @@ class CatalogTitlePageBuilder
             'recommendationItems' => $recommendationItems,
             'seo' => $this->seo->title($catalogTitle, $taxonomiesByType, $seasons, $episodeCount, $mediaCount, null, null),
         ];
+    }
+
+    /** @return array<string, mixed> */
+    public function dataForId(int $catalogTitleId, ?User $user): array
+    {
+        $key = $this->requestKey($catalogTitleId, $user);
+
+        if (isset($this->preparedPages[$key])) {
+            return $this->preparedPages[$key];
+        }
+
+        return $this->data(
+            $this->query->visibleTo($user)->findOrFail($catalogTitleId),
+            $user,
+        );
+    }
+
+    public function forget(int $catalogTitleId, ?User $user): void
+    {
+        unset($this->preparedPages[$this->requestKey($catalogTitleId, $user)]);
+        $this->playback->forget($catalogTitleId, $user);
     }
 
     /**
@@ -164,25 +205,20 @@ class CatalogTitlePageBuilder
     /** @return array<string, mixed> */
     public function seo(CatalogTitle $catalogTitle, ?User $user): array
     {
-        $catalogTitle->load(array_merge([
-            'aliases:id,catalog_title_id,name',
-            'ratings:id,catalog_title_id,provider,rating,votes',
-        ], $this->taxonomies->relationSummaryLoads()));
-        $taxonomiesByType = collect($this->taxonomies->relations())
-            ->mapWithKeys(fn (array $config, string $filterType): array => [$filterType => $catalogTitle->{$config['relation']}->values()]);
-        $seasons = $this->playback->seasonSummaries($catalogTitle, $user);
-        $episodeCount = (int) $seasons->sum('available_episodes_count');
-        $mediaCount = $this->playback->availableMedia($catalogTitle, $user)->count();
+        $seo = $this->data($catalogTitle, $user)['seo'];
 
-        return $this->seo->title(
-            $catalogTitle,
-            $taxonomiesByType,
-            $seasons,
-            $episodeCount,
-            $mediaCount,
-            null,
-            null,
-        );
+        return is_array($seo) ? $seo : [];
+    }
+
+    private function requestKey(int $catalogTitleId, ?User $user): string
+    {
+        if ($user === null) {
+            return $catalogTitleId.'|guest';
+        }
+
+        $userKey = $user->getAuthIdentifier();
+
+        return $catalogTitleId.'|user:'.($userKey !== null ? (string) $userKey : 'object:'.spl_object_id($user));
     }
 
     /**
@@ -204,7 +240,10 @@ class CatalogTitlePageBuilder
         }
 
         return $catalogTitle->recommendations()
-            ->whereHas('recommendedTitle', fn (Builder $query): Builder => $this->query->constrainVisible($query, $user))
+            ->whereHas('recommendedTitle', fn (Builder $query): Builder => $query->whereIn(
+                (new CatalogTitle)->qualifyColumn('id'),
+                $this->query->visibleTo($user)->select((new CatalogTitle)->qualifyColumn('id')),
+            ))
             ->orderBy('rank')
             ->orderByDesc('score')
             ->limit($this->recommendationDisplayLimit())
@@ -237,7 +276,25 @@ class CatalogTitlePageBuilder
         return $this->query
             ->constrainVisible($query, $user)
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url', 'indexed_at'])
-            ->with($this->taxonomies->cardSummaryLoads())
+            ->with($this->cardSummaryLoads())
             ->withCount($this->query->publicCardCounts($user));
+    }
+
+    /** @return array<string, \Closure> */
+    private function cardSummaryLoads(): array
+    {
+        $loads = [];
+
+        foreach ($this->taxonomies->cardSummaryLoads() as $relationName => $constraint) {
+            $loads[$relationName] = static function (Relation $relation) use ($constraint): mixed {
+                if (! $relation instanceof BelongsToMany) {
+                    throw new LogicException('Card taxonomy eager loading requires a belongs-to-many relation.');
+                }
+
+                return $constraint($relation);
+            };
+        }
+
+        return $loads;
     }
 }

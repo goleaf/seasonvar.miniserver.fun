@@ -11,6 +11,7 @@ use App\Services\Catalog\Search\CatalogPeopleLookup;
 use App\Services\Catalog\Search\CatalogSearchQuery;
 use App\Services\Catalog\Search\CatalogSearchQueryParser;
 use App\Services\Catalog\Search\CatalogTitleSearch;
+use App\Services\Tags\TagQuery;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -23,9 +24,10 @@ final readonly class CatalogSearchSuggestionQuery
         private CatalogTitleSearch $search,
         private CatalogTitleQuery $titles,
         private CatalogPeopleLookup $people,
+        private TagQuery $tags,
     ) {}
 
-    /** @return array{query: string, items: Collection<int, array<string, int|string|null>>} */
+    /** @return array{query: string, items: Collection<int, covariant array{type: string, public_id?: string, label: string, slug: string, title_slug: string|null, count: int}>} */
     public function search(string $query, ?User $user): array
     {
         $parsed = $this->parser->parse($query);
@@ -41,16 +43,26 @@ final readonly class CatalogSearchSuggestionQuery
             ->search($type, $parsed->raw, $user)
             ->take(self::LIMIT_PER_TYPE)
             ->map(static fn ($person): array => [
-                'type' => (string) $person->filter_type,
-                'label' => (string) $person->name,
-                'slug' => (string) $person->slug,
+                'type' => (string) $person->getAttribute('filter_type'),
+                'label' => (string) $person->getAttribute('name'),
+                'slug' => (string) $person->getAttribute('slug'),
                 'title_slug' => null,
-                'count' => (int) $person->public_titles_count,
+                'count' => (int) $person->getAttribute('public_titles_count'),
             ]));
+        $tagItems = $this->tags
+            ->searchPublic($parsed->raw, self::LIMIT_PER_TYPE)
+            ->map(static fn ($tag): array => [
+                'type' => 'tag',
+                'public_id' => (string) $tag->public_id,
+                'label' => (string) $tag->name,
+                'slug' => (string) $tag->slug,
+                'title_slug' => null,
+                'count' => (int) $tag->public_titles_count,
+            ]);
 
         return [
             'query' => $parsed->raw,
-            'items' => $titleItems->concat($peopleItems)->values(),
+            'items' => $titleItems->concat($peopleItems)->concat($tagItems)->values(),
         ];
     }
 

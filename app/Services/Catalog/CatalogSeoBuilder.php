@@ -5,6 +5,7 @@ namespace App\Services\Catalog;
 use App\DTOs\CatalogDirectoryDefinition;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
+use App\Models\Season;
 use App\Support\CatalogTitleDisplayName;
 use App\Support\PlainText;
 use Illuminate\Database\Eloquent\Model;
@@ -16,7 +17,8 @@ use Illuminate\Support\Str;
 class CatalogSeoBuilder
 {
     /**
-     * @param  array{titles: int, episodes: int, genres: int, countries: int}  $stats
+     * @param  array{titles: int, episodes: int, videos: int, genres: int, countries: int}  $stats
+     * @param  Collection<int, CatalogTitle>  $latestTitles
      * @return array<string, mixed>
      */
     public function home(array $stats, Collection $latestTitles): array
@@ -82,6 +84,9 @@ class CatalogSeoBuilder
     }
 
     /**
+     * @param  Collection<string, Model>  $activeTaxonomies
+     * @param  array<string, string>  $invalidFilterSlugs
+     * @param  Collection<int, CatalogTitle>  $pageTitles
      * @return array<string, mixed>
      */
     public function titles(
@@ -125,7 +130,9 @@ class CatalogSeoBuilder
             $invalidFilterSlugs !== [] ? 'Часть фильтров не найдена.' : null,
         ])->filter()->implode(' ');
         $canonical = $this->catalogCanonicalUrl($request, $activeTaxonomies, $year, $currentPage, $titleContext);
-        $robots = $search === '' && $invalidFilterSlugs === [] && ! $invalidYear && $activeTaxonomies->count() <= 1 && ! $this->hasComplexCatalogQuery($request)
+        $hasIndexableLandingShape = ($activeTaxonomies->isEmpty() && $year !== null)
+            || ($activeTaxonomies->count() <= 1 && $year === null);
+        $robots = $search === '' && $invalidFilterSlugs === [] && ! $invalidYear && $hasIndexableLandingShape && ! $this->hasComplexCatalogQuery($request)
             ? $this->indexRobots()
             : 'noindex,nofollow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
         $keywords = collect(['сериалы онлайн', 'каталог сериалов', 'смотреть сериалы'])
@@ -182,7 +189,7 @@ class CatalogSeoBuilder
     }
 
     /**
-     * @param  Collection<int, object>  $pageItems
+     * @param  Collection<int, covariant object>  $pageItems
      * @return array<string, mixed>
      */
     public function directory(
@@ -242,6 +249,8 @@ class CatalogSeoBuilder
     }
 
     /**
+     * @param  Collection<string, Collection<int, Model>>  $taxonomiesByType
+     * @param  Collection<int, Season>  $seasons
      * @return array<string, mixed>
      */
     public function title(
@@ -402,6 +411,7 @@ class CatalogSeoBuilder
         return PlainText::clean($value, $limit);
     }
 
+    /** @param Collection<string, Model> $activeTaxonomies */
     private function catalogCanonicalUrl(Request $request, Collection $activeTaxonomies, ?int $year, int $currentPage, ?CatalogTitle $titleContext = null): string
     {
         $pageQuery = $currentPage > 1 ? ['page' => $currentPage] : [];
@@ -465,6 +475,9 @@ class CatalogSeoBuilder
             'updated',
             'letter',
             'per_page',
+            'sort',
+            'publication_type',
+            'decade',
         ];
 
         if (collect($complexKeys)->contains(fn (string $key): bool => $request->query->has($key))) {
@@ -477,6 +490,7 @@ class CatalogSeoBuilder
     }
 
     /**
+     * @param  Collection<string, Collection<int, Model>>  $taxonomiesByType
      * @return Collection<int, string>
      */
     private function taxonomyNames(Collection $taxonomiesByType, string $type): Collection
@@ -521,16 +535,17 @@ class CatalogSeoBuilder
     }
 
     /**
+     * @param  Collection<string, Model>  $activeTaxonomies
      * @return Collection<int, string>
      */
     private function taxonomyContextPhrases(Collection $activeTaxonomies): Collection
     {
         return $activeTaxonomies
             ->map(fn (Model $record, string $filterType): string => $this->taxonomyContextPhrase($filterType, $record))
-            ->filter()
             ->values();
     }
 
+    /** @param Collection<string, Model> $activeTaxonomies */
     private function catalogFilteredTitle(Collection $activeTaxonomies, ?int $year = null): string
     {
         if ($activeTaxonomies->isEmpty()) {
@@ -556,6 +571,7 @@ class CatalogSeoBuilder
             : 'Сериалы '.$year.' года по выбранным параметрам — '.$suffix;
     }
 
+    /** @param Collection<string, Model> $activeTaxonomies */
     private function catalogFilteredDescription(Collection $activeTaxonomies): string
     {
         $contexts = $this->taxonomyContextPhrases($activeTaxonomies);
@@ -567,9 +583,7 @@ class CatalogSeoBuilder
         return 'Показаны сериалы '.$contexts->implode(', ').'.';
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
     private function websiteJsonLd(): array
     {
         return [
@@ -697,6 +711,7 @@ class CatalogSeoBuilder
     }
 
     /**
+     * @param  Collection<int, CatalogTitle>  $titles
      * @return array<string, mixed>
      */
     private function itemListJsonLd(Collection $titles, int $startPosition, string $name): array
@@ -720,7 +735,7 @@ class CatalogSeoBuilder
     }
 
     /**
-     * @param  Collection<int, object>  $items
+     * @param  Collection<int, covariant object>  $items
      * @return array<string, mixed>
      */
     private function directoryItemListJsonLd(Collection $items, int $startPosition, string $name): array
@@ -743,6 +758,7 @@ class CatalogSeoBuilder
     }
 
     /**
+     * @param  Collection<string, Model>  $activeTaxonomies
      * @return list<string>
      */
     private function catalogSeoText(int $total, string $search, ?int $year, Collection $activeTaxonomies): array
@@ -761,6 +777,7 @@ class CatalogSeoBuilder
     }
 
     /**
+     * @param  Collection<string, Model>  $activeTaxonomies
      * @return list<array{name: string, url: string}>
      */
     private function catalogRelatedLinks(string $search, ?int $year, Collection $activeTaxonomies): array
@@ -794,6 +811,10 @@ class CatalogSeoBuilder
     }
 
     /**
+     * @param  Collection<int, string>  $genres
+     * @param  Collection<int, string>  $countries
+     * @param  Collection<int, string>  $actors
+     * @param  Collection<int, string>  $directors
      * @return list<string>
      */
     private function titleSeoText(
@@ -822,6 +843,7 @@ class CatalogSeoBuilder
     }
 
     /**
+     * @param  Collection<string, Collection<int, Model>>  $taxonomiesByType
      * @return list<array{name: string, url: string}>
      */
     private function titleRelatedLinks(CatalogTitle $catalogTitle, Collection $taxonomiesByType): array
@@ -851,6 +873,7 @@ class CatalogSeoBuilder
     }
 
     /**
+     * @param  Collection<string, Model>  $activeTaxonomies
      * @return list<string>
      */
     private function catalogSearchPhrases(string $search, ?int $year, Collection $activeTaxonomies): array
@@ -898,6 +921,7 @@ class CatalogSeoBuilder
             ->all();
     }
 
+    /** @param Collection<string, Model> $activeTaxonomies */
     private function catalogSeoHeading(string $search, ?int $year, Collection $activeTaxonomies): string
     {
         if ($search !== '') {
@@ -919,6 +943,7 @@ class CatalogSeoBuilder
         return 'Все сериалы онлайн';
     }
 
+    /** @param Collection<string, Model> $activeTaxonomies */
     private function catalogSeoLead(int $total, string $search, ?int $year, Collection $activeTaxonomies): string
     {
         $parts = collect([
@@ -931,6 +956,14 @@ class CatalogSeoBuilder
         return ucfirst($parts).'. Текстовый поиск проверяет только основное, оригинальное и альтернативные названия; остальные параметры задаются отдельными фильтрами.';
     }
 
+    /**
+     * @param  Collection<int, string>  $alternateNames
+     * @param  Collection<int, string>  $genres
+     * @param  Collection<int, string>  $countries
+     * @param  Collection<int, string>  $actors
+     * @param  Collection<int, string>  $directors
+     * @return Collection<int, string>
+     */
     private function titleKeywordCollection(
         CatalogTitle $catalogTitle,
         Collection $alternateNames,
@@ -1005,6 +1038,9 @@ class CatalogSeoBuilder
     }
 
     /**
+     * @param  Collection<int, string>  $keywords
+     * @param  Collection<int, string>  $genres
+     * @param  Collection<int, string>  $countries
      * @return list<string>
      */
     private function titleSearchPhrases(
@@ -1045,6 +1081,8 @@ class CatalogSeoBuilder
     }
 
     /**
+     * @param  Collection<int, string>  $genres
+     * @param  Collection<int, string>  $countries
      * @return list<array{question: string, answer: string}>
      */
     private function titleFaqItems(
@@ -1119,6 +1157,7 @@ class CatalogSeoBuilder
     }
 
     /**
+     * @param  Collection<int, Season>  $seasons
      * @return list<array<string, mixed>>
      */
     private function seasonJsonLd(CatalogTitle $catalogTitle, Collection $seasons): array
@@ -1140,6 +1179,7 @@ class CatalogSeoBuilder
     }
 
     /**
+     * @param  Collection<int, Season>  $seasons
      * @return array<string, mixed>
      */
     private function episodeItemListJsonLd(CatalogTitle $catalogTitle, Collection $seasons): array
@@ -1222,6 +1262,7 @@ class CatalogSeoBuilder
     }
 
     /**
+     * @param  Collection<string, Model>  $activeTaxonomies
      * @return list<array{title: string, items: list<string>}>
      */
     private function catalogKeywordClusters(string $search, ?int $year, Collection $activeTaxonomies): array
@@ -1254,6 +1295,10 @@ class CatalogSeoBuilder
     }
 
     /**
+     * @param  Collection<int, string>  $genres
+     * @param  Collection<int, string>  $countries
+     * @param  Collection<int, string>  $actors
+     * @param  Collection<int, string>  $directors
      * @return list<array{title: string, items: list<string>}>
      */
     private function titleKeywordClusters(

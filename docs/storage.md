@@ -31,3 +31,9 @@
 - Upload-тесты используют `Storage::fake('uploads')` и `UploadedFile::fake()`.
 - Проверяйте, что сохраненный путь не содержит клиентское имя файла.
 - Проверяйте private visibility и cleanup через `Storage::disk('uploads')->assertExists()` / `assertMissing()`.
+
+## Обложки коллекций
+
+Collection cover хранится только через `PrivateUploadStorage` в `catalog-collections/{public_uuid}/` на `config('uploads.disk')`. В БД находятся disk/path/MIME/size и monotonic `cover_version`; client filename и public storage URL не сохраняются. Разрешены те же validated raster formats, что задаёт `PrivateImageUploadRules`; collage generation, signed provider image и request-time image processing не добавлены.
+
+`GET /collections/covers/{publicId}/{version}` не является публичным disk route: controller повторно разрешает collection policy, exact current version, configured disk, owned prefix и traversal guards, затем отдаёт `private, no-store`, `nosniff`, `noindex`. При replace предыдущий реально locked path удаляется после commit; ошибка DB удаляет только новый orphan. Remove/force delete/account delete удаляют owned file, но не fallback poster и не shared catalog media.

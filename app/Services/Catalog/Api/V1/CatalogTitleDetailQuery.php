@@ -35,6 +35,7 @@ final class CatalogTitleDetailQuery
     public function title(string $titleSlug, ?User $user): CatalogTitle
     {
         $title = $this->visibleTitle($titleSlug, $user);
+        $this->pageBuilder->forget($title->id, $user);
         $data = $this->pageBuilder->data($title, $user);
         $seasons = $data['seasons'];
 

@@ -8,7 +8,6 @@ use App\Models\CatalogTitleRecommendation;
 use App\Models\User;
 use App\Services\Catalog\CatalogTaxonomyRegistry;
 use App\Services\Catalog\CatalogTitleQuery;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 final readonly class CatalogRecommendationQuery
@@ -33,7 +32,7 @@ final readonly class CatalogRecommendationQuery
                 'rank',
                 'reasons',
             ])
-            ->whereHas('recommendedTitle', fn (Builder $query): Builder => $this->titles->constrainVisible($query, $user))
+            ->whereIn('recommended_title_id', $this->titles->visibleTo($user)->select('id'))
             ->with([
                 'recommendedTitle' => function ($relation) use ($user): void {
                     $query = $relation->getQuery();

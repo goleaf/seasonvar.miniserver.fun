@@ -6,10 +6,19 @@ namespace App\Services\Admin;
 
 use App\Enums\AdminAuditAction;
 use App\Models\AdminAuditEvent;
+use App\Models\CatalogCollection;
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleReview;
+use App\Models\CatalogTitleReviewReport;
+use App\Models\CatalogTitleReviewRestriction;
+use App\Models\Comment;
+use App\Models\CommentReport;
+use App\Models\CommentRestriction;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
+use App\Models\Tag;
+use App\Models\TagProviderMapping;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
@@ -24,11 +33,21 @@ final class AdminAuditRecorder
         Season::class => 'season',
         Episode::class => 'episode',
         LicensedMedia::class => 'licensed_media',
+        CatalogCollection::class => 'catalog_collection',
+        Comment::class => 'comment',
+        CommentReport::class => 'comment_report',
+        CommentRestriction::class => 'comment_restriction',
+        CatalogTitleReview::class => 'catalog_title_review',
+        CatalogTitleReviewReport::class => 'catalog_title_review_report',
+        CatalogTitleReviewRestriction::class => 'catalog_title_review_restriction',
+        Tag::class => 'tag',
+        TagProviderMapping::class => 'tag_provider_mapping',
     ];
 
     /** @var list<string> */
     private const CHANGED_FIELDS = [
         'external_id',
+        'name',
         'slug',
         'title',
         'original_title',
@@ -58,6 +77,30 @@ final class AdminAuditRecorder
         'relations.genre',
         'relations.country',
         'relations.translation',
+        'moderation_status',
+        'is_featured',
+        'report_status',
+        'code',
+        'visibility',
+        'translations',
+        'aliases',
+        'synonyms',
+        'provider_mapping_status',
+        'merged_into_id',
+        'archived_at',
+        'archived_from_visibility',
+        'archived_from_moderation_status',
+        'comment_status',
+        'review_status',
+        'is_spoiler',
+        'moderation_reason',
+        'moderator_note',
+        'deleted_at',
+        'restriction_type',
+        'reason_code',
+        'starts_at',
+        'expires_at',
+        'revoked_at',
     ];
 
     /** @param array<int, mixed> $changedFields */

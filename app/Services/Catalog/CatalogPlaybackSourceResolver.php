@@ -70,7 +70,7 @@ class CatalogPlaybackSourceResolver
                 fn ($query) => $query
                     ->whereNull('episode_id')
                     ->with([
-                        'season' => fn (BelongsTo $query): BelongsTo => $query->select($this->seasonColumns()),
+                        'season' => fn ($query) => $query->select($this->seasonColumns()),
                     ]),
             );
 
@@ -179,13 +179,13 @@ class CatalogPlaybackSourceResolver
         }
 
         $raw = $media->playback_url ?: $media->path;
-        $format = $this->format($media, is_string($raw) ? $raw : null);
+        $format = $this->format($media, $raw);
 
         if ($format === null || ! in_array($format, (array) config('playback.allowed_formats', []), true)) {
             return $this->sourceResult(PlaybackAvailability::TemporarilyUnavailable);
         }
 
-        if (is_string($raw) && parse_url($raw, PHP_URL_SCHEME) !== null) {
+        if (parse_url($raw, PHP_URL_SCHEME) !== null) {
             $target = $this->urls->safeExternalUrl($raw);
 
             return $target === null
@@ -194,7 +194,7 @@ class CatalogPlaybackSourceResolver
         }
 
         $disk = trim((string) $media->storage_disk);
-        $path = is_string($raw) ? trim($raw) : '';
+        $path = trim($raw);
 
         if (! in_array($disk, (array) config('playback.allowed_storage_disks', []), true) || ! $this->safePath($path)) {
             return $this->sourceResult(PlaybackAvailability::TemporarilyUnavailable);
@@ -256,7 +256,7 @@ class CatalogPlaybackSourceResolver
         $expiresAt = now()->addSeconds($ttl);
         $url = URL::temporarySignedRoute('playback.source', $expiresAt, [
             'licensedMedia' => $media->id,
-            'viewer' => (int) ($user?->id ?? 0),
+            'viewer' => (int) ($user->id ?? 0),
         ]);
 
         return new PlaybackSourceData(

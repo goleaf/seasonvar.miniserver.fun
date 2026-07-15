@@ -1,4 +1,4 @@
-<div wire:poll.15s.visible="refreshStats" class="space-y-5" data-livewire-stats-dashboard>
+<div class="space-y-5" data-livewire-stats-dashboard>
     <section class="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm shadow-slate-200/60">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div class="min-w-0">

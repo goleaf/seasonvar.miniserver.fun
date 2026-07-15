@@ -109,8 +109,9 @@ final class SeasonvarPreparedMediaResolver
      */
     private function parseExternalPlaylistItem(array $playlistItem, ?callable $progress): array
     {
-        $playlistUrl = $this->playlistImporter->safeExternalUrl((string) $playlistItem['url']);
-        $response = $this->httpClient->get($playlistUrl, 0, $progress);
+        $target = $this->playlistImporter->verifiedExternalUrl((string) $playlistItem['url']);
+        $playlistUrl = $target->url;
+        $response = $this->httpClient->getVerified($target, 0, $progress);
 
         if (! $response->successful()) {
             throw new RuntimeException('Плейлист вернул HTTP '.$response->status().'.');

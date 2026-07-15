@@ -81,7 +81,7 @@ final class FailedJobSummaryBuilder
         return match ($queue) {
             'seasonvar-import' => 'import',
             'seasonvar-title-refresh' => 'title_refresh',
-            'cache-warm' => 'cache',
+            'cache-warm', 'cache-warm-v2' => 'cache',
             'critical' => 'critical',
             'default' => 'default',
             default => 'other',

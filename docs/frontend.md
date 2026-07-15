@@ -108,3 +108,23 @@ composer dev
 - Проверка responsive player должна подтверждать, что смена viewport не заменяет существующий `video.js-catalog-player`: player island остается под `wire:ignore`, а lifecycle-cleanup срабатывает только при смене выпуска или навигации.
 - Blade не должен содержать `@php`/`@endphp` или asset-логику на PHP; используйте Laravel/Vite helpers и конфигурацию Vite.
 - Livewire cached/persisted computed, Session properties, lazy/defer/isolate/Islands, async, Teleport и stream не включаются ради демонстрации API. Текущие SEO-critical оболочки должны быть в первом HTML, mutations синхронны с UI, а domain cache и polling имеют собственную точную invalidation/visibility политику.
+
+## Frontend lifecycle коллекций
+
+Directory, dashboard, editor, public/private/unlisted page, owner profile, title membership и admin queue используют Livewire 4 без Volt. Public properties — normalized scalar URL state, bounded draft UUIDs и locked identities/version; Eloquent graphs существуют только внутри render. Search/filter/sort/pagination используют browser history, а locale switch сохраняет безопасный query state.
+
+`resources/js/collections.js` подключён через общий Vite entry и после Livewire navigation/morph повторно инициализирует только dialog/share affordances. Native dialog/sheet сохраняет trigger focus, поддерживает Escape/cancel и не записывает staged membership. Share предпочитает Web Share API, затем clipboard, никогда не включает private URL или user-specific query. Up/down buttons — keyboard/touch reordering baseline; hover и drag-and-drop не обязательны. Layout использует существующие light panels, list title cards, 44px controls, wrapping text и responsive grid только для structural forms/cards.
+
+## Frontend lifecycle обсуждений
+
+`CommentDiscussion` — class-based Livewire 4 component без Volt. Public mutable state ограничен body/form/URL scalars; target identity, locale, submission tokens, edit version и prepared reveal/expand IDs locked. Render каждый раз повторно разрешает target и получает paginator/DTO из `CommentDiscussionQuery`; Eloquent graph не сериализуется. `discussion_scope`, `discussion_sort`, `comments_page`, `thread`, `comment` поддерживают refresh/back/forward и являются единственными query keys, которые locale-link enhancement переносит между `ru/en` collection routes.
+
+Replies загружаются одним chronological batch только для раскрытого root, затем `load more` увеличивает controlled limit; poll/recursive nested components отсутствуют. Spoiler/long body reveal выполняются server-side. Composer/reply/edit/report сохраняют text на recoverable error и очищаются только после success; scoped `wire:loading` не blank-ит discussion.
+
+`resources/js/comments.js` подключён через `resources/js/app.js` и отвечает только за native dialog open/cancel/focus return, editor focus, focused-anchor scroll/highlight, locale URL state, локальное отображение Unicode-длины textarea и `prefers-reduced-motion`. В нём нет body parsing, authorization, aggregate count, moderation, reaction или write logic и нет console logging. Без JavaScript SSR list, ordinary paginator/direct links и textarea content остаются читаемыми; Livewire-only mutations честно требуют рабочий transport.
+
+## Frontend lifecycle отзывов
+
+`resources/js/reviews.js` owns only session draft persistence, direct `#review-{id}` focus/highlight and reduced-motion-safe scroll after Livewire morph. Draft payload is scoped by an opaque account token plus target/review identity, bounded and expires after 24 hours; a later account in the same browser session cannot inherit it. It contains only title/body/rating/spoiler and no provider URL, watch evidence, report or moderation data. Storage exceptions fail silently back to server form state.
+
+Review business state remains in Livewire/actions/DTO: viewer vote, permission, restriction, rating, verified snapshot and spoiler reveal are never decided in JavaScript. Stable `wire:key` prevents row identity loss; URL-backed sort/filter/page works with browser navigation. Vite imports the module from `resources/js/app.js`; no inline application script/CSS, external package, polling or full Eloquent serialization is added.

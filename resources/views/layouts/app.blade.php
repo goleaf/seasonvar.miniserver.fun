@@ -5,152 +5,65 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
         <meta name="robots" content="{{ $robots }}">
         <meta name="description" content="{{ $seoDescription }}">
-        <meta name="author" content="{{ $siteName }}">
         <meta name="application-name" content="{{ $siteName }}">
-        <meta name="generator" content="{{ $siteName }}">
-        <meta name="url" content="{{ $canonicalUrl }}">
-        <meta name="identifier-URL" content="{{ $canonicalUrl }}">
-        <meta name="summary" content="{{ $seoDescription }}">
-        <meta name="owner" content="{{ $siteName }}">
-        <meta name="answer-count" content="{{ $quickAnswers->count() }}">
-        <meta name="toc-count" content="{{ $seoSections->count() }}">
-        <meta name="query-count" content="{{ $longTailQueries->count() }}">
-        <meta name="related-collection-count" content="{{ $relatedCollections->count() }}">
-        <meta name="expanded-keyword-count" content="{{ $expandedKeywords->count() }}">
-        <meta name="action-count" content="{{ $seoActions->count() }}">
-        <meta name="glossary-count" content="{{ $semanticGlossary->count() }}">
-        <meta name="semantic-hub-count" content="{{ $semanticHubs->count() }}">
-        <meta name="snippet-count" content="{{ $snippetBlocks->count() }}">
-        <meta name="content-signal-count" content="{{ $contentSignals->count() }}">
-        <meta name="content-signal-summary" content="{{ $contentSignals->map(fn ($signal) => $signal['name'].': '.$signal['value'])->implode(', ') }}">
-        <meta name="audience-path-count" content="{{ $audiencePaths->count() }}">
-        <meta name="also-search-count" content="{{ $alsoSearches->count() }}">
-        <meta name="discovery-signal-count" content="{{ $discoverySignals->count() }}">
-        <meta name="query-matrix-count" content="{{ $queryMatrix->sum(fn ($group) => $group['items']->count()) }}">
-        <meta name="media-signal-count" content="{{ $mediaSignals->count() }}">
-        <meta name="publisher-signal-count" content="{{ $publisherSignals->count() }}">
-        <meta name="freshness-query-count" content="{{ $freshnessQueries->count() }}">
-        <meta name="freshness-year" content="{{ $currentSeoYear }}">
-        <meta name="russian-query-variant-count" content="{{ $russianQueryVariants->count() }}">
-        <meta name="catalog-direction-count" content="{{ $catalogDirections->count() }}">
-        <meta name="comparison-query-count" content="{{ $comparisonQueries->count() }}">
-        <meta name="episode-intent-count" content="{{ $episodeIntentQueries->count() }}">
-        <meta name="watch-mode-count" content="{{ $watchModeQueries->count() }}">
-        <meta name="translation-query-count" content="{{ $translationQueries->count() }}">
-        <meta name="voice-search-query-count" content="{{ $voiceSearchQueries->count() }}">
-        <meta name="topic-authority-count" content="{{ $topicAuthoritySignals->count() }}">
-        <meta name="release-calendar-query-count" content="{{ $releaseCalendarQueries->count() }}">
-        @if ($expandedKeywords->isNotEmpty())
-            <meta name="keywords" content="{{ $expandedKeywords->take(60)->implode(', ') }}">
-            <meta name="news_keywords" content="{{ $newsKeywords->implode(', ') }}">
-            <meta name="keyphrases" content="{{ $keywordAliases->take(40)->implode(', ') }}">
-            <meta name="topic-keywords" content="{{ $topicTerms->take(30)->implode(', ') }}">
-            <meta name="content-keywords" content="{{ $expandedKeywords->slice(20)->take(40)->implode(', ') }}">
-        @endif
-        @if ($topicTerms->isNotEmpty())
-            <meta name="subject" content="{{ $topicTerms->take(12)->implode(', ') }}">
-            <meta name="classification" content="{{ $topicTerms->take(16)->implode(', ') }}">
-            <meta name="category" content="{{ $seo['section'] ?? $topicTerms->first() }}">
-            <meta name="page-topic" content="{{ $topicTerms->take(10)->implode(', ') }}">
-            <meta name="audience" content="зрители сериалов онлайн">
-            <meta name="coverage" content="Worldwide">
-            <meta name="distribution" content="Global">
-            <meta name="revisit-after" content="1 days">
-            <meta name="abstract" content="{{ $seoDescription }}">
-            <meta name="topic" content="{{ $topicTerms->take(14)->implode(', ') }}">
-            <meta name="target" content="{{ $seoIntents->take(18)->implode(', ') }}">
-            <meta name="search-intent" content="{{ $seoIntents->take(18)->implode(', ') }}">
-            <meta name="long-tail-keywords" content="{{ $longTailQueries->take(20)->implode(', ') }}">
-            <meta name="keyword-aliases" content="{{ $keywordAliases->take(30)->implode(', ') }}">
-            <meta name="defined-terms" content="{{ $semanticGlossary->pluck('term')->take(20)->implode(', ') }}">
-            <meta name="semantic-hubs" content="{{ $semanticHubs->pluck('title')->implode(', ') }}">
-            <meta name="snippet-topics" content="{{ $snippetBlocks->pluck('query')->take(20)->implode(', ') }}">
-            <meta name="content-signals" content="{{ $contentSignals->pluck('name')->implode(', ') }}">
-            <meta name="audience-paths" content="{{ $audiencePaths->pluck('name')->implode(', ') }}">
-            <meta name="also-searches" content="{{ $alsoSearches->take(30)->implode(', ') }}">
-            <meta name="discovery-signals" content="{{ $discoverySignals->pluck('name')->implode(', ') }}">
-            <meta name="query-matrix" content="{{ $queryMatrix->pluck('name')->implode(', ') }}">
-            <meta name="query-matrix-keywords" content="{{ $queryMatrix->flatMap(fn ($group) => $group['items'])->take(30)->implode(', ') }}">
-            <meta name="media-assets" content="{{ $mediaSignals->pluck('name')->implode(', ') }}">
-            <meta name="publisher-signals" content="{{ $publisherSignals->pluck('name')->implode(', ') }}">
-            <meta name="freshness-keywords" content="{{ $freshnessQueries->pluck('query')->take(30)->implode(', ') }}">
-            <meta name="russian-query-variants" content="{{ $russianQueryVariants->take(35)->implode(', ') }}">
-            <meta name="catalog-directions" content="{{ $catalogDirections->pluck('name')->implode(', ') }}">
-            <meta name="catalog-direction-keywords" content="{{ $catalogDirections->pluck('query')->take(30)->implode(', ') }}">
-            <meta name="comparison-keywords" content="{{ $comparisonQueries->pluck('query')->take(30)->implode(', ') }}">
-            <meta name="episode-keywords" content="{{ $episodeIntentQueries->pluck('query')->take(35)->implode(', ') }}">
-            <meta name="watch-mode-keywords" content="{{ $watchModeQueries->pluck('query')->take(35)->implode(', ') }}">
-            <meta name="translation-keywords" content="{{ $translationQueries->pluck('query')->take(35)->implode(', ') }}">
-            <meta name="voice-search-keywords" content="{{ $voiceSearchQueries->pluck('query')->take(35)->implode(', ') }}">
-            <meta name="topic-authority-keywords" content="{{ $topicAuthoritySignals->pluck('query')->take(35)->implode(', ') }}">
-            <meta name="release-calendar-keywords" content="{{ $releaseCalendarQueries->pluck('query')->take(35)->implode(', ') }}">
-            <meta name="resource-type" content="document">
-            <meta name="language" content="{{ $languageName }}">
-        @endif
-        @foreach ($topicTerms->take(10) as $term)
-            <meta name="entity" content="{{ $term }}">
-        @endforeach
-        @if (! empty($seo['section']))
-            <meta property="article:section" content="{{ $seo['section'] }}">
-        @endif
-        @foreach ($topicTerms->take(12) as $term)
-            <meta property="article:tag" content="{{ $term }}">
-        @endforeach
         <meta name="theme-color" content="#ecfdf5">
+        @if ($seoSection !== null)
+            <meta property="article:section" content="{{ $seoSection }}">
+        @endif
         <link rel="canonical" href="{{ $canonicalUrl }}">
-        <link rel="alternate" hreflang="{{ $htmlLang }}" href="{{ $canonicalUrl }}">
-        <link rel="alternate" hreflang="x-default" href="{{ $canonicalUrl }}">
+        @foreach ($alternateUrls as $alternate)
+            <link rel="alternate" hreflang="{{ $alternate['hreflang'] }}" href="{{ $alternate['url'] }}">
+        @endforeach
         <link rel="sitemap" type="application/xml" href="{{ $layoutHeadUrls['sitemap'] }}">
         <link rel="sitemap" type="application/xml" href="{{ $layoutHeadUrls['landing_sitemap'] }}">
         <link rel="alternate" type="application/rss+xml" title="{{ $siteName }}" href="{{ $layoutHeadUrls['feed'] }}">
         <link rel="search" type="application/opensearchdescription+xml" title="{{ $siteName }}" href="{{ $layoutHeadUrls['opensearch'] }}">
         <link rel="alternate" type="text/plain" title="LLMs" href="{{ $layoutHeadUrls['llms'] }}">
-        <meta name="rating" content="general">
         <meta name="referrer" content="strict-origin-when-cross-origin">
-        <meta name="DC.title" content="{{ $fullTitle }}">
-        <meta name="DC.description" content="{{ $seoDescription }}">
-        <meta name="DC.language" content="{{ $htmlLang }}">
-        @if (! empty($seo['prev']))
-            <link rel="prev" href="{{ $seo['prev'] }}">
+        @if ($previousPageUrl !== null)
+            <link rel="prev" href="{{ $previousPageUrl }}">
         @endif
-        @if (! empty($seo['next']))
-            <link rel="next" href="{{ $seo['next'] }}">
+        @if ($nextPageUrl !== null)
+            <link rel="next" href="{{ $nextPageUrl }}">
         @endif
-        <meta property="og:locale" content="{{ $seoLocale }}">
-        <meta property="og:site_name" content="{{ $siteName }}">
-        <meta property="og:type" content="{{ $seoType }}">
-        <meta property="og:title" content="{{ $fullTitle }}">
-        <meta property="og:description" content="{{ $seoDescription }}">
-        <meta property="og:url" content="{{ $canonicalUrl }}">
-        @if ($seoImage)
-            <link rel="image_src" href="{{ $seoImage }}">
-            <meta property="og:image" content="{{ $seoImage }}">
-            <meta property="og:image:alt" content="{{ $seo['image_alt'] ?? $fullTitle }}">
-            <meta name="twitter:card" content="summary_large_image">
-            <meta name="twitter:image" content="{{ $seoImage }}">
-        @else
-            <meta name="twitter:card" content="summary">
+        @if ($showSocialMetadata)
+            <meta property="og:locale" content="{{ $seoLocale }}">
+            <meta property="og:site_name" content="{{ $siteName }}">
+            <meta property="og:type" content="{{ $seoType }}">
+            <meta property="og:title" content="{{ $fullTitle }}">
+            <meta property="og:description" content="{{ $seoDescription }}">
+            <meta property="og:url" content="{{ $canonicalUrl }}">
+            @if ($seoImage)
+                <link rel="image_src" href="{{ $seoImage }}">
+                <meta property="og:image" content="{{ $seoImage }}">
+                <meta property="og:image:alt" content="{{ $seoImageAlt }}">
+                <meta name="twitter:card" content="summary_large_image">
+                <meta name="twitter:image" content="{{ $seoImage }}">
+            @else
+                <meta name="twitter:card" content="summary">
+            @endif
+            @if ($seoVideo)
+                <meta property="og:video" content="{{ $seoVideo }}">
+                <meta property="og:video:secure_url" content="{{ $seoVideo }}">
+            @endif
         @endif
-        @if ($seoVideo)
-            <meta property="og:video" content="{{ $seoVideo }}">
-            <meta property="og:video:secure_url" content="{{ $seoVideo }}">
+        @if ($publishedTime !== null)
+            <meta property="article:published_time" content="{{ $publishedTime }}">
         @endif
-        @if (! empty($seo['published_time']))
-            <meta property="article:published_time" content="{{ $seo['published_time'] }}">
+        @if ($updatedTime !== null)
+            <meta name="last-modified" content="{{ $updatedTime }}">
+            @if ($showSocialMetadata)
+                <meta property="og:updated_time" content="{{ $updatedTime }}">
+            @endif
+            <meta property="article:modified_time" content="{{ $updatedTime }}">
         @endif
-        @if (! empty($seo['updated_time']))
-            <meta name="last-modified" content="{{ $seo['updated_time'] }}">
-            <meta property="og:updated_time" content="{{ $seo['updated_time'] }}">
-            <meta property="article:modified_time" content="{{ $seo['updated_time'] }}">
+        @if ($showSocialMetadata)
+            <meta name="twitter:title" content="{{ $fullTitle }}">
+            <meta name="twitter:description" content="{{ $seoDescription }}">
         @endif
-        @foreach ($seoTags as $tag)
-            <meta property="article:tag" content="{{ $tag }}">
-        @endforeach
-        <meta name="twitter:title" content="{{ $fullTitle }}">
-        <meta name="twitter:description" content="{{ $seoDescription }}">
         <title>{{ $fullTitle }}</title>
-        @foreach ($jsonLdItems as $jsonLd)
-            <script type="application/ld+json">{!! json_encode($jsonLd, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) !!}</script>
+        @foreach ($jsonLdScripts as $jsonLd)
+            <script type="application/ld+json">{!! $jsonLd !!}</script>
         @endforeach
         @livewireStyles
         @stack('head')
@@ -164,7 +77,7 @@
         <x-layout.site-header :site-name="$siteName" :search-query="$layoutSearchQuery" :header="$layoutHeader" />
 
         <main id="main-content" class="mx-auto max-w-[1760px] px-3 py-4 sm:px-6 sm:py-6 lg:px-8" itemscope itemtype="https://schema.org/WebPageElement" itemid="{{ $canonicalUrl }}#main-content">
-            @if ($breadcrumbs->count() > 1)
+            @if ($showBreadcrumbs)
                 <nav aria-label="Хлебные крошки" class="mb-4 rounded-panel border border-slate-200 bg-white px-3 py-2 text-sm shadow-panel">
                     <ol class="flex flex-wrap items-center gap-2 text-slate-500">
                         @foreach ($breadcrumbs as $breadcrumb)
@@ -183,599 +96,6 @@
                 </nav>
             @endif
             @yield('content')
-            @if (($seo['show_public_seo_blocks'] ?? false) === true)
-            @if ($seoSections->isNotEmpty())
-                <nav id="table-of-contents" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Содержание страницы" itemscope itemtype="https://schema.org/SiteNavigationElement">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-table-list text-emerald-700" />
-                        <span itemprop="name">Содержание страницы</span>
-                    </div>
-                    <div class="mt-3 flex flex-wrap gap-2">
-                        @foreach ($seoSections as $section)
-                            <a href="#{{ $section['id'] }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                <x-ui.icon name="fa-solid fa-bookmark text-[0.8em] text-slate-400" />
-                                <span itemprop="name">{{ $section['name'] }}</span>
-                            </a>
-                        @endforeach
-                    </div>
-                </nav>
-            @endif
-            @if (! empty($seo['seo_text']) || ! empty($seo['related_links']))
-                <section id="seo-summary" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="SEO описание страницы" data-seo-summary>
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-file-lines text-emerald-700" />
-                        <span>Описание страницы</span>
-                    </div>
-                    @if (! empty($seo['seo_text']))
-                        <div class="mt-3 space-y-2 text-sm leading-6 text-slate-600">
-                            @foreach (collect($seo['seo_text'])->filter()->take(4) as $paragraph)
-                                <p>{{ $paragraph }}</p>
-                            @endforeach
-                        </div>
-                    @endif
-                    @if (! empty($seo['related_links']))
-                        <div class="mt-4 flex flex-wrap gap-2">
-                            @foreach (collect($seo['related_links'])->filter()->take(14) as $link)
-                                <a href="{{ $link['url'] }}" class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100">
-                                    <x-ui.icon name="fa-solid fa-link text-[0.8em]" />
-                                    <span>{{ $link['name'] }}</span>
-                                </a>
-                            @endforeach
-                        </div>
-                    @endif
-                </section>
-            @endif
-            @if ($topicTerms->isNotEmpty())
-                <section id="key-topics" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Ключевые темы" itemscope itemtype="https://schema.org/SiteNavigationElement">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-tags text-emerald-700" />
-                        <span itemprop="name">Ключевые темы</span>
-                    </div>
-                    <div class="mt-3 flex flex-wrap gap-2">
-                        @foreach ($topicTerms as $term)
-                            <a href="{{ $seoSearchUrl($term) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 hover:bg-emerald-50 hover:text-emerald-700">
-                                <x-ui.icon name="fa-solid fa-hashtag text-[0.8em] text-amber-500" />
-                                <span itemprop="name">{{ $term }}</span>
-                            </a>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($semanticGlossary->isNotEmpty())
-                <section id="semantic-glossary" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Глоссарий страницы" itemscope itemtype="https://schema.org/DefinedTermSet">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-book-open text-emerald-700" />
-                        <span itemprop="name">Глоссарий страницы</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                        @foreach ($semanticGlossary as $item)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3" itemprop="hasDefinedTerm" itemscope itemtype="https://schema.org/DefinedTerm">
-                                <a href="{{ $item['url'] }}" class="text-sm font-bold text-slate-800 hover:text-emerald-700" itemprop="url">
-                                    <span itemprop="name">{{ $item['term'] }}</span>
-                                </a>
-                                <p class="mt-2 text-xs leading-5 text-slate-600" itemprop="description">{{ $item['description'] }}</p>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($seoIntents->isNotEmpty())
-                <section id="query-navigation" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Навигация по запросам" itemscope itemtype="https://schema.org/SiteNavigationElement">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-route text-emerald-700" />
-                        <span itemprop="name">Навигация по запросам</span>
-                    </div>
-                    <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                        @foreach ($seoIntents->take(16) as $intent)
-                            <a href="{{ $seoSearchUrl($intent) }}" itemprop="url" class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                <x-ui.icon name="fa-solid fa-arrow-up-right-from-square text-[0.8em] text-slate-400" />
-                                <span itemprop="name">{{ $intent }}</span>
-                            </a>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($longTailQueries->isNotEmpty())
-                <section id="long-tail-queries" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Поисковые формулировки" itemscope itemtype="https://schema.org/SiteNavigationElement">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-keyboard text-emerald-700" />
-                        <span itemprop="name">Поисковые формулировки</span>
-                    </div>
-                    <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                        @foreach ($longTailQueries->take(24) as $query)
-                            <a href="{{ $seoSearchUrl($query) }}" itemprop="url" class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                <x-ui.icon name="fa-solid fa-magnifying-glass text-[0.8em] text-slate-400" />
-                                <span itemprop="name">{{ $query }}</span>
-                            </a>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($relatedCollections->isNotEmpty())
-                <section id="related-collections" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Связанные подборки" itemscope itemtype="https://schema.org/CollectionPage">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-layer-group text-emerald-700" />
-                        <span itemprop="name">Связанные подборки</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                        @foreach ($relatedCollections->take(18) as $collection)
-                            <a href="{{ $seoSearchUrl($collection['query']) }}" class="block rounded-lg bg-slate-50 p-3 hover:bg-emerald-50" itemprop="hasPart" itemscope itemtype="https://schema.org/CollectionPage">
-                                <span class="flex items-center gap-2 text-sm font-bold text-slate-800" itemprop="name">
-                                    <x-ui.icon name="fa-solid fa-folder-open text-[0.85em] text-emerald-700" />
-                                    {{ $collection['name'] }}
-                                </span>
-                                <span class="mt-2 block text-xs leading-5 text-slate-600" itemprop="description">{{ $collection['description'] }}</span>
-                                <meta itemprop="url" content="{{ $seoSearchUrl($collection['query']) }}">
-                            </a>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($semanticHubs->isNotEmpty())
-                <section id="semantic-hubs" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Тематические хабы">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-sitemap text-emerald-700" />
-                        <span>Тематические хабы</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 lg:grid-cols-2">
-                        @foreach ($semanticHubs as $hub)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <h2 class="text-sm font-bold text-slate-800">{{ $hub['title'] }}</h2>
-                                <p class="mt-1 text-xs leading-5 text-slate-600">{{ $hub['description'] }}</p>
-                                <div class="mt-3 flex flex-wrap gap-2">
-                                    @foreach ($hub['items'] as $item)
-                                        <a href="{{ $seoSearchUrl($item['query']) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                            <x-ui.icon name="fa-solid fa-link text-[0.8em] text-slate-400" />
-                                            <span>{{ $item['name'] }}</span>
-                                        </a>
-                                    @endforeach
-                                </div>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($seoActions->isNotEmpty())
-                <section id="page-actions" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Действия на странице" itemscope itemtype="https://schema.org/SiteNavigationElement">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-bolt text-emerald-700" />
-                        <span itemprop="name">Действия на странице</span>
-                    </div>
-                    <div class="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                        @foreach ($seoActions->take(16) as $action)
-                            <a href="{{ $action['url'] }}" itemprop="url" class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                <x-ui.icon name="fa-solid fa-circle-arrow-right text-[0.85em] text-emerald-700" />
-                                <span itemprop="name">{{ $action['label'] ?? $action['name'] }}</span>
-                            </a>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($snippetBlocks->isNotEmpty())
-                <section id="snippet-blocks" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Короткие тезисы страницы">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-quote-left text-emerald-700" />
-                        <span>Короткие тезисы</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        @foreach ($snippetBlocks as $block)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <h2 class="text-sm font-bold text-slate-800">{{ $block['title'] }}</h2>
-                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $block['text'] }}</p>
-                                <a href="{{ $seoSearchUrl($block['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <x-ui.icon name="fa-solid fa-magnifying-glass text-[0.8em]" />
-                                    <span>Найти: {{ $block['query'] }}</span>
-                                </a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($contentSignals->isNotEmpty())
-                <section id="content-signals" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Сигналы страницы">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-chart-simple text-emerald-700" />
-                        <span>Сигналы страницы</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                        @foreach ($contentSignals as $signal)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <div class="flex items-start justify-between gap-3">
-                                    <h2 class="text-sm font-bold text-slate-800">{{ $signal['name'] }}</h2>
-                                    <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">{{ $signal['value'] }}</span>
-                                </div>
-                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $signal['description'] }}</p>
-                                <a href="{{ $seoSearchUrl($signal['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <x-ui.icon name="fa-solid fa-arrow-up-right-from-square text-[0.8em]" />
-                                    <span>Открыть связанный поиск</span>
-                                </a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($audiencePaths->isNotEmpty())
-                <section id="audience-paths" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Пути поиска">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-signs-post text-emerald-700" />
-                        <span>Пути поиска</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 lg:grid-cols-2">
-                        @foreach ($audiencePaths as $path)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <div class="flex items-start justify-between gap-3">
-                                    <div>
-                                        <h2 class="text-sm font-bold text-slate-800">{{ $path['name'] }}</h2>
-                                        <p class="mt-1 text-xs leading-5 text-slate-600">{{ $path['description'] }}</p>
-                                    </div>
-                                    <a href="{{ $seoSearchUrl($path['query']) }}" class="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
-                                        Открыть
-                                    </a>
-                                </div>
-                                <div class="mt-3 flex flex-wrap gap-2">
-                                    @foreach ($path['items'] as $item)
-                                        <a href="{{ $seoSearchUrl($item) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                            <x-ui.icon name="fa-solid fa-compass text-[0.8em] text-slate-400" />
-                                            <span>{{ $item }}</span>
-                                        </a>
-                                    @endforeach
-                                </div>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($alsoSearches->isNotEmpty())
-                <section id="also-searches" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Также ищут" itemscope itemtype="https://schema.org/SiteNavigationElement">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-binoculars text-emerald-700" />
-                        <span itemprop="name">Также ищут</span>
-                    </div>
-                    <div class="mt-3 flex flex-wrap gap-2">
-                        @foreach ($alsoSearches->take(36) as $query)
-                            <a href="{{ $seoSearchUrl($query) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                <x-ui.icon name="fa-solid fa-magnifying-glass-plus text-[0.8em] text-slate-400" />
-                                <span itemprop="name">{{ $query }}</span>
-                            </a>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($showDiscoverySignals)
-                <section id="discovery-signals" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Индексация и обновления">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-satellite-dish text-emerald-700" />
-                        <span>Индексация и обновления</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                        @foreach ($discoverySignals as $signal)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <h2 class="text-sm font-bold text-slate-800">{{ $signal['name'] }}</h2>
-                                <p class="mt-1 break-words text-xs font-semibold text-emerald-700">{{ $signal['value'] }}</p>
-                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $signal['description'] }}</p>
-                                <a href="{{ $signal['url'] }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <x-ui.icon name="fa-solid fa-arrow-up-right-from-square text-[0.8em]" />
-                                    <span>Открыть</span>
-                                </a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($queryMatrix->isNotEmpty())
-                <section id="query-matrix" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Матрица запросов">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-table-cells-large text-emerald-700" />
-                        <span>Матрица запросов</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 lg:grid-cols-2">
-                        @foreach ($queryMatrix as $group)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <h2 class="text-sm font-bold text-slate-800">{{ $group['name'] }}</h2>
-                                <p class="mt-1 text-xs leading-5 text-slate-600">{{ $group['description'] }}</p>
-                                <div class="mt-3 flex flex-wrap gap-2">
-                                    @foreach ($group['items'] as $query)
-                                        <a href="{{ $seoSearchUrl($query) }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                            <x-ui.icon name="fa-solid fa-table-cells text-[0.8em] text-slate-400" />
-                                            <span>{{ $query }}</span>
-                                        </a>
-                                    @endforeach
-                                </div>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($mediaSignals->isNotEmpty())
-                <section id="media-signals" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Медиа и превью">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-photo-film text-emerald-700" />
-                        <span>Медиа и превью</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 md:grid-cols-2">
-                        @foreach ($mediaSignals as $signal)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <h2 class="text-sm font-bold text-slate-800">{{ $signal['name'] }}</h2>
-                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $signal['description'] }}</p>
-                                <a href="{{ $signal['url'] }}" class="mt-3 inline-flex items-center gap-1 break-all text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <x-ui.icon name="fa-solid fa-arrow-up-right-from-square text-[0.8em]" />
-                                    <span>{{ $signal['type'] === 'video' ? 'Открыть видео' : 'Открыть изображение' }}</span>
-                                </a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($publisherSignals->isNotEmpty())
-                <section id="publisher-trust" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Доверие и индексация">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-shield-halved text-emerald-700" />
-                        <span>Доверие и индексация</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                        @foreach ($publisherSignals as $signal)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <h2 class="text-sm font-bold text-slate-800">{{ $signal['name'] }}</h2>
-                                <p class="mt-1 break-words text-xs font-semibold text-emerald-700">{{ $signal['value'] }}</p>
-                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $signal['description'] }}</p>
-                                <a href="{{ $signal['url'] }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <x-ui.icon name="fa-solid fa-arrow-up-right-from-square text-[0.8em]" />
-                                    <span>Открыть</span>
-                                </a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($freshnessQueries->isNotEmpty())
-                <section id="freshness-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Актуальные запросы">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-clock-rotate-left text-emerald-700" />
-                        <span>Актуальные запросы {{ $currentSeoYear }}</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                        @foreach ($freshnessQueries as $item)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
-                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
-                                <a href="{{ $item['url'] }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <x-ui.icon name="fa-solid fa-arrow-up-right-from-square text-[0.8em]" />
-                                    <span>{{ $item['query'] }}</span>
-                                </a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($russianQueryVariants->isNotEmpty())
-                <section id="russian-query-variants" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Русские варианты поиска" itemscope itemtype="https://schema.org/SiteNavigationElement">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-language text-emerald-700" />
-                        <span itemprop="name">Русские варианты поиска</span>
-                    </div>
-                    <div class="mt-3 flex flex-wrap gap-2">
-                        @foreach ($russianQueryVariants->take(42) as $query)
-                            <a href="{{ $seoSearchUrl($query) }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
-                                <x-ui.icon name="fa-solid fa-spell-check text-[0.8em] text-slate-400" />
-                                <span itemprop="name">{{ $query }}</span>
-                            </a>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($catalogDirections->isNotEmpty())
-                <section id="catalog-directions" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Направления каталога">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-compass-drafting text-emerald-700" />
-                        <span>Направления каталога</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                        @foreach ($catalogDirections as $item)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
-                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
-                                <a href="{{ $item['url'] }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <x-ui.icon name="fa-solid fa-arrow-up-right-from-square text-[0.8em]" />
-                                    <span>{{ $item['query'] }}</span>
-                                </a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($comparisonQueries->isNotEmpty())
-                <section id="comparison-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Похожие и сравнения">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-code-compare text-emerald-700" />
-                        <span>Похожие и сравнения</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                        @foreach ($comparisonQueries as $item)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
-                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
-                                <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <x-ui.icon name="fa-solid fa-magnifying-glass text-[0.8em]" />
-                                    <span>{{ $item['query'] }}</span>
-                                </a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($episodeIntentQueries->isNotEmpty())
-                <section id="episode-intents" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Серии и сезоны">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-film text-emerald-700" />
-                        <span>Серии и сезоны</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        @foreach ($episodeIntentQueries as $item)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
-                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
-                                <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <x-ui.icon name="fa-solid fa-magnifying-glass text-[0.8em]" />
-                                    <span>{{ $item['query'] }}</span>
-                                </a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($watchModeQueries->isNotEmpty())
-                <section id="watch-mode-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Способы просмотра">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-display text-emerald-700" />
-                        <span>Способы просмотра</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        @foreach ($watchModeQueries as $item)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
-                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
-                                <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <x-ui.icon name="fa-solid fa-play text-[0.8em]" />
-                                    <span>{{ $item['query'] }}</span>
-                                </a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($translationQueries->isNotEmpty())
-                <section id="translation-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Переводы и озвучки">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-microphone-lines text-emerald-700" />
-                        <span>Переводы и озвучки</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        @foreach ($translationQueries as $item)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
-                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
-                                <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <x-ui.icon name="fa-solid fa-language text-[0.8em]" />
-                                    <span>{{ $item['query'] }}</span>
-                                </a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($voiceSearchQueries->isNotEmpty())
-                <section id="voice-search-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Голосовые запросы">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-comments text-emerald-700" />
-                        <span>Голосовые запросы</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        @foreach ($voiceSearchQueries as $item)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
-                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
-                                <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <x-ui.icon name="fa-solid fa-magnifying-glass text-[0.8em]" />
-                                    <span>{{ $item['query'] }}</span>
-                                </a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($topicAuthoritySignals->isNotEmpty())
-                <section id="topic-authority-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Тематический авторитет">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-award text-emerald-700" />
-                        <span>Тематический авторитет</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        @foreach ($topicAuthoritySignals as $item)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
-                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
-                                <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <x-ui.icon name="fa-solid fa-magnifying-glass text-[0.8em]" />
-                                    <span>{{ $item['query'] }}</span>
-                                </a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($releaseCalendarQueries->isNotEmpty())
-                <section id="release-calendar-seo" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Календарь релизов">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-calendar-days text-emerald-700" />
-                        <span>Календарь релизов</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        @foreach ($releaseCalendarQueries as $item)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <h2 class="text-sm font-bold text-slate-800">{{ $item['name'] }}</h2>
-                                <p class="mt-2 text-xs leading-5 text-slate-600">{{ $item['description'] }}</p>
-                                <a href="{{ $seoSearchUrl($item['query']) }}" class="mt-3 inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-600">
-                                    <x-ui.icon name="fa-solid fa-clock text-[0.8em]" />
-                                    <span>{{ $item['query'] }}</span>
-                                </a>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if ($quickAnswers->isNotEmpty())
-                <section class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Быстрые ответы" id="quick-answers">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-circle-question text-emerald-700" />
-                        <span>Быстрые ответы</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 lg:grid-cols-3">
-                        @foreach ($quickAnswers as $item)
-                            <article class="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <h2 class="text-sm font-bold text-slate-800">{{ $item['question'] }}</h2>
-                                <p class="mt-2 text-sm leading-6 text-slate-600">{{ $item['answer'] }}</p>
-                            </article>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if (! empty($seo['keyword_clusters']))
-                <section id="semantic-clusters" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Семантические кластеры">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-diagram-project text-emerald-700" />
-                        <span>Семантические подборки</span>
-                    </div>
-                    <div class="mt-3 grid gap-3 md:grid-cols-3">
-                        @foreach (collect($seo['keyword_clusters'])->filter()->take(6) as $cluster)
-                            <div class="rounded-lg bg-slate-50 p-3">
-                                <div class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ $cluster['title'] }}</div>
-                                <div class="mt-2 flex flex-wrap gap-1.5">
-                                    @foreach (collect($cluster['items'] ?? [])->filter()->unique()->take(8) as $item)
-                                        <a href="{{ $seoSearchUrl($item) }}" class="rounded-full bg-white px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">{{ $item }}</a>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @if (! empty($seo['search_phrases']))
-                <section id="popular-searches" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Популярные поисковые запросы">
-                    <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
-                        <x-ui.icon name="fa-solid fa-magnifying-glass-chart text-emerald-700" />
-                        <span>Популярные запросы</span>
-                    </div>
-                    <div class="mt-3 flex flex-wrap gap-2">
-                        @foreach (collect($seo['search_phrases'])->filter()->unique()->take(18) as $phrase)
-                            <a href="{{ $seoSearchUrl($phrase) }}" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
-                                <x-ui.icon name="fa-solid fa-key text-[0.8em] text-slate-400" />
-                                <span>{{ $phrase }}</span>
-                            </a>
-                        @endforeach
-                    </div>
-                </section>
-            @endif
-            @endif
         </main>
         <x-layout.site-footer :site-name="$siteName" :footer="$layoutFooter" />
         @livewireScripts

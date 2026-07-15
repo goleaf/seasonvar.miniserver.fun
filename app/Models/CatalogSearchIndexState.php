@@ -5,9 +5,21 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\CatalogSearchIndexStatus;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property int $id
+ * @property int $version
+ * @property CatalogSearchIndexStatus $status
+ * @property int $source_count
+ * @property int $document_count
+ * @property int $checkpoint_id
+ * @property CarbonInterface|null $build_started_at
+ * @property CarbonInterface|null $completed_at
+ * @property CarbonInterface|null $failed_at
+ */
 #[Fillable([
     'version',
     'status',

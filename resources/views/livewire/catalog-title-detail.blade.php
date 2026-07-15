@@ -33,6 +33,11 @@
                             <x-ui.icon name="fa-solid fa-circle-info text-slate-400" />
                             <span>{{ __('catalog.title.about') }}</span>
                         </a>
+
+                        <a data-title-quick-link href="#reviews" class="inline-flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-700">
+                            <x-ui.icon name="fa-solid fa-star-half-stroke text-slate-400" />
+                            <span>{{ __('reviews.section.label') }}</span>
+                        </a>
                     </nav>
 
                     <div class="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
@@ -121,6 +126,19 @@
                             </h2>
                             <p class="mt-2 text-sm leading-6 text-slate-600">{{ $showView->displayDescription !== '' ? $showView->displayDescription : __('catalog.title.description_missing') }}</p>
                         </section>
+
+                        <div class="mt-4">
+                            <livewire:collections.catalog-collection-membership-manager
+                                :catalog-title-id="$title->id"
+                                :wire:key="'catalog-title-collection-membership-'.$title->id"
+                            />
+                        </div>
+                        <div class="mt-3">
+                            <livewire:tags.personal-tag-selector
+                                :catalog-title-id="$title->id"
+                                :wire:key="'catalog-title-personal-tags-'.$title->id"
+                            />
+                        </div>
 
                     </div>
                 </article>
@@ -238,6 +256,34 @@
                     </div>
                 @endif
             </x-ui.panel>
+
+            @if ($publicCollections->isNotEmpty())
+                <section aria-labelledby="title-public-collections">
+                    <h2 id="title-public-collections" class="mb-3 flex items-center gap-2 text-lg font-black text-slate-800">
+                        <x-ui.icon name="fa-solid fa-layer-group text-emerald-700" />
+                        <span>{{ __('collections.page.contains_title') }}</span>
+                    </h2>
+                    <div class="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        @foreach ($publicCollections as $publicCollection)
+                            <x-collections.collection-card wire:key="title-public-collection-{{ $publicCollection->public_id }}" :collection="$publicCollection" />
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+
+            <livewire:reviews.catalog-title-reviews
+                :catalog-title-id="$title->id"
+                :locale="$reviewLocale"
+                :wire:key="'title-reviews-'.$title->id"
+                lazy
+            />
+
+            <livewire:comments.comment-discussion
+                target-type="title"
+                :target-id="$title->id"
+                :wire:key="'title-discussion-'.$title->id"
+                lazy
+            />
 
             @if (! empty($seo['faq']))
                 <x-ui.panel :title="__('catalog.title.questions')" icon="fa-solid fa-circle-question" :pad="false">

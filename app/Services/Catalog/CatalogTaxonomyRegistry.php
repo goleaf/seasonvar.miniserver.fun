@@ -6,6 +6,7 @@ use App\Enums\CatalogFilterType;
 use App\Models\Actor;
 use App\Models\AgeRating;
 use App\Models\CatalogStatus;
+use App\Models\CatalogTitle;
 use App\Models\Country;
 use App\Models\Director;
 use App\Models\Genre;
@@ -14,7 +15,6 @@ use App\Models\Studio;
 use App\Models\Tag;
 use App\Models\Translation;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class CatalogTaxonomyRegistry
 {
@@ -78,7 +78,7 @@ class CatalogTaxonomyRegistry
     }
 
     /**
-     * @return array<string, \Closure(BelongsToMany): BelongsToMany>
+     * @return array<string, \Closure>
      */
     public function relationSummaryLoads(): array
     {
@@ -87,8 +87,31 @@ class CatalogTaxonomyRegistry
                 $modelClass = $config['model'];
                 $table = (new $modelClass)->getTable();
 
+                if ($modelClass === Tag::class && Tag::usesCanonicalSchema()) {
+                    return [
+                        $config['relation'] => fn ($query) => $query
+                            ->select([
+                                $table.'.id',
+                                $table.'.public_id',
+                                $table.'.code',
+                                $table.'.name',
+                                $table.'.slug',
+                                $table.'.type',
+                                $table.'.visibility',
+                                $table.'.moderation_status',
+                                $table.'.source',
+                                $table.'.archived_at',
+                                $table.'.merged_into_id',
+                            ])
+                            ->publiclyEligible()
+                            ->withLocalizedLabel()
+                            ->orderBy($table.'.name')
+                            ->orderBy($table.'.id'),
+                    ];
+                }
+
                 return [
-                    $config['relation'] => fn (BelongsToMany $query): BelongsToMany => $query
+                    $config['relation'] => fn ($query) => $query
                         ->select([$table.'.id', $table.'.name', $table.'.slug'])
                         ->orderBy($table.'.name')
                         ->orderBy($table.'.id'),
@@ -98,7 +121,7 @@ class CatalogTaxonomyRegistry
     }
 
     /**
-     * @return array<string, \Closure(BelongsToMany): BelongsToMany>
+     * @return array<string, \Closure>
      */
     public function cardSummaryLoads(): array
     {
@@ -110,6 +133,18 @@ class CatalogTaxonomyRegistry
     public function relationName(string $filterType): string
     {
         return self::FILTER_RELATIONS[$filterType]['relation'];
+    }
+
+    /** @return array{table: string, title_key: string, related_key: string} */
+    public function pivot(string $filterType): array
+    {
+        $relation = (new CatalogTitle)->{$this->relationName($filterType)}();
+
+        return [
+            'table' => $relation->getTable(),
+            'title_key' => $relation->getForeignPivotKeyName(),
+            'related_key' => $relation->getRelatedPivotKeyName(),
+        ];
     }
 
     public function supports(string $filterType): bool

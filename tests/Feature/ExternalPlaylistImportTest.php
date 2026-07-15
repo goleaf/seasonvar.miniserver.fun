@@ -10,7 +10,9 @@ use App\Models\Season;
 use App\Models\Source;
 use App\Models\SourcePage;
 use App\Services\Media\ExternalPlaylistImporter;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -22,11 +24,15 @@ class ExternalPlaylistImportTest extends TestCase
     {
         Http::preventStrayRequests();
         Http::fake([
-            'playlist.example.com/*' => Http::response(<<<'M3U'
-                #EXTM3U
-                #EXTINF:-1,6 кадров S01E02
-                https://media.example.com/files/6_kadrov_s01e02.mp4
-                M3U),
+            'playlist.example.com/*' => Http::response(
+                <<<'M3U'
+                    #EXTM3U
+                    #EXTINF:-1,6 кадров S01E02
+                    https://media.example.com/files/6_kadrov_s01e02.mp4
+                    M3U,
+                200,
+                ['Content-Type' => 'application/vnd.apple.mpegurl'],
+            ),
         ]);
 
         $source = Source::factory()->create(['code' => 'seasonvar']);
@@ -91,11 +97,15 @@ class ExternalPlaylistImportTest extends TestCase
     {
         Http::preventStrayRequests();
         Http::fake([
-            'playlist.example.com/*' => Http::response(<<<'M3U'
-                #EXTM3U
-                #EXTINF:-1,2 серия
-                https://media.example.com/files/episode-2.mp4
-                M3U),
+            'playlist.example.com/*' => Http::response(
+                <<<'M3U'
+                    #EXTM3U
+                    #EXTINF:-1,2 серия
+                    https://media.example.com/files/episode-2.mp4
+                    M3U,
+                200,
+                ['Content-Type' => 'application/vnd.apple.mpegurl'],
+            ),
         ]);
 
         $source = Source::factory()->create(['code' => 'seasonvar']);
@@ -130,6 +140,56 @@ class ExternalPlaylistImportTest extends TestCase
         ]);
     }
 
+    public function test_global_playlist_matching_loads_release_graphs_only_for_matching_titles(): void
+    {
+        $target = CatalogTitle::factory()->create([
+            'slug' => 'tochnyi-kandidat',
+            'title' => 'Точный кандидат',
+        ]);
+        Season::factory()->create(['catalog_title_id' => $target->id]);
+        $unrelatedIds = collect(range(1, 30))->map(function (int $number): int {
+            $title = CatalogTitle::factory()->create([
+                'slug' => "postoronnii-serial-{$number}",
+                'title' => "Посторонний сериал {$number}",
+            ]);
+            Season::factory()->create(['catalog_title_id' => $title->id]);
+
+            return $title->id;
+        });
+        $releaseGraphTitleIds = collect();
+        $seasonQueries = collect();
+
+        DB::listen(function (QueryExecuted $query) use ($target, $unrelatedIds, $releaseGraphTitleIds, $seasonQueries): void {
+            if (! str_contains($query->sql, 'from "seasons"')) {
+                return;
+            }
+
+            $seasonQueries->push($query->sql.' | '.json_encode($query->bindings, JSON_THROW_ON_ERROR));
+            $knownIds = $unrelatedIds->concat([$target->id]);
+
+            if (preg_match('/catalog_title_id" in \((?<ids>[\d, ]+)\)/', $query->sql, $matches) === 1) {
+                $releaseGraphTitleIds->push(...collect(explode(',', $matches['ids']))
+                    ->map(fn (string $id): int => (int) trim($id))
+                    ->filter(fn (int $id): bool => $knownIds->contains($id)));
+            }
+        });
+
+        app(ExternalPlaylistImporter::class)->importFromContent(
+            "#EXTM3U\n#EXTINF:-1,Точный кандидат\nhttps://media.example.com/tochnyi-kandidat.mp4",
+            'https://playlist.example.com/list.m3u',
+        );
+
+        $this->assertSame(
+            [$target->id],
+            $releaseGraphTitleIds->unique()->values()->all(),
+            $seasonQueries->implode("\n"),
+        );
+        $this->assertDatabaseHas('licensed_media', [
+            'catalog_title_id' => $target->id,
+            'playback_url' => 'https://media.example.com/tochnyi-kandidat.mp4',
+        ]);
+    }
+
     public function test_it_does_not_follow_playlist_redirects_to_an_unverified_target(): void
     {
         Http::preventStrayRequests();
@@ -143,6 +203,48 @@ class ExternalPlaylistImportTest extends TestCase
         $this->expectExceptionMessage('HTTP 302');
 
         app(ExternalPlaylistImporter::class)->importFromUrl('https://playlist.example.com/list.m3u');
+    }
+
+    public function test_it_rejects_a_remote_playlist_with_an_unsupported_content_type(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake([
+            'playlist.example.com/*' => Http::response(
+                "#EXTM3U\nhttps://media.example.com/files/episode-1.mp4",
+                200,
+                ['Content-Type' => 'text/html; charset=UTF-8'],
+            ),
+        ]);
+
+        try {
+            app(ExternalPlaylistImporter::class)->importFromUrl('https://playlist.example.com/list.m3u');
+            $this->fail('Импортер принял ответ с неподдерживаемым Content-Type.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Плейлист вернул неподдерживаемый Content-Type.', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('licensed_media', 0);
+    }
+
+    public function test_it_rejects_a_remote_playlist_without_an_extm3u_signature(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake([
+            'playlist.example.com/*' => Http::response(
+                '<html><body>not a playlist</body></html>',
+                200,
+                ['Content-Type' => 'application/vnd.apple.mpegurl'],
+            ),
+        ]);
+
+        try {
+            app(ExternalPlaylistImporter::class)->importFromUrl('https://playlist.example.com/list.m3u');
+            $this->fail('Импортер принял ответ без сигнатуры #EXTM3U.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Плейлист не содержит сигнатуру #EXTM3U.', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('licensed_media', 0);
     }
 
     public function test_it_imports_all_playlist_entries_by_default(): void

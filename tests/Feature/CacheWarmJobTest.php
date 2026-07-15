@@ -16,6 +16,7 @@ use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Queue\SyncQueue;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -33,8 +34,30 @@ final class CacheWarmJobTest extends TestCase
         $this->assertInstanceOf(ShouldBeUniqueUntilProcessing::class, $job);
         $this->assertTrue($job->afterCommit);
         $this->assertSame(604_800, $job->uniqueFor);
-        $this->assertSame('catalog-critical-cache-warm', $job->uniqueId());
+        $this->assertSame('catalog-critical-cache-warm-v2', $job->uniqueId());
         $this->assertContainsOnlyInstancesOf(WithoutOverlapping::class, $job->middleware());
+    }
+
+    public function test_warmer_job_can_wait_for_a_worker_without_expiring_before_handle(): void
+    {
+        $queue = new class extends SyncQueue
+        {
+            /** @return array<string, mixed> */
+            public function payload(object $job, string $queue): array
+            {
+                return json_decode(
+                    $this->createPayload($job, $queue),
+                    true,
+                    flags: JSON_THROW_ON_ERROR,
+                );
+            }
+        };
+        $queue->setContainer($this->app);
+
+        $payload = $queue->payload(new WarmCatalogCaches, 'cache-warm-v2');
+
+        $this->assertNull($payload['retryUntil']);
+        $this->assertSame(3, $payload['maxTries']);
     }
 
     public function test_critical_warmer_records_an_operational_snapshot(): void
@@ -52,14 +75,16 @@ final class CacheWarmJobTest extends TestCase
 
     public function test_refresh_option_is_carried_by_the_queued_warmer(): void
     {
+        config(['cache-architecture.warming.queue' => 'cache-warm-v2']);
         Queue::fake();
 
         $this->artisan('cache:warm-catalog', ['--queue' => true, '--refresh' => true])
+            ->expectsOutput('Прогрев поставлен в очередь cache-warm-v2.')
             ->assertSuccessful();
 
         Queue::assertPushed(
             WarmCatalogCaches::class,
-            fn (WarmCatalogCaches $job): bool => $job->refresh,
+            fn (WarmCatalogCaches $job): bool => $job->refresh && $job->queue === 'cache-warm-v2',
         );
         $work = app(CatalogCacheWarmRequestStore::class)->claim(10);
 

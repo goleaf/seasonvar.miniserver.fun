@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\CatalogTitle;
+use App\Models\Episode;
 use App\Models\Genre;
+use App\Models\Season;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
@@ -96,10 +98,30 @@ class CatalogVisualSystemTest extends TestCase
             'poster_url' => null,
             'indexed_at' => now(),
         ]);
-        CatalogTitle::factory()->create([
+        $latestSeason = Season::factory()->create([
+            'catalog_title_id' => $latestWithoutPoster->id,
+            'number' => 2,
+        ]);
+        Episode::factory()->create([
+            'season_id' => $latestSeason->id,
+            'number' => 3,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $previousTitle = CatalogTitle::factory()->create([
             'title' => 'Предыдущий тайтл с постером',
             'poster_url' => 'https://media.example.com/previous.jpg',
             'indexed_at' => now()->subDay(),
+        ]);
+        $previousSeason = Season::factory()->create([
+            'catalog_title_id' => $previousTitle->id,
+            'number' => 1,
+        ]);
+        Episode::factory()->create([
+            'season_id' => $previousSeason->id,
+            'number' => 1,
+            'created_at' => now()->subDay(),
+            'updated_at' => now()->subDay(),
         ]);
 
         $response = $this->get(route('home'));
@@ -181,8 +203,9 @@ class CatalogVisualSystemTest extends TestCase
         $matched = preg_match('/<nav aria-label="Быстрые переходы по сериалу"[^>]*>(.*?)<\/nav>/s', $content, $navigation);
 
         $this->assertSame(1, $matched);
-        $this->assertSame(3, substr_count($navigation[1], 'data-title-quick-link'));
-        $this->assertSame(3, substr_count($navigation[1], 'min-h-11'));
+        $this->assertSame(4, substr_count($navigation[1], 'data-title-quick-link'));
+        $this->assertSame(4, substr_count($navigation[1], 'min-h-11'));
+        $this->assertStringContainsString('href="#reviews"', $navigation[1]);
         $this->assertStringNotContainsString('bg-emerald-700', $navigation[1]);
         $this->assertDoesNotMatchRegularExpression('/\b(?:border|ring|outline)(?:-|\s)/', $navigation[1]);
     }
@@ -205,14 +228,13 @@ class CatalogVisualSystemTest extends TestCase
         ], 'Catalog pages should rely on the single main landmark from the layout shell.');
     }
 
-    public function test_public_views_do_not_define_internal_scroll_containers(): void
+    public function test_public_views_only_define_bounded_vertical_internal_scroll_containers(): void
     {
         $forbiddenClasses = [
             'overflow-auto',
             'overflow-scroll',
             'overflow-x-auto',
             'overflow-x-scroll',
-            'overflow-y-auto',
             'overflow-y-scroll',
             'overscroll-x-contain',
             'overscroll-y-contain',
@@ -238,9 +260,17 @@ class CatalogVisualSystemTest extends TestCase
                     $violations[] = $file->getRelativePathname().': '.$class;
                 }
             }
+
+            preg_match_all('/class="[^"]*overflow-y-auto[^"]*"/', $content, $verticalScrollContainers);
+
+            foreach ($verticalScrollContainers[0] as $container) {
+                if (! str_contains($container, 'max-h-[') && preg_match('/\bmax-h-\d+\b/', $container) !== 1) {
+                    $violations[] = $file->getRelativePathname().': unbounded overflow-y-auto';
+                }
+            }
         }
 
-        $this->assertSame([], $violations, 'Публичный интерфейс не должен создавать прокрутку внутри блоков.');
+        $this->assertSame([], $violations, 'Внутренняя вертикальная прокрутка допустима только в явно ограниченном по высоте блоке.');
     }
 
     public function test_title_surfaces_use_one_title_link_and_keep_relation_links_accessible(): void

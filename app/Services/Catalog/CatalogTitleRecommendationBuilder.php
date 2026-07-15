@@ -2,8 +2,11 @@
 
 namespace App\Services\Catalog;
 
+use App\Enums\ReviewStatus;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
+use App\Models\Tag;
+use App\Services\Reviews\ReviewSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Carbon;
@@ -11,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 
 final class CatalogTitleRecommendationBuilder
 {
-    private const ALGORITHM_VERSION = 'v3';
+    private const ALGORITHM_VERSION = 'v4';
 
     private const DEFAULT_MIN_SCORE = 600;
 
@@ -97,6 +100,7 @@ final class CatalogTitleRecommendationBuilder
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogTitleQuery $titles,
         private readonly CatalogRecommendationThemeExtractor $themes,
+        private readonly ReviewSchema $reviewSchema,
     ) {}
 
     /**
@@ -205,18 +209,24 @@ final class CatalogTitleRecommendationBuilder
         $featureMap = $this->sharedCandidateFeatureMap();
         $themeMap = [];
         $publicCounts = $this->titles->publicCardCounts(null);
+        $reviewCount = $this->reviewSchema->communityAvailable()
+            ? ['reviews' => fn (Builder $query): Builder => $query
+                ->where('status', ReviewStatus::Published->value)
+                ->whereNull('deleted_at')
+                ->whereNull('merged_into_id')]
+            : ['reviews'];
         $this->profileRelationTypes = array_keys($this->taxonomies->relations());
 
         $this->titles->visibleTo(null)
             ->select(['id', 'title', 'original_title', 'description', 'type', 'year'])
-            ->with(array_merge($this->taxonomies->relationNames(), [
+            ->with(array_merge($this->recommendationRelationLoads(), [
                 'ratings:id,catalog_title_id,rating',
                 'recommendationSignals' => fn ($query) => $query
                     ->positive()
                     ->whereIn('signal_type', self::SOURCE_SIGNAL_TYPES),
             ]))
             ->withCount([
-                'reviews',
+                ...$reviewCount,
                 'licensedMedia as published_media_count' => $publicCounts['licensedMedia as published_media_count'],
             ])
             ->lazyById($chunkSize)
@@ -306,6 +316,10 @@ final class CatalogTitleRecommendationBuilder
             $featureIds = DB::table($relation->getTable())
                 ->select($relatedKey)
                 ->whereIn($foreignKey, $this->titles->visibleTo(null)->select('id'))
+                ->when(
+                    $filterType === 'tag',
+                    fn ($query) => $query->whereIn($relatedKey, Tag::query()->publiclyEligible()->select('tags.id')),
+                )
                 ->groupBy($relatedKey)
                 ->havingRaw('count(distinct '.$foreignKey.') > 1')
                 ->pluck($relatedKey)
@@ -318,6 +332,29 @@ final class CatalogTitleRecommendationBuilder
         }
 
         return $featureMap;
+    }
+
+    /** @return array<string, \Closure> */
+    private function recommendationRelationLoads(): array
+    {
+        return collect($this->taxonomies->relations())
+            ->mapWithKeys(function (array $config, string $filterType): array {
+                $modelClass = $config['model'];
+                $table = (new $modelClass)->getTable();
+
+                return [
+                    $config['relation'] => function ($query) use ($filterType, $table) {
+                        $query->select($table.'.id');
+
+                        if ($filterType === 'tag') {
+                            $query->publiclyEligible();
+                        }
+
+                        return $query;
+                    },
+                ];
+            })
+            ->all();
     }
 
     /**
@@ -456,7 +493,7 @@ final class CatalogTitleRecommendationBuilder
                     }
 
                     $candidateScores[$candidateId] = ($candidateScores[$candidateId] ?? 0)
-                        + (self::MATCH_WEIGHTS[$filterType] ?? 0);
+                        + self::MATCH_WEIGHTS[$filterType];
                 }
 
                 if (count($candidateScores) > $retainedPoolSize * 2) {
@@ -781,7 +818,7 @@ final class CatalogTitleRecommendationBuilder
      */
     private function rankRows(array $rows, int $maxPerTitle): array
     {
-        $remaining = array_values($rows);
+        $remaining = $rows;
         $selected = [];
         $diversityPenalty = max(0, (int) config('seasonvar.recommendations.diversity_penalty', 120));
 

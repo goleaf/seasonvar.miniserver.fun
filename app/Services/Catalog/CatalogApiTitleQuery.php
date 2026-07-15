@@ -3,11 +3,10 @@
 namespace App\Services\Catalog;
 
 use App\Models\CatalogTitle;
+use App\Models\Episode;
+use App\Models\Season;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CatalogApiTitleQuery
 {
@@ -54,9 +53,9 @@ class CatalogApiTitleQuery
             ->with(array_merge(
                 $this->publicTaxonomyRelations(),
                 [
-                    'seasons' => function (HasMany $query) use ($user): void {
-                        $query
-                            ->availableTo($user)
+                    'seasons' => function ($relation) use ($user): void {
+                        $relation
+                            ->whereIn('seasons.id', Season::query()->availableTo($user)->select('id'))
                             ->select([
                                 'id',
                                 'catalog_title_id',
@@ -70,9 +69,9 @@ class CatalogApiTitleQuery
                                 'translation_name',
                             ])
                             ->with([
-                                'episodes' => function (HasMany $query) use ($user): void {
-                                    $query
-                                        ->availableTo($user)
+                                'episodes' => function ($relation) use ($user): void {
+                                    $relation
+                                        ->whereIn('episodes.id', Episode::query()->availableTo($user)->select('id'))
                                         ->select(['id', 'season_id', 'number', 'kind', 'sort_order', 'title', 'released_at', 'summary']);
                                 },
                             ]);
@@ -83,32 +82,14 @@ class CatalogApiTitleQuery
             ->firstOrFail();
     }
 
-    /**
-     * @return array<string, \Closure(BelongsToMany): void>
-     */
+    /** @return array<string, \Closure> */
     private function publicTaxonomyRelations(): array
     {
-        $relations = [];
-
-        foreach ($this->taxonomies->relationNames() as $relation) {
-            $relations[$relation] = function (BelongsToMany $query): void {
-                $model = $query->getRelated();
-
-                $query
-                    ->select([
-                        $model->qualifyColumn('id'),
-                        $model->qualifyColumn('name'),
-                        $model->qualifyColumn('slug'),
-                    ])
-                    ->orderBy($model->qualifyColumn('name'));
-            };
-        }
-
-        return $relations;
+        return $this->taxonomies->relationSummaryLoads();
     }
 
     /**
-     * @return array<int|string, string|\Closure(Builder): Builder>
+     * @return array<int|string, string|\Closure>
      */
     private function publicCounts(?User $user): array
     {

@@ -45,6 +45,13 @@ final class PublicPageCachePolicy
         'format',
     ];
 
+    private const COLLECTION_QUERY_KEYS = [
+        'page',
+        'collectionsPage',
+        'profileCollectionsPage',
+        'sort',
+    ];
+
     public function __construct(private readonly CacheVersionRegistry $versions) {}
 
     public function context(Request $request, string $profile): ?PublicPageCacheContext
@@ -88,6 +95,7 @@ final class PublicPageCachePolicy
                 ? new PublicPageCacheContext(CacheDomain::CatalogStats, $dimensions)
                 : null,
             'title' => $this->titleContext($request, $dimensions),
+            'collections' => new PublicPageCacheContext(CacheDomain::Collections, $dimensions),
             default => null,
         };
     }
@@ -130,6 +138,7 @@ final class PublicPageCachePolicy
                 ...array_keys(CatalogSeriesFilters::TAXONOMY_PROPERTIES),
             ])),
             'title' => self::TITLE_QUERY_KEYS,
+            'collections' => self::COLLECTION_QUERY_KEYS,
             default => null,
         };
 

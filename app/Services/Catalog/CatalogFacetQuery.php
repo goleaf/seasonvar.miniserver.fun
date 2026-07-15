@@ -4,15 +4,17 @@ namespace App\Services\Catalog;
 
 use App\Enums\CatalogPublicationType;
 use App\Models\CatalogTitle;
+use App\Models\Tag;
+use App\Models\TagTranslation;
 use App\Models\User;
 use App\Services\Catalog\Search\CatalogSearchMatchSet;
 use App\Services\Catalog\Search\CatalogSearchState;
-use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use stdClass;
 
 class CatalogFacetQuery
 {
@@ -41,10 +43,10 @@ class CatalogFacetQuery
         $facetQueries = collect($filterTypes)->map(function (string $filterType) use ($criteria, $limits, $searches, $user, $searchMatches): QueryBuilder {
             $modelClass = $this->taxonomies->modelClass($filterType);
             $model = new $modelClass;
-            $relation = $model->catalogTitles();
-            $pivotTable = $relation->getTable();
-            $taxonomyPivotKey = $relation->getForeignPivotKeyName();
-            $catalogTitlePivotKey = $relation->getRelatedPivotKeyName();
+            $pivot = $this->taxonomies->pivot($filterType);
+            $pivotTable = $pivot['table'];
+            $taxonomyPivotKey = $pivot['related_key'];
+            $catalogTitlePivotKey = $pivot['title_key'];
             $contextTitles = $criteria === null
                 ? $this->titles->visibleTo($user)
                 : $this->titles->filteredTitles($criteria->withoutRelation($filterType), $user, searchMatches: $searchMatches);
@@ -66,14 +68,28 @@ class CatalogFacetQuery
                 ->selectRaw('? as filter_type', [$filterType])
                 ->addSelect([
                     $model->qualifyColumn('id').' as id',
-                    $model->qualifyColumn('name').' as name',
                     $model->qualifyColumn('slug').' as slug',
                     $countsAlias.'.context_titles_count as context_titles_count',
                 ]);
 
+            if ($model instanceof Tag && Tag::usesCanonicalSchema()) {
+                $query
+                    ->whereIn($model->qualifyColumn('id'), Tag::query()->publiclyEligible()->select('tags.id'))
+                    ->selectRaw($this->localizedTagNameSql($model->getTable()), $this->localizedTagNameBindings());
+            } else {
+                $query->addSelect($model->qualifyColumn('name').' as name');
+            }
+
             $query = $this->applySearch($query, $model, $searches[$filterType] ?? null)
-                ->orderByDesc($countsAlias.'.context_titles_count')
-                ->orderBy($model->qualifyColumn('name'))
+                ->orderByDesc($countsAlias.'.context_titles_count');
+
+            if ($model instanceof Tag && Tag::usesCanonicalSchema()) {
+                $query->orderBy('name');
+            } else {
+                $query->orderBy($model->qualifyColumn('name'));
+            }
+
+            $query
                 ->orderBy($model->qualifyColumn('id'))
                 ->limit(max(1, (int) ($limits[$filterType] ?? 1)));
 
@@ -84,7 +100,7 @@ class CatalogFacetQuery
         $unionQuery = $facetQueries->shift();
 
         if (! $unionQuery instanceof QueryBuilder) {
-            return collect($filterTypes)->mapWithKeys(fn (string $filterType): array => [$filterType => collect()]);
+            return $this->emptyTaxonomyGroups($filterTypes);
         }
 
         foreach ($facetQueries as $facetQuery) {
@@ -113,18 +129,23 @@ class CatalogFacetQuery
                 'locale' => app()->getLocale(),
             ], $rowsQuery)
             : $rowsQuery())
-            ->map(fn (array $row): object => (object) $row)
-            ->groupBy('filter_type');
+            ->groupBy(fn (array $row): string => $row['filter_type']);
 
         return collect($filterTypes)->mapWithKeys(function (string $filterType) use ($rows): array {
             $modelClass = $this->taxonomies->modelClass($filterType);
-            $records = $rows->get($filterType, collect())->map(function (object $row) use ($modelClass): Model {
+            $group = $rows->get($filterType);
+
+            if (! $group instanceof Collection) {
+                return [$filterType => $this->emptyTaxonomyCollection()];
+            }
+
+            $records = $group->map(function (array $row) use ($modelClass): Model {
                 $record = (new $modelClass)->newInstance([], true);
                 $record->setRawAttributes([
-                    'id' => (int) $row->id,
-                    'name' => (string) $row->name,
-                    'slug' => (string) $row->slug,
-                    'context_titles_count' => (int) $row->context_titles_count,
+                    'id' => $row['id'],
+                    'name' => $row['name'],
+                    'slug' => $row['slug'],
+                    'context_titles_count' => $row['context_titles_count'],
                 ], true);
 
                 return $record;
@@ -145,10 +166,10 @@ class CatalogFacetQuery
     ): Collection {
         $modelClass = $this->taxonomies->modelClass($filterType);
         $model = new $modelClass;
-        $relation = $model->catalogTitles();
-        $pivotTable = $relation->getTable();
-        $taxonomyPivotKey = $relation->getForeignPivotKeyName();
-        $catalogTitlePivotKey = $relation->getRelatedPivotKeyName();
+        $pivot = $this->taxonomies->pivot($filterType);
+        $pivotTable = $pivot['table'];
+        $taxonomyPivotKey = $pivot['related_key'];
+        $catalogTitlePivotKey = $pivot['title_key'];
         $countAlias = 'context_facet_counts';
         $contextTitles = $criteria === null
             ? $this->titles->visibleTo($user)
@@ -177,11 +198,28 @@ class CatalogFacetQuery
             ->orderBy($model->getTable().'.name')
             ->orderBy($model->getTable().'.id');
 
+        if ($model instanceof Tag && Tag::usesCanonicalSchema()) {
+            $query
+                ->whereIn($model->qualifyColumn('id'), Tag::query()->publiclyEligible()->select('tags.id'))
+                ->addSelect([
+                    'localized_label' => TagTranslation::query()
+                        ->select('label')
+                        ->whereColumn('tag_id', $model->qualifyColumn('id'))
+                        ->where('locale', app()->getLocale())
+                        ->limit(1),
+                    'fallback_label' => TagTranslation::query()
+                        ->select('label')
+                        ->whereColumn('tag_id', $model->qualifyColumn('id'))
+                        ->where('locale', (string) config('app.fallback_locale', 'ru'))
+                        ->limit(1),
+                ]);
+        }
+
         if ($criteria === null) {
             $query->addSelect($countAlias.'.context_titles_count as catalog_titles_count');
         }
 
-        $this->applySearch($query, $model, $search);
+        $this->applySearch($query->getQuery(), $model, $search);
 
         if ($limit !== null) {
             $query->limit($limit);
@@ -208,7 +246,7 @@ class CatalogFacetQuery
         })->values();
     }
 
-    private function applySearch(QueryBuilder|EloquentBuilder $query, Model $model, ?string $search): QueryBuilder|EloquentBuilder
+    private function applySearch(QueryBuilder $query, Model $model, ?string $search): QueryBuilder
     {
         $search = Str::limit(Str::squish((string) $search), 80, '');
 
@@ -216,17 +254,63 @@ class CatalogFacetQuery
             return $query;
         }
 
-        $nameSearch = '%'.str_replace(['%', '_'], '', $search).'%';
+        $term = str_replace(['%', '_'], '', $search);
+
+        if ($term === '') {
+            $query->whereRaw('1 = 0');
+
+            return $query;
+        }
+
+        $nameSearch = '%'.$term.'%';
         $slugSearch = '%'.str_replace(['%', '_'], '', Str::slug($search)).'%';
 
         return $query->where(function ($query) use ($model, $nameSearch, $slugSearch): void {
             $query
                 ->where($model->qualifyColumn('name'), 'like', $nameSearch)
                 ->orWhere($model->qualifyColumn('slug'), 'like', $slugSearch);
+
+            if ($model instanceof Tag && Tag::usesCanonicalSchema()) {
+                $query
+                    ->orWhereExists(fn (QueryBuilder $translations): QueryBuilder => $translations
+                        ->from('tag_translations')
+                        ->selectRaw('1')
+                        ->whereColumn('tag_translations.tag_id', 'tags.id')
+                        ->whereIn('tag_translations.locale', $this->tagContentLocales())
+                        ->where('tag_translations.label', 'like', $nameSearch))
+                    ->orWhereExists(fn (QueryBuilder $aliases): QueryBuilder => $aliases
+                        ->from('tag_aliases')
+                        ->selectRaw('1')
+                        ->whereColumn('tag_aliases.tag_id', 'tags.id')
+                        ->whereIn('tag_aliases.locale', ['und', ...$this->tagContentLocales()])
+                        ->where('tag_aliases.moderation_status', 'approved')
+                        ->where('tag_aliases.name', 'like', $nameSearch));
+            }
         });
     }
 
-    /** @return Collection<int, object{value: string, label: string, context_titles_count: int}> */
+    private function localizedTagNameSql(string $table): string
+    {
+        return "coalesce((select tag_labels.label from tag_translations as tag_labels where tag_labels.tag_id = {$table}.id and tag_labels.locale = ? limit 1), (select fallback_tag_labels.label from tag_translations as fallback_tag_labels where fallback_tag_labels.tag_id = {$table}.id and fallback_tag_labels.locale = ? limit 1), {$table}.name) as name";
+    }
+
+    /** @return list<string> */
+    private function localizedTagNameBindings(): array
+    {
+        return [app()->getLocale(), (string) config('app.fallback_locale', 'ru')];
+    }
+
+    /** @return list<string> */
+    private function tagContentLocales(): array
+    {
+        return collect($this->localizedTagNameBindings())
+            ->filter(fn (string $locale): bool => in_array($locale, config('tags.supported_locales', []), true))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /** @return Collection<int, stdClass> */
     public function publicationTypes(
         CatalogTitlesCriteria $criteria,
         ?User $user = null,
@@ -258,10 +342,10 @@ class CatalogFacetQuery
             ? $this->snapshots->remember('publication-types', ['locale' => app()->getLocale()], $rebuild)
             : $rebuild();
 
-        return collect($rows)->map(fn (array $row): object => (object) $row)->values();
+        return collect($rows)->map(fn (array $row): stdClass => (object) $row)->values();
     }
 
-    /** @return Collection<int, object{value: string, label: string, context_titles_count: int}> */
+    /** @return Collection<int, stdClass> */
     public function subtitleAvailability(
         CatalogTitlesCriteria $criteria,
         ?User $user = null,
@@ -287,12 +371,12 @@ class CatalogFacetQuery
             ? $this->snapshots->remember('subtitle-availability', ['locale' => app()->getLocale()], $rebuild)
             : $rebuild();
 
-        return collect($rows)->map(fn (array $row): object => (object) $row)->values();
+        return collect($rows)->map(fn (array $row): stdClass => (object) $row)->values();
     }
 
     /**
      * @param  list<int>  $selectedYears
-     * @return Collection<int, object>
+     * @return Collection<int, stdClass>
      */
     public function years(
         CatalogTitlesCriteria $criteria,
@@ -315,13 +399,13 @@ class CatalogFacetQuery
             ->get()
             ->map(fn (CatalogTitle $bucket): array => [
                 'year' => (int) $bucket->year,
-                'context_titles_count' => (int) $bucket->context_titles_count,
+                'context_titles_count' => (int) $bucket->getAttribute('context_titles_count'),
             ])
             ->all();
         $yearRows = $selectedYears === [] && $this->isDefaultPublicContext($user, $criteria)
             ? $this->snapshots->remember('years', ['limit' => $limit, 'year' => (int) now()->format('Y')], $yearBucketsQuery)
             : $yearBucketsQuery();
-        $yearBuckets = collect($yearRows)->map(fn (array $row): object => (object) $row);
+        $yearBuckets = collect($yearRows)->map(fn (array $row): stdClass => (object) $row);
 
         $selectedYears = collect($selectedYears)
             ->filter(fn (int $year): bool => $year >= 1900 && $year <= ((int) now()->format('Y') + 1))
@@ -333,7 +417,7 @@ class CatalogFacetQuery
             return $yearBuckets;
         }
 
-        $visibleYears = $yearBuckets->keyBy(fn (object $bucket): int => (int) $bucket->year);
+        $visibleYears = $yearBuckets->keyBy(fn (stdClass $bucket): int => (int) $bucket->year);
         $missingYears = $selectedYears
             ->reject(fn (int $year): bool => $visibleYears->has($year))
             ->values();
@@ -342,21 +426,42 @@ class CatalogFacetQuery
             : (clone $context)
                 ->whereIn('year', $missingYears->all())
                 ->get()
-                ->keyBy(fn (object $bucket): int => (int) $bucket->year);
+                ->map(fn (CatalogTitle $bucket): stdClass => (object) [
+                    'year' => (int) $bucket->year,
+                    'context_titles_count' => (int) $bucket->getAttribute('context_titles_count'),
+                ])
+                ->keyBy(fn (stdClass $bucket): int => (int) $bucket->year);
 
         $selectedBuckets = $selectedYears
-            ->map(fn (int $selectedYear): object => $visibleYears->get($selectedYear) ?? $selectedYearBuckets->get($selectedYear) ?? (object) [
+            ->map(fn (int $selectedYear): stdClass => $visibleYears->get($selectedYear) ?? $selectedYearBuckets->get($selectedYear) ?? (object) [
                 'year' => $selectedYear,
                 'context_titles_count' => 0,
             ]);
         $remainingBuckets = $yearBuckets
-            ->reject(fn (object $bucket): bool => $selectedYears->contains((int) $bucket->year))
+            ->reject(fn (stdClass $bucket): bool => $selectedYears->contains((int) $bucket->year))
             ->values();
 
         return $selectedBuckets
             ->concat($remainingBuckets)
-            ->unique(fn (object $bucket): int => (int) $bucket->year)
+            ->unique(fn (stdClass $bucket): int => (int) $bucket->year)
             ->values();
+    }
+
+    /** @return Collection<int, Model> */
+    private function emptyTaxonomyCollection(): Collection
+    {
+        return collect();
+    }
+
+    /**
+     * @param  list<string>  $filterTypes
+     * @return Collection<string, Collection<int, Model>>
+     */
+    private function emptyTaxonomyGroups(array $filterTypes): Collection
+    {
+        return collect($filterTypes)->mapWithKeys(
+            fn (string $filterType): array => [$filterType => $this->emptyTaxonomyCollection()],
+        );
     }
 
     private function isDefaultPublicContext(?User $user, ?CatalogTitlesCriteria $criteria): bool

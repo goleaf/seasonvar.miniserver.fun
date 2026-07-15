@@ -11,6 +11,7 @@ use App\Models\EpisodeViewProgress;
 use App\Models\User;
 use App\Services\Api\V1\Sync\ApiSyncReadiness;
 use App\Services\Api\V1\Sync\UserSyncChangePublisher;
+use App\Services\Reviews\ReviewCacheInvalidator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -23,6 +24,7 @@ class CatalogUserStateService
         private readonly CatalogPlaybackCompletionRule $completionRule,
         private readonly ApiSyncReadiness $syncReadiness,
         private readonly UserSyncChangePublisher $syncChanges,
+        private readonly ReviewCacheInvalidator $reviewCache,
     ) {}
 
     public function state(User $user, CatalogTitle $catalogTitle): ?CatalogTitleUserState
@@ -315,6 +317,10 @@ class CatalogUserStateService
 
             $state->forceFill($updates)->save();
             $this->syncChanges->publishTitleState($user, $catalogTitle);
+
+            if ($column === 'rating') {
+                $this->reviewCache->titleChanged((int) $catalogTitle->id);
+            }
 
             return ['applied' => true, 'state' => $state, 'version' => $version];
         }, attempts: 3);

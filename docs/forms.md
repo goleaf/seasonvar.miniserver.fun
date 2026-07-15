@@ -33,3 +33,21 @@
 - На странице каталога `Очистить поиск` удаляет только `q`; точечный сброс группы сохраняет остальные параметры, а `Сбросить все` возвращает поиск, фильтры, сортировку, вид и размер страницы к значениям по умолчанию.
 - Все фильтры `/titles` находятся в одной GET/Livewire-форме внутри полноширинного `<details id="catalog-filters">`. Блок уже открыт в первом SSR независимо от наличия условий, а summary показывает их общее число и позволяет при желании свернуть длинную форму; отдельные mobile dialog и desktop sidebar отсутствуют.
 - `npm run build` нужен после изменения Blade-компонентов форм, потому что классы Tailwind участвуют во frontend build.
+
+## Формы коллекций
+
+Create/edit/report/cover/membership/reorder используют Livewire forms с localized `ru/en` labels/errors, server enum rules и повторной service validation. Create form не принимает owner/moderation/feature; default visibility берётся из config и равна `private`. Editor передаёт locked UUID и optimistic `contentVersion`; stale save не затирает более новое изменение.
+
+Title-page selector держит existing membership и draft UUID set раздельно. Apply выполняет одну canonical batch transaction, Cancel/закрытие ничего не записывает, create-and-add использует тот же create service и одну outer transaction. Submit controls имеют scoped loading/disabled labels; delete/permanent delete/cover removal/item removal требуют явного подтверждения. Dialog lifecycle восстанавливает focus и закрывается Escape через Vite module, без inline application JavaScript.
+
+## Формы обсуждений
+
+Comment/reply/edit/report forms — Livewire forms с visible label, escaped draft, whole-comment spoiler checkbox, локальным Unicode-счётчиком для create/reply/edit, server/client maximum, scoped loading/disabled state и localized error/status live region. Счётчик обновляет Vite-модуль без запроса на каждое нажатие, а canonical maximum повторно проверяет PHP value object. Enter в multiline textarea остаётся переносом строки; публикация происходит только submit button/form action. Composer очищается и получает новый UUID token только после success; recoverable validation/rate/target failure сохраняет текст. При смене title/season/episode scope максимум три draft сохраняются только в locked текущем component state, не localStorage/public cache.
+
+Body и spoiler повторно валидируют canonical actions, report category/reaction/moderation/restriction/sort/target — enums. Client не передаёт author/status/deletion reason/moderator/target class. Reply/edit/report mode имеют Cancel; delete/moderation/restriction используют translated confirmation. Dialog закрывается Escape и возвращает focus через Vite module. Persistent draft sync, Markdown toolbar, mention picker и premium control не рендерятся.
+
+## Формы отзывов
+
+`CatalogTitleReviews` composer has visible title/body labels, optional labelled 1–10 rating select, whole-body spoiler checkbox, character guidance, submit/cancel and localized live error/success/loading. Create draft is opaque-account/target-scoped; edit draft is opaque-account/review-scoped, stored in `sessionStorage` for at most 24 hours, restored after recoverable failure and cleared only after confirmed success/cancel. This prevents cross-account draft reuse in one browser session; browser storage failure does not block submission.
+
+Edit never exposes author/target/status/verified fields; expected version and stable review ID are revalidated. Delete/restore/vote/report/preferences and moderation actions have explicit buttons/confirmations/loading locks; destructive GET routes do not exist. Client maxlength/disabled/select are fallback UX, while policy, value objects, canonical rating service, anti-spam, restriction and transaction enforce server truth.

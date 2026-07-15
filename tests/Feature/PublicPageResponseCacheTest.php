@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\CatalogTitle;
+use App\Models\LicensedMedia;
 use App\Models\User;
 use App\Services\Catalog\CatalogCacheInvalidator;
 use Illuminate\Database\Events\QueryExecuted;
@@ -19,9 +20,14 @@ final class PublicPageResponseCacheTest extends TestCase
 
     public function test_homepage_is_served_from_shared_html_cache_without_catalog_queries(): void
     {
-        CatalogTitle::factory()->create([
+        $title = CatalogTitle::factory()->create([
             'title' => 'Быстрый сериал',
             'slug' => 'bystryi-serial',
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $title->id,
+            'status' => 'published',
+            'published_at' => now(),
         ]);
 
         $this->get(route('home'))
@@ -107,6 +113,11 @@ final class PublicPageResponseCacheTest extends TestCase
         $this->get(route('home'))->assertHeader('X-Seasonvar-Page-Cache', 'HIT');
 
         $newTitle = CatalogTitle::factory()->create(['title' => 'Новый сериал после импорта']);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $newTitle->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
         app(CatalogCacheInvalidator::class)->catalogChanged([$newTitle->id]);
 
         $this->get(route('home'))
@@ -115,6 +126,80 @@ final class PublicPageResponseCacheTest extends TestCase
             ->assertSeeText('Новый сериал после импорта');
 
         $this->get(route('home'))->assertHeader('X-Seasonvar-Page-Cache', 'HIT');
+    }
+
+    public function test_large_compressible_public_html_is_served_from_shared_cache(): void
+    {
+        config([
+            'cache-architecture.page_cache.max_payload_bytes' => 850_000,
+            'cache-architecture.page_cache.max_uncompressed_payload_bytes' => 1_500_000,
+        ]);
+        $html = '<html><body>'.str_repeat('Большой публичный блок ', 25_000).'</body></html>';
+        Route::middleware(['web', 'public.page:stats'])
+            ->get('/_tests/large-public-page', fn () => response($html, 200, ['Content-Type' => 'text/html; charset=UTF-8']))
+            ->name('tests.large-public-page');
+
+        $first = $this->get('/_tests/large-public-page')
+            ->assertOk()
+            ->assertHeader('X-Seasonvar-Page-Cache', 'MISS')
+            ->assertSeeText('Большой публичный блок');
+
+        $this->assertGreaterThan(850_000, strlen((string) $first->getContent()));
+
+        $this->get('/_tests/large-public-page')
+            ->assertOk()
+            ->assertHeader('X-Seasonvar-Page-Cache', 'HIT')
+            ->assertSeeText('Большой публичный блок');
+    }
+
+    public function test_stats_livewire_page_is_served_from_shared_cache(): void
+    {
+        $this->get(route('stats'))
+            ->assertOk()
+            ->assertHeader('X-Seasonvar-Page-Cache', 'MISS')
+            ->assertSeeText('Сводка каталога');
+
+        $this->get(route('stats'))
+            ->assertOk()
+            ->assertHeader('X-Seasonvar-Page-Cache', 'HIT')
+            ->assertSeeText('Сводка каталога');
+    }
+
+    public function test_standard_guest_session_cookies_do_not_prevent_shared_caching(): void
+    {
+        Route::middleware(['web', 'public.page:stats'])
+            ->get('/_tests/public-page-with-session-cookies', function () {
+                return response('<html><body>Публичная Livewire страница</body></html>')
+                    ->cookie('XSRF-TOKEN', 'test-token')
+                    ->cookie((string) config('session.cookie'), 'test-session');
+            })
+            ->name('tests.public-page-with-session-cookies');
+
+        $this->get('/_tests/public-page-with-session-cookies')
+            ->assertOk()
+            ->assertHeader('X-Seasonvar-Page-Cache', 'MISS');
+
+        $this->get('/_tests/public-page-with-session-cookies')
+            ->assertOk()
+            ->assertHeader('X-Seasonvar-Page-Cache', 'HIT');
+    }
+
+    public function test_custom_response_cookie_prevents_shared_caching(): void
+    {
+        Route::middleware(['web', 'public.page:stats'])
+            ->get('/_tests/public-page-with-custom-cookie', function () {
+                return response('<html><body>Ответ с прикладным cookie</body></html>')
+                    ->cookie('catalog-preference', 'private-value');
+            })
+            ->name('tests.public-page-with-custom-cookie');
+
+        $this->get('/_tests/public-page-with-custom-cookie')
+            ->assertOk()
+            ->assertHeader('X-Seasonvar-Page-Cache', 'BYPASS');
+
+        $this->get('/_tests/public-page-with-custom-cookie')
+            ->assertOk()
+            ->assertHeader('X-Seasonvar-Page-Cache', 'BYPASS');
     }
 
     public function test_cacheable_public_routes_have_the_expected_profiles(): void

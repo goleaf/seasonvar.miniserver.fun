@@ -1,0 +1,177 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Actions\Comments;
+
+use App\Enums\AdminAuditAction;
+use App\Enums\CommentDeletionReason;
+use App\Enums\CommentModerationReason;
+use App\Enums\CommentReportStatus;
+use App\Enums\CommentStatus;
+use App\Exceptions\Comments\CommentActionException;
+use App\Models\Comment;
+use App\Models\CommentReport;
+use App\Models\User;
+use App\Services\Admin\AdminAuditRecorder;
+use App\Services\Comments\CommentCacheInvalidator;
+use App\Services\Comments\CommentModerationAudit;
+use App\Services\Comments\CommentNotificationService;
+use App\Support\UserPlainText;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
+
+final class ModerateComment
+{
+    public function __construct(
+        private readonly CommentCacheInvalidator $cache,
+        private readonly CommentNotificationService $notifications,
+        private readonly AdminAuditRecorder $auditRecorder,
+        private readonly CommentModerationAudit $audit,
+    ) {}
+
+    public function handle(
+        User $moderator,
+        int $commentId,
+        CommentStatus|string $status,
+        CommentModerationReason|string $reason,
+        mixed $privateNote = null,
+        bool $resolveOpenReports = true,
+    ): Comment {
+        $comment = Comment::query()->withTrashed()->findOrFail($commentId);
+        Gate::forUser($moderator)->authorize('moderate', $comment);
+        $status = is_string($status) ? CommentStatus::tryFrom($status) : $status;
+        $reason = is_string($reason) ? CommentModerationReason::tryFrom($reason) : $reason;
+
+        if (! $status instanceof CommentStatus || ! $reason instanceof CommentModerationReason) {
+            throw new CommentActionException('comments.errors.invalid_moderation');
+        }
+
+        $privateNote = UserPlainText::description($privateNote);
+
+        if ($privateNote !== null && Str::length($privateNote) > 2_000) {
+            throw new CommentActionException('comments.errors.moderator_note_too_long', ['maximum' => 2_000]);
+        }
+
+        [$comment, $beforeVersion, $resolvedReports, $commentChanged, $visibilityChanged] = DB::transaction(function () use (
+            $comment,
+            $moderator,
+            $status,
+            $reason,
+            $privateNote,
+            $resolveOpenReports,
+        ): array {
+            $locked = Comment::query()
+                ->withTrashed()
+                ->lockForUpdate()
+                ->findOrFail($comment->id);
+            Gate::forUser($moderator)->authorize('moderate', $locked);
+
+            if ($locked->deletion_reason === CommentDeletionReason::Privacy
+                && $status !== CommentStatus::Removed) {
+                throw new CommentActionException('comments.errors.invalid_moderation');
+            }
+
+            $beforeVersion = $this->audit->comment($locked);
+            $protectedDeletion = $locked->deleted_at !== null
+                && in_array(
+                    $locked->deletion_reason,
+                    [CommentDeletionReason::Author, CommentDeletionReason::Privacy],
+                    true,
+                );
+            $deletionStateChanges = $status === CommentStatus::Removed
+                ? $locked->deleted_at === null
+                : $locked->deleted_at !== null
+                    && $locked->deletion_reason === CommentDeletionReason::Moderator;
+            $statusChanged = $locked->status !== $status;
+            $visibilityChanged = $statusChanged || $deletionStateChanges;
+            $commentChanged = $statusChanged
+                || $locked->moderation_reason !== $reason
+                || $locked->moderator_note !== $privateNote
+                || $deletionStateChanges;
+
+            if ($commentChanged) {
+                $locked->forceFill([
+                    'status' => $status,
+                    'moderated_by_id' => $moderator->id,
+                    'moderation_reason' => $reason,
+                    'moderator_note' => $privateNote,
+                    'moderated_at' => now(),
+                    'version' => (int) $locked->version + 1,
+                ]);
+
+                if ($status === CommentStatus::Removed) {
+                    if (! $protectedDeletion) {
+                        $locked->deletion_reason = CommentDeletionReason::Moderator;
+                        $locked->deleted_by_id = $moderator->id;
+                    }
+
+                    $locked->save();
+
+                    if ($locked->deleted_at === null) {
+                        $locked->delete();
+                    }
+                } else {
+                    if (! $protectedDeletion
+                        && $locked->deleted_at !== null
+                        && $locked->deletion_reason === CommentDeletionReason::Moderator) {
+                        $locked->restore();
+                        $locked->deletion_reason = null;
+                        $locked->deleted_by_id = null;
+                    }
+
+                    $locked->save();
+                }
+            }
+
+            if (! $resolveOpenReports) {
+                return [$locked, $beforeVersion, collect(), $commentChanged, $visibilityChanged];
+            }
+
+            $reports = CommentReport::query()
+                ->where('comment_id', $locked->id)
+                ->whereIn('status', [CommentReportStatus::Open->value, CommentReportStatus::Reviewed->value])
+                ->lockForUpdate()
+                ->get();
+
+            if ($reports->isNotEmpty()) {
+                $reports->toQuery()->update([
+                    'status' => CommentReportStatus::Resolved->value,
+                    'moderator_id' => $moderator->id,
+                    'private_note' => $privateNote,
+                    'deduplication_key' => null,
+                    'resolved_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            return [$locked, $beforeVersion, $reports, $commentChanged, $visibilityChanged];
+        }, attempts: 3);
+
+        $comment->refresh();
+
+        if ($commentChanged) {
+            $this->auditRecorder->record(
+                $moderator,
+                AdminAuditAction::CommentModerated,
+                $comment,
+                $beforeVersion,
+                $this->audit->comment($comment),
+                ['comment_status', 'moderation_reason', 'moderator_note', 'deleted_at'],
+            );
+        }
+
+        if ($visibilityChanged) {
+            $this->cache->commentChanged($comment);
+            $this->notifications->moderationChanged($comment);
+        }
+
+        foreach ($resolvedReports as $report) {
+            $report->refresh();
+            $this->notifications->reportResolved($report);
+        }
+
+        return $comment;
+    }
+}

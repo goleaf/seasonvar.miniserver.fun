@@ -3,6 +3,10 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Services\Collections\CatalogCollectionSchema;
+use App\Services\Comments\CommentSchema;
+use App\Services\Reviews\ReviewSchema;
+use App\Services\Tags\TagSchema;
 use App\Support\Cache\CacheEventReporter;
 use App\View\ViewData\AppLayoutData;
 use Illuminate\Cache\Events\CacheFailedOver;
@@ -30,6 +34,10 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         config()->set('livewire.temporary_file_upload.middleware', 'web');
+        $this->app->scopedIf(CatalogCollectionSchema::class);
+        $this->app->scopedIf(CommentSchema::class);
+        $this->app->scopedIf(ReviewSchema::class);
+        $this->app->singletonIf(TagSchema::class);
     }
 
     /**
@@ -53,6 +61,8 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::define('manage-seasonvar-imports', $catalogAdministrator);
         Gate::define('manage-catalog', $catalogAdministrator);
+        Gate::define('manage-comments', $catalogAdministrator);
+        Gate::define('manage-reviews', $catalogAdministrator);
 
         Livewire::setUpdateRoute(function ($handle, string $path) {
             return Route::post($path, $handle)

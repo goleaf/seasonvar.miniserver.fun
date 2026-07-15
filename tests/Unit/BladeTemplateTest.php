@@ -58,6 +58,7 @@ class BladeTemplateTest extends TestCase
 
                 return preg_match('/<\?(?:php|=)/i', $contents) === 1
                     || preg_match('/\b(?:Auth|Cache|Gate|Redis|Storage|DB)::|\b(?:cache|config|request|resolve|app)\s*\(|::query\s*\(/', $contents) === 1
+                    || preg_match('/\bjson_encode\s*\(/i', $contents) === 1
                     || preg_match('/\bnew\s+\\\\?App\\\\|\\\\?App\\\\[A-Za-z0-9_\\\\]+::/', $contents) === 1
                     || preg_match('/@(?:auth|guest|can|cannot|canany|cannotany|inject|use)\b/i', $contents) === 1;
             })
@@ -65,7 +66,7 @@ class BladeTemplateTest extends TestCase
             ->values()
             ->all();
 
-        $this->assertSame([], $offendingFiles, 'Blade templates must receive prepared request, configuration, authentication, authorization, storage, database, Redis, cache, and service state.');
+        $this->assertSame([], $offendingFiles, 'Blade templates must receive prepared request, configuration, authentication, authorization, storage, database, Redis, cache, serialization, and service state.');
     }
 
     public function test_catalog_artwork_is_emitted_only_by_the_shared_poster_frame(): void

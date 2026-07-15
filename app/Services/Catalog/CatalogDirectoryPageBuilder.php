@@ -4,7 +4,9 @@ namespace App\Services\Catalog;
 
 use App\DTOs\CatalogDirectoryDefinition;
 use App\Support\CatalogAlphabet;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Pagination\LengthAwarePaginator;
+use stdClass;
 
 class CatalogDirectoryPageBuilder
 {
@@ -54,10 +56,10 @@ class CatalogDirectoryPageBuilder
         ];
     }
 
-    /** @param LengthAwarePaginator<int, object> $items */
+    /** @param LengthAwarePaginator<int, Model|stdClass> $items */
     private function decorateItems(LengthAwarePaginator $items, CatalogDirectoryDefinition $directory): void
     {
-        $items->setCollection($items->getCollection()->map(function (object $item) use ($directory): object {
+        $items->setCollection($items->getCollection()->map(function (Model|stdClass $item) use ($directory): Model|stdClass {
             if ($directory->isYear()) {
                 $item->name = (string) $item->year;
                 $item->detail_url = route('titles.year', ['year' => $item->year]);

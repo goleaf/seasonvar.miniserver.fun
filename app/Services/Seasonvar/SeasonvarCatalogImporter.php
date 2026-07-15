@@ -513,7 +513,12 @@ class SeasonvarCatalogImporter
 
         $transactionResult = $this->databaseTransaction->run(function () use ($page, $data, $prepared, $progress, $preferredCatalogTitle): array {
             $catalogTitle = $this->upsertCatalogTitle($page, $data, $prepared->contentHash, $progress, $preferredCatalogTitle);
-            $this->relationSyncer->sync($catalogTitle, $data->taxonomies, $progress);
+            $this->relationSyncer->sync(
+                $catalogTitle,
+                $data->taxonomies,
+                $progress,
+                completeTagSnapshot: $data->hasCompleteMetadataSnapshot(),
+            );
             $this->syncCatalogAliases($catalogTitle, $data->aliases, $progress);
             $this->syncCatalogRatings($catalogTitle, $data->ratings, $progress);
 
@@ -1560,8 +1565,9 @@ class SeasonvarCatalogImporter
      */
     private function parseExternalPlaylistItem(array $playlistItem, ?callable $progress = null): array
     {
-        $playlistUrl = $this->playlistImporter->safeExternalUrl($playlistItem['url']);
-        $response = $this->httpClient->get($playlistUrl, 0, $progress);
+        $target = $this->playlistImporter->verifiedExternalUrl($playlistItem['url']);
+        $playlistUrl = $target->url;
+        $response = $this->httpClient->getVerified($target, 0, $progress);
 
         if (! $response->successful()) {
             throw new RuntimeException('Плейлист вернул HTTP '.$response->status().'.');

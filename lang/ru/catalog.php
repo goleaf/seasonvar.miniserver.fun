@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'loading' => 'Загружаем содержимое…',
+
     'counts' => [
         'results' => ':count сериал|:count сериала|:count сериалов',
         'results_found' => 'Найден :count сериал|Найдено :count сериала|Найдено :count сериалов',

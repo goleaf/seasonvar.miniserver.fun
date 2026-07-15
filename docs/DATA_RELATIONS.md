@@ -209,6 +209,116 @@
 - Для каждой relation-группы выполняется один grouped aggregate; годы, publication type и subtitles используют отдельные bounded агрегаты. Полные коллекции тайтлов для подсчета в PHP не загружаются.
 - Default public facets хранятся как compact snapshot через `CatalogFacetSnapshotCache`; пользовательский и любой непустой контекст фильтров обходят общий snapshot. Importer/admin mutations инвалидируют соответствующую catalog cache version after commit, поэтому устаревший snapshot не переживает authoritative изменение.
 
+## Коллекции сериалов
+
+### Таблицы и связи
+
+| Таблица | Назначение и ограничения |
+| --- | --- |
+| `catalog_collections` | Stable DB ID, unique public UUID и global current slug; nullable owner FK, original name/description, enum-backed type/visibility/moderation/sort, optional content locale, feature/publication state, private cover metadata/version, content version, timestamps и soft delete. |
+| `catalog_collection_slugs` | Unique historical slug → stable collection FK. Старые URL разрешаются после policy check и перенаправляются на current slug. |
+| `catalog_collection_items` | Одна serial membership: collection FK, `CatalogTitle` FK, nullable added-by FK, manual position и timestamps. Unique collection/title запрещает логический дубль; title/collection и collection/position indexes обслуживают discovery и ordering. |
+| `catalog_collection_translations` | Только editorial DB content: unique collection/locale title, description, SEO title/description. User-created text сюда не копируется. |
+| `catalog_collection_reports` | Collection moderation evidence с nullable FK, preserved collection UUID/content version, nullable reporter/moderator, stable reason/status, sanitized details/note и unique deduplication key. |
+
+`users.public_id` — nullable-at-schema external UUID с migration backfill и model-side assignment для новых users. Публичный owner URL использует его, а не numeric ID/email. Relations: `User::catalogCollections()`, `CatalogCollection::{owner,items,historicalSlugs,translations,reports,comments}()`, `CatalogTitle::collectionItems()` и item `catalogTitleWithTrashed()` для owner-safe unavailable state.
+
+### Invariants
+
+- User collection создаётся только с server-derived `owner_id`; owner name/email не входят в identity. `id` и `public_id` переживают rename, slug change, locale, cover, visibility и restore.
+- Internal values хранятся только как `user|editorial|system`, `private|unlisted|public`, `pending|approved|rejected|hidden|archived` и enum sort codes. Переведённые labels существуют только в `lang/ru|en/collections.php`.
+- Unique current slug и unique history slug вместе с UUID suffix дают deterministic allocation. История same collection может быть освобождена при возврате к прежнему имени; current/history другого record не переиспользуются.
+- Unique item constraint вводится сразу, потому что pre-migration audit подтвердил отсутствие legacy collection tables/rows. Runtime add/batch остаётся идемпотентным и обрабатывает DB races transaction retry; merge duplicate titles выполняет reconciliation до title delete.
+- Manual positions последовательны после remove/move/reorder/merge. Automatic ordering не меняет их. Стабильный secondary key — item/title ID в зависимости от sort.
+- Public count считает только guest-visible titles; owner count — сохранённые items, включая bounded unavailable list. Это не раскрывает скрытые memberships гостю и сохраняет owner recovery.
+- Soft delete сохраняет items/slugs/translations/reports на restoration window. Restore делает record private/approved; permanent delete cascades owned structural rows, оставляет report evidence через nullable FK и privacy-retires generic comments.
+
+### Обоснованные индексы
+
+- `catalog_collections_owner_order_idx(owner_id, deleted_at, updated_at, id)` — active/deleted owner dashboards с deterministic pagination.
+- `catalog_collections_public_order_idx(visibility, moderation_status, deleted_at, updated_at, id)` — public directory/profile/search/sitemap eligibility и recent ordering.
+- `catalog_collections_featured_idx(type, is_featured, visibility, moderation_status)` — bounded homepage/editorial featured query.
+- `catalog_collection_items_manual_order_idx(catalog_collection_id, position, id)` — manual page/order normalization; unique collection/title одновременно обслуживает membership existence.
+- `catalog_collection_items_title_lookup_idx(catalog_title_id, catalog_collection_id)` — title page discovery и merge reconciliation.
+- Translation locale/name, slug history collection/time и report collection/status/public-identity/queue indexes соответствуют editorial lookup, redirects, preserved evidence и admin queue. Дополнительные likes/follows/collaborator indexes не добавлялись, потому что таких таблиц нет.
+
+### Rollback и legacy normalization
+
+Миграции additive и SQLite-compatible: сначала добавляют/backfill `users.public_id`, затем collection tables, потом editorial translations. `down()` удаляет только новые tables и UUID column; watchlist, rating, progress, history, comments, reviews, catalog identity и media не затрагиваются. После production writes перед rollback нужен account/collection export и backup: rollback схемы намеренно не переносит новые коллекции в другую архитектуру.
+
+Baseline audit не нашёл duplicate systems/items/slugs/positions, translated DB labels, invalid owners или unsafe legacy covers, поэтому destructive backfill не нужен. Будущая диагностика должна выявлять unique violations, invalid enum codes, orphaned owners/titles, position gaps/duplicates, missing cover files и public rows вне approved state; исправление проходит idempotent domain services, а не blind delete.
+
+## Обсуждения
+
+### Таблицы и identity
+
+| Таблица | Контракт |
+| --- | --- |
+| `comments` | Stable ID, nullable author, allowlisted target type/numeric ID, optional root title FK, root `parent_id`, logical `reply_to_id`, plain body/hash, spoiler/status/version/edit/moderation/deletion fields, UUID-derived submission key, timestamps и soft delete. |
+| `comment_reactions` | Unique `(comment_id,user_id)` и stable `up|down`; comment/user deletion удаляет только engagement row. |
+| `comment_reports` | Comment evidence, nullable reporter/moderator, category/status, sanitized details/private note, nullable unique unresolved deduplication key и resolution time. Comment FK restrict сохраняет evidence. |
+| `comment_restrictions` | Comment-only temporary/permanent restriction с user/moderator/revoker, reason, private note, start/expiry/revocation. Expiry определяется query, не scheduler. |
+| `user_blocks`, `user_mutes` | Directional private relations с unique pair и reverse lookup. Block и mute имеют разные semantics. |
+| `comment_notification_preferences` | Одна строка на user с reply/reaction/moderation/report switches. |
+| `notifications` | Стандартная Laravel database-notification identity/data/read state; comment payload body-free и использует type `comment.activity`. |
+
+`comments.id` переживает edit, soft delete/restore, target slug/name/locale change и merge. `target_type,target_id` не является arbitrary polymorphic relation: model class никогда не хранится и разрешается только `CommentTargetType`/`CommentTargetResolver`. `catalog_title_id` связывает title/season/episode scope с одним cache/merge root; collection target оставляет его `null`.
+
+### Reply, status и aggregate invariants
+
+- Top-level row имеет `parent_id=null`; reply имеет `parent_id` ровно root ID и optional `reply_to_id` на published non-deleted row той же цели. `CreateComment` вычисляет root server-side и требует, чтобы он оставался published; live root либо author-deleted published tombstone допускает сохранённое продолжение, но hidden/rejected/spam/removed root закрывает новые replies. Reparent/update target API отсутствует, поэтому cycles и structural nesting глубже одного невозможны.
+- `restrictOnDelete` для `parent_id` и comment reports не позволяет случайно force-delete thread/evidence; `reply_to_id` допускает `nullOnDelete` только для законного hard-delete контекста. Обычные user/moderator удаления используют soft delete.
+- Public count — число `status=published AND deleted_at IS NULL` для цели, включая roots/replies. Root `replies_count` — published non-deleted replies. Собственные pending/hidden/rejected/spam replies считаются отдельным private viewer overlay; removed/deleted и blocked/muted state не изменяют public aggregate.
+- Reaction up/down/score и reply totals derived SQL subqueries. Stored aggregate columns не добавлены, поэтому create/edit/delete/restore/moderation/reaction не поддерживают drift-prone counters.
+- Stable DB values никогда не переводятся: target/status/reaction/report/restriction/deletion/moderation/notification codes хранятся на английском; `lang/{ru,en}/comments.php` владеет labels. User body сохраняет исходный язык/script и не входит в translation rows/files.
+
+### Query indexes и uniqueness
+
+- `comments_target_list_idx(target_type,target_id,parent_id,status,created_at,id)` обслуживает exact scope, root list и deterministic pagination; `comments_thread_replies_idx(parent_id,status,deleted_at,created_at,id)` — chronological progressive replies.
+- `comments_author_activity_idx(user_id,status,deleted_at,created_at,id)` обслуживает private export/activity; `comments_duplicate_window_idx(user_id,target_type,target_id,body_hash,created_at)` — short duplicate detection; `comments_title_cache_idx(catalog_title_id,status,deleted_at)` — targeted invalidation/account identity changes.
+- `comments_moderation_queue_idx(status,created_at,id)` и report queue/comment-status indexes обслуживают bounded moderator views. `comment_reactions_totals_idx` и unique pair обслуживают grouped totals/current state. Restriction/block reverse indexes соответствуют active permission и both-direction block queries.
+- `notifications_recipient_list_idx(notifiable_type,notifiable_id,created_at,id)` обслуживает deterministic paginated inbox, а `notifications_recipient_unread_idx(notifiable_type,notifiable_id,read_at)` — unread count/update. Отдельный дублирующий morph-prefix index намеренно не создаётся.
+- Unique submission key, reaction pair, report deduplication key и directional block/mute pair введены сразу: pre-migration audit подтвердил отсутствие любых legacy comment/reaction/report rows. Runtime actions всё равно idempotent и обрабатывают concurrent retry.
+
+### Migration, normalization, targets и privacy
+
+Migrations `2026_07_15_210000`–`210300` additive, reversible и SQLite-compatible. Они не переписывают `catalog_title_reviews`, каталог, collections, watchlist/rating, progress/history, media или import state. Initial audit не нашёл competing comment/reply/reaction tables, orphan/circular relations, translated statuses, unsafe legacy bodies, duplicate votes/reports или legacy anchors, поэтому destructive normalization/backfill отсутствует. Permanent collection retirement bulk-обновляет и активные rows, и tombstones до stable `removed/privacy`, сохраняет существующий `deleted_at` и всю thread/report evidence. После появления production discussion data rollback допустим только после private export/backup; `down()` удаляет новые данные и не переносит их в reviews.
+
+Title merge сначала remap-ит title/season/episode targets и root title FK, затем удаляет duplicate hierarchy; ID, parent/reply context, reactions, reports, moderation/spoiler/edit/deletion state и timestamps сохраняются. Soft-deleted/hidden target закрывается существующей visibility boundary без изменения comments. Permanent collection deletion privacy-retires discussion, сохраняя rows/evidence; public direct URL не обходит target policy, moderator queue читает сохранённую запись отдельно.
+
+Account deletion анонимизирует `comments.user_id` и `comment_reports.reporter_id`, очищает user-derived unresolved report deduplication key, удаляет reactions/private relations/preferences/restrictions и body-free notifications до удаления user. Thread body, report content/status и moderation evidence сохраняются без former account linkage. Export содержит только owner comments/reactions и исключает private moderator/report data и чужие поля.
+
+## Отзывы пользователей
+
+### Таблицы, identity и rating relation
+
+| Таблица | Контракт |
+| --- | --- |
+| `catalog_title_reviews` | Existing stable ID/title/source/author/body/body hash/date плюс nullable user, `provider|user` origin, title, original hash, spoiler/verified flags, moderation/version/edit/deletion/ownership/submission/merge fields. Прямой title FK — единственный review target. |
+| `catalog_title_review_aliases` | Unique legacy review ID → canonical review ID и legacy title context после merge; direct links не зависят от slug/page. |
+| `catalog_title_review_votes` | Unique `(review_id,user_id)`, stable `helpful|not_helpful`; FK cascade удаляет engagement только при законном hard delete review/user. |
+| `catalog_title_review_reports` | Review evidence, nullable reporter/moderator, category/status, sanitized details/private note, resolution и nullable unique open deduplication key. Review FK restrict сохраняет evidence. |
+| `catalog_title_review_restrictions` | Review-only temporary/permanent restriction, reason, private note, start/expiry/revocation; active query учитывает expiry без scheduler. |
+| `catalog_title_review_notification_preferences` | Одна owner row для helpful/moderation/report preferences. Standard `notifications` хранит body-free `review.activity` payload. |
+| `catalog_title_user_states` | Уже существующая unique user/title row остаётся единственным optional 1–10 portal score. Review table не хранит дублирующую оценку. |
+
+Provider rows сохраняют прежний `(catalog_title_id,body_hash)` unique key, ID/source/body/date и unlimited-per-title semantics. User `body_hash` author-scoped; `original_body_hash` сохраняет evidence при archival collision. Nullable unique `ownership_key=sha256(user,title)` обеспечивает один current user review, а `submission_key=sha256(user,title,UUID)` — idempotent retry. Deleted row хранит ownership 30 дней; следующая create после expiry очищает slot в той же locked transaction, но не удаляет historical review.
+
+### Visibility, aggregates и query indexes
+
+- Public row: `status=published`, `deleted_at IS NULL`, `merged_into_id IS NULL` и доступный title. Owner-only pending/history и moderator records не входят в public count/cache. Imported provider rows получают DB defaults `origin=provider,status=published` без destructive backfill.
+- Public count — provider+user rows этого public predicate. Review score count/average — только `origin=user` public rows с non-null `catalog_title_user_states.rating`; missing score не равен 0. Helpful/not-helpful/score derived from grouped vote subqueries. Stored counters/average columns отсутствуют.
+- Public title list index ведёт exact title/status/deleted/date/id pagination; author-history — user/status/deleted/date/id; moderation — status/date/id; verified/spoiler/rating filters используют ограниченные indexes и canonical rating join. Vote unique/totals, report queue/dedup и active restriction indexes соответствуют реальным permission/list queries; duplicate speculative indexes не добавляются.
+- Sorting uses allowlisted SQL only and deterministic ID tie-breaker. Author/title/rating/totals eager/join/grouped; viewer vote и block/mute sets загружаются bounded отдельно. Full lists не сортируются in memory и Eloquent graphs не сериализуются в Livewire.
+
+### Migration, merge, lifecycle и privacy
+
+`2026_07_15_220000_extend_catalog_title_reviews_for_community_reviews.php` additive и SQLite-compatible: расширяет существующую table, затем создаёт aliases/votes/reports/restrictions/preferences. Pre-migration schema audit нашёл 73 101 provider rows, zero duplicate title/body-hash groups, orphans, unsafe HTML-like bodies или legacy user/vote/report data, поэтому destructive duplicate reconciliation не нужен. `ReviewSchema` fail-closed отключает community writes до полной schema capability и сохраняет legacy provider API reads. `down()` удаляет только Task 13 schema, но production user data перед rollback требует export/backup.
+
+Title merge переносит provider/user rows до удаления duplicate title. Same body/author collision сначала выбирает current ownership slot, затем public/active, latest edited и более содержательную row; retained historical rows не могут перехватить reconciliation, а released/previously merged rows не получают ownership повторно. Non-canonical ID архивируется с `merged_into_id`, stable alias, прежним status/deletion evidence и collision-safe active hash; входящие aliases flatten-ятся на финальный canonical ID, поэтому direct links и notification cleanup не зависят от длины merge chain. Truthful verified snapshot и safety-critical spoiler flag объединяются monotonic OR, votes/reports переходят idempotently, self/duplicate votes схлопываются, portal rating/progress rows объединяются отдельным existing title-user merger; review delete/create не меняет progress, history, watchlist, bookmark или collection membership.
+
+Account deletion обнуляет `reviews.user_id` и `reports.reporter_id`, удаляет reporter dedup key, privacy-rotates author-scoped body hash, очищает original/ownership/submission hashes, удаляет actor votes/preferences/restrictions/body-free notifications и сохраняет public text/moderation evidence без former identity. Export включает owner title reference/title/body/rating/spoiler/verified/public status/timestamps и votes made, но исключает moderator note, reports/reporters и exact watch evidence. `verified_watching` — non-downgrading boolean snapshot, не FK/aggregate private progress.
+
 <!-- project-docs:start -->
 ## Публичная индексация
 

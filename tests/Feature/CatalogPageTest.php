@@ -1073,7 +1073,7 @@ class CatalogPageTest extends TestCase
 
         $this->get(route('home'))
             ->assertOk()
-            ->assertSeeText('Субтитры');
+            ->assertSeeText('С субтитрами');
     }
 
     public function test_catalog_year_filter_accepts_cached_plain_year_bucket_rows(): void
@@ -1259,7 +1259,7 @@ class CatalogPageTest extends TestCase
         $response
             ->assertOk()
             ->assertSeeLivewire('stats-dashboard')
-            ->assertSee('wire:poll.15s.visible="refreshStats"', false)
+            ->assertDontSee('wire:poll', false)
             ->assertSeeText('Сводка каталога')
             ->assertSeeText('Снимок обновляется после изменений каталога и в плановом прогреве')
             ->assertSeeText('Показано:')
@@ -1324,7 +1324,6 @@ class CatalogPageTest extends TestCase
             ->assertDontSee('private context secret', false);
 
         Livewire::test(StatsDashboard::class)
-            ->call('refreshStats')
             ->assertSee('Сводка каталога')
             ->assertDontSee($sourceUrl)
             ->assertDontSee($sourcePageUrl)
@@ -2094,11 +2093,7 @@ class CatalogPageTest extends TestCase
 
     public function test_title_page_renders_when_recommendation_table_is_missing(): void
     {
-        Schema::partialMock()
-            ->shouldReceive('hasTable')
-            ->with('catalog_title_recommendations')
-            ->once()
-            ->andReturnFalse();
+        Schema::drop('catalog_title_recommendations');
 
         $catalogTitle = CatalogTitle::factory()->create([
             'title' => 'Сериал без таблицы рекомендаций',

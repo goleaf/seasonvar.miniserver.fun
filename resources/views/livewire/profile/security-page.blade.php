@@ -21,6 +21,14 @@
         />
     </x-ui.panel>
 
+    <x-ui.panel :title="__('collections.account.export_title')" :subtitle="__('collections.account.export_hint')" icon="fa-solid fa-file-arrow-down">
+        <p class="mb-4 text-sm leading-6 text-slate-600">{{ __('comments.profile.export_hint') }}</p>
+        <a href="{{ route('profile.export') }}" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200 sm:w-auto">
+            <x-ui.icon name="fa-solid fa-download" />
+            <span>{{ __('collections.actions.export') }}</span>
+        </a>
+    </x-ui.panel>
+
     <x-ui.panel title="Сменить пароль" subtitle="После смены все устройства API будут отключены, текущая browser-сессия сохранится." icon="fa-solid fa-lock">
         @if ($passwordStatus)
             <div class="mb-5">
@@ -134,7 +142,8 @@
             <x-ui.icon name="fa-solid fa-triangle-exclamation" />
             Удаление аккаунта
         </h2>
-        <p class="mt-2 text-sm leading-6 text-slate-600">Будут удалены профиль, личная библиотека, история просмотра, синхронизация и все токены. Каталог останется без изменений.</p>
+        <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('collections.account.deletion_scope') }}</p>
+        <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('comments.profile.deletion_hint') }}</p>
 
         <button
             type="button"

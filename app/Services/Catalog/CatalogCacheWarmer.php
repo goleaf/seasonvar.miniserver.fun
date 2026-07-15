@@ -19,7 +19,10 @@ final class CatalogCacheWarmer
         private readonly PublicPageCacheWarmer $pages,
     ) {}
 
-    /** @return array{started_at: string, finished_at: string, duration_ms: int, targets: array<string, int>} */
+    /**
+     * @param  iterable<array-key, int|string>  $titleIds
+     * @return array{started_at: string, finished_at: string, duration_ms: int, targets: array<string, int>}
+     */
     public function warmCritical(bool $refresh = false, iterable $titleIds = []): array
     {
         $startedAt = now();

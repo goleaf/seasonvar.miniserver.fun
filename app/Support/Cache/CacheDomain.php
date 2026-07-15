@@ -13,6 +13,8 @@ enum CacheDomain: string
     case TitleDetail = 'title-detail';
     case Recommendations = 'recommendations';
     case SearchSuggestions = 'search-suggestions';
+    case Tags = 'tags';
+    case Collections = 'collections';
     case Sitemap = 'sitemap';
     case Api = 'api';
     case Operational = 'operational';

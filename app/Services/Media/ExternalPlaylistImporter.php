@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Media;
 
 use App\DTOs\VerifiedExternalUrlData;
@@ -8,14 +10,38 @@ use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
+use App\Services\Crawler\PoliteHttpClient;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
 
-class ExternalPlaylistImporter
+/**
+ * @phpstan-type PlaylistEntry array{
+ *     title: string,
+ *     url: string,
+ *     file_name: string,
+ *     title_key: string,
+ *     season_number: int|null,
+ *     episode_number: int|null
+ * }
+ */
+final class ExternalPlaylistImporter
 {
+    private const TITLE_MATCH_CHUNK_SIZE = 500;
+
+    /** @var list<string> */
+    private const PLAYLIST_CONTENT_TYPES = [
+        'application/mpegurl',
+        'application/octet-stream',
+        'application/vnd.apple.mpegurl',
+        'application/x-mpegurl',
+        'audio/mpegurl',
+        'audio/x-mpegurl',
+        'text/plain',
+    ];
+
     /** @var array<string, list<string>> */
     private array $publicHosts = [];
 
@@ -24,7 +50,10 @@ class ExternalPlaylistImporter
      */
     private array $mediaExtensions = ['mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi', 'm3u', 'm3u8'];
 
-    public function __construct(private readonly ExternalMediaMetadata $mediaMetadata) {}
+    public function __construct(
+        private readonly ExternalMediaMetadata $mediaMetadata,
+        private readonly PoliteHttpClient $httpClient,
+    ) {}
 
     /**
      * @return array{
@@ -40,18 +69,38 @@ class ExternalPlaylistImporter
     {
         $target = $this->verifiedExternalUrl($playlistUrl);
         $safePlaylistUrl = $target->url;
-        $response = Http::timeout(10)
-            ->connectTimeout(5)
-            ->withoutRedirecting()
-            ->withOptions($target->httpOptions())
-            ->retry([100, 300, 700])
-            ->get($safePlaylistUrl);
+        $response = $this->httpClient->getVerified($target, delaySeconds: 0);
 
         if (! $response->successful()) {
             throw new RuntimeException('Плейлист вернул HTTP '.$response->status().'.');
         }
 
-        return $this->importFromContent($response->body(), $safePlaylistUrl, $forcedTitle, $dryRun);
+        return $this->importFromContent(
+            $this->validatedRemotePlaylistContent($response),
+            $safePlaylistUrl,
+            $forcedTitle,
+            $dryRun,
+        );
+    }
+
+    private function validatedRemotePlaylistContent(Response $response): string
+    {
+        $contentType = strtolower(trim(Str::before($response->header('Content-Type'), ';')));
+
+        if (! in_array($contentType, self::PLAYLIST_CONTENT_TYPES, true)) {
+            throw new RuntimeException('Плейлист вернул неподдерживаемый Content-Type.');
+        }
+
+        $content = $response->body();
+        $signatureCandidate = str_starts_with($content, "\xEF\xBB\xBF")
+            ? substr($content, 3)
+            : $content;
+
+        if (! str_starts_with(ltrim($signatureCandidate), '#EXTM3U')) {
+            throw new RuntimeException('Плейлист не содержит сигнатуру #EXTM3U.');
+        }
+
+        return $content;
     }
 
     /**
@@ -68,7 +117,7 @@ class ExternalPlaylistImporter
     {
         $entries = $this->parse($content, $baseUrl);
         $titles = $forcedTitle === null
-            ? CatalogTitle::query()->with(['seasons.episodes'])->get()
+            ? $this->candidateTitles($entries)
             : new EloquentCollection([$forcedTitle->loadMissing(['seasons.episodes'])]);
         $result = [
             'total' => count($entries),
@@ -230,6 +279,7 @@ class ExternalPlaylistImporter
     }
 
     /**
+     * @param  PlaylistEntry  $entry
      * @param  EloquentCollection<int, CatalogTitle>  $titles
      * @return array{catalogTitle: CatalogTitle, season: Season|null, episode: Episode|null}|null
      */
@@ -246,7 +296,7 @@ class ExternalPlaylistImporter
         $season = $this->matchSeason($catalogTitle, $entry);
         $episode = $season === null || $entry['episode_number'] === null
             ? null
-            : $season->episodes->first(fn (Episode $episode): bool => $episode->kind === ReleaseKind::Regular
+            : $season->episodes->first(fn (Episode $episode): bool => $this->isRegularRelease($episode)
                 && $episode->number === $entry['episode_number']);
 
         return [
@@ -257,45 +307,88 @@ class ExternalPlaylistImporter
     }
 
     /**
+     * @param  PlaylistEntry  $entry
      * @param  EloquentCollection<int, CatalogTitle>  $titles
      */
     private function matchCatalogTitle(array $entry, EloquentCollection $titles): ?CatalogTitle
     {
-        $entryKey = $entry['title_key'];
-        $fileKey = Str::slug($this->normalizeTitleText($entry['file_name']));
         $bestTitle = null;
         $bestScore = 0;
 
         foreach ($titles as $title) {
-            $titleKeys = array_filter([
-                $title->slug,
-                Str::slug($title->title),
-                $title->original_title ? Str::slug($title->original_title) : null,
-            ]);
+            $score = $this->titleMatchScore($entry, $title);
 
-            foreach ($titleKeys as $titleKey) {
-                $score = match (true) {
-                    $entryKey === $titleKey => 100,
-                    $fileKey === $titleKey => 95,
-                    Str::startsWith($entryKey, $titleKey.'-') => 85,
-                    Str::startsWith($fileKey, $titleKey.'-') => 80,
-                    default => 0,
-                };
-
-                if ($score > $bestScore) {
-                    $bestScore = $score;
-                    $bestTitle = $title;
-                }
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestTitle = $title;
             }
         }
 
         return $bestScore >= 80 ? $bestTitle : null;
     }
 
+    /**
+     * @param  list<PlaylistEntry>  $entries
+     * @return EloquentCollection<int, CatalogTitle>
+     */
+    private function candidateTitles(array $entries): EloquentCollection
+    {
+        $candidateIds = [];
+
+        CatalogTitle::query()
+            ->select(['id', 'slug', 'title', 'original_title'])
+            ->chunkById(self::TITLE_MATCH_CHUNK_SIZE, function (EloquentCollection $titles) use ($entries, &$candidateIds): void {
+                foreach ($titles as $title) {
+                    foreach ($entries as $entry) {
+                        if ($this->titleMatchScore($entry, $title) >= 80) {
+                            $candidateIds[$title->id] = $title->id;
+
+                            break;
+                        }
+                    }
+                }
+            });
+
+        if ($candidateIds === []) {
+            return new EloquentCollection;
+        }
+
+        return CatalogTitle::query()
+            ->whereKey(array_values($candidateIds))
+            ->with(['seasons.episodes'])
+            ->orderBy('id')
+            ->get();
+    }
+
+    /** @param PlaylistEntry $entry */
+    private function titleMatchScore(array $entry, CatalogTitle $title): int
+    {
+        $entryKey = (string) $entry['title_key'];
+        $fileKey = Str::slug($this->normalizeTitleText((string) $entry['file_name']));
+        $bestScore = 0;
+
+        foreach (array_filter([
+            $title->slug,
+            Str::slug($title->title),
+            $title->original_title ? Str::slug($title->original_title) : null,
+        ]) as $titleKey) {
+            $bestScore = max($bestScore, match (true) {
+                $entryKey === $titleKey => 100,
+                $fileKey === $titleKey => 95,
+                Str::startsWith($entryKey, $titleKey.'-') => 85,
+                Str::startsWith($fileKey, $titleKey.'-') => 80,
+                default => 0,
+            });
+        }
+
+        return $bestScore;
+    }
+
+    /** @param PlaylistEntry $entry */
     private function matchSeason(CatalogTitle $catalogTitle, array $entry): ?Season
     {
         if ($entry['season_number'] !== null) {
-            return $catalogTitle->seasons->first(fn (Season $season): bool => $season->kind === ReleaseKind::Regular
+            return $catalogTitle->seasons->first(fn (Season $season): bool => $this->isRegularRelease($season)
                 && $season->number === $entry['season_number']);
         }
 
@@ -304,8 +397,8 @@ class ExternalPlaylistImporter
         }
 
         $matchingSeasons = $catalogTitle->seasons
-            ->filter(fn (Season $season): bool => $season->kind === ReleaseKind::Regular
-                && $season->episodes->contains(fn (Episode $episode): bool => $episode->kind === ReleaseKind::Regular
+            ->filter(fn (Season $season): bool => $this->isRegularRelease($season)
+                && $season->episodes->contains(fn (Episode $episode): bool => $this->isRegularRelease($episode)
                     && $episode->number === $entry['episode_number']))
             ->values();
 
@@ -367,7 +460,7 @@ class ExternalPlaylistImporter
         return trim($matches['title']);
     }
 
-    private function titleFromStreamInf(string $line): ?string
+    private function titleFromStreamInf(string $line): string
     {
         $resolution = null;
         $bandwidth = null;
@@ -420,6 +513,7 @@ class ExternalPlaylistImporter
         return preg_replace('/\.(?:'.implode('|', $this->mediaExtensions).')$/iu', '', $value) ?: $value;
     }
 
+    /** @param PlaylistEntry $entry */
     private function sourceMediaKey(CatalogTitle $catalogTitle, array $entry, string $baseUrl): string
     {
         return $this->mediaMetadata->sourceMediaKey(
@@ -433,6 +527,11 @@ class ExternalPlaylistImporter
             $this->mediaMetadata->quality($entry['title'], $entry['url']),
             $this->mediaMetadata->format($entry['url']),
         );
+    }
+
+    private function isRegularRelease(Season|Episode $release): bool
+    {
+        return $release->getAttribute('kind') === ReleaseKind::Regular;
     }
 
     private function isMediaFileUrl(string $url): bool
@@ -473,7 +572,7 @@ class ExternalPlaylistImporter
         return $this->verifiedExternalUrl($url)->url;
     }
 
-    private function verifiedExternalUrl(string $url): VerifiedExternalUrlData
+    public function verifiedExternalUrl(string $url): VerifiedExternalUrlData
     {
         if (filter_var($url, FILTER_VALIDATE_URL) === false) {
             throw new InvalidArgumentException('Неверная ссылка.');

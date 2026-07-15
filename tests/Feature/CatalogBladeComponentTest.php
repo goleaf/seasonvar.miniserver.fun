@@ -86,12 +86,20 @@ class CatalogBladeComponentTest extends TestCase
             'quality' => '1080p',
             'format' => 'm3u8',
             'published_at' => now()->setDate(2026, 7, 13),
-        ])->load(['catalogTitle', 'season', 'episode']);
-        $media->setAttribute('card_meta', 'Профессиональный перевод / M3U8 / 13.07.2026');
+        ])->load(['season', 'episode']);
+        $episode->load('season');
 
-        $html = Blade::render('<x-catalog.latest-media-card :media="$media" />', ['media' => $media]);
+        $html = Blade::render(
+            '<x-catalog.latest-media-card :title="$title" :episodes="$episodes" :media="$media" />',
+            [
+                'title' => $catalogTitle,
+                'episodes' => collect([$episode]),
+                'media' => collect([$media]),
+            ],
+        );
 
         $this->assertStringContainsString('data-ui-poster-card', $html);
+        $this->assertStringContainsString('data-home-latest-media-group="'.$catalogTitle->id.'"', $html);
         $this->assertStringContainsString('Новая серия', $html);
         $this->assertStringContainsString('Сезон 2', $html);
         $this->assertStringContainsString('7 серия', $html);

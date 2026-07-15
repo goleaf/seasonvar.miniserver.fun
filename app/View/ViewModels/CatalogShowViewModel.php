@@ -729,6 +729,7 @@ class CatalogShowViewModel
             ['label' => __('catalog.taxonomy.status'), 'items' => $this->statuses, 'icon' => $this->taxonomyIcon('status')],
             ['label' => __('catalog.taxonomy.network'), 'items' => $this->networks, 'icon' => $this->taxonomyIcon('network')],
             ['label' => __('catalog.taxonomy.studio'), 'items' => $this->studios, 'icon' => $this->taxonomyIcon('studio')],
+            ['label' => __('catalog.taxonomy.tags'), 'items' => $this->tags, 'icon' => $this->taxonomyIcon('tag')],
         ];
     }
 }

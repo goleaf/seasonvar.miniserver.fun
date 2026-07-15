@@ -22,7 +22,7 @@ class CatalogDirectoryRegistry
         'statuses' => ['path' => 'statuses', 'filter_type' => 'status', 'alphabet' => false, 'icon' => 'fa-solid fa-signal'],
         'networks' => ['path' => 'networks', 'filter_type' => 'network', 'alphabet' => false, 'icon' => 'fa-solid fa-tower-broadcast'],
         'studios' => ['path' => 'studios', 'filter_type' => 'studio', 'alphabet' => false, 'icon' => 'fa-solid fa-building'],
-        'tags' => ['path' => 'tags', 'filter_type' => 'tag', 'alphabet' => false, 'icon' => 'fa-solid fa-tags'],
+        'tags' => ['path' => 'tags', 'filter_type' => 'tag', 'alphabet' => true, 'icon' => 'fa-solid fa-tags'],
         'years' => ['path' => 'years', 'filter_type' => null, 'alphabet' => false, 'icon' => 'fa-solid fa-calendar-days'],
     ];
 

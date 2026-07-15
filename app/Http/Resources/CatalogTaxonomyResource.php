@@ -25,11 +25,19 @@ class CatalogTaxonomyResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $isTag = $this->resource instanceof Tag;
+
         return [
             'type' => $this->type(),
             'id' => $this->id,
+            'public_id' => $this->when($isTag, fn (): string => (string) $this->public_id),
+            'code' => $this->when($isTag && $this->code !== null, fn (): string => (string) $this->code),
+            'tag_type' => $this->when($isTag, fn (): string => $this->resource->type->value),
             'name' => $this->name,
             'slug' => $this->slug,
+            'links' => $this->when($isTag, fn (): array => [
+                'web' => route('titles.taxonomy', ['type' => 'tag', 'taxonomy' => $this->slug]),
+            ]),
         ];
     }
 

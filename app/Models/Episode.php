@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\CommentTargetType;
 use App\Enums\ContentAudience;
 use App\Enums\PublicationStatus;
 use App\Enums\ReleaseKind;
 use App\Models\Concerns\HasPublicationAvailability;
+use Carbon\CarbonInterface;
 use Database\Factories\EpisodeFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,6 +16,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * @property int $id
+ * @property int $season_id
+ * @property int $number
+ * @property ReleaseKind $kind
+ * @property PublicationStatus $publication_status
+ * @property ContentAudience $audience
+ * @property CarbonInterface|null $available_from
+ * @property CarbonInterface|null $available_until
+ * @property CarbonInterface|null $deleted_at
+ */
 #[Fillable([
     'season_id',
     'source_page_id',
@@ -63,6 +76,13 @@ class Episode extends Model
     public function viewProgress(): HasMany
     {
         return $this->hasMany(EpisodeViewProgress::class);
+    }
+
+    /** @return HasMany<Comment, $this> */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(Comment::class, 'target_id')
+            ->where('target_type', CommentTargetType::Episode->value);
     }
 
     /**

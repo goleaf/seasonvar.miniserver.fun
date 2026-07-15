@@ -6,6 +6,7 @@ use App\Enums\ContentAudience;
 use App\Enums\MediaHealthErrorCategory;
 use App\Enums\MediaHealthStatus;
 use App\Models\Concerns\HasPublicationAvailability;
+use Carbon\CarbonInterface;
 use Database\Factories\LicensedMediaFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -14,6 +15,27 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * @property int $id
+ * @property int|null $catalog_title_id
+ * @property int|null $season_id
+ * @property int|null $episode_id
+ * @property string $storage_disk
+ * @property string $path
+ * @property string|null $playback_url
+ * @property string $status
+ * @property string|null $quality
+ * @property string|null $translation_name
+ * @property string|null $variant_name
+ * @property string|null $variant_key
+ * @property string|null $format
+ * @property MediaHealthStatus $health_status
+ * @property ContentAudience $audience
+ * @property CarbonInterface|null $published_at
+ * @property CarbonInterface|null $available_from
+ * @property CarbonInterface|null $available_until
+ * @property CarbonInterface|null $deleted_at
+ */
 #[Fillable([
     'catalog_title_id',
     'season_id',
@@ -92,14 +114,15 @@ class LicensedMedia extends Model
             ->where(function (Builder $query) use ($user): void {
                 $query
                     ->whereNull('season_id')
-                    ->orWhereHas('season', fn (Builder $query): Builder => $query->availableTo($user));
+                    ->orWhereIn('season_id', Season::query()->availableTo($user)->select('id'));
             })
             ->where(function (Builder $query) use ($user): void {
                 $query
                     ->whereNull('episode_id')
-                    ->orWhereHas('episode', fn (Builder $query): Builder => $query
+                    ->orWhereIn('episode_id', Episode::query()
                         ->availableTo($user)
-                        ->whereHas('season', fn (Builder $query): Builder => $query->availableTo($user)));
+                        ->whereIn('season_id', Season::query()->availableTo($user)->select('id'))
+                        ->select('id'));
             });
     }
 

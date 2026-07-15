@@ -24,21 +24,13 @@
             @endif
         </div>
 
-        <div class="hidden shrink-0 items-center gap-2 text-xs font-semibold text-slate-500 sm:flex">
+        <div class="flex shrink-0 items-center gap-2 text-xs font-semibold text-slate-500">
             <span>{{ $title->type === 'serial' ? __('catalog.title.series_type') : $title->type }}</span>
             @if ($title->year)
                 <span aria-hidden="true">·</span>
                 <span>{{ $title->year }}</span>
             @endif
         </div>
-    </div>
-
-    <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-slate-500 sm:hidden">
-        <span>{{ $title->type === 'serial' ? __('catalog.title.series_type') : $title->type }}</span>
-        @if ($title->year)
-            <span aria-hidden="true">·</span>
-            <span>{{ $title->year }}</span>
-        @endif
     </div>
 
     @if ($reasonLabels !== [])

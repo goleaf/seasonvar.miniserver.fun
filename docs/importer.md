@@ -12,7 +12,7 @@
 4. `SeasonvarCatalogIdentityResolver` ищет тайтл сначала по `(source_id, external_id)`, затем по каноническому URL hash или закреплённой source page. Название не является автоматическим идентификатором.
 5. Короткая retry-aware transaction выполняет upsert тайтла, справочников, pivot-связей, provider ratings/reviews/signals, сезонов и серий и только затем помечает страницу разобранной.
 6. Внешние playlist/media запросы выполняются вне catalog transaction; `source_media_key`, playback URL и unique keys делают повторную запись идемпотентной.
-7. Import run counters обновляются после URL/chunk. `indexed_at` отмечает SQL-search visibility; Scout или внешний поисковый движок в проекте не установлен.
+7. Import run counters обновляются после URL/chunk. `indexed_at` отмечает SQL-search visibility; Scout или внешний поисковый движок в проекте не установлен. На главной обновление тайтла определяется только добавлением доступной серии (`episodes.created_at`) или опубликованного видеоварианта (`licensed_media.created_at`), поэтому повторный импорт одной метаинформации не поднимает тайтл в свежей выдаче.
 8. Полный sync/queued finalizer пересобирает рекомендации и обновляет stats cache; targeted URL run обновляет stats cache, но намеренно не запускает глобальное обслуживание каталога.
 9. Новый тайтл получает `published/public`, но повторный import не меняет локальные publication status, audience, availability window, soft delete или slug. Публичный интерфейс всё равно повторно применяет `CatalogEntitlementService`.
 
@@ -136,3 +136,13 @@ Candidate maps используют packed IDs для жанров, тегов, 
 Пока additive migration реестра ожидает применения, `CatalogRelationSourceIdentityRegistry` fail-open возвращает canonical fallback и не обращается к отсутствующей таблице: уже запущенные workers не падают, но новые source mappings в этот период не закрепляются. Это только rolling-deploy совместимость, а не замена migration; после её применения обязателен штатный `queue:restart` из шага 4.
 
 Все указанные migrations additive и не делают удалений. Admin fields nullable и не требуют backfill; отсутствие editorial baseline намеренно заставляет первый repeat import считать существующее заполненное поле потенциально редакционным.
+
+## Импортные и пользовательские отзывы
+
+`catalog_title_reviews` remains one table. Seasonvar importer owns only `origin=provider` rows and continues to upsert by `(catalog_title_id,body_hash)` with source page, provider author, plain body and publication date. It never assigns portal `user_id`, title/spoiler/verified/moderation ownership/submission fields, never creates helpful votes and never changes `catalog_title_user_states`.
+
+Recommendation v4 reads the published/non-deleted/non-merged provider+user review count only during its existing full import rebuild. Community review writes never invoke that catalog-wide job synchronously and do not add a queue/scheduler; they invalidate the existing read namespace, while persisted ordering/reasons converge on the next scheduled or explicit `seasonvar:import` rebuild. Review text, author identity, votes and personal rating are not recommendation features.
+
+The additive review migration uses provider/published defaults, so existing importer SQL and 73 101 audited rows remain compatible before/after rollout. `ReviewSchema` keeps the legacy API/read path active during partial deploy. Provider bodies may exceed community limits and are preserved byte-semantically; community value-object validation is not retroactively applied to imported content.
+
+`SeasonvarTitleMerger` invokes `ReviewMergeService` before duplicate hierarchy deletion. Review identity, source/body/date, votes/reports/status/deletion evidence and direct aliases survive; exact body-hash collisions are archived with preserved original hash instead of hard-deleted. Import never downloads video or translates/rewrites user reviews and review creation never changes importer state.

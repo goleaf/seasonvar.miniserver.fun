@@ -23,6 +23,9 @@ final class CatalogCacheInvalidator
         CacheDomain::Api,
         CacheDomain::Sitemap,
         CacheDomain::Recommendations,
+        CacheDomain::SearchSuggestions,
+        CacheDomain::Tags,
+        CacheDomain::Collections,
     ];
 
     public function __construct(
@@ -35,7 +38,7 @@ final class CatalogCacheInvalidator
     public function catalogChanged(iterable $titleIds = []): void
     {
         $normalizedIds = collect($titleIds)
-            ->filter(fn (mixed $id): bool => is_int($id) || (is_string($id) && ctype_digit($id)))
+            ->filter(fn (int|string $id): bool => is_int($id) || ctype_digit($id))
             ->map(fn (int|string $id): int => (int) $id)
             ->filter(fn (int $id): bool => $id > 0)
             ->unique()
@@ -43,6 +46,23 @@ final class CatalogCacheInvalidator
             ->values()
             ->all();
         $invalidate = fn () => $this->invalidateNow($normalizedIds);
+
+        if (DB::transactionLevel() > 0) {
+            DB::afterCommit($invalidate);
+
+            return;
+        }
+
+        $invalidate();
+    }
+
+    public function importedTitleChanged(int $titleId): void
+    {
+        if ($titleId < 1) {
+            return;
+        }
+
+        $invalidate = fn () => $this->invalidateImportedTitleNow($titleId);
 
         if (DB::transactionLevel() > 0) {
             DB::afterCommit($invalidate);
@@ -69,21 +89,36 @@ final class CatalogCacheInvalidator
             $this->versions->bump(CacheDomain::TitleDetail);
         }
 
-        if ((bool) config('cache-architecture.warming.enabled', true)) {
-            $job = (new WarmCatalogCaches)
-                ->onConnection((string) config('cache-architecture.warming.connection', 'redis'))
-                ->onQueue((string) config('cache-architecture.warming.queue', 'cache-warm'))
-                ->afterCommit();
+        $this->dispatchWarm($titleIds, refresh: $titleIds === []);
+    }
 
-            try {
-                $this->warmRequests->request($titleIds, refresh: $titleIds === []);
-                Bus::dispatch($job);
-            } catch (Throwable $exception) {
-                $this->telemetry->increment(CacheDomain::Operational, 'warming-dispatch-failure');
-                Log::warning('Инвалидация каталога завершена, но отложенный прогрев не поставлен в очередь.', [
-                    'exception' => $exception::class,
-                ]);
-            }
+    private function invalidateImportedTitleNow(int $titleId): void
+    {
+        $this->versions->bump(CacheDomain::TitleDetail, 'title:'.$titleId);
+        $this->telemetry->increment(CacheDomain::TitleDetail, 'invalidation');
+        $this->dispatchWarm([$titleId], refresh: false);
+    }
+
+    /** @param list<int> $titleIds */
+    private function dispatchWarm(array $titleIds, bool $refresh): void
+    {
+        if (! (bool) config('cache-architecture.warming.enabled', true)) {
+            return;
+        }
+
+        $job = (new WarmCatalogCaches)
+            ->onConnection((string) config('cache-architecture.warming.connection', 'redis'))
+            ->onQueue((string) config('cache-architecture.warming.queue', 'cache-warm-v2'))
+            ->afterCommit();
+
+        try {
+            $this->warmRequests->request($titleIds, $refresh);
+            Bus::dispatch($job);
+        } catch (Throwable $exception) {
+            $this->telemetry->increment(CacheDomain::Operational, 'warming-dispatch-failure');
+            Log::warning('Инвалидация каталога завершена, но отложенный прогрев не поставлен в очередь.', [
+                'exception' => $exception::class,
+            ]);
         }
     }
 }

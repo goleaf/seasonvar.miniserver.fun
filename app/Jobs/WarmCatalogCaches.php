@@ -8,7 +8,6 @@ use App\DTOs\CatalogCacheWarmWork;
 use App\Services\Catalog\CacheWarmingState;
 use App\Services\Catalog\CatalogCacheWarmer;
 use App\Services\Catalog\CatalogCacheWarmRequestStore;
-use DateTimeInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
@@ -40,7 +39,7 @@ final class WarmCatalogCaches implements ShouldBeUniqueUntilProcessing, ShouldQu
         $this->timeout = max(30, (int) config('cache-architecture.warming.timeout', 300));
         $this->uniqueFor = max(30, (int) config('cache-architecture.warming.unique_seconds', 604_800));
         $this->onConnection((string) config('cache-architecture.warming.connection', 'redis'));
-        $this->onQueue((string) config('cache-architecture.warming.queue', 'cache-warm'));
+        $this->onQueue((string) config('cache-architecture.warming.queue', 'cache-warm-v2'));
         $this->afterCommit();
     }
 
@@ -79,7 +78,7 @@ final class WarmCatalogCaches implements ShouldBeUniqueUntilProcessing, ShouldQu
     public function middleware(): array
     {
         return [
-            (new WithoutOverlapping('catalog-cache-warm'))
+            (new WithoutOverlapping('catalog-cache-warm-v2'))
                 ->expireAfter($this->timeout + 30)
                 ->releaseAfter(30),
         ];
@@ -91,14 +90,9 @@ final class WarmCatalogCaches implements ShouldBeUniqueUntilProcessing, ShouldQu
         return [30, 120, 300];
     }
 
-    public function retryUntil(): DateTimeInterface
-    {
-        return now()->addHour();
-    }
-
     public function uniqueId(): string
     {
-        return 'catalog-critical-cache-warm';
+        return 'catalog-critical-cache-warm-v2';
     }
 
     public function uniqueVia(): Repository

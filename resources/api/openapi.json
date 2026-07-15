@@ -83,6 +83,77 @@
                 }
             }
         },
+        "/api/v1/tags": {
+            "get": {
+                "operationId": "getPublicTags",
+                "summary": "Найти публичные канонические теги или получить популярные",
+                "description": "Возвращает только approved, public, non-archived теги с видимыми сериалами; aliases и переводы участвуют в поиске и разрешаются к одной канонической записи.",
+                "security": [{}, {"bearerAuth": []}],
+                "parameters": [{"name": "q", "in": "query", "schema": {"type": "string", "minLength": 2, "maxLength": 80}}],
+                "responses": {
+                    "200": {"description": "Публичные теги", "content": {"application/json": {"schema": {"type": "object", "required": ["data", "meta"], "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/PublicTag"}}, "meta": {"type": "object", "additionalProperties": true}}}}}},
+                    "422": {"$ref": "#/components/responses/ValidationError"}
+                }
+            }
+        },
+        "/api/v1/tags/{tagSlug}": {
+            "get": {
+                "operationId": "getPublicTag",
+                "summary": "Получить канонический публичный тег",
+                "description": "Alias, historical slug и merged source дают 301 к каноническому slug. Приватные, пустые, pending, rejected, hidden и archived теги возвращают 404.",
+                "security": [{}, {"bearerAuth": []}],
+                "parameters": [{"name": "tagSlug", "in": "path", "required": true, "schema": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9-]*$"}}],
+                "responses": {
+                    "200": {"description": "Публичный тег", "content": {"application/json": {"schema": {"type": "object", "required": ["data", "meta"], "properties": {"data": {"$ref": "#/components/schemas/PublicTag"}, "meta": {"type": "object", "additionalProperties": true}}}}}},
+                    "301": {"description": "Canonical tag redirect"},
+                    "404": {"$ref": "#/components/responses/NotFound"}
+                }
+            }
+        },
+        "/api/v1/collections": {
+            "get": {
+                "operationId": "getPublicCollections",
+                "summary": "Получить публичные одобренные подборки сериалов",
+                "parameters": [
+                    {"name": "q", "in": "query", "schema": {"type": "string", "maxLength": 100}},
+                    {"name": "sort", "in": "query", "schema": {"type": "string", "enum": ["featured", "recent", "title"]}},
+                    {"name": "per_page", "in": "query", "schema": {"type": "integer", "enum": [12, 18, 24, 36]}}
+                ],
+                "responses": {
+                    "200": {"description": "Пагинированный список публичных подборок", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PublicCollectionListResponse"}}}},
+                    "422": {"$ref": "#/components/responses/ValidationError"}
+                }
+            }
+        },
+        "/api/v1/collections/{collectionSlug}": {
+            "get": {
+                "operationId": "getPublicCollection",
+                "summary": "Получить публичную подборку и её видимые сериалы",
+                "parameters": [
+                    {"name": "collectionSlug", "in": "path", "required": true, "schema": {"type": "string"}},
+                    {"name": "per_page", "in": "query", "schema": {"type": "integer", "minimum": 6, "maximum": 48}},
+                    {"name": "page", "in": "query", "schema": {"type": "integer", "minimum": 1, "maximum": 10000}}
+                ],
+                "responses": {
+                    "200": {"description": "Подборка и пагинированные элементы", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PublicCollectionItemsResponse"}}}},
+                    "422": {"$ref": "#/components/responses/ValidationError"},
+                    "404": {"$ref": "#/components/responses/NotFound"}
+                }
+            }
+        },
+        "/api/v1/titles/{titleSlug}/collections": {
+            "get": {
+                "operationId": "getCollectionsForTitle",
+                "summary": "Получить публичные подборки с указанным сериалом",
+                "parameters": [
+                    {"name": "titleSlug", "in": "path", "required": true, "schema": {"type": "string"}}
+                ],
+                "responses": {
+                    "200": {"description": "Публичные подборки с сериалом", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PublicCollectionArrayResponse"}}}},
+                    "404": {"$ref": "#/components/responses/NotFound"}
+                }
+            }
+        },
         "/api/v1/titles": {
             "get": {
                 "operationId": "getCatalogTitles",
@@ -1737,6 +1808,121 @@
                 }
             }
         },
+        "/api/v1/me/tags": {
+            "get": {
+                "operationId": "getPersonalTags",
+                "summary": "Получить приватные личные теги текущего пользователя",
+                "description": "Owner-scoped ответ private, no-store. Теги других пользователей и удалённые теги не возвращаются.",
+                "security": [{"bearerAuth": []}],
+                "parameters": [{"name": "q", "in": "query", "schema": {"type": "string", "maxLength": 80}}],
+                "responses": {
+                    "200": {"description": "Личные теги", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PersonalTagCollectionResponse"}}}},
+                    "401": {"$ref": "#/components/responses/Unauthorized"},
+                    "403": {"$ref": "#/components/responses/Forbidden"}
+                }
+            },
+            "post": {
+                "operationId": "createPersonalTag",
+                "summary": "Создать приватный личный тег",
+                "description": "Owner назначается сервером; исходный язык и регистр label сохраняются, автоматический перевод не выполняется.",
+                "security": [{"bearerAuth": []}],
+                "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PersonalTagWriteRequest"}}}},
+                "responses": {
+                    "201": {"description": "Личный тег создан", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PersonalTagResponse"}}}},
+                    "401": {"$ref": "#/components/responses/Unauthorized"},
+                    "403": {"$ref": "#/components/responses/Forbidden"},
+                    "422": {"$ref": "#/components/responses/ValidationError"},
+                    "429": {"$ref": "#/components/responses/TooManyRequests"}
+                }
+            }
+        },
+        "/api/v1/me/tags/{tagPublicId}": {
+            "parameters": [{"name": "tagPublicId", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+            "patch": {
+                "operationId": "updatePersonalTag",
+                "summary": "Изменить собственный личный тег",
+                "security": [{"bearerAuth": []}],
+                "requestBody": {"required": true, "content": {"application/json": {"schema": {"allOf": [{"$ref": "#/components/schemas/PersonalTagWriteRequest"}, {"type": "object", "required": ["content_version"], "properties": {"content_version": {"type": "integer", "minimum": 1}}}]}}}},
+                "responses": {
+                    "200": {"description": "Личный тег обновлён", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PersonalTagResponse"}}}},
+                    "401": {"$ref": "#/components/responses/Unauthorized"},
+                    "403": {"$ref": "#/components/responses/Forbidden"},
+                    "404": {"$ref": "#/components/responses/NotFound"},
+                    "422": {"$ref": "#/components/responses/ValidationError"}
+                }
+            },
+            "delete": {
+                "operationId": "deletePersonalTag",
+                "summary": "Мягко удалить собственный личный тег",
+                "description": "Назначения сохраняются только на срок восстановления; сериал, прогресс, закладки и коллекции не изменяются.",
+                "security": [{"bearerAuth": []}],
+                "responses": {
+                    "204": {"description": "Личный тег удалён"},
+                    "401": {"$ref": "#/components/responses/Unauthorized"},
+                    "403": {"$ref": "#/components/responses/Forbidden"},
+                    "404": {"$ref": "#/components/responses/NotFound"}
+                }
+            }
+        },
+        "/api/v1/me/tags/{tagPublicId}/restore": {
+            "post": {
+                "operationId": "restorePersonalTag",
+                "summary": "Восстановить собственный личный тег",
+                "security": [{"bearerAuth": []}],
+                "parameters": [{"name": "tagPublicId", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}],
+                "responses": {
+                    "200": {"description": "Личный тег восстановлен", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PersonalTagResponse"}}}},
+                    "401": {"$ref": "#/components/responses/Unauthorized"},
+                    "403": {"$ref": "#/components/responses/Forbidden"},
+                    "404": {"$ref": "#/components/responses/NotFound"},
+                    "422": {"$ref": "#/components/responses/ValidationError"}
+                }
+            }
+        },
+        "/api/v1/me/titles/{titleSlug}/tags": {
+            "parameters": [{"$ref": "#/components/parameters/TitleSlug"}],
+            "get": {
+                "operationId": "getPersonalTitleTags",
+                "summary": "Получить личные теги текущего пользователя для сериала",
+                "security": [{"bearerAuth": []}],
+                "responses": {
+                    "200": {"description": "Приватные назначения", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PersonalTagCollectionResponse"}}}},
+                    "401": {"$ref": "#/components/responses/Unauthorized"},
+                    "404": {"$ref": "#/components/responses/NotFound"}
+                }
+            },
+            "put": {
+                "operationId": "replacePersonalTitleTags",
+                "summary": "Транзакционно применить полный набор личных тегов к сериалу",
+                "description": "Идемпотентный Apply; принимает только owner-scoped UUID и не меняет глобальные теги или пользовательский progress.",
+                "security": [{"bearerAuth": []}],
+                "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PersonalTagAssignmentRequest"}}}},
+                "responses": {
+                    "200": {"description": "Назначения согласованы"},
+                    "401": {"$ref": "#/components/responses/Unauthorized"},
+                    "403": {"$ref": "#/components/responses/Forbidden"},
+                    "404": {"$ref": "#/components/responses/NotFound"},
+                    "422": {"$ref": "#/components/responses/ValidationError"}
+                }
+            }
+        },
+        "/api/v1/me/titles/{titleSlug}/tags/{tagPublicId}": {
+            "delete": {
+                "operationId": "removePersonalTitleTag",
+                "summary": "Идемпотентно убрать один личный тег с сериала",
+                "security": [{"bearerAuth": []}],
+                "parameters": [
+                    {"$ref": "#/components/parameters/TitleSlug"},
+                    {"name": "tagPublicId", "in": "path", "required": true, "schema": {"type": "string", "format": "uuid"}}
+                ],
+                "responses": {
+                    "204": {"description": "Назначение удалено"},
+                    "401": {"$ref": "#/components/responses/Unauthorized"},
+                    "403": {"$ref": "#/components/responses/Forbidden"},
+                    "404": {"$ref": "#/components/responses/NotFound"}
+                }
+            }
+        },
         "/api/v1/me/watchlist": {
             "get": {
                 "operationId": "getMobileWatchlist",
@@ -1755,6 +1941,9 @@
                     },
                     {
                         "$ref": "#/components/parameters/LibraryYear"
+                    },
+                    {
+                        "$ref": "#/components/parameters/LibraryPersonalTag"
                     },
                     {
                         "$ref": "#/components/parameters/LibraryWatchlistSort"
@@ -1813,6 +2002,9 @@
                     },
                     {
                         "$ref": "#/components/parameters/LibraryYear"
+                    },
+                    {
+                        "$ref": "#/components/parameters/LibraryPersonalTag"
                     },
                     {
                         "$ref": "#/components/parameters/LibraryRatingSort"
@@ -2261,6 +2453,15 @@
                     "minimum": 1900
                 }
             },
+            "LibraryPersonalTag": {
+                "name": "tag",
+                "in": "query",
+                "description": "UUID личного тега текущего пользователя. Чужие и удалённые теги не совпадают с результатами.",
+                "schema": {
+                    "type": "string",
+                    "format": "uuid"
+                }
+            },
             "LibraryWatchlistSort": {
                 "name": "sort",
                 "in": "query",
@@ -2340,6 +2541,137 @@
             }
         },
         "schemas": {
+            "PublicCollection": {
+                "type": "object",
+                "required": ["id", "slug", "name", "type", "visibility", "featured", "sort", "item_count", "links"],
+                "properties": {
+                    "id": {"type": "string", "format": "uuid"},
+                    "slug": {"type": "string", "maxLength": 180},
+                    "name": {"type": "string", "maxLength": 160},
+                    "description": {"type": ["string", "null"], "maxLength": 10000},
+                    "type": {"type": "string", "enum": ["user", "editorial", "system"]},
+                    "visibility": {"type": "string", "const": "public"},
+                    "content_locale": {"type": ["string", "null"], "enum": ["ru", "en", null]},
+                    "featured": {"type": "boolean"},
+                    "sort": {"type": "string", "enum": ["manual", "added_desc", "added_asc", "title_asc", "year_desc", "rating_desc", "updated_desc"]},
+                    "cover_url": {"type": ["string", "null"], "format": "uri"},
+                    "item_count": {"type": "integer", "minimum": 0},
+                    "owner": {
+                        "type": ["object", "null"],
+                        "properties": {
+                            "id": {"type": "string", "format": "uuid"},
+                            "name": {"type": "string"},
+                            "collections_url": {"type": "string", "format": "uri"}
+                        },
+                        "additionalProperties": false
+                    },
+                    "published_at": {"type": ["string", "null"], "format": "date-time"},
+                    "updated_at": {"type": ["string", "null"], "format": "date-time"},
+                    "links": {"type": "object", "required": ["self", "web"], "additionalProperties": {"type": "string", "format": "uri"}}
+                },
+                "additionalProperties": false
+            },
+            "PublicCollectionItem": {
+                "type": "object",
+                "required": ["slug", "title", "position", "web_url"],
+                "properties": {
+                    "slug": {"type": "string"},
+                    "title": {"type": "string"},
+                    "original_title": {"type": ["string", "null"]},
+                    "year": {"type": ["integer", "null"]},
+                    "poster_url": {"type": ["string", "null"], "format": "uri"},
+                    "position": {"type": "integer", "minimum": 1},
+                    "added_at": {"type": ["string", "null"], "format": "date-time"},
+                    "web_url": {"type": "string", "format": "uri"}
+                },
+                "additionalProperties": false
+            },
+            "PublicCollectionListResponse": {
+                "type": "object",
+                "required": ["data", "links", "meta"],
+                "properties": {
+                    "data": {"type": "array", "items": {"$ref": "#/components/schemas/PublicCollection"}},
+                    "links": {"type": "object", "additionalProperties": true},
+                    "meta": {"type": "object", "additionalProperties": true}
+                }
+            },
+            "PublicCollectionItemsResponse": {
+                "type": "object",
+                "required": ["data", "links", "meta", "collection"],
+                "properties": {
+                    "data": {"type": "array", "items": {"$ref": "#/components/schemas/PublicCollectionItem"}},
+                    "links": {"type": "object", "additionalProperties": true},
+                    "meta": {"type": "object", "additionalProperties": true},
+                    "collection": {"$ref": "#/components/schemas/PublicCollection"}
+                }
+            },
+            "PublicCollectionArrayResponse": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {"data": {"type": "array", "items": {"$ref": "#/components/schemas/PublicCollection"}}}
+            },
+            "PublicTag": {
+                "type": "object",
+                "required": ["public_id", "type", "name", "slug", "links"],
+                "properties": {
+                    "public_id": {"type": "string", "format": "uuid"},
+                    "code": {"type": ["string", "null"]},
+                    "type": {"type": "string", "enum": ["system", "editorial", "imported"]},
+                    "name": {"type": "string", "maxLength": 80},
+                    "slug": {"type": "string"},
+                    "description": {"type": ["string", "null"]},
+                    "serial_count": {"type": "integer", "minimum": 0},
+                    "aliases": {"type": "array", "items": {"type": "string"}},
+                    "links": {"type": "object", "required": ["web", "self"], "additionalProperties": {"type": "string", "format": "uri"}}
+                }
+            },
+            "PersonalTag": {
+                "type": "object",
+                "required": ["public_id", "name", "visibility", "content_version"],
+                "properties": {
+                    "public_id": {"type": "string", "format": "uuid"},
+                    "name": {"type": "string", "maxLength": 80},
+                    "description": {"type": ["string", "null"], "maxLength": 1000},
+                    "content_locale": {"type": ["string", "null"], "enum": ["ru", "en", null]},
+                    "visibility": {"type": "string", "const": "private"},
+                    "content_version": {"type": "integer", "minimum": 1},
+                    "assignments_count": {"type": "integer", "minimum": 0},
+                    "created_at": {"type": ["string", "null"], "format": "date-time"},
+                    "updated_at": {"type": ["string", "null"], "format": "date-time"},
+                    "deleted_at": {"type": ["string", "null"], "format": "date-time"}
+                }
+            },
+            "PersonalTagWriteRequest": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                    "name": {"type": "string", "minLength": 2, "maxLength": 80},
+                    "description": {"type": ["string", "null"], "maxLength": 1000},
+                    "content_locale": {"type": ["string", "null"], "enum": ["ru", "en", null]}
+                },
+                "additionalProperties": false
+            },
+            "PersonalTagAssignmentRequest": {
+                "type": "object",
+                "required": ["tags"],
+                "properties": {
+                    "tags": {"type": "array", "maxItems": 50, "uniqueItems": true, "items": {"type": "string", "format": "uuid"}}
+                },
+                "additionalProperties": false
+            },
+            "PersonalTagResponse": {
+                "type": "object",
+                "required": ["data"],
+                "properties": {"data": {"$ref": "#/components/schemas/PersonalTag"}}
+            },
+            "PersonalTagCollectionResponse": {
+                "type": "object",
+                "required": ["data", "meta"],
+                "properties": {
+                    "data": {"type": "array", "items": {"$ref": "#/components/schemas/PersonalTag"}},
+                    "meta": {"type": "object", "properties": {"privacy": {"type": "string", "const": "private"}}, "additionalProperties": true}
+                }
+            },
             "ApiError": {
                 "type": "object",
                 "required": [
@@ -4309,11 +4641,16 @@
                         "enum": [
                             "title",
                             "actor",
-                            "director"
+                            "director",
+                            "tag"
                         ]
                     },
                     "label": {
                         "type": "string"
+                    },
+                    "public_id": {
+                        "type": ["string", "null"],
+                        "format": "uuid"
                     },
                     "slug": {
                         "type": "string"

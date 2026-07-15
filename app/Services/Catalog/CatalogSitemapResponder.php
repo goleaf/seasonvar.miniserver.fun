@@ -2,9 +2,14 @@
 
 namespace App\Services\Catalog;
 
+use App\Models\CatalogCollection;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
+use App\Models\Season;
+use App\Models\Tag;
+use App\Services\Collections\CatalogCollectionQuery;
+use App\Services\Collections\CatalogCollectionSchema;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -25,6 +30,8 @@ class CatalogSitemapResponder
         private readonly CatalogTitleQuery $titles,
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogDirectoryRegistry $directories,
+        private readonly CatalogCollectionQuery $collections,
+        private readonly CatalogCollectionSchema $collectionSchema,
     ) {}
 
     public function index(): StreamedResponse
@@ -40,6 +47,7 @@ class CatalogSitemapResponder
             $this->writeSitemapIndexUrl(route('sitemap.static'), now());
             $this->writeSitemapIndexUrl(route('sitemap.taxonomies'), now());
             $this->writeSitemapIndexUrl(route('sitemap.landings'), now());
+            $this->writeSitemapIndexUrl(route('sitemap.collections'), now());
 
             for ($page = 1; $page <= $titleSitemapPages; $page++) {
                 $this->writeSitemapIndexUrl(route('sitemap.titles', ['page' => $page]), now());
@@ -60,6 +68,7 @@ class CatalogSitemapResponder
             echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
             $this->writeSitemapUrl(route('home'), now(), 'daily', '1.0');
             $this->writeSitemapUrl(route('titles.index'), now(), 'daily', '0.9');
+            $this->writeSitemapUrl(route('collections.index'), now(), 'daily', '0.8');
 
             foreach ($this->directories->all() as $directory) {
                 $this->writeSitemapUrl(route($directory->indexRouteName), now(), 'weekly', '0.8');
@@ -89,13 +98,28 @@ class CatalogSitemapResponder
             foreach ($this->taxonomies->relations() as $filterType => $config) {
                 $modelClass = $config['model'];
 
-                $modelClass::query()
-                    ->select(['id', 'slug'])
-                    ->whereHas('catalogTitles', fn (Builder $query): Builder => $this->titles->constrainVisible($query, null))
+                $query = $modelClass::query()
+                    ->select(['id', 'slug', 'updated_at'])
+                    ->whereHas('catalogTitles', fn (Builder $query): Builder => $query->whereIn(
+                        'catalog_titles.id',
+                        $this->titles->visibleTo(null)->select('catalog_titles.id'),
+                    ));
+
+                if ($modelClass === Tag::class) {
+                    $query->whereIn('id', Tag::query()->publiclyEligible()->select('tags.id'));
+                }
+
+                $query
                     ->orderBy('id')
                     ->chunkById(1000, function (Collection $taxonomies) use ($filterType): void {
                         foreach ($taxonomies as $taxonomy) {
-                            $this->writeSitemapUrl(route('titles.taxonomy', ['type' => $filterType, 'taxonomy' => $taxonomy->slug]), now(), 'weekly', '0.7');
+                            $slug = (string) $taxonomy->getAttribute('slug');
+                            $this->writeSitemapUrl(
+                                route('titles.taxonomy', ['type' => $filterType, 'taxonomy' => $slug]),
+                                $taxonomy->getAttribute('updated_at'),
+                                'weekly',
+                                '0.7',
+                            );
                         }
                     });
             }
@@ -117,8 +141,14 @@ class CatalogSitemapResponder
 
                 $taxonomies = $modelClass::query()
                     ->select(['id', 'slug'])
-                    ->withCount(['catalogTitles as catalog_titles_count' => fn (Builder $query): Builder => $this->titles->constrainVisible($query, null)])
-                    ->whereHas('catalogTitles', fn (Builder $query): Builder => $this->titles->constrainVisible($query, null))
+                    ->withCount(['catalogTitles as catalog_titles_count' => fn (Builder $query): Builder => $query->whereIn(
+                        'catalog_titles.id',
+                        $this->titles->visibleTo(null)->select('catalog_titles.id'),
+                    )])
+                    ->whereHas('catalogTitles', fn (Builder $query): Builder => $query->whereIn(
+                        'catalog_titles.id',
+                        $this->titles->visibleTo(null)->select('catalog_titles.id'),
+                    ))
                     ->orderByDesc('catalog_titles_count')
                     ->limit(80)
                     ->get();
@@ -138,7 +168,10 @@ class CatalogSitemapResponder
                             continue;
                         }
 
-                        $url = route('titles.taxonomy', ['type' => $filterType, 'taxonomy' => $taxonomy->slug]).'?year='.$year;
+                        $url = route('titles.taxonomy', [
+                            'type' => $filterType,
+                            'taxonomy' => (string) $taxonomy->getAttribute('slug'),
+                        ]).'?year='.$year;
                         $this->writeSitemapUrl($url, now(), 'weekly', '0.65');
                     }
                 });
@@ -216,6 +249,41 @@ class CatalogSitemapResponder
                         'Постер '.$title->title,
                     );
                 });
+
+            echo '</urlset>'."\n";
+        }, 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
+    }
+
+    public function collections(): StreamedResponse
+    {
+        return response()->stream(function (): void {
+            echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
+            echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">'."\n";
+
+            if ($this->collectionSchema->available()) {
+                $this->collections->publicSitemapQuery()
+                    ->cursor()
+                    ->each(function (Model $collection): void {
+                        if (! $collection instanceof CatalogCollection) {
+                            return;
+                        }
+
+                        $cover = $collection->cover_path !== null && $collection->cover_version > 0
+                            ? route('collections.cover', [
+                                'publicId' => $collection->public_id,
+                                'version' => $collection->cover_version,
+                            ])
+                            : null;
+                        $this->writeSitemapUrlWithImage(
+                            route('collections.show', ['collectionSlug' => $collection->slug]),
+                            $collection->updated_at,
+                            'weekly',
+                            $collection->is_featured ? '0.8' : '0.6',
+                            $cover,
+                            $cover === null ? null : $collection->name,
+                        );
+                    });
+            }
 
             echo '</urlset>'."\n";
         }, 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
@@ -318,8 +386,14 @@ class CatalogSitemapResponder
             $titleCount = $this->titles->visibleTo(null)->count();
             $episodeCount = Episode::query()
                 ->availableTo(null)
-                ->whereHas('season', fn (Builder $query): Builder => $query->availableTo(null))
-                ->whereHas('season.catalogTitle', fn (Builder $query): Builder => $this->titles->constrainVisible($query, null))
+                ->whereHas('season', fn (Builder $query): Builder => $query->whereIn(
+                    'seasons.id',
+                    Season::query()->availableTo(null)->select('seasons.id'),
+                ))
+                ->whereHas('season.catalogTitle', fn (Builder $query): Builder => $query->whereIn(
+                    'catalog_titles.id',
+                    $this->titles->visibleTo(null)->select('catalog_titles.id'),
+                ))
                 ->count();
             $mediaCount = LicensedMedia::query()
                 ->availableTo(null)
@@ -336,6 +410,7 @@ class CatalogSitemapResponder
             echo "## Основные URL\n\n";
             echo '- Главная: '.route('home')."\n";
             echo '- Каталог: '.route('titles.index')."\n";
+            echo '- Подборки: '.route('collections.index')."\n";
             echo '- Сериалы текущего года: '.route('titles.year', ['year' => now()->year])."\n";
             echo '- Карта посадочных страниц: '.route('sitemap.landings')."\n";
             echo '- Индекс карты сайта: '.route('sitemap.index')."\n";

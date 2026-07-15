@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Auth;
 
 use App\Models\User;
+use App\Services\Collections\CatalogCollectionAccountService;
+use App\Services\Comments\CommentAccountService;
+use App\Services\Reviews\ReviewAccountService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -12,6 +15,12 @@ use Illuminate\Validation\ValidationException;
 
 final class AccountService
 {
+    public function __construct(
+        private readonly CatalogCollectionAccountService $collections,
+        private readonly CommentAccountService $comments,
+        private readonly ReviewAccountService $reviews,
+    ) {}
+
     /** @param array{name?: string, email?: string} $data */
     public function updateProfile(User $user, array $data): User
     {
@@ -26,6 +35,8 @@ final class AccountService
         $oldEmail = Str::lower(Str::squish((string) $user->email));
         $emailChanged = array_key_exists('email', $data)
             && $oldEmail !== $data['email'];
+        $nameChanged = array_key_exists('name', $data)
+            && $user->name !== $data['name'];
 
         DB::transaction(function () use ($user, $data, $oldEmail, $emailChanged): void {
             $user->fill($data);
@@ -42,6 +53,12 @@ final class AccountService
 
         if ($emailChanged) {
             $user->sendEmailVerificationNotification();
+        }
+
+        if ($nameChanged) {
+            $this->collections->ownerIdentityChanged($user);
+            $this->comments->authorIdentityChanged($user);
+            $this->reviews->authorIdentityChanged($user);
         }
 
         return $user->refresh();
@@ -83,6 +100,9 @@ final class AccountService
         }
 
         DB::transaction(function () use ($user): void {
+            $this->collections->purgeOwned($user);
+            $this->comments->prepareForDeletion($user);
+            $this->reviews->prepareForDeletion($user);
             $user->tokens()->delete();
             DB::table('password_reset_tokens')
                 ->whereRaw('lower(email) = ?', [Str::lower((string) $user->email)])

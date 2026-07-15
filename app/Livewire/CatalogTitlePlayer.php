@@ -100,6 +100,7 @@ class CatalogTitlePlayer extends Component
             return;
         }
 
+        $this->playback->forget($this->catalogTitleId, $this->user());
         $this->resolvedTitle = null;
         $this->resolvedEpisode = null;
         $this->resolvedSeasons = null;
@@ -139,6 +140,7 @@ class CatalogTitlePlayer extends Component
         $this->episode = '';
         $this->media = '';
         $this->resolvedEpisode = null;
+        $this->dispatchDiscussionTarget();
     }
 
     public function selectEpisode(mixed $episodeId): void
@@ -149,6 +151,7 @@ class CatalogTitlePlayer extends Component
             $this->episode = '';
             $this->media = '';
             $this->resolvedEpisode = null;
+            $this->dispatchDiscussionTarget();
 
             return;
         }
@@ -160,6 +163,7 @@ class CatalogTitlePlayer extends Component
             $this->episode = '';
             $this->media = '';
             $this->resolvedEpisode = null;
+            $this->dispatchDiscussionTarget();
 
             return;
         }
@@ -180,6 +184,8 @@ class CatalogTitlePlayer extends Component
         if ($media !== null) {
             $this->syncMediaProfile($media);
         }
+
+        $this->dispatchDiscussionTarget();
     }
 
     public function selectMedia(mixed $mediaId): void
@@ -205,6 +211,7 @@ class CatalogTitlePlayer extends Component
         $this->season = $media->season_id !== null ? (string) $media->season_id : '';
         $this->episode = $media->episode_id !== null ? (string) $media->episode_id : '';
         $this->syncMediaProfile($media);
+        $this->dispatchDiscussionTarget();
     }
 
     public function setWatchlist(mixed $inWatchlist): void
@@ -349,7 +356,7 @@ class CatalogTitlePlayer extends Component
             ? ($mediaItems->firstWhere('id', $playbackSource->mediaId) ?? $selectedMedia)
             : $selectedMedia;
         $playerSessionKey = $selectedMedia !== null && $playbackSource->isPlayable()
-            ? implode(':', [$title->id, $selectedEpisode?->id ?? 0, $selectedMedia->id])
+            ? implode(':', [$title->id, $selectedEpisode->id ?? 0, $selectedMedia->id])
             : '';
         $progressSessionToken = $user !== null
             && $selectedEpisode !== null
@@ -368,7 +375,7 @@ class CatalogTitlePlayer extends Component
             mediaMetadata: $this->mediaMetadata,
             playbackSource: $playbackSource,
             episodeCount: $seasons->sum('available_episodes_count'),
-            parsedSeasonCount: $seasons->filter(fn (Season $season): bool => (int) $season->available_episodes_count > 0)->count(),
+            parsedSeasonCount: $seasons->filter(fn (Season $season): bool => (int) $season->getAttribute('available_episodes_count') > 0)->count(),
             mediaCount: $seasons->sum('available_media_count'),
         );
         $state = $user !== null ? $this->userState->state($user, $title) : null;
@@ -389,7 +396,7 @@ class CatalogTitlePlayer extends Component
             'progressSessionToken' => $progressSessionToken,
             'mediaItems' => $mediaItems,
             'showView' => $showView,
-            'inWatchlist' => (bool) ($state?->in_watchlist ?? false),
+            'inWatchlist' => (bool) ($state->in_watchlist ?? false),
             'userRating' => $state?->rating,
             'userStateSummary' => $stateSummary,
             'ratingOptions' => $this->userState->ratingOptions(),
@@ -407,14 +414,10 @@ class CatalogTitlePlayer extends Component
     public function episodeDisplayLabel(Episode $episode): string
     {
         if ($episode->kind === ReleaseKind::Special) {
-            return $episode->number !== null
-                ? __('catalog.release.special_episode', ['number' => $episode->number])
-                : __('catalog.release.special_episode_without_number');
+            return __('catalog.release.special_episode', ['number' => $episode->number]);
         }
 
-        return $episode->number !== null
-            ? __('catalog.release.episode', ['number' => $episode->number])
-            : __('catalog.release.episode_without_number');
+        return __('catalog.release.episode', ['number' => $episode->number]);
     }
 
     public function selectedEpisodeLabel(Episode $episode): string
@@ -428,21 +431,17 @@ class CatalogTitlePlayer extends Component
     public function seasonDisplayLabel(Season $season): string
     {
         if ($season->kind === ReleaseKind::Special) {
-            return $season->number !== null
-                ? __('catalog.release.special_season', ['number' => $season->number])
-                : __('catalog.release.special_season_without_number');
+            return __('catalog.release.special_season', ['number' => $season->number]);
         }
 
-        return $season->number !== null
-            ? __('catalog.release.season', ['number' => $season->number])
-            : __('catalog.release.season_without_number');
+        return __('catalog.release.season', ['number' => $season->number]);
     }
 
     /** @param Collection<int, Season> $seasons */
     private function activeSeason(Collection $seasons, ?Episode $requestedEpisode, CatalogPrimaryAction $primaryAction): ?Season
     {
         $requestedSeasonId = $this->positiveId($this->season);
-        $seasonId = $requestedEpisode?->season_id
+        $seasonId = $requestedEpisode->season_id
             ?? $requestedSeasonId
             ?? $primaryAction->seasonId;
 
@@ -510,6 +509,7 @@ class CatalogTitlePlayer extends Component
         $this->season = $action->seasonId !== null ? (string) $action->seasonId : '';
         $this->episode = $action->episodeId !== null ? (string) $action->episodeId : '';
         $this->media = $action->mediaId !== null ? (string) $action->mediaId : '';
+        $this->dispatchDiscussionTarget();
     }
 
     private function syncMediaProfile(LicensedMedia $media): void
@@ -559,6 +559,17 @@ class CatalogTitlePlayer extends Component
         $this->season = '';
         $this->episode = '';
         $this->media = '';
+        $this->dispatchDiscussionTarget();
+    }
+
+    private function dispatchDiscussionTarget(): void
+    {
+        $this->dispatch(
+            'discussion-target-selected',
+            catalogTitleId: $this->catalogTitleId,
+            seasonId: $this->positiveId($this->season),
+            episodeId: $this->positiveId($this->episode),
+        );
     }
 
     private function normalizeInitialSelection(): void

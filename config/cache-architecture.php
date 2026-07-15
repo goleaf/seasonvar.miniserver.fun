@@ -26,6 +26,7 @@ return [
     'page_cache' => [
         'enabled' => env('PUBLIC_PAGE_CACHE_ENABLED', true),
         'max_payload_bytes' => (int) env('PUBLIC_PAGE_CACHE_MAX_PAYLOAD_BYTES', 850_000),
+        'max_uncompressed_payload_bytes' => (int) env('PUBLIC_PAGE_CACHE_MAX_UNCOMPRESSED_PAYLOAD_BYTES', 1_500_000),
         'max_query_length' => (int) env('PUBLIC_PAGE_CACHE_MAX_QUERY_LENGTH', 2_048),
         'max_query_fields' => (int) env('PUBLIC_PAGE_CACHE_MAX_QUERY_FIELDS', 24),
         'max_query_values' => (int) env('PUBLIC_PAGE_CACHE_MAX_QUERY_VALUES', 24),
@@ -59,7 +60,7 @@ return [
     'warming' => [
         'enabled' => env('CACHE_WARMING_ENABLED', true),
         'connection' => env('CACHE_WARM_QUEUE_CONNECTION', 'redis'),
-        'queue' => env('CACHE_WARM_QUEUE', 'cache-warm'),
+        'queue' => env('CACHE_WARM_QUEUE', 'cache-warm-v2'),
         'timeout' => (int) env('CACHE_WARM_TIMEOUT', 300),
         'unique_seconds' => (int) env('CACHE_WARM_UNIQUE_SECONDS', 604_800),
         'request_retention_seconds' => (int) env('CACHE_WARM_REQUEST_RETENTION_SECONDS', 604_800),
@@ -133,6 +134,24 @@ return [
             'wait_milliseconds' => 200,
             'jitter_percent' => 15,
         ],
+        'tags' => [
+            'fresh' => 300,
+            'stale' => 1_800,
+            'hot' => 120,
+            'negative' => 30,
+            'lock' => 60,
+            'wait_milliseconds' => 250,
+            'jitter_percent' => 10,
+        ],
+        'collections' => [
+            'fresh' => 300,
+            'stale' => 1_800,
+            'hot' => 120,
+            'negative' => 30,
+            'lock' => 60,
+            'wait_milliseconds' => 250,
+            'jitter_percent' => 10,
+        ],
         'sitemap' => [
             'fresh' => 1_800,
             'stale' => 21_600,
@@ -169,11 +188,23 @@ return [
             'stale_while_revalidate' => 60,
             'stale_if_error' => 600,
         ],
+        'collection_api' => [
+            'max_age' => 0,
+            'shared_max_age' => 0,
+            'stale_while_revalidate' => 0,
+            'stale_if_error' => 0,
+        ],
         'documents' => [
             'max_age' => 300,
             'shared_max_age' => 1_800,
             'stale_while_revalidate' => 300,
             'stale_if_error' => 3_600,
+        ],
+        'collection_documents' => [
+            'max_age' => 0,
+            'shared_max_age' => 0,
+            'stale_while_revalidate' => 0,
+            'stale_if_error' => 0,
         ],
     ],
 ];

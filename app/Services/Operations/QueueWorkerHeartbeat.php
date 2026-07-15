@@ -119,7 +119,7 @@ final class QueueWorkerHeartbeat
             ],
             'cache_warm' => [
                 'connection' => (string) config('cache-architecture.warming.connection', 'redis'),
-                'queue' => (string) config('cache-architecture.warming.queue', 'cache-warm'),
+                'queue' => (string) config('cache-architecture.warming.queue', 'cache-warm-v2'),
                 'busy_threshold' => max(1, (int) config('cache-architecture.operations.cache_warm_queue_busy_threshold', 1_000)),
             ],
             'seasonvar_import' => [

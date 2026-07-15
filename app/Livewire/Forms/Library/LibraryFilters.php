@@ -21,6 +21,9 @@ final class LibraryFilters extends Form
     #[Url(except: '')]
     public string|int $year = '';
 
+    #[Url(as: 'tag', except: '')]
+    public string $personalTag = '';
+
     #[Url(except: 'updated')]
     public string $sort = 'updated';
 
@@ -31,6 +34,7 @@ final class LibraryFilters extends Form
     {
         $this->query = str($this->query)->squish()->toString();
         $this->type = str($this->type)->trim()->lower()->toString();
+        $this->personalTag = str($this->personalTag)->trim()->lower()->toString();
         $this->sort = str($this->sort)->trim()->lower()->toString();
         $this->direction = str($this->direction)->trim()->lower()->toString();
 
@@ -49,6 +53,7 @@ final class LibraryFilters extends Form
             'query' => ['nullable', 'string', 'max:160'],
             'type' => ['nullable', Rule::enum(CatalogPublicationType::class)],
             'year' => ['nullable', 'integer', 'min:1900', 'max:'.(now()->year + 1)],
+            'personalTag' => ['nullable', 'uuid'],
             'sort' => ['required', Rule::in($sorts)],
             'direction' => ['required', Rule::in(['asc', 'desc'])],
         ], [
@@ -57,6 +62,7 @@ final class LibraryFilters extends Form
             'year.integer' => 'Год должен быть целым числом.',
             'year.min' => 'Год должен быть не меньше 1900.',
             'year.max' => 'Указан недопустимый год.',
+            'personalTag.uuid' => __('tags.validation.personal_tag'),
             'sort.in' => 'Выбран недоступный способ сортировки.',
             'direction.in' => 'Выбрано недоступное направление сортировки.',
         ]);
@@ -74,6 +80,9 @@ final class LibraryFilters extends Form
             query: str($this->query)->squish()->limit(160, '')->toString(),
             type: $type?->value,
             year: $year !== false && $year >= 1900 && $year <= now()->year + 1 ? $year : null,
+            personalTagPublicId: preg_match('/^[a-f0-9-]{36}$/iD', $this->personalTag) === 1
+                ? $this->personalTag
+                : null,
             sort: in_array($this->sort, $allowedSorts, true) ? $this->sort : 'updated',
             direction: in_array($this->direction, ['asc', 'desc'], true) ? $this->direction : 'desc',
             perPage: max(1, min(48, $perPage)),

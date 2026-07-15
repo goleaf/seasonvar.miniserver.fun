@@ -11,6 +11,7 @@ use App\Models\SourcePage;
 use App\Services\Catalog\CatalogRelationNameSanitizer;
 use App\Services\Catalog\CatalogRelationSourceIdentityRegistry;
 use App\Services\Catalog\CatalogTaxonomyRegistry;
+use App\Services\Tags\TagImportSynchronizer;
 use Illuminate\Database\Eloquent\Model;
 
 final readonly class SeasonvarTaxonomyPageImporter
@@ -21,6 +22,7 @@ final readonly class SeasonvarTaxonomyPageImporter
         private CatalogRelationSourceIdentityRegistry $sourceIdentities,
         private SeasonvarDiscoveredPageStore $pages,
         private SeasonvarDatabaseTransaction $transactions,
+        private TagImportSynchronizer $tagImports,
     ) {}
 
     /**
@@ -30,7 +32,26 @@ final readonly class SeasonvarTaxonomyPageImporter
     {
         $filterType = $data->pageType->value;
         $modelClass = $this->taxonomies->modelClass($filterType);
-        $result = $this->transactions->run(function () use ($data, $modelClass, $page): array {
+        $result = $this->transactions->run(function () use ($data, $modelClass, $page, $filterType): array {
+            if ($filterType === 'tag') {
+                $resolvedTag = $this->tagImports->resolveProviderTag(
+                    sourceId: (int) $page->source_id,
+                    name: $data->displayName,
+                    sourceUrl: $data->canonicalSourceUrl,
+                    aliases: $data->sourceAliases,
+                );
+
+                if ($resolvedTag === null) {
+                    throw new \RuntimeException('Страница тега Seasonvar не прошла каноническую нормализацию.');
+                }
+
+                return [
+                    'taxonomy' => $resolvedTag['tag'],
+                    'created' => $resolvedTag['created'],
+                    'changed' => $resolvedTag['changed'],
+                ];
+            }
+
             $resolved = $this->resolve($modelClass, $data, $page->source_id);
             $taxonomy = $resolved['taxonomy'];
             $created = ! $taxonomy->exists;

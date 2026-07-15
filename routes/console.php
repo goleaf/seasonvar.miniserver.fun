@@ -12,7 +12,7 @@ Artisan::command('inspire', function () {
 Schedule::useCache((string) config('cache-architecture.stores.locks', 'redis-locks'));
 
 Schedule::command('cache:warm-catalog --queue --refresh')
-    ->hourlyAt(17)
+    ->everyTenMinutes()
     ->name('catalog-cache-warm')
     ->withoutOverlapping(10)
     ->onOneServer();
@@ -27,6 +27,12 @@ Schedule::command('api:sync-prune')
     ->dailyAt('03:23')
     ->name('api-sync-prune')
     ->withoutOverlapping(10)
+    ->onOneServer();
+
+Schedule::command('catalog-collections:prune --limit='.(int) config('catalog-collections.prune_batch_size', 200))
+    ->dailyAt('04:07')
+    ->name('catalog-collections-prune')
+    ->withoutOverlapping(30)
     ->onOneServer();
 
 Schedule::job(new WakeSeasonvarImportFinalizers)

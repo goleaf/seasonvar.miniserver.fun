@@ -20,8 +20,10 @@ final class ApiDiscoveryController extends Controller
                 'openapi_url' => url('/api/openapi.json'),
                 'capabilities' => [
                     'catalog',
+                    'public_collections',
                     'authentication',
                     'user_state',
+                    'personal_tags',
                     'playback',
                     'offline_sync',
                 ],

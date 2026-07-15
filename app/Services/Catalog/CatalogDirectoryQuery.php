@@ -4,23 +4,27 @@ namespace App\Services\Catalog;
 
 use App\DTOs\CatalogDirectoryDefinition;
 use App\Models\CatalogTitle;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use App\Models\Tag;
+use App\Models\TagTranslation;
+use App\Services\Tags\TagResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Pagination\LengthAwarePaginator as LaravelLengthAwarePaginator;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use stdClass;
 
 class CatalogDirectoryQuery
 {
     public function __construct(
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly CatalogTitleQuery $titles,
+        private readonly TagResolver $tagResolver,
     ) {}
 
-    /** @return LengthAwarePaginator<int, Model|object> */
+    /** @return LengthAwarePaginator<int, Model|stdClass> */
     public function paginate(
         CatalogDirectoryDefinition $directory,
         string $search,
@@ -47,10 +51,16 @@ class CatalogDirectoryQuery
                 $query->orderByDesc('published_titles_count');
             }
 
-            $query->orderBy($table.'.name')->orderBy($table.'.id');
+            if ($filterType === 'tag' && Tag::usesCanonicalSchema()) {
+                $query
+                    ->orderByRaw('coalesce(localized_label, fallback_label, tags.name)')
+                    ->orderBy($table.'.id');
+            } else {
+                $query->orderBy($table.'.name')->orderBy($table.'.id');
+            }
         }
 
-        $page = max(1, LaravelLengthAwarePaginator::resolveCurrentPage('page'));
+        $page = max(1, LengthAwarePaginator::resolveCurrentPage('page'));
         $hasFilters = $search !== '' || $letter !== '' || $decade !== null;
         $total = $hasFilters
             ? $this->filteredValueCount($directory, $search, $letter, $decade)
@@ -58,7 +68,7 @@ class CatalogDirectoryQuery
         $perPage = max(1, min(50, $perPage ?? $directory->perPage));
         $items = $query->forPage($page, $perPage)->get();
 
-        return new LaravelLengthAwarePaginator($items, $total, $perPage, $page, [
+        return new LengthAwarePaginator($items, $total, $perPage, $page, [
             'path' => request()->url(),
             'query' => request()->query(),
             'pageName' => 'page',
@@ -79,14 +89,14 @@ class CatalogDirectoryQuery
                 ->first();
 
             return [
-                'values' => (int) ($summary?->values_count ?? 0),
-                'titles' => (int) ($summary?->titles_count ?? 0),
+                'values' => (int) ($summary->values_count ?? 0),
+                'titles' => (int) ($summary->titles_count ?? 0),
             ];
         }
 
         $filterType = $directory->filterType?->value;
         abort_if($filterType === null, 404);
-        $pivot = $this->pivot($filterType);
+        $pivot = $this->taxonomies->pivot($filterType);
         $visibleTitles = $this->titles->visibleTo(null)->select('catalog_titles.id');
         $visibleAlias = 'visible_directory_summary_titles';
         $summaryQuery = DB::table($pivot['table'])->joinSub(
@@ -96,14 +106,21 @@ class CatalogDirectoryQuery
             '=',
             $pivot['table'].'.'.$pivot['title_key'],
         );
+
+        if ($filterType === 'tag') {
+            $summaryQuery->whereIn(
+                $pivot['table'].'.'.$pivot['related_key'],
+                Tag::query()->publiclyEligible()->select('tags.id'),
+            );
+        }
         $summary = $summaryQuery
             ->selectRaw("count(distinct {$pivot['table']}.{$pivot['related_key']}) as values_count")
             ->selectRaw("count(distinct {$pivot['table']}.{$pivot['title_key']}) as titles_count")
             ->first();
 
         return [
-            'values' => (int) ($summary?->values_count ?? 0),
-            'titles' => (int) ($summary?->titles_count ?? 0),
+            'values' => (int) ($summary->values_count ?? 0),
+            'titles' => (int) ($summary->titles_count ?? 0),
         ];
     }
 
@@ -118,11 +135,14 @@ class CatalogDirectoryQuery
         $modelClass = $this->taxonomies->modelClass($filterType);
         $model = new $modelClass;
         $table = $model->getTable();
-        $pivot = $this->pivot($filterType);
+        $pivot = $this->taxonomies->pivot($filterType);
         $visibleAlias = 'visible_directory_letter_titles';
+        $localizedTag = $filterType === 'tag' && Tag::usesCanonicalSchema();
+        $labelSql = $localizedTag ? $this->localizedTagNameSql($table) : $table.'.name';
+        $labelBindings = $localizedTag ? $this->localizedTagNameBindings() : [];
 
-        return DB::table($table)
-            ->selectRaw("substr({$table}.name, 1, 1) as initial")
+        $query = DB::table($table)
+            ->selectRaw("substr({$labelSql}, 1, 1) as initial", $labelBindings)
             ->join($pivot['table'], $pivot['table'].'.'.$pivot['related_key'], '=', $table.'.id')
             ->joinSub(
                 $this->titles->visibleTo(null)->select('catalog_titles.id'),
@@ -132,7 +152,13 @@ class CatalogDirectoryQuery
                 $pivot['table'].'.'.$pivot['title_key'],
             )
             ->whereNotNull($table.'.name')
-            ->where($table.'.name', '<>', '')
+            ->where($table.'.name', '<>', '');
+
+        if ($filterType === 'tag') {
+            $query->whereIn($table.'.id', Tag::query()->publiclyEligible()->select('tags.id'));
+        }
+
+        return $query
             ->groupBy('initial')
             ->pluck('initial')
             ->map(fn (mixed $initial): string => $this->normalizedInitial((string) $initial))
@@ -167,11 +193,27 @@ class CatalogDirectoryQuery
             return false;
         }
 
-        $modelClass = $this->taxonomies->modelClass($directory->filterType->value);
+        $filterType = $directory->filterType->value;
+        $modelClass = $this->taxonomies->modelClass($filterType);
+
+        if ($modelClass === Tag::class && Tag::usesCanonicalSchema()) {
+            return $this->tagResolver->resolvePublic($value) !== null;
+        }
+
+        $model = new $modelClass;
+        $pivot = $this->taxonomies->pivot($filterType);
 
         return $modelClass::query()
             ->where('slug', $value)
-            ->whereHas('catalogTitles', fn (Builder $query): Builder => $this->titles->constrainVisible($query, null))
+            ->whereIn(
+                $model->qualifyColumn('id'),
+                DB::table($pivot['table'])
+                    ->select($pivot['related_key'])
+                    ->whereIn(
+                        $pivot['title_key'],
+                        $this->titles->visibleTo(null)->select('catalog_titles.id'),
+                    ),
+            )
             ->exists();
     }
 
@@ -186,7 +228,7 @@ class CatalogDirectoryQuery
         $modelClass = $this->taxonomies->modelClass($filterType);
         $model = new $modelClass;
         $table = $model->getTable();
-        $pivot = $this->pivot($filterType);
+        $pivot = $this->taxonomies->pivot($filterType);
         $counts = DB::table($pivot['table'])
             ->selectRaw("{$pivot['related_key']} as directory_value_id")
             ->selectRaw("count(distinct {$pivot['title_key']}) as published_titles_count")
@@ -215,10 +257,19 @@ class CatalogDirectoryQuery
             ->whereNotNull($table.'.slug')
             ->where($table.'.slug', '<>', '');
 
-        $this->applyTaxonomySearch($query, $table, $search);
+        if ($model instanceof Tag && Tag::usesCanonicalSchema()) {
+            $this->constrainCanonicalTags($query, $table);
+        }
+
+        $this->applyTaxonomySearch(
+            $query,
+            $table,
+            $search,
+            $model instanceof Tag && Tag::usesCanonicalSchema(),
+        );
 
         if ($letter !== '') {
-            $this->applyLetter($query, $table, $letter);
+            $this->applyLetter($query, $table, $letter, $model instanceof Tag && Tag::usesCanonicalSchema());
         }
 
         return $query;
@@ -252,7 +303,7 @@ class CatalogDirectoryQuery
         abort_if($filterType === null, 404);
         $modelClass = $this->taxonomies->modelClass($filterType);
         $table = (new $modelClass)->getTable();
-        $pivot = $this->pivot($filterType);
+        $pivot = $this->taxonomies->pivot($filterType);
         $visibleAlias = 'visible_directory_filtered_count_titles';
         $query = $modelClass::query()
             ->join($pivot['table'], $pivot['table'].'.'.$pivot['related_key'], '=', $table.'.id')
@@ -263,31 +314,69 @@ class CatalogDirectoryQuery
                 '=',
                 $pivot['table'].'.'.$pivot['title_key'],
             );
-        $this->applyTaxonomySearch($query, $table, $search);
+
+        if ($modelClass === Tag::class && Tag::usesCanonicalSchema()) {
+            $query->whereIn($table.'.id', Tag::query()->publiclyEligible()->select('tags.id'));
+        }
+
+        $this->applyTaxonomySearch(
+            $query,
+            $table,
+            $search,
+            $modelClass === Tag::class && Tag::usesCanonicalSchema(),
+        );
 
         if ($letter !== '') {
-            $this->applyLetter($query, $table, $letter);
+            $this->applyLetter($query, $table, $letter, $modelClass === Tag::class && Tag::usesCanonicalSchema());
         }
 
         return $query->distinct()->count($table.'.id');
     }
 
     /** @param Builder<Model> $query */
-    private function applyTaxonomySearch(Builder $query, string $table, string $search): void
+    private function applyTaxonomySearch(Builder $query, string $table, string $search, bool $includeTagNames = false): void
     {
         if ($search === '') {
             return;
         }
 
         $term = str_replace(['%', '_'], '', $search);
+
+        if ($term === '') {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
         $slug = Str::slug($term);
-        $query->where(function (Builder $query) use ($table, $term, $slug): void {
+        $query->where(function (Builder $query) use ($table, $term, $slug, $includeTagNames): void {
             $query->where($table.'.name', 'like', '%'.$term.'%');
 
             if ($slug !== '') {
                 $query->orWhere($table.'.slug', 'like', '%'.$slug.'%');
             }
+
+            if ($includeTagNames) {
+                $query
+                    ->orWhereHas('translations', fn (Builder $translations): Builder => $translations
+                        ->whereIn('locale', $this->tagContentLocales())
+                        ->where('label', 'like', '%'.$term.'%'))
+                    ->orWhereHas('aliases', fn (Builder $aliases): Builder => $aliases
+                        ->whereIn('locale', ['und', ...$this->tagContentLocales()])
+                        ->where('moderation_status', 'approved')
+                        ->where('name', 'like', '%'.$term.'%'));
+            }
         });
+    }
+
+    /** @return list<string> */
+    private function tagContentLocales(): array
+    {
+        return collect([app()->getLocale(), (string) config('app.fallback_locale', 'ru')])
+            ->filter(fn (string $locale): bool => in_array($locale, config('tags.supported_locales', []), true))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function yearQuery(string $search, ?int $decade): QueryBuilder
@@ -321,15 +410,18 @@ class CatalogDirectoryQuery
     }
 
     /** @param Builder<Model> $query */
-    private function applyLetter(Builder $query, string $table, string $letter): void
+    private function applyLetter(Builder $query, string $table, string $letter, bool $localizedTag = false): void
     {
+        $labelSql = $localizedTag ? $this->localizedTagNameSql($table) : $table.'.name';
+        $bindings = $localizedTag ? $this->localizedTagNameBindings() : [];
+
         if ($letter === '#') {
             $driver = DB::connection()->getDriverName();
 
             match ($driver) {
-                'mysql', 'mariadb' => $query->whereRaw("{$table}.name not regexp '^[[:alpha:]]'"),
-                'pgsql' => $query->whereRaw("{$table}.name !~ '^[[:alpha:]]'"),
-                default => $query->whereRaw("substr({$table}.name, 1, 1) not glob '[A-Za-zА-Яа-яЁё]'"),
+                'mysql', 'mariadb' => $query->whereRaw("{$labelSql} not regexp '^[[:alpha:]]'", $bindings),
+                'pgsql' => $query->whereRaw("{$labelSql} !~ '^[[:alpha:]]'", $bindings),
+                default => $query->whereRaw("substr({$labelSql}, 1, 1) not glob '[A-Za-zА-Яа-яЁё]'", $bindings),
             };
 
             return;
@@ -337,10 +429,21 @@ class CatalogDirectoryQuery
 
         $upper = mb_strtoupper($letter);
         $lower = mb_strtolower($letter);
-        $query->where(function (Builder $query) use ($table, $upper, $lower): void {
-            $query->where($table.'.name', 'like', $upper.'%')
-                ->orWhere($table.'.name', 'like', $lower.'%');
+        $query->where(function (Builder $query) use ($labelSql, $bindings, $upper, $lower): void {
+            $query->whereRaw("{$labelSql} like ?", [...$bindings, $upper.'%'])
+                ->orWhereRaw("{$labelSql} like ?", [...$bindings, $lower.'%']);
         });
+    }
+
+    private function localizedTagNameSql(string $table): string
+    {
+        return "coalesce((select tag_directory_labels.label from tag_translations as tag_directory_labels where tag_directory_labels.tag_id = {$table}.id and tag_directory_labels.locale = ? limit 1), (select fallback_tag_directory_labels.label from tag_translations as fallback_tag_directory_labels where fallback_tag_directory_labels.tag_id = {$table}.id and fallback_tag_directory_labels.locale = ? limit 1), {$table}.name)";
+    }
+
+    /** @return list<string> */
+    private function localizedTagNameBindings(): array
+    {
+        return [app()->getLocale(), (string) config('app.fallback_locale', 'ru')];
     }
 
     private function normalizedInitial(string $initial): string
@@ -350,16 +453,23 @@ class CatalogDirectoryQuery
             : '#';
     }
 
-    /** @return array{table: string, title_key: string, related_key: string} */
-    private function pivot(string $filterType): array
+    /** @param Builder<Model> $query */
+    private function constrainCanonicalTags(Builder $query, string $table): void
     {
-        $relation = (new CatalogTitle)->{$this->taxonomies->relationName($filterType)}();
-
-        return [
-            'table' => $relation->getTable(),
-            'title_key' => $relation->getForeignPivotKeyName(),
-            'related_key' => $relation->getRelatedPivotKeyName(),
-        ];
+        $query
+            ->whereIn($table.'.id', Tag::query()->publiclyEligible()->select('tags.id'))
+            ->addSelect([
+                'localized_label' => TagTranslation::query()
+                    ->select('label')
+                    ->whereColumn('tag_id', $table.'.id')
+                    ->where('locale', app()->getLocale())
+                    ->limit(1),
+                'fallback_label' => TagTranslation::query()
+                    ->select('label')
+                    ->whereColumn('tag_id', $table.'.id')
+                    ->where('locale', (string) config('app.fallback_locale', 'ru'))
+                    ->limit(1),
+            ]);
     }
 
     private function minimumYear(): int

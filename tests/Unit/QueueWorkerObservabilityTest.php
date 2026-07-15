@@ -17,6 +17,37 @@ use Tests\TestCase;
 
 final class QueueWorkerObservabilityTest extends TestCase
 {
+    public function test_missing_queue_configuration_uses_the_versioned_cache_queue(): void
+    {
+        config([
+            'cache-architecture.stores.domain' => 'array',
+            'cache-architecture.stores.versions' => 'array',
+            'cache-architecture.warming.connection' => 'redis',
+            'queue.default' => 'redis',
+            'queue.connections.redis.queue' => 'default',
+            'seasonvar.queue.connection' => 'redis',
+            'seasonvar.queue.queue' => 'seasonvar-import',
+            'seasonvar.title_refresh.queue' => 'seasonvar-title-refresh',
+        ]);
+        $warming = (array) config('cache-architecture.warming');
+        unset($warming['queue']);
+        config(['cache-architecture.warming' => $warming]);
+
+        $queue = $this->createMock(QueueContract::class);
+        $queue->method('pendingSize')->willReturn(0);
+        $queue->method('delayedSize')->willReturn(0);
+        $queue->method('reservedSize')->willReturn(0);
+        $queue->method('creationTimeOfOldestPendingJob')->willReturn(null);
+
+        $manager = $this->createMock(QueueManager::class);
+        $manager->method('connection')->with('redis')->willReturn($queue);
+        $this->app->instance(QueueManager::class, $manager);
+
+        $status = app(QueueWorkerHeartbeat::class)->status();
+
+        $this->assertSame('cache-warm-v2', $status['queues']['cache_warm']['queue']);
+    }
+
     public function test_processing_and_failure_events_record_low_cardinality_queue_metrics(): void
     {
         $job = $this->createMock(Job::class);

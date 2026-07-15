@@ -37,3 +37,29 @@
 ## Measurements still required
 
 After lifecycle stabilization, capture stable medians for home, catalog, title, stats, sitemap, import page apply and recommendation rebuild. Active import contention currently makes isolated response-time comparisons noisy; this limitation is explicit rather than hidden.
+
+## Task 10 collection schema audit
+
+Pre-implementation scan подтвердил отсутствие collection/list/playlist/folder tables, duplicate item pivots и rows в production-style SQLite snapshot; watchlist является отдельным boolean state. Поэтому additive migration безопасно создаёт unique current/public IDs and unique collection/title immediately, без destructive reconciliation. User UUID backfill использует ordered `chunkById(500)` и model callback для будущих inserts.
+
+Добавлены пять tables (`catalog_collections`, slugs, items, reports, translations) и одна nullable unique `users.public_id`. Индексы соответствуют owner/public/featured directory, manual order, title membership/merge, locale lookup и moderation queue; guessed likes/follows/popularity indexes не добавлены. Schema остаётся explicit serial-only, без arbitrary morph type. Title merge выполняет service reconciliation до duplicate force-delete, а soft-delete restoration сохраняет structural children.
+
+Полная migration chain была применена к отдельной SQLite базе, после чего обе Task 10 migrations откатились в обратном порядке. Проверка после rollback показала ноль `catalog_collection*` tables, отсутствие additive `users.public_id`, сохранённые baseline `users`/`catalog_titles` и удалённые только две migration rows. Повторный final full-batch rollback подтвердил те же collection postconditions, а затем уже ниже по истории остановился на unrelated released importer migration `2026_07_09_204238`; Task 10 не переписывает старую migration и не скрывает это отдельное migration-program ограничение. Представительные планы запросов использовали documented owner/public/manual/title/report/translation indexes; duplicate `(collection, title)` rows отсутствовали после повторного batch Apply.
+
+Risk до rollout: migrations ещё должны пройти обычный disposable SQLite up/down/schema/index inspection и production backup/write-pause gate; текущий live snapshot не мигрировался этой задачей. Collection benchmark не публикуется без representative rows. Task instruction запрещает создание/запуск automated tests, поэтому финальная verification использует static migration inspection и disposable schema diagnostics, не заменяя production backup.
+
+## Task 12 discussion schema audit
+
+Pre-implementation inspection нашёл zero discussion tables/rows, поэтому migrations `210000`–`210300` add comments, engagement/reports/restrictions, blocks/mutes/preferences и standard notifications без legacy copy/delete/backfill. Stable numeric comment ID отделён от body/locale/slug; target хранит enum code + ID, а root title FK служит merge/cache identity. Replies используют один self-FK root плюс nullable reply context, не отдельную table/nested set/morph.
+
+Unique submission, user/comment reaction, report deduplication и directional relationship pairs безопасны на empty audited domain. Exact composite indexes обслуживают target pagination, root replies, author activity, duplicate window, moderation/report queue, reaction totals/current state, restriction expiry и reverse block queries. Reply/reaction totals derived; stored score/count columns не добавлены.
+
+Disposable SQLite migration output подтвердил успешный `up()` всех discussion migrations и notification table. Production file не мигрировался. Remaining rollout evidence: verified backup/writer pause, full repository migration after the unrelated tag migration is complete, index/foreign-key inspection on disposable copy, representative comment query plans and practical rollback before accepting user writes.
+
+## Task 13 review schema audit
+
+The deployed table has 73 101 provider rows and one unique `(catalog_title_id,body_hash)` key; audit found zero duplicate groups, invalid body hashes, orphan title/source or legacy user/vote/report data. Therefore migration `2026_07_15_220000` adds nullable community columns/default `origin=provider,status=published` and aliases/votes/reports/restrictions/preferences without copying, deleting or re-rating provider content. Rating remains unique `catalog_title_user_states(user_id,catalog_title_id)`.
+
+Nullable unique ownership/submission hashes avoid cross-engine nullable composite semantics and preserve provider many-per-title behavior. Vote pair and open-report dedup keys make engagement retry-safe. Public title/author/moderation, vote totals/current state, report queue and active restriction indexes correspond to exact documented query predicates; no stored aggregate or speculative sentiment/reaction/season index was added.
+
+Title merge archives hash/author collisions with stable alias/original hash instead of hard delete, moves votes/reports and uses `eachById()` while changing scope. Production file remains unmigrated. Isolated SQLite `up()`, foreign-key/index inspection and representative `EXPLAIN` are final verification evidence; rollback drops community schema and therefore requires export/backup after user writes. Task 13 does not create/run automated tests.

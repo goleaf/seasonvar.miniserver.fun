@@ -466,9 +466,9 @@ class SeasonvarImportMaintenanceTest extends TestCase
 
         $this->assertNotNull($recommendation);
         $this->assertSame(1, $recommendation->rank);
-        $this->assertSame('v3', $recommendation->algorithm_version);
+        $this->assertSame('v4', $recommendation->algorithm_version);
         $this->assertSame('full', $run->summary['last_recommendations']['mode']);
-        $this->assertSame('v3', $run->summary['last_recommendations']['algorithm_version']);
+        $this->assertSame('v4', $run->summary['last_recommendations']['algorithm_version']);
         $this->assertSame(2, $run->summary['last_recommendations']['titles']);
         $this->assertSame(1, $run->summary['last_recommendations']['titles_with_recommendations']);
         $this->assertSame(1, $run->summary['last_recommendations']['titles_without_recommendations']);

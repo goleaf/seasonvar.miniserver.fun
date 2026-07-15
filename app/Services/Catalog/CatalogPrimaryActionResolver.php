@@ -35,9 +35,7 @@ class CatalogPrimaryActionResolver
                 $episode = $this->playback->watchableEpisode($catalogTitle, $user, $progress->episode_id);
 
                 if ($episode !== null) {
-                    $label = $episode->number !== null
-                        ? __('catalog.player.continue_episode', ['number' => $episode->number])
-                        : __('catalog.player.continue_release');
+                    $label = __('catalog.player.continue_episode', ['number' => $episode->number]);
 
                     return $this->episodeAction('continue', $label, $catalogTitle, $user, $episode, $progress->position_seconds);
                 }
@@ -50,9 +48,7 @@ class CatalogPrimaryActionResolver
                     : null;
 
                 if ($nextEpisode !== null) {
-                    $label = $nextEpisode->number !== null
-                        ? __('catalog.player.next_episode', ['number' => $nextEpisode->number])
-                        : __('catalog.player.next_release');
+                    $label = __('catalog.player.next_episode', ['number' => $nextEpisode->number]);
 
                     return $this->episodeAction('next', $label, $catalogTitle, $user, $nextEpisode);
                 }
@@ -68,9 +64,7 @@ class CatalogPrimaryActionResolver
         $firstEpisode = $this->playback->firstWatchableEpisode($catalogTitle, $user);
 
         if ($firstEpisode !== null) {
-            $label = $firstEpisode->number !== null
-                ? __('catalog.player.start_episode', ['number' => $firstEpisode->number])
-                : __('catalog.player.start_release');
+            $label = __('catalog.player.start_episode', ['number' => $firstEpisode->number]);
 
             return $this->episodeAction('start', $label, $catalogTitle, $user, $firstEpisode);
         }

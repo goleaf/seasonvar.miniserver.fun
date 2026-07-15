@@ -61,11 +61,22 @@
 
     @if (in_array($section, ['watchlist', 'ratings'], true))
         <form wire:submit="applyFilters" class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel" novalidate>
-            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(240px,2fr)_minmax(150px,1fr)_minmax(120px,.7fr)_minmax(160px,1fr)_minmax(130px,.8fr)_auto] xl:items-end">
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(220px,2fr)_minmax(140px,1fr)_minmax(120px,.7fr)_minmax(160px,1fr)_minmax(150px,1fr)_minmax(130px,.8fr)_auto] xl:items-end">
                 <label class="block min-w-0">
                     <span class="mb-1.5 block text-sm font-bold text-slate-700">Поиск</span>
                     <input type="search" wire:model="filters.query" placeholder="Название тайтла" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100">
                     @error('filters.query') <span class="mt-1 block text-xs font-semibold text-rose-700">{{ $message }}</span> @enderror
+                </label>
+
+                <label class="block min-w-0">
+                    <span class="mb-1.5 block text-sm font-bold text-slate-700">{{ __('tags.personal') }}</span>
+                    <select wire:model="filters.personalTag" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-100">
+                        <option value="">{{ __('tags.personal_page.all_tags') }}</option>
+                        @foreach ($personalTags as $personalTag)
+                            <option value="{{ $personalTag->public_id }}">{{ $personalTag->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('filters.personalTag') <span class="mt-1 block text-xs font-semibold text-rose-700">{{ $message }}</span> @enderror
                 </label>
 
                 <label class="block min-w-0">

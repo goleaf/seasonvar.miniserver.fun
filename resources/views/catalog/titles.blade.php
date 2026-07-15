@@ -118,6 +118,65 @@
                     </form>
                 </div>
 
+                @if ($tagPage !== null)
+                    <section aria-labelledby="public-tag-summary-{{ $tagPage->publicId }}" class="mt-5 rounded-lg border border-emerald-100 bg-emerald-50/60 p-4">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <h2 id="public-tag-summary-{{ $tagPage->publicId }}" class="break-words text-lg font-black text-slate-800">{{ $tagPage->name }}</h2>
+                                    <x-ui.status-pill variant="success">{{ __('tags.types.'.$tagPage->type) }}</x-ui.status-pill>
+                                </div>
+                                <p class="mt-1 text-sm text-slate-600">{{ trans_choice('tags.page.count', $tagPage->publicTitleCount, ['count' => $tagPage->publicTitleCount]) }}</p>
+                            </div>
+                            <a href="{{ route('tags.index') }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                                <x-ui.icon name="fa-solid fa-tags" />
+                                <span>{{ __('tags.title') }}</span>
+                            </a>
+                        </div>
+
+                        @if ($tagPage->shortDescription !== null)
+                            <p class="mt-3 max-w-4xl text-sm leading-6 text-slate-700">{{ $tagPage->shortDescription }}</p>
+                        @endif
+
+                        @if ($tagPage->description !== null && $tagPage->description !== $tagPage->shortDescription)
+                            <details class="group mt-3 max-w-4xl">
+                                <summary class="inline-flex min-h-11 cursor-pointer list-none items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                                    <x-ui.icon name="fa-solid fa-circle-info" />
+                                    <span>{{ __('tags.page.show_description') }}</span>
+                                    <x-ui.icon name="fa-solid fa-chevron-down transition group-open:rotate-180" />
+                                </summary>
+                                <p class="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{{ $tagPage->description }}</p>
+                            </details>
+                        @endif
+
+                        @if ($tagPage->aliases !== [])
+                            <div class="mt-4">
+                                <h3 class="text-xs font-black uppercase tracking-wide text-slate-500">{{ __('tags.page.aliases') }}</h3>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    @foreach ($tagPage->aliases as $alias)
+                                        <x-ui.status-pill variant="muted">{{ $alias }}</x-ui.status-pill>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
+                        @if ($tagPage->related !== [])
+                            <nav aria-labelledby="related-tags-{{ $tagPage->publicId }}" class="mt-4">
+                                <h3 id="related-tags-{{ $tagPage->publicId }}" class="text-xs font-black uppercase tracking-wide text-slate-500">{{ __('tags.page.related') }}</h3>
+                                <div class="mt-2 flex flex-wrap gap-2">
+                                    @foreach ($tagPage->related as $relatedTag)
+                                        <a href="{{ route('titles.taxonomy', ['type' => 'tag', 'taxonomy' => $relatedTag['slug']]) }}" class="inline-flex min-h-11 max-w-full items-center gap-2 rounded-full bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-100 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                                            <x-ui.icon name="fa-solid fa-tag text-emerald-700" />
+                                            <span class="min-w-0 break-words">{{ $relatedTag['name'] }}</span>
+                                            <span class="tabular-nums text-slate-400">{{ $relatedTag['count'] }}</span>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            </nav>
+                        @endif
+                    </section>
+                @endif
+
                 <div class="mt-4 hidden flex-wrap gap-2 lg:flex">
                     @foreach ($filterView->sortLabels as $sortKey => $sortLabel)
                         <a data-catalog-sort-option href="{{ route('titles.index', $filterView->sortQuery($sortKey)) }}" rel="nofollow" wire:click.prevent="sortBy('{{ $sortKey }}')" @if ($filterView->isActiveSort($sortKey)) aria-current="true" @endif @class([
@@ -197,6 +256,23 @@
             @endisland
 
             @island(name: 'catalog-live', with: $this->catalogPage)
+            @if ($collectionSuggestions->isNotEmpty())
+                <section aria-labelledby="catalog-collection-suggestions-title">
+                    <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+                        <h2 id="catalog-collection-suggestions-title" class="flex items-center gap-2 text-lg font-black text-slate-800">
+                            <x-ui.icon name="fa-solid fa-layer-group text-emerald-700" />
+                            <span>{{ __('collections.directory.search_results') }}</span>
+                        </h2>
+                        <a href="{{ route('collections.index', ['q' => $search]) }}" class="text-sm font-bold text-emerald-700 hover:text-emerald-600">{{ __('collections.navigation.public_collections') }}</a>
+                    </div>
+                    <div class="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        @foreach ($collectionSuggestions as $collectionSuggestion)
+                            <x-collections.collection-card wire:key="search-collection-{{ $collectionSuggestion->public_id }}" :collection="$collectionSuggestion" />
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+
             <div data-catalog-results class="relative scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48">
                 <div wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll,previousPage,nextPage,gotoPage" class="hidden absolute inset-x-0 top-0 z-20 rounded-panel bg-white text-sm font-bold text-emerald-700" role="status" aria-live="polite">
                     <div class="flex min-h-24 items-center justify-center">

@@ -54,7 +54,7 @@
 | Import/parser/sitemap/media checks | `Http::fake`, stray-request prevention, queue/DB tests | Optional real provider integration only when explicitly enabled |
 | API contract/privacy | Route/OpenAPI/Resource/error/owner/query-delta tests | HTTP smoke after deploy |
 | Cache/queue/health/deployment | Infrastructure fake + optional Redis/Memcached tests | Production read-only preflight/heartbeat/status |
-| SEO/sitemap/feed/robots | Response/stream/schema tests | Browser canonical/JSON-LD parse and search tooling checks |
+| SEO/sitemap/feed/robots | Response/stream/schema tests plus prepared JSON-LD closing-script/XSS regression | Browser canonical/JSON-LD parse and search tooling checks |
 | Blade/Tailwind/a11y | Static Blade/visual-system tests | Build + axe + responsive viewport matrix |
 
 Every fixed defect receives a regression that first fails for the demonstrated reason. Tests are not weakened or deleted to make a gate pass.

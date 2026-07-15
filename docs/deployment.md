@@ -26,7 +26,7 @@ Production environment должен соответствовать `docs/environ
 8. `php artisan app:health --json`, public API conditional GET, sitemap GET/HEAD и два запроса к `/`, `/titles` и title page; второй гостевой ответ должен иметь `X-Seasonvar-Page-Cache: HIT`.
 9. Вернуть traffic/writers и наблюдать queue wait, cache failure/lock timeout, Redis memory, Memcached evictions и warm p95.
 
-Установка cache-warm unit не означает немедленный запуск. Сначала read-only проверить `php artisan app:health --json`, размер/возраст `cache_warm`, отсутствие конфликтующего worker и importer/SQLite contention. Историческую очередь не очищать и массово не retry-ить: новый код безопасно превращает jobs без pending intent в no-op. После наблюдаемого dry pass установить unit и запустить один изолированный процесс:
+Установка cache-warm unit не означает немедленный запуск. Сначала read-only проверить `php artisan app:health --json`, размер/возраст `cache_warm`, отсутствие конфликтующего worker и importer/SQLite contention. Историческую очередь `cache-warm` не очищать и массово не retry-ить: её payload уже имеют истёкший `retryUntil`, поэтому Laravel отклоняет их до `handle()` и не может выполнить application-level no-op. Она остаётся изолированным legacy backlog, а новый intent, unique/overlap locks, health и worker используют versioned очередь `cache-warm-v2`. После наблюдаемого dry pass установить unit и запустить один изолированный процесс:
 
 ```bash
 sudo cp deploy/systemd/seasonvar-cache-warm-worker.service /etc/systemd/system/
@@ -35,7 +35,7 @@ sudo systemctl enable seasonvar-cache-warm-worker.service
 sudo systemctl start seasonvar-cache-warm-worker.service
 ```
 
-Unit слушает только `cache-warm` и имеет bounded timeout/memory/max-time/max-jobs. После запуска дождаться уменьшения backlog, проверить heartbeat/warming state, `cache:metrics --json` и повторные guest HIT. При росте SQLite wait/CPU/ошибок остановить unit штатно; pending intent сохранится и не требует flush.
+Unit слушает только `cache-warm-v2` и имеет bounded timeout/memory/max-time/max-jobs. После запуска дождаться обработки текущего versioned intent, проверить heartbeat/warming state, `cache:metrics --json` и повторные guest HIT. При росте SQLite wait/CPU/ошибок остановить unit штатно; pending intent сохранится и не требует flush. Старую `cache-warm` не включать в новый worker и не удалять автоматически: её disposition остаётся отдельной операторской процедурой после сверки агрегатной сводки failed/pending jobs.
 
 `/health/ready` разрешается только monitoring/load-balancer boundary и не раскрывает topology. Failed Redis sessions/queues/locks делает readiness failed; Redis cache/Memcached outage — degraded и требует снижения traffic/устранения причины до исчерпания cold-path capacity.
 
@@ -69,7 +69,7 @@ Media due sources по-прежнему выбирает importer finalizer, а 
 
 Перед deploy дождаться active import jobs и сделать backup SQLite. Затем применить additive `2026_07_13_140000_add_administration_fields_to_seasonvar_import_runs`, задать comma-separated `SEASONVAR_IMPORT_ADMIN_EMAILS`, пересобрать config cache и выполнить `php artisan queue:restart`. Migration добавляет nullable foreign keys/timestamps и indexes; данные не переписывает и backfill не требует.
 
-Production scheduler — внешний cron, который каждую минуту вызывает Laravel `schedule:run`; текущий read-only аудит 15.07.2026 такой entry не нашёл, поэтому это rollout blocker. Admin UI не заменяет cron: он даёт ручной authorized старт/retry/cancel и recovery для `running` run без heartbeat и live claims. Threshold задаёт `SEASONVAR_QUEUE_STALE_AFTER_MINUTES=120`; перед ручным recovery нужно убедиться, что workers не остановлены на долгую maintenance-паузу.
+Production scheduler — внешний cron, который каждую минуту вызывает Laravel `schedule:run`. Entry установлен для пользователя `www` и проверен 15.07.2026 через `crontab -T`, ручной `schedule:run` и journal cron; cache-warm fallback запускается Laravel scheduler каждые десять минут. Admin UI не заменяет cron: он даёт ручной authorized старт/retry/cancel и recovery для `running` run без heartbeat и live claims. Threshold задаёт `SEASONVAR_QUEUE_STALE_AFTER_MINUTES=120`; перед ручным recovery нужно убедиться, что workers не остановлены на долгую maintenance-паузу.
 
 ## Import identity и editorial baseline от 13.07.2026
 
@@ -233,7 +233,7 @@ php artisan queue:failed
 php artisan queue:retry all
 ```
 
-Исторически в crontab пользователя `www` был добавлен dispatcher с десятью запусками в сутки и read-only монитор очереди каждые пять минут:
+В crontab пользователя `www` сохранены dispatcher с десятью запусками в сутки и read-only монитор очереди каждые пять минут; 15.07.2026 к ним добавлен Laravel scheduler каждую минуту:
 
 ```cron
 * * * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan schedule:run >> /dev/null 2>&1
@@ -241,7 +241,7 @@ php artisan queue:retry all
 */5 * * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan queue:monitor 'redis:seasonvar-title-refresh,redis:seasonvar-import' --max=5000 >> storage/logs/seasonvar-queue-monitor.log 2>&1
 ```
 
-15.07.2026 production evidence опровергло прежнее предположение о полном lifecycle deduplication: baseline содержал 11 queued runs, 8037 pending jobs и 5670 live claims; более поздний snapshot — 12 running sitemap runs и 1601 active groups. Новый общий coordinator переиспользует один active global run, а повторный cron вызов дополнительно dispatches уникальный finalizer watchdog, поэтому recovery не зависит только от отсутствующего scheduler entry. Тем не менее `schedule:run` нужен для полного project schedule и должен быть установлен/проверен при rollout. Existing failed/backlog jobs не retry-ить и не очищать массово: сначала сопоставить их с текущим run/group/claim state.
+15.07.2026 production evidence опровергло прежнее предположение о полном lifecycle deduplication: baseline содержал 11 queued runs, 8037 pending jobs и 5670 live claims; более поздний snapshot — 12 running sitemap runs и 1601 active groups. Новый общий coordinator переиспользует один active global run, а повторный cron вызов дополнительно dispatches уникальный finalizer watchdog. Установленный `schedule:run` обслуживает полный project schedule, включая десятиминутный резервный cache warm. Existing failed/backlog jobs не retry-ить и не очищать массово: сначала сопоставить их с текущим run/group/claim state.
 
 ## Server requirements snapshot 15.07.2026
 
@@ -249,8 +249,8 @@ php artisan queue:retry all
 - NVMe-backed XFS root: 920 GiB, ~807 GiB available at audit time.
 - nginx 1.31.2 with observed HTTP/2, advertised HTTP/3 and HSTS; TLS renewal is owned by aaPanel cron.
 - PHP 8.5.8 FPM/CLI with required Laravel extensions, OPcache, Redis, Memcached, SQLite, GD, Imagick and PCNTL. FFmpeg/ffprobe were not confirmed and are not required while the application does not transcode.
-- Redis and Memcached listen locally; SQLite remains the catalog database. Current importer topology is 4 import + 8 title-refresh workers; cache-warm worker unit exists in Git but was not installed.
-- Runtime currently violates production gate: debug enabled, config/events not cached, two migrations pending. Instrumented read-only preflight is finite (24.45 s wall; SQLite quick/FK 23655 ms), so allow at least 30 s outside active writer load and do not treat the host as rollout-ready until all failed checks are resolved.
+- Redis and Memcached listen locally; SQLite remains the catalog database. Current topology is 4 import + 8 title-refresh workers plus one enabled `cache-warm-v2` worker; the historical `cache-warm` backlog remains isolated.
+- Runtime config cache currently enforces debug-off and routes are cached; two unrelated migrations and the FTS readiness gate remain pending. Instrumented read-only preflight is finite (24.45 s wall; SQLite quick/FK 23655 ms), so allow at least 30 s outside active writer load and do not treat the host as fully rollout-ready until all failed checks are resolved.
 
 ## Exact deployment checklist
 
@@ -337,3 +337,32 @@ php artisan test --filter=ConfigurationEnvironmentTest
 ```bash
 php artisan project:docs-refresh --check
 ```
+
+## Rollout коллекций
+
+Collection rollout состоит из двух additive migrations: `2026_07_15_200000_create_catalog_collections.php` добавляет/backfill `users.public_id` и canonical collection/slug/item/report tables; `2026_07_15_200100_create_catalog_collection_translations.php` добавляет editorial locale rows. Existing watchlist/progress/history/catalog/comment/review data не переписывается. Перед `migrate --force` применяются обычные production backup, writer pause и SQLite integrity rules этого документа.
+
+После migration пересоберите config/routes/views и production assets, graceful reload PHP-FPM/Livewire workers, затем проверьте `/collections`, owner dashboard, public/unlisted/private access, legacy redirects, title selector, cover delivery, `/api/v1/collections`, `/sitemap-collections.xml` и account export. Public collection sitemap включён в существующий sitemap index; collection API/sitemap HTTP profiles должны иметь нулевые shared/stale TTL. Не прогревайте private/unlisted pages и не добавляйте CDN immutable cache для covers.
+
+Existing per-minute `schedule:run` обслуживает `catalog-collections:prune --limit=200` ежедневно в 04:07. Команда не требует queue/worker и удаляет только collections, soft-deleted не менее 30 дней, bounded максимум 1000 за ручной запуск. Убедитесь, что scheduler активен; отдельный cron/Supervisor для коллекций не создаётся.
+
+Rollback до появления production collection writes: остановить writers, вернуть code/assets, выполнить migration rollback в обратном порядке и восстановить caches. После реальных writes сначала выгрузить collection/account JSON и сделать verified DB/uploads backup: `down()` удаляет новые data tables и `users.public_id`, поэтому rollback без экспорта теряет только новую collection domain data. Он не должен использовать `migrate:fresh`, `db:wipe`, delete uploads tree или затрагивать watchlist/progress/history. Roll-forward предпочтителен после начала пользовательской записи.
+
+## Rollout обсуждений
+
+Discussion rollout применяет по порядку четыре additive migrations: `2026_07_15_210000_create_comments_table.php`, `210100_create_comment_engagement_tables.php`, `210200_create_discussion_preference_tables.php`, `210300_create_notifications_table.php`. Preflight подтвердил отсутствие legacy comment/reply/reaction/report/notification tables, поэтому backfill или destructive reconciliation не выполняются. Existing provider reviews, catalog, collections, watchlist/rating, progress/history и import rows не переписываются.
+
+Порядок: verified backup и writer pause по общему SQLite runbook; deploy code; `php artisan migrate --force`; rebuild `config:cache`, `route:cache`, `view:cache`; `npm run build`; graceful PHP-FPM reload. Checked-in/local `bootstrap/cache/routes-v7.php` может быть старше source routes, поэтому post-deploy route cache rebuild обязателен. Затем read-only проверить `comments.show`, `localized.comments.show`, `profile.discussions`, `notifications.index`, `admin.comments`, title/season/episode/collection scope, private/noindex headers и отсутствие comments в sitemap/OpenAPI.
+
+`CommentSchema` делает deploy-order safe: до полной schema discussion показывает disabled state, а остальной портал продолжает работать. Новая queue/cron/scheduler/Supervisor не нужна; restriction expiry проверяется request-time, database notifications отправляются sync. Public caches не flush-ятся: after-commit versions bump-ятся target-scoped.
+
+Rollback до первых writes удаляет migrations в обратном порядке после возврата совместимого code/assets. После production writes сначала выполнить password-confirmed account/discussion export и verified DB backup; `down()` удаляет новые UGC. Не использовать `migrate:fresh`, `db:wipe`, `cache:clear`, hard-delete comments или перенос в `catalog_title_reviews`. Roll-forward предпочтителен, потому что stable IDs/threads/moderation evidence нельзя восстановить из body.
+
+## Rollout отзывов пользователей
+
+1. Back up the database and export review/account data before schema rollback. Pause HTTP/queue/import/title-merge writers for the whole code-plus-migration window; no legacy title merger may run between these steps. Do not edit the deployed provider-review migration or run destructive reset/wipe commands.
+2. Deploy code with `ReviewSchema` capability guards, then apply additive `2026_07_15_220000_extend_catalog_title_reviews_for_community_reviews.php` before resuming any writer. Legacy provider API reads remain available before every required column/table exists; community writes fail closed until schema is complete. The writer pause is what guarantees that the pre-alias legacy merge fallback cannot consume a provider review ID during the rolling window.
+3. Inspect provider row count/IDs/body hashes/source links and confirm defaults `origin=provider,status=published`; migration performs no destructive provider backfill. Validate indexes/foreign keys and one ownership/vote/report key on the target database engine.
+4. Verify uncached routes `/reviews/{review}`, `/profile/reviews`, `/admin/reviews`; title Livewire composer/list, direct anchor, profile inbox/preferences and gate authorization. Confirm imported `/api/v1/titles/{slug}/reviews` response shape remains provider-only.
+5. Smoke create/edit/spoiler/vote/report/delete/restore using non-production fixtures only; verify scoped title/API/recommendation cache version changes and no viewer state in guest HTML. Inspect moderation/restriction/account export/delete and title merge in a controlled environment.
+6. No new queue, scheduler or worker is required. Rollback drops Task 13 tables/columns and destroys community rows, so export/backup is mandatory after production writes; provider ID/body/source/date remain in the predecessor table.

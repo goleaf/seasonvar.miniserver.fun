@@ -20,11 +20,12 @@ final class WarmCatalogCache extends Command
         $refresh = (bool) $this->option('refresh');
 
         if ((bool) $this->option('queue')) {
+            $queue = (string) config('cache-architecture.warming.queue', 'cache-warm-v2');
             $requests->request(refresh: $refresh);
             WarmCatalogCaches::dispatch($refresh)
                 ->onConnection((string) config('cache-architecture.warming.connection', 'redis'))
-                ->onQueue((string) config('cache-architecture.warming.queue', 'cache-warm'));
-            $this->info('Прогрев поставлен в очередь cache-warm.');
+                ->onQueue($queue);
+            $this->info("Прогрев поставлен в очередь {$queue}.");
 
             return self::SUCCESS;
         }

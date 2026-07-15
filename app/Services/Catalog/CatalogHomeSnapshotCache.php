@@ -15,6 +15,7 @@ final class CatalogHomeSnapshotCache
 {
     public function __construct(
         private readonly CatalogTitleQuery $titles,
+        private readonly CatalogHomeContentAdditionQuery $contentAdditions,
         private readonly TieredCache $cache,
         private readonly CacheTtlPolicy $ttl,
     ) {}
@@ -22,6 +23,7 @@ final class CatalogHomeSnapshotCache
     /**
      * @return array{
      *     latest_title_ids: list<int>,
+     *     latest_title_updates: list<array{id: int, added_at: string}>,
      *     featured_title_ids: list<int>,
      *     video_title_ids: list<int>,
      *     latest_media_ids: list<int>,
@@ -45,7 +47,7 @@ final class CatalogHomeSnapshotCache
     {
         $arguments = [
             CacheDomain::Homepage,
-            'content-index',
+            'content-index-v2',
             ['audience' => 'public', 'locale' => app()->getLocale(), 'year' => (int) now()->format('Y')],
             $this->ttl->for(CacheDomain::Homepage),
             fn (): array => $this->build(),
@@ -60,13 +62,8 @@ final class CatalogHomeSnapshotCache
     /** @return array<string, mixed> */
     private function build(): array
     {
-        $latestTitleIds = $this->titles->visibleTo(null)
-            ->latest('indexed_at')
-            ->orderByDesc('id')
-            ->limit(48)
-            ->pluck('id')
-            ->map(fn (mixed $id): int => (int) $id)
-            ->all();
+        $latestTitleUpdates = $this->contentAdditions->latestTitleUpdates();
+        $latestTitleIds = collect($latestTitleUpdates)->pluck('id')->all();
         $featuredTitleIds = $this->titles->visibleTo(null)
             ->whereNotNull('poster_url')
             ->latest('indexed_at')
@@ -118,6 +115,7 @@ final class CatalogHomeSnapshotCache
 
         return [
             'latest_title_ids' => $latestTitleIds,
+            'latest_title_updates' => $latestTitleUpdates,
             'featured_title_ids' => $featuredTitleIds,
             'video_title_ids' => $videoTitleIds,
             'latest_media_ids' => $latestMediaIds,
@@ -131,6 +129,7 @@ final class CatalogHomeSnapshotCache
     {
         return [
             'latest_title_ids' => [],
+            'latest_title_updates' => [],
             'featured_title_ids' => [],
             'video_title_ids' => [],
             'latest_media_ids' => [],

@@ -38,7 +38,9 @@ final class PublicHttpCacheHeaders
             return $response;
         }
 
-        $domain = $profile === 'documents' ? CacheDomain::Sitemap : CacheDomain::Api;
+        $domain = in_array($profile, ['documents', 'collection_documents'], true)
+            ? CacheDomain::Sitemap
+            : CacheDomain::Api;
         $response->headers->set('Cache-Control', implode(', ', [
             'public',
             'max-age='.max(0, (int) ($policy['max_age'] ?? 0)),

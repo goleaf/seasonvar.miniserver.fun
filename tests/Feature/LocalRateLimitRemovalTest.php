@@ -21,7 +21,7 @@ final class LocalRateLimitRemovalTest extends TestCase
         $this->assertSame('web', config('livewire.temporary_file_upload.middleware'));
     }
 
-    public function test_public_web_and_api_routes_have_no_throttle_middleware(): void
+    public function test_normal_public_navigation_routes_have_no_throttle_middleware(): void
     {
         foreach ([
             'health.ready',
@@ -31,7 +31,6 @@ final class LocalRateLimitRemovalTest extends TestCase
             'titles.index',
             'titles.year',
             'titles.taxonomy',
-            'api.catalog.people',
             'api.discovery',
             'api.openapi',
             'api.titles.index',

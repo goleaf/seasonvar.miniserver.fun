@@ -14,15 +14,19 @@ use App\Http\Controllers\Api\V1\Auth\ResendVerificationController;
 use App\Http\Controllers\Api\V1\Auth\ResetPasswordController;
 use App\Http\Controllers\Api\V1\Auth\TokenController;
 use App\Http\Controllers\Api\V1\Auth\VerifyEmailController;
+use App\Http\Controllers\Api\V1\CatalogCollectionController;
 use App\Http\Controllers\Api\V1\CatalogDirectoryController;
 use App\Http\Controllers\Api\V1\CatalogFilterSchemaController;
 use App\Http\Controllers\Api\V1\CatalogHomeController;
 use App\Http\Controllers\Api\V1\CatalogRecommendationController;
 use App\Http\Controllers\Api\V1\CatalogReviewController;
 use App\Http\Controllers\Api\V1\CatalogTitleController as V1CatalogTitleController;
+use App\Http\Controllers\Api\V1\PersonalTagAssignmentController;
+use App\Http\Controllers\Api\V1\PersonalTagController;
 use App\Http\Controllers\Api\V1\PlaybackProgressController;
 use App\Http\Controllers\Api\V1\PlaybackSessionController;
 use App\Http\Controllers\Api\V1\PlaybackSourceController;
+use App\Http\Controllers\Api\V1\PublicTagController;
 use App\Http\Controllers\Api\V1\SearchSuggestionController;
 use App\Http\Controllers\Api\V1\SyncController;
 use App\Http\Controllers\Api\V1\UserLibraryController;
@@ -43,7 +47,15 @@ Route::middleware(['auth.optional.sanctum', 'public.cache:api'])->group(function
         Route::get('/catalog/directories/{directory}', [CatalogDirectoryController::class, 'show'])
             ->whereIn('directory', array_keys(CatalogDirectoryRegistry::routeMap()))
             ->name('catalog.directories.show');
-        Route::get('/search/suggestions', SearchSuggestionController::class)->name('search.suggestions');
+        Route::get('/search/suggestions', SearchSuggestionController::class)
+            ->middleware('throttle:api-search-suggestions')
+            ->name('search.suggestions');
+        Route::get('/tags', [PublicTagController::class, 'index'])
+            ->middleware('throttle:api-search-suggestions')
+            ->name('tags.index');
+        Route::get('/tags/{tagSlug}', [PublicTagController::class, 'show'])
+            ->where('tagSlug', '[A-Za-z0-9][A-Za-z0-9-]*')
+            ->name('tags.show');
         Route::get('/titles', [V1CatalogTitleController::class, 'index'])->name('titles.index');
         Route::get('/titles/{titleSlug}', [V1CatalogTitleController::class, 'show'])
             ->where('titleSlug', '[^/]+')
@@ -64,21 +76,37 @@ Route::middleware(['auth.optional.sanctum', 'public.cache:api'])->group(function
     });
 });
 
+Route::middleware(['auth.optional.sanctum', 'public.cache:collection_api'])
+    ->prefix('v1')
+    ->name('api.v1.')
+    ->group(function (): void {
+        Route::get('/collections', [CatalogCollectionController::class, 'index'])->name('collections.index');
+        Route::get('/collections/{collectionSlug}', [CatalogCollectionController::class, 'show'])
+            ->where('collectionSlug', '[^/]+')
+            ->name('collections.show');
+        Route::get('/titles/{titleSlug}/collections', [CatalogCollectionController::class, 'forTitle'])
+            ->where('titleSlug', '[^/]+')
+            ->name('titles.collections');
+    });
+
 Route::middleware('public.cache:api')->group(function (): void {
-    Route::get('/catalog/people', CatalogPeopleLookupController::class)->name('api.catalog.people');
+    Route::get('/catalog/people', CatalogPeopleLookupController::class)
+        ->middleware('throttle:api-search-suggestions')
+        ->name('api.catalog.people');
     Route::get('/titles', [CatalogTitleController::class, 'index'])->name('api.titles.index');
     Route::get('/titles/{catalogTitle:slug}', [CatalogTitleController::class, 'show'])->name('api.titles.show');
 });
 
 Route::get('/v1/health', ApiHealthController::class)->name('api.v1.health');
 
-Route::prefix('v1/sync')->name('api.v1.sync.')->group(function (): void {
+Route::middleware('throttle:api-catalog-sync')->prefix('v1/sync')->name('api.v1.sync.')->group(function (): void {
     Route::get('/manifest', [SyncController::class, 'manifest'])->name('manifest');
     Route::get('/changes', [SyncController::class, 'catalog'])->name('changes');
 });
 
 Route::middleware('auth.optional.sanctum')->prefix('v1')->name('api.v1.')->group(function (): void {
     Route::post('/titles/{titleSlug}/playback-sessions', PlaybackSessionController::class)
+        ->middleware('throttle:api-playback-session')
         ->where('titleSlug', '[^/]+')
         ->name('titles.playback-sessions.store');
     Route::get('/playback/{licensedMedia}', PlaybackSourceController::class)
@@ -111,7 +139,7 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
     Route::put('/titles/{titleSlug}/episodes/{episode}/progress', PlaybackProgressController::class)
         ->where('titleSlug', '[^/]+')
         ->whereNumber('episode')
-        ->middleware(['auth:sanctum', 'abilities:mobile:write', 'verified.api'])
+        ->middleware(['auth:sanctum', 'abilities:mobile:write', 'verified.api', 'throttle:api-playback-progress'])
         ->name('titles.episodes.progress.update');
 
     Route::middleware(['auth:sanctum', 'abilities:mobile:read'])->group(function (): void {
@@ -147,6 +175,11 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             ->name('me.history.index');
         Route::get('/me/titles/{catalogTitle:slug}/state', [UserTitleStateController::class, 'show'])
             ->name('me.titles.state.show');
+        Route::get('/me/tags', [PersonalTagController::class, 'index'])
+            ->name('me.tags.index');
+        Route::get('/me/titles/{titleSlug}/tags', [PersonalTagAssignmentController::class, 'show'])
+            ->where('titleSlug', '[^/]+')
+            ->name('me.titles.tags.show');
 
         Route::middleware('abilities:mobile:write')->group(function (): void {
             Route::patch('/me', [AccountController::class, 'update'])->name('me.update');
@@ -154,7 +187,28 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             Route::delete('/me', [AccountController::class, 'destroy'])->name('me.destroy');
 
             Route::middleware('verified.api')->group(function (): void {
-                Route::post('/me/sync', [SyncController::class, 'push'])->name('me.sync.push');
+                Route::post('/me/tags', [PersonalTagController::class, 'store'])
+                    ->middleware('throttle:20,60')
+                    ->name('me.tags.store');
+                Route::patch('/me/tags/{tagPublicId}', [PersonalTagController::class, 'update'])
+                    ->whereUuid('tagPublicId')
+                    ->name('me.tags.update');
+                Route::delete('/me/tags/{tagPublicId}', [PersonalTagController::class, 'destroy'])
+                    ->whereUuid('tagPublicId')
+                    ->name('me.tags.destroy');
+                Route::post('/me/tags/{tagPublicId}/restore', [PersonalTagController::class, 'restore'])
+                    ->whereUuid('tagPublicId')
+                    ->name('me.tags.restore');
+                Route::put('/me/titles/{titleSlug}/tags', [PersonalTagAssignmentController::class, 'update'])
+                    ->where('titleSlug', '[^/]+')
+                    ->name('me.titles.tags.update');
+                Route::delete('/me/titles/{titleSlug}/tags/{tagPublicId}', [PersonalTagAssignmentController::class, 'destroy'])
+                    ->where('titleSlug', '[^/]+')
+                    ->whereUuid('tagPublicId')
+                    ->name('me.titles.tags.destroy');
+                Route::post('/me/sync', [SyncController::class, 'push'])
+                    ->middleware('throttle:api-user-sync')
+                    ->name('me.sync.push');
                 Route::put('/me/watchlist/{catalogTitle:slug}', [UserTitleStateController::class, 'storeWatchlist'])
                     ->name('me.watchlist.store');
                 Route::delete('/me/watchlist/{catalogTitle:slug}', [UserTitleStateController::class, 'destroyWatchlist'])

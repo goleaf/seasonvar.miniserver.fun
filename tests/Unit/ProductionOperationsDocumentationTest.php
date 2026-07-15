@@ -48,4 +48,19 @@ class ProductionOperationsDocumentationTest extends TestCase
         $this->assertStringContainsString('deploy/logrotate/seasonvar', $environment);
         $this->assertStringContainsString('php artisan about --only=environment', $environment);
     }
+
+    public function test_cache_warm_rollout_quarantines_expired_legacy_jobs_on_a_versioned_queue(): void
+    {
+        $cacheConfig = require config_path('cache-architecture.php');
+        $envExample = File::get(base_path('.env.example'));
+        $unit = File::get(base_path('deploy/systemd/seasonvar-cache-warm-worker.service'));
+        $deployment = File::get(base_path('docs/deployment.md'));
+
+        $this->assertSame('cache-warm-v2', $cacheConfig['warming']['queue']);
+        $this->assertStringContainsString('CACHE_WARM_QUEUE=cache-warm-v2', $envExample);
+        $this->assertStringContainsString('--queue=cache-warm-v2', $unit);
+        $this->assertStringContainsString('retryUntil', $deployment);
+        $this->assertStringContainsString('cache-warm-v2', $deployment);
+        $this->assertStringContainsString('не очищать', $deployment);
+    }
 }

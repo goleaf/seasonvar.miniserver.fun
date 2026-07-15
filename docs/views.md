@@ -15,7 +15,7 @@
 
 ## Текущая структура
 
-- `App\View\ViewData\AppLayoutData` готовит SEO, JSON-LD, метаданные и поисковые блоки для `layouts.app` через view composer в `AppServiceProvider`. Он также один раз за request формирует header/footer URL, active/audience/permission state и полные Tailwind class maps как immutable `LayoutNavigationItem`; Blade только итерирует готовые элементы.
+- `App\View\ViewData\AppLayoutData` через view composer в `AppServiceProvider` готовит explicit layout contract: SEO scalars, normalized breadcrumbs/flags, hex-safe JSON-LD strings и header/footer URL, active/audience/permission state с полными Tailwind class maps как immutable `LayoutNavigationItem`. Blade только проверяет готовые flags, итерирует готовые элементы и выводит один audited raw JSON-LD scalar; `json_encode()` в шаблонах запрещён regression-тестом.
 - `App\View\ViewModels\CatalogTitlesViewModel` готовит подписи фильтров и параметры ссылок каталога.
 - `App\Support\CatalogAlphabet` без запросов к базе задаёт канонический порядок символов, кириллицы и `A`–`Z`; `CatalogTitlesViewModel` и `CatalogDirectoryPageBuilder` передают Blade готовые группы. Query-free компонент `x-catalog.alphabet-filter` только выводит эти группы и готовые query-ссылки каталога.
 - `App\Livewire\CatalogSeries` разделяет render-local данные на computed `catalogPage` и `catalogFacets`; Eloquent-коллекции не хранятся в публичных properties. Связанные Livewire islands `catalog-live` атомарно обновляют фильтры и карточки, а первый SSR не вычисляет facets. Карточки и строки используют `catalog-title-{id}` как стабильный `wire:key`.
@@ -43,3 +43,25 @@
 - Публичное имя тайтла берётся из `CatalogTitle::display_title`: совпадающий суффикс `/original_title` не повторяется в основном заголовке, а `display_original_title` выводится отдельной вторичной строкой. Исходные поля базы и поисковый индекс не изменяются.
 - Стандартный вызов `$paginator->links()` использует русский светлый override `vendor.pagination.tailwind`; Livewire callers передают scoped `scrollTo` в отдельный override `vendor.livewire.tailwind`.
 - Пустая выдача каталога показывает точный запрос; запрос только из стоп-слов получает отдельное сообщение «слишком общий». Пустое состояние не подменяется ближайшими карточками.
+
+## Представление коллекций
+
+`x-collections.collection-card` получает eager-loaded `CatalogCollection` summary и `CatalogCollectionCardViewModel`; Blade не считает visibility/count/URL и не запрашивает owner/cover/items. Collection item rows переиспользуют `x-catalog.title-card`, prepared collection item attributes и stable `wire:key` по item ID. Public count и owner count подготовлены query-object раздельно.
+
+Collection Livewire views содержат только passive loops/conditions над prepared values. Locked UUID/title IDs остаются в component, policy and criteria — в PHP. Нет `@php`, model/service/database calls, inline CSS или inline business JavaScript. Empty/search-empty/unavailable/moderation/status/loading/error/report/share/delete/restore states имеют реальные controls или safe text; absent likes/follows/collaboration не изображаются неработающими кнопками.
+
+## Представление обсуждений
+
+`CommentDiscussion` передаёт `x-comments.item` только immutable `CommentItemData`, scope DTO, paginator и form scalars. Blade не получает Eloquent graph и не вычисляет authorization, status visibility, reaction/reply totals, block/mute state, target URL или spoiler access. Stable `wire:key` использует comment ID; root/reply markup переиспользуется, recursive component tree отсутствует.
+
+Unrevealed spoiler и collapsed long tail не находятся в скрытой DOM-разметке: presenter возвращает `body=null` или excerpt, а explicit Livewire action повторно готовит full body. Tombstone/hidden state не рендерит original author/body. All user text идёт через escaped interpolation с `whitespace-pre-line`/wrapping; automatic anchors/raw HTML отсутствуют.
+
+Composer/reply/edit/report/moderation controls имеют реальные submit/cancel/loading/disabled/error states. `resources/js/comments.js` отвечает только за dialog lifecycle, focus/scroll, reduced motion, локальный Unicode character counter и allowlisted locale-state carry; business decisions и записи остаются PHP actions. Inline CSS, inline application JS, `@php`, Blade model/service/facade calls и Volt не используются.
+
+## Представление отзывов
+
+`CatalogTitleReviews` передаёт `x-reviews.item` immutable `ReviewItemData`, criteria/paginator and bounded form scalars; Eloquent model graphs не являются Livewire public state. Stable `wire:key`/anchor uses review ID. Presenter заранее вычисляет scope, title/body/excerpt, author/rating/verified/status/edited, vote totals/current vote, permissions and direct URL; Blade не вызывает models/services/database и не рассчитывает aggregate, verification, spoiler or authorization.
+
+Unrevealed spoiler title/body равны `null` и отсутствуют в DOM/screen-reader tree, а translated warning/reveal server action загружает их заново. Hidden/deleted/blocked records never render body/private reason. User/provider text is escaped with preserved line breaks and wrapping; no `{!! !!}`, auto-link, Markdown or provider HTML. Rating uses normal labelled select fallback and textual value, not color-only stars.
+
+Composer/edit/report/preferences/helpfulness/delete/restore/moderation controls map to real actions with error/success/loading/disabled/confirm states and retain drafts on recoverable failure. `resources/js/reviews.js` only stores account-, target- and edit-scoped 24-hour session drafts, restores focus/direct highlight and respects reduced motion; policy, validation and writes remain PHP. The opaque account scope prevents a draft from one signed-in account appearing to another account in the same browser session. No Volt, `@php`, inline CSS, inline business JavaScript or query from Blade is introduced.

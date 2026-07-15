@@ -5,11 +5,15 @@ namespace App\Services\Catalog;
 use App\Enums\CatalogSort;
 use App\Http\Requests\CatalogTitlesRequest;
 use App\Models\CatalogTitle;
+use App\Models\Tag;
 use App\Services\Catalog\Search\CatalogSearchMatchSet;
 use App\Services\Catalog\Search\CatalogSearchQueryParser;
 use App\Services\Catalog\Search\CatalogSearchState;
 use App\Services\Catalog\Search\CatalogSearchSuggestion;
 use App\Services\Catalog\Search\CatalogTitleSearch;
+use App\Services\Collections\CatalogCollectionQuery;
+use App\Services\Tags\TagPagePresenter;
+use App\Services\Tags\TagSeoPresenter;
 use App\View\ViewModels\CatalogTitlesViewModel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -42,6 +46,9 @@ class CatalogTitlesPageBuilder
         private readonly CatalogTitleSearch $titleSearch,
         private readonly CatalogSearchSuggestion $searchSuggestions,
         private readonly CatalogUserCardStateLoader $cardStates,
+        private readonly CatalogCollectionQuery $collections,
+        private readonly TagPagePresenter $tagPages,
+        private readonly TagSeoPresenter $tagSeo,
     ) {}
 
     /**
@@ -182,6 +189,32 @@ class CatalogTitlesPageBuilder
             $subtitleOptions = collect();
         }
 
+        $tagPage = $this->tagPages->present(
+            $context['routeTaxonomyFilterType'],
+            $activeTaxonomies,
+            (int) $catalogTitles->total(),
+        );
+        $seo = $this->seo->titles(
+            $seoRequest,
+            (int) $catalogTitles->total(),
+            $search,
+            $year,
+            $activeTaxonomies,
+            $invalidFilterSlugs,
+            $invalidYear,
+            $requestedYear,
+            (int) $catalogTitles->currentPage(),
+            $catalogTitles->previousPageUrl(),
+            $catalogTitles->nextPageUrl(),
+            $catalogTitles->getCollection(),
+            (int) ($catalogTitles->firstItem() ?? 1),
+            $titleContext,
+        );
+
+        if ($tagPage !== null) {
+            $seo = $this->tagSeo->present($seo, $tagPage, (int) $catalogTitles->currentPage());
+        }
+
         return [
             'titles' => $catalogTitles,
             'search' => $search,
@@ -194,6 +227,10 @@ class CatalogTitlesPageBuilder
             'insufficientSearch' => $searchQuery->state === CatalogSearchState::Insufficient && $titleContext === null,
             'searchSuggestions' => $suggestions,
             'directorySuggestions' => $this->directories->suggestions($search),
+            'collectionSuggestions' => $searchQuery->isReady()
+                ? $this->collections->publicSearch($search)
+                : collect(),
+            'tagPage' => $tagPage,
             'titleContext' => $titleContext,
             'selectedTaxonomy' => $activeTaxonomies->first(),
             'activeTaxonomies' => $activeTaxonomies,
@@ -207,22 +244,7 @@ class CatalogTitlesPageBuilder
             'yearBuckets' => $yearBuckets,
             'publicationTypeOptions' => $publicationTypeOptions,
             'subtitleOptions' => $subtitleOptions,
-            'seo' => $this->seo->titles(
-                $seoRequest,
-                (int) $catalogTitles->total(),
-                $search,
-                $year,
-                $activeTaxonomies,
-                $invalidFilterSlugs,
-                $invalidYear,
-                $requestedYear,
-                (int) $catalogTitles->currentPage(),
-                $catalogTitles->previousPageUrl(),
-                $catalogTitles->nextPageUrl(),
-                $catalogTitles->getCollection(),
-                (int) ($catalogTitles->firstItem() ?? 1),
-                $titleContext,
-            ),
+            'seo' => $seo,
         ];
     }
 
@@ -310,8 +332,14 @@ class CatalogTitlesPageBuilder
             }
 
             $modelClass = $this->taxonomies->modelClass($filterType);
-            $records = $modelClass::query()
-                ->select(['id', 'name', 'slug'])
+            $recordsQuery = $modelClass::query()
+                ->select(['id', 'name', 'slug']);
+
+            if ($modelClass === Tag::class && Tag::usesCanonicalSchema()) {
+                $recordsQuery->publiclyEligible()->withLocalizedLabel();
+            }
+
+            $records = $recordsQuery
                 ->whereIn('slug', $slugs)
                 ->get()
                 ->keyBy('slug');
@@ -344,8 +372,14 @@ class CatalogTitlesPageBuilder
             }
 
             $modelClass = $this->taxonomies->modelClass($filterType);
-            $records = $modelClass::query()
-                ->select(['id', 'name', 'slug'])
+            $recordsQuery = $modelClass::query()
+                ->select(['id', 'name', 'slug']);
+
+            if ($modelClass === Tag::class && Tag::usesCanonicalSchema()) {
+                $recordsQuery->publiclyEligible()->withLocalizedLabel();
+            }
+
+            $records = $recordsQuery
                 ->whereIn('slug', $slugs)
                 ->get();
 
@@ -412,6 +446,7 @@ class CatalogTitlesPageBuilder
             'sort' => $sort,
             'perPage' => $perPage,
             'filterTypes' => $filterTypes,
+            'routeTaxonomyFilterType' => $routeTaxonomyFilterType,
             'activeTaxonomies' => $activeTaxonomies,
             'selectedTaxonomies' => $selectedTaxonomies,
             'excludedTaxonomies' => $excludedTaxonomies,

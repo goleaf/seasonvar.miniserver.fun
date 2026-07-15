@@ -52,6 +52,25 @@ final class CheckDeploymentReadinessCommandTest extends TestCase
         $this->assertStringNotContainsString('RuntimeException', $serialized);
     }
 
+    public function test_failed_job_summary_classifies_the_versioned_cache_warm_queue(): void
+    {
+        DB::table('failed_jobs')->insert([
+            'uuid' => fake()->uuid(),
+            'connection' => 'redis',
+            'queue' => 'cache-warm-v2',
+            'payload' => json_encode([
+                'displayName' => 'App\\Jobs\\WarmCatalogCaches',
+            ], JSON_THROW_ON_ERROR),
+            'exception' => 'RuntimeException: private failure',
+            'failed_at' => now(),
+        ]);
+
+        $summary = app(FailedJobSummaryBuilder::class)->build();
+
+        $this->assertSame(['warm_catalog_cache' => 1], $summary['jobs']);
+        $this->assertSame(['cache' => 1], $summary['categories']);
+    }
+
     public function test_checker_reports_unsafe_runtime_missing_index_and_fts_mismatch(): void
     {
         config([

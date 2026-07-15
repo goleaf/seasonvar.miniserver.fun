@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'loading' => 'Loading content…',
+
     'counts' => [
         'results' => ':count series|:count series',
         'results_found' => ':count series found|:count series found',

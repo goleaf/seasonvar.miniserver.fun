@@ -5,11 +5,25 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Policies\EpisodeViewProgressPolicy;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UsePolicy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property int $id
+ * @property int $user_id
+ * @property int $catalog_title_id
+ * @property int $episode_id
+ * @property int|null $licensed_media_id
+ * @property int $position_seconds
+ * @property int $duration_seconds
+ * @property int $progress_percent
+ * @property CarbonInterface|null $first_started_at
+ * @property CarbonInterface|null $completed_at
+ * @property CarbonInterface $last_watched_at
+ */
 #[Fillable([
     'user_id',
     'catalog_title_id',

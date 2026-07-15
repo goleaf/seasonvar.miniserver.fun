@@ -120,8 +120,16 @@ final class UserLibrarySummaryTest extends TestCase
             ->assertJsonPath('components.parameters.LibraryType.schema.enum.2', 'anime')
             ->assertJsonPath('components.parameters.LibraryDirection.schema.enum.1', 'desc')
             ->assertJsonPath('paths./api/v1/me/watchlist.get.parameters.0.$ref', '#/components/parameters/LibraryQuery')
-            ->assertJsonPath('paths./api/v1/me/ratings.get.parameters.3.$ref', '#/components/parameters/LibraryRatingSort')
             ->assertJsonPath('paths./api/v1/me/library/summary.get.responses.429.$ref', '#/components/responses/TooManyRequests');
+
+        $this->assertContains(
+            ['$ref' => '#/components/parameters/LibraryRatingSort'],
+            $document->json('paths./api/v1/me/ratings.get.parameters'),
+        );
+        $this->assertContains(
+            ['$ref' => '#/components/parameters/LibraryPersonalTag'],
+            $document->json('paths./api/v1/me/ratings.get.parameters'),
+        );
     }
 
     /** @return array{CatalogTitle, Episode} */

@@ -9,10 +9,11 @@ use App\Enums\SeasonvarImportStatus;
 use App\Models\CatalogTitle;
 use App\Models\User;
 use App\Services\Catalog\CatalogTitlePageBuilder;
-use App\Services\Catalog\CatalogTitleQuery;
+use App\Services\Collections\CatalogCollectionQuery;
 use App\Services\Seasonvar\CatalogTitleRefreshCoordinator;
 use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -24,22 +25,22 @@ class CatalogTitleDetail extends Component
 
     protected CatalogTitlePageBuilder $pages;
 
-    protected CatalogTitleQuery $titles;
-
     protected CatalogTitleRefreshCoordinator $refreshes;
 
     protected CatalogTitleRefreshStateStore $states;
 
+    protected CatalogCollectionQuery $collections;
+
     public function boot(
         CatalogTitlePageBuilder $pages,
-        CatalogTitleQuery $titles,
         CatalogTitleRefreshCoordinator $refreshes,
         CatalogTitleRefreshStateStore $states,
+        CatalogCollectionQuery $collections,
     ): void {
         $this->pages = $pages;
-        $this->titles = $titles;
         $this->refreshes = $refreshes;
         $this->states = $states;
+        $this->collections = $collections;
     }
 
     public function mount(int $catalogTitleId): void
@@ -54,25 +55,33 @@ class CatalogTitleDetail extends Component
 
     public function refreshCatalog(): void
     {
+        $this->pages->forget($this->catalogTitleId, $this->user());
         $this->dispatch('catalog-title-refreshed', catalogTitleId: $this->catalogTitleId)
             ->to(component: CatalogTitlePlayer::class);
     }
 
     public function render(): View
     {
-        $title = $this->title();
+        $user = $this->user();
+        $page = $this->pages->dataForId($this->catalogTitleId, $user);
         $refreshState = $this->states->read($this->catalogTitleId);
 
         return view('livewire.catalog-title-detail', [
-            ...$this->pages->data($title, $this->user()),
+            ...$page,
             'refreshState' => $refreshState,
             'refreshStatus' => $this->refreshStatus($refreshState),
+            'publicCollections' => $this->collections->publicForTitle($this->catalogTitleId),
+            'reviewLocale' => App::getLocale(),
         ]);
     }
 
     private function title(): CatalogTitle
     {
-        return $this->titles->visibleTo($this->user())->findOrFail($this->catalogTitleId);
+        $title = $this->pages->dataForId($this->catalogTitleId, $this->user())['title'];
+
+        abort_unless($title instanceof CatalogTitle, 404);
+
+        return $title;
     }
 
     private function user(): ?User

@@ -17,6 +17,7 @@
 ## Публичные страницы
 
 - Главная страница загружает только опубликованные тайтлы, их опубликованные видео, годы и таксономии. Подборка «Сейчас можно смотреть» ограничивается индексируемым подзапросом published media, а связанные тайтлы в блоке новых серий дополнительно проходят `published()`.
+- Порядок «Последних обновлений» строится одним `UNION ALL` доступных `episodes.created_at` и опубликованных `licensed_media.created_at` с последующей группировкой по тайтлу; изменение одной метаинформации тайтла в запрос не попадает. Детали «Новых серий» загружаются двумя bounded-запросами для выбранных тайтлов и группируются в PHP. Доступ к дочерним добавлениям поддерживают индексы `(season_id, created_at, id)` и `(catalog_title_id, created_at, id)`.
 - Выбор ID главных подборок, latest media IDs, year buckets, subtitle row и верхние genre/country rows хранится как компактный public tiered snapshot. На hit база загружает только фактически показываемые модели/relations по bounded ID; cached Eloquent graphs не используются.
 - Главная страница загружает последние карточки с `CatalogTaxonomyRegistry::cardSummaryLoads()` и `withCount(['seasons', 'episodes'])`. Для taxonomy-моделей выбираются только `id/name/slug`, а для строки списка вместо всей коллекции сезонов загружается только `latestSeason(id, catalog_title_id, number)`.
 - Страница списка каталога использует те же constrained relation loads, один компактный `latestSeason` на тайтл в list-режиме и счетчики сезонов/серий один раз на страницу пагинации.
@@ -88,6 +89,14 @@
 - Независимый facet gate сохраняет 11 запросов полного page-builder при росте actor options с 1 до 20; title gate выполняется на максимальной публичной recommendation collection, поэтому query ceilings не растут на каждый видимый элемент.
 - Full-response regression отдельно доказывает: второй гостевой `GET /` получает `HIT` без SQL к catalog tables, а title HIT выполняет не более одного catalog query, необходимого текущему implicit route binding. Это test fixture contract, не production p95.
 
+## Query contract обсуждений
+
+- Top-level query всегда exact target + `parent_id IS NULL`, allowlisted SQL ordering и stable ID tie-breaker, затем `LengthAwarePaginator` по 15. Full discussion и in-memory sort не используются. Oldest direct link считает только preceding visible roots для одной страницы.
+- Presentation query eager-loads bounded author/reply-to-author и grouped `withCount` up/down/public replies; authenticated viewer reaction загружается одним `WHERE IN`, blocks одним both-direction query, mutes одним directional query. Собственный pending-reply count — отдельный subquery overlay. Ни author, reaction, reply count, block/mute, permission, target URL не запрашиваются из Blade.
+- Replies exact root/target, chronological, initial limit 20; раскрыт только один thread. `parent_id` всегда root исключает recursive CTE/render. Load-more не дублирует/пропускает rows благодаря `created_at,id`; public count — один indexed aggregate.
+- Moderation queue пагинируется по open-report count/status/time/id, eager-loads open reports/author и одним grouped query получает active restrictions для users текущей страницы. Profile activity/inbox пагинированы и фильтруют доступные targets SQL subqueries до presentation.
+- Индексы и их exact query rationale перечислены в `DATA_RELATIONS.md`. Current-user overlays/shared cache separation описаны в `caching.md`. Denormalized counts/score отсутствуют: запись дешевле, reconciliation drift не требуется.
+
 - Production-like localhost baseline до tiered-cache на 34 319 опубликованных тайтлах: первый `GET /` — 24,731 s, `/titles` — 3,265 s, одна title page — 0,785 s. Это одиночные cold observations, не p95.
 - Исторически до full-response cache после version bump без предварительного warm: `GET /` — 3,836 s (−84,5% к исходному cold observation), `/titles` — 2,819 s (−13,7%), title page — 0,886 s. Эти cold observations больше не описывают текущий повторный гостевой HIT и не считаются новым SLA.
 - После `cache:warm-catalog`, 20 последовательных localhost requests: homepage mean 244 ms, p50 217 ms, p95 361 ms, max/p99 sample 404 ms; catalog mean 314 ms, p50 286 ms, p95 454 ms, max 491 ms; title mean 718 ms, p50 670 ms, p95 977 ms, max 1014 ms.
@@ -107,3 +116,21 @@
 - Progress, history, Continue Watching, private user state, arbitrary search и signed playback URL не кэшируются между пользователями. DTO playback создаётся на каждый authorized resolve и ограничен `playback.signed_url_ttl_seconds`.
 - Bulk/admin/import writes проходят after-commit `CatalogCacheInvalidator`, который bump-ит доменные версии один раз и ставит deduplicated warm job. Full-store flush и wildcard scan не используются.
 - Key/TTL/store/failure/metrics контракт принадлежит `caching.md`; этот документ фиксирует SQL cold path и измерения, а не дублирует cache policy.
+
+## Query contract коллекций
+
+- Summary cards используют один `CatalogCollectionQuery::summaryQuery`: owner и active/fallback editorial translations eager-loaded, total/guest-visible counts — correlated grouped counts, fallback poster — bounded subquery. Blade/card component не выполняет дополнительных reads.
+- Title membership selector выполняет один owner-scoped collection query с `withExists`; Apply locks one manageable set, reads one current membership snapshot, one grouped count/max set, then bulk insert/delete. Нет запроса на checkbox и загрузки всех collection items.
+- Item page joins unique pivot once, reuses `CatalogTitleQuery::visibleTo`, taxonomy card loads and grouped title counts, then `CatalogUserCardStateLoader` once for owner. Search/filter remain SQL-scoped; pagination is 24 by default, deterministic secondary keys prevent skip/duplicate.
+- Public directory/profile/sitemap/recommendations filter visibility/moderation/deleted before hydration. Visible count and unavailable owner list are separate, so guest pages do not hydrate hidden rows. Related collections use a title subquery and bounded limit rather than loading membership IDs in PHP.
+- Title merge reconciles collection membership with `eachById(500)` inside the existing merge transaction rather than materializing every affected collection. Earliest addition/lowest position semantics remain unchanged, positions normalize per touched collection and one post-commit public-domain invalidation replaces one callback per membership.
+- Actual collection indexes and exact query ownership are documented in `DATA_RELATIONS.md`. No likes/follows/collaborator/popularity indexes or expensive request-time collage/popularity aggregate were added because corresponding product signals do not exist.
+
+Static acceptance must inspect generated SQL and SQLite `EXPLAIN QUERY PLAN` against a migrated disposable database with representative rows before claiming production timings. Task 10 intentionally does not create/run automated tests; the final evidence therefore records syntax/routes/schema/index/query and browser/manual observations, not invented benchmark numbers.
+
+## Query contract отзывов
+
+- Title list uses exact `catalog_title_id`, public/owner status predicate, `merged_into_id IS NULL`, allowlisted sort and stable date/ID tie-breaker, then `LengthAwarePaginator`; no full review list or PHP sort. Direct newest-page position counts only preceding visible rows. Profile and moderation queues are independently paginated.
+- Presentation eager-loads bounded author/title, joins one canonical `catalog_title_user_states` rating alias, and calculates helpful/not-helpful totals with grouped subqueries. Authenticated current votes are one `WHERE IN`; generic blocks/mutes are bounded relationship queries; active restrictions in admin are one grouped page query. Blade performs zero reads and verified state is the stored privacy-safe snapshot, not a progress query per row.
+- Filters are indexed rating/spoiler/verified predicates; missing rating remains null and sorts last. Moderation queue orders pending/open reports, eager-loads report context and grouped open counts. Public count and user review average are bounded derived SQL without denormalized drift.
+- `DATA_RELATIONS.md` owns exact index rationale. Review/title/user-state/progress merge loops use `eachById()` because they mutate their own scope; this prevents offset pagination from skipping rows above 1 000 and avoids loading all records. Disposable SQLite `EXPLAIN` is required before claiming a plan; Task 13 creates/runs no automated tests by explicit requirement.

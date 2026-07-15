@@ -7,7 +7,6 @@ namespace Tests\Feature;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheKeyFactory;
 use App\Support\Cache\CacheMetricsSnapshot;
-use App\Support\Cache\CacheRebuildTimeout;
 use App\Support\Cache\CacheTtlPolicy;
 use App\Support\Cache\CacheVersionRegistry;
 use App\Support\Cache\TieredCache;
@@ -220,7 +219,7 @@ final class TieredCacheTest extends TestCase
         $this->assertSame(['revision' => 1], $second->value);
     }
 
-    public function test_waiting_for_an_in_progress_rebuild_has_a_bounded_timeout(): void
+    public function test_lock_timeout_rebuilds_without_cache_for_request_availability(): void
     {
         $domain = CacheDomain::CatalogStats;
         $resource = 'locked-'.bin2hex(random_bytes(6));
@@ -232,15 +231,17 @@ final class TieredCacheTest extends TestCase
         $this->assertTrue($lock->get());
 
         try {
-            $this->expectException(CacheRebuildTimeout::class);
-
-            app(TieredCache::class)->remember(
+            $result = app(TieredCache::class)->remember(
                 $domain,
                 $resource,
                 [],
                 $window,
-                fn (): array => ['must-not-run' => true],
+                fn (): array => ['database-fallback' => true],
             );
+
+            $this->assertSame(['database-fallback' => true], $result->value);
+            $this->assertSame('rebuild', $result->source);
+            $this->assertFalse(Cache::store('tiered-domain-test')->has($dataKey));
         } finally {
             $lock->release();
         }

@@ -28,7 +28,7 @@ final readonly class UserLibraryQuery
         UserLibraryFilters $filters,
         string $pageName = 'page',
     ): LengthAwarePaginator {
-        return $this->applyFilters($this->base($user), $filters)
+        return $this->applyFilters($this->base($user), $filters, $user)
             ->where('in_watchlist', true)
             ->tap(fn (Builder $query): Builder => $this->applyOrder($query, $filters))
             ->paginate($filters->perPage, pageName: $pageName)
@@ -41,7 +41,7 @@ final readonly class UserLibraryQuery
         UserLibraryFilters $filters,
         string $pageName = 'page',
     ): LengthAwarePaginator {
-        return $this->applyFilters($this->base($user), $filters)
+        return $this->applyFilters($this->base($user), $filters, $user)
             ->whereNotNull('rating')
             ->tap(fn (Builder $query): Builder => $this->applyOrder($query, $filters))
             ->paginate($filters->perPage, pageName: $pageName)
@@ -92,7 +92,7 @@ final readonly class UserLibraryQuery
      * @param  Builder<CatalogTitleUserState>  $query
      * @return Builder<CatalogTitleUserState>
      */
-    private function applyFilters(Builder $query, UserLibraryFilters $filters): Builder
+    private function applyFilters(Builder $query, UserLibraryFilters $filters, User $user): Builder
     {
         if ($filters->query !== '') {
             $search = '%'.$filters->query.'%';
@@ -118,6 +118,12 @@ final readonly class UserLibraryQuery
                 'catalogTitle',
                 fn (Builder $titleQuery): Builder => $titleQuery->where('year', $filters->year),
             );
+        }
+
+        if ($filters->personalTagPublicId !== null) {
+            $query->whereHas('catalogTitle.personalTags', fn (Builder $tagQuery): Builder => $tagQuery
+                ->where('user_tags.user_id', $user->id)
+                ->where('user_tags.public_id', $filters->personalTagPublicId));
         }
 
         return $query;

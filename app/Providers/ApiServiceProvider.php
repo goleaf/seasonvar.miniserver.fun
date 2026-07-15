@@ -41,5 +41,29 @@ final class ApiServiceProvider extends ServiceProvider
 
             return Limit::perMinute(20)->by('token-refresh|'.$key);
         });
+
+        foreach ([
+            'api-search-suggestions' => 120,
+            'api-playback-session' => 30,
+            'api-playback-progress' => 120,
+            'api-catalog-sync' => 60,
+            'api-user-sync' => 30,
+        ] as $limiter => $attempts) {
+            RateLimiter::for($limiter, fn (Request $request): Limit => Limit::perMinute($attempts)
+                ->by($limiter.'|'.$this->requesterKey($request)));
+        }
+    }
+
+    private function requesterKey(Request $request): string
+    {
+        $identifier = $request->user()?->getAuthIdentifier();
+
+        if ($identifier !== null) {
+            return 'user:'.(string) $identifier;
+        }
+
+        $ip = $request->ip();
+
+        return 'ip:'.(is_string($ip) && $ip !== '' ? $ip : 'unknown');
     }
 }

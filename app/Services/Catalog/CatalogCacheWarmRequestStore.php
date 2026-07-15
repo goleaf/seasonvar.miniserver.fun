@@ -8,8 +8,10 @@ use App\DTOs\CatalogCacheWarmWork;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheKeyFactory;
 use Closure;
-use Illuminate\Contracts\Cache\Repository;
+use Illuminate\Cache\Repository;
+use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Support\Facades\Cache;
+use LogicException;
 
 final class CatalogCacheWarmRequestStore
 {
@@ -19,7 +21,7 @@ final class CatalogCacheWarmRequestStore
     public function request(iterable $titleIds = [], bool $refresh = false): int
     {
         $titleIds = collect($titleIds)
-            ->filter(fn (mixed $id): bool => is_int($id) || (is_string($id) && ctype_digit($id)))
+            ->filter(fn (int|string $id): bool => is_int($id) || ctype_digit($id))
             ->map(fn (int|string $id): int => (int) $id)
             ->filter(fn (int $id): bool => $id > 0)
             ->unique()
@@ -115,14 +117,25 @@ final class CatalogCacheWarmRequestStore
     {
         $value = $store->get($this->key(), []);
         $value = is_array($value) ? $value : [];
-        $titleIds = collect($value['title_ids'] ?? [])
-            ->filter(fn (mixed $generation, mixed $id): bool => (is_int($id) || (is_string($id) && ctype_digit($id)))
-                && is_int($generation)
-                && (int) $id > 0
-                && $generation > 0)
-            ->mapWithKeys(fn (int $generation, int|string $id): array => [(int) $id => $generation])
-            ->take($this->requestTitleLimit())
-            ->all();
+        $titleIds = [];
+        $storedTitleIds = $value['title_ids'] ?? [];
+
+        if (is_array($storedTitleIds)) {
+            foreach ($storedTitleIds as $id => $generation) {
+                if ((! is_int($id) && ! ctype_digit($id))
+                    || ! is_int($generation)
+                    || (int) $id < 1
+                    || $generation < 1) {
+                    continue;
+                }
+
+                $titleIds[(int) $id] = $generation;
+
+                if (count($titleIds) >= $this->requestTitleLimit()) {
+                    break;
+                }
+            }
+        }
 
         return [
             'generation' => max(0, (int) ($value['generation'] ?? 0)),
@@ -151,9 +164,21 @@ final class CatalogCacheWarmRequestStore
             || $state['title_ids'] !== [];
     }
 
+    /** @param Closure(Repository): mixed $callback */
     private function synchronized(Closure $callback): mixed
     {
-        $store = Cache::store($this->store());
+        $repository = Cache::store($this->store());
+
+        if (! $repository instanceof Repository) {
+            throw new LogicException('Cache store прогрева должен использовать Laravel cache repository.');
+        }
+
+        $store = $repository->getStore();
+
+        if (! $store instanceof LockProvider) {
+            throw new LogicException('Cache store прогрева должен поддерживать atomic locks.');
+        }
+
         $lock = $store->lock(
             $this->keys->lock($this->key()),
             max(1, (int) config('cache-architecture.warming.request_lock_seconds', 10)),
@@ -161,7 +186,7 @@ final class CatalogCacheWarmRequestStore
 
         return $lock->block(
             max(1, (int) config('cache-architecture.warming.request_lock_wait_seconds', 2)),
-            fn (): mixed => $callback($store),
+            fn (): mixed => $callback($repository),
         );
     }
 

@@ -85,6 +85,30 @@
 - Имена данных для view должны описывать подготовленные данные, а не детали реализации.
 - Blade-компоненты лежат в `resources/views/components`, переиспользуемый интерфейс лежит в `resources/views/components/ui`.
 
+## Коллекции
+
+- Новая collection behavior расширяет только `App\Services\Collections`, `CatalogCollectionQuery`, enums/models/policy/DTO и существующие catalog/account/cache/SEO boundaries. Не создавайте второй list/folder/playlist model, pivot, visibility mapper или cache infrastructure.
+- Все mutations принимают stable resolved record/UUID, берут actor/owner server-side, повторно authorizes и выполняют short transaction. Invalidation регистрируется after commit; membership не вызывает watchlist/rating/progress/history services.
+- User text проходит `UserPlainText`, остаётся plain original-language content и экранируется. Editorial translations живут в DB rows; visibility/type/moderation/sort codes никогда не переводятся в storage.
+- Query-object заранее готовит owner, translations, counts, cover fallback, permissions/state and paginated items. Blade не рассчитывает visibility/SEO/order/count, не вызывает relation lazy load и не конкатенирует collection URL.
+- Livewire хранит locked stable IDs/version и bounded scalar/UUID drafts, не full Eloquent graphs. Используются existing Vite/Tailwind/components, без Volt, `@php`, inline CSS и inline business JavaScript.
+
+## Обсуждения
+
+- Любая новая comment mutation расширяет существующие `App\Actions\Comments`/policy/services и `Comment` table; отдельная reply/reaction/report architecture для title/season/episode/collection запрещена.
+- Target type, sort/status/reaction/report/restriction/notification values проходят enums и resolver, не raw class/column/translated label. Author/target/moderation fields не принимаются из client data.
+- Body обрабатывается только `CommentBody`/`UserPlainText` и escaped Blade. Не добавлять unrestricted HTML, Markdown renderer, auto-link/preview или mention notification без отдельного audited domain contract.
+- Read path готовит DTO/query overlays; Blade не считает permissions/status/counts/block/spoiler и не lazy-load-ит relations. Viewer state не входит в public cache. Replies остаются bounded root threads, direct routes — redirects на target.
+- Visible control обязан иметь canonical action, localized state/error/loading и server authorization. Новые labels добавляются одновременно в exact-parity `lang/ru/comments.php` и `lang/en/comments.php`; placeholder/plural structure проверяется автоматически, а естественность, терминология и aria-label — редактором обеих локалей.
+
+## Отзывы
+
+- Любая review mutation расширяет `catalog_title_reviews`, `App\Actions\Reviews`, policy/services/query/presenter и существующие rating/account/cache/merge boundaries. Вторая review/rating/helpfulness/moderation table, comment-as-review adapter или season/episode review запрещены без нового product contract.
+- Target/status/origin/sort/vote/report/restriction/deletion/moderation/notification values проходят enums; arbitrary class, raw column и translated DB value запрещены. Actor/owner/status/verified target берутся server-side, rating переиспользует `CatalogTitleUserState`.
+- User title/body проходят `ReviewTitle`/`ReviewBody`/`UserPlainText`, остаются original-language escaped plain text. Не добавлять unrestricted HTML, Markdown, automatic translation/link preview/sentiment/reaction/schema без отдельного audited contract.
+- Public query/presenter готовит counts, canonical rating, permissions, spoiler body, author and vote totals; viewer vote/block/mute/restriction/pending state — отдельный overlay. Blade не lazy-load-ит models и не рассчитывает permission/average/helpfulness/verified/spoiler.
+- Stable ID/aliases переживают edit/delete/restore/slug/title merge. Create/vote/report must be idempotent and transaction-safe; cache invalidation is after commit and scoped. Visible actions require localized success/error/loading/confirmation and exact `lang/ru/reviews.php`/`lang/en/reviews.php` parity.
+
 <!-- project-docs:start -->
 ## Автоматизация документации, карты сайта и robots
 

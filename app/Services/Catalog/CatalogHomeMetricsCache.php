@@ -11,7 +11,6 @@ use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheTtlPolicy;
 use App\Support\Cache\CacheVersionRegistry;
 use App\Support\Cache\TieredCache;
-use Illuminate\Database\Eloquent\Builder;
 
 final class CatalogHomeMetricsCache
 {
@@ -67,7 +66,6 @@ final class CatalogHomeMetricsCache
             'titles' => $this->titles->visibleTo(null)->count(),
             'episodes' => Episode::query()
                 ->published()
-                ->whereHas('season', fn (Builder $query): Builder => $query->published())
                 ->whereIn('season_id', Season::query()
                     ->published()
                     ->select('id')

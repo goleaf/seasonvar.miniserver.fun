@@ -107,9 +107,31 @@
 - Карточка тайтла отдается через v1 `CatalogTitleResource`; справочники, media profiles, сезоны, серии, рекомендации, отзывы и подсказки отдаются через отдельные ресурсы.
 - Ресурсы используют `whenLoaded()` и `whenCounted()`. Контроллеры и query-сервисы решают, какие связи и счетчики загружать, чтобы не создавать N+1 внутри сериализации.
 
+## Public collections v1
+
+- `GET /api/v1/collections` принимает validated `q`, `sort=featured|recent|title`, `per_page=12|18|24|36` и обычный `page`. Возвращаются только approved public non-deleted collections с public UUID/slug, original-or-editorial display text, visible item count, safe owner public UUID/name, cover web URL и canonical web/API links.
+- `GET /api/v1/collections/{collectionSlug}` возвращает paginated visible serial items (`page`, `per_page` 6–48) и отдельный safe `collection` object. Private, unlisted, pending, rejected, hidden, archived и deleted collections отвечают `not_found`; API не является способом чтения intended unlisted links.
+- `GET /api/v1/titles/{titleSlug}/collections` возвращает bounded public approved collections, содержащие guest-visible title. Membership current user, owner controls, unavailable items и private item counts не сериализуются.
+- Collection Resources не отдают numeric collection/user IDs, `owner_id`, storage disk/path, report/moderation notes, membership attribution, content/cache versions или source/media URLs. Pagination query-object общий с web, но API явно использует conventional `page`, а не Livewire key `collectionsPage`.
+- `resources/api/openapi.json` содержит `PublicCollection`, `PublicCollectionItem`, paginated list/items schemas и route response references. Discovery `/api` публикует collection links через существующий manifest.
+
+Collection endpoints находятся в отдельном `public.cache:collection_api` profile: Authorization/cookies по общему API policy делают ответ private/no-store, а guest shared TTL/stale равны нулю. Это сохраняет HTTP validators/revalidation без риска stale public response после visibility/moderation change.
+
+## Обсуждения и API
+
+Task 12 не добавляет comment endpoints в legacy или `/api/v1`: текущий product scope — web/Livewire, а существующий API/OpenAPI contract остаётся совместимым. Web direct-comment URL является redirect на canonical target, не JSON resource и не отдельная индексируемая сущность.
+
+Будущий mobile discussion API обязан переиспользовать `CommentTargetResolver`, `CommentPolicy`, canonical actions/query и explicit API Resources. Нельзя возвращать Eloquent graph, raw target URLs, body hash/submission key, moderator note/reporter, block/mute/restriction/notification state или author-only pending через public endpoint. Public DTO и viewer overlay должны оставаться разделены, а spoiler body — отсутствовать до явного authorized reveal.
+
+## Отзывы пользователей и API
+
+Existing `GET /api/v1/titles/{titleSlug}/reviews` and route name remain backward-compatible read-only provider-review feed. `CatalogReviewQuery` explicitly filters `origin=provider,status=published,deleted_at IS NULL,merged_into_id IS NULL` when the additive schema is ready; before migration `ReviewSchema` preserves the legacy query. Response fields/pagination do not expose source page, hashes, user/account IDs, votes, reports, moderation, rating state or viewer overlays.
+
+Community review create/edit/delete/vote/report/moderation/history are web Livewire only and intentionally absent from mobile API/OpenAPI. This avoids silently broadening token abilities, caching or privacy semantics. A future mobile contract must reuse existing review actions/policy/DTO, declare private/no-store responses and never mix imported provider ratings with portal review score.
+
 ## Публичные поля
 
-API отдает только публичные данные каталога: slug, название, тип, год, описание, постер, дату индексации, счетчики, справочники, сезоны, серии, безопасные media profiles, рекомендации и тексты отзывов.
+API отдает только публичные данные каталога: slug, название, тип, год, описание, постер, дату индексации, счетчики, справочники, сезоны, серии, безопасные media profiles, рекомендации, тексты отзывов и approved public collection summaries/items.
 
 Через API нельзя раскрывать:
 
@@ -117,4 +139,5 @@ API отдает только публичные данные каталога: 
 - исходные страницы, HTML-снимки и внутреннее состояние импортера;
 - `licensed_media.path`, `playback_url`, `source_url`, ключи медиа и HTTP-статусы проверки;
 - recommendation score/breakdown/signals/algorithm version и review source page/body hash;
+- comment body hash/submission key, moderation notes, reporter identity, restrictions, blocks/mutes, notification payload/state и author-only pending comments;
 - пароли, токены, stack traces, секреты и приватные диагностические поля.

@@ -29,7 +29,7 @@ final class CatalogAdministrationQuery
                     $query->where('title', 'like', '%'.$search.'%')
                         ->orWhere('slug', 'like', $search.'%')
                         ->orWhere('external_id', $search)
-                        ->when(ctype_digit($search), fn (Builder $query): Builder => $query->orWhereKey((int) $search));
+                        ->when(ctype_digit($search), fn (Builder $query): Builder => $query->orWhere('id', (int) $search));
                 });
             })
             ->orderByDesc('updated_at')
@@ -90,7 +90,7 @@ final class CatalogAdministrationQuery
     {
         return Episode::query()
             ->withTrashed()
-            ->whereHas('season', fn (Builder $query): Builder => $query->withTrashed()->whereBelongsTo($title))
+            ->whereIn('season_id', Season::query()->withTrashed()->whereBelongsTo($title)->select('id'))
             ->findOrFail($episodeId);
     }
 
@@ -126,7 +126,10 @@ final class CatalogAdministrationQuery
         return LicensedMedia::query()
             ->withTrashed()
             ->whereBelongsTo($title, 'catalogTitle')
-            ->whereHas('episode.season', fn (Builder $query): Builder => $query->withTrashed()->whereBelongsTo($title))
+            ->whereIn('episode_id', Episode::query()
+                ->withTrashed()
+                ->whereIn('season_id', Season::query()->withTrashed()->whereBelongsTo($title)->select('id'))
+                ->select('id'))
             ->findOrFail($mediaId);
     }
 
@@ -138,8 +141,10 @@ final class CatalogAdministrationQuery
         return $title->{$relation}()->select(['id', 'name', 'slug'])->orderBy('name')->orderBy('id')->get();
     }
 
-    /** @return Collection<int, Model> */
-    /** @param list<int> $selectedIds */
+    /**
+     * @param  list<int>  $selectedIds
+     * @return Collection<int, Model>
+     */
     public function relationOptions(string $type, string $search, array $selectedIds): Collection
     {
         $modelClass = $this->taxonomies->modelClass($this->validatedRelationType($type));

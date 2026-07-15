@@ -131,7 +131,7 @@ class CatalogTitleRecommendationBuilderTest extends TestCase
             ->get();
 
         $this->assertSame('full', $result['mode']);
-        $this->assertSame('v3', $result['algorithm_version']);
+        $this->assertSame('v4', $result['algorithm_version']);
         $this->assertSame(5, $result['titles']);
         $this->assertSame(1, $result['titles_with_recommendations']);
         $this->assertSame(4, $result['titles_without_recommendations']);
@@ -283,7 +283,7 @@ class CatalogTitleRecommendationBuilderTest extends TestCase
             ->orderBy('rank')
             ->get();
 
-        $this->assertSame('v3', $result['algorithm_version']);
+        $this->assertSame('v4', $result['algorithm_version']);
         $this->assertSame($topical->id, $recommendations->first()?->recommended_title_id);
         $this->assertTrue($recommendations->contains('recommended_title_id', $actorOnly->id));
         $this->assertArrayHasKey('theme_romance', $recommendations->first()?->reasons ?? []);

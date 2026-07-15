@@ -2,12 +2,30 @@
 
 namespace Tests\Unit;
 
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Facades\File;
 use SplFileInfo;
 use Tests\TestCase;
 
 class ConfigurationEnvironmentTest extends TestCase
 {
+    public function test_laravel_13_security_defaults_are_explicit(): void
+    {
+        $this->assertFalse(config('cache.serializable_classes'));
+        $this->assertSame(
+            PreventRequestForgery::class,
+            config('sanctum.middleware.validate_csrf_token'),
+        );
+    }
+
+    public function test_remote_http_response_limit_is_documented(): void
+    {
+        $envExample = File::get(base_path('.env.example'));
+
+        $this->assertStringContainsString('SEASONVAR_HTTP_MAX_RESPONSE_BYTES=8388608', $envExample);
+        $this->assertSame(8_388_608, config('seasonvar.http.max_response_bytes'));
+    }
+
     public function test_google_integration_placeholders_are_documented(): void
     {
         $envExample = File::get(base_path('.env.example'));
