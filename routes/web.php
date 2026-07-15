@@ -16,10 +16,10 @@ use App\Livewire\Auth\VerifyEmailPage;
 use App\Livewire\CatalogAdministrationManager;
 use App\Livewire\CatalogDirectoryBrowser;
 use App\Livewire\CatalogSeries;
+use App\Livewire\Library\UserLibraryPage;
 use App\Livewire\Profile\ProfilePage;
 use App\Livewire\Profile\SecurityPage;
 use App\Livewire\SeasonvarImportManager;
-use App\Livewire\ViewingActivity;
 use App\Services\Catalog\CatalogDirectoryRegistry;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -48,7 +48,14 @@ Route::middleware(['auth', 'auth.session'])->group(function (): void {
     Route::get('/confirm-password', ConfirmPasswordPage::class)->name('password.confirm');
     Route::get('/profile', ProfilePage::class)->name('profile.show');
     Route::get('/profile/security', SecurityPage::class)->name('profile.security');
-    Route::redirect('/library', '/watching')->name('library.index');
+    Route::get('/library', UserLibraryPage::class)
+        ->defaults('section', 'watchlist')
+        ->name('library.index');
+    Route::get('/library/{section}', UserLibraryPage::class)
+        ->whereIn('section', ['watchlist', 'ratings', 'continue-watching', 'history'])
+        ->name('library.section');
+    Route::redirect('/watching', '/library/continue-watching')
+        ->name('viewing-activity');
 });
 
 $publicDocumentMiddleware = [
@@ -100,7 +107,6 @@ foreach (CatalogDirectoryRegistry::routeMap() as $directory => $config) {
 
 Route::get('/titles', CatalogSeries::class)
     ->name('titles.index');
-Route::get('/watching', ViewingActivity::class)->name('viewing-activity');
 Route::get('/admin/imports', SeasonvarImportManager::class)
     ->middleware('can:manage-seasonvar-imports')
     ->name('admin.imports');

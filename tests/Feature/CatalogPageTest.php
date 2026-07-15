@@ -3169,9 +3169,11 @@ class CatalogPageTest extends TestCase
             'last_watched_at' => now(),
         ]);
 
-        $this->get(route('viewing-activity'))->assertForbidden();
+        $this->get(route('viewing-activity'))->assertRedirect(route('login'));
         $this->actingAs($user)
             ->get(route('viewing-activity'))
+            ->assertRedirect(route('library.section', 'continue-watching'));
+        $this->get(route('library.section', 'history'))
             ->assertOk()
             ->assertSee('data-ui-poster-card', false)
             ->assertSee('data-ui-poster-frame', false)

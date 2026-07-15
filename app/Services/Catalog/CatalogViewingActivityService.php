@@ -31,7 +31,9 @@ final class CatalogViewingActivityService
                 ->when($ownerScoped, fn ($query) => $query->whereBelongsTo($user))
                 ->whereKey($progressId)
                 ->lockForUpdate()
-                ->firstOrFail();
+                ->first();
+
+            abort_if($progress === null, 404);
 
             Gate::forUser($user)->authorize('delete', $progress);
             $progress->delete();

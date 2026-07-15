@@ -50,13 +50,13 @@
                     </li>
                     @auth
                         <li>
-                            <a href="{{ route('viewing-activity') }}" @class([
+                            <a href="{{ route('library.section', 'continue-watching') }}" @class([
                                 '-mx-3 flex min-h-11 items-center gap-3 rounded-control px-3 py-2 text-sm font-semibold transition',
-                                'bg-emerald-50 text-emerald-700' => request()->routeIs('viewing-activity'),
-                                'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('viewing-activity'),
-                            ]) @if (request()->routeIs('viewing-activity')) aria-current="page" @endif>
+                                'bg-emerald-50 text-emerald-700' => request()->routeIs('library.*'),
+                                'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('library.*'),
+                            ]) @if (request()->routeIs('library.*')) aria-current="page" @endif>
                                 <x-ui.icon name="fa-solid fa-clock-rotate-left text-slate-400" />
-                                <span>Мои просмотры</span>
+                                <span>Моя библиотека</span>
                             </a>
                         </li>
                     @endauth

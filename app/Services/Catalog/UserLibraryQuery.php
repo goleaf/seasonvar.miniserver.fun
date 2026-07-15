@@ -23,22 +23,28 @@ final readonly class UserLibraryQuery
     ) {}
 
     /** @return LengthAwarePaginator<int, CatalogTitleUserState> */
-    public function watchlist(User $user, UserLibraryFilters $filters): LengthAwarePaginator
-    {
+    public function watchlist(
+        User $user,
+        UserLibraryFilters $filters,
+        string $pageName = 'page',
+    ): LengthAwarePaginator {
         return $this->applyFilters($this->base($user), $filters)
             ->where('in_watchlist', true)
             ->tap(fn (Builder $query): Builder => $this->applyOrder($query, $filters))
-            ->paginate($filters->perPage)
+            ->paginate($filters->perPage, pageName: $pageName)
             ->withQueryString();
     }
 
     /** @return LengthAwarePaginator<int, CatalogTitleUserState> */
-    public function ratings(User $user, UserLibraryFilters $filters): LengthAwarePaginator
-    {
+    public function ratings(
+        User $user,
+        UserLibraryFilters $filters,
+        string $pageName = 'page',
+    ): LengthAwarePaginator {
         return $this->applyFilters($this->base($user), $filters)
             ->whereNotNull('rating')
             ->tap(fn (Builder $query): Builder => $this->applyOrder($query, $filters))
-            ->paginate($filters->perPage)
+            ->paginate($filters->perPage, pageName: $pageName)
             ->withQueryString();
     }
 

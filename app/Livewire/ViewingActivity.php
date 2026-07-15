@@ -27,11 +27,6 @@ final class ViewingActivity extends Component
         $this->actions = $actions;
     }
 
-    public function mount(): void
-    {
-        abort_unless(auth()->check(), 403);
-    }
-
     public function removeHistoryItem(mixed $progressId): void
     {
         $progressId = filter_var($progressId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);

@@ -604,7 +604,7 @@ Expected: library API tests PASS.
 - Consumes: shared `UserLibraryQuery`, `UserLibrarySummaryQuery`, `CatalogViewingActivityQuery`, `CatalogUserStateService`, `CatalogViewingActivityService`.
 - Produces: route sections `watchlist|ratings|continue-watching|history` and backward-compatible `/watching` redirect.
 
-- [ ] **Step 1: Write failing Livewire library tests**
+- [x] **Step 1: Write failing Livewire library tests**
 
 Cover auth redirect, sections, URL filters, separate paginator names, watchlist/rating mutations, history deletion/clear confirmation and `/watching` redirect:
 
@@ -624,7 +624,7 @@ public function test_verified_user_filters_watchlist_and_removes_an_item(): void
 }
 ```
 
-- [ ] **Step 2: Run tests and confirm RED**
+- [x] **Step 2: Run tests and confirm RED**
 
 ```bash
 php artisan test tests/Feature/Web/UserLibraryPageTest.php
@@ -632,7 +632,7 @@ php artisan test tests/Feature/Web/UserLibraryPageTest.php
 
 Expected: FAIL because the component and routes are absent.
 
-- [ ] **Step 3: Implement filters and page component**
+- [x] **Step 3: Implement filters and page component**
 
 `LibraryFilters` exposes URL-backed `query`, `type`, `year`, `sort`, `direction`. `UserLibraryPage` validates section in `mount`, resolves current user privately, prepares render-local summary/list data, and exposes owner-safe actions:
 
@@ -645,11 +645,11 @@ public function clearHistory(): void;
 
 Catalog titles are re-resolved through an entitlement-scoped query; no model or `user_id` is a public property.
 
-- [ ] **Step 4: Implement responsive view and compatibility redirect**
+- [x] **Step 4: Implement responsive view and compatibility redirect**
 
 Use existing UI/poster components, one `h1`, wrapping section navigation, search/filter form, independent empty/loading/error states and standard Livewire pagination. No nested scroll or fake content. `/watching` redirects under `auth` to `library.section` with `continue-watching`; remove the component-level guest `abort_unless` once route middleware owns authentication.
 
-- [ ] **Step 5: Run tests/build, format and commit**
+- [x] **Step 5: Run tests/build, format and commit**
 
 ```bash
 ./vendor/bin/pint --dirty --format agent

@@ -18,8 +18,8 @@
 
     <div data-focus-frame @class([
         $frameClass,
-        'border-rose-300 ring-1 ring-rose-100' => $errors->has($name),
-        'border-slate-200 focus-within:border-emerald-300' => ! $errors->has($name),
+        'border-rose-300 ring-1 ring-rose-100' => isset($errors) && $errors->has($name),
+        'border-slate-200 focus-within:border-emerald-300' => ! isset($errors) || ! $errors->has($name),
     ])>
         @if ($icon !== '')
             <span class="{{ $iconClass }}">
@@ -34,7 +34,7 @@
             value="{{ old($name, $value) }}"
             placeholder="{{ $placeholder }}"
             @if ($label !== '') aria-label="{{ $label }}" @endif
-            @error($name) aria-invalid="true" aria-describedby="{{ ($id ?? $name).'-error' }}" @enderror
+            @if (isset($errors) && $errors->has($name)) aria-invalid="true" aria-describedby="{{ ($id ?? $name).'-error' }}" @endif
             {{ $attributes->merge(['class' => $inputClass]) }}
         >
     </div>

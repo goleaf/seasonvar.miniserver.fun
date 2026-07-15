@@ -133,7 +133,7 @@ final class WebPasswordRecoveryTest extends TestCase
 
         $this->actingAs($user)
             ->get(route('library.index'))
-            ->assertRedirect('/watching');
+            ->assertOk();
 
         $this->assertNotNull(session('password_hash_web'));
 
