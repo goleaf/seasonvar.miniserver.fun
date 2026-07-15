@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Seasonvar;
 
 use App\Enums\SeasonvarPageType;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
-class SeasonvarUrl
+final class SeasonvarUrl
 {
     /**
      * @var list<string>
@@ -146,10 +148,6 @@ class SeasonvarUrl
         $path = Str::lower(rawurldecode((string) (parse_url($url, PHP_URL_PATH) ?: '/')));
         $path = '/'.ltrim(rtrim($path, '/'), '/');
 
-        if ($path === '') {
-            $path = '/';
-        }
-
         return match (true) {
             preg_match('~^/rss(?:[._/-]|$)~u', $path) === 1 => SeasonvarPageType::Rss,
             preg_match('~\.xml(?:\.gz)?$~u', $path) === 1 => SeasonvarPageType::Sitemap,
@@ -171,9 +169,7 @@ class SeasonvarUrl
 
     public function sanitizedPath(string $url): string
     {
-        $path = (string) (parse_url($url, PHP_URL_PATH) ?: '/');
-
-        return $path === '' ? '/' : $path;
+        return (string) (parse_url($url, PHP_URL_PATH) ?: '/');
     }
 
     public function externalSerialId(string $url): ?string
@@ -238,9 +234,7 @@ class SeasonvarUrl
             $segments[] = $segment;
         }
 
-        $normalized = '/'.implode('/', $segments);
-
-        return $normalized === '' ? '/' : $normalized;
+        return '/'.implode('/', $segments);
     }
 
     private function normalizePathSegment(string $segment): string

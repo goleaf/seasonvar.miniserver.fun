@@ -23,6 +23,9 @@ class CatalogTitleDetail extends Component
     #[Locked]
     public int $catalogTitleId;
 
+    #[Locked]
+    public ?int $highlightedReviewId = null;
+
     protected CatalogTitlePageBuilder $pages;
 
     protected CatalogTitleRefreshCoordinator $refreshes;
@@ -46,6 +49,8 @@ class CatalogTitleDetail extends Component
     public function mount(int $catalogTitleId): void
     {
         $this->catalogTitleId = $catalogTitleId;
+        $highlightedReviewId = request()->integer('review');
+        $this->highlightedReviewId = $highlightedReviewId > 0 ? $highlightedReviewId : null;
     }
 
     public function startRefresh(): void
@@ -68,7 +73,7 @@ class CatalogTitleDetail extends Component
 
         return view('livewire.catalog-title-detail', [
             ...$page,
-            'refreshState' => $refreshState,
+            'refreshIsActive' => $refreshState->isActive(),
             'refreshStatus' => $this->refreshStatus($refreshState),
             'publicCollections' => $this->collections->publicForTitle($this->catalogTitleId),
             'reviewLocale' => App::getLocale(),

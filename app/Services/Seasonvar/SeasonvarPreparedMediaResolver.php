@@ -121,8 +121,8 @@ final class SeasonvarPreparedMediaResolver
             ->map(function (array $entry) use ($playlistItem, $playlistUrl): array {
                 $isM3Playlist = $this->parsedMediaExtension($playlistUrl) === 'm3u';
                 $title = $isM3Playlist
-                    ? ($entry['title'] ?? null)
-                    : collect([$playlistItem['title'] ?? null, $entry['title'] ?? null])
+                    ? $entry['title']
+                    : collect([$playlistItem['title'] ?? null, $entry['title']])
                         ->filter()
                         ->unique()
                         ->implode(' ');
@@ -193,7 +193,10 @@ final class SeasonvarPreparedMediaResolver
         return $items;
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * @param  array<array-key, mixed>  $entries
+     * @return list<array<string, mixed>>
+     */
     private function flattenSeasonvarPlaylistEntries(array $entries, int $depth = 0): array
     {
         if ($depth > 16) {

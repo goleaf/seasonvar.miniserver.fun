@@ -8,8 +8,12 @@ use App\DTOs\CatalogTitleRefreshState;
 use App\Enums\SeasonvarImportStatus;
 use App\Jobs\RefreshSeasonvarCatalogTitle;
 use App\Models\CatalogTitle;
+use Illuminate\Cache\Repository as CacheRepository;
 use Illuminate\Contracts\Bus\Dispatcher;
+use Illuminate\Contracts\Cache\LockProvider;
+use Illuminate\Contracts\Cache\Store;
 use Illuminate\Support\Facades\Cache;
+use LogicException;
 use Throwable;
 
 final class CatalogTitleRefreshCoordinator
@@ -26,7 +30,7 @@ final class CatalogTitleRefreshCoordinator
         }
 
         try {
-            $lock = Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'))->lock(
+            $lock = $this->lockStore()->lock(
                 $this->states->dispatchLockKey($catalogTitle->id),
                 max(1, (int) config('seasonvar.title_refresh.dispatch_lock_seconds', 10)),
             );
@@ -64,5 +68,22 @@ final class CatalogTitleRefreshCoordinator
                 failedAt: now(),
             );
         }
+    }
+
+    private function lockStore(): Store&LockProvider
+    {
+        $repository = Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'));
+
+        if (! $repository instanceof CacheRepository) {
+            throw new LogicException('Seasonvar title refresh lock repository is unavailable.');
+        }
+
+        $store = $repository->getStore();
+
+        if (! $store instanceof LockProvider) {
+            throw new LogicException('Seasonvar title refresh cache store does not support atomic locks.');
+        }
+
+        return $store;
     }
 }

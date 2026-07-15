@@ -38,7 +38,7 @@
                     </div>
                     <div>
                         <dt class="font-bold text-slate-500">{{ __('collections.page.updated_label') }}</dt>
-                        <dd class="mt-1 font-black text-slate-700"><time datetime="{{ $collection->updated_at?->toAtomString() }}">{{ $collection->updated_at?->format('d.m.Y') }}</time></dd>
+                        <dd class="mt-1 font-black text-slate-700"><time datetime="{{ $collectionUpdatedAtIso }}">{{ $collectionUpdatedAtLabel }}</time></dd>
                     </div>
                     <div>
                         <dt class="font-bold text-slate-500">{{ __('collections.page.item_count_label') }}</dt>

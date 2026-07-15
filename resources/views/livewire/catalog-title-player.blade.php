@@ -38,7 +38,7 @@
                 type="button"
                 wire:click="playPrimary"
                 data-catalog-history
-                @disabled(! $primaryAction->isPlayable())
+                @disabled(! $primaryActionIsPlayable)
                 class="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
             >
                 <x-ui.icon name="fa-solid fa-play" />
@@ -78,7 +78,7 @@
                         </span>
                     </div>
 
-                    @if ($selectedMedia && $playbackSource->isPlayable() && $showView->selectedMediaUrl)
+                    @if ($selectedMedia && $playbackSourceIsPlayable && $showView->selectedMediaUrl)
                         <div
                             wire:key="catalog-player-media-shell-{{ $selectedMedia->id }}"
                             wire:ignore

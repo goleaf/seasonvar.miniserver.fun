@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Catalog;
 
 use App\Jobs\WarmCatalogCaches;
+use App\Services\Collections\CatalogCollectionCacheInvalidator;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheTelemetry;
 use App\Support\Cache\CacheVersionRegistry;
@@ -32,6 +33,7 @@ final class CatalogCacheInvalidator
         private readonly CacheVersionRegistry $versions,
         private readonly CacheTelemetry $telemetry,
         private readonly CatalogCacheWarmRequestStore $warmRequests,
+        private readonly CatalogCollectionCacheInvalidator $collections,
     ) {}
 
     /** @param iterable<int, int|string> $titleIds */
@@ -96,6 +98,7 @@ final class CatalogCacheInvalidator
     {
         $this->versions->bump(CacheDomain::TitleDetail, 'title:'.$titleId);
         $this->telemetry->increment(CacheDomain::TitleDetail, 'invalidation');
+        $this->collections->titleChanged($titleId);
         $this->dispatchWarm([$titleId], refresh: false);
     }
 

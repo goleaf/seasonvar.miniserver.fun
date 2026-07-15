@@ -123,36 +123,44 @@ final class CommentProfileQuery
         });
     }
 
-    /** @return list<CommentRelationshipData> */
-    public function blocks(User $user): array
+    /** @return LengthAwarePaginator<int, CommentRelationshipData> */
+    public function blocks(User $user): LengthAwarePaginator
     {
-        return UserBlock::query()
+        $paginator = UserBlock::query()
             ->where('blocker_id', $user->id)
             ->with('blocked:id,name')
-            ->latest('created_at')
-            ->get(['id', 'blocked_id', 'created_at'])
-            ->map(fn (UserBlock $block): CommentRelationshipData => new CommentRelationshipData(
-                userId: (int) $block->blocked_id,
-                name: $block->blocked->name ?? __('comments.author.unavailable'),
-                createdAtLabel: $block->created_at?->diffForHumans() ?? '',
-            ))
-            ->all();
+            ->orderByDesc('id')
+            ->paginate(
+                max(1, (int) config('comments.pagination.profile_per_page', 15)),
+                ['id', 'blocked_id', 'created_at'],
+                'blocks_page',
+            );
+
+        return $paginator->through(fn (UserBlock $block): CommentRelationshipData => new CommentRelationshipData(
+            userId: (int) $block->blocked_id,
+            name: $block->blocked->name ?? __('comments.author.unavailable'),
+            createdAtLabel: $block->created_at?->diffForHumans() ?? '',
+        ));
     }
 
-    /** @return list<CommentRelationshipData> */
-    public function mutes(User $user): array
+    /** @return LengthAwarePaginator<int, CommentRelationshipData> */
+    public function mutes(User $user): LengthAwarePaginator
     {
-        return UserMute::query()
+        $paginator = UserMute::query()
             ->where('muter_id', $user->id)
             ->with('muted:id,name')
-            ->latest('created_at')
-            ->get(['id', 'muted_id', 'created_at'])
-            ->map(fn (UserMute $mute): CommentRelationshipData => new CommentRelationshipData(
-                userId: (int) $mute->muted_id,
-                name: $mute->muted->name ?? __('comments.author.unavailable'),
-                createdAtLabel: $mute->created_at?->diffForHumans() ?? '',
-            ))
-            ->all();
+            ->orderByDesc('id')
+            ->paginate(
+                max(1, (int) config('comments.pagination.profile_per_page', 15)),
+                ['id', 'muted_id', 'created_at'],
+                'mutes_page',
+            );
+
+        return $paginator->through(fn (UserMute $mute): CommentRelationshipData => new CommentRelationshipData(
+            userId: (int) $mute->muted_id,
+            name: $mute->muted->name ?? __('comments.author.unavailable'),
+            createdAtLabel: $mute->created_at?->diffForHumans() ?? '',
+        ));
     }
 
     private function accessibleTargets(User $user): callable

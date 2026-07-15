@@ -51,9 +51,9 @@ class SeasonvarQueueStatus
             activeRuns: $activeRuns->count(),
             runId: $run?->id,
             runStatus: $run?->status,
-            selected: (int) ($run?->selected ?? 0),
-            parsed: (int) ($run?->parsed ?? 0),
-            failed: (int) ($run?->failed ?? 0),
+            selected: (int) $run?->selected,
+            parsed: (int) $run?->parsed,
+            failed: (int) $run?->failed,
         );
     }
 }

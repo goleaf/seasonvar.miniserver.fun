@@ -64,7 +64,7 @@
                 <span>{{ __('tags.selector.loading') }}</span>
             </div>
 
-            <div id="personal-tag-options-{{ $catalogTitleId }}" role="listbox" aria-multiselectable="true" class="mt-3 grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-2">
+            <div id="personal-tag-options-{{ $catalogTitleId }}" role="listbox" aria-multiselectable="true" class="mt-3 grid gap-2 sm:grid-cols-2">
                 @forelse ($allTags as $personalTag)
                     <button
                         type="button"
@@ -103,7 +103,7 @@
             </form>
             <div class="mt-4 flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4">
                 <button type="button" wire:click="cancel" wire:loading.attr="disabled" class="inline-flex min-h-11 items-center justify-center rounded-control bg-slate-50 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-60">{{ __('tags.actions.cancel') }}</button>
-                <button type="button" wire:click="apply" wire:loading.attr="disabled" wire:target="apply" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-700 disabled:cursor-wait disabled:opacity-60">
+                <button type="button" wire:click="apply" wire:loading.attr="disabled" wire:target="apply" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60">
                     <x-ui.icon name="fa-solid fa-check" />
                     <span wire:loading.remove wire:target="apply">{{ __('tags.actions.apply') }}</span>
                     <span wire:loading wire:target="apply">{{ __('tags.selector.saving') }}</span>

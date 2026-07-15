@@ -11,6 +11,7 @@ use App\Services\Comments\CommentTargetLifecycleService;
 use App\Services\Storage\PrivateUploadStorage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 final class CatalogCollectionAccountService
 {
@@ -107,7 +108,11 @@ final class CatalogCollectionAccountService
 
         DB::afterCommit(function () use ($covers): void {
             foreach ($covers as $cover) {
-                $this->uploads->delete($cover);
+                try {
+                    $this->uploads->delete($cover);
+                } catch (Throwable $exception) {
+                    report($exception);
+                }
             }
         });
         $this->cache->changed();

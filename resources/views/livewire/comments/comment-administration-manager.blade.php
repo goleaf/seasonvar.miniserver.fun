@@ -37,7 +37,7 @@
                         <option value="attention">{{ __('comments.admin.queue') }}</option>
                         <option value="">{{ __('comments.admin.all') }}</option>
                         @foreach ($statusOptions as $statusOption)
-                            <option value="{{ $statusOption->value }}">{{ $statusOption->label() }}</option>
+                            <option value="{{ $statusOption['value'] }}">{{ $statusOption['label'] }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -46,7 +46,7 @@
                     <select id="comment-admin-target" wire:model.live="target" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
                         <option value="">{{ __('comments.admin.all') }}</option>
                         @foreach ($targetOptions as $targetOption)
-                            <option value="{{ $targetOption->value }}">{{ $targetOption->label() }}</option>
+                            <option value="{{ $targetOption['value'] }}">{{ $targetOption['label'] }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -173,13 +173,13 @@
                         <div>
                             <label for="comment-moderation-status" class="block text-sm font-bold text-slate-700">{{ __('comments.admin.status_filter') }}</label>
                             <select id="comment-moderation-status" wire:model="moderationStatus" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
-                                @foreach ($statusOptions as $statusOption)<option value="{{ $statusOption->value }}">{{ $statusOption->label() }}</option>@endforeach
+                                @foreach ($statusOptions as $statusOption)<option value="{{ $statusOption['value'] }}">{{ $statusOption['label'] }}</option>@endforeach
                             </select>
                         </div>
                         <div>
                             <label for="comment-moderation-reason" class="block text-sm font-bold text-slate-700">{{ __('comments.reports.category') }}</label>
                             <select id="comment-moderation-reason" wire:model="moderationReason" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
-                                @foreach ($moderationReasons as $reason)<option value="{{ $reason->value }}">{{ $reason->label() }}</option>@endforeach
+                                @foreach ($moderationReasons as $reason)<option value="{{ $reason['value'] }}">{{ $reason['label'] }}</option>@endforeach
                             </select>
                         </div>
                     </div>
@@ -197,13 +197,13 @@
                         <div>
                             <label for="comment-restriction-type" class="block text-sm font-bold text-slate-700">{{ __('comments.admin.restrict') }}</label>
                             <select id="comment-restriction-type" wire:model.live="restrictionType" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
-                                @foreach ($restrictionTypes as $type)<option value="{{ $type->value }}">{{ $type->label() }}</option>@endforeach
+                                @foreach ($restrictionTypes as $type)<option value="{{ $type['value'] }}">{{ $type['label'] }}</option>@endforeach
                             </select>
                         </div>
                         <div>
                             <label for="comment-restriction-reason" class="block text-sm font-bold text-slate-700">{{ __('comments.reports.category') }}</label>
                             <select id="comment-restriction-reason" wire:model="restrictionReason" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
-                                @foreach ($restrictionReasons as $reason)<option value="{{ $reason->value }}">{{ $reason->label() }}</option>@endforeach
+                                @foreach ($restrictionReasons as $reason)<option value="{{ $reason['value'] }}">{{ $reason['label'] }}</option>@endforeach
                             </select>
                         </div>
                         @if ($restrictionType === 'temporary')

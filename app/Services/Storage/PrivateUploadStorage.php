@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Storage;
 
 use Illuminate\Http\UploadedFile;
@@ -76,7 +78,7 @@ final class PrivateUploadStorage
 
         $segments = explode('/', trim($path, '/'));
 
-        if ($segments === [] || in_array('', $segments, true) || in_array('.', $segments, true) || in_array('..', $segments, true)) {
+        if (in_array('', $segments, true) || in_array('.', $segments, true) || in_array('..', $segments, true)) {
             return null;
         }
 

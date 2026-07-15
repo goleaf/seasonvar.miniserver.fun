@@ -83,7 +83,7 @@
                             <x-ui.icon name="fa-solid fa-list" />
                             <span>Все сериалы</span>
                         </a>
-                        <a href="{{ route('titles.year', ['year' => now()->year]) }}" class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
+                        <a href="{{ $noveltiesUrl }}" class="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                             <x-ui.icon name="fa-solid fa-star" />
                             <span>Новинки</span>
                         </a>
@@ -108,7 +108,7 @@
                 <x-ui.panel title="Страны" icon="fa-solid fa-earth-europe">
                     <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
                         @forelse ($countries->take(12) as $country)
-                            <a href="{{ route('titles.taxonomy', ['type' => $country->filterType(), 'taxonomy' => $country->slug]) }}" class="flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
+                            <a href="{{ $country->detail_url }}" class="flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                                 <span class="inline-flex min-w-0 items-center gap-2">
                                     <x-ui.icon name="fa-solid fa-earth-europe text-slate-400" />
                                     <span class="min-w-0 break-words">{{ $country->name }}</span>
@@ -127,7 +127,7 @@
                             </summary>
                             <div class="grid gap-2 border-t border-slate-200 p-3 sm:grid-cols-2 xl:grid-cols-1">
                                 @foreach ($countries->skip(12) as $country)
-                                    <a href="{{ route('titles.taxonomy', ['type' => $country->filterType(), 'taxonomy' => $country->slug]) }}" class="flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
+                                    <a href="{{ $country->detail_url }}" class="flex min-h-11 min-w-0 items-center justify-between gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                                         <span class="inline-flex min-w-0 items-center gap-2">
                                             <x-ui.icon name="fa-solid fa-earth-europe text-slate-400" />
                                             <span class="min-w-0 break-words">{{ $country->name }}</span>

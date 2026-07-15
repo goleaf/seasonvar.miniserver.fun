@@ -16,6 +16,9 @@ final class TitleFilters extends Component
     public function __construct(
         public readonly array $data,
         public readonly array $optionSearch,
+        public readonly ?int $routeYear = null,
+        public readonly ?string $routeFilterType = null,
+        public readonly ?string $routeTaxonomy = null,
     ) {}
 
     public function render(): View

@@ -196,7 +196,7 @@ class ExternalMediaMetadata
             return null;
         }
 
-        $name = Str::squish($matches['name'] ?? '');
+        $name = Str::squish($matches['name']);
 
         if ($name === '' || preg_match('/^\d+$/', $name) === 1 || $this->hasSubtitles($name)) {
             return null;

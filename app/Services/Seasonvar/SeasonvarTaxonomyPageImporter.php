@@ -59,7 +59,7 @@ final readonly class SeasonvarTaxonomyPageImporter
             $sourceUrl = $this->preservedSourceUrl($taxonomy, $data->canonicalSourceUrl);
             $type = $data->pageType->value;
             $name = $taxonomy->exists
-                ? $this->relationNames->preferredName($type, (string) $taxonomy->name, $data->displayName)
+                ? $this->relationNames->preferredName($type, (string) $taxonomy->getAttribute('name'), $data->displayName)
                 : $this->relationNames->normalize($data->displayName);
 
             $taxonomy->fill([
@@ -85,7 +85,7 @@ final readonly class SeasonvarTaxonomyPageImporter
             : ($result['changed'] ? 'seasonvar-taxonomy-updated' : 'seasonvar-taxonomy-duplicate-prevented');
         $context = [
             'page_type' => $data->pageType->value,
-            'taxonomy_id' => $result['taxonomy']->id,
+            'taxonomy_id' => $result['taxonomy']->getKey(),
             'structured_fields' => $this->structuredFields($data),
             'linked_serial_urls_found' => count($data->linkedSerialUrls),
         ];
@@ -110,7 +110,7 @@ final readonly class SeasonvarTaxonomyPageImporter
     {
         $bySourceUrl = $modelClass::query()->where('source_url', $data->canonicalSourceUrl)->first();
         $fallbackKey = $this->relationNames->canonicalKey($data->pageType->value, $data->displayName);
-        $candidateKey = $bySourceUrl?->slug ?: $fallbackKey;
+        $candidateKey = (string) ($bySourceUrl?->getAttribute('slug') ?: $fallbackKey);
         $canonicalKey = $this->sourceIdentities->resolve(
             $sourceId,
             $data->pageType->value,
@@ -120,7 +120,7 @@ final readonly class SeasonvarTaxonomyPageImporter
         );
         $byCanonicalKey = $modelClass::query()->where('slug', $canonicalKey)->first();
         $taxonomy = $byCanonicalKey
-            ?? ($bySourceUrl?->slug === $canonicalKey ? $bySourceUrl : null)
+            ?? ($bySourceUrl?->getAttribute('slug') === $canonicalKey ? $bySourceUrl : null)
             ?? new $modelClass;
 
         return [
@@ -163,7 +163,10 @@ final readonly class SeasonvarTaxonomyPageImporter
         ]);
     }
 
-    /** @param (callable(string, array<string, mixed>): void)|null $progress */
+    /**
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @param  array<string, mixed>  $context
+     */
     private function report(?callable $progress, string $event, array $context): void
     {
         if ($progress !== null) {

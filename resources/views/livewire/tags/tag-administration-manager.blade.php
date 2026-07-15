@@ -42,12 +42,12 @@
                 <select id="admin-tag-moderation" wire:model.live="moderationFilter" class="min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800">
                     <option value="">{{ __('tags.admin.all_statuses') }}</option>
                     @foreach ($moderationStatuses as $moderationStatus)
-                        <option value="{{ $moderationStatus->value }}">{{ $moderationStatus->label() }}</option>
+                        <option value="{{ $moderationStatus['value'] }}">{{ $moderationStatus['label'] }}</option>
                     @endforeach
                 </select>
             </div>
             <div wire:loading.delay wire:target="search,moderationFilter" role="status" aria-live="polite" class="p-3 text-sm font-bold text-emerald-700">{{ __('tags.states.loading') }}</div>
-            <div class="max-h-[70vh] divide-y divide-slate-200 overflow-y-auto">
+            <div class="divide-y divide-slate-200">
                 @forelse ($tagsPage as $tagRow)
                     <button type="button" wire:key="admin-tag-row-{{ $tagRow->public_id }}" wire:click="selectTag('{{ $tagRow->public_id }}')" @class([
                         'block min-h-16 w-full min-w-0 px-3 py-3 text-left hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200',
@@ -61,14 +61,14 @@
                             <span class="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-bold tabular-nums text-slate-600">{{ $tagRow->catalog_titles_count }}</span>
                         </span>
                         <span class="mt-2 flex flex-wrap gap-1.5 text-[11px] font-bold">
-                            <span class="rounded-full bg-slate-100 px-2 py-1 text-slate-600">{{ $tagRow->type->label() }}</span>
+                            <span class="rounded-full bg-slate-100 px-2 py-1 text-slate-600">{{ $tagTypeLabels[$tagRow->type->value] }}</span>
                             <span @class([
                                 'rounded-full px-2 py-1',
                                 'bg-emerald-100 text-emerald-700' => $tagRow->moderation_status->value === 'approved',
                                 'bg-amber-100 text-amber-800' => $tagRow->moderation_status->value === 'pending',
                                 'bg-rose-100 text-rose-700' => in_array($tagRow->moderation_status->value, ['rejected', 'hidden'], true),
                                 'bg-slate-200 text-slate-700' => in_array($tagRow->moderation_status->value, ['merged', 'archived'], true),
-                            ])>{{ $tagRow->moderation_status->label() }}</span>
+                            ])>{{ $moderationStatusLabels[$tagRow->moderation_status->value] }}</span>
                         </span>
                     </button>
                 @empty
@@ -96,22 +96,22 @@
                         <label class="text-sm font-bold text-slate-700">{{ __('tags.fields.type') }}
                             <select wire:model="tagForm.type" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 font-normal">
                                 @foreach ($tagTypes as $tagType)
-                                    <option value="{{ $tagType->value }}">{{ $tagType->label() }}</option>
+                                    <option value="{{ $tagType['value'] }}">{{ $tagType['label'] }}</option>
                                 @endforeach
                             </select>
                         </label>
                         <label class="text-sm font-bold text-slate-700">{{ __('tags.fields.visibility') }}
                             <select wire:model="tagForm.visibility" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 font-normal">
                                 @foreach ($visibilities as $visibility)
-                                    <option value="{{ $visibility->value }}">{{ $visibility->label() }}</option>
+                                    <option value="{{ $visibility['value'] }}">{{ $visibility['label'] }}</option>
                                 @endforeach
                             </select>
                         </label>
                         <label class="text-sm font-bold text-slate-700">{{ __('tags.fields.moderation') }}
                             <select wire:model="tagForm.moderation_status" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 font-normal">
                                 @foreach ($moderationStatuses as $moderationStatus)
-                                    @if (! in_array($moderationStatus->value, ['merged', 'archived'], true) || $selectedTag?->moderation_status === $moderationStatus)
-                                        <option value="{{ $moderationStatus->value }}">{{ $moderationStatus->label() }}</option>
+                                    @if ($moderationStatus['selectable'])
+                                        <option value="{{ $moderationStatus['value'] }}">{{ $moderationStatus['label'] }}</option>
                                     @endif
                                 @endforeach
                             </select>
@@ -119,7 +119,7 @@
                         <label class="text-sm font-bold text-slate-700">{{ __('tags.fields.source') }}
                             <select wire:model="tagForm.source" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 font-normal">
                                 @foreach ($tagSources as $tagSource)
-                                    <option value="{{ $tagSource->value }}">{{ __('tags.sources.'.$tagSource->value) }}</option>
+                                    <option value="{{ $tagSource['value'] }}">{{ $tagSource['label'] }}</option>
                                 @endforeach
                             </select>
                         </label>
@@ -131,7 +131,7 @@
                     @error('slug') <p role="alert" class="text-sm font-bold text-rose-700">{{ $message }}</p> @enderror
 
                     <div class="flex flex-wrap gap-2">
-                        <button type="submit" wire:loading.attr="disabled" wire:target="saveTag" @disabled($selectedTag?->merged_into_id !== null || $selectedTag?->archived_at !== null) class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50">
+                        <button type="submit" wire:loading.attr="disabled" wire:target="saveTag" @disabled($selectedTag?->merged_into_id !== null || $selectedTag?->archived_at !== null) class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
                             <x-ui.icon name="fa-solid fa-floppy-disk" />
                             <span>{{ __('tags.actions.save') }}</span>
                         </button>
@@ -195,8 +195,8 @@
                                     <div wire:key="admin-tag-alias-{{ $alias->id }}" class="flex flex-wrap items-center justify-between gap-2 rounded-control bg-slate-50 p-2">
                                         <span class="min-w-0 break-words text-sm font-bold text-slate-700">
                                             {{ $alias->name }}
-                                            <span class="text-xs text-slate-400">{{ $alias->locale }}</span>
-                                            <span class="mt-1 block text-xs font-bold text-slate-500">{{ $alias->moderation_status->label() }}</span>
+                                            <span class="text-xs text-slate-500">{{ $alias->locale }}</span>
+                                            <span class="mt-1 block text-xs font-bold text-slate-500">{{ $moderationStatusLabels[$alias->moderation_status->value] }}</span>
                                         </span>
                                         <span class="flex flex-wrap items-center gap-1">
                                             @if ($alias->source->value === 'provider' || $alias->moderation_status->value !== 'approved')
@@ -253,7 +253,7 @@
                         <div class="mt-4 grid gap-2 sm:grid-cols-2">
                             @forelse ($assignedTitles as $assignedTitle)
                                 <div wire:key="admin-tag-assigned-title-{{ $assignedTitle->id }}" class="flex min-w-0 items-center justify-between gap-3 rounded-control border border-slate-200 p-3">
-                                    @if ($assignedTitle->trashed())
+                                    @if ($assignedTitle->is_deleted)
                                         <span class="min-w-0 break-words text-sm font-bold text-slate-500">{{ $assignedTitle->title }} · {{ __('tags.admin.deleted_title') }}</span>
                                     @else
                                         <a href="{{ route('titles.show', $assignedTitle) }}" class="min-w-0 break-words text-sm font-bold text-slate-700 hover:text-emerald-700">{{ $assignedTitle->title }}</a>
@@ -273,7 +273,7 @@
                             @foreach ($mergeCandidates as $candidate)
                                 <button type="button" wire:key="admin-tag-merge-candidate-{{ $candidate->public_id }}" wire:click="$set('mergeTarget', '{{ $candidate->public_id }}')" @class(['min-h-16 rounded-control border p-3 text-left', 'border-amber-300 bg-amber-50' => $mergeTarget === $candidate->public_id, 'border-slate-200 bg-white' => $mergeTarget !== $candidate->public_id])>
                                     <span class="block break-words text-sm font-black text-slate-800">{{ $candidate->name }}</span>
-                                    <span class="mt-1 block break-all text-xs text-slate-500">{{ $candidate->slug }} · {{ $candidate->moderation_status->label() }}</span>
+                                    <span class="mt-1 block break-all text-xs text-slate-500">{{ $candidate->slug }} · {{ $moderationStatusLabels[$candidate->moderation_status->value] }}</span>
                                     <span class="mt-1 block text-xs text-slate-500">{{ __('tags.admin.merge_counts', ['titles' => $candidate->catalog_titles_count, 'translations' => $candidate->translations_count, 'aliases' => $candidate->aliases_count, 'providers' => $candidate->provider_mappings_count]) }}</span>
                                 </button>
                             @endforeach
@@ -295,7 +295,7 @@
                                         <li class="rounded-control bg-slate-50 p-2">
                                             <span class="block break-words font-bold text-slate-700">{{ $mapping->raw_label }}</span>
                                             <span class="mt-1 block break-all text-xs text-slate-500">{{ $mapping->provider }} · {{ $mapping->provider_key }}</span>
-                                            <span class="mt-1 block text-xs font-bold text-slate-600">{{ $mapping->status->label() }}</span>
+                                            <span class="mt-1 block text-xs font-bold text-slate-600">{{ $providerMappingStatusLabels[$mapping->status->value] }}</span>
                                             <span class="mt-2 flex flex-wrap gap-2">
                                                 <button type="button" wire:click="moderateProviderMapping({{ $mapping->id }}, 'approved')" wire:loading.attr="disabled" wire:target="moderateProviderMapping({{ $mapping->id }}, 'approved')" class="inline-flex min-h-11 items-center rounded-control bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50">{{ __('tags.actions.approve') }}</button>
                                                 <button type="button" wire:click="moderateProviderMapping({{ $mapping->id }}, 'rejected')" wire:confirm="{{ __('tags.admin.provider_mapping_reject_confirm') }}" wire:loading.attr="disabled" wire:target="moderateProviderMapping({{ $mapping->id }}, 'rejected')" class="inline-flex min-h-11 items-center rounded-control bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-50">{{ __('tags.actions.reject') }}</button>

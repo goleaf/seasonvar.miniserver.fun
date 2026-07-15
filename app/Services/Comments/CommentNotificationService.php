@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Notifications\CommentActivityNotification;
 use App\Support\DeterministicUuid;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 final class CommentNotificationService
@@ -153,17 +154,22 @@ final class CommentNotificationService
             $recipient->id.':'.$deduplicationKey,
         );
 
-        if ($recipient->notifications()->whereKey($notification->id)->exists()) {
-            return;
-        }
+        DB::transaction(function () use ($recipient, $notification): void {
+            $lockedRecipient = User::query()->lockForUpdate()->find($recipient->id);
 
-        try {
-            $recipient->notify($notification);
-        } catch (QueryException $exception) {
-            if (! $recipient->notifications()->whereKey($notification->id)->exists()) {
-                throw $exception;
+            if (! $lockedRecipient instanceof User
+                || $lockedRecipient->notifications()->whereKey($notification->id)->exists()) {
+                return;
             }
-        }
+
+            try {
+                $lockedRecipient->notify($notification);
+            } catch (QueryException $exception) {
+                if (! $lockedRecipient->notifications()->whereKey($notification->id)->exists()) {
+                    throw $exception;
+                }
+            }
+        }, attempts: 3);
     }
 
     private function safely(callable $operation): void

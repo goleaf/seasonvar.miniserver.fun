@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Seasonvar;
 
 use App\DTOs\Seasonvar\SeasonvarCatalogData;
@@ -23,9 +25,7 @@ final class SeasonvarEditorialFieldResolver
         if ($data->hasPublicationTypeEvidence()) {
             $incoming['type'] = $data->type;
         }
-        $previousProviderValues = is_array($title->provider_field_values)
-            ? $title->provider_field_values
-            : [];
+        $previousProviderValues = $this->previousProviderValues($title);
         $values = [];
 
         foreach ($incoming as $field => $incomingValue) {
@@ -51,9 +51,7 @@ final class SeasonvarEditorialFieldResolver
     /** @return array{value: mixed, provider_field_values: array<string, mixed>} */
     public function resolveType(CatalogTitle $title, string $incomingType): array
     {
-        $previousProviderValues = is_array($title->provider_field_values)
-            ? $title->provider_field_values
-            : [];
+        $previousProviderValues = $this->previousProviderValues($title);
 
         return [
             'value' => $this->resolveValue(
@@ -107,5 +105,25 @@ final class SeasonvarEditorialFieldResolver
     private function equivalent(mixed $left, mixed $right): bool
     {
         return $left === $right;
+    }
+
+    /** @return array<string, mixed> */
+    private function previousProviderValues(CatalogTitle $title): array
+    {
+        $stored = $title->getAttribute('provider_field_values');
+
+        if (! is_array($stored)) {
+            return [];
+        }
+
+        $values = [];
+
+        foreach ($stored as $field => $value) {
+            if (is_string($field)) {
+                $values[$field] = $value;
+            }
+        }
+
+        return $values;
     }
 }

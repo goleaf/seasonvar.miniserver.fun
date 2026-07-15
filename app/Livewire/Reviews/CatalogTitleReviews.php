@@ -139,12 +139,15 @@ final class CatalogTitleReviews extends Component
         App::setLocale($this->locale);
     }
 
-    public function mount(int $catalogTitleId, ?string $locale = null): void
-    {
+    public function mount(
+        int $catalogTitleId,
+        ?string $locale = null,
+        ?int $highlightedReviewId = null,
+    ): void {
         $this->catalogTitleId = $catalogTitleId;
         $this->locale = is_string($locale) && $locale !== '' ? $locale : App::getLocale();
         App::setLocale($this->locale);
-        $highlighted = request()->integer('review');
+        $highlighted = $highlightedReviewId ?? request()->integer('review');
         $this->highlightedReviewId = $highlighted > 0 ? $highlighted : null;
         $this->submissionToken = (string) Str::uuid();
     }

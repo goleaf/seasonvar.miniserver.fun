@@ -20,8 +20,8 @@ final class UserLibraryItemResource extends JsonResource
                 'in_watchlist' => (bool) $this->in_watchlist,
                 'rating' => $this->rating === null ? null : (int) $this->rating,
                 'versions' => [
-                    'watchlist' => (int) $this->watchlist_version,
-                    'rating' => (int) $this->rating_version,
+                    'watchlist' => $this->resource->watchlistVersion(),
+                    'rating' => $this->resource->ratingVersion(),
                 ],
                 'updated_at' => $this->updated_at?->toJSON(),
             ],

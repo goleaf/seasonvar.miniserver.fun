@@ -164,7 +164,7 @@
             <div class="mt-4 grid gap-4 lg:grid-cols-2">
                 <div>
                     <h3 class="text-sm font-black text-slate-700">{{ __('comments.profile.blocks') }}</h3>
-                    @if ($blocks === [])
+                    @if ($blocks === null || $blocks->isEmpty())
                         <p class="mt-2 rounded-control bg-slate-50 p-3 text-sm text-slate-600">{{ __('comments.profile.blocks_empty') }}</p>
                     @else
                         <ul class="mt-2 space-y-2">
@@ -175,11 +175,14 @@
                                 </li>
                             @endforeach
                         </ul>
+                        @if ($blocks->hasPages())
+                            <nav class="mt-3" aria-label="{{ __('comments.profile.blocks') }}">{{ $blocks->links() }}</nav>
+                        @endif
                     @endif
                 </div>
                 <div>
                     <h3 class="text-sm font-black text-slate-700">{{ __('comments.profile.mutes') }}</h3>
-                    @if ($mutes === [])
+                    @if ($mutes === null || $mutes->isEmpty())
                         <p class="mt-2 rounded-control bg-slate-50 p-3 text-sm text-slate-600">{{ __('comments.profile.mutes_empty') }}</p>
                     @else
                         <ul class="mt-2 space-y-2">
@@ -190,6 +193,9 @@
                                 </li>
                             @endforeach
                         </ul>
+                        @if ($mutes->hasPages())
+                            <nav class="mt-3" aria-label="{{ __('comments.profile.mutes') }}">{{ $mutes->links() }}</nav>
+                        @endif
                     @endif
                 </div>
             </div>

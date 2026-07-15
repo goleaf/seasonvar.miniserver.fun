@@ -167,7 +167,7 @@ final class CatalogCollectionEditor extends Component
 
     public function delete(CatalogCollectionResolver $resolver, CatalogCollectionService $service): void
     {
-        $service->delete($this->user(), $resolver->byPublicId($this->collectionPublicId));
+        $service->delete($this->user(), $resolver->byPublicId($this->collectionPublicId, true));
         Session::flash('catalog_collection_status', __('collections.status.deleted'));
         $this->redirectRoute('collections.mine', navigate: true);
     }

@@ -7,6 +7,7 @@ namespace App\Livewire\Collections;
 use App\Livewire\Concerns\InteractsWithCollectionLocale;
 use App\Models\User;
 use App\Services\Collections\CatalogCollectionQuery;
+use App\Services\Collections\CatalogCollectionSchema;
 use App\Services\Collections\CatalogCollectionSeoPresenter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
@@ -29,8 +30,12 @@ final class CatalogCollectionProfile extends Component
         $this->userPublicId = Str::lower($userPublicId);
     }
 
-    public function render(CatalogCollectionQuery $collections, CatalogCollectionSeoPresenter $seo): View
-    {
+    public function render(
+        CatalogCollectionQuery $collections,
+        CatalogCollectionSeoPresenter $seo,
+        CatalogCollectionSchema $schema,
+    ): View {
+        abort_unless($schema->available(), 404);
         $owner = User::query()
             ->select(['id', 'public_id', 'name', 'created_at'])
             ->where('public_id', $this->userPublicId)

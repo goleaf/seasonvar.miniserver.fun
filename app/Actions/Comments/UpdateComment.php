@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Actions\Comments;
 
+use App\Enums\CommentAntiSpamDecision;
+use App\Enums\CommentStatus;
 use App\Exceptions\Comments\CommentActionException;
 use App\Models\Comment;
 use App\Models\User;
@@ -73,11 +75,16 @@ final class UpdateComment
                 $normalizedBody,
                 (int) $locked->id,
             );
+            $status = $locked->status === CommentStatus::Published
+                && $this->antiSpam->decision($user, $normalizedBody) === CommentAntiSpamDecision::Review
+                    ? CommentStatus::Pending
+                    : $locked->status;
 
             $locked->forceFill([
                 'body' => $normalizedBody->value,
                 'body_hash' => $normalizedBody->hash,
                 'is_spoiler' => $isSpoiler,
+                'status' => $status,
                 'version' => $expectedVersion + 1,
                 'edited_at' => now(),
             ])->save();

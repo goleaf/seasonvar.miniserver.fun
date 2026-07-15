@@ -28,8 +28,8 @@ final readonly class CatalogTitleDisplayName
 
         preg_match_all('/\//u', $primary, $separators, PREG_OFFSET_CAPTURE);
 
-        foreach ($separators[0] ?? [] as $separator) {
-            $offset = (int) ($separator[1] ?? -1);
+        foreach ($separators[0] as $separator) {
+            $offset = $separator[1];
 
             if ($offset < 0) {
                 continue;

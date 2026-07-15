@@ -68,6 +68,21 @@ final class CatalogTitleReviewQuery
         $paginator = $query
             ->paginate(max(1, (int) config('reviews.per_page', 10)), pageName: $pageName)
             ->withQueryString();
+        $paginator->setPath(route('titles.show', $title));
+        $paginator->appends(array_filter([
+            'review_sort' => $criteria->sort === ReviewSort::Newest ? null : $criteria->sort->value,
+            'review_rating' => $criteria->rating,
+            'review_spoiler' => match ($criteria->containsSpoiler) {
+                true => 'contains',
+                false => 'spoiler_free',
+                null => null,
+            },
+            'review_verified' => match ($criteria->verifiedWatching) {
+                true => 'verified',
+                false => 'unverified',
+                null => null,
+            },
+        ], static fn (mixed $value): bool => $value !== null));
         $reviews = $paginator->getCollection();
         $votes = $this->viewerVotes($reviews, $viewer);
 
@@ -106,6 +121,11 @@ final class CatalogTitleReviewQuery
         $paginator = $query
             ->paginate(max(1, (int) config('reviews.profile_per_page', 12)), pageName: $pageName)
             ->withQueryString();
+        $paginator->setPath(route('profile.reviews'));
+        $paginator->appends(array_filter([
+            'sort' => $sort === ReviewSort::Newest ? null : $sort->value,
+            'status' => $status?->value,
+        ], static fn (mixed $value): bool => $value !== null));
 
         return $paginator->through(fn (CatalogTitleReview $review): ReviewItemData => $this->presenter->item(
             $review,
@@ -242,6 +262,13 @@ final class CatalogTitleReviewQuery
         $paginator = $query
             ->paginate(max(1, (int) config('reviews.admin_per_page', 20)), pageName: $pageName)
             ->withQueryString();
+        $paginator->setPath(route('admin.reviews'));
+        $paginator->appends(array_filter([
+            'status' => ! $attentionOnly && $status !== null ? $status->value : null,
+            'author' => $authorSearch,
+            'target' => $targetSearch,
+            'rating' => $rating,
+        ], static fn (mixed $value): bool => $value !== null && $value !== ''));
         $reviewModels = $paginator->getCollection();
         $restrictions = CatalogTitleReviewRestriction::query()
             ->active()

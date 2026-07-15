@@ -46,7 +46,7 @@ Native dialog/share progressive enhancement is isolated in the Vite module, rest
 
 One reusable component is embedded on title/player and eligible collection pages; title/selected season/selected episode scope is explicit. Root/item/reply/composer/report/admin/profile views use prepared DTOs, stable ID keys, existing panels/icons/status/pagination and no Volt, `@php`, raw body, inline CSS or inline business JavaScript. Mobile replies retain one indentation level, text/links/actions wrap and touch controls remain at least 44px.
 
-Whole-body spoilers and long tails are server revealed, keyboard/screen-reader labelled and removable from the next payload. Loading/live/error/guest/unverified/restricted/disabled/empty/tombstone/end-of-replies states are present; dialog/editor/direct-anchor focus and reduced-motion behavior live in the Vite module. RU/EN catalogs have exact key parity. Final browser smoke/zoom/responsive evidence is recorded in verification report rather than claimed here before execution.
+Whole-body spoilers and long tails are server revealed, keyboard/screen-reader labelled and removable from the next payload. Loading/live/error/guest/unverified/restricted/disabled/empty/tombstone/end-of-replies states are present; dialog/editor/direct-anchor focus and reduced-motion behavior live in the Vite module. RU/EN catalogs have exact key parity. Managed Chromium confirmed the complete visible action set, stable focus and 390×844 geometry: document/viewport width stayed 390 px, the discussion used 366 px and the single flattened reply retained 328 px with no horizontal overflow. Exact snapshots and zero-error browser evidence are recorded in `audits/verification-report.md`.
 
 ## Task 13 review UI audit
 

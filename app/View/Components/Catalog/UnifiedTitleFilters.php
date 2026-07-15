@@ -26,6 +26,9 @@ final class UnifiedTitleFilters extends Component
         public readonly array $optionSearch = [],
         ?CatalogTitlesViewModel $filterView = null,
         bool $loading = false,
+        public readonly ?int $routeYear = null,
+        public readonly ?string $routeFilterType = null,
+        public readonly ?string $routeTaxonomy = null,
     ) {
         $resolvedFilterView = $filterView ?? ($data['filterView'] ?? null);
 

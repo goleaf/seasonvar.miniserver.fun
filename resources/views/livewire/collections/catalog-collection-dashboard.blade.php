@@ -104,7 +104,7 @@
                     <article wire:key="deleted-collection-{{ $collection->public_id }}" class="grid gap-3 py-4 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                         <div class="min-w-0">
                             <h3 class="break-words font-black text-slate-800">{{ $collection->display_name }}</h3>
-                            <p class="mt-1 text-xs font-semibold text-slate-500">{{ $collection->deleted_at?->format('d.m.Y H:i') }}</p>
+                            <p class="mt-1 text-xs font-semibold text-slate-500">{{ $collection->deleted_at_label }}</p>
                         </div>
                         <div class="flex flex-wrap gap-2">
                             @if ($collection->is_restorable)

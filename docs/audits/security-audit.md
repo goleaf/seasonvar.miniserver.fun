@@ -49,7 +49,7 @@ Confirmed controls: verified-email writes, `CommentPolicy` on every mutation, ta
 
 Stored/reflected XSS review confirms canonical NFKC plain-text sanitizer, HTML/script/style/control/bidi removal, dangerous-scheme/link/line/length/repetition limits and escaped Blade only. Unrevealed spoiler/full long body is absent from DTO/HTML/profile/inbox/SEO rather than CSS-blurred. Reports/reporter, private notes, block/mute/restriction/current reaction/pending ownership and notification state never enter guest DTO/shared cache.
 
-Direct IDs reauthorize comment and visible target; hidden content returns 404, while moderator-only deleted/hidden context remains private. Account export excludes чужие/private moderation data; deletion anonymizes author/reporter and removes private engagement/relationships/preferences. Static Blade scan and targeted Larastan are required final evidence; no claim replaces penetration testing or rollout observation.
+Direct IDs reauthorize comment and visible target; hidden content returns 404, while moderator-only deleted/hidden context remains private. Account export excludes чужие/private moderation data; deletion anonymizes author/reporter and removes private engagement/relationships/preferences. Static Blade scan and targeted Larastan passed; manual second-user/admin Chromium confirmed the hidden-link 404, neutral relationship placeholders, private report/note boundary, reversible moderation and comment-only restriction enforcement. These checks do not replace penetration testing or rollout observation.
 
 ## Task 13 review security review
 

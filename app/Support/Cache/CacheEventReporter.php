@@ -43,10 +43,7 @@ final class CacheEventReporter
             $connection = Redis::connection((string) config('cache-architecture.framework_events.connection', 'cache'));
             $key = app(CacheKeyFactory::class)->metric(CacheDomain::Operational, 'framework-'.$metric, now()->format('Y-m-d'));
             $store = Cache::store((string) config('cache-architecture.stores.metrics', 'redis-domain'))->getStore();
-
-            if (method_exists($store, 'getPrefix')) {
-                $key = $store->getPrefix().$key;
-            }
+            $key = $store->getPrefix().$key;
 
             $connection->incr($key);
             $connection->expire($key, (int) config('cache-architecture.metrics_retention_seconds', 604_800));

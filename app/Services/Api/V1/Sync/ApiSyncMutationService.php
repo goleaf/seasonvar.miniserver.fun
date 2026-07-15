@@ -216,8 +216,8 @@ final class ApiSyncMutationService
             'in_watchlist' => $state->in_watchlist,
             'rating' => $state->rating,
             'versions' => [
-                'watchlist' => $state->watchlist_version,
-                'rating' => $state->rating_version,
+                'watchlist' => $state->watchlistVersion(),
+                'rating' => $state->ratingVersion(),
             ],
         ];
     }

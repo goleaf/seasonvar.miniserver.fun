@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Comments;
 
-use App\DTOs\Comments\CommentModerationData;
 use App\DTOs\Comments\CommentModerationContextData;
+use App\DTOs\Comments\CommentModerationData;
+use App\DTOs\Comments\CommentModerationThreadData;
 use App\DTOs\Comments\CommentReportModerationData;
 use App\DTOs\Comments\CommentRestrictionData;
-use App\DTOs\Comments\CommentModerationThreadData;
 use App\Enums\CommentReportStatus;
 use App\Enums\CommentStatus;
 use App\Enums\CommentTargetType;
@@ -31,6 +31,8 @@ final class CommentModerationQuery
                 'reports' => fn ($query) => $query
                     ->whereIn('status', [CommentReportStatus::Open->value, CommentReportStatus::Reviewed->value])
                     ->oldest('created_at')
+                    ->orderBy('id')
+                    ->limit(5)
                     ->select(['id', 'comment_id', 'category', 'details', 'status', 'created_at']),
             ])
             ->withCount([

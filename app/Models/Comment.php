@@ -38,7 +38,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property CommentModerationReason|null $moderation_reason
  * @property string|null $moderator_note
  * @property CarbonImmutable|null $moderated_at
- * @property string $submission_key
+ * @property string|null $submission_key
  * @property CarbonImmutable|null $deleted_at
  */
 #[UsePolicy(CommentPolicy::class)]

@@ -7,7 +7,6 @@ namespace App\Services\Seasonvar;
 use App\Enums\SeasonvarSourceAvailability;
 use App\Models\SourcePage;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\LazyCollection;
 
 final class SeasonvarSourceAvailabilityBackfill
 {
@@ -52,12 +51,11 @@ final class SeasonvarSourceAvailabilityBackfill
             ->chunk($chunkSize);
 
         foreach ($pages as $chunk) {
-            $chunk = $chunk instanceof LazyCollection ? $chunk : LazyCollection::make($chunk);
             $blockedIds = [];
             $withoutKnownRestrictionIds = [];
 
             foreach ($chunk as $page) {
-                $status = $this->detector->detect($page->latestSnapshot?->html ?? '');
+                $status = $this->detector->detect($page->latestSnapshot->html);
 
                 if ($status === SeasonvarSourceAvailability::RegionBlocked) {
                     $blockedIds[] = $page->id;

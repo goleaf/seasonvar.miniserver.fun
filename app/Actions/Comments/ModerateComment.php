@@ -147,6 +147,8 @@ final class ModerateComment
                 $reports = CommentReport::query()
                     ->where('comment_id', $locked->id)
                     ->whereIn('status', [CommentReportStatus::Open->value, CommentReportStatus::Reviewed->value])
+                    ->orderBy('id')
+                    ->limit(100)
                     ->lockForUpdate()
                     ->get();
 

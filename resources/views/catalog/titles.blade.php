@@ -168,7 +168,7 @@
                                         <a href="{{ route('titles.taxonomy', ['type' => 'tag', 'taxonomy' => $relatedTag['slug']]) }}" class="inline-flex min-h-11 max-w-full items-center gap-2 rounded-full bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-100 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
                                             <x-ui.icon name="fa-solid fa-tag text-emerald-700" />
                                             <span class="min-w-0 break-words">{{ $relatedTag['name'] }}</span>
-                                            <span class="tabular-nums text-slate-400">{{ $relatedTag['count'] }}</span>
+                                            <span class="tabular-nums text-slate-500">{{ $relatedTag['count'] }}</span>
                                         </a>
                                     @endforeach
                                 </div>
@@ -224,7 +224,7 @@
                         @endforeach
                     </div>
                     <div data-catalog-mobile-page-size-controls class="mt-3 border-t border-slate-200 pt-3">
-                        <div class="text-xs font-black uppercase tracking-wide text-slate-400">{{ __('catalog.catalog.page_size_label') }}</div>
+                        <div class="text-xs font-black uppercase tracking-wide text-slate-500">{{ __('catalog.catalog.page_size_label') }}</div>
                         <div class="mt-2 flex flex-wrap gap-2">
                             @foreach ([24, 48, 96] as $pageSize)
                                 <a href="{{ route('titles.index', $filterView->perPageQuery($pageSize)) }}" rel="nofollow" wire:click.prevent="setPerPage({{ $pageSize }})" @class([
@@ -245,6 +245,9 @@
                 @placeholder
                     <x-catalog.unified-title-filters
                         :filter-view="$this->catalogPage['filterView']"
+                        :route-year="$routeYear"
+                        :route-filter-type="$routeFilterType"
+                        :route-taxonomy="$routeTaxonomy"
                         loading
                     />
                 @endplaceholder
@@ -252,6 +255,9 @@
                 <x-catalog.unified-title-filters
                     :data="$this->catalogFacets"
                     :option-search="$this->optionSearch"
+                    :route-year="$routeYear"
+                    :route-filter-type="$routeFilterType"
+                    :route-taxonomy="$routeTaxonomy"
                 />
             @endisland
 

@@ -123,7 +123,30 @@ final readonly class TagTitleMergeService
         }
 
         foreach (array_unique($ownerIds) as $ownerId) {
+            $this->normalizePersonalPositions($canonical, $ownerId);
             $this->cache->personalChangedId($ownerId);
+        }
+    }
+
+    private function normalizePersonalPositions(CatalogTitle $title, int $ownerId): void
+    {
+        $tagIds = DB::table('catalog_title_user_tag')
+            ->join('user_tags', 'user_tags.id', '=', 'catalog_title_user_tag.user_tag_id')
+            ->where('catalog_title_user_tag.catalog_title_id', $title->id)
+            ->where('user_tags.user_id', $ownerId)
+            ->orderBy('catalog_title_user_tag.position')
+            ->orderBy('catalog_title_user_tag.user_tag_id')
+            ->pluck('catalog_title_user_tag.user_tag_id');
+        $now = now();
+
+        foreach ($tagIds as $position => $tagId) {
+            DB::table('catalog_title_user_tag')
+                ->where('user_tag_id', $tagId)
+                ->where('catalog_title_id', $title->id)
+                ->update([
+                    'position' => $position,
+                    'updated_at' => $now,
+                ]);
         }
     }
 

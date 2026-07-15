@@ -69,6 +69,42 @@ class BladeTemplateTest extends TestCase
         $this->assertSame([], $offendingFiles, 'Blade templates must receive prepared request, configuration, authentication, authorization, storage, database, Redis, cache, serialization, and service state.');
     }
 
+    public function test_blade_templates_do_not_call_enum_presentation_methods(): void
+    {
+        $offendingFiles = collect(File::allFiles(resource_path('views')))
+            ->filter(fn (SplFileInfo $file): bool => str_ends_with($file->getFilename(), '.blade.php'))
+            ->filter(fn (SplFileInfo $file): bool => preg_match('/->label\s*\(/', (string) file_get_contents($file->getPathname())) === 1)
+            ->map(fn (SplFileInfo $file): string => str_replace(base_path().'/', '', $file->getPathname()))
+            ->values()
+            ->all();
+
+        $this->assertSame([], $offendingFiles, 'Blade templates must receive prepared enum labels instead of calling enum presentation methods.');
+    }
+
+    public function test_blade_templates_do_not_calculate_the_current_date(): void
+    {
+        $offendingFiles = collect(File::allFiles(resource_path('views')))
+            ->filter(fn (SplFileInfo $file): bool => str_ends_with($file->getFilename(), '.blade.php'))
+            ->filter(fn (SplFileInfo $file): bool => preg_match('/\b(?:now|today)\s*\(/', (string) file_get_contents($file->getPathname())) === 1)
+            ->map(fn (SplFileInfo $file): string => str_replace(base_path().'/', '', $file->getPathname()))
+            ->values()
+            ->all();
+
+        $this->assertSame([], $offendingFiles, 'Blade templates must receive prepared date-dependent values and presentation flags.');
+    }
+
+    public function test_blade_templates_do_not_call_presentation_predicates_or_formatters(): void
+    {
+        $offendingFiles = collect(File::allFiles(resource_path('views')))
+            ->filter(fn (SplFileInfo $file): bool => str_ends_with($file->getFilename(), '.blade.php'))
+            ->filter(fn (SplFileInfo $file): bool => preg_match('/->(?:isActive|isPlayable|trashed|toAtomString|format)\s*\(/', (string) file_get_contents($file->getPathname())) === 1)
+            ->map(fn (SplFileInfo $file): string => str_replace(base_path().'/', '', $file->getPathname()))
+            ->values()
+            ->all();
+
+        $this->assertSame([], $offendingFiles, 'Blade templates must receive prepared presentation predicates and formatted scalar values.');
+    }
+
     public function test_catalog_artwork_is_emitted_only_by_the_shared_poster_frame(): void
     {
         $posterFrame = resource_path('views/components/ui/poster-frame.blade.php');

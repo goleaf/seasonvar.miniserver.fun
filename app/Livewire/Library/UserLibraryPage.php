@@ -146,13 +146,21 @@ final class UserLibraryPage extends Component
     public function render(): View
     {
         $user = $this->user();
+        $summary = $this->summaries->get($user);
         $data = [
-            'summary' => $this->summaries->get($user),
+            'summary' => $summary,
+            'lastWatchedAtLabel' => $summary->lastWatchedAt?->format('d.m.Y H:i'),
             'publicationTypes' => collect(CatalogPublicationType::cases())
-                ->reject(fn (CatalogPublicationType $type): bool => $type === CatalogPublicationType::Unknown),
+                ->reject(fn (CatalogPublicationType $type): bool => $type === CatalogPublicationType::Unknown)
+                ->map(fn (CatalogPublicationType $type): array => [
+                    'value' => $type->value,
+                    'label' => $type->label(),
+                ])
+                ->values(),
             'ratingOptions' => $this->userState->ratingOptions(),
             'canInteract' => $user->hasVerifiedEmail(),
             'personalTags' => $this->personalTags->active($user),
+            'maximumYear' => now()->year + 1,
             'watchlist' => null,
             'ratings' => null,
             'continueWatching' => null,

@@ -233,11 +233,26 @@ final class CommentAdministrationManager extends Component
             'queryFailed' => $queryFailed,
             'comments' => $comments,
             'selectedThread' => $selectedThread,
-            'statusOptions' => CommentStatus::cases(),
-            'targetOptions' => CommentTargetType::cases(),
-            'moderationReasons' => CommentModerationReason::cases(),
-            'restrictionTypes' => CommentRestrictionType::cases(),
-            'restrictionReasons' => CommentRestrictionReason::cases(),
+            'statusOptions' => array_map(static fn (CommentStatus $option): array => [
+                'value' => $option->value,
+                'label' => $option->label(),
+            ], CommentStatus::cases()),
+            'targetOptions' => array_map(static fn (CommentTargetType $option): array => [
+                'value' => $option->value,
+                'label' => $option->label(),
+            ], CommentTargetType::cases()),
+            'moderationReasons' => array_map(static fn (CommentModerationReason $option): array => [
+                'value' => $option->value,
+                'label' => $option->label(),
+            ], CommentModerationReason::cases()),
+            'restrictionTypes' => array_map(static fn (CommentRestrictionType $option): array => [
+                'value' => $option->value,
+                'label' => $option->label(),
+            ], CommentRestrictionType::cases()),
+            'restrictionReasons' => array_map(static fn (CommentRestrictionReason $option): array => [
+                'value' => $option->value,
+                'label' => $option->label(),
+            ], CommentRestrictionReason::cases()),
             'restrictionDurations' => [1, 3, 7, 30, 90],
             'resolvedReportStatus' => CommentReportStatus::Resolved->value,
             'dismissedReportStatus' => CommentReportStatus::Dismissed->value,

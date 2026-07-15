@@ -1,21 +1,24 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Seasonvar;
 
 use App\Enums\SeasonvarPageType;
 use App\Enums\SeasonvarSourceAvailability;
-use App\Models\LicensedMedia;
 use App\Models\SourcePage;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
-class SeasonvarRefreshPlanner
+final class SeasonvarRefreshPlanner
 {
     public function __construct(private readonly SeasonvarPageHandlerRegistry $handlers) {}
 
     /**
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @param  list<string>|null  $pageTypes
      * @return iterable<Collection<int, SourcePage>>
      */
     public function pageChunksForImportCycle(
@@ -75,7 +78,7 @@ class SeasonvarRefreshPlanner
             }
 
             foreach ($pagesForReason->chunk($chunkSize) as $pages) {
-                $pages = $pages instanceof Collection ? $pages : $pages->collect();
+                $pages = $pages->collect();
                 $pages = $this->rejectAlreadySelectedPages($pages, $selectedIds);
 
                 if ($pages->isEmpty()) {
@@ -100,6 +103,7 @@ class SeasonvarRefreshPlanner
 
     /**
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @param  list<string>|null  $pageTypes
      * @return iterable<Collection<int, SourcePage>>
      */
     public function forcedPageChunks(
@@ -122,7 +126,7 @@ class SeasonvarRefreshPlanner
         }
 
         foreach ($this->baseQuery($importRunId)->lazyById($chunkSize)->chunk($chunkSize) as $pages) {
-            $pages = $pages instanceof Collection ? $pages : $pages->collect();
+            $pages = $pages->collect();
             $totalSelected += $pages->count();
 
             $this->report($progress, 'seasonvar-refresh-candidates-selected', [
@@ -214,7 +218,7 @@ class SeasonvarRefreshPlanner
                 ->orderBy('id');
 
             foreach ($query->lazyById($chunkSize)->chunk($chunkSize) as $pages) {
-                $pages = $pages instanceof Collection ? $pages->values() : $pages->collect()->values();
+                $pages = $pages->collect()->values();
 
                 $this->report($progress, 'seasonvar-refresh-candidates-selected', [
                     'reason' => $force ? 'force_metadata' : 'metadata_due',
@@ -272,7 +276,7 @@ class SeasonvarRefreshPlanner
                 ->where('parse_status', 'parsed')
                 ->where(fn (Builder $query): Builder => $this->dueForMissingDataRetry($query))
                 ->whereHas('linkedSeasons', function (Builder $query): void {
-                    $query->whereDoesntHave('licensedMedia', fn (Builder $query): Builder => $query->published());
+                    $query->whereDoesntHave('publishedMedia');
                 }),
 
             'episodes_without_video' => fn (Builder $query): Builder => $query
@@ -281,10 +285,10 @@ class SeasonvarRefreshPlanner
                 ->where(function (Builder $query): void {
                     $query
                         ->whereHas('linkedSeasons.episodes', function (Builder $query): void {
-                            $query->whereDoesntHave('licensedMedia', fn (Builder $query): Builder => $query->published());
+                            $query->whereDoesntHave('publishedMedia');
                         })
                         ->orWhereHas('seasons.episodes', function (Builder $query): void {
-                            $query->whereDoesntHave('licensedMedia', fn (Builder $query): Builder => $query->published());
+                            $query->whereDoesntHave('publishedMedia');
                         });
                 }),
 
@@ -292,7 +296,7 @@ class SeasonvarRefreshPlanner
                 ->where('parse_status', 'parsed')
                 ->where(fn (Builder $query): Builder => $this->dueForMissingDataRetry($query))
                 ->whereHas('catalogTitle', function (Builder $query): void {
-                    $query->whereDoesntHave('licensedMedia', fn (Builder $query): Builder => $query->published());
+                    $query->whereDoesntHave('publishedMedia');
                 }),
 
             'missing_data' => fn (Builder $query): Builder => $query
@@ -347,7 +351,10 @@ class SeasonvarRefreshPlanner
     }
 
     /**
-     * @return Builder<SourcePage>
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
      */
     private function dueForMissingDataRetry(Builder $query): Builder
     {
@@ -358,7 +365,10 @@ class SeasonvarRefreshPlanner
     }
 
     /**
-     * @return Builder<LicensedMedia>
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @return Builder<TModel>
      */
     private function unavailableMedia(Builder $query): Builder
     {

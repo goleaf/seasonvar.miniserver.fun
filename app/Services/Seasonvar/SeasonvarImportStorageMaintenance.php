@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Seasonvar;
 
 use App\Models\SeasonvarImportEvent;
@@ -8,7 +10,7 @@ use App\Models\SourcePageSnapshot;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
-class SeasonvarImportStorageMaintenance
+final class SeasonvarImportStorageMaintenance
 {
     private const REDACTED_URL = '[redacted-url]';
 
@@ -64,8 +66,8 @@ class SeasonvarImportStorageMaintenance
     }
 
     /**
-     * @param  array<string, mixed>  $values
-     * @return array<string, mixed>
+     * @param  array<array-key, mixed>  $values
+     * @return array<array-key, mixed>
      */
     private function sanitizeArray(array $values): array
     {

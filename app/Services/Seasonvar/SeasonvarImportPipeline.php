@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Seasonvar;
 
 use App\Enums\MediaHealthStatus;
@@ -329,7 +331,6 @@ class SeasonvarImportPipeline
 
     /**
      * @param  callable(string, array<string, mixed>): void  $progress
-     * @param  list<string>|null  $pageTypes
      * @return array{selected: int, backfilled: int}
      */
     private function backfillParsedSourcePageStatuses(callable $progress): array
@@ -348,7 +349,7 @@ class SeasonvarImportPipeline
             ->lazyById($chunkSize)
             ->chunk($chunkSize)
             ->each(function ($pages) use (&$selected, &$backfilled, $progress): void {
-                $pages = $pages instanceof Collection ? $pages : $pages->collect();
+                $pages = $pages->collect();
                 $selected += $pages->count();
                 $backfilled += SourcePage::query()->whereKey($pages->pluck('id')->all())->update([
                     'import_status' => 'parsed',
@@ -375,6 +376,7 @@ class SeasonvarImportPipeline
 
     /**
      * @param  callable(string, array<string, mixed>): void  $progress
+     * @param  list<string>|null  $pageTypes
      * @return array{discovered: int, stored: int, selected: int, parsed: int, failed: int, media_attached: int, media_updated: int, media_skipped: int, media_failed: int, cleaned: int}
      */
     private function runSitemapCycle(
@@ -470,7 +472,6 @@ class SeasonvarImportPipeline
 
     /**
      * @param  callable(string, array<string, mixed>): void  $progress
-     * @param  list<string>|null  $pageTypes
      * @return array{discovered: int, stored: int, selected: int, parsed: int, failed: int, media_attached: int, media_updated: int, media_skipped: int, media_failed: int, cleaned: int}
      */
     private function runUrlCycle(SeasonvarImportRun $run, string $argument, bool $force, callable $progress): array
@@ -535,6 +536,7 @@ class SeasonvarImportPipeline
 
     /**
      * @param  callable(string, array<string, mixed>): void  $progress
+     * @param  list<string>|null  $pageTypes
      * @return iterable<Collection<int, SourcePage>>
      */
     private function pageChunksForImportCycle(
@@ -650,13 +652,13 @@ class SeasonvarImportPipeline
         ];
 
         foreach ($mediaQuery->lazyById($chunkSize)->take($maxPerCycle)->chunk($chunkSize) as $mediaItems) {
-            $mediaItems = $mediaItems instanceof Collection ? $mediaItems : $mediaItems->collect();
+            $mediaItems = $mediaItems->collect();
             $result['selected'] += $mediaItems->count();
 
             foreach ($mediaItems as $media) {
                 $url = $media->playback_url ?: $media->path;
 
-                $availability = $this->mediaAvailabilityChecker->check(is_string($url) ? $url : '', $progress);
+                $availability = $this->mediaAvailabilityChecker->check($url, $progress);
                 $media = $this->mediaHealth->record($media, $availability);
 
                 $result['media_checked']++;
@@ -728,13 +730,13 @@ class SeasonvarImportPipeline
         ];
 
         foreach ($mediaQuery->lazyById($chunkSize)->chunk($chunkSize) as $mediaItems) {
-            $mediaItems = $mediaItems instanceof Collection ? $mediaItems : $mediaItems->collect();
+            $mediaItems = $mediaItems->collect();
             $result['selected'] += $mediaItems->count();
 
             foreach ($mediaItems as $media) {
                 $url = $media->playback_url ?: $media->path;
 
-                if (! is_string($url) || trim($url) === '') {
+                if (trim($url) === '') {
                     continue;
                 }
 
@@ -833,13 +835,13 @@ class SeasonvarImportPipeline
         ];
 
         foreach ($mediaQuery->lazyById($chunkSize)->chunk($chunkSize) as $mediaItems) {
-            $mediaItems = $mediaItems instanceof Collection ? $mediaItems : $mediaItems->collect();
+            $mediaItems = $mediaItems->collect();
             $result['selected'] += $mediaItems->count();
 
             foreach ($mediaItems as $media) {
                 $url = $media->playback_url ?: $media->path;
 
-                if (! is_string($url) || trim($url) === '') {
+                if (trim($url) === '') {
                     continue;
                 }
 

@@ -100,7 +100,7 @@ class LatestMediaCard extends Component
         return [
             'key' => 'episode-'.$episode->id,
             'season_label' => $season?->number !== null ? 'Сезон '.$season->number : null,
-            'episode_label' => $episode->number !== null ? $episode->number.' серия' : null,
+            'episode_label' => $episode->number.' серия',
             'title' => filled($episode->title) ? (string) $episode->title : null,
             'added_at' => $episode->created_at?->getTimestamp() ?? 0,
             'media' => [],

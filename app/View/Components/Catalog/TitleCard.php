@@ -39,18 +39,20 @@ class TitleCard extends Component
      */
     public Collection $cardRelations;
 
+    /**
+     * @param  list<string>  $reasonLabels
+     * @param  array{type: string, label: string, url: string}|null  $userPrimaryAction
+     */
     public function __construct(
         public CatalogTitle $title,
         string $layout = 'list',
         public bool $showDescription = true,
         public bool $readable = false,
         public ?int $rank = null,
-        /** @var list<string> */
         public array $reasonLabels = [],
         ?bool $userInWatchlist = null,
         ?int $userRating = null,
         ?int $userProgressPercent = null,
-        /** @var array{type: string, label: string, url: string}|null */
         ?array $userPrimaryAction = null,
     ) {
         $this->layout = in_array($layout, self::LAYOUTS, true) ? $layout : 'list';

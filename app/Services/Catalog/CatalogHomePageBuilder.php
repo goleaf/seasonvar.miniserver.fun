@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Collections\CatalogCollectionQuery;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
 class CatalogHomePageBuilder
@@ -34,6 +35,12 @@ class CatalogHomePageBuilder
     {
         $genres = $this->facets->taxonomies('genre');
         $countries = $this->facets->taxonomies('country');
+        $countries->each(function (Model $country): void {
+            $country->setAttribute('detail_url', route('titles.taxonomy', [
+                'type' => 'country',
+                'taxonomy' => $country->getAttribute('slug'),
+            ]));
+        });
         $snapshot = $this->snapshot->snapshot();
         $stats = [
             ...$this->metrics->metrics(),
@@ -120,6 +127,7 @@ class CatalogHomePageBuilder
             'countries' => $countries,
             'subtitleTag' => $subtitleTag,
             'featuredCollections' => $this->collections->featured(),
+            'noveltiesUrl' => route('titles.year', ['year' => now()->year]),
             'seo' => $this->seo->home($stats, $latestTitles),
         ];
     }

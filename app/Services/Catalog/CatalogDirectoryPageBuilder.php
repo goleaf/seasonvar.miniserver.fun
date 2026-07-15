@@ -31,6 +31,7 @@ class CatalogDirectoryPageBuilder
 
         return [
             'definition' => $directory,
+            'isYearDirectory' => $directory->isYear(),
             'items' => $items,
             'itemsByDecade' => $directory->isYear()
                 ? $items->getCollection()->groupBy(fn (object $item): int => (int) floor(((int) $item->year) / 10) * 10)
@@ -64,6 +65,7 @@ class CatalogDirectoryPageBuilder
                 $item->name = (string) $item->year;
                 $item->detail_url = route('titles.year', ['year' => $item->year]);
                 $item->item_key = 'year-'.$item->year;
+                $item->is_upcoming = (int) $item->year > now()->year;
 
                 return $item;
             }

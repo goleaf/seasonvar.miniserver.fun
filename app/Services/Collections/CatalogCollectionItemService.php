@@ -29,9 +29,12 @@ final class CatalogCollectionItemService
 
         $created = DB::transaction(function () use ($actor, $collection, $title): bool {
             $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
+            Gate::forUser($actor)->authorize('manageItems', $locked);
+            $currentTitle = CatalogTitle::query()->lockForUpdate()->findOrFail($title->id);
+            Gate::forUser($actor)->authorize('interact', $currentTitle);
             $existing = CatalogCollectionItem::query()
                 ->whereBelongsTo($locked, 'collection')
-                ->whereBelongsTo($title)
+                ->whereBelongsTo($currentTitle)
                 ->exists();
 
             if ($existing) {
@@ -50,7 +53,7 @@ final class CatalogCollectionItemService
 
             CatalogCollectionItem::query()->create([
                 'catalog_collection_id' => $locked->id,
-                'catalog_title_id' => $title->id,
+                'catalog_title_id' => $currentTitle->id,
                 'added_by_id' => $actor->id,
                 'position' => (int) ($summary->maximum_position ?? 0) + 1,
             ]);
@@ -59,9 +62,7 @@ final class CatalogCollectionItemService
             return true;
         }, attempts: 3);
 
-        if ($created) {
-            $this->cache->changed($collection);
-        }
+        $this->cache->changed($collection);
 
         return $created;
     }
@@ -72,8 +73,9 @@ final class CatalogCollectionItemService
         $this->rateLimiter->ensure($actor, 'membership');
         $titleId = $title instanceof CatalogTitle ? $title->id : $title;
 
-        $removed = DB::transaction(function () use ($collection, $titleId): bool {
+        $removed = DB::transaction(function () use ($actor, $collection, $titleId): bool {
             $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
+            Gate::forUser($actor)->authorize('manageItems', $locked);
             $deleted = CatalogCollectionItem::query()
                 ->whereBelongsTo($locked, 'collection')
                 ->where('catalog_title_id', $titleId)
@@ -89,9 +91,7 @@ final class CatalogCollectionItemService
             return true;
         }, attempts: 3);
 
-        if ($removed) {
-            $this->cache->changed($collection);
-        }
+        $this->cache->changed($collection);
 
         return $removed;
     }
@@ -127,6 +127,9 @@ final class CatalogCollectionItemService
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
+            $manageable->each(fn (CatalogCollection $collection) => Gate::forUser($actor)->authorize('manageItems', $collection));
+            $currentTitle = CatalogTitle::query()->lockForUpdate()->findOrFail($title->id);
+            Gate::forUser($actor)->authorize('interact', $currentTitle);
             $manageablePublicIds = $manageable->pluck('public_id')->all();
             $manageablePublicIdsById = $manageable->pluck('public_id', 'id');
 
@@ -138,7 +141,7 @@ final class CatalogCollectionItemService
             $maximumItems = max(1, (int) config('catalog-collections.maximum_items_per_collection', 5_000));
             $existingItems = CatalogCollectionItem::query()
                 ->whereIn('catalog_collection_id', $manageable->modelKeys())
-                ->where('catalog_title_id', $title->id)
+                ->where('catalog_title_id', $currentTitle->id)
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('catalog_collection_id');
@@ -155,8 +158,6 @@ final class CatalogCollectionItemService
                 ->keyBy('catalog_collection_id');
 
             foreach ($manageable as $collection) {
-                Gate::forUser($actor)->authorize('manageItems', $collection);
-
                 if ($additions->contains('id', $collection->id)
                     && (int) ($summaries->get($collection->id)->aggregate ?? 0) >= $maximumItems) {
                     throw ValidationException::withMessages(['collection' => [__('collections.errors.item_limit')]]);
@@ -168,7 +169,7 @@ final class CatalogCollectionItemService
                 CatalogCollectionItem::query()->insert($additions
                     ->map(fn (CatalogCollection $collection): array => [
                         'catalog_collection_id' => $collection->id,
-                        'catalog_title_id' => $title->id,
+                        'catalog_title_id' => $currentTitle->id,
                         'added_by_id' => $actor->id,
                         'position' => (int) ($summaries->get($collection->id)->maximum_position ?? 0) + 1,
                         'created_at' => $timestamp,
@@ -201,7 +202,7 @@ final class CatalogCollectionItemService
             return [$manageable, $changedIds];
         }, attempts: 3);
 
-        $this->cache->changedMany($manageable->whereIn('id', $changed));
+        $this->cache->changedMany($changed === [] ? $manageable : $manageable->whereIn('id', $changed));
 
         return $changed;
     }
@@ -238,8 +239,9 @@ final class CatalogCollectionItemService
 
         $orderedItemIds = $normalizedItemIds;
 
-        DB::transaction(function () use ($collection, $orderedItemIds): void {
+        DB::transaction(function () use ($actor, $collection, $orderedItemIds): void {
             $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
+            Gate::forUser($actor)->authorize('manageItems', $locked);
             $allIds = CatalogCollectionItem::query()
                 ->whereBelongsTo($locked, 'collection')
                 ->orderBy('position')
@@ -255,8 +257,14 @@ final class CatalogCollectionItemService
 
             $completeOrder = [...$orderedItemIds, ...array_values(array_diff($allIds, $orderedItemIds))];
 
+            if ($completeOrder === $allIds) {
+                return;
+            }
+
             foreach ($completeOrder as $index => $itemId) {
-                CatalogCollectionItem::query()->whereKey($itemId)->update(['position' => $index + 1]);
+                if (($allIds[$index] ?? null) !== $itemId) {
+                    CatalogCollectionItem::query()->whereKey($itemId)->update(['position' => $index + 1]);
+                }
             }
 
             $this->touch($locked);
@@ -270,8 +278,9 @@ final class CatalogCollectionItemService
         Gate::forUser($actor)->authorize('manageItems', $collection);
         $this->rateLimiter->ensure($actor, 'reorder', 'order');
         abort_unless(in_array($direction, [-1, 1], true), 404);
-        $changed = DB::transaction(function () use ($collection, $itemId, $direction): bool {
+        $changed = DB::transaction(function () use ($actor, $collection, $itemId, $direction): bool {
             $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
+            Gate::forUser($actor)->authorize('manageItems', $locked);
             $item = CatalogCollectionItem::query()
                 ->whereBelongsTo($locked, 'collection')
                 ->lockForUpdate()
@@ -314,9 +323,7 @@ final class CatalogCollectionItemService
             return true;
         }, attempts: 3);
 
-        if ($changed) {
-            $this->cache->changed($collection);
-        }
+        $this->cache->changed($collection);
 
         return $changed;
     }

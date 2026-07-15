@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Seasonvar;
 
 use App\Enums\SeasonvarSourceAvailability;
@@ -144,7 +146,7 @@ final class SeasonvarTitlePageStateSynchronizer
         }
 
         if ($media->contains(fn (LicensedMedia $media): bool => $media->status === 'unavailable'
-            || in_array($media->health_status?->value, ['unavailable', 'disabled'], true))) {
+            || in_array($media->health_status->value, ['unavailable', 'disabled'], true))) {
             $flags[] = 'unavailable_video';
         }
 

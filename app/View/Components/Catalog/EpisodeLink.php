@@ -26,7 +26,7 @@ class EpisodeLink extends Component
     public ?string $releasedAtLabel;
 
     /**
-     * @var Collection<int, string>
+     * @var Collection<int, non-empty-string>
      */
     public Collection $variantBadges;
 

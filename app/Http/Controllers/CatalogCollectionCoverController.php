@@ -23,10 +23,13 @@ final class CatalogCollectionCoverController extends Controller
         abort_unless($collection->cover_path !== null && $collection->cover_disk !== null, 404);
         abort_unless($collection->cover_version === $version, 404);
         abort_unless($collection->cover_disk === config('uploads.disk'), 404);
+        abort_unless(in_array($collection->cover_mime_type, ['image/jpeg', 'image/png', 'image/webp'], true), 404);
         abort_unless(str_starts_with($collection->cover_path, 'catalog-collections/'.$collection->public_id.'/'), 404);
         abort_if(str_contains($collection->cover_path, '..') || str_contains($collection->cover_path, '\\'), 404);
+        $disk = Storage::disk($collection->cover_disk);
+        abort_unless($disk->exists($collection->cover_path), 404);
         $headers = [
-            'Content-Type' => $collection->cover_mime_type ?? 'application/octet-stream',
+            'Content-Type' => $collection->cover_mime_type,
             'Content-Disposition' => 'inline',
             'X-Content-Type-Options' => 'nosniff',
             'X-Robots-Tag' => 'noindex, nofollow, noarchive',
@@ -35,6 +38,6 @@ final class CatalogCollectionCoverController extends Controller
         $headers['Cache-Control'] = 'private, no-store, max-age=0';
         $headers['Pragma'] = 'no-cache';
 
-        return Storage::disk($collection->cover_disk)->response($collection->cover_path, null, $headers);
+        return $disk->response($collection->cover_path, null, $headers);
     }
 }

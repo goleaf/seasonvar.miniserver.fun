@@ -9,8 +9,8 @@
                 <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Сохранённые тайтлы, оценки, продолжение просмотра и личная история.</p>
             </div>
 
-            @if ($summary->lastWatchedAt)
-                <p class="text-xs font-semibold text-slate-500">Последний просмотр {{ $summary->lastWatchedAt->format('d.m.Y H:i') }}</p>
+            @if ($lastWatchedAtLabel !== null)
+                <p class="text-xs font-semibold text-slate-500">Последний просмотр {{ $lastWatchedAtLabel }}</p>
             @endif
         </div>
 
@@ -84,7 +84,7 @@
                     <select wire:model="filters.type" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100">
                         <option value="">Все типы</option>
                         @foreach ($publicationTypes as $publicationType)
-                            <option value="{{ $publicationType->value }}">{{ $publicationType->label() }}</option>
+                            <option value="{{ $publicationType['value'] }}">{{ $publicationType['label'] }}</option>
                         @endforeach
                     </select>
                     @error('filters.type') <span class="mt-1 block text-xs font-semibold text-rose-700">{{ $message }}</span> @enderror
@@ -92,7 +92,7 @@
 
                 <label class="block min-w-0">
                     <span class="mb-1.5 block text-sm font-bold text-slate-700">Год</span>
-                    <input type="number" min="1900" max="{{ now()->year + 1 }}" wire:model="filters.year" placeholder="Любой" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100">
+                    <input type="number" min="1900" max="{{ $maximumYear }}" wire:model="filters.year" placeholder="Любой" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100">
                     @error('filters.year') <span class="mt-1 block text-xs font-semibold text-rose-700">{{ $message }}</span> @enderror
                 </label>
 
@@ -271,7 +271,7 @@
                                         @else
                                             <p class="text-base font-black text-slate-700">Недоступный эпизод</p>
                                         @endif
-                                        <p class="mt-2 text-xs font-semibold text-slate-500">{{ $progress->last_watched_at->format('d.m.Y H:i') }}</p>
+                                        <p class="mt-2 text-xs font-semibold text-slate-500">{{ $progress->last_watched_at_label }}</p>
                                     </div>
                                     @if ($canInteract)
                                         <button type="button" wire:click="removeHistoryItem({{ $progress->id }})" wire:confirm="Удалить этот просмотр из истории?" class="relative z-10 inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-rose-50 hover:text-rose-700">

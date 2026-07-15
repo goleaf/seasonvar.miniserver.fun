@@ -27,7 +27,11 @@
                         'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveYear($bucket),
                     ])>
                         <span class="inline-flex min-w-0 items-center gap-2">
-                            <input type="checkbox" wire:model.live="filters.years" wire:replace.self name="year[]" value="{{ $filterView->bucketYear($bucket) }}" class="h-5 w-5 shrink-0 accent-emerald-700">
+                            @if ($routeYear === $filterView->bucketYear($bucket))
+                                <input type="checkbox" checked wire:click="removeYear({{ $filterView->bucketYear($bucket) }})" name="year[]" value="{{ $filterView->bucketYear($bucket) }}" class="h-5 w-5 shrink-0 accent-emerald-700">
+                            @else
+                                <input type="checkbox" wire:model.live="filters.years" wire:replace.self name="year[]" value="{{ $filterView->bucketYear($bucket) }}" class="h-5 w-5 shrink-0 accent-emerald-700">
+                            @endif
                             <x-ui.icon name="fa-solid fa-calendar-days text-[0.85em] text-slate-400" />
                             <span class="min-w-0 break-words">{{ $filterView->bucketYear($bucket) }}</span>
                         </span>
@@ -160,7 +164,11 @@
                             'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! $filterView->isActiveTaxonomy($filterType, $taxonomy),
                         ])>
                             <span class="inline-flex min-w-0 items-center gap-2">
-                                <input type="checkbox" wire:model.live="filters.{{ $filterType }}" wire:replace.self name="{{ $filterType }}[]" value="{{ $taxonomy->slug }}" class="h-5 w-5 shrink-0 accent-emerald-700">
+                                @if ($routeFilterType === $filterType && $routeTaxonomy === $taxonomy->slug)
+                                    <input type="checkbox" checked wire:click="removeTaxonomy('{{ $filterType }}', '{{ $taxonomy->slug }}')" name="{{ $filterType }}[]" value="{{ $taxonomy->slug }}" class="h-5 w-5 shrink-0 accent-emerald-700">
+                                @else
+                                    <input type="checkbox" wire:model.live="filters.{{ $filterType }}" wire:replace.self name="{{ $filterType }}[]" value="{{ $taxonomy->slug }}" class="h-5 w-5 shrink-0 accent-emerald-700">
+                                @endif
                                 <x-ui.icon name="{{ $filterView->icon($filterType) }} text-[0.85em] text-slate-400" />
                                 <span class="min-w-0 break-words">{{ $taxonomy->name }}</span>
                             </span>

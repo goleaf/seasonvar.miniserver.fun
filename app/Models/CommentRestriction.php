@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property int $id
  * @property int $user_id
- * @property int $moderator_id
+ * @property int|null $moderator_id
  * @property int|null $revoked_by_id
  * @property CommentRestrictionType $type
  * @property CommentRestrictionReason $reason_code

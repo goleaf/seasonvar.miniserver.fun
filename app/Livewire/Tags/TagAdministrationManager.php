@@ -300,6 +300,13 @@ final class TagAdministrationManager extends Component
     public function render(): View
     {
         $tag = $this->selectedPublicId === null ? null : $this->query->tag($this->selectedPublicId);
+        $assignedTitles = $tag === null ? collect() : $this->query->assignedTitles($tag);
+        $assignedTitles->each(function (CatalogTitle $title): void {
+            $title->setAttribute('is_deleted', $title->deleted_at !== null);
+        });
+        $tagTypes = $tag === null || $tag->type !== TagType::Imported
+            ? array_values(array_filter(TagType::cases(), fn (TagType $type): bool => $type !== TagType::Imported))
+            : TagType::cases();
 
         return view('livewire.tags.tag-administration-manager', [
             'tagsPage' => $this->query->paginate($this->search, $this->moderationFilter),
@@ -307,13 +314,34 @@ final class TagAdministrationManager extends Component
             'relationshipCandidates' => $this->query->candidates($this->relationshipSearch, $tag),
             'mergeCandidates' => $this->query->candidates($this->mergeSearch, $tag),
             'titleOptions' => $tag === null ? collect() : $this->query->titleOptions($tag, $this->titleSearch),
-            'assignedTitles' => $tag === null ? collect() : $this->query->assignedTitles($tag),
-            'tagTypes' => $tag === null || $tag->type !== TagType::Imported
-                ? array_values(array_filter(TagType::cases(), fn (TagType $type): bool => $type !== TagType::Imported))
-                : TagType::cases(),
-            'visibilities' => TagVisibility::cases(),
-            'moderationStatuses' => TagModerationStatus::cases(),
-            'tagSources' => TagSource::cases(),
+            'assignedTitles' => $assignedTitles,
+            'tagTypes' => array_map(static fn (TagType $type): array => [
+                'value' => $type->value,
+                'label' => $type->label(),
+            ], $tagTypes),
+            'tagTypeLabels' => collect(TagType::cases())->mapWithKeys(
+                static fn (TagType $type): array => [$type->value => $type->label()],
+            )->all(),
+            'visibilities' => array_map(static fn (TagVisibility $visibility): array => [
+                'value' => $visibility->value,
+                'label' => $visibility->label(),
+            ], TagVisibility::cases()),
+            'moderationStatuses' => array_map(static fn (TagModerationStatus $status): array => [
+                'value' => $status->value,
+                'label' => $status->label(),
+                'selectable' => ! in_array($status, [TagModerationStatus::Merged, TagModerationStatus::Archived], true)
+                    || $tag?->moderation_status === $status,
+            ], TagModerationStatus::cases()),
+            'moderationStatusLabels' => collect(TagModerationStatus::cases())->mapWithKeys(
+                static fn (TagModerationStatus $status): array => [$status->value => $status->label()],
+            )->all(),
+            'providerMappingStatusLabels' => collect(TagProviderMappingStatus::cases())->mapWithKeys(
+                static fn (TagProviderMappingStatus $status): array => [$status->value => $status->label()],
+            )->all(),
+            'tagSources' => array_map(static fn (TagSource $source): array => [
+                'value' => $source->value,
+                'label' => __('tags.sources.'.$source->value),
+            ], TagSource::cases()),
             'supportedLocales' => config('tags.supported_locales', []),
         ])->extends('layouts.app', [
             'title' => __('tags.admin.title'),

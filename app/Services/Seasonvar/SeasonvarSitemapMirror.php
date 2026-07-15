@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Seasonvar;
 
 use App\DTOs\Seasonvar\SeasonvarRobotsRules;
@@ -9,7 +11,7 @@ use RuntimeException;
 use Throwable;
 use XMLReader;
 
-class SeasonvarSitemapMirror
+final class SeasonvarSitemapMirror
 {
     private int $malformedUrlCount = 0;
 
@@ -84,7 +86,7 @@ class SeasonvarSitemapMirror
             $currentUrl = array_key_first($queue);
             $currentFile = array_shift($queue);
 
-            if ($currentUrl === null || isset($visited[$currentUrl])) {
+            if (isset($visited[$currentUrl])) {
                 continue;
             }
 

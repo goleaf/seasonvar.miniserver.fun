@@ -7,6 +7,7 @@ namespace App\Services\Collections;
 use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
+use App\Models\CatalogCollectionTranslation;
 use App\Models\User;
 use App\Support\PlainText;
 
@@ -52,8 +53,15 @@ final class CatalogCollectionSeoPresenter
     ): array {
         $defaultLocale = (string) config('catalog-collections.default_locale', 'ru');
         $locale = app()->currentLocale();
-        $editorialLocales = $collection->type === CatalogCollectionType::Editorial && $collection->relationLoaded('translations')
-            ? $collection->translations->pluck('locale')->unique()->values()->all()
+        $editorialLocales = $collection->type === CatalogCollectionType::Editorial
+            ? CatalogCollectionTranslation::query()
+                ->whereBelongsTo($collection, 'collection')
+                ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+                ->orderBy('locale')
+                ->pluck('locale')
+                ->unique()
+                ->values()
+                ->all()
             : [];
         $hasEditorialTranslation = in_array($locale, $editorialLocales, true);
         $localizedCanonical = $localizedAlias

@@ -79,9 +79,7 @@ final class CatalogCollectionModerationService
         /** @var CatalogCollection $collection */
         $collection = $result['collection'];
 
-        if ($result['changed']) {
-            $this->cache->changed($collection);
-        }
+        $this->cache->changed($collection);
 
         return $collection->refresh();
     }
@@ -123,9 +121,7 @@ final class CatalogCollectionModerationService
         /** @var CatalogCollection $collection */
         $collection = $result['collection'];
 
-        if ($result['changed']) {
-            $this->cache->changed($collection);
-        }
+        $this->cache->changed($collection);
 
         return $collection->refresh();
     }

@@ -20,6 +20,10 @@ use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
 
+/**
+ * @property-read array<string, mixed> $catalogPage
+ * @property-read array<string, mixed> $catalogFacets
+ */
 class CatalogSeries extends Component
 {
     use WithPagination;
@@ -305,7 +309,7 @@ class CatalogSeries extends Component
 
     public function render(): View
     {
-        $data = $this->catalogPage();
+        $data = $this->catalogPage;
         $titles = $data['titles'];
 
         if ($titles->currentPage() > $titles->lastPage()) {

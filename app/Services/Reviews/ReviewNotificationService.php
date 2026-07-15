@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Notifications\ReviewActivityNotification;
 use App\Support\DeterministicUuid;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Throwable;
 
 final class ReviewNotificationService
@@ -161,17 +162,22 @@ final class ReviewNotificationService
     {
         $notification->id = $this->id($recipient, $key);
 
-        if ($recipient->notifications()->whereKey($notification->id)->exists()) {
-            return;
-        }
+        DB::transaction(function () use ($recipient, $notification): void {
+            $lockedRecipient = User::query()->lockForUpdate()->find($recipient->id);
 
-        try {
-            $recipient->notify($notification);
-        } catch (QueryException $exception) {
-            if (! $recipient->notifications()->whereKey($notification->id)->exists()) {
-                throw $exception;
+            if (! $lockedRecipient instanceof User
+                || $lockedRecipient->notifications()->whereKey($notification->id)->exists()) {
+                return;
             }
-        }
+
+            try {
+                $lockedRecipient->notify($notification);
+            } catch (QueryException $exception) {
+                if (! $lockedRecipient->notifications()->whereKey($notification->id)->exists()) {
+                    throw $exception;
+                }
+            }
+        }, attempts: 3);
     }
 
     private function id(User $recipient, string $key): string

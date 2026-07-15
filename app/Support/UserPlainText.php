@@ -36,8 +36,9 @@ final class UserPlainText
             ? Normalizer::normalize($value, Normalizer::FORM_KC)
             : $value;
         $text = $normalized === false ? '' : str_replace(["\r\n", "\r"], "\n", $normalized);
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $text = preg_replace('/<(script|style)\b[^>]*>.*?<\/\1>/isu', ' ', $text) ?? '';
-        $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = strip_tags($text);
         $text = preg_replace('/[\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', '', $text) ?? $text;
 
         if (! $preserveParagraphs) {

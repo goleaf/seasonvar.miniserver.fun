@@ -128,6 +128,7 @@ final class DiscussionPage extends Component
         });
 
         if ($result === true) {
+            $this->resetPage(pageName: 'blocks_page');
             $this->notice = __('comments.success.unblocked');
         }
     }
@@ -141,6 +142,7 @@ final class DiscussionPage extends Component
         });
 
         if ($result === true) {
+            $this->resetPage(pageName: 'mutes_page');
             $this->notice = __('comments.success.unmuted');
         }
     }
@@ -159,8 +161,8 @@ final class DiscussionPage extends Component
         $queryFailed = false;
         $activity = null;
         $notifications = null;
-        $blocks = [];
-        $mutes = [];
+        $blocks = null;
+        $mutes = null;
 
         if ($available) {
             try {

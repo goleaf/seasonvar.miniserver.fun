@@ -48,6 +48,7 @@ class CatalogLivewireBudgetTest extends TestCase
             $title = CatalogTitle::factory()->create([
                 'title' => sprintf('Бюджетный сериал %02d', $number),
                 'slug' => sprintf('biudzhetnyi-serial-%02d', $number),
+                'year' => 2024,
                 'description' => str_repeat('Описание карточки. ', 5),
                 ...($number === 1 ? [
                     'source_url' => $sourceUrl,

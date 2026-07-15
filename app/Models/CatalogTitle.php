@@ -198,6 +198,12 @@ class CatalogTitle extends Model
         return $this->hasMany(LicensedMedia::class);
     }
 
+    /** @return HasMany<LicensedMedia, $this> */
+    public function publishedMedia(): HasMany
+    {
+        return $this->licensedMedia()->published();
+    }
+
     /**
      * @return HasMany<LicensedMedia, $this>
      */

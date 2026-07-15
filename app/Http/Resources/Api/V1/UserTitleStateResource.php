@@ -28,8 +28,8 @@ final class UserTitleStateResource extends JsonResource
             'in_watchlist' => $state instanceof CatalogTitleUserState && $state->in_watchlist,
             'rating' => $state?->rating,
             'versions' => [
-                'watchlist' => $state === null ? 0 : $state->watchlist_version,
-                'rating' => $state === null ? 0 : $state->rating_version,
+                'watchlist' => $state?->watchlistVersion() ?? 0,
+                'rating' => $state?->ratingVersion() ?? 0,
             ],
             'aggregate' => [
                 'watchlist_count' => $summary->watchlistCount,

@@ -89,7 +89,10 @@ final class CacheKeyFactory
         ]);
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @param  array<string, mixed>  $dimensions
+     * @return array<string, mixed>
+     */
     private function canonicalize(array $dimensions): array
     {
         $count = 0;

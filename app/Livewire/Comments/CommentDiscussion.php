@@ -102,6 +102,7 @@ final class CommentDiscussion extends Component
     #[Locked]
     public string $submissionToken = '';
 
+    #[Locked]
     public ?int $replyToCommentId = null;
 
     public string $replyBody = '';
@@ -111,6 +112,7 @@ final class CommentDiscussion extends Component
     #[Locked]
     public string $replySubmissionToken = '';
 
+    #[Locked]
     public ?int $editingCommentId = null;
 
     public string $editBody = '';
@@ -120,6 +122,7 @@ final class CommentDiscussion extends Component
     #[Locked]
     public int $editVersion = 0;
 
+    #[Locked]
     public ?int $reportingCommentId = null;
 
     public string $reportCategory = 'spam';
@@ -384,7 +387,9 @@ final class CommentDiscussion extends Component
         }
 
         $this->cancelEdit();
-        $this->notice = __('comments.success.updated');
+        $this->notice = $comment->status === CommentStatus::Pending
+            ? __('comments.success.pending')
+            : __('comments.success.updated');
     }
 
     public function deleteComment(int $commentId, DeleteComment $delete, CommentSchema $schema): void
@@ -396,6 +401,12 @@ final class CommentDiscussion extends Component
         });
 
         if ($comment instanceof Comment) {
+            $this->focusedCommentId = (int) $comment->id;
+
+            if ($comment->parent_id !== null) {
+                $this->expandedThreadId = (int) $comment->parent_id;
+            }
+
             $this->notice = __('comments.success.deleted');
             $this->dispatch('comment-action-completed', selector: '#comment-'.$comment->id);
         }
@@ -655,8 +666,14 @@ final class CommentDiscussion extends Component
             'replies' => $replies,
             'hasMoreReplies' => $hasMoreReplies,
             'publicCount' => $publicCount,
-            'sortOptions' => CommentSort::cases(),
-            'reportCategories' => CommentReportCategory::cases(),
+            'sortOptions' => array_map(static fn (CommentSort $option): array => [
+                'value' => $option->value,
+                'label' => $option->label(),
+            ], CommentSort::cases()),
+            'reportCategories' => array_map(static fn (CommentReportCategory $option): array => [
+                'value' => $option->value,
+                'label' => $option->label(),
+            ], CommentReportCategory::cases()),
             'isAuthenticated' => $viewer !== null,
             'isVerified' => $viewer?->hasVerifiedEmail() === true,
             'canCompose' => $canCompose,

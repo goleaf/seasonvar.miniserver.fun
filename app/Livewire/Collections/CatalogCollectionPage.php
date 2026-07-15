@@ -199,6 +199,8 @@ final class CatalogCollectionPage extends Component
             'collectionVisibilityLabel' => $collection->visibility->label(),
             'collectionModerationLabel' => $collection->moderation_status->label(),
             'collectionSortLabel' => $collection->sort_mode->label(),
+            'collectionUpdatedAtIso' => $collection->updated_at?->toAtomString(),
+            'collectionUpdatedAtLabel' => $collection->updated_at?->format('d.m.Y'),
             'isEditorial' => $collection->type->value === 'editorial',
             'canShare' => $collection->visibility !== CatalogCollectionVisibility::Private,
             'headerItemCountLabel' => trans_choice('collections.page.items', $headerItemCount, [

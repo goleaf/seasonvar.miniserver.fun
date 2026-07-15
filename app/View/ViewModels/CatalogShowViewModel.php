@@ -120,7 +120,7 @@ class CatalogShowViewModel
     public string $selectedPlaybackLabel;
 
     /**
-     * @var Collection<int, string>
+     * @var Collection<int, non-empty-string>
      */
     public Collection $selectedMediaBadges;
 
@@ -200,7 +200,9 @@ class CatalogShowViewModel
         $this->taxonomyRows = $this->buildTaxonomyRows();
         $this->mediaByEpisodeId = $this->mediaItems->whereNotNull('episode_id')->groupBy('episode_id');
         $this->selectedMediaUrl = $this->playbackSource?->url;
-        $this->selectedMediaFormat = $this->playbackSource?->format ?? '';
+        $this->selectedMediaFormat = $this->playbackSource === null
+            ? ''
+            : ($this->playbackSource->format ?? '');
         $this->selectedMediaType = $this->playbackSource?->mimeType;
         $this->selectedEpisodeMediaItems = $this->selectedEpisode
             ? $this->mediaByEpisodeId->get($this->selectedEpisode->id, collect())
@@ -211,7 +213,9 @@ class CatalogShowViewModel
         $this->selectedPlaybackLabel = $this->selectedMedia ? $this->playbackLabel($this->selectedMedia) : __('catalog.player.variant_not_selected');
         $this->selectedMediaBadges = $this->buildSelectedMediaBadges();
         $this->playbackOptionGroups = $this->buildPlaybackOptionGroups();
-        $this->selectedSeasonId = $this->selectedEpisode?->season_id ?? $this->selectedMedia?->season_id;
+        $this->selectedSeasonId = $this->selectedEpisode !== null
+            ? $this->selectedEpisode->season_id
+            : $this->selectedMedia?->season_id;
         $this->selectedSeason = $this->selectedSeasonId !== null
             ? $this->seasons->firstWhere('id', $this->selectedSeasonId)
             : null;
@@ -250,7 +254,7 @@ class CatalogShowViewModel
     }
 
     /**
-     * @return Collection<int, string>
+     * @return Collection<int, non-empty-string>
      */
     public function seasonStatusBadges(Season $season): Collection
     {
@@ -264,12 +268,12 @@ class CatalogShowViewModel
             ? ($season->episodes_total !== null ? __('catalog.player.of_total', ['count' => $season->episodes_total]) : null)
             : null;
 
-        return collect([
+        return $this->stringBadges([
             $season->latest_episode_released_at?->format('d.m.Y'),
             $releasedEpisodeLabel,
             $totalEpisodeLabel,
             $season->translation_name,
-        ])->filter()->values();
+        ]);
     }
 
     /**
@@ -362,7 +366,7 @@ class CatalogShowViewModel
     }
 
     /**
-     * @return Collection<int, string>
+     * @return Collection<int, non-empty-string>
      */
     public function episodeVariantBadges(Episode $episode): Collection
     {
@@ -372,11 +376,11 @@ class CatalogShowViewModel
             return collect();
         }
 
-        return collect([
+        return $this->stringBadges([
             $mediaItems->count() > 1 ? trans_choice('catalog.counts.variants', $mediaItems->count()) : null,
             $mediaItems->contains(fn (LicensedMedia $media): bool => $this->mediaHasSubtitles($media)) ? __('catalog.player.subtitles_lower') : null,
             $this->bestQualityLabel($mediaItems),
-        ])->filter()->unique()->values();
+        ])->unique()->values();
     }
 
     /**
@@ -398,7 +402,7 @@ class CatalogShowViewModel
                 'options' => $this->playbackOptions(
                     $this->selectedEpisodeMediaItems,
                     'variant',
-                    fn (LicensedMedia $media): ?string => $this->mediaVariantKey($media),
+                    fn (LicensedMedia $media): string => $this->mediaVariantKey($media),
                     fn (LicensedMedia $media): string => $this->variantDisplayLabel($media),
                     'fa-solid fa-language',
                 ),
@@ -502,7 +506,7 @@ class CatalogShowViewModel
     }
 
     /**
-     * @return Collection<int, string>
+     * @return Collection<int, non-empty-string>
      */
     private function buildSelectedMediaBadges(): Collection
     {
@@ -510,11 +514,11 @@ class CatalogShowViewModel
             return collect();
         }
 
-        return collect([
+        return $this->stringBadges([
             $this->variantDisplayLabel($this->selectedMedia),
             $this->selectedQuality ? Str::upper($this->selectedQuality) : null,
             $this->selectedFormat ? Str::upper($this->selectedFormat) : null,
-        ])->filter()->unique()->values();
+        ])->unique()->values();
     }
 
     private function playbackLabel(LicensedMedia $media): string
@@ -612,7 +616,7 @@ class CatalogShowViewModel
     {
         $url = $media->playback_url ?: $media->path;
 
-        return is_string($url) && trim($url) !== '' ? $url : null;
+        return trim($url) !== '' ? $url : null;
     }
 
     private function preferredMediaForEpisode(Episode $episode): ?LicensedMedia
@@ -672,10 +676,11 @@ class CatalogShowViewModel
             'quality' => $this->selectedQuality,
             'format' => $this->selectedFormat,
         ])
-            ->filter(fn (?string $value): bool => is_string($value) && $value !== '')
+            ->filter(fn (?string $value): bool => $value !== null && $value !== '')
             ->all();
     }
 
+    /** @param Collection<int, LicensedMedia> $mediaItems */
     private function bestQualityLabel(Collection $mediaItems): ?string
     {
         return $mediaItems
@@ -684,6 +689,17 @@ class CatalogShowViewModel
             ->sortBy(fn (string $quality): int => $this->qualityRank($quality))
             ->map(fn (string $quality): string => Str::upper($quality))
             ->first();
+    }
+
+    /**
+     * @param  list<mixed>  $values
+     * @return Collection<int, non-empty-string>
+     */
+    private function stringBadges(array $values): Collection
+    {
+        return collect($values)
+            ->filter(fn (mixed $value): bool => is_string($value) && $value !== '')
+            ->values();
     }
 
     private function qualityRank(string $quality): int

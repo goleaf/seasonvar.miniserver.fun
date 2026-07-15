@@ -255,6 +255,7 @@ final class CatalogViewingActivityQuery
 
         $history->getCollection()->each(function (EpisodeViewProgress $progress) use ($accessibleEpisodeIds): void {
             $progress->setAttribute('is_accessible', $accessibleEpisodeIds->has($progress->episode_id));
+            $progress->setAttribute('last_watched_at_label', $progress->last_watched_at->format('d.m.Y H:i'));
         });
 
         return $history;

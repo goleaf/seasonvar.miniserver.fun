@@ -206,6 +206,7 @@ class SeasonvarTitleMerger
             ->orderBy('source_id')
             ->orderBy('id')
             ->get()
+            ->toBase()
             ->groupBy(fn (CatalogTitle $title): string => implode('|', [
                 $title->source_id,
                 $title->type,
@@ -240,8 +241,12 @@ class SeasonvarTitleMerger
             ->whereIn('seasons.source_url_hash', $duplicateSeasonHashes)
             ->orderBy('seasons.catalog_title_id')
             ->get()
-            ->groupBy('catalog_title_id')
-            ->map(fn (Collection $rows): Collection => $rows->pluck('source_url_hash')->filter()->unique()->values());
+            ->groupBy(fn (object $row): int => (int) $row->catalog_title_id)
+            ->map(fn (Collection $rows): Collection => $rows
+                ->map(fn (object $row): string => (string) $row->source_url_hash)
+                ->filter(fn (string $hash): bool => $hash !== '')
+                ->unique()
+                ->values());
 
         if ($seasonHashesByTitle->isEmpty()) {
             return collect();
@@ -265,7 +270,7 @@ class SeasonvarTitleMerger
 
     /**
      * @param  Collection<int, CatalogTitle>  $titles
-     * @param  Collection<int, Collection<int, string>>  $seasonHashesByTitle
+     * @param  Collection<int|string, Collection<int, non-empty-string>>  $seasonHashesByTitle
      * @return Collection<int, Collection<int, CatalogTitle>>
      */
     private function connectedSeasonFamilies(
@@ -561,8 +566,8 @@ class SeasonvarTitleMerger
 
         if ($existing !== null && $existing->isNot($media)) {
             $existing->fill([
-                'season_id' => $season?->id ?? $existing->season_id,
-                'episode_id' => $episode?->id ?? $existing->episode_id,
+                'season_id' => $season === null ? $existing->season_id : $season->id,
+                'episode_id' => $episode === null ? $existing->episode_id : $episode->id,
                 'title' => $existing->title ?: $media->title,
                 'storage_disk' => $media->storage_disk ?: $existing->storage_disk,
                 'path' => $media->path ?: $existing->path,
@@ -585,8 +590,8 @@ class SeasonvarTitleMerger
 
         $media->fill([
             'catalog_title_id' => $canonical->id,
-            'season_id' => $season?->id ?? $media->season_id,
-            'episode_id' => $episode?->id ?? $media->episode_id,
+            'season_id' => $season === null ? $media->season_id : $season->id,
+            'episode_id' => $episode === null ? $media->episode_id : $episode->id,
         ])->save();
 
         return $media;

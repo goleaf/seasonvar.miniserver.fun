@@ -1,4 +1,4 @@
-@props(['item', 'directory'])
+@props(['item', 'upcoming' => false])
 
 <a
     href="{{ $item->detail_url }}"
@@ -11,7 +11,7 @@
         <span class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-slate-500">
             <x-ui.icon name="fa-solid fa-layer-group text-emerald-700" />
             <span>{{ trans_choice('catalog.counts.results', (int) $item->published_titles_count) }}</span>
-            @if ($directory->isYear() && (int) $item->year > now()->year)
+            @if ($upcoming)
                 <span class="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">{{ __('catalog.directories.upcoming') }}</span>
             @endif
         </span>

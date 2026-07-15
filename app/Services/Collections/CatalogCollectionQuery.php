@@ -8,6 +8,7 @@ use App\DTOs\CatalogCollectionItemCriteria;
 use App\Enums\CatalogCollectionModerationStatus;
 use App\Enums\CatalogCollectionReportStatus;
 use App\Enums\CatalogCollectionSort;
+use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionItem;
@@ -407,7 +408,12 @@ final class CatalogCollectionQuery
             }))
             ->where(function (Builder $query): void {
                 $query->where('moderation_status', CatalogCollectionModerationStatus::Pending->value)
-                    ->orWhereHas('reports', fn (Builder $query): Builder => $query->where('status', CatalogCollectionReportStatus::Open->value));
+                    ->orWhereHas('reports', fn (Builder $query): Builder => $query->where('status', CatalogCollectionReportStatus::Open->value))
+                    ->orWhere(fn (Builder $query): Builder => $query
+                        ->where('type', CatalogCollectionType::Editorial->value)
+                        ->where('visibility', CatalogCollectionVisibility::Public->value)
+                        ->where('moderation_status', CatalogCollectionModerationStatus::Approved->value)
+                        ->whereNull('catalog_collections.deleted_at'));
             })
             ->orderByRaw('CASE WHEN moderation_status = ? THEN 0 ELSE 1 END', [CatalogCollectionModerationStatus::Pending->value])
             ->orderByDesc('updated_at')

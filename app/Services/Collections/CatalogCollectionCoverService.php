@@ -32,8 +32,9 @@ final class CatalogCollectionCoverService
         $stored = $this->uploads->store($file, 'catalog-collections/'.$collection->public_id);
 
         try {
-            [$oldDisk, $oldPath] = DB::transaction(function () use ($collection, $stored): array {
+            [$oldDisk, $oldPath] = DB::transaction(function () use ($actor, $collection, $stored): array {
                 $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
+                Gate::forUser($actor)->authorize('update', $locked);
                 $oldDisk = $locked->cover_disk;
                 $oldPath = $locked->cover_path;
                 $locked->forceFill([
@@ -57,13 +58,17 @@ final class CatalogCollectionCoverService
                 return [$oldDisk, $oldPath];
             }, attempts: 3);
         } catch (Throwable $exception) {
-            $this->uploads->delete($stored);
+            try {
+                $this->uploads->delete($stored);
+            } catch (Throwable $cleanupException) {
+                report($cleanupException);
+            }
 
             throw $exception;
         }
 
         if ($oldDisk === config('uploads.disk') && is_string($oldPath) && $oldPath !== '') {
-            $this->uploads->delete($oldPath);
+            $this->deleteBestEffort($oldPath);
         }
 
         $collection->refresh();
@@ -75,11 +80,18 @@ final class CatalogCollectionCoverService
     public function remove(User $actor, CatalogCollection $collection): CatalogCollection
     {
         Gate::forUser($actor)->authorize('update', $collection);
+        $this->rateLimiter->ensure($actor, 'cover', 'cover');
 
-        [$disk, $path] = DB::transaction(function () use ($collection): array {
+        [$disk, $path] = DB::transaction(function () use ($actor, $collection): array {
             $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
+            Gate::forUser($actor)->authorize('update', $locked);
             $disk = $locked->cover_disk;
             $path = $locked->cover_path;
+
+            if ($disk === null && $path === null) {
+                return [null, null];
+            }
+
             $locked->forceFill([
                 'cover_disk' => null,
                 'cover_path' => null,
@@ -102,10 +114,11 @@ final class CatalogCollectionCoverService
         }, attempts: 3);
 
         if ($disk === config('uploads.disk') && is_string($path) && $path !== '') {
-            $this->uploads->delete($path);
+            $this->deleteBestEffort($path);
         }
 
         $collection->refresh();
+
         $this->cache->changed($collection);
 
         return $collection;
@@ -123,7 +136,7 @@ final class CatalogCollectionCoverService
 
             if ($disk === config('uploads.disk') && is_string($path) && $path !== '') {
                 DB::afterCommit(function () use ($path): void {
-                    $this->uploads->delete($path);
+                    $this->deleteBestEffort($path);
                 });
             }
         }, attempts: 3);
@@ -141,5 +154,14 @@ final class CatalogCollectionCoverService
             'publicId' => $collection->public_id,
             'version' => $collection->cover_version,
         ]);
+    }
+
+    private function deleteBestEffort(string $path): void
+    {
+        try {
+            $this->uploads->delete($path);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 }

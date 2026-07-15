@@ -152,7 +152,7 @@
                 <h3 class="mt-4 text-lg font-black text-slate-800">{{ __('catalog.directories.empty') }}</h3>
                 <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('catalog.directories.empty_hint') }}</p>
             </div>
-        @elseif ($definition->isYear())
+        @elseif ($isYearDirectory)
             <div class="mt-4 space-y-8">
                 @foreach ($itemsByDecade as $itemDecade => $decadeItems)
                     <section aria-labelledby="decade-{{ $itemDecade }}">
@@ -160,7 +160,7 @@
                         <div data-directory-results-list class="mt-3 divide-y divide-slate-200 overflow-hidden rounded-panel border border-slate-200 bg-white">
                             @foreach ($decadeItems as $item)
                                 <div wire:key="{{ $item->item_key }}">
-                                    <x-catalog.directory-card :item="$item" :directory="$definition" />
+                                    <x-catalog.directory-card :item="$item" :upcoming="$item->is_upcoming" />
                                 </div>
                             @endforeach
                         </div>
@@ -171,7 +171,7 @@
             <div data-directory-results-list class="mt-4 divide-y divide-slate-200 overflow-hidden rounded-panel border border-slate-200 bg-white">
                 @foreach ($items as $item)
                     <div wire:key="{{ $item->item_key }}">
-                        <x-catalog.directory-card :item="$item" :directory="$definition" />
+                        <x-catalog.directory-card :item="$item" />
                     </div>
                 @endforeach
             </div>

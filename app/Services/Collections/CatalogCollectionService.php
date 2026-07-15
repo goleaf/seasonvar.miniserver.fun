@@ -47,15 +47,15 @@ final class CatalogCollectionService
         $publicId = $data->publicId !== null && Str::isUuid($data->publicId)
             ? Str::lower($data->publicId)
             : (string) Str::uuid();
+        $this->rateLimiter->ensure($owner, 'create', 'name');
         $existing = CatalogCollection::query()->where('public_id', $publicId)->first();
 
         if ($existing !== null) {
             abort_unless($existing->isOwnedBy($owner), 404);
+            $this->cache->changed($existing);
 
-            return $existing;
+            return $existing->refresh();
         }
-
-        $this->rateLimiter->ensure($owner, 'create', 'name');
 
         $collection = DB::transaction(function () use ($owner, $data, $name, $description, $seoTitle, $seoDescription, $contentLocale, $publicId): CatalogCollection {
             User::query()->lockForUpdate()->findOrFail($owner->id);
@@ -108,7 +108,7 @@ final class CatalogCollectionService
 
         $this->cache->changed($collection);
 
-        return $collection;
+        return $collection->refresh();
     }
 
     public function update(User $actor, CatalogCollection $collection, CatalogCollectionData $data, ?int $expectedVersion = null): CatalogCollection
@@ -180,7 +180,11 @@ final class CatalogCollectionService
                 || $contentLocaleChanged;
 
             if (! $contentChanged && ! $lifecycleChanged) {
-                return ['collection' => $locked, 'changed' => false];
+                return [
+                    'collection' => $locked,
+                    'changed' => false,
+                    'repair_cache' => $expectedVersion !== null && $locked->content_version !== $expectedVersion,
+                ];
             }
 
             if ($expectedVersion !== null && $locked->content_version !== $expectedVersion) {
@@ -219,13 +223,13 @@ final class CatalogCollectionService
 
             $locked->save();
 
-            return ['collection' => $locked, 'changed' => true];
+            return ['collection' => $locked, 'changed' => true, 'repair_cache' => false];
         }, attempts: 3);
 
         /** @var CatalogCollection $updated */
         $updated = $result['collection'];
 
-        if ($result['changed']) {
+        if ($result['changed'] || $result['repair_cache']) {
             $this->cache->changed($updated);
         }
 
@@ -234,10 +238,17 @@ final class CatalogCollectionService
 
     public function delete(User $actor, CatalogCollection $collection): void
     {
-        Gate::forUser($actor)->authorize('delete', $collection);
+        Gate::forUser($actor)->authorize($collection->trashed() ? 'update' : 'delete', $collection);
+        $this->rateLimiter->ensure($actor, 'mutate');
 
-        DB::transaction(function () use ($collection): void {
-            $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
+        DB::transaction(function () use ($actor, $collection): void {
+            $locked = CatalogCollection::query()->withTrashed()->lockForUpdate()->findOrFail($collection->id);
+            Gate::forUser($actor)->authorize($locked->trashed() ? 'update' : 'delete', $locked);
+
+            if ($locked->trashed()) {
+                return;
+            }
+
             $locked->is_featured = false;
             $locked->content_version++;
             $locked->save();
@@ -249,13 +260,16 @@ final class CatalogCollectionService
 
     public function restore(User $actor, CatalogCollection $collection): CatalogCollection
     {
-        Gate::forUser($actor)->authorize('restore', $collection);
+        Gate::forUser($actor)->authorize($collection->trashed() ? 'restore' : 'update', $collection);
+        $this->rateLimiter->ensure($actor, 'mutate');
         $days = max(1, (int) config('catalog-collections.restoration_days', 30));
 
         $result = DB::transaction(function () use ($actor, $collection, $days): array {
             $locked = CatalogCollection::query()->withTrashed()->lockForUpdate()->findOrFail($collection->id);
 
             if (! $locked->trashed()) {
+                Gate::forUser($actor)->authorize('update', $locked);
+
                 return ['collection' => $locked, 'changed' => false];
             }
 
@@ -282,9 +296,7 @@ final class CatalogCollectionService
         /** @var CatalogCollection $collection */
         $collection = $result['collection'];
 
-        if ($result['changed']) {
-            $this->cache->changed($collection);
-        }
+        $this->cache->changed($collection);
 
         return $collection->refresh();
     }
@@ -292,6 +304,7 @@ final class CatalogCollectionService
     public function forceDelete(User $actor, CatalogCollection $collection, CatalogCollectionCoverService $covers): void
     {
         Gate::forUser($actor)->authorize('forceDelete', $collection);
+        $this->rateLimiter->ensure($actor, 'mutate');
         abort_unless($collection->trashed(), 404);
         $covers->deleteWithCollection($collection);
     }

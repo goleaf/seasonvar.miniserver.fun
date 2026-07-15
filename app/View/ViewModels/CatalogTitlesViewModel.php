@@ -97,6 +97,8 @@ class CatalogTitlesViewModel
      * @param  array<string, string>  $activeFilterSlugs
      * @param  array<string, list<string>>  $selectedFilterSlugs
      * @param  array<string, string>  $invalidFilterSlugs
+     * @param  array<string, mixed>  $catalogQueryState
+     * @param  Collection<string, Collection<int, Model>>|null  $excludedTaxonomies
      */
     public function __construct(
         public readonly string $search,
@@ -750,7 +752,10 @@ class CatalogTitlesViewModel
         return $query;
     }
 
-    /** @param array<string, mixed> $query @return array<string, mixed> */
+    /**
+     * @param  array<string, mixed>  $query
+     * @return array<string, mixed>
+     */
     private function withCatalogState(array $query): array
     {
         return array_merge($this->catalogQueryState, $query);

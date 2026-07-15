@@ -29,11 +29,15 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string|null $variant_name
  * @property string|null $variant_key
  * @property string|null $format
+ * @property string|null $check_status
  * @property MediaHealthStatus $health_status
  * @property ContentAudience $audience
  * @property CarbonInterface|null $published_at
  * @property CarbonInterface|null $available_from
  * @property CarbonInterface|null $available_until
+ * @property CarbonInterface|null $checked_at
+ * @property CarbonInterface|null $last_successful_check_at
+ * @property CarbonInterface|null $next_check_at
  * @property CarbonInterface|null $deleted_at
  */
 #[Fillable([

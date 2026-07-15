@@ -123,7 +123,7 @@
                 <label for="comment-sort-{{ $targetType }}-{{ $targetId }}" class="block text-xs font-bold text-slate-600">{{ __('comments.sort.label') }}</label>
                 <select id="comment-sort-{{ $targetType }}-{{ $targetId }}" wire:model.live="sort" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
                     @foreach ($sortOptions as $sortOption)
-                        <option value="{{ $sortOption->value }}">{{ $sortOption->label() }}</option>
+                        <option value="{{ $sortOption['value'] }}">{{ $sortOption['label'] }}</option>
                     @endforeach
                 </select>
             </div>
@@ -179,7 +179,7 @@
                         <label for="comment-report-category" class="block text-sm font-bold text-slate-700">{{ __('comments.reports.category') }}</label>
                         <select id="comment-report-category" wire:model="reportCategory" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
                             @foreach ($reportCategories as $category)
-                                <option value="{{ $category->value }}">{{ $category->label() }}</option>
+                                <option value="{{ $category['value'] }}">{{ $category['label'] }}</option>
                             @endforeach
                         </select>
                     </div>

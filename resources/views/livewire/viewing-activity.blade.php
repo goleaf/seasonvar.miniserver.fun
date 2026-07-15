@@ -159,7 +159,7 @@
                                 <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
                                     <span class="inline-flex items-center gap-1">
                                         <x-ui.icon name="fa-regular fa-clock" />
-                                        {{ $progress->last_watched_at->format('d.m.Y H:i') }}
+                                        {{ $progress->last_watched_at_label }}
                                     </span>
                                     @if ($progress->completed_at)
                                         <span class="inline-flex items-center gap-1 text-emerald-700">

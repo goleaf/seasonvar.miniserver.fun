@@ -15,6 +15,8 @@ final class CatalogCollectionResource extends JsonResource
     public function toArray(Request $request): array
     {
         $owner = $this->relationLoaded('owner') ? $this->owner : null;
+        $ownerPublicId = $owner?->getAttribute('public_id');
+        $ownerPublicId = is_string($ownerPublicId) && $ownerPublicId !== '' ? $ownerPublicId : null;
         $coverUrl = $this->cover_path !== null && $this->cover_version > 0
             ? route('collections.cover', ['publicId' => $this->public_id, 'version' => $this->cover_version])
             : ($this->getAttribute('fallback_poster_url') ?: null);
@@ -31,11 +33,13 @@ final class CatalogCollectionResource extends JsonResource
             'sort' => $this->sort_mode->value,
             'cover_url' => $coverUrl,
             'item_count' => (int) ($this->visible_items_count ?? 0),
-            'owner' => $owner === null ? null : [
-                'id' => $owner->public_id,
+            'owner' => $owner === null ? null : array_filter([
+                'id' => $ownerPublicId,
                 'name' => $owner->name,
-                'collections_url' => route('profiles.collections', ['userPublicId' => $owner->public_id]),
-            ],
+                'collections_url' => $ownerPublicId === null
+                    ? null
+                    : route('profiles.collections', ['userPublicId' => $ownerPublicId]),
+            ], static fn (mixed $value): bool => $value !== null),
             'published_at' => $this->published_at?->toJSON(),
             'updated_at' => $this->updated_at?->toJSON(),
             'links' => [

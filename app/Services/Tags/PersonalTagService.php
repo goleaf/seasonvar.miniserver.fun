@@ -72,7 +72,7 @@ final readonly class PersonalTagService
 
         $this->cache->personalChanged($owner);
 
-        return $tag;
+        return $tag->refresh();
     }
 
     public function update(User $owner, UserTag $tag, PersonalTagData $data, ?int $expectedVersion = null): UserTag

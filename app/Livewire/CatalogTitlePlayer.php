@@ -385,6 +385,7 @@ class CatalogTitlePlayer extends Component
         return view('livewire.catalog-title-player', [
             'title' => $title,
             'primaryAction' => $primaryAction,
+            'primaryActionIsPlayable' => $primaryAction->isPlayable(),
             'seasons' => $seasons,
             'activeSeason' => $activeSeason,
             'episodes' => $episodes,
@@ -392,6 +393,7 @@ class CatalogTitlePlayer extends Component
             'episodeNavigation' => $episodeNavigation,
             'selectedMedia' => $selectedMedia,
             'playbackSource' => $playbackSource,
+            'playbackSourceIsPlayable' => $playbackSource->isPlayable(),
             'playerSessionKey' => $playerSessionKey,
             'progressSessionToken' => $progressSessionToken,
             'mediaItems' => $mediaItems,

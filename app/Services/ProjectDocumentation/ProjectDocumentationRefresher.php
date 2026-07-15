@@ -369,7 +369,7 @@ class ProjectDocumentationRefresher
         $filenames = array_map('basename', $paths);
         sort($filenames, SORT_STRING);
 
-        return array_values($filenames);
+        return $filenames;
     }
 
     /** @return list<string> */
@@ -399,7 +399,7 @@ class ProjectDocumentationRefresher
 
                 preg_match_all('/!?\[[^\]]*\]\((?<target>[^)]+)\)/u', $line, $matches);
 
-                foreach ($matches['target'] ?? [] as $rawTarget) {
+                foreach ($matches['target'] as $rawTarget) {
                     $target = $this->markdownLinkTarget((string) $rawTarget);
 
                     if ($target === null) {

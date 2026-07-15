@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Seasonvar;
 
 use App\Enums\CatalogPublicationType;
@@ -13,7 +15,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
-class SeasonvarCatalogParser
+final class SeasonvarCatalogParser
 {
     public const METADATA_VERSION = 5;
 
@@ -228,7 +230,8 @@ class SeasonvarCatalogParser
     public function metadataPresence(array $taxonomies, array $parseMeta): array
     {
         $presentTypes = collect($taxonomies)->pluck('type')->unique();
-        $labels = collect($parseMeta['info_labels'] ?? [])
+        $infoLabels = $parseMeta['info_labels'] ?? [];
+        $labels = collect(is_array($infoLabels) ? $infoLabels : [])
             ->filter(fn (mixed $label): bool => is_string($label))
             ->map(fn (string $label): string => Str::lower($label));
 
@@ -270,7 +273,7 @@ class SeasonvarCatalogParser
                 continue;
             }
 
-            $value = trim($nodes->item(0)?->textContent ?? '');
+            $value = trim($nodes->item(0)->textContent);
 
             if ($value !== '') {
                 return html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -278,6 +281,13 @@ class SeasonvarCatalogParser
         }
 
         return null;
+    }
+
+    private function hasNodes(DOMXPath $xpath, string $query): bool
+    {
+        $nodes = $xpath->query($query);
+
+        return $nodes !== false && $nodes->length > 0;
     }
 
     /**
@@ -424,8 +434,8 @@ class SeasonvarCatalogParser
     {
         return [
             'info_labels' => array_keys($infoFields),
-            'has_info_list' => ($xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " pgs-sinfo_list ")]')?->length ?? 0) > 0,
-            'has_season_list' => ($xpath->query('//*[contains(concat(" ", normalize-space(@class), " "), " pgs-seaslist ")]')?->length ?? 0) > 0,
+            'has_info_list' => $this->hasNodes($xpath, '//*[contains(concat(" ", normalize-space(@class), " "), " pgs-sinfo_list ")]'),
+            'has_season_list' => $this->hasNodes($xpath, '//*[contains(concat(" ", normalize-space(@class), " "), " pgs-seaslist ")]'),
             'has_episode_script' => Str::contains($html, 'arEpisodes'),
             'provider_availability_status' => $this->sourceAvailability->detect($html)?->value,
         ];
@@ -674,7 +684,7 @@ class SeasonvarCatalogParser
             'has_season_list' => 20,
             'has_episode_script' => 20,
         ] as $key => $weight) {
-            if (($parseMeta[$key] ?? false) === true) {
+            if ($parseMeta[$key]) {
                 $this->addRecommendationSignal($signals, 'seasonvar_info', 'page_quality', $key, '1', $weight);
             }
         }
@@ -1330,6 +1340,8 @@ class SeasonvarCatalogParser
     }
 
     /**
+     * @param  array<string, mixed>  $structuredData
+     * @param  array<string, list<string>>  $infoFields
      * @return list<array{type: string, name: string, source_url: string|null}>
      */
     private function taxonomies(DOMXPath $xpath, string $baseUrl, array $structuredData, array $infoFields): array
@@ -1553,7 +1565,13 @@ class SeasonvarCatalogParser
                     'студия', 'студии' => 'studio',
                     'телеканал', 'канал' => 'network',
                     'статус' => 'status',
+                    default => null,
                 };
+
+                if ($type === null) {
+                    continue;
+                }
+
                 $items[] = [
                     'type' => $type,
                     'name' => $matches['value'],
@@ -1719,12 +1737,8 @@ class SeasonvarCatalogParser
         ];
     }
 
-    private function infoField(DOMXPath $xpath, string $label): ?string
-    {
-        return $this->firstInfoField($this->infoFields($xpath), [$label]);
-    }
-
     /**
+     * @param  array<string, mixed>  $structuredData
      * @return list<array{type: string, name: string, source_url: string|null}>
      */
     private function structuredTaxonomies(array $structuredData): array
@@ -1803,6 +1817,7 @@ class SeasonvarCatalogParser
         return array_values($items);
     }
 
+    /** @return array<string, mixed> */
     private function structuredData(DOMXPath $xpath): array
     {
         $fallback = [];
@@ -1831,6 +1846,7 @@ class SeasonvarCatalogParser
     }
 
     /**
+     * @param  array<array-key, mixed>  $value
      * @return list<array<string, mixed>>
      */
     private function structuredItems(array $value): array

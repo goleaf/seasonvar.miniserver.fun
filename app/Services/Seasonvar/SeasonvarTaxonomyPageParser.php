@@ -8,6 +8,7 @@ use App\DTOs\Seasonvar\SeasonvarMetadataPageData;
 use App\Enums\SeasonvarPageType;
 use DOMDocument;
 use DOMElement;
+use DOMNode;
 use DOMXPath;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -72,7 +73,7 @@ final readonly class SeasonvarTaxonomyPageParser
 
     private function nodeText(DOMXPath $xpath, string $query): ?string
     {
-        $value = $xpath->query($query)?->item(0)?->textContent;
+        $value = $this->firstNode($xpath, $query)?->textContent;
         $value = is_string($value) ? Str::squish(html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8')) : '';
 
         return $value !== '' ? $value : null;
@@ -80,7 +81,7 @@ final readonly class SeasonvarTaxonomyPageParser
 
     private function canonicalUrl(DOMXPath $xpath, string $sourceUrl, SeasonvarPageType $pageType): string
     {
-        $node = $xpath->query('//link[contains(concat(" ", translate(@rel, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"), " "), " canonical ")]')?->item(0);
+        $node = $this->firstNode($xpath, '//link[contains(concat(" ", translate(@rel, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"), " "), " canonical ")]');
         $candidate = $node instanceof DOMElement ? trim($node->getAttribute('href')) : '';
 
         if ($candidate === '') {
@@ -131,7 +132,7 @@ final readonly class SeasonvarTaxonomyPageParser
 
     private function sourceCount(DOMXPath $xpath): ?int
     {
-        $node = $xpath->query('//*[@data-source-count]')?->item(0);
+        $node = $this->firstNode($xpath, '//*[@data-source-count]');
 
         if (! $node instanceof DOMElement) {
             return null;
@@ -140,5 +141,12 @@ final readonly class SeasonvarTaxonomyPageParser
         $value = filter_var($node->getAttribute('data-source-count'), FILTER_VALIDATE_INT);
 
         return is_int($value) && $value >= 0 ? $value : null;
+    }
+
+    private function firstNode(DOMXPath $xpath, string $query): ?DOMNode
+    {
+        $nodes = $xpath->query($query);
+
+        return $nodes === false ? null : $nodes->item(0);
     }
 }

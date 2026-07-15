@@ -52,7 +52,7 @@ final readonly class ReviewTitle
         $configuredGenericValues = config('reviews.title.generic_values', []);
         $genericValues = is_array($configuredGenericValues) ? $configuredGenericValues : [];
         $generic = collect($genericValues)
-            ->filter('is_string')
+            ->filter(static fn (mixed $item): bool => is_string($item))
             ->map(fn (string $item): string => Str::lower(UserPlainText::name($item)))
             ->contains(Str::lower($value));
 

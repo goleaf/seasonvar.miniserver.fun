@@ -1,6 +1,6 @@
 <div
     wire:init="startRefresh"
-    @if ($refreshState->isActive())
+    @if ($refreshIsActive)
         wire:poll.3s.visible="refreshCatalog"
     @endif
     class="space-y-5"
@@ -274,8 +274,9 @@
             <livewire:reviews.catalog-title-reviews
                 :catalog-title-id="$title->id"
                 :locale="$reviewLocale"
+                :highlighted-review-id="$highlightedReviewId"
                 :wire:key="'title-reviews-'.$title->id"
-                lazy
+                :lazy="$highlightedReviewId === null"
             />
 
             <livewire:comments.comment-discussion

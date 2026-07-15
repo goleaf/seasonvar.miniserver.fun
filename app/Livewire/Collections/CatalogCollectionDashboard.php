@@ -81,7 +81,7 @@ final class CatalogCollectionDashboard extends Component
 
     public function delete(string $publicId, CatalogCollectionResolver $resolver, CatalogCollectionService $service): void
     {
-        $service->delete($this->user(), $resolver->byPublicId($publicId));
+        $service->delete($this->user(), $resolver->byPublicId($publicId, true));
         $this->status = __('collections.status.deleted');
         $this->resetPage(pageName: 'myCollectionsPage');
     }
@@ -107,13 +107,18 @@ final class CatalogCollectionDashboard extends Component
     public function render(CatalogCollectionQuery $collections): View
     {
         $user = $this->user();
+        $ownedCollections = $collections->ownedBy($user);
+        $deletedCollections = $collections->ownedBy($user, true);
+        $deletedCollections->getCollection()->each(function (CatalogCollection $collection): void {
+            $collection->setAttribute('deleted_at_label', $collection->deleted_at?->format('d.m.Y H:i'));
+        });
         $typeOptions = Gate::forUser($user)->allows('createEditorial', CatalogCollection::class)
             ? [CatalogCollectionType::User, CatalogCollectionType::Editorial]
             : [CatalogCollectionType::User];
 
         return view('livewire.collections.catalog-collection-dashboard', [
-            'collections' => $collections->ownedBy($user),
-            'deletedCollections' => $collections->ownedBy($user, true),
+            'collections' => $ownedCollections,
+            'deletedCollections' => $deletedCollections,
             'visibilityOptions' => array_map(static fn (CatalogCollectionVisibility $option): array => [
                 'value' => $option->value,
                 'label' => $option->label(),

@@ -152,7 +152,13 @@
             <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-500">Выберите годы, тип материалов и характеристики сериала.</p>
 
             @if ($facetsLoaded)
-                <x-catalog.title-filters :data="$facetData" :option-search="$optionSearch" />
+                <x-catalog.title-filters
+                    :data="$facetData"
+                    :option-search="$optionSearch"
+                    :route-year="$routeYear"
+                    :route-filter-type="$routeFilterType"
+                    :route-taxonomy="$routeTaxonomy"
+                />
             @else
                 <div data-catalog-facets-loading aria-live="polite" class="mt-3 flex min-h-24 items-center justify-center gap-2 rounded-control bg-white px-4 py-5 text-sm font-bold text-slate-600">
                     <x-ui.icon name="fa-solid fa-spinner fa-spin text-emerald-700" />

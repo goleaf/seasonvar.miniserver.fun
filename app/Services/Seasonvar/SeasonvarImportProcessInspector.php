@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Seasonvar;
 
 use App\Models\SeasonvarImportRun;
@@ -166,7 +168,7 @@ class SeasonvarImportProcessInspector
 
         $posixAlive = $this->posixProcessExists($pid);
         if ($posixAlive !== null) {
-            $alive = $alive || $posixAlive;
+            $alive = $posixAlive;
             $checks[] = 'posix:'.($posixAlive ? 'alive' : 'missing');
         }
 
@@ -181,7 +183,7 @@ class SeasonvarImportProcessInspector
         $procCommand = $this->readProcCommand($pid);
         if ($procCommand !== null) {
             $procMatches = $this->isImportExecutionCommand($procCommand);
-            $commandMatches = $commandMatches || $procMatches;
+            $commandMatches = $procMatches;
             $checks[] = 'proc-cmdline:'.($procMatches ? 'match' : 'miss');
         } else {
             $checks[] = 'proc-cmdline:unavailable';
@@ -190,8 +192,8 @@ class SeasonvarImportProcessInspector
         $psResult = $this->inspectPidWithPs($pid, $candidate['started_at']);
         $alive = $alive || $psResult['alive'];
         $commandMatches = $commandMatches || $psResult['command_matches'];
-        $zombie = $zombie || $psResult['zombie'];
-        $processTooNew = $processTooNew || $psResult['process_too_new'];
+        $zombie = $psResult['zombie'];
+        $processTooNew = $psResult['process_too_new'];
         $checks = [...$checks, ...$psResult['checks']];
 
         return [
@@ -427,6 +429,7 @@ class SeasonvarImportProcessInspector
         return preg_match('/(?:^|\s)--(?:status|queued|help)(?:\s|$)/u', $normalized) !== 1;
     }
 
+    /** @param list<string> $command */
     private function runCommand(array $command): ?string
     {
         try {

@@ -152,7 +152,9 @@ final class SeasonvarSourceInventory
     }
 
     /**
-     * @param  Collection<int, string>  $urls
+     * @template TUrl of string
+     *
+     * @param  Collection<int, TUrl>  $urls
      * @return array<string, int>
      */
     private function countsByType(Collection $urls): array
@@ -168,7 +170,9 @@ final class SeasonvarSourceInventory
     }
 
     /**
-     * @param  Collection<int, string>  $urls
+     * @template TUrl of string
+     *
+     * @param  Collection<int, TUrl>  $urls
      * @return array<string, list<string>>
      */
     private function samplesByType(Collection $urls): array

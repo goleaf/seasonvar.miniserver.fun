@@ -1,11 +1,23 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Integrations;
 
 use Illuminate\Filesystem\Filesystem;
 use Symfony\Component\Process\ExecutableFinder;
 
-class IntegrationDoctor
+/**
+ * @phpstan-type IntegrationCheck array{
+ *     key: string,
+ *     title: string,
+ *     status: string,
+ *     message: string,
+ *     required: bool,
+ *     details: list<string>
+ * }
+ */
+final class IntegrationDoctor
 {
     public const STATUS_MISSING = 'missing';
 
@@ -36,7 +48,7 @@ class IntegrationDoctor
     ) {}
 
     /**
-     * @return array<int, array{key: string, title: string, status: string, message: string, required: bool, details: array<int, string>}>
+     * @return list<IntegrationCheck>
      */
     public function checks(): array
     {
@@ -83,8 +95,8 @@ class IntegrationDoctor
     }
 
     /**
-     * @param  array<int, string>  $details
-     * @return array{key: string, title: string, status: string, message: string, required: bool, details: array<int, string>}
+     * @param  list<string>  $details
+     * @return IntegrationCheck
      */
     private function check(string $key, string $title, string $status, string $message, bool $required = false, array $details = []): array
     {
@@ -92,7 +104,7 @@ class IntegrationDoctor
     }
 
     /**
-     * @return array<int, string>
+     * @return list<string>
      */
     private function globalMcpServers(): array
     {
@@ -104,9 +116,10 @@ class IntegrationDoctor
 
         preg_match_all('/^\[mcp_servers\.([A-Za-z0-9_.-]+)\]/m', $this->files->get($path), $matches);
 
-        return array_values(array_unique($matches[1] ?? []));
+        return array_values(array_unique($matches[1]));
     }
 
+    /** @return IntegrationCheck */
     private function laravelBoostMcpCheck(): array
     {
         $path = base_path('.codex/config.toml');
@@ -139,6 +152,7 @@ class IntegrationDoctor
         );
     }
 
+    /** @return IntegrationCheck */
     private function context7McpCheck(): array
     {
         $server = $this->projectMcpServer('context7');
@@ -159,6 +173,7 @@ class IntegrationDoctor
         );
     }
 
+    /** @return IntegrationCheck */
     private function playwrightMcpCheck(): array
     {
         $server = $this->projectMcpServer('playwright');
@@ -198,6 +213,7 @@ class IntegrationDoctor
         return $matches['server'];
     }
 
+    /** @return IntegrationCheck */
     private function mcpExampleCheck(): array
     {
         $exists = $this->files->isFile(base_path('.codex/mcp.example.toml'));
@@ -212,6 +228,7 @@ class IntegrationDoctor
         );
     }
 
+    /** @return IntegrationCheck */
     private function projectSkillsCheck(): array
     {
         $path = base_path('boost.json');
@@ -245,7 +262,8 @@ class IntegrationDoctor
     }
 
     /**
-     * @param  array<int, string>  $globalMcpServers
+     * @param  list<string>  $globalMcpServers
+     * @return IntegrationCheck
      */
     private function openAiDocsMcpCheck(array $globalMcpServers): array
     {
@@ -262,7 +280,8 @@ class IntegrationDoctor
     }
 
     /**
-     * @param  array<int, string>  $globalMcpServers
+     * @param  list<string>  $globalMcpServers
+     * @return IntegrationCheck
      */
     private function googleWorkspaceMcpCheck(array $globalMcpServers): array
     {
@@ -279,6 +298,7 @@ class IntegrationDoctor
         );
     }
 
+    /** @return IntegrationCheck */
     private function googleSearchConsoleCheck(): array
     {
         $config = config('services.google.search_console', []);
@@ -315,6 +335,7 @@ class IntegrationDoctor
         );
     }
 
+    /** @return IntegrationCheck */
     private function googleAnalyticsCheck(): array
     {
         $config = config('services.google.analytics', []);
@@ -340,6 +361,7 @@ class IntegrationDoctor
         );
     }
 
+    /** @return IntegrationCheck */
     private function googleCredentialsCheck(): array
     {
         $credentials = (string) config('services.google.application_credentials', '');
@@ -363,6 +385,7 @@ class IntegrationDoctor
         );
     }
 
+    /** @return IntegrationCheck */
     private function cliToolCheck(string $key, string $title, string $executable, bool $required): array
     {
         $path = $this->executables->find($executable);
@@ -380,7 +403,8 @@ class IntegrationDoctor
 
     private function homePath(string $suffix): ?string
     {
-        $home = $_SERVER['HOME'] ?? getenv('HOME') ?: null;
+        $serverHome = $_SERVER['HOME'] ?? null;
+        $home = is_string($serverHome) && $serverHome !== '' ? $serverHome : getenv('HOME');
 
         if (! is_string($home) || $home === '') {
             return null;
