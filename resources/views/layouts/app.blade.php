@@ -100,11 +100,11 @@
         <link rel="canonical" href="{{ $canonicalUrl }}">
         <link rel="alternate" hreflang="{{ $htmlLang }}" href="{{ $canonicalUrl }}">
         <link rel="alternate" hreflang="x-default" href="{{ $canonicalUrl }}">
-        <link rel="sitemap" type="application/xml" href="{{ route('sitemap.index') }}">
-        <link rel="sitemap" type="application/xml" href="{{ route('sitemap.landings') }}">
-        <link rel="alternate" type="application/rss+xml" title="{{ $siteName }}" href="{{ route('feed') }}">
-        <link rel="search" type="application/opensearchdescription+xml" title="{{ $siteName }}" href="{{ route('opensearch') }}">
-        <link rel="alternate" type="text/plain" title="LLMs" href="{{ route('llms') }}">
+        <link rel="sitemap" type="application/xml" href="{{ $layoutHeadUrls['sitemap'] }}">
+        <link rel="sitemap" type="application/xml" href="{{ $layoutHeadUrls['landing_sitemap'] }}">
+        <link rel="alternate" type="application/rss+xml" title="{{ $siteName }}" href="{{ $layoutHeadUrls['feed'] }}">
+        <link rel="search" type="application/opensearchdescription+xml" title="{{ $siteName }}" href="{{ $layoutHeadUrls['opensearch'] }}">
+        <link rel="alternate" type="text/plain" title="LLMs" href="{{ $layoutHeadUrls['llms'] }}">
         <meta name="rating" content="general">
         <meta name="referrer" content="strict-origin-when-cross-origin">
         <meta name="DC.title" content="{{ $fullTitle }}">
@@ -161,7 +161,7 @@
             Перейти к содержанию
         </a>
 
-        <x-layout.site-header :site-name="$siteName" :search-query="$layoutSearchQuery" />
+        <x-layout.site-header :site-name="$siteName" :search-query="$layoutSearchQuery" :header="$layoutHeader" />
 
         <main id="main-content" class="mx-auto max-w-[1760px] px-3 py-4 sm:px-6 sm:py-6 lg:px-8" itemscope itemtype="https://schema.org/WebPageElement" itemid="{{ $canonicalUrl }}#main-content">
             @if ($breadcrumbs->count() > 1)
@@ -192,7 +192,6 @@
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         @foreach ($seoSections as $section)
-                            @continue(($section['id'] ?? null) === 'discovery-signals' && ! request()->routeIs('stats'))
                             <a href="#{{ $section['id'] }}" itemprop="url" class="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700">
                                 <x-ui.icon name="fa-solid fa-bookmark text-[0.8em] text-slate-400" />
                                 <span itemprop="name">{{ $section['name'] }}</span>
@@ -442,7 +441,7 @@
                     </div>
                 </section>
             @endif
-            @if ($discoverySignals->isNotEmpty() && request()->routeIs('stats'))
+            @if ($showDiscoverySignals)
                 <section id="discovery-signals" class="mt-5 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60" aria-label="Индексация и обновления">
                     <div class="flex items-center gap-2 text-sm font-bold text-slate-700">
                         <x-ui.icon name="fa-solid fa-satellite-dish text-emerald-700" />
@@ -778,7 +777,7 @@
             @endif
             @endif
         </main>
-        <x-layout.site-footer :site-name="$siteName" :directories="$catalogDirectoryLinks" />
+        <x-layout.site-footer :site-name="$siteName" :footer="$layoutFooter" />
         @livewireScripts
     </body>
 </html>

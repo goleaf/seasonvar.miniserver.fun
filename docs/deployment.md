@@ -8,7 +8,7 @@
 
 SQLite migration нельзя запускать одновременно с импортом, pending/delayed/reserved jobs или live page claims. Порядок: `seasonvar:import --status` и `app:deployment-check` → дождаться нулевых активных writers/claims и остановить их штатно → backup SQLite → `migrate:status` → `migrate --force` → `config:cache` и `route:cache` → reload PHP-FPM/`queue:restart` → вернуть workers → повторить preflight/health и smoke manifest, public pull, authenticated owner pull/push. Очереди и claims не очищаются ради миграции.
 
-После миграции внешний scheduler должен ежедневно запускать Laravel schedule, чтобы `api:sync-prune` выполнялся в 03:23 с `withoutOverlapping`/`onOneServer`. Changes старше 30 дней и receipts старше 90 дней удаляются пачками до 500; canonical user state/history/catalog эта команда не удаляет. Rollback сначала требует убрать sync routes/publishers из обслуживаемого кода, затем `migrate:rollback` удаляет только transport tables и version columns.
+После миграции внешний scheduler должен вызывать Laravel schedule каждую минуту; уже Laravel запускает `api:sync-prune` в 03:23 с `withoutOverlapping`/`onOneServer`. Changes старше 30 дней и receipts старше 90 дней удаляются пачками до 500; canonical user state/history/catalog эта команда не удаляет. Rollback сначала требует убрать sync routes/publishers из обслуживаемого кода, затем `migrate:rollback` удаляет только transport tables и version columns.
 
 ## Cache/queue rollout от 13.07.2026
 
@@ -60,13 +60,13 @@ Production обязан использовать `APP_ENV=production`, `APP_DEBU
 
 Порядок production rollout для SQLite: дождаться finalizer/page jobs → остановить workers → сделать backup → развернуть код → `php artisan migrate --force` → задать/проверить `SEASONVAR_MEDIA_CHECK_FAILURE_THRESHOLD`, retry intervals и официальный `PLAYBACK_ALLOWED_HOSTS` → `php artisan config:cache` → `php artisan queue:restart` и запустить workers. Web/worker код не должен обслуживать запросы между deploy и migration, потому что новый resolver читает `health_status`.
 
-Отдельный `schedule:run` не нужен: внешний cron запускает queued importer, а finalizer берёт только due sources. `disabled` не проверяется автоматически. Перед добавлением host в allowlist нужно подтвердить лицензионный/provider contract; private, reserved, link-local, metadata IP, credentials, redirects и HTTP блокируются независимо от allowlist.
+Media due sources по-прежнему выбирает importer finalizer, а не отдельная media-команда. Однако общий `schedule:run` обязателен для cache warm, Sanctum/API prune и watchdog импортера. `disabled` не проверяется автоматически. Перед добавлением host в allowlist нужно подтвердить лицензионный/provider contract; private, reserved, link-local, metadata IP, credentials, redirects и HTTP блокируются независимо от allowlist.
 
 ## Admin queue interface от 13.07.2026
 
 Перед deploy дождаться active import jobs и сделать backup SQLite. Затем применить additive `2026_07_13_140000_add_administration_fields_to_seasonvar_import_runs`, задать comma-separated `SEASONVAR_IMPORT_ADMIN_EMAILS`, пересобрать config cache и выполнить `php artisan queue:restart`. Migration добавляет nullable foreign keys/timestamps и indexes; данные не переписывает и backfill не требует.
 
-Production scheduler в этом репозитории — внешний cron ниже, а не Laravel `schedule:run`. Admin UI не заменяет cron: он даёт ручной authorized старт/retry/cancel и recovery для `running` run без heartbeat и live claims. Threshold задаёт `SEASONVAR_QUEUE_STALE_AFTER_MINUTES=120`; перед ручным recovery нужно убедиться, что workers не остановлены на долгую maintenance-паузу.
+Production scheduler — внешний cron, который каждую минуту вызывает Laravel `schedule:run`; текущий read-only аудит 15.07.2026 такой entry не нашёл, поэтому это rollout blocker. Admin UI не заменяет cron: он даёт ручной authorized старт/retry/cancel и recovery для `running` run без heartbeat и live claims. Threshold задаёт `SEASONVAR_QUEUE_STALE_AFTER_MINUTES=120`; перед ручным recovery нужно убедиться, что workers не остановлены на долгую maintenance-паузу.
 
 ## Import identity и editorial baseline от 13.07.2026
 
@@ -150,7 +150,7 @@ Google-интеграции по умолчанию выключены. Если
 - `NOTIFICATIONS_MAIL_QUEUE` — queue для email notification jobs.
 - `SEASONVAR_IMPORT_FAILURE_MAIL_TO` и `SEASONVAR_IMPORT_FAILURE_MAIL_TO_NAME` — optional получатель письма об ошибке queued import; пустое значение отключает отправку.
 - `SEASONVAR_QUEUE_CONNECTION=redis`, `SEASONVAR_QUEUE_NAME=seasonvar-import` и `SEASONVAR_QUEUE_LOCK_STORE=redis-locks` — отдельная очередь и critical-lock store параллельного импортера; domain cache для блокировок не используется.
-- `SEASONVAR_TITLE_REFRESH_QUEUE=seasonvar-title-refresh` — отдельная очередь browser-triggered групп; `SEASONVAR_TITLE_REFRESH_FINALIZER_DELAY_SECONDS` задаёт задержку fan-in retry, но не ограничивает число page jobs. `SEASONVAR_IMPORT_PREPARED_RETENTION_DAYS` задаёт bounded очистку terminal staging groups.
+- `SEASONVAR_TITLE_REFRESH_QUEUE=seasonvar-title-refresh` — отдельная очередь browser-triggered групп; `SEASONVAR_TITLE_REFRESH_FINALIZER_DELAY_SECONDS` задаёт начальную задержку finalizer, но не polling и не ограничение page jobs. `SEASONVAR_QUEUE_FINALIZER_WATCHDOG_BATCH_SIZE=250` ограничивает десятиминутное восстановление потерянных terminal signals. `SEASONVAR_IMPORT_PREPARED_RETENTION_DAYS` задаёт bounded очистку terminal staging groups.
 - `SEASONVAR_IMPORT_ADMIN_EMAILS` — comma-separated email allowlist gate `/admin/imports`; пустое значение закрывает страницу для всех.
 - Тот же `SEASONVAR_IMPORT_ADMIN_EMAILS` защищает `/admin/catalog`; write actions дополнительно проходят policy, validation и optimistic version checks.
 - `SEASONVAR_QUEUE_STALE_AFTER_MINUTES` — минимальный возраст stale running run для recovery, не меньше 5 минут в runtime.
@@ -233,11 +233,12 @@ php artisan queue:retry all
 Исторически в crontab пользователя `www` был добавлен dispatcher с десятью запусками в сутки и read-only монитор очереди каждые пять минут:
 
 ```cron
+* * * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan schedule:run >> /dev/null 2>&1
 0 0,2,5,7,10,12,14,17,19,22 * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan seasonvar:import --queued >> storage/logs/seasonvar-cron.log 2>&1
 */5 * * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan queue:monitor 'redis:seasonvar-title-refresh,redis:seasonvar-import' --max=5000 >> storage/logs/seasonvar-queue-monitor.log 2>&1
 ```
 
-15.07.2026 production evidence опровергло прежнее предположение о полном lifecycle deduplication: при этой частоте одновременно существовали 11 queued runs, 8037 pending jobs и 5670 live claims. Coordinator lock сериализует постановку, а page lease защищает URL, но это не гарантирует один non-terminal global run. До rollout lifecycle single-flight из living plan новые dispatch-частоты не добавлять; оператор должен наблюдать `seasonvar:import --status` и не запускать следующий цикл при существующем active run. Удалять/очищать уже поставленные jobs запрещено.
+15.07.2026 production evidence опровергло прежнее предположение о полном lifecycle deduplication: baseline содержал 11 queued runs, 8037 pending jobs и 5670 live claims; более поздний snapshot — 12 running sitemap runs и 1601 active groups. Новый общий coordinator переиспользует один active global run, а повторный cron вызов дополнительно dispatches уникальный finalizer watchdog, поэтому recovery не зависит только от отсутствующего scheduler entry. Тем не менее `schedule:run` нужен для полного project schedule и должен быть установлен/проверен при rollout. Existing failed/backlog jobs не retry-ить и не очищать массово: сначала сопоставить их с текущим run/group/claim state.
 
 ## Server requirements snapshot 15.07.2026
 

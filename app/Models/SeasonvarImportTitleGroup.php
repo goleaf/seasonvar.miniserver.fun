@@ -9,7 +9,21 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
+/**
+ * @property SeasonvarImportTitleGroupStatus $status
+ * @property int $expected_pages
+ * @property int $prepared_pages
+ * @property int $failed_pages
+ * @property int $applied_pages
+ * @property Carbon|null $started_at
+ * @property Carbon|null $finished_at
+ * @property SeasonvarImportRun $run
+ * @property CatalogTitle|null $catalogTitle
+ * @property Collection<int, SeasonvarImportPreparedPage> $preparedPages
+ */
 #[Fillable([
     'seasonvar_import_run_id',
     'catalog_title_id',

@@ -9,6 +9,7 @@ use App\Jobs\FinalizeSeasonvarQueuedImport;
 use App\Jobs\ImportSeasonvarSourcePage;
 use App\Jobs\PrepareSeasonvarImportTitlePage;
 use App\Jobs\StartSeasonvarQueuedImport;
+use App\Jobs\WakeSeasonvarImportFinalizers;
 use App\Models\LicensedMedia;
 use App\Models\SeasonvarImportPreparedPage;
 use App\Models\SeasonvarImportRun;
@@ -630,6 +631,7 @@ class SeasonvarParallelImportTest extends TestCase
             FinalizeSeasonvarQueuedImport::class,
             fn (FinalizeSeasonvarQueuedImport $job): bool => $job->afterCommit === true,
         );
+        Queue::assertPushedTimes(WakeSeasonvarImportFinalizers::class, 1);
         $this->assertSame(2, $run->fresh()->selected);
         $this->assertSame(1, $run->titleGroups()->count());
         $this->assertSame(2, $run->preparedPages()->count());

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Jobs;
 
 use App\Models\SeasonvarImportRun;
@@ -13,6 +15,9 @@ use App\Services\Seasonvar\SeasonvarImportTitleGroupDispatcher;
 use App\Services\Seasonvar\SeasonvarPageClaimManager;
 use DateTimeInterface;
 use Illuminate\Bus\Queueable;
+use Illuminate\Cache\Repository as CacheRepository;
+use Illuminate\Contracts\Cache\LockProvider;
+use Illuminate\Contracts\Cache\Store;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -20,6 +25,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use LogicException;
 use Throwable;
 
 class ImportSeasonvarSourcePage implements ShouldQueue
@@ -84,7 +90,7 @@ class ImportSeasonvarSourcePage implements ShouldQueue
 
         if ($page === null) {
             $claims->release($this->sourcePageId, $this->importRunId, $this->claimToken);
-            $finalizers->globalRun($run);
+            $finalizers->signalGlobalRun($run);
 
             return;
         }
@@ -130,7 +136,7 @@ class ImportSeasonvarSourcePage implements ShouldQueue
         }
 
         $runs->heartbeat($this->importRunId);
-        $lock = Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'))
+        $lock = $this->lockStore()
             ->lock($groupKeys->forUrl($page->url, $page->url_hash), $this->timeout + 300);
 
         if (! $lock->get()) {
@@ -162,7 +168,7 @@ class ImportSeasonvarSourcePage implements ShouldQueue
         } finally {
             if ($releaseClaim) {
                 $claims->release($page->id, $this->importRunId, $this->claimToken);
-                $finalizers->globalRun($run);
+                $finalizers->signalGlobalRun($run);
             }
 
             $lock->release();
@@ -197,7 +203,7 @@ class ImportSeasonvarSourcePage implements ShouldQueue
         $run = SeasonvarImportRun::query()->find($this->importRunId);
 
         if ($run !== null) {
-            app(SeasonvarImportFinalizationDispatcher::class)->globalRun($run);
+            app(SeasonvarImportFinalizationDispatcher::class)->signalGlobalRun($run);
         }
 
         Log::error('Страница Seasonvar не обработана queue worker.', [
@@ -207,5 +213,22 @@ class ImportSeasonvarSourcePage implements ShouldQueue
             'exception' => $exception ? get_class($exception) : null,
             'error' => app(SeasonvarImportErrorSanitizer::class)->fromException($exception),
         ]);
+    }
+
+    private function lockStore(): Store&LockProvider
+    {
+        $repository = Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'));
+
+        if (! $repository instanceof CacheRepository) {
+            throw new LogicException('Seasonvar lock cache repository is unavailable.');
+        }
+
+        $store = $repository->getStore();
+
+        if (! $store instanceof LockProvider) {
+            throw new LogicException('Seasonvar lock cache store does not support atomic locks.');
+        }
+
+        return $store;
     }
 }

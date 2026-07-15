@@ -8,7 +8,18 @@ use App\Enums\SeasonvarPreparedPageStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property SeasonvarPreparedPageStatus $status
+ * @property array<string, mixed>|null $payload
+ * @property list<array<string, mixed>>|null $warnings
+ * @property Carbon|null $prepared_at
+ * @property Carbon|null $applied_at
+ * @property SeasonvarImportRun $run
+ * @property SeasonvarImportTitleGroup $group
+ * @property SourcePage $sourcePage
+ */
 #[Fillable([
     'seasonvar_import_run_id',
     'seasonvar_import_title_group_id',

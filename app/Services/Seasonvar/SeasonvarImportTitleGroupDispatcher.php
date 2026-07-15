@@ -80,8 +80,9 @@ final class SeasonvarImportTitleGroupDispatcher
     public function addUrls(SeasonvarImportTitleGroup $group, array $urls): int
     {
         $group->loadMissing(['catalogTitle.source', 'run', 'preparedPages.sourcePage']);
-        $sourceId = $group->catalogTitle?->source_id
-            ?? $group->preparedPages->first()?->sourcePage?->source_id;
+        $sourceId = $group->catalog_title_id !== null
+            ? $group->catalogTitle->source_id
+            : $group->preparedPages->first()?->sourcePage->source_id;
 
         if ($sourceId === null) {
             throw new InvalidArgumentException('Для группы Seasonvar не определён источник каталога.');
@@ -186,7 +187,9 @@ final class SeasonvarImportTitleGroupDispatcher
                 'url_hash' => $urlHash,
                 'page_type' => SeasonvarPageType::Serial->value,
                 'parse_status' => 'pending',
-                'discovered_from_url' => $group->catalogTitle?->source_url ?? $url,
+                'discovered_from_url' => $group->catalog_title_id !== null
+                    ? $group->catalogTitle->source_url
+                    : $url,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
@@ -232,7 +235,7 @@ final class SeasonvarImportTitleGroupDispatcher
     private function normalizedUrls(array $urls): array
     {
         return collect($urls)
-            ->map(fn (mixed $url): ?string => is_string($url) ? $this->normalizedSerialUrl($url) : null)
+            ->map(fn (string $url): ?string => $this->normalizedSerialUrl($url))
             ->filter()
             ->unique()
             ->values()

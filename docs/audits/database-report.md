@@ -15,10 +15,10 @@
 
 | ID | Класс | Наблюдение | Изменение | Статус | Проверка / риск |
 | --- | --- | --- | --- | --- | --- |
-| DB-01 | Confirmed problem | Две additive migrations pending | Backup + остановка writers + `migrate --force` + integrity/index/API verification | Pending P0 | Нельзя применять при 11 overlapping runs |
+| DB-01 | Confirmed problem | Две additive migrations pending | Backup + остановка writers + `migrate --force` + integrity/index/API verification | Pending P0 | Нельзя применять при legacy active runs до verified safe point |
 | DB-02 | Confirmed problem | SQLite — single-writer при 12 queue workers и overlapping cycles | Устранить лишнюю работу/runs до изменения concurrency | Pending P0 | Увеличение workers запрещено без lock/write-latency measurement |
 | DB-03 | Confirmed problem | Raw source snapshot hash меняется из-за volatile provider counters/timestamps | Semantic fingerprint отдельно от retained raw evidence | Pending P2 | Retention/recovery contract должен предшествовать prune |
-| DB-04 | Confirmed problem | Prepared/finalizer state и failed jobs растут из-за terminal lifecycle | Idempotent terminal transitions и bounded cleanup only for proven terminal rows | Pending P1 | Нельзя удалять live claims/jobs |
+| DB-04 | Confirmed problem, code fixed | Prepared/finalizer state и failed jobs росли из-за polling terminal lifecycle | Completion signals, unique-until-processing finalizers и bounded watchdog; cleanup только для доказанно terminal rows | Implemented; data reconciliation pending | Нельзя удалять live claims/jobs; existing 4155/793/9 failed-job classes требуют state-aware disposition |
 | DB-05 | Confirmed problem | FTS state stale | Rebuild после migrations/import safe point, затем compare document/source counts | Pending P0 | Rebuild конкурирует за SQLite writer/CPU |
 | DB-06 | Confirmed performance cost | Некоторые hot aggregations медленные; deployment quick/FK integrity path занимает 23655 ms на 14+ GB | Inspect SQL + `EXPLAIN QUERY PLAN` для application queries; integrity duration наблюдать отдельно и не «ускорять» guessed indexes | Pending P3 | Не добавлять guessed/redundant indexes и не ослаблять corruption detection |
 | DB-07 | Intentional | No polymorphic metadata, no production seeders, external URLs only | Preserve | Accepted | Соответствует project constraints |

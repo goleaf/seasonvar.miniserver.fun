@@ -27,7 +27,7 @@ Build assets: app CSS 154.51 kB / 32.90 gzip; app JS 8.51/3.61; player JS 11.73/
 | Environment | production, debug enabled | Blocker; environment owner action required |
 | Laravel caches | config/events not cached; routes/views cached | Blocker after safe environment setup |
 | Migrations | two pending | Blocker until writer stop + verified backup |
-| Import lifecycle | 11 active runs, 8037 pending, 4 reserved, 5670 claims, oldest pending 2117 s | Blocker |
+| Import lifecycle | Baseline 11 active runs/8037 pending/5670 claims; later read-only snapshot: 12 running sitemap runs, 4155 failed group finalizers, 793 page jobs, 9 preparation jobs and 1601 active groups | Code fixed; rollout/reconciliation blocker remains |
 | Health truthfulness | New scoped check reports `failed`: 32821 pending, 4 reserved; cache-warm oldest age 151156 s and import oldest age 3162 s | Code verified; worker restart/cache-warm installation still pending |
 | Deployment check | Instrumented full run: 24.45 s wall, SQLite quick/FK 23655 ms, remaining checks 0–303 ms; integrity pass; safe exit 1 for debug, 2 migrations and stale FTS | Finite but expensive; `duration_ms` verified; retain >=30 s operational budget |
 | Cache worker | versioned unit exists in Git but no process/installed unit | Blocker for cache-warm readiness |
@@ -50,3 +50,6 @@ No `.env` edit, destructive database command, queue clear, failed-job payload du
 - CLI/HTTP policy regression: operational `app:health` exits 1 for `degraded`, while `/health/ready` remains HTTP 200 when critical traffic transports are ready; response remains private/no-store and path-free.
 - Combined preflight/queue/health increment: 12 passed, 88 assertions; changed-scope Larastan 0; targeted Pint pass.
 - Live read-only `app:health --json`: `degraded`, `ready=true`, exit 1; queue component `failed`, 32325 pending across four named queues and no secret/path leakage. Current long-running workers still run pre-rollout code, so missing scoped heartbeat remains expected until restart.
+- Import lifecycle RED/GREEN: admin/CLI/repeated dispatch shares one atomic active global run while targeted title refresh remains independent; rejected dispatch becomes a sanitized terminal failure.
+- Finalizer RED/GREEN: incomplete siblings/live claims return without polling release; terminal page/group completion signals deduplicated `ShouldBeUniqueUntilProcessing` finalizers; unique ten-minute watchdog restores lost signals in bounded batches.
+- Importer increment: 52 tests, 266 assertions; changed model/job/service Larastan 0 with `--memory-limit=1G`; targeted Pint pass; `schedule:list` confirms `*/10 * * * * seasonvar-import-finalization-watchdog`.

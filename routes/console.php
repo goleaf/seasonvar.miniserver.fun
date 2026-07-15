@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\WakeSeasonvarImportFinalizers;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -25,5 +26,11 @@ Schedule::command('sanctum:prune-expired --hours=24')
 Schedule::command('api:sync-prune')
     ->dailyAt('03:23')
     ->name('api-sync-prune')
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
+Schedule::job(new WakeSeasonvarImportFinalizers)
+    ->everyTenMinutes()
+    ->name('seasonvar-import-finalization-watchdog')
     ->withoutOverlapping(10)
     ->onOneServer();

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire;
 
 use App\Services\Catalog\CatalogDirectoryPageBuilder;
@@ -113,6 +115,7 @@ class CatalogDirectoryBrowser extends Component
             (string) $this->sort,
             is_int($this->decade) ? $this->decade : null,
         );
+        $data['searchMaxLength'] = $this->searchMaxLength();
         $items = $data['items'];
 
         if ($items->currentPage() > $items->lastPage()) {
@@ -147,7 +150,7 @@ class CatalogDirectoryBrowser extends Component
             $value = Normalizer::normalize($value, Normalizer::FORM_KC) ?: $value;
         }
 
-        return Str::limit(Str::squish(strip_tags($value)), (int) config('catalog.directories.search_max_length', 80), '');
+        return Str::limit(Str::squish(strip_tags($value)), $this->searchMaxLength(), '');
     }
 
     private function normalizeLetter(mixed $value): string
@@ -187,6 +190,11 @@ class CatalogDirectoryBrowser extends Component
         $configured = config('catalog.directories.maximum_year');
 
         return is_numeric($configured) ? (int) $configured : now()->year + 1;
+    }
+
+    private function searchMaxLength(): int
+    {
+        return max(1, (int) config('catalog.directories.search_max_length', 80));
     }
 
     private function url(string $routeName, int $page): string

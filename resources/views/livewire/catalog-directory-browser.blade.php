@@ -53,7 +53,7 @@
                         id="directory-search"
                         type="search"
                         wire:model.live.debounce.400ms="search"
-                        maxlength="{{ config('catalog.directories.search_max_length', 80) }}"
+                        maxlength="{{ $searchMaxLength }}"
                         class="min-h-11 min-w-0 flex-1 border-0 bg-transparent px-3 py-2.5 text-base text-slate-800 outline-none"
                         placeholder="{{ __('catalog.directories.search_placeholder', ['item' => mb_strtolower($definition->itemLabel)]) }}"
                         autocomplete="off"

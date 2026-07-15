@@ -13,7 +13,10 @@ use App\Services\Seasonvar\SeasonvarImportRunRecorder;
 use App\Services\Seasonvar\SeasonvarPageClaimManager;
 use DateTimeInterface;
 use Illuminate\Bus\Queueable;
+use Illuminate\Cache\Repository as CacheRepository;
+use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Cache\Repository;
+use Illuminate\Contracts\Cache\Store;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -22,6 +25,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use LogicException;
 use Throwable;
 
 class FinalizeSeasonvarQueuedImport implements ShouldBeUniqueUntilProcessing, ShouldQueue
@@ -75,7 +79,7 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUniqueUntilProcessing, Sh
             return;
         }
 
-        $lock = $this->uniqueVia()->lock(self::GLOBAL_LOCK_KEY, $this->timeout + 300);
+        $lock = $this->lockStore()->lock(self::GLOBAL_LOCK_KEY, $this->timeout + 300);
 
         if (! $lock->get()) {
             $runs->heartbeat($run->id);
@@ -156,6 +160,23 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUniqueUntilProcessing, Sh
             ->where('seasonvar_import_run_id', $runId)
             ->whereIn('status', ['discovering', 'running', 'finalizing'])
             ->exists();
+    }
+
+    private function lockStore(): Store&LockProvider
+    {
+        $repository = $this->uniqueVia();
+
+        if (! $repository instanceof CacheRepository) {
+            throw new LogicException('Seasonvar lock cache repository is unavailable.');
+        }
+
+        $store = $repository->getStore();
+
+        if (! $store instanceof LockProvider) {
+            throw new LogicException('Seasonvar lock cache store does not support atomic locks.');
+        }
+
+        return $store;
     }
 
     public function failed(?Throwable $exception): void

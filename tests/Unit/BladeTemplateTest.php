@@ -57,13 +57,14 @@ class BladeTemplateTest extends TestCase
                 $contents = (string) file_get_contents($file->getPathname());
 
                 return preg_match('/<\?(?:php|=)/i', $contents) === 1
-                    || preg_match('/\b(?:Cache|Redis|DB)::|\b(?:cache|resolve|app)\s*\(|::query\s*\(/', $contents) === 1;
+                    || preg_match('/\b(?:Auth|Cache|Gate|Redis|Storage|DB)::|\b(?:cache|config|request|resolve|app)\s*\(|::query\s*\(/', $contents) === 1
+                    || preg_match('/@(?:auth|guest|can|cannot|canany|cannotany)\b/i', $contents) === 1;
             })
             ->map(fn (SplFileInfo $file): string => str_replace(base_path().'/', '', $file->getPathname()))
             ->values()
             ->all();
 
-        $this->assertSame([], $offendingFiles, 'Blade templates must not contain PHP tags, service resolution, database, Redis, or cache calls.');
+        $this->assertSame([], $offendingFiles, 'Blade templates must receive prepared request, configuration, authentication, authorization, storage, database, Redis, cache, and service state.');
     }
 
     public function test_catalog_artwork_is_emitted_only_by_the_shared_poster_frame(): void

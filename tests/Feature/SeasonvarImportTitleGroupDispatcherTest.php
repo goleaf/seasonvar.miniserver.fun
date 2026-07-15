@@ -140,7 +140,7 @@ class SeasonvarImportTitleGroupDispatcherTest extends TestCase
             'status' => 'queued',
         ]);
         Queue::assertPushed(PrepareSeasonvarImportTitlePage::class, 2);
-        Queue::assertPushed(FinalizeSeasonvarImportTitleGroup::class, 2);
+        Queue::assertPushed(FinalizeSeasonvarImportTitleGroup::class, 1);
     }
 
     public function test_failed_preparation_counts_page_and_run_once(): void

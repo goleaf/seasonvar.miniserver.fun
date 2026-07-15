@@ -78,6 +78,7 @@ return [
         'worker_timeout' => (int) env('SEASONVAR_QUEUE_WORKER_TIMEOUT', 900),
         'retry_window_seconds' => (int) env('SEASONVAR_QUEUE_RETRY_WINDOW_SECONDS', 21600),
         'finalizer_delay_seconds' => (int) env('SEASONVAR_QUEUE_FINALIZER_DELAY_SECONDS', 60),
+        'finalizer_watchdog_batch_size' => (int) env('SEASONVAR_QUEUE_FINALIZER_WATCHDOG_BATCH_SIZE', 250),
         'busy_threshold' => (int) env('SEASONVAR_QUEUE_BUSY_THRESHOLD', 5000),
         'busy_log_seconds' => (int) env('SEASONVAR_QUEUE_BUSY_LOG_SECONDS', 3600),
         'stale_after_minutes' => (int) env('SEASONVAR_QUEUE_STALE_AFTER_MINUTES', 120),

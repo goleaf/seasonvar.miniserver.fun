@@ -72,7 +72,7 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
             SeasonvarPreparedPageStatus::Prepared,
             SeasonvarPreparedPageStatus::Applied,
         ], true)) {
-            $finalizers->titleGroup($preparedRow->group);
+            $finalizers->signalTitleGroup($preparedRow->group);
 
             return;
         }
@@ -93,7 +93,6 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
         }
 
         $preparedRow->markPreparing();
-        $terminal = false;
 
         try {
             $prepared = $preparer->prepare(
@@ -111,7 +110,6 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
                 SeasonvarImportTitleGroup::query()->whereKey($preparedRow->group->id)->increment('prepared_pages');
                 SeasonvarImportRun::query()->whereKey($preparedRow->seasonvar_import_run_id)->increment('parsed');
             });
-            $terminal = true;
         } catch (Throwable $exception) {
             $failureType = $pageFailures->handle(
                 $preparedRow->sourcePage,
@@ -121,7 +119,6 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
 
             if ($failureType === SeasonvarImportFailureType::Permanent) {
                 $this->markTerminalFailure($preparedRow, $exception);
-                $terminal = true;
             } else {
                 throw $exception;
             }
@@ -133,9 +130,7 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
             );
         }
 
-        if ($terminal) {
-            $finalizers->titleGroup($preparedRow->group);
-        }
+        $finalizers->signalTitleGroup($preparedRow->group);
     }
 
     /** @return list<int> */
@@ -192,7 +187,7 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
         }
 
         $this->markTerminalFailure($preparedRow, $exception);
-        app(SeasonvarImportFinalizationDispatcher::class)->titleGroup($preparedRow->group);
+        app(SeasonvarImportFinalizationDispatcher::class)->signalTitleGroup($preparedRow->group);
 
         Log::error('Страница Seasonvar не подготовлена для групповой финализации.', [
             'prepared_page_id' => $this->preparedPageId,
@@ -209,7 +204,7 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
                 ->lockForUpdate()
                 ->find($preparedRow->id);
 
-            if ($lockedRow === null || $lockedRow->status?->isTerminal()) {
+            if ($lockedRow === null || $lockedRow->status->isTerminal()) {
                 return;
             }
 

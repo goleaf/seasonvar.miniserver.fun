@@ -8,6 +8,7 @@ use App\DTOs\Seasonvar\SeasonvarImportStartResultData;
 use App\Enums\SeasonvarImportStatus;
 use App\Enums\SeasonvarPageType;
 use App\Jobs\ImportSeasonvarSourcePage;
+use App\Jobs\WakeSeasonvarImportFinalizers;
 use App\Models\CatalogTitle;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
@@ -36,6 +37,8 @@ class SeasonvarQueuedImportDispatcher
         $result = $this->globalRuns->acquire($force, $discover, $pageTypes);
 
         if (! $result->created) {
+            WakeSeasonvarImportFinalizers::dispatch()->afterCommit();
+
             return $result;
         }
 

@@ -6,7 +6,7 @@
 
 | ID | Класс | Наблюдение | Изменение | Статус | Verification / remaining risk |
 | --- | --- | --- | --- | --- | --- |
-| PERF-01 | Confirmed problem | 11 overlapping import runs, thousands of jobs/claims | Lifecycle-level single-flight and terminal recovery before tuning workers | Pending P0/P1 | Current work amplification invalidates capacity estimates |
+| PERF-01 | Confirmed problem, code fixed | 12 legacy overlapping sitemap runs, thousands of jobs/claims; failed-job aggregate includes 4155 group finalizers | Shared lifecycle single-flight plus event-driven finalizers and bounded watchdog before tuning workers | Implemented; rollout/reconciliation pending | Existing backlog still invalidates capacity estimates until workers are safely restarted and legacy jobs dispositioned |
 | PERF-02 | Confirmed problem | Cache-warm queue accumulated work without installed worker | Install only after dedupe/backlog review; verify heartbeat and drain rate | Pending | Uncontrolled drain can increase SQLite contention |
 | PERF-03 | Confirmed problem | Cold/repeat home under load measured ~18/8 s; stats exceeded 60 s; sitemap index ~10 s | Profile builders/SQL/cache misses after lifecycle stabilization | Pending P3/P4 | Samples are not isolated benchmarks |
 | PERF-04 | Confirmed performance cost, instrumented | External 25 s deadline expired, but instrumented run completed in 24.45 s: SQLite quick/FK 23655 ms; every other check 0–303 ms | Preserve integrity semantics, retain safe `duration_ms`, allow >=30 s outside writer load; optimize only with equivalent corruption detection | Implemented; rollout pending | Cost grows with the 14+ GB SQLite dataset; no evidence of an infinite scan |

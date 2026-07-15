@@ -1,13 +1,32 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\View\ViewData;
 
+use App\DTOs\CatalogDirectoryDefinition;
 use App\Services\Catalog\CatalogDirectoryRegistry;
 use App\Support\PlainText;
+use Illuminate\Contracts\Auth\Access\Gate;
+use Illuminate\Contracts\Translation\Translator;
+use Illuminate\Http\Request;
+use Illuminate\Routing\UrlGenerator;
 use Illuminate\Support\Str;
 
-class AppLayoutData
+final class AppLayoutData
 {
+    private const HEADER_LINK_CLASS = 'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-control px-3 py-2';
+
+    private const FOOTER_LINK_CLASS = '-mx-3 flex min-h-11 items-center gap-3 rounded-control px-3 py-2 text-sm font-semibold transition';
+
+    public function __construct(
+        private readonly CatalogDirectoryRegistry $directories,
+        private readonly Request $request,
+        private readonly Gate $gate,
+        private readonly UrlGenerator $urls,
+        private readonly Translator $translator,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $viewData
      * @return array<string, mixed>
@@ -16,7 +35,103 @@ class AppLayoutData
     {
         extract($viewData, EXTR_SKIP);
         $siteName = config('app.name', 'Каталог сериалов');
-        $catalogDirectoryLinks = app(CatalogDirectoryRegistry::class)->all();
+        $authenticatedUser = $this->request->user();
+        $isAuthenticated = $authenticatedUser !== null;
+        $canManageImports = $authenticatedUser !== null
+            && $this->gate->forUser($authenticatedUser)->allows('manage-seasonvar-imports');
+        $layoutHeaderNavigation = [
+            $this->headerLink('home', 'fa-solid fa-house', 'Главная', $this->request->routeIs('home')),
+            $this->headerLink('titles.index', 'fa-solid fa-list-ul', 'Каталог', $this->request->routeIs('titles.*')),
+        ];
+
+        if ($isAuthenticated) {
+            $layoutHeaderNavigation[] = $this->headerLink(
+                'library.index',
+                'fa-solid fa-bookmark',
+                'Моя библиотека',
+                $this->request->routeIs('library.*', 'viewing-activity'),
+            );
+            $layoutHeaderNavigation[] = $this->headerLink(
+                'profile.show',
+                'fa-solid fa-user',
+                'Профиль',
+                $this->request->routeIs('profile.show'),
+            );
+            $layoutHeaderNavigation[] = $this->headerLink(
+                'profile.security',
+                'fa-solid fa-shield-halved',
+                'Безопасность',
+                $this->request->routeIs('profile.security'),
+            );
+
+            if ($canManageImports) {
+                $layoutHeaderNavigation[] = $this->headerLink(
+                    'admin.imports',
+                    'fa-solid fa-cloud-arrow-down',
+                    'Импорт',
+                    $this->request->routeIs('admin.imports'),
+                );
+            }
+        } else {
+            $layoutHeaderNavigation[] = $this->headerLink(
+                'login',
+                'fa-solid fa-right-to-bracket',
+                'Войти',
+                $this->request->routeIs('login'),
+            );
+            $layoutHeaderNavigation[] = $this->headerLink(
+                'register',
+                'fa-solid fa-user-plus',
+                'Регистрация',
+                $this->request->routeIs('register'),
+            );
+        }
+
+        $layoutFooterNavigation = [
+            $this->footerLink('home', 'fa-solid fa-house text-slate-400', 'Главная', $this->request->routeIs('home')),
+            $this->footerLink('titles.index', 'fa-solid fa-list-ul text-slate-400', 'Каталог', $this->request->routeIs('titles.*')),
+        ];
+
+        if ($isAuthenticated) {
+            $layoutFooterNavigation[] = $this->footerLink(
+                'library.section',
+                'fa-solid fa-clock-rotate-left text-slate-400',
+                'Моя библиотека',
+                $this->request->routeIs('library.*'),
+                ['section' => 'continue-watching'],
+            );
+        }
+
+        $catalogDirectoryLinks = $this->directories->all()
+            ->map(fn (CatalogDirectoryDefinition $directory): array => $this->directoryLink($directory))
+            ->values();
+        $layoutFooterServiceLinks = [
+            $this->footerLink('stats', 'fa-solid fa-chart-simple text-slate-400', 'Статистика каталога', $this->request->routeIs('stats')),
+            $this->footerLink('sitemap', 'fa-solid fa-sitemap text-slate-400', 'Карта сайта', false),
+            $this->footerLink('feed', 'fa-solid fa-rss text-slate-400', 'RSS-лента', false),
+        ];
+        $layoutHeader = [
+            'home_url' => $this->route('home'),
+            'search_url' => $this->route('titles.index'),
+            'navigation' => $layoutHeaderNavigation,
+            'show_logout' => $isAuthenticated,
+        ];
+        $layoutFooter = [
+            'home_url' => $this->route('home'),
+            'catalog_url' => $this->route('titles.index'),
+            'navigation' => $layoutFooterNavigation,
+            'directories' => $catalogDirectoryLinks,
+            'directory_label' => __('catalog.directories.label'),
+            'service_links' => $layoutFooterServiceLinks,
+            'current_year' => now()->year,
+        ];
+        $layoutHeadUrls = [
+            'sitemap' => $this->route('sitemap.index'),
+            'landing_sitemap' => $this->route('sitemap.landings'),
+            'feed' => $this->route('feed'),
+            'opensearch' => $this->route('opensearch'),
+            'llms' => $this->route('llms'),
+        ];
         $seo = is_array($seo ?? null) ? $this->cleanGeneratedSeoPayload($seo) : [];
         $extendedSeo = ($seo['extended_seo'] ?? false) === true;
         $showPublicSeoBlocks = ($seo['show_public_seo_blocks'] ?? false) === true;
@@ -31,19 +146,19 @@ class AppLayoutData
             $seoDescription = PlainText::clean(__('catalog.seo.default_description'), 190);
         }
 
-        $canonicalUrl = $seo['canonical'] ?? url()->current();
-        $layoutSearchValue = request()->query('q', '');
+        $canonicalUrl = $seo['canonical'] ?? $this->urls->current();
+        $layoutSearchValue = $this->request->query('q', '');
         $layoutSearchQuery = is_scalar($layoutSearchValue)
             ? mb_substr(Str::squish((string) $layoutSearchValue), 0, 160)
             : '';
-        $seoSearchContext = collect($seo['search_context'] ?? []);
+        $seoSearchContext = collect($this->iterableMap($seo['search_context'] ?? []));
         $seoSearchContextTitle = trim((string) $seoSearchContext->get('title', ''));
         $seoSearchContextSlug = trim((string) $seoSearchContext->get('slug', ''));
         $seoSearchUrl = function ($query) use ($seoSearchContextTitle, $seoSearchContextSlug) {
             $query = trim(preg_replace('/\s+/u', ' ', strip_tags((string) $query)) ?: '');
 
             if ($query === '') {
-                return route('titles.index');
+                return $this->route('titles.index');
             }
 
             $params = ['q' => $query];
@@ -56,22 +171,22 @@ class AppLayoutData
                 $params['title'] = $seoSearchContextSlug;
             }
 
-            return route('titles.index', $params);
+            return $this->route('titles.index', $params);
         };
         $robots = $seo['robots'] ?? 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
         $seoType = $seo['type'] ?? 'website';
         $seoImage = $seo['image'] ?? null;
         $seoVideo = $seo['video'] ?? null;
-        $interfaceLocale = str_replace('_', '-', app()->currentLocale());
+        $interfaceLocale = str_replace('_', '-', $this->translator->getLocale());
         $htmlLang = $seo['htmlLang'] ?? $interfaceLocale;
         $seoLocale = $seo['locale'] ?? __('catalog.locale.open_graph');
         $languageName = __('catalog.locale.language_name');
-        $seoTags = collect($seo['tags'] ?? [])->filter()->unique()->take(25)->values();
-        $seoClusterTerms = collect($seo['keyword_clusters'] ?? [])
-            ->flatMap(fn ($cluster) => collect($cluster['items'] ?? []));
-        $topicTerms = collect($seo['topic_terms'] ?? [])
+        $seoTags = collect($this->iterableList($seo['tags'] ?? []))->filter()->unique()->take(25)->values();
+        $seoClusterTerms = collect($this->iterableList($seo['keyword_clusters'] ?? []))
+            ->flatMap(fn ($cluster) => collect($this->iterableList($cluster['items'] ?? [])));
+        $topicTerms = collect($this->iterableList($seo['topic_terms'] ?? []))
             ->merge($seoTags)
-            ->merge($seo['search_phrases'] ?? [])
+            ->merge($this->iterableList($seo['search_phrases'] ?? []))
             ->merge($seoClusterTerms)
             ->filter()
             ->map(fn ($term) => $this->cleanGeneratedPhrase($term))
@@ -175,7 +290,7 @@ class AppLayoutData
         ])->map(fn ($hub) => [
             'title' => $hub['title'],
             'description' => $hub['description'],
-            'items' => collect($hub['items'] ?? [])
+            'items' => collect($hub['items'])
                 ->map(fn ($item) => $this->cleanGeneratedSeoItem($item))
                 ->filter(fn ($item) => ! empty($item['name']) && ! empty($item['query']))
                 ->unique('name')
@@ -236,7 +351,7 @@ class AppLayoutData
                 'type' => 'ViewAction',
                 'name' => 'Открыть полный каталог сериалов',
                 'label' => 'Открыть каталог',
-                'url' => route('titles.index'),
+                'url' => $this->route('titles.index'),
                 'description' => 'Перейти в общий каталог сериалов с поиском и фильтрами.',
             ],
             [
@@ -313,7 +428,7 @@ class AppLayoutData
                 'description' => 'Количество коротких ответов, сгенерированных по описанию, темам и запросам страницы.',
                 'query' => $pageTitle,
             ],
-        ])->filter(fn ($signal) => ! empty($signal['name']) && ($signal['value'] ?? 0) > 0)->values();
+        ])->filter(fn ($signal) => ! empty($signal['name']) && $signal['value'] > 0)->values();
         $audiencePaths = collect([
             [
                 'name' => 'Для просмотра онлайн',
@@ -343,7 +458,7 @@ class AppLayoutData
             'name' => $path['name'],
             'description' => $path['description'],
             'query' => $this->cleanGeneratedPhrase($path['query']),
-            'items' => collect($path['items'] ?? [])->map(fn ($item) => $this->cleanGeneratedPhrase($item))->filter()->unique()->take(8)->values(),
+            'items' => collect($path['items'])->map(fn ($item) => $this->cleanGeneratedPhrase($item))->filter()->unique()->take(8)->values(),
         ])->filter(fn ($path) => $path['items']->isNotEmpty())->values();
         $alsoSearches = $topicTerms->take(10)
             ->flatMap(fn ($term) => collect([
@@ -372,25 +487,25 @@ class AppLayoutData
             [
                 'name' => 'Карта сайта',
                 'value' => 'sitemap-index.xml',
-                'url' => route('sitemap.index'),
+                'url' => $this->route('sitemap.index'),
                 'description' => 'Главная XML-карта сайта с разделами, страницами, видео и SEO-посадочными страницами.',
             ],
             [
                 'name' => 'RSS обновления',
                 'value' => 'feed.xml',
-                'url' => route('feed'),
+                'url' => $this->route('feed'),
                 'description' => 'Лента последних обновлений каталога для поисковых систем и подписчиков.',
             ],
             [
                 'name' => 'Поиск браузера',
                 'value' => 'opensearch.xml',
-                'url' => route('opensearch'),
+                'url' => $this->route('opensearch'),
                 'description' => 'OpenSearch-описание для быстрого поиска по каталогу из браузера.',
             ],
             [
                 'name' => 'LLMs discovery',
                 'value' => 'llms.txt',
-                'url' => route('llms'),
+                'url' => $this->route('llms'),
                 'description' => 'Текстовый discovery-файл для систем, которые анализируют структуру портала.',
             ],
         ])->when(! empty($seo['updated_time']), fn ($signals) => $signals->prepend([
@@ -433,10 +548,10 @@ class AppLayoutData
                 ->values(),
         ])->filter(fn ($group) => $group['items']->isNotEmpty())->values();
         $normalizedSeoImage = $seoImage
-            ? (Str::startsWith($seoImage, ['http://', 'https://']) ? $seoImage : url($seoImage))
+            ? (Str::startsWith($seoImage, ['http://', 'https://']) ? $seoImage : $this->urls->to($seoImage))
             : null;
         $normalizedSeoVideo = $seoVideo
-            ? (Str::startsWith($seoVideo, ['http://', 'https://']) ? $seoVideo : url($seoVideo))
+            ? (Str::startsWith($seoVideo, ['http://', 'https://']) ? $seoVideo : $this->urls->to($seoVideo))
             : null;
         $mediaSignals = collect([
             $normalizedSeoImage ? [
@@ -459,13 +574,13 @@ class AppLayoutData
             [
                 'name' => 'Издатель портала',
                 'value' => $siteName,
-                'url' => route('home'),
+                'url' => $this->route('home'),
                 'description' => 'Единый каталог сериалов с автоматической индексацией страниц, фильтров, подборок и медиа.',
             ],
             [
                 'name' => 'Раздел каталога',
                 'value' => 'Сериалы онлайн',
-                'url' => route('titles.index'),
+                'url' => $this->route('titles.index'),
                 'description' => 'Основной раздел портала для поиска сериалов, сезонов, серий, жанров, стран, актеров и режиссеров.',
             ],
             [
@@ -477,19 +592,19 @@ class AppLayoutData
             [
                 'name' => 'Поисковая карта',
                 'value' => 'XML sitemap',
-                'url' => route('sitemap.index'),
+                'url' => $this->route('sitemap.index'),
                 'description' => 'XML-карта помогает поисковым системам находить все важные страницы портала.',
             ],
             [
                 'name' => 'Лента обновлений',
                 'value' => 'RSS feed',
-                'url' => route('feed'),
+                'url' => $this->route('feed'),
                 'description' => 'RSS-лента помогает отслеживать новые и обновленные страницы каталога.',
             ],
             [
                 'name' => 'Встроенный поиск',
                 'value' => 'OpenSearch',
-                'url' => route('opensearch'),
+                'url' => $this->route('opensearch'),
                 'description' => 'OpenSearch-описание позволяет быстро искать по сериалам и страницам каталога.',
             ],
         ])->filter(fn ($signal) => ! empty($signal['name']) && ! empty($signal['url']))->values();
@@ -498,7 +613,7 @@ class AppLayoutData
             [
                 'name' => 'Новинки сериалов '.$currentSeoYear,
                 'query' => 'сериалы '.$currentSeoYear.' смотреть онлайн',
-                'url' => route('titles.year', ['year' => $currentSeoYear]),
+                'url' => $this->route('titles.year', ['year' => $currentSeoYear]),
                 'description' => 'Актуальная посадочная страница для сериалов, выпусков и обновлений '.$currentSeoYear.' года.',
             ],
             [
@@ -516,7 +631,7 @@ class AppLayoutData
             [
                 'name' => 'Обновления каталога',
                 'query' => 'обновления сериалов онлайн',
-                'url' => route('feed'),
+                'url' => $this->route('feed'),
                 'description' => 'Лента и страницы каталога помогают находить недавно обновленную информацию.',
             ],
         ])->merge($topicTerms->take(8)->flatMap(fn ($term) => collect([
@@ -574,7 +689,7 @@ class AppLayoutData
             [
                 'name' => 'Сериалы '.$currentSeoYear.' года',
                 'query' => 'сериалы '.$currentSeoYear.' года',
-                'url' => route('titles.year', ['year' => $currentSeoYear]),
+                'url' => $this->route('titles.year', ['year' => $currentSeoYear]),
                 'description' => 'Чистая годовая посадочная страница для новых и актуальных сериалов.',
             ],
             [
@@ -995,6 +1110,7 @@ class AppLayoutData
             $keywordAliases = collect();
         }
 
+        $showDiscoverySignals = $discoverySignals->isNotEmpty() && $this->request->routeIs('stats');
         $seoSections = $showPublicSeoBlocks
             ? collect([
                 ['id' => 'seo-summary', 'name' => 'Описание страницы', 'enabled' => ! empty($seo['seo_text']) || ! empty($seo['related_links'])],
@@ -1009,7 +1125,7 @@ class AppLayoutData
                 ['id' => 'content-signals', 'name' => 'Сигналы страницы', 'enabled' => $contentSignals->isNotEmpty()],
                 ['id' => 'audience-paths', 'name' => 'Пути поиска', 'enabled' => $audiencePaths->isNotEmpty()],
                 ['id' => 'also-searches', 'name' => 'Также ищут', 'enabled' => $alsoSearches->isNotEmpty()],
-                ['id' => 'discovery-signals', 'name' => 'Индексация и обновления', 'enabled' => $discoverySignals->isNotEmpty() && request()->routeIs('stats')],
+                ['id' => 'discovery-signals', 'name' => 'Индексация и обновления', 'enabled' => $showDiscoverySignals],
                 ['id' => 'query-matrix', 'name' => 'Матрица запросов', 'enabled' => $queryMatrix->isNotEmpty()],
                 ['id' => 'media-signals', 'name' => 'Медиа и превью', 'enabled' => $mediaSignals->isNotEmpty()],
                 ['id' => 'publisher-trust', 'name' => 'Доверие и индексация', 'enabled' => $publisherSignals->isNotEmpty()],
@@ -1028,10 +1144,12 @@ class AppLayoutData
                 ['id' => 'popular-searches', 'name' => 'Популярные запросы', 'enabled' => ! empty($seo['search_phrases'])],
             ])->filter(fn ($section) => $section['enabled'])->values()
             : collect();
-        $breadcrumbs = collect($seo['breadcrumbs'] ?? [])->filter(fn ($item) => is_array($item) && ! empty($item['name']) && ! empty($item['url']))->values();
+        $breadcrumbs = collect($this->iterableList($seo['breadcrumbs'] ?? []))
+            ->filter(fn ($item) => is_array($item) && ! empty($item['name']) && ! empty($item['url']))
+            ->values();
 
         if ($seoImage && ! Str::startsWith($seoImage, ['http://', 'https://'])) {
-            $seoImage = url($seoImage);
+            $seoImage = $this->urls->to($seoImage);
         }
 
         $jsonLdItems = $seo['jsonLd'] ?? [];
@@ -1076,7 +1194,7 @@ class AppLayoutData
                 'isPartOf' => [
                     '@type' => 'WebSite',
                     'name' => $siteName,
-                    'url' => route('home'),
+                    'url' => $this->route('home'),
                 ],
             ];
         }
@@ -1141,7 +1259,7 @@ class AppLayoutData
                         '@type' => $action['type'],
                         'name' => $action['name'],
                         'target' => $action['url'],
-                        'description' => $action['description'] ?? $action['name'],
+                        'description' => $action['description'],
                     ];
 
                     if ($action['type'] === 'SearchAction') {
@@ -1351,15 +1469,15 @@ class AppLayoutData
                 'publisher' => [
                     '@type' => 'Organization',
                     'name' => $siteName,
-                    'url' => route('home'),
+                    'url' => $this->route('home'),
                 ],
                 'isPartOf' => [
                     '@type' => 'WebSite',
                     'name' => $siteName,
-                    'url' => route('home'),
+                    'url' => $this->route('home'),
                     'potentialAction' => [
                         '@type' => 'SearchAction',
-                        'target' => route('titles.index', ['q' => '{search_term_string}']),
+                        'target' => $this->route('titles.index', ['q' => '{search_term_string}']),
                         'query-input' => 'required name=search_term_string',
                     ],
                 ],
@@ -1562,6 +1680,90 @@ class AppLayoutData
         unset($data['viewData'], $data['data'], $data['layoutSearchValue']);
 
         return $data;
+    }
+
+    /**
+     * @return array{url: string, icon: string, label: string, class: string, aria_current: string|null}
+     */
+    private function headerLink(string $routeName, string $icon, string $label, bool $active): array
+    {
+        return [
+            'url' => $this->route($routeName),
+            'icon' => $icon,
+            'label' => $label,
+            'class' => self::HEADER_LINK_CLASS.' '.($active
+                ? 'bg-emerald-50 text-emerald-700'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700'),
+            'aria_current' => $active ? 'page' : null,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $parameters
+     * @return array{url: string, icon: string, label: string, class: string, aria_current: string|null}
+     */
+    private function footerLink(
+        string $routeName,
+        string $icon,
+        string $label,
+        bool $active,
+        array $parameters = [],
+    ): array {
+        return [
+            'url' => $this->route($routeName, $parameters),
+            'icon' => $icon,
+            'label' => $label,
+            'class' => self::FOOTER_LINK_CLASS.' '.($active
+                ? 'bg-emerald-50 text-emerald-700'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700'),
+            'aria_current' => $active ? 'page' : null,
+        ];
+    }
+
+    /**
+     * @return array{url: string, icon: string, title: string, class: string, aria_current: string|null}
+     */
+    private function directoryLink(CatalogDirectoryDefinition $directory): array
+    {
+        $active = $this->request->routeIs($directory->key.'.*');
+
+        return [
+            'url' => $this->route($directory->indexRouteName),
+            'icon' => $directory->icon.' shrink-0 text-slate-400',
+            'title' => $directory->title,
+            'class' => 'flex min-h-11 min-w-0 items-center gap-2 py-2 text-sm font-semibold transition hover:text-emerald-700 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 '.($active
+                ? 'text-emerald-700'
+                : 'text-slate-600'),
+            'aria_current' => $active ? 'page' : null,
+        ];
+    }
+
+    /** @param array<string, mixed> $parameters */
+    private function route(string $name, array $parameters = []): string
+    {
+        return $this->urls->route($name, $parameters);
+    }
+
+    /** @return list<mixed> */
+    private function iterableList(mixed $value): array
+    {
+        if (! is_iterable($value)) {
+            return [];
+        }
+
+        $items = [];
+
+        foreach ($value as $item) {
+            $items[] = $item;
+        }
+
+        return $items;
+    }
+
+    /** @return array<array-key, mixed> */
+    private function iterableMap(mixed $value): array
+    {
+        return is_array($value) ? $value : [];
     }
 
     private function appendQuerySuffix(mixed $query, mixed $suffix): string

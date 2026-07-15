@@ -113,12 +113,13 @@ Rollback: restore pre-update lockfiles and install exactly from them. Laravel an
 
 ### 2.1 Single active global cycle
 
-- [ ] Trace command → coordinator → run → page jobs → title groups → finalizers → completion events.
-- [ ] Write characterization tests for queued dispatch while another non-terminal global run exists.
-- [ ] Introduce one lifecycle-level atomic lock/active-run decision, not merely an enqueue critical section.
-- [ ] Define idempotent return for duplicate cron invocation and safe recovery for stale run after verified no-live-jobs/no-claims condition.
-- [ ] Keep browser-triggered title refresh separate from global-cycle ownership.
-- [ ] Update cron/runbook so frequency cannot create overlapping full runs; verify with concurrent test processes where practical.
+- [x] Trace command → coordinator → run → page jobs → title groups → finalizers → completion events.
+- [x] Write characterization tests for CLI/admin/repeated queued dispatch while another non-terminal global run exists.
+- [x] Introduce one lifecycle-level atomic lock/active-run decision, not merely an enqueue critical section.
+- [x] Return the existing run idempotently for duplicate cron/admin invocation; Russian command output explains that new work was not created.
+- [ ] Harden stale-run recovery only after proving no-live-jobs/no-claims/no-terminal-signal conditions; current recovery contract remains intentionally conservative.
+- [x] Keep browser-triggered title refresh separate from global-cycle ownership.
+- [x] Update importer/queue runbooks so cron frequency cannot create new overlapping full runs; concurrent process stress remains a later verification layer.
 
 Acceptance: repeated dispatch results in one active global run and no duplicate page/title-group work; command output explains reuse/skip in Russian.
 
@@ -133,11 +134,13 @@ Acceptance: repeated dispatch results in one active global run and no duplicate 
 
 ### 2.3 Finalizer retry storm
 
-- [ ] Reproduce polling finalizer behavior with delayed/missing siblings.
-- [ ] Replace high-frequency self-release loop with one bounded deduplicated wake-up signal or completion counter/event.
+- [x] Reproduce polling finalizer behavior with delayed/missing siblings and verify no release when work is not terminal.
+- [x] Replace high-frequency self-release loop with deduplicated completion signals plus a bounded ten-minute unique watchdog.
 - [ ] Define tries, retryUntil, timeout, backoff, uniqueness and failed behavior on every importer job.
-- [ ] Finalize exactly once after all required pages reach terminal prepared state; tolerate duplicate job delivery.
+- [x] Finalize only after all required pages reach terminal prepared state; unique jobs plus group/global apply locks tolerate duplicate delivery.
 - [ ] Convert permanently impossible groups to explicit failed/abandoned state with user-safe reason code.
+
+Verified increment: 52 importer lifecycle tests / 266 assertions; changed importer/model scope Larastan 0; targeted Pint pass; `schedule:list` exposes `*/10 * * * * seasonvar-import-finalization-watchdog`. Production failed-job aggregation found 4155 group-finalizer, 793 page and 9 preparation `MaxAttemptsExceededException` rows plus 1601 active groups. Historical rows/jobs were not retried, forgotten or cleared; code rollout and explicit reconciliation remain pending.
 
 ### 2.4 Failed-job reconciliation
 

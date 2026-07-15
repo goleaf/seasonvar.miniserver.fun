@@ -28,7 +28,10 @@ use App\Services\Seasonvar\SeasonvarTitleMerger;
 use App\Services\Seasonvar\SeasonvarUrl;
 use DateTimeInterface;
 use Illuminate\Bus\Queueable;
+use Illuminate\Cache\Repository as CacheRepository;
+use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Cache\Repository;
+use Illuminate\Contracts\Cache\Store;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -38,6 +41,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use LogicException;
 use RuntimeException;
 use Throwable;
 
@@ -88,7 +92,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
         }
 
         if ($group->status->isTerminal()) {
-            $finalizers->globalRun($group->run);
+            $finalizers->signalGlobalRun($group->run);
 
             return;
         }
@@ -100,7 +104,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
         }
 
         $group->update(['status' => SeasonvarImportTitleGroupStatus::Finalizing]);
-        $lock = $this->uniqueVia()->lock(
+        $lock = $this->lockStore()->lock(
             'seasonvar-title-group-apply:'.$group->group_key_hash,
             $this->timeout + 300,
         );
@@ -123,7 +127,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
             }
 
             if ($group->status->isTerminal()) {
-                $finalizers->globalRun($group->run);
+                $finalizers->signalGlobalRun($group->run);
 
                 return;
             }
@@ -148,7 +152,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
 
             if ($validRows->isEmpty()) {
                 $this->finishWithoutPreparedPages($group, $invalidPages, $refreshStates);
-                $finalizers->globalRun($group->run);
+                $finalizers->signalGlobalRun($group->run);
 
                 return;
             }
@@ -226,7 +230,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
                 }
             }
 
-            $finalizers->globalRun($group->run);
+            $finalizers->signalGlobalRun($group->run);
         } catch (Throwable $exception) {
             if (! $syncChangePublished && $catalogTitleForSync !== null) {
                 $syncChanges->publishUpsert($catalogTitleForSync);
@@ -287,7 +291,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
             app(CatalogTitleRefreshStateStore::class)->failed($group->catalog_title_id);
         }
 
-        app(SeasonvarImportFinalizationDispatcher::class)->globalRun($group->run);
+        app(SeasonvarImportFinalizationDispatcher::class)->signalGlobalRun($group->run);
 
         Log::error('Группа сезонов Seasonvar не финализирована.', [
             'group_id' => $this->groupId,
@@ -485,5 +489,22 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
             'seasonvar.title_refresh.finalizer_delay_seconds',
             config('seasonvar.queue.finalizer_delay_seconds', 60),
         ));
+    }
+
+    private function lockStore(): Store&LockProvider
+    {
+        $repository = $this->uniqueVia();
+
+        if (! $repository instanceof CacheRepository) {
+            throw new LogicException('Seasonvar lock cache repository is unavailable.');
+        }
+
+        $store = $repository->getStore();
+
+        if (! $store instanceof LockProvider) {
+            throw new LogicException('Seasonvar lock cache store does not support atomic locks.');
+        }
+
+        return $store;
     }
 }
