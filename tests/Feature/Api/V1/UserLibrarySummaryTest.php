@@ -108,6 +108,22 @@ final class UserLibrarySummaryTest extends TestCase
         }
     }
 
+    public function test_openapi_describes_library_summary_and_filters(): void
+    {
+        $document = $this->getJson('/api/openapi.json')->assertOk();
+
+        $document
+            ->assertJsonPath('paths./api/v1/me/library/summary.get.operationId', 'getMobileLibrarySummary')
+            ->assertJsonPath('paths./api/v1/me/library/summary.get.security.0.bearerAuth', [])
+            ->assertJsonPath('components.schemas.UserLibrarySummary.properties.watchlist_count.type', 'integer')
+            ->assertJsonPath('components.parameters.LibraryQuery.name', 'q')
+            ->assertJsonPath('components.parameters.LibraryType.schema.enum.2', 'anime')
+            ->assertJsonPath('components.parameters.LibraryDirection.schema.enum.1', 'desc')
+            ->assertJsonPath('paths./api/v1/me/watchlist.get.parameters.0.$ref', '#/components/parameters/LibraryQuery')
+            ->assertJsonPath('paths./api/v1/me/ratings.get.parameters.3.$ref', '#/components/parameters/LibraryRatingSort')
+            ->assertJsonPath('paths./api/v1/me/library/summary.get.responses.429.$ref', '#/components/responses/TooManyRequests');
+    }
+
     /** @return array{CatalogTitle, Episode} */
     private function createWatchableTitle(string $slug): array
     {

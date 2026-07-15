@@ -1,13 +1,13 @@
 # Frontend
 
-Обновлено: 14.07.2026
+Обновлено: 15.07.2026
 
 ## Стек
 
 - Vite 8 и `laravel-vite-plugin` 3 собирают фронтенд.
 - Tailwind CSS 4 подключается через `@tailwindcss/vite` и `resources/css/app.css`.
 - FontAwesome, Plyr и HLS подключаются из локальных npm-пакетов, без CDN.
-- Livewire 4 используется для интерактивного каталога `/titles`, одиннадцати directory hubs, полной динамической оболочки и playback-island карточки `/titles/{slug}`, личной страницы `/watching` и live-страницы `/stats`; styles/scripts подключаются layout один раз на всех routes и не дублируются в компонентах.
+- Livewire 4 используется для интерактивного каталога `/titles`, одиннадцати directory hubs, полной динамической оболочки и playback-island карточки `/titles/{slug}`, регистрации/входа, профиля, безопасности, личной библиотеки `/library/*` и live-страницы `/stats`; styles/scripts подключаются layout один раз на всех routes и не дублируются в компонентах.
 - Volt не установлен и не используется. Все Livewire-компоненты conventional class-based, а Blade остаётся presentation-only без PHP tags, database/cache/service calls.
 
 ## Граница текущего продукта
@@ -15,6 +15,14 @@
 Локализованные записи контента и QoE telemetry отсутствуют как продуктовые возможности, а не являются незавершёнными frontend-задачами. Текущая locale переводит только UI/page metadata и не создаёт отдельные версии названий, описаний, аудио или субтитров; player показывает bounded локальные состояния без отправки пользовательской телеметрии качества воспроизведения. Добавление таких возможностей требует отдельных schema/privacy/retention contracts и измеримого rollout, а не скрытого JavaScript-сбора.
 
 Mobile-клиент создаёт playback session через API и использует выданный same-origin `playback_url` как opaque URL: он следует разрешённому redirect/HLS-потоку, не извлекает и не сохраняет provider URL и не добавляет Bearer token в query. Для progress клиент хранит отдельный `progress_session_token` только на время просмотра и отправляет возрастающий `event_sequence`; server response остаётся единственным каноническим состоянием позиции. Web Plyr/Livewire продолжает использовать существующий signed `/playback/{licensedMedia}` и этим mobile contract не заменяется.
+
+## Пользовательский портал
+
+- `/register`, `/login`, `/forgot-password` и `/reset-password/{token}` — гостевые full-page Livewire-компоненты с русской валидацией. После входа доступны `/email/verify`, `/confirm-password`, `/profile`, `/profile/security` и `/library/*`; layout показывает ссылки по фактическому session state и использует Livewire logout action.
+- `/profile` изменяет имя/email и выводит сводку библиотеки. `/profile/security` меняет пароль, owner-scoped отзывает mobile devices, завершает остальные database sessions и удаляет аккаунт только после явного password confirmation; plaintext tokens и hash никогда не попадают в markup или Livewire snapshot.
+- `/library/watchlist`, `/library/ratings`, `/library/continue-watching` и `/library/history` используют один `UserLibraryPage`. Раздел зафиксирован route parameter, а нормализованные `q`, `type`, `year`, `sort`, `direction` и отдельные `watchlistPage`, `ratingsPage`, `historyPage` сохраняются в URL. Модели и paginator не хранятся в public Livewire state.
+- Личная библиотека читается unverified пользователем, но mutation controls отображаются только при `canInteract`; server-side policies всё равно повторяют verified/entitlement boundary. `/watching` сохраняется только как redirect на `/library/continue-watching`.
+- Главная, каталог и рекомендации получают личные признаки карточек через bounded eager loader до Blade render: watchlist, rating, progress и primary action не выполняют запросы из `x-catalog.title-card` и не попадают в guest shared cache.
 
 ## Browser baseline 13.07.2026
 
@@ -60,7 +68,7 @@ composer dev
 - Основная точка входа Vite одна: `resources/js/app.js`.
 - `resources/js/app.js` импортирует `resources/css/app.css` и глобальные стили FontAwesome.
 - Player-код для Plyr/HLS находится в `resources/js/player.js` и загружается dynamic import только на страницах с `video.js-catalog-player`.
-- Player создаёт одну guarded browser-session на точный `title:episode:media` source, восстанавливает позицию после metadata load и отправляет bounded progress только для authenticated markup: первый `play` создаёт start event, 30-секундный heartbeat работает лишь во время воспроизведения, а pause, stable seek, hidden visibility, navigation, pagehide и ended принудительно фиксируют позицию. Каждый event несёт opaque server-issued progress token и возрастающий sequence; browser duration остаётся только sanity signal и не становится trusted duration. `AbortController` освобождает listeners/timers/Plyr/HLS, generation token отменяет stale async-init, а cleanup очищает и media node, восстановленный `Plyr.destroy()`.
+- Player создаёт одну guarded browser-session на точный `title:episode:media` source, восстанавливает позицию после metadata load и отправляет bounded progress только для verified authenticated markup: первый `play` создаёт start event, 30-секундный heartbeat работает лишь во время воспроизведения, а pause, stable seek, hidden visibility, navigation, pagehide и ended принудительно фиксируют позицию. Unverified пользователь видит предложение подтвердить email и не получает progress marker/token. Каждый разрешённый event несёт opaque server-issued progress token и возрастающий sequence; browser duration остаётся только sanity signal и не становится trusted duration. `AbortController` освобождает listeners/timers/Plyr/HLS, generation token отменяет stale async-init, а cleanup очищает и media node, восстановленный `Plyr.destroy()`.
 - Состояния loading, buffering, automatic retry, expired/unavailable source и fatal error отображаются фиксированным русским текстом рядом с `wire:ignore` player island. Provider URL, exception text и raw media errors в status region не выводятся.
 - Поиск актёров и режиссёров выполняется read-only API combobox из `resources/js/app.js`: debounce 300 мс, `AbortController` для stale request, максимум 20 результатов, клавиши Arrow Up/Down, Enter и Escape. Результат добавляет slug в обычный URL, поэтому выбранное состояние и GET-фильтрация не зависят от публичных model IDs. Локальный поиск для остальных длинных групп остаётся progressive enhancement по уже загруженному ограниченному списку.
 - Header search остаётся видимым на всех публичных routes, включая `/titles`, `/titles/year/{year}` и taxonomy listing pages. Локальная поисковая форма каталога находится над результатами и имеет отдельное доступное имя `Поиск по каталогу` или `Искать в выбранной подборке`, поэтому на listing routes допустимы два разных search landmarks без дублирования input IDs. Один полноширинный `<details id="catalog-filters">` расположен между панелью управления и результатами; sidebar/dialog отсутствуют. Первый HTML содержит карточки, расширенные поля и нейтральный placeholder, после чего отдельный sibling deferred island автоматически подгружает годы и справочники без отправки сотен options в initial payload.
@@ -69,7 +77,7 @@ composer dev
 - «Точный подбор» объединяет `year`, публикацию, субтитры, справочники, `year_*`/`updated`, `seasons_*`/`episodes_*`, `rating_*`/`votes_min` и `video`/`quality` без изменения query keys. Общая форма исключает дублирование видимых query-параметров, summary считает все условия и раскрывается при любом активном фильтре; «Сбросить фильтры» использует существующий `resetAll`. Мобильная панель выдачи переиспользует `setView`/`setPerPage` и те же query builders, что desktop, без нового client state.
 - `CatalogTitlePlayer` использует scoped Livewire loading states для смены media-варианта: `selectMedia` подсвечивает только player island, варианты просмотра и список серий. Ссылки вариантов и серий сохраняют обычный `href` fallback и обновляют URL-профиль `variant`/`quality`/`format`.
 - `CatalogTitleDetail` оставляет начальный SSR без queue side effects, запускает проверку свежести только через browser `wire:init="startRefresh"`, а во время активного targeted refresh обновляет всю видимую оболочку через `wire:poll.3s.visible="refreshCatalog"`. После `completed` или `failed` poll-атрибут исчезает. Каждый poll отправляет scoped событие вложенному `CatalogTitlePlayer`, который очищает только render-кэши и сохраняет валидные `season`/`episode`/`media`/profile URL-параметры.
-- `/watching` не сериализует Eloquent collections в публичное состояние: Continue Watching и paginator истории строятся только внутри render. Удаление использует `wire:confirm`, полная очистка — `wire:confirm.prompt`, а `historyPage` остаётся отдельным URL-параметром Livewire pagination.
+- `/library/*` не сериализует Eloquent collections в публичное состояние: списки, Continue Watching и paginator истории строятся только внутри render. Удаление использует `wire:confirm`, полная очистка — `wire:confirm.prompt`, а каждый пагинируемый раздел имеет отдельный URL-параметр.
 - `/admin/imports` опрашивает сервер через `wire:poll.5s.visible` только пока есть active run. После terminal state poll-attribute исчезает; run models и collections не хранятся в public snapshot, а rows имеют stable `wire:key`.
 - Для HLS используется `hls.js/light`: он сохраняет воспроизведение HLS-плейлистов и не тянет модули субтитров, DRM и расширенной аналитики, которые сейчас не используются интерфейсом.
 - Layout подключает ассеты через `@vite('resources/js/app.js')`; не добавлять raw `<script>`/`<style>` для обычных assets.

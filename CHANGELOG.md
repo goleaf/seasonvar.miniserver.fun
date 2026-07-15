@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-15
+
+- Added the complete Livewire session-authenticated user portal: Russian registration/login/verification/password recovery, profile and security self-service, device/session/account controls, and a unified filterable `/library/*` for watchlist, ratings, Continue Watching and history. Web and mobile now share account/library services; verified-email policies guard every personal mutation, catalog cards receive bounded query-free personalization, and `/api/v1/me/library/summary` plus documented library filters complete the private API surface.
+
 ## 2026-07-14
 
 - Added deterministic offline-first mobile synchronization under `/api/v1`: manifest-first catalog bootstrap, signed owner/scope cursors, 30-day public/private invalidation journal, owner pull, and idempotent 1–50 mutation batches for watchlist, ratings, progress and history. Optimistic per-state versions prevent stale device overwrites; 90-day safe receipts, bounded daily pruning, schema-readiness guards, complete OpenAPI and privacy/regression coverage avoid raw playback/source/token disclosure and keep the existing API available before migration.

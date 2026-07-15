@@ -774,7 +774,7 @@ Expected: Web/API verified matrices and query budgets PASS.
 - Documents: summary operation ID `getMobileLibrarySummary` and library filter query parameters.
 - Documents: Web route/session/verification/profile/library contract.
 
-- [ ] **Step 1: Write failing OpenAPI assertions**
+- [x] **Step 1: Write failing OpenAPI assertions**
 
 ```php
 public function test_openapi_describes_library_summary_and_filters(): void
@@ -788,7 +788,7 @@ public function test_openapi_describes_library_summary_and_filters(): void
 }
 ```
 
-- [ ] **Step 2: Run documentation tests and confirm RED**
+- [x] **Step 2: Run documentation tests and confirm RED**
 
 ```bash
 php artisan test tests/Feature/Api/V1/UserLibrarySummaryTest.php tests/Feature/RefreshProjectDocsCommandTest.php
@@ -796,11 +796,11 @@ php artisan test tests/Feature/Api/V1/UserLibrarySummaryTest.php tests/Feature/R
 
 Expected: FAIL because OpenAPI/docs do not describe the new surface.
 
-- [ ] **Step 3: Update OpenAPI and thematic documentation**
+- [x] **Step 3: Update OpenAPI and thematic documentation**
 
 Add the exact route, security, parameters, schemas, 401/403/422/429 responses and private cache description. Update each thematic owner with actual implemented behavior; do not copy the design verbatim and do not edit managed `project-docs` blocks manually.
 
-- [ ] **Step 4: Refresh generated documentation and commit**
+- [x] **Step 4: Refresh generated documentation and commit**
 
 ```bash
 php artisan project:docs-refresh

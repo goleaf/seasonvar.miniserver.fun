@@ -1748,6 +1748,21 @@
                 ],
                 "parameters": [
                     {
+                        "$ref": "#/components/parameters/LibraryQuery"
+                    },
+                    {
+                        "$ref": "#/components/parameters/LibraryType"
+                    },
+                    {
+                        "$ref": "#/components/parameters/LibraryYear"
+                    },
+                    {
+                        "$ref": "#/components/parameters/LibraryWatchlistSort"
+                    },
+                    {
+                        "$ref": "#/components/parameters/LibraryDirection"
+                    },
+                    {
                         "$ref": "#/components/parameters/Page"
                     },
                     {
@@ -1773,6 +1788,9 @@
                     },
                     "422": {
                         "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/TooManyRequests"
                     }
                 }
             }
@@ -1787,6 +1805,21 @@
                     }
                 ],
                 "parameters": [
+                    {
+                        "$ref": "#/components/parameters/LibraryQuery"
+                    },
+                    {
+                        "$ref": "#/components/parameters/LibraryType"
+                    },
+                    {
+                        "$ref": "#/components/parameters/LibraryYear"
+                    },
+                    {
+                        "$ref": "#/components/parameters/LibraryRatingSort"
+                    },
+                    {
+                        "$ref": "#/components/parameters/LibraryDirection"
+                    },
                     {
                         "$ref": "#/components/parameters/Page"
                     },
@@ -1813,6 +1846,45 @@
                     },
                     "422": {
                         "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/TooManyRequests"
+                    }
+                }
+            }
+        },
+        "/api/v1/me/library/summary": {
+            "get": {
+                "operationId": "getMobileLibrarySummary",
+                "summary": "Получить сводку личной библиотеки",
+                "description": "Возвращает owner-scoped агрегаты только по доступным тайтлам. Ответ всегда private, no-store и не содержит playback URL или идентификатор пользователя.",
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Счётчики библиотеки и канонические ссылки разделов",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserLibrarySummaryResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "$ref": "#/components/responses/Unauthorized"
+                    },
+                    "403": {
+                        "$ref": "#/components/responses/Forbidden"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/ValidationError"
+                    },
+                    "429": {
+                        "$ref": "#/components/responses/TooManyRequests"
                     }
                 }
             }
@@ -2155,6 +2227,77 @@
                     "minimum": 1,
                     "maximum": 50,
                     "default": 20
+                }
+            },
+            "LibraryQuery": {
+                "name": "q",
+                "in": "query",
+                "description": "Поиск по основному или оригинальному названию.",
+                "schema": {
+                    "type": "string",
+                    "maxLength": 160
+                }
+            },
+            "LibraryType": {
+                "name": "type",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "enum": [
+                        "serial",
+                        "show",
+                        "anime",
+                        "documentary",
+                        "unknown"
+                    ]
+                }
+            },
+            "LibraryYear": {
+                "name": "year",
+                "in": "query",
+                "description": "Год публикации от 1900 до следующего календарного года.",
+                "schema": {
+                    "type": "integer",
+                    "minimum": 1900
+                }
+            },
+            "LibraryWatchlistSort": {
+                "name": "sort",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "enum": [
+                        "updated",
+                        "title",
+                        "year"
+                    ],
+                    "default": "updated"
+                }
+            },
+            "LibraryRatingSort": {
+                "name": "sort",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "enum": [
+                        "updated",
+                        "rating",
+                        "title",
+                        "year"
+                    ],
+                    "default": "updated"
+                }
+            },
+            "LibraryDirection": {
+                "name": "direction",
+                "in": "query",
+                "schema": {
+                    "type": "string",
+                    "enum": [
+                        "asc",
+                        "desc"
+                    ],
+                    "default": "desc"
                 }
             },
             "TitleSlug": {
@@ -2964,6 +3107,87 @@
                     },
                     "meta": {
                         "type": "object"
+                    }
+                }
+            },
+            "UserLibrarySummary": {
+                "type": "object",
+                "required": [
+                    "watchlist_count",
+                    "ratings_count",
+                    "continue_watching_count",
+                    "history_count",
+                    "last_watched_at",
+                    "links"
+                ],
+                "properties": {
+                    "watchlist_count": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "ratings_count": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "continue_watching_count": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 24
+                    },
+                    "history_count": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "last_watched_at": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time"
+                    },
+                    "links": {
+                        "type": "object",
+                        "required": [
+                            "self",
+                            "watchlist",
+                            "ratings",
+                            "continue_watching",
+                            "history"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "self": {
+                                "type": "string",
+                                "format": "uri"
+                            },
+                            "watchlist": {
+                                "type": "string",
+                                "format": "uri"
+                            },
+                            "ratings": {
+                                "type": "string",
+                                "format": "uri"
+                            },
+                            "continue_watching": {
+                                "type": "string",
+                                "format": "uri"
+                            },
+                            "history": {
+                                "type": "string",
+                                "format": "uri"
+                            }
+                        }
+                    }
+                }
+            },
+            "UserLibrarySummaryResponse": {
+                "type": "object",
+                "required": [
+                    "data"
+                ],
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/UserLibrarySummary"
                     }
                 }
             },
@@ -4289,7 +4513,7 @@
                 }
             },
             "TooManyRequests": {
-                "description": "Исчерпан named budget credential endpoint",
+                "description": "Исчерпан лимит запросов endpoint",
                 "content": {
                     "application/json": {
                         "schema": {
