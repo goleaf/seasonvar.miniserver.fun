@@ -16,6 +16,15 @@ final class LoginPage extends Component
 
     public LoginForm $form;
 
+    public ?string $status = null;
+
+    public function mount(): void
+    {
+        $status = session('status');
+
+        $this->status = is_string($status) ? $status : null;
+    }
+
     public function login(
         WebAuthenticationService $authentication,
         WebAuthenticationRateLimiter $rateLimiter,

@@ -344,7 +344,7 @@ Expected: focused tests and build PASS.
 - Consumes: `AccountPasswordResetService::reset()` and `AccountEmailVerificationService::verify()`.
 - Produces: standard routes `verification.notice`, `verification.verify`, `password.request`, `password.reset`, `password.confirm`.
 
-- [ ] **Step 1: Write failing verification and recovery tests**
+- [x] **Step 1: Write failing verification and recovery tests**
 
 Tests must cover valid/tampered/expired/already-used links, non-enumerating forgot response, reset token consumption, API token revocation and password confirmation timestamp:
 
@@ -366,7 +366,7 @@ public function test_signed_web_verification_works_without_an_active_session(): 
 }
 ```
 
-- [ ] **Step 2: Run tests and confirm RED**
+- [x] **Step 2: Run tests and confirm RED**
 
 ```bash
 php artisan test tests/Feature/Web/WebEmailVerificationTest.php tests/Feature/Web/WebPasswordRecoveryTest.php
@@ -374,11 +374,11 @@ php artisan test tests/Feature/Web/WebEmailVerificationTest.php tests/Feature/We
 
 Expected: FAIL because routes/components are absent.
 
-- [ ] **Step 3: Implement signed handler and verification page**
+- [x] **Step 3: Implement signed handler and verification page**
 
 The thin controller calls the shared verifier and redirects authenticated matching owner to `library.index`; every other valid link redirects to `login`. `VerifyEmailPage::resend()` checks `hasVerifiedEmail()`, applies `web-verification`, sends queued notification and returns Russian status. In the same change, update `VerifyAccountEmail` to `verification.verify` and `ResetAccountPassword` to `password.reset`, so notification URLs only change after both Web routes exist.
 
-- [ ] **Step 4: Implement forgot/reset/confirm forms**
+- [x] **Step 4: Implement forgot/reset/confirm forms**
 
 Forgot always exposes this text regardless of broker result:
 
@@ -388,11 +388,11 @@ public const STATUS = 'Если аккаунт существует, письм�
 
 Reset form properties are `email`, `token`, `password`, `passwordConfirmation`; `mount(string $token)` copies route/query values without placing password in URL. Confirm form validates `current_password`, calls `request()->session()->passwordConfirmed()` and redirects intended.
 
-- [ ] **Step 5: Apply `auth.session` and Russian signed-link rendering**
+- [x] **Step 5: Apply `auth.session` and Russian signed-link rendering**
 
 Protected profile/library routes use `['auth', 'auth.session']`. An expired/tampered Web verification link renders a Russian 403 response without exception details; API signed link retains JSON behavior.
 
-- [ ] **Step 6: Run regression tests, format and commit**
+- [x] **Step 6: Run regression tests, format and commit**
 
 ```bash
 ./vendor/bin/pint --dirty --format agent
@@ -424,7 +424,7 @@ Expected: Web and API recovery tests PASS.
 - Consumes: `AccountService` and `MobileTokenService`.
 - Produces: `ProfilePage::saveProfile()`, `SecurityPage::updatePassword()`, `revokeDevice(int)`, `revokeAllDevices()`, `logoutOtherDevices()`, `deleteAccount()`.
 
-- [ ] **Step 1: Write failing owner/security tests**
+- [x] **Step 1: Write failing owner/security tests**
 
 Cover profile normalization, email reverification, current-password errors, token revocation, foreign token 404, other browser sessions and cascade deletion:
 
@@ -446,7 +446,7 @@ public function test_profile_email_change_requires_reverification_and_sends_one_
 }
 ```
 
-- [ ] **Step 2: Run tests and confirm RED**
+- [x] **Step 2: Run tests and confirm RED**
 
 ```bash
 php artisan test tests/Feature/Web/WebAccountManagementTest.php
@@ -454,15 +454,15 @@ php artisan test tests/Feature/Web/WebAccountManagementTest.php
 
 Expected: FAIL because profile components do not exist.
 
-- [ ] **Step 3: Implement ProfilePage**
+- [x] **Step 3: Implement ProfilePage**
 
 Use public properties `name` and `email`, initialize only from `Auth::user()`, normalize before validation and call `AccountService::updateProfile`. Validation mirrors `UpdateProfileRequest`, including case-insensitive duplicate check excluding current user.
 
-- [ ] **Step 4: Implement SecurityPage**
+- [x] **Step 4: Implement SecurityPage**
 
 Keep passwords only in `currentPassword`, `password`, `passwordConfirmation`, reset them after action, and never render them back. Devices are loaded render-locally from `$user->tokens()->latest('id')`. Revoke uses `MobileTokenService::revoke($user,$tokenId)`. Other sessions use `Auth::logoutOtherDevices($currentPassword)`. Account deletion calls `AccountService::delete`, logs out, invalidates session and redirects home.
 
-- [ ] **Step 5: Run tests/build, format and commit**
+- [x] **Step 5: Run tests/build, format and commit**
 
 ```bash
 ./vendor/bin/pint --dirty --format agent
@@ -498,7 +498,7 @@ Expected: Web/API account tests PASS.
 - Produces: `UserLibraryQuery::ratings(User,UserLibraryFilters): LengthAwarePaginator`.
 - Produces: `UserLibrarySummaryQuery::get(User): UserLibrarySummary`.
 
-- [ ] **Step 1: Write failing API summary/filter tests**
+- [x] **Step 1: Write failing API summary/filter tests**
 
 Test `GET /api/v1/me/library/summary`, `q`, `type`, `year`, sort/direction, invalid values, pagination, private caching and constant query budget:
 
@@ -528,7 +528,7 @@ public function test_library_summary_is_owner_scoped_and_private(): void
 }
 ```
 
-- [ ] **Step 2: Run tests and confirm RED**
+- [x] **Step 2: Run tests and confirm RED**
 
 ```bash
 php artisan test tests/Feature/Api/V1/UserLibraryTest.php tests/Feature/Api/V1/UserLibrarySummaryTest.php
@@ -536,7 +536,7 @@ php artisan test tests/Feature/Api/V1/UserLibraryTest.php tests/Feature/Api/V1/U
 
 Expected: FAIL because summary route and filter validation do not exist.
 
-- [ ] **Step 3: Implement filter value object and shared query**
+- [x] **Step 3: Implement filter value object and shared query**
 
 Use an immutable filter shape:
 
@@ -556,13 +556,13 @@ final readonly class UserLibraryFilters
 
 Apply filters through `whereHas('catalogTitle')`, preserve visibility scope/eager card loads, and use explicit allowlisted order clauses. Rating sort is accepted only by ratings query/request context.
 
-- [ ] **Step 4: Implement summary DTO/resource/route**
+- [x] **Step 4: Implement summary DTO/resource/route**
 
 Return exact fields from the spec and named links. Aggregate counts are scoped to owner and current title visibility; history counts only rows with `first_started_at`; Continue Watching count uses the existing query semantics and maximum safe collection size rather than exposing hidden releases.
 
 After `UserLibrarySummaryQuery` exists, update `ProfilePage` from Task 4 to render the same summary DTO instead of issuing independent count queries.
 
-- [ ] **Step 5: Add reversible indexes and verify schema test**
+- [x] **Step 5: Add reversible indexes and verify schema test**
 
 Migration adds named indexes:
 
@@ -574,7 +574,7 @@ $table->index(['user_id', 'rating', 'updated_at', 'id'], 'catalog_user_state_rat
 
 `down()` drops those exact names. Do not edit existing migrations.
 
-- [ ] **Step 6: Run tests, format and commit**
+- [x] **Step 6: Run tests, format and commit**
 
 ```bash
 ./vendor/bin/pint --dirty --format agent

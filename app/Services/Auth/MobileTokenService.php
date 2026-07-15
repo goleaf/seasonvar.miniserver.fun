@@ -39,4 +39,9 @@ final class MobileTokenService
 
         $token->delete();
     }
+
+    public function revokeAll(User $user): int
+    {
+        return $user->tokens()->delete();
+    }
 }

@@ -15,6 +15,14 @@ final class AccountService
     /** @param array{name?: string, email?: string} $data */
     public function updateProfile(User $user, array $data): User
     {
+        if (array_key_exists('name', $data)) {
+            $data['name'] = Str::squish($data['name']);
+        }
+
+        if (array_key_exists('email', $data)) {
+            $data['email'] = Str::lower(Str::squish($data['email']));
+        }
+
         $oldEmail = Str::lower(Str::squish((string) $user->email));
         $emailChanged = array_key_exists('email', $data)
             && $oldEmail !== $data['email'];
@@ -76,7 +84,9 @@ final class AccountService
 
         DB::transaction(function () use ($user): void {
             $user->tokens()->delete();
-            DB::table('password_reset_tokens')->where('email', $user->email)->delete();
+            DB::table('password_reset_tokens')
+                ->whereRaw('lower(email) = ?', [Str::lower((string) $user->email)])
+                ->delete();
             DB::table('sessions')->where('user_id', $user->getKey())->delete();
             $user->deleteOrFail();
         }, attempts: 3);

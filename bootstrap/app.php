@@ -58,6 +58,11 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $invalidVerificationLink = static fn () => response()->view('errors.403', [
+            'title' => 'Ссылка недействительна',
+            'message' => 'Ссылка недействительна или срок её действия истёк.',
+        ], 403);
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*'),
         );
@@ -86,8 +91,12 @@ return Application::configure(basePath: dirname(__DIR__))
                 401,
             );
         });
-        $exceptions->render(function (AuthorizationException $exception, Request $request) {
+        $exceptions->render(function (AuthorizationException $exception, Request $request) use ($invalidVerificationLink) {
             if (! $request->is('api/*')) {
+                if ($request->routeIs('verification.verify') || $request->is('email/verify/*')) {
+                    return $invalidVerificationLink();
+                }
+
                 return null;
             }
 
@@ -98,8 +107,12 @@ return Application::configure(basePath: dirname(__DIR__))
                 403,
             );
         });
-        $exceptions->render(function (AccessDeniedHttpException $exception, Request $request) {
+        $exceptions->render(function (AccessDeniedHttpException $exception, Request $request) use ($invalidVerificationLink) {
             if (! $request->is('api/*')) {
+                if ($request->routeIs('verification.verify') || $request->is('email/verify/*')) {
+                    return $invalidVerificationLink();
+                }
+
                 return null;
             }
 
@@ -110,8 +123,12 @@ return Application::configure(basePath: dirname(__DIR__))
                 403,
             );
         });
-        $exceptions->render(function (InvalidSignatureException $exception, Request $request) {
+        $exceptions->render(function (InvalidSignatureException $exception, Request $request) use ($invalidVerificationLink) {
             if (! $request->is('api/*')) {
+                if ($request->routeIs('verification.verify') || $request->is('email/verify/*')) {
+                    return $invalidVerificationLink();
+                }
+
                 return null;
             }
 

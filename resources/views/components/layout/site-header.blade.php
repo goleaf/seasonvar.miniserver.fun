@@ -69,6 +69,22 @@
                     <x-ui.icon name="fa-solid fa-bookmark" />
                     <span class="sr-only xl:not-sr-only">Моя библиотека</span>
                 </a>
+                <a href="{{ route('profile.show') }}" @class([
+                    'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-control px-3 py-2',
+                    'bg-emerald-50 text-emerald-700' => request()->routeIs('profile.show'),
+                    'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('profile.show'),
+                ]) @if (request()->routeIs('profile.show')) aria-current="page" @endif>
+                    <x-ui.icon name="fa-solid fa-user" />
+                    <span class="sr-only xl:not-sr-only">Профиль</span>
+                </a>
+                <a href="{{ route('profile.security') }}" @class([
+                    'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-control px-3 py-2',
+                    'bg-emerald-50 text-emerald-700' => request()->routeIs('profile.security'),
+                    'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('profile.security'),
+                ]) @if (request()->routeIs('profile.security')) aria-current="page" @endif>
+                    <x-ui.icon name="fa-solid fa-shield-halved" />
+                    <span class="sr-only xl:not-sr-only">Безопасность</span>
+                </a>
                 @can('manage-seasonvar-imports')
                     <a href="{{ route('admin.imports') }}" @class([
                         'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-control px-3 py-2',

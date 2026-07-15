@@ -17,7 +17,7 @@ final class VerifyAccountEmail extends VerifyEmail implements ShouldQueue
     /** @param mixed $notifiable */
     protected function verificationUrl($notifiable): string
     {
-        return URL::temporarySignedRoute('api.v1.auth.verify', now()->addMinutes(60), [
+        return URL::temporarySignedRoute('verification.verify', now()->addMinutes(60), [
             'id' => $notifiable->getKey(),
             'hash' => sha1($notifiable->getEmailForVerification()),
         ]);

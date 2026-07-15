@@ -14,8 +14,19 @@ use Illuminate\Validation\ValidationException;
 
 final class AccountPasswordResetService
 {
+    public const REQUEST_STATUS = 'Если аккаунт существует, письмо для восстановления отправлено.';
+
+    public function sendResetLink(string $email): void
+    {
+        $email = Str::lower(Str::squish($email));
+        $user = User::query()->whereRaw('lower(email) = ?', [$email])->first();
+
+        Password::sendResetLink(['email' => $user?->email ?? $email]);
+    }
+
     public function reset(string $email, string $token, string $password): void
     {
+        $email = Str::lower(Str::squish($email));
         $user = User::query()->whereRaw('lower(email) = ?', [$email])->first();
         $status = Password::reset([
             'email' => $user?->email ?? $email,

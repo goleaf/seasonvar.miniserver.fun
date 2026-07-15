@@ -26,9 +26,24 @@ final class WebAuthenticationRateLimiter
         return RateLimiter::tooManyAttempts($key, $maximumAttempts);
     }
 
-    public function hit(string $key): void
+    public function verificationKey(int $userId): string
     {
-        RateLimiter::hit($key, self::DECAY_SECONDS);
+        return 'web-auth:verification:'.$userId;
+    }
+
+    public function forgotPasswordKey(string $email, ?string $ipAddress): string
+    {
+        return 'web-auth:forgot-password:'.Str::lower(Str::squish($email)).'|'.($ipAddress ?? 'unknown');
+    }
+
+    public function resetPasswordKey(string $email, ?string $ipAddress): string
+    {
+        return 'web-auth:reset-password:'.Str::lower(Str::squish($email)).'|'.($ipAddress ?? 'unknown');
+    }
+
+    public function hit(string $key, int $decaySeconds = self::DECAY_SECONDS): void
+    {
+        RateLimiter::hit($key, $decaySeconds);
     }
 
     public function clear(string $key): void

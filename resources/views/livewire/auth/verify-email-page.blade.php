@@ -13,9 +13,28 @@
             </div>
         </div>
 
-        <a href="{{ route('library.index') }}" class="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 sm:w-auto">
-            <x-ui.icon name="fa-solid fa-bookmark" />
-            <span>Перейти в библиотеку</span>
-        </a>
+        <div class="mt-6 space-y-4">
+            <x-form.status-message :message="$status" />
+            <x-form.input-error for="email" id="verification-email-error" />
+
+            <div class="flex flex-col gap-3 sm:flex-row">
+                <button
+                    type="button"
+                    wire:click="resend"
+                    wire:loading.attr="disabled"
+                    wire:target="resend"
+                    class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+                >
+                    <x-ui.icon name="fa-solid fa-paper-plane" />
+                    <span wire:loading.remove wire:target="resend">Отправить письмо ещё раз</span>
+                    <span wire:loading wire:target="resend">Отправка…</span>
+                </button>
+
+                <a href="{{ route('library.index') }}" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200 sm:w-auto">
+                    <x-ui.icon name="fa-solid fa-bookmark" />
+                    <span>Перейти в библиотеку</span>
+                </a>
+            </div>
+        </div>
     </section>
 </div>

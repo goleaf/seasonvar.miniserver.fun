@@ -1,17 +1,23 @@
 <?php
 
 use App\Enums\CatalogFilterType;
+use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogDirectoryRedirectController;
 use App\Http\Controllers\CatalogSitemapController;
 use App\Http\Controllers\InfrastructureHealthController;
 use App\Http\Controllers\PlaybackSourceController;
+use App\Livewire\Auth\ConfirmPasswordPage;
+use App\Livewire\Auth\ForgotPasswordPage;
 use App\Livewire\Auth\LoginPage;
 use App\Livewire\Auth\RegisterPage;
+use App\Livewire\Auth\ResetPasswordPage;
 use App\Livewire\Auth\VerifyEmailPage;
 use App\Livewire\CatalogAdministrationManager;
 use App\Livewire\CatalogDirectoryBrowser;
 use App\Livewire\CatalogSeries;
+use App\Livewire\Profile\ProfilePage;
+use App\Livewire\Profile\SecurityPage;
 use App\Livewire\SeasonvarImportManager;
 use App\Livewire\ViewingActivity;
 use App\Services\Catalog\CatalogDirectoryRegistry;
@@ -28,10 +34,20 @@ Route::get('/', [CatalogController::class, 'index'])->name('home');
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', LoginPage::class)->name('login');
     Route::get('/register', RegisterPage::class)->name('register');
+    Route::get('/forgot-password', ForgotPasswordPage::class)->name('password.request');
+    Route::get('/reset-password/{token}', ResetPasswordPage::class)->name('password.reset');
 });
 
-Route::middleware('auth')->group(function (): void {
+Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
+    ->whereNumber('id')
+    ->middleware('signed')
+    ->name('verification.verify');
+
+Route::middleware(['auth', 'auth.session'])->group(function (): void {
     Route::get('/email/verify', VerifyEmailPage::class)->name('verification.notice');
+    Route::get('/confirm-password', ConfirmPasswordPage::class)->name('password.confirm');
+    Route::get('/profile', ProfilePage::class)->name('profile.show');
+    Route::get('/profile/security', SecurityPage::class)->name('profile.security');
     Route::redirect('/library', '/watching')->name('library.index');
 });
 

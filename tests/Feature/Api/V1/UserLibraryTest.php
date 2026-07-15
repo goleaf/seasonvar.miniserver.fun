@@ -137,6 +137,70 @@ final class UserLibraryTest extends TestCase
         }
     }
 
+    public function test_library_filters_and_allowlisted_sorts_are_shared_by_watchlist_and_ratings(): void
+    {
+        $user = User::factory()->create();
+        $baseTime = now()->subDay();
+        $items = [
+            ['slug' => 'alpha-serial', 'title' => 'Альфа сериал', 'type' => 'serial', 'year' => 2024, 'rating' => 5],
+            ['slug' => 'needed-anime', 'title' => 'Нужное аниме', 'type' => 'anime', 'year' => 2024, 'rating' => 9],
+            ['slug' => 'older-anime', 'title' => 'Старое аниме', 'type' => 'anime', 'year' => 2023, 'rating' => 7],
+        ];
+
+        foreach ($items as $index => $item) {
+            $title = CatalogTitle::factory()->create([
+                'slug' => $item['slug'],
+                'title' => $item['title'],
+                'type' => $item['type'],
+                'year' => $item['year'],
+            ]);
+            $state = CatalogTitleUserState::query()->create([
+                'user_id' => $user->id,
+                'catalog_title_id' => $title->id,
+                'in_watchlist' => true,
+                'rating' => $item['rating'],
+            ]);
+            $state->forceFill(['updated_at' => $baseTime->copy()->addMinutes($index)])->saveQuietly();
+        }
+
+        Sanctum::actingAs($user, ['mobile:read']);
+
+        $this->getJson('/api/v1/me/watchlist?q=%20%20Нужное%20%20&type=anime&year=2024&sort=title&direction=asc')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title.slug', 'needed-anime')
+            ->assertJsonPath('meta.total', 1);
+
+        $this->getJson('/api/v1/me/ratings?sort=rating&direction=desc')
+            ->assertOk()
+            ->assertJsonCount(3, 'data')
+            ->assertJsonPath('data.0.title.slug', 'needed-anime')
+            ->assertJsonPath('data.1.title.slug', 'older-anime')
+            ->assertJsonPath('data.2.title.slug', 'alpha-serial');
+
+        $this->getJson('/api/v1/me/watchlist?sort=year&direction=asc')
+            ->assertOk()
+            ->assertJsonPath('data.0.title.slug', 'older-anime');
+    }
+
+    public function test_library_filter_validation_rejects_unknown_or_malformed_values(): void
+    {
+        Sanctum::actingAs(User::factory()->create(), ['mobile:read']);
+
+        foreach ([
+            ['endpoint' => 'watchlist', 'query' => 'type=film', 'field' => 'type'],
+            ['endpoint' => 'watchlist', 'query' => 'year=1899', 'field' => 'year'],
+            ['endpoint' => 'watchlist', 'query' => 'sort=rating', 'field' => 'sort'],
+            ['endpoint' => 'ratings', 'query' => 'sort=unsupported', 'field' => 'sort'],
+            ['endpoint' => 'ratings', 'query' => 'direction=sideways', 'field' => 'direction'],
+            ['endpoint' => 'ratings', 'query' => 'q[]=invalid', 'field' => 'q'],
+        ] as $case) {
+            $this->getJson("/api/v1/me/{$case['endpoint']}?{$case['query']}")
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors($case['field']);
+        }
+    }
+
     public function test_watchlist_query_count_stays_constant_as_the_page_grows(): void
     {
         $user = User::factory()->create();

@@ -12,6 +12,12 @@
             </div>
         </header>
 
+        @if ($status)
+            <div class="mt-6">
+                <x-form.status-message :message="$status" />
+            </div>
+        @endif
+
         <form wire:submit="login" class="mt-6 space-y-5" novalidate>
             <x-form.field
                 label="Электронная почта"
@@ -42,9 +48,12 @@
             </button>
         </form>
 
-        <p class="mt-6 border-t border-slate-200 pt-5 text-center text-sm leading-6 text-slate-600">
-            Нет аккаунта?
-            <a href="{{ route('register') }}" class="font-bold text-emerald-700 hover:text-emerald-600">Зарегистрироваться</a>
-        </p>
+        <div class="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-5 text-center text-sm leading-6 sm:flex-row sm:items-center sm:justify-between sm:text-left">
+            <a href="{{ route('password.request') }}" class="font-bold text-emerald-700 hover:text-emerald-600">Забыли пароль?</a>
+            <span class="text-slate-600">
+                Нет аккаунта?
+                <a href="{{ route('register') }}" class="font-bold text-emerald-700 hover:text-emerald-600">Зарегистрироваться</a>
+            </span>
+        </div>
     </section>
 </div>

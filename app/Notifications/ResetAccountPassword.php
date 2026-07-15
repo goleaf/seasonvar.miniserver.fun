@@ -17,8 +17,7 @@ final class ResetAccountPassword extends ResetPassword implements ShouldQueue
     /** @param mixed $notifiable */
     protected function resetUrl($notifiable): string
     {
-        return url('/api/v1/auth/reset-password').'?'.Arr::query([
-            'token' => $this->token,
+        return route('password.reset', ['token' => $this->token]).'?'.Arr::query([
             'email' => $notifiable->getEmailForPasswordReset(),
         ]);
     }

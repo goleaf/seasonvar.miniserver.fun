@@ -11,6 +11,7 @@ use Illuminate\Cache\Events\CacheMissed;
 use Illuminate\Cache\Events\KeyForgotten;
 use Illuminate\Cache\Events\KeyWritten;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
@@ -57,6 +58,7 @@ class AppServiceProvider extends ServiceProvider
             return Route::post($path, $handle)
                 ->middleware('web');
         });
+        Livewire::addPersistentMiddleware(AuthenticateSession::class);
 
         Model::shouldBeStrict(! $this->app->isProduction());
         DB::prohibitDestructiveCommands($this->app->isProduction());

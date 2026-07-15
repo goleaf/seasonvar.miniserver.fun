@@ -139,6 +139,8 @@ Route::prefix('v1')->name('api.v1.')->group(function (): void {
             ->name('me.watchlist.index');
         Route::get('/me/ratings', [UserLibraryController::class, 'ratings'])
             ->name('me.ratings.index');
+        Route::get('/me/library/summary', [UserLibraryController::class, 'summary'])
+            ->name('me.library.summary');
         Route::get('/me/continue-watching', [ViewingActivityController::class, 'continueWatching'])
             ->name('me.continue-watching.index');
         Route::get('/me/history', [ViewingActivityController::class, 'history'])
