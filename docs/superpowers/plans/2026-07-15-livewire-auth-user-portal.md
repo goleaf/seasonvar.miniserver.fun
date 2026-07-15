@@ -828,7 +828,7 @@ Expected: docs/OpenAPI tests PASS and only intended docs/generated files are sta
 - Consumes: all prior tasks.
 - Produces: verified responsive browser flows and clean `main` worktree.
 
-- [ ] **Step 1: Add browser flow tests before UI fixes**
+- [x] **Step 1: Add browser flow tests before UI fixes**
 
 The Playwright file must exercise:
 
@@ -843,7 +843,7 @@ test('guest authentication and private library navigation are responsive', async
 
 Extend `tests/browser/prepare-fixtures.php` with a verified `browser@example.com` user whose password is `Browser-Strong-Password-42!`, plus one watchlist item and one real playback-progress row. Change Playwright server env to `SESSION_DRIVER=database` so authentication persists across HTTP requests. Add a Tablet Chromium project with viewport 768×1024. The test logs in through `/login`, then verifies profile, library tabs, logout, player progress and Continue Watching. Run at 390×844, 768×1024 and 1440×1200; assert no console/page errors and no failed same-origin requests.
 
-- [ ] **Step 2: Run Playwright and confirm any RED is behavior-specific**
+- [x] **Step 2: Run Playwright and confirm any RED is behavior-specific**
 
 ```bash
 npx playwright test tests/browser/auth-portal.spec.js
@@ -851,7 +851,7 @@ npx playwright test tests/browser/auth-portal.spec.js
 
 Expected before final UI fixes: any failure names the exact missing/incorrect auth or geometry behavior, not a test syntax/setup error.
 
-- [ ] **Step 3: Apply minimal UI fixes and rerun focused checks**
+- [x] **Step 3: Apply minimal UI fixes and rerun focused checks**
 
 Fix only failures demonstrated by the browser test. Preserve light theme, no internal scroll, full text and 44×44 controls.
 

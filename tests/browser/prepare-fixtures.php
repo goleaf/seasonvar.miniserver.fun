@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 use App\Models\Actor;
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleUserState;
 use App\Models\Country;
 use App\Models\Episode;
+use App\Models\EpisodeViewProgress;
 use App\Models\LicensedMedia;
 use App\Models\Season;
+use App\Models\User;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Hash;
 
 require dirname(__DIR__, 2).'/vendor/autoload.php';
 
@@ -18,7 +22,10 @@ $app = require dirname(__DIR__, 2).'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
 $database = (string) config('database.connections.sqlite.database');
-$expected = base_path('output/playwright/browser.sqlite');
+$configuredDatabase = getenv('BROWSER_TEST_DATABASE');
+$expected = is_string($configuredDatabase) && $configuredDatabase !== ''
+    ? $configuredDatabase
+    : base_path('output/playwright/browser.sqlite');
 
 if ($database !== $expected) {
     fwrite(STDERR, "Browser fixtures require the dedicated output/playwright/browser.sqlite file.\n");
@@ -89,7 +96,7 @@ $episode = Episode::factory()->create([
     'title' => 'Серия 1',
 ]);
 
-LicensedMedia::factory()->create([
+$media = LicensedMedia::factory()->create([
     'catalog_title_id' => $title->id,
     'season_id' => $season->id,
     'episode_id' => $episode->id,
@@ -98,10 +105,37 @@ LicensedMedia::factory()->create([
     'path' => 'https://media.example.com/browser-smoke.m3u8',
     'playback_url' => 'https://media.example.com/browser-smoke.m3u8',
     'format' => 'm3u8',
+    'duration_seconds' => 600,
     'status' => 'published',
     'check_status' => 'available',
     'health_status' => 'active',
     'published_at' => now()->subMinute(),
+]);
+
+$user = User::factory()->create([
+    'name' => 'Browser User',
+    'email' => 'browser@example.com',
+    'email_verified_at' => now()->subDay(),
+    'password' => Hash::make('Browser-Strong-Password-42!'),
+]);
+
+CatalogTitleUserState::query()->create([
+    'user_id' => $user->id,
+    'catalog_title_id' => $title->id,
+    'in_watchlist' => true,
+    'rating' => null,
+]);
+
+EpisodeViewProgress::query()->create([
+    'user_id' => $user->id,
+    'catalog_title_id' => $title->id,
+    'episode_id' => $episode->id,
+    'licensed_media_id' => $media->id,
+    'position_seconds' => 120,
+    'duration_seconds' => 600,
+    'progress_percent' => 20,
+    'first_started_at' => now()->subMinutes(10),
+    'last_watched_at' => now()->subMinute(),
 ]);
 
 if (Artisan::call('catalog:search-rebuild', ['--chunk' => 50]) !== 0) {

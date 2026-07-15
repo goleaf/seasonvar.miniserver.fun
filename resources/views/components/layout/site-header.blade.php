@@ -25,7 +25,7 @@
             </button>
         </form>
 
-        <nav aria-label="Основная навигация" class="order-2 flex items-center gap-1.5 text-sm font-bold lg:order-3">
+        <nav aria-label="Основная навигация" class="order-2 col-span-2 flex flex-wrap items-center justify-end gap-1.5 text-sm font-bold sm:col-span-1 lg:order-3">
             <a href="{{ route('home') }}" @class([
                 'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-control px-3 py-2',
                 'bg-emerald-50 text-emerald-700' => request()->routeIs('home'),

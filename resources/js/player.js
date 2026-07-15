@@ -140,6 +140,7 @@ class CatalogPlayerSession {
         this.lastSavedPosition = Number.parseInt(video.dataset.progressPosition || '', 10) || 0;
         this.progressSequence = 0;
         this.hasDispatchedProgress = false;
+        this.hasStartedPlayback = false;
         this.resumePosition = this.lastSavedPosition;
         this.networkRetries = 0;
         this.mediaRecoveries = 0;
@@ -197,6 +198,7 @@ class CatalogPlayerSession {
     }
 
     handlePlay() {
+        this.hasStartedPlayback = true;
         this.setStatus('playing', 'Видео воспроизводится.');
         this.dispatchProgress(false, true, 'play');
         this.startHeartbeat();
@@ -398,6 +400,7 @@ class CatalogPlayerSession {
     canReportProgress() {
         if (
             this.destroyed
+            || !this.hasStartedPlayback
             || this.video.dataset.progressEnabled !== '1'
             || this.playbackSessionToken === ''
         ) {
