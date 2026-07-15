@@ -131,6 +131,33 @@ class BladeTemplateTest extends TestCase
             ->assertSee('bg-emerald-50', false);
     }
 
+    public function test_account_form_components_render_visible_labels_and_accessible_controls(): void
+    {
+        $this->blade(
+            '<x-form.field label="Электронная почта" for="account-email" type="email" wire:model="form.email" autocomplete="email" required />',
+        )
+            ->assertSeeText('Электронная почта')
+            ->assertSee('for="account-email"', false)
+            ->assertSee('id="account-email"', false)
+            ->assertSee('wire:model="form.email"', false)
+            ->assertSee('autocomplete="email"', false)
+            ->assertSee('min-h-11', false);
+
+        $this->blade(
+            '<x-form.password-field label="Пароль" for="account-password" wire:model="form.password" autocomplete="current-password" required />',
+        )
+            ->assertSeeText('Пароль')
+            ->assertSee('type="password"', false)
+            ->assertSee('autocomplete="current-password"', false);
+
+        $this->blade(
+            '<x-form.checkbox label="Запомнить меня" for="remember-account" wire:model="form.remember" />',
+        )
+            ->assertSeeText('Запомнить меня')
+            ->assertSee('type="checkbox"', false)
+            ->assertSee('wire:model="form.remember"', false);
+    }
+
     public function test_poster_frame_covers_and_overscans_without_an_inner_outline(): void
     {
         $view = $this->blade('<x-ui.poster-frame src="https://media.example.com/poster.jpg" alt="Постер сериала" class="aspect-[2/3]" />');

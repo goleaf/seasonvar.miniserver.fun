@@ -182,8 +182,8 @@ Expected: all three test files PASS; branch is `main`.
 ### Task 2: Livewire registration, login and logout
 
 **Files:**
-- Create: `app/Providers/AuthServiceProvider.php`
-- Modify: `bootstrap/providers.php`
+- Create: `app/Services/Auth/WebAuthenticationRateLimiter.php`
+- Create: `app/Services/Auth/WebAuthenticationService.php`
 - Create: `app/Livewire/Forms/Auth/RegistrationForm.php`
 - Create: `app/Livewire/Forms/Auth/LoginForm.php`
 - Create: `app/Livewire/Auth/RegisterPage.php`
@@ -206,9 +206,9 @@ Expected: all three test files PASS; branch is `main`.
 
 **Interfaces:**
 - Consumes: `AccountRegistrationService::register()` from Task 1.
-- Produces: named routes `login`, `register`, `library.index`; `LogoutButton::logout(): RedirectResponse`.
+- Produces: named routes `login`, `register`, `library.index`; `LogoutButton::logout(): void` with a Livewire redirect effect.
 
-- [ ] **Step 1: Write failing route and Livewire auth tests**
+- [x] **Step 1: Write failing route and Livewire auth tests**
 
 Create tests covering guest rendering, registration, intended login and logout:
 
@@ -248,7 +248,7 @@ public function test_login_regenerates_the_session_and_returns_to_intended_route
 }
 ```
 
-- [ ] **Step 2: Run test and confirm RED**
+- [x] **Step 2: Run test and confirm RED**
 
 Run:
 
@@ -258,9 +258,9 @@ php artisan test tests/Feature/Web/WebAuthenticationTest.php
 
 Expected: FAIL because Web auth components and routes do not exist.
 
-- [ ] **Step 3: Implement routes, rate limiters and form objects**
+- [x] **Step 3: Implement routes, rate limiters and form objects**
 
-Add guest routes and protected placeholders for the already-approved route names. Task 2 installs the basic authenticated `verification.notice` page and a temporary named `/library` redirect to the existing authenticated viewing page; Task 3 adds verification actions and Task 6 replaces the redirect with `UserLibraryPage`. `AuthServiceProvider` defines `web-register`, `web-login`, `web-verification`, `web-forgot-password` and `web-reset-password`. Login key is normalized email plus IP.
+Add guest routes and protected placeholders for the already-approved route names. Task 2 installs the basic authenticated `verification.notice` page and a temporary named `/library` redirect to the existing authenticated viewing page; Task 3 adds verification actions and Task 6 replaces the redirect with `UserLibraryPage`. Because Livewire submits actions through its shared update route, `WebAuthenticationRateLimiter` applies separate action-level keys instead of rate-limiting only the GET form routes. Login key is normalized email plus IP; registration is limited per IP.
 
 `RegistrationForm` and `LoginForm` use these exact property names:
 
@@ -283,27 +283,27 @@ final class LoginForm extends Form
 
 Use the API password contract `Password::min(12)->letters()->mixedCase()->numbers()->symbols()` and Russian messages. Normalize before validation.
 
-- [ ] **Step 4: Implement full-page components and accessible views**
+- [x] **Step 4: Implement full-page components and accessible views**
 
 `RegisterPage::register()` validates, calls `AccountRegistrationService`, logs in, regenerates the session and redirects to `verification.notice`. `LoginPage::login()` rate-limits, performs case-insensitive user lookup plus `Auth::attempt(['email' => $storedEmail, 'password' => $this->form->password], $this->form->remember)`, regenerates and returns `redirect()->intended(route('library.index'))`. Failure adds only `form.email` generic error.
 
-`LogoutButton::logout()` uses:
+`LogoutButton::logout()` delegates session teardown to `WebAuthenticationService`, which uses:
 
 ```php
 Auth::guard('web')->logout();
 request()->session()->invalidate();
 request()->session()->regenerateToken();
 
-return $this->redirectRoute('home');
+$this->redirectRoute('home');
 ```
 
 Views extend `layouts.app`, set `robots=noindex,nofollow`, use visible labels, correct autocomplete and 44 px controls. No `wire:navigate`.
 
-- [ ] **Step 5: Update header and guest redirects**
+- [x] **Step 5: Update header and guest redirects**
 
 Guest header shows `Войти` and `Регистрация`; authenticated header shows `Моя библиотека`, profile/security links and `<livewire:auth.logout-button />`. `bootstrap/app.php` keeps `redirectGuestsTo(route('login'))` and sets authenticated guest-route redirect to `library.index`.
 
-- [ ] **Step 6: Run tests/build, format and commit**
+- [x] **Step 6: Run tests/build, format and commit**
 
 Run:
 

@@ -6,6 +6,9 @@ use App\Http\Controllers\CatalogDirectoryRedirectController;
 use App\Http\Controllers\CatalogSitemapController;
 use App\Http\Controllers\InfrastructureHealthController;
 use App\Http\Controllers\PlaybackSourceController;
+use App\Livewire\Auth\LoginPage;
+use App\Livewire\Auth\RegisterPage;
+use App\Livewire\Auth\VerifyEmailPage;
 use App\Livewire\CatalogAdministrationManager;
 use App\Livewire\CatalogDirectoryBrowser;
 use App\Livewire\CatalogSeries;
@@ -21,6 +24,17 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 Route::get('/', [CatalogController::class, 'index'])->name('home');
+
+Route::middleware('guest')->group(function (): void {
+    Route::get('/login', LoginPage::class)->name('login');
+    Route::get('/register', RegisterPage::class)->name('register');
+});
+
+Route::middleware('auth')->group(function (): void {
+    Route::get('/email/verify', VerifyEmailPage::class)->name('verification.notice');
+    Route::redirect('/library', '/watching')->name('library.index');
+});
+
 $publicDocumentMiddleware = [
     EncryptCookies::class,
     AddQueuedCookiesToResponse::class,

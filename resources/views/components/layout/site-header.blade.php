@@ -42,14 +42,32 @@
                 <x-ui.icon name="fa-solid fa-table-cells-large" />
                 <span class="sr-only xl:not-sr-only">Каталог</span>
             </a>
-            @auth
-                <a href="{{ route('viewing-activity') }}" @class([
+            @guest
+                <a href="{{ route('login') }}" @class([
                     'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-control px-3 py-2',
-                    'bg-emerald-50 text-emerald-700' => request()->routeIs('viewing-activity'),
-                    'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('viewing-activity'),
-                ]) @if (request()->routeIs('viewing-activity')) aria-current="page" @endif>
-                    <x-ui.icon name="fa-solid fa-clock-rotate-left" />
-                    <span class="sr-only xl:not-sr-only">Мои просмотры</span>
+                    'bg-emerald-50 text-emerald-700' => request()->routeIs('login'),
+                    'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('login'),
+                ]) @if (request()->routeIs('login')) aria-current="page" @endif>
+                    <x-ui.icon name="fa-solid fa-right-to-bracket" />
+                    <span class="sr-only xl:not-sr-only">Войти</span>
+                </a>
+                <a href="{{ route('register') }}" @class([
+                    'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-control px-3 py-2',
+                    'bg-emerald-50 text-emerald-700' => request()->routeIs('register'),
+                    'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('register'),
+                ]) @if (request()->routeIs('register')) aria-current="page" @endif>
+                    <x-ui.icon name="fa-solid fa-user-plus" />
+                    <span class="sr-only xl:not-sr-only">Регистрация</span>
+                </a>
+            @endguest
+            @auth
+                <a href="{{ route('library.index') }}" @class([
+                    'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-control px-3 py-2',
+                    'bg-emerald-50 text-emerald-700' => request()->routeIs('library.*', 'viewing-activity'),
+                    'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('library.*', 'viewing-activity'),
+                ]) @if (request()->routeIs('library.*', 'viewing-activity')) aria-current="page" @endif>
+                    <x-ui.icon name="fa-solid fa-bookmark" />
+                    <span class="sr-only xl:not-sr-only">Моя библиотека</span>
                 </a>
                 @can('manage-seasonvar-imports')
                     <a href="{{ route('admin.imports') }}" @class([
@@ -61,6 +79,7 @@
                         <span class="sr-only xl:not-sr-only">Импорт</span>
                     </a>
                 @endcan
+                <livewire:auth.logout-button />
             @endauth
         </nav>
     </div>
