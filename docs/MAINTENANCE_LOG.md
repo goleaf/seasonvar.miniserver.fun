@@ -322,7 +322,10 @@
 - `2026_07_15_220000_extend_catalog_title_reviews_for_community_reviews.php`
 - `2026_07_15_230000_create_canonical_tag_domain.php`
 - `2026_07_15_230050_preserve_tag_archive_state.php`
+- `2026_07_15_230060_optimize_public_tag_eligibility_index.php`
+- `2026_07_15_230075_repair_canonical_tag_normalization.php`
 - `2026_07_15_230100_backfill_canonical_tag_provider_provenance.php`
 - `2026_07_15_230200_enforce_canonical_tag_name_uniqueness.php`
 - `2026_07_15_235000_add_home_content_addition_indexes.php`
+- `2026_07_15_235100_repair_catalog_title_review_rollout.php`
 <!-- project-docs:end -->
