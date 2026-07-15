@@ -690,7 +690,7 @@ Expected: library and catalog regression tests PASS; build succeeds.
 - Produces: `CatalogTitlePolicy::interact()` requires verified email plus entitlement.
 - Produces: query-provided attributes `user_in_watchlist`, `user_rating`, `user_progress_percent`, `user_primary_action` on card titles for authenticated requests.
 
-- [ ] **Step 1: Write failing parity and query-budget tests**
+- [x] **Step 1: Write failing parity and query-budget tests**
 
 Add a Livewire test proving an unverified user can read but cannot mutate, a verified user can mutate, and catalog card query count is constant as card count grows:
 
@@ -711,7 +711,7 @@ public function test_unverified_web_user_sees_verification_prompt_and_cannot_cha
 }
 ```
 
-- [ ] **Step 2: Run tests and confirm RED**
+- [x] **Step 2: Run tests and confirm RED**
 
 ```bash
 php artisan test tests/Feature/AuthorizationTest.php tests/Feature/CatalogPageTest.php --filter='unverified|personal|query'
@@ -719,7 +719,7 @@ php artisan test tests/Feature/AuthorizationTest.php tests/Feature/CatalogPageTe
 
 Expected: FAIL because Web policies do not require verification and cards lack personal attributes.
 
-- [ ] **Step 3: Harden policies and UI state**
+- [x] **Step 3: Harden policies and UI state**
 
 Implement:
 
@@ -738,11 +738,11 @@ public function deleteAny(User $user): bool
 
 `EpisodeViewProgressPolicy::delete` also requires owner plus verified email. API keeps `verified.api` so JSON error code remains unchanged. Player shows a linked verification prompt instead of a dead hint.
 
-- [ ] **Step 4: Add query-prepared personal card state**
+- [x] **Step 4: Add query-prepared personal card state**
 
 `CatalogUserCardStateLoader::load(Collection $titles, ?User $user): Collection` performs grouped owner-state/progress queries, sets `user_in_watchlist`, `user_rating`, `user_progress_percent` and a precomputed `user_primary_action` array, and never runs one query per title. Home, catalog, directory and recommendation page builders call it after retrieving their bounded title collections. `TitleCard` only reads already-present attributes and exposes query-free display properties. Library passes its known state directly. Do not query inside the component or Blade.
 
-- [ ] **Step 5: Run regression tests/build, format and commit**
+- [x] **Step 5: Run regression tests/build, format and commit**
 
 ```bash
 ./vendor/bin/pint --dirty --format agent

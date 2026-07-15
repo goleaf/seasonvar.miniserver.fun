@@ -11,11 +11,11 @@ final class EpisodeViewProgressPolicy
 {
     public function deleteAny(User $user): bool
     {
-        return $user->exists;
+        return $user->hasVerifiedEmail();
     }
 
     public function delete(User $user, EpisodeViewProgress $progress): bool
     {
-        return $progress->user_id === $user->id;
+        return $user->hasVerifiedEmail() && $progress->user_id === $user->id;
     }
 }

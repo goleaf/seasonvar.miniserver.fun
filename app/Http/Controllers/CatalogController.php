@@ -9,6 +9,7 @@ use App\Services\Catalog\CatalogStatsPageBuilder;
 use App\Services\Catalog\CatalogStatsPosterResponder;
 use App\Services\Catalog\CatalogTitlePageBuilder;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -20,9 +21,9 @@ class CatalogController extends Controller
         private readonly CatalogStatsPageBuilder $statsPage,
     ) {}
 
-    public function index(): View
+    public function index(Request $request): View
     {
-        return view('catalog.index', $this->homePage->data());
+        return view('catalog.index', $this->homePage->data($request->user()));
     }
 
     public function show(CatalogShowRequest $request, CatalogTitle $catalogTitle): View|RedirectResponse

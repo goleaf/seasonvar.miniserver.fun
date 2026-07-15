@@ -395,6 +395,7 @@ class CatalogTitlePlayer extends Component
             'ratingOptions' => $this->userState->ratingOptions(),
             'ratingMaximum' => $ratingRange['maximum'],
             'isAuthenticated' => $user !== null,
+            'canInteract' => $user?->hasVerifiedEmail() === true,
         ]);
     }
 

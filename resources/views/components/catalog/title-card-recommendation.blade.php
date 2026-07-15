@@ -72,4 +72,6 @@
             </span>
         @endif
     </div>
+
+    @include('components.catalog.title-card-personal-state')
 </x-ui.poster-card>

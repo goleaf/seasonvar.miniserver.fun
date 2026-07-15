@@ -118,7 +118,7 @@
                                 data-progress-episode="{{ $selectedEpisode?->id }}"
                                 data-progress-session="{{ $progressSessionToken }}"
                                 data-progress-position="{{ $primaryAction->episodeId === $selectedEpisode?->id ? $primaryAction->positionSeconds : 0 }}"
-                                data-progress-enabled="{{ $isAuthenticated ? '1' : '0' }}"
+                                data-progress-enabled="{{ $canInteract ? '1' : '0' }}"
                                 @if ($showView->selectedMediaFormat === 'm3u8') data-hls-src="{{ $showView->selectedMediaUrl }}" @endif
                             >
                                 <source src="{{ $showView->selectedMediaUrl }}" @if ($showView->selectedMediaType) type="{{ $showView->selectedMediaType }}" @endif>
@@ -189,7 +189,7 @@
                     <span>{{ __('catalog.player.your_series') }}</span>
                 </div>
 
-                @if ($isAuthenticated)
+                @if ($canInteract)
                     <div class="mt-3 grid gap-3 sm:grid-cols-2 sm:items-end">
                         <button
                             type="button"
@@ -216,6 +216,15 @@
                         @error('rating')
                             <p class="text-sm font-semibold text-rose-700">{{ $message }}</p>
                         @enderror
+                    </div>
+                @elseif ($isAuthenticated)
+                    <div class="mt-3 rounded-control border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
+                        <p class="font-bold">Подтвердите электронную почту</p>
+                        <p class="mt-1">После подтверждения можно сохранять тайтлы, оценки и позицию просмотра.</p>
+                        <a href="{{ route('verification.notice') }}" class="mt-2 inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 font-bold text-amber-800 hover:bg-amber-100">
+                            <x-ui.icon name="fa-solid fa-envelope-circle-check" />
+                            <span>Перейти к подтверждению</span>
+                        </a>
                     </div>
                 @else
                     <p class="mt-3 text-sm leading-6 text-slate-500">{{ __('catalog.player.auth_hint') }}</p>

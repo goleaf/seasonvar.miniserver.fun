@@ -69,4 +69,6 @@
             @endforeach
         </div>
     @endif
+
+    @include('components.catalog.title-card-personal-state')
 </x-ui.poster-card>

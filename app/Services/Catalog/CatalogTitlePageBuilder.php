@@ -23,6 +23,7 @@ class CatalogTitlePageBuilder
         private readonly CatalogTitlePlaybackQuery $playback,
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly ExternalMediaMetadata $mediaMetadata,
+        private readonly CatalogUserCardStateLoader $cardStates,
     ) {}
 
     /**
@@ -48,6 +49,7 @@ class CatalogTitlePageBuilder
         $mediaCount = $this->playback->availableMedia($catalogTitle, $user)->count();
         $genreIds = $taxonomiesByType->get('genre', collect())->pluck('id')->unique()->values();
         $recommendationItems = $this->recommendationItems($catalogTitle, $user, $genreIds);
+        $this->cardStates->load($recommendationItems->pluck('title'), $user);
 
         $showView = new CatalogShowViewModel(
             title: $catalogTitle,

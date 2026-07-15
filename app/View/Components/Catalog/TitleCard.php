@@ -23,6 +23,17 @@ class TitleCard extends Component
 
     public string $layout;
 
+    public bool $hasPersonalState;
+
+    public bool $userInWatchlist;
+
+    public ?int $userRating;
+
+    public ?int $userProgressPercent;
+
+    /** @var array{type: string, label: string, url: string}|null */
+    public ?array $userPrimaryAction;
+
     /**
      * @var Collection<int, Model>
      */
@@ -36,12 +47,23 @@ class TitleCard extends Component
         public ?int $rank = null,
         /** @var list<string> */
         public array $reasonLabels = [],
+        ?bool $userInWatchlist = null,
+        ?int $userRating = null,
+        ?int $userProgressPercent = null,
+        /** @var array{type: string, label: string, url: string}|null */
+        ?array $userPrimaryAction = null,
     ) {
         $this->layout = in_array($layout, self::LAYOUTS, true) ? $layout : 'grid';
         $this->seasonsCount = (int) ($title->seasons_count ?? ($title->relationLoaded('seasons') ? $title->seasons->count() : 0));
         $this->episodesCount = (int) ($title->episodes_count ?? 0);
         $this->mediaCount = (int) ($title->published_media_count ?? $title->licensed_media_count ?? 0);
         $this->latestSeason = $title->relationLoaded('latestSeason') ? $title->latestSeason : null;
+        $this->hasPersonalState = $userInWatchlist !== null || $title->hasAttribute('user_in_watchlist');
+        $this->userInWatchlist = $userInWatchlist
+            ?? ($title->hasAttribute('user_in_watchlist') && (bool) $title->getAttribute('user_in_watchlist'));
+        $this->userRating = $userRating ?? $this->integerAttribute($title, 'user_rating');
+        $this->userProgressPercent = $userProgressPercent ?? $this->integerAttribute($title, 'user_progress_percent');
+        $this->userPrimaryAction = $userPrimaryAction ?? $this->primaryActionAttribute($title);
         $this->cardRelations = collect()
             ->merge($title->relationLoaded('genres') ? $title->genres : collect())
             ->merge($title->relationLoaded('countries') ? $title->countries : collect())
@@ -58,5 +80,39 @@ class TitleCard extends Component
             'recommendation' => 'components.catalog.title-card-recommendation',
             default => 'components.catalog.title-card-horizontal',
         });
+    }
+
+    private function integerAttribute(CatalogTitle $title, string $key): ?int
+    {
+        if (! $title->hasAttribute($key)) {
+            return null;
+        }
+
+        $value = $title->getAttribute($key);
+
+        return $value === null ? null : (int) $value;
+    }
+
+    /** @return array{type: string, label: string, url: string}|null */
+    private function primaryActionAttribute(CatalogTitle $title): ?array
+    {
+        if (! $title->hasAttribute('user_primary_action')) {
+            return null;
+        }
+
+        $action = $title->getAttribute('user_primary_action');
+
+        if (! is_array($action)
+            || ! is_string($action['type'] ?? null)
+            || ! is_string($action['label'] ?? null)
+            || ! is_string($action['url'] ?? null)) {
+            return null;
+        }
+
+        return [
+            'type' => $action['type'],
+            'label' => $action['label'],
+            'url' => $action['url'],
+        ];
     }
 }

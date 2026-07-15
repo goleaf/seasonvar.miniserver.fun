@@ -5,6 +5,7 @@ namespace App\Services\Catalog;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
 use App\Models\Tag;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
@@ -17,12 +18,13 @@ class CatalogHomePageBuilder
         private readonly CatalogTitleQuery $titles,
         private readonly CatalogHomeMetricsCache $metrics,
         private readonly CatalogHomeSnapshotCache $snapshot,
+        private readonly CatalogUserCardStateLoader $cardStates,
     ) {}
 
     /**
      * @return array<string, mixed>
      */
-    public function data(): array
+    public function data(?User $user = null): array
     {
         $genres = $this->facets->taxonomies('genre');
         $countries = $this->facets->taxonomies('country');
@@ -32,17 +34,17 @@ class CatalogHomePageBuilder
             'genres' => $genres->count(),
             'countries' => $countries->count(),
         ];
-        $latestTitles = $this->orderedTitles($snapshot['latest_title_ids'] ?? [], $this->titleSummaryQuery()
+        $latestTitles = $this->orderedTitles($snapshot['latest_title_ids'] ?? [], $this->titleSummaryQuery($user)
             ->with(array_merge([
                 'latestSeason' => fn ($query) => $query->select(['seasons.id', 'seasons.catalog_title_id', 'seasons.number']),
             ], $this->taxonomies->cardSummaryLoads())));
         $featuredTitles = $this->orderedTitles(
             $snapshot['featured_title_ids'] ?? [],
-            $this->titleSummaryQuery()->with($this->taxonomies->cardSummaryLoads()),
+            $this->titleSummaryQuery($user)->with($this->taxonomies->cardSummaryLoads()),
         );
         $videoTitles = $this->orderedTitles(
             $snapshot['video_title_ids'] ?? [],
-            $this->titleSummaryQuery()->with($this->taxonomies->cardSummaryLoads()),
+            $this->titleSummaryQuery($user)->with($this->taxonomies->cardSummaryLoads()),
         );
         $latestMedia = $this->orderedModels(LicensedMedia::query()
             ->published()
@@ -64,6 +66,10 @@ class CatalogHomePageBuilder
         $latestMedia->each(function (LicensedMedia $media): void {
             $media->setAttribute('card_meta', $this->latestMediaCardMeta($media));
         });
+        $this->cardStates->load(
+            $latestTitles->concat($featuredTitles)->concat($videoTitles),
+            $user,
+        );
         $yearBuckets = collect($snapshot['year_buckets'] ?? [])->map(fn (array $attributes): object => (object) $attributes);
         $subtitleTag = null;
 
@@ -90,11 +96,11 @@ class CatalogHomePageBuilder
     /**
      * @return Builder<CatalogTitle>
      */
-    private function titleSummaryQuery(): Builder
+    private function titleSummaryQuery(?User $user): Builder
     {
-        return $this->titles->visibleTo(null)
+        return $this->titles->visibleTo($user)
             ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url', 'indexed_at'])
-            ->withCount($this->titles->publicCardCounts(null));
+            ->withCount($this->titles->publicCardCounts($user));
     }
 
     private function latestMediaCardMeta(LicensedMedia $media): string

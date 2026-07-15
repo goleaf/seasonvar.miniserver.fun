@@ -17,10 +17,11 @@ class CatalogTitlePolicy
 
     public function interact(User $user, CatalogTitle $catalogTitle): bool
     {
-        return $this->entitlements
-            ->constrain(CatalogTitle::query(), $user)
-            ->whereKey($catalogTitle->id)
-            ->exists();
+        return $user->hasVerifiedEmail()
+            && $this->entitlements
+                ->constrain(CatalogTitle::query(), $user)
+                ->whereKey($catalogTitle->id)
+                ->exists();
     }
 
     public function viewAdmin(User $user, CatalogTitle $catalogTitle): bool

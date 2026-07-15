@@ -42,6 +42,17 @@
         <x-form.status-message :message="$status" />
     @endif
 
+    @unless ($canInteract)
+        <div class="rounded-panel border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900 shadow-panel">
+            <p class="font-bold">Подтвердите электронную почту</p>
+            <p class="mt-1">Просматривать личные данные можно сейчас. Для изменения списка, оценок и истории подтвердите адрес.</p>
+            <a href="{{ route('verification.notice') }}" class="mt-2 inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 font-bold text-amber-800 hover:bg-amber-100">
+                <x-ui.icon name="fa-solid fa-envelope-circle-check" />
+                <span>Перейти к подтверждению</span>
+            </a>
+        </div>
+    @endunless
+
     @if ($errors->has('rating'))
         <div role="alert" class="rounded-control border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
             {{ $errors->first('rating') }}
@@ -125,11 +136,18 @@
                     <div class="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
                         @foreach ($watchlist as $state)
                             <article wire:key="watchlist-{{ $state->id }}" class="flex min-w-0 flex-col gap-3">
-                                <x-catalog.title-card :title="$state->catalogTitle" :show-description="false" />
-                                <button type="button" wire:click="setWatchlist({{ $state->catalog_title_id }}, false)" wire:confirm="Удалить тайтл из списка?" class="relative z-10 inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700 hover:bg-rose-100">
-                                    <x-ui.icon name="fa-solid fa-bookmark-slash" />
-                                    <span>Удалить из списка</span>
-                                </button>
+                                <x-catalog.title-card
+                                    :title="$state->catalogTitle"
+                                    :show-description="false"
+                                    :user-in-watchlist="(bool) $state->in_watchlist"
+                                    :user-rating="$state->rating"
+                                />
+                                @if ($canInteract)
+                                    <button type="button" wire:click="setWatchlist({{ $state->catalog_title_id }}, false)" wire:confirm="Удалить тайтл из списка?" class="relative z-10 inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700 hover:bg-rose-100">
+                                        <x-ui.icon name="fa-solid fa-bookmark-slash" />
+                                        <span>Удалить из списка</span>
+                                    </button>
+                                @endif
                             </article>
                         @endforeach
                     </div>
@@ -150,16 +168,23 @@
                     <div class="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
                         @foreach ($ratings as $state)
                             <article wire:key="rating-{{ $state->id }}" class="flex min-w-0 flex-col gap-3">
-                                <x-catalog.title-card :title="$state->catalogTitle" :show-description="false" />
-                                <label class="relative z-10 block">
-                                    <span class="mb-1.5 block text-sm font-bold text-slate-700">Ваша оценка</span>
-                                    <select wire:change="setRating({{ $state->catalog_title_id }}, $event.target.value)" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100">
-                                        <option value="">Удалить оценку</option>
-                                        @foreach ($ratingOptions as $rating)
-                                            <option value="{{ $rating }}" @selected($state->rating === $rating)>{{ $rating }}</option>
-                                        @endforeach
-                                    </select>
-                                </label>
+                                <x-catalog.title-card
+                                    :title="$state->catalogTitle"
+                                    :show-description="false"
+                                    :user-in-watchlist="(bool) $state->in_watchlist"
+                                    :user-rating="$state->rating"
+                                />
+                                @if ($canInteract)
+                                    <label class="relative z-10 block">
+                                        <span class="mb-1.5 block text-sm font-bold text-slate-700">Ваша оценка</span>
+                                        <select wire:change="setRating({{ $state->catalog_title_id }}, $event.target.value)" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100">
+                                            <option value="">Удалить оценку</option>
+                                            @foreach ($ratingOptions as $rating)
+                                                <option value="{{ $rating }}" @selected($state->rating === $rating)>{{ $rating }}</option>
+                                            @endforeach
+                                        </select>
+                                    </label>
+                                @endif
                             </article>
                         @endforeach
                     </div>
@@ -209,12 +234,14 @@
                         <p class="mt-1 text-sm text-slate-500">Здесь появятся реально начатые эпизоды.</p>
                     </div>
                 @else
-                    <div class="flex justify-end border-b border-slate-200 p-4">
-                        <button type="button" wire:click="clearHistory" wire:confirm.prompt="Очистить всю историю просмотров? Введите ОЧИСТИТЬ для подтверждения.|ОЧИСТИТЬ" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-100">
-                            <x-ui.icon name="fa-solid fa-trash-can" />
-                            <span>Очистить историю</span>
-                        </button>
-                    </div>
+                    @if ($canInteract)
+                        <div class="flex justify-end border-b border-slate-200 p-4">
+                            <button type="button" wire:click="clearHistory" wire:confirm.prompt="Очистить всю историю просмотров? Введите ОЧИСТИТЬ для подтверждения.|ОЧИСТИТЬ" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-100">
+                                <x-ui.icon name="fa-solid fa-trash-can" />
+                                <span>Очистить историю</span>
+                            </button>
+                        </div>
+                    @endif
                     <div class="space-y-3 p-4">
                         @foreach ($history as $progress)
                             <x-ui.poster-card :src="$progress->is_accessible && $progress->catalogTitle ? $progress->catalogTitle->poster_url : null" :alt="$progress->is_accessible && $progress->catalogTitle ? 'Постер '.$progress->catalogTitle->display_title : 'Недоступный эпизод'" layout="compact" wire:key="history-{{ $progress->id }}">
@@ -231,10 +258,12 @@
                                         @endif
                                         <p class="mt-2 text-xs font-semibold text-slate-500">{{ $progress->last_watched_at->format('d.m.Y H:i') }}</p>
                                     </div>
-                                    <button type="button" wire:click="removeHistoryItem({{ $progress->id }})" wire:confirm="Удалить этот просмотр из истории?" class="relative z-10 inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-rose-50 hover:text-rose-700">
-                                        <x-ui.icon name="fa-solid fa-xmark" />
-                                        <span>Удалить</span>
-                                    </button>
+                                    @if ($canInteract)
+                                        <button type="button" wire:click="removeHistoryItem({{ $progress->id }})" wire:confirm="Удалить этот просмотр из истории?" class="relative z-10 inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-rose-50 hover:text-rose-700">
+                                            <x-ui.icon name="fa-solid fa-xmark" />
+                                            <span>Удалить</span>
+                                        </button>
+                                    @endif
                                 </div>
                             </x-ui.poster-card>
                         @endforeach

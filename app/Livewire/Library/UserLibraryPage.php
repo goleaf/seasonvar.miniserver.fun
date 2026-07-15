@@ -146,6 +146,7 @@ final class UserLibraryPage extends Component
             'publicationTypes' => collect(CatalogPublicationType::cases())
                 ->reject(fn (CatalogPublicationType $type): bool => $type === CatalogPublicationType::Unknown),
             'ratingOptions' => $this->userState->ratingOptions(),
+            'canInteract' => $user->hasVerifiedEmail(),
             'watchlist' => null,
             'ratings' => null,
             'continueWatching' => null,

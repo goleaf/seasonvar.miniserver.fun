@@ -41,6 +41,7 @@ class CatalogTitlesPageBuilder
         private readonly CatalogSearchQueryParser $searchParser,
         private readonly CatalogTitleSearch $titleSearch,
         private readonly CatalogSearchSuggestion $searchSuggestions,
+        private readonly CatalogUserCardStateLoader $cardStates,
     ) {}
 
     /**
@@ -158,6 +159,9 @@ class CatalogTitlesPageBuilder
             $this->query->sorted($catalogTitleQuery, $sortOption);
             $catalogTitles = $catalogTitleQuery->paginate($perPage)->appends($paginationQuery);
         }
+        $catalogTitles->setCollection(
+            $this->cardStates->load($catalogTitles->getCollection(), $request->user()),
+        );
         $suggestions = $catalogTitles->total() === 0 && ! $invalidInput && $titleContext === null
             ? $this->searchSuggestions->forQuery($searchQuery, $request->user())
             : collect();
