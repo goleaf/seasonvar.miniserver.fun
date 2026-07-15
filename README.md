@@ -48,6 +48,19 @@ npm run build
 
 Датированный Laravel/Livewire/video audit, environment preflight, security/performance findings и MCP verification находятся в [`docs/audits/current-state-audit.md`](docs/audits/current-state-audit.md) и [`docs/tooling/mcp-setup.md`](docs/tooling/mcp-setup.md). Они дополняют, но не заменяют тематические документы-владельцы.
 
+## Локальные учётные записи
+
+Создать или обновить локальные демонстрационные учётные записи:
+
+```bash
+php artisan db:seed
+```
+
+- Администратор: `admin@example.com` / `password`.
+- Пользователь: `user@example.com` / `password`.
+
+Для административного доступа email должен находиться в существующем allowlist: `SEASONVAR_IMPORT_ADMIN_EMAILS=admin@example.com`. Эти данные предназначены только для локальной разработки; не используйте их в production.
+
 ## Импорт
 
 `seasonvar:import` скачивает карту сайта Seasonvar, сохраняет найденные страницы, обновляет карточки, сезоны, серии, связи, рейтинги, отзывы и видео. Команда продолжает работу после ошибки отдельной страницы, пишет подробные события в базу и может работать постоянно через `--forever`.
