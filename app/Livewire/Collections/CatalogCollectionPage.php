@@ -157,7 +157,7 @@ final class CatalogCollectionPage extends Component
         Gate::authorize('view', $collection);
         $viewer = $this->viewer();
         $canManage = $viewer instanceof User && Gate::forUser($viewer)->allows('update', $collection);
-        $itemViewer = $canManage ? $viewer : null;
+        $itemViewer = $viewer;
         $criteria = new CatalogCollectionItemCriteria(
             search: $this->search,
             genre: $this->genre !== '' ? $this->genre : null,
@@ -181,12 +181,41 @@ final class CatalogCollectionPage extends Component
         $usesLocalizedEditorialCanonical = $collection->type->value === 'editorial'
             && $this->interfaceLocale !== $defaultLocale
             && $collection->translations->contains('locale', $this->interfaceLocale);
+        $headerItemCount = (int) ($canManage
+            ? ($collection->total_items_count ?? 0)
+            : ($collection->visible_items_count ?? 0));
+        [$visibilityIcon, $visibilityNotice] = match ($collection->visibility) {
+            CatalogCollectionVisibility::Private => ['fa-solid fa-lock text-slate-400', __('collections.page.private_notice')],
+            CatalogCollectionVisibility::Unlisted => ['fa-solid fa-link text-slate-400', __('collections.page.unlisted_notice')],
+            CatalogCollectionVisibility::Public => ['fa-solid fa-earth-europe text-slate-400', __('collections.page.public_notice')],
+        };
+        $ownerPublicId = $collection->owner?->getAttribute('public_id');
 
         return view('livewire.collections.catalog-collection-page', [
             'collection' => $collection,
             'items' => $items,
             'filterOptions' => $query->filterOptions($collection, $itemViewer),
-            'sortOptions' => CatalogCollectionSort::cases(),
+            'collectionTypeLabel' => $collection->type->label(),
+            'collectionVisibilityLabel' => $collection->visibility->label(),
+            'collectionModerationLabel' => $collection->moderation_status->label(),
+            'collectionSortLabel' => $collection->sort_mode->label(),
+            'isEditorial' => $collection->type->value === 'editorial',
+            'canShare' => $collection->visibility !== CatalogCollectionVisibility::Private,
+            'headerItemCountLabel' => trans_choice('collections.page.items', $headerItemCount, [
+                'count' => $headerItemCount,
+            ]),
+            'itemResultTitle' => trans_choice('collections.page.items', $items->total(), [
+                'count' => $items->total(),
+            ]),
+            'visibilityIcon' => $visibilityIcon,
+            'visibilityNotice' => $visibilityNotice,
+            'ownerUrl' => is_string($ownerPublicId) && $ownerPublicId !== ''
+                ? route('profiles.collections', ['userPublicId' => $ownerPublicId])
+                : null,
+            'sortOptions' => array_map(static fn (CatalogCollectionSort $option): array => [
+                'value' => $option->value,
+                'label' => $option->label(),
+            ], CatalogCollectionSort::cases()),
             'unavailableItems' => $canManage && $collection->isOwnedBy($viewer)
                 ? $query->unavailableItems($collection, $viewer)
                 : collect(),
@@ -202,7 +231,10 @@ final class CatalogCollectionPage extends Component
                 : route('collections.show', ['collectionSlug' => $collection->slug]),
             'canManage' => $canManage,
             'canReport' => $viewer instanceof User && Gate::forUser($viewer)->allows('report', $collection),
-            'reportReasons' => CatalogCollectionReportReason::cases(),
+            'reportReasons' => array_map(static fn (CatalogCollectionReportReason $reason): array => [
+                'value' => $reason->value,
+                'label' => $reason->label(),
+            ], CatalogCollectionReportReason::cases()),
             'hasFilters' => $this->search !== '' || $this->genre !== '' || $this->country !== ''
                 || $this->statusFilter !== '' || $this->year !== '' || $this->sort !== $collection->sort_mode->value,
             'localeUrls' => collect($this->collectionLocales())

@@ -159,3 +159,19 @@ window.addEventListener('comment-action-completed', (event) => {
 
     window.requestAnimationFrame(() => focusCommentElement(document.querySelector(selector)));
 });
+
+window.addEventListener('comment-spoiler-toggled', (event) => {
+    const selector = event.detail?.selector;
+
+    if (typeof selector !== 'string') {
+        return;
+    }
+
+    window.requestAnimationFrame(() => {
+        const toggle = document.querySelector(selector)?.querySelector('[data-comment-spoiler-toggle]');
+
+        if (toggle instanceof HTMLButtonElement) {
+            toggle.focus({ preventScroll: true });
+        }
+    });
+});

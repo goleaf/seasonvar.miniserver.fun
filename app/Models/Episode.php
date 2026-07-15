@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use App\Enums\CommentTargetType;
@@ -20,6 +22,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int $id
  * @property int $season_id
  * @property int $number
+ * @property CarbonInterface|null $released_at
  * @property ReleaseKind $kind
  * @property PublicationStatus $publication_status
  * @property ContentAudience $audience

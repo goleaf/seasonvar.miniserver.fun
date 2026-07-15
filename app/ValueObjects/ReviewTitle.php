@@ -7,6 +7,7 @@ namespace App\ValueObjects;
 use App\Exceptions\Reviews\ReviewActionException;
 use App\Support\UserPlainText;
 use Illuminate\Support\Str;
+use Stringable;
 
 final readonly class ReviewTitle
 {
@@ -14,7 +15,20 @@ final readonly class ReviewTitle
 
     public static function from(mixed $input): self
     {
+        if (! is_string($input)
+            && ! is_int($input)
+            && ! is_float($input)
+            && ! $input instanceof Stringable) {
+            throw new ReviewActionException('reviews.errors.title_required');
+        }
+
         $raw = (string) $input;
+        $minimum = max(1, (int) config('reviews.title.minimum_length', 5));
+        $maximum = max($minimum, (int) config('reviews.title.maximum_length', 120));
+
+        if (strlen($raw) > max(4_096, $maximum * 8)) {
+            throw new ReviewActionException('reviews.errors.title_too_long', ['maximum' => $maximum]);
+        }
 
         if (! mb_check_encoding($raw, 'UTF-8')
             || preg_match('/[\p{Cc}\p{Cs}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', $raw) === 1) {
@@ -22,8 +36,6 @@ final readonly class ReviewTitle
         }
 
         $value = UserPlainText::name($input);
-        $minimum = max(1, (int) config('reviews.title.minimum_length', 5));
-        $maximum = max($minimum, (int) config('reviews.title.maximum_length', 120));
 
         if ($value === '') {
             throw new ReviewActionException('reviews.errors.title_required');
@@ -37,7 +49,9 @@ final readonly class ReviewTitle
             throw new ReviewActionException('reviews.errors.title_too_long', ['maximum' => $maximum]);
         }
 
-        $generic = collect(config('reviews.title.generic_values', []))
+        $configuredGenericValues = config('reviews.title.generic_values', []);
+        $genericValues = is_array($configuredGenericValues) ? $configuredGenericValues : [];
+        $generic = collect($genericValues)
             ->filter('is_string')
             ->map(fn (string $item): string => Str::lower(UserPlainText::name($item)))
             ->contains(Str::lower($value));

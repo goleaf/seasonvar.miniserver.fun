@@ -58,10 +58,7 @@ final readonly class PersonalTagService
         }
 
         try {
-            $tag = UserTag::query()->create([
-                'user_id' => $owner->getKey(),
-                ...$prepared,
-            ]);
+            $tag = $owner->personalTags()->create($prepared);
         } catch (UniqueConstraintViolationException) {
             $tag = UserTag::query()
                 ->ownedBy($owner)
@@ -186,19 +183,20 @@ final readonly class PersonalTagService
     }
 
     /**
-     * @param  list<string>  $publicIds
+     * @param  array<array-key, mixed>  $publicIds
      * @return array{added: list<int>, removed: list<int>, selected: list<int>, changed: bool}
      */
     public function reconcileAssignments(User $owner, CatalogTitle $title, array $publicIds): array
     {
         Gate::forUser($owner)->authorize('interact', $title);
-        $publicIds = collect($publicIds);
+        $publicIds = collect($publicIds)
+            ->map(function (mixed $id): string {
+                if (! is_string($id) || preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/iD', $id) !== 1) {
+                    throw ValidationException::withMessages(['tags' => [__('tags.errors.unauthorized_assignment')]]);
+                }
 
-        if ($publicIds->contains(fn (mixed $id): bool => ! is_string($id) || preg_match('/^[a-f0-9-]{36}$/iD', $id) !== 1)) {
-            throw ValidationException::withMessages(['tags' => [__('tags.errors.unauthorized_assignment')]]);
-        }
-
-        $publicIds = $publicIds
+                return mb_strtolower($id);
+            })
             ->unique()
             ->values();
         $limit = max(1, (int) config('tags.personal_assignment_limit', 50));
@@ -332,9 +330,13 @@ final readonly class PersonalTagService
             throw ValidationException::withMessages(['description' => [__('tags.validation.description', ['max' => $descriptionMaximum])]]);
         }
 
-        $locale = in_array($data->contentLocale, config('tags.supported_locales', []), true)
-            ? $data->contentLocale
-            : null;
+        $supportedLocales = config('tags.supported_locales', []);
+
+        if ($data->contentLocale !== null && ! in_array($data->contentLocale, $supportedLocales, true)) {
+            throw ValidationException::withMessages(['contentLocale' => [__('tags.validation.locale')]]);
+        }
+
+        $locale = $data->contentLocale;
         $normalized = $this->normalizer->comparison($name);
 
         return [

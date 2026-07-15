@@ -157,27 +157,49 @@ class CatalogTitleQuery
     }
 
     /**
-     * @return array<int|string, string|\Closure(Builder): Builder>
+     * @return array{
+     *     seasons: \Closure(Builder<Model>): Builder<Model>,
+     *     episodes: \Closure(Builder<Model>): Builder<Model>,
+     *     'licensedMedia as published_media_count': \Closure(Builder<Model>): Builder<Model>
+     * }
      */
     public function publicCardCounts(?User $user): array
     {
         return [
-            'seasons' => fn (Builder $query): Builder => $query->availableTo($user),
-            'episodes' => fn (Builder $query): Builder => $query
-                ->availableTo($user)
-                ->whereHas('season', fn (Builder $query): Builder => $query->availableTo($user)),
-            'licensedMedia as published_media_count' => fn (Builder $query): Builder => $query
-                ->availableTo($user)
-                ->forAvailableReleases($user),
+            'seasons' => fn (Builder $query): Builder => $query->whereIn(
+                'seasons.id',
+                Season::query()->availableTo($user)->select('seasons.id'),
+            ),
+            'episodes' => fn (Builder $query): Builder => $query->whereIn(
+                'episodes.id',
+                Episode::query()
+                    ->availableTo($user)
+                    ->whereIn('season_id', Season::query()->availableTo($user)->select('seasons.id'))
+                    ->select('episodes.id'),
+            ),
+            'licensedMedia as published_media_count' => fn (Builder $query): Builder => $query->whereIn(
+                'licensed_media.id',
+                LicensedMedia::query()
+                    ->availableTo($user)
+                    ->forAvailableReleases($user)
+                    ->select('licensed_media.id'),
+            ),
         ];
     }
 
-    /** @return array<string, \Closure(Builder): Builder> */
+    /**
+     * @return array{
+     *     'ratings as kinopoisk_rating': \Closure(Builder<CatalogTitleRating>): Builder<CatalogTitleRating>,
+     *     'ratings as imdb_rating': \Closure(Builder<CatalogTitleRating>): Builder<CatalogTitleRating>
+     * }
+     */
     public function ratingAggregates(): array
     {
         return [
-            'ratings as kinopoisk_rating' => fn (Builder $query): Builder => $query->where('provider', 'kinopoisk'),
-            'ratings as imdb_rating' => fn (Builder $query): Builder => $query->where('provider', 'imdb'),
+            'ratings as kinopoisk_rating' => /** @param Builder<CatalogTitleRating> $query */
+                fn (Builder $query): Builder => $query->where('provider', 'kinopoisk'),
+            'ratings as imdb_rating' => /** @param Builder<CatalogTitleRating> $query */
+                fn (Builder $query): Builder => $query->where('provider', 'imdb'),
         ];
     }
 
@@ -190,10 +212,17 @@ class CatalogTitleQuery
         $contextTitles = $this
             ->filteredTitles($criteria->withoutSubtitleAvailability(), $user, searchMatches: $searchMatches)
             ->select('catalog_titles.id')
-            ->withExists(['licensedMedia as has_available_subtitles' => fn (Builder $query): Builder => $query
-                ->availableTo($user)
-                ->forAvailableReleases($user)
-                ->where('has_subtitles', true)]);
+            ->withExists([
+                'licensedMedia as has_available_subtitles' => /** @param Builder<LicensedMedia> $query */
+                    fn (Builder $query): Builder => $query->whereIn(
+                        'licensed_media.id',
+                        LicensedMedia::query()
+                            ->availableTo($user)
+                            ->forAvailableReleases($user)
+                            ->where('has_subtitles', true)
+                            ->select('licensed_media.id'),
+                    ),
+            ]);
         $counts = DB::query()
             ->fromSub($contextTitles, 'subtitle_context_titles')
             ->selectRaw('count(*) as total_count')
@@ -491,6 +520,7 @@ class CatalogTitleQuery
     }
 
     /**
+     * @param  Builder<CatalogTitle>  $query
      * @param  array<string, mixed>  $filters
      */
     private function applyAdvancedFilters(Builder $query, array $filters, ?User $user): void
@@ -534,7 +564,9 @@ class CatalogTitleQuery
             $query->whereNotIn($catalogTitleTable.'.id', $this->publishedMediaTitleIds($user, true));
         }
 
-        $publicationTypes = collect($filters['publication_type'] ?? [])
+        $publicationTypeValues = $filters['publication_type'] ?? [];
+        $publicationTypeValues = is_array($publicationTypeValues) ? $publicationTypeValues : [];
+        $publicationTypes = collect($publicationTypeValues)
             ->map(fn (mixed $type): ?CatalogPublicationType => is_string($type) ? CatalogPublicationType::tryFrom($type) : null)
             ->filter()
             ->flatMap(fn (CatalogPublicationType $type): array => $type->databaseValues())
@@ -598,6 +630,7 @@ class CatalogTitleQuery
         return $query;
     }
 
+    /** @return Builder<Season> */
     private function seasonTitleIdsByCount(string $operator, int $count, ?User $user): Builder
     {
         $seasonTable = (new Season)->getTable();
@@ -610,6 +643,7 @@ class CatalogTitleQuery
             ->havingRaw('count(*) '.$operator.' ?', [$count]);
     }
 
+    /** @return Builder<Season> */
     private function episodeTitleIdsByCount(string $operator, int $count, ?User $user): Builder
     {
         $episodeTable = (new Episode)->getTable();

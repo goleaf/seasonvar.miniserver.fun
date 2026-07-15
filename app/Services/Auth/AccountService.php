@@ -100,15 +100,16 @@ final class AccountService
         }
 
         DB::transaction(function () use ($user): void {
-            $this->collections->purgeOwned($user);
-            $this->comments->prepareForDeletion($user);
-            $this->reviews->prepareForDeletion($user);
-            $user->tokens()->delete();
+            $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
+            $this->collections->purgeOwned($lockedUser);
+            $this->comments->prepareForDeletion($lockedUser);
+            $this->reviews->prepareForDeletion($lockedUser);
+            $lockedUser->tokens()->delete();
             DB::table('password_reset_tokens')
-                ->whereRaw('lower(email) = ?', [Str::lower((string) $user->email)])
+                ->whereRaw('lower(email) = ?', [Str::lower((string) $lockedUser->email)])
                 ->delete();
-            DB::table('sessions')->where('user_id', $user->getKey())->delete();
-            $user->deleteOrFail();
+            DB::table('sessions')->where('user_id', $lockedUser->getKey())->delete();
+            $lockedUser->deleteOrFail();
         }, attempts: 3);
     }
 }

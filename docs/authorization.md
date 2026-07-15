@@ -45,7 +45,7 @@ Household/детские профили, PIN, billing, подписки/поку
 
 `CatalogCollectionPolicy` — единственная authorization boundary коллекций. `view` разрешает approved public/unlisted или owner/admin и иначе отвечает `denyAsNotFound`; private name, count, owner и canonical slug не раскрываются. `create` требует authenticated verified user, `createEditorial`, moderation и feature используют `manage-catalog`; update/delete/restore/force-delete/item/reorder/cover повторно разрешают stable resolved record. System record изменяет только admin, а feature разрешена только approved public editorial collection.
 
-Owner берётся из authenticated actor внутри service; client не передаёт `owner_id`, type/moderation/feature не mass-assignятся из public form. Title ID повторно проходит `CatalogTitlePolicy::interact`/visible query, collection UUID batch сравнивается с полным owner-scoped manageable set, item IDs проверяются внутри locked collection. Report разрешён verified non-owner только для directly public-viewable target и имеет отдельный limiter/deduplication key.
+Owner берётся из authenticated actor внутри service; client не передаёт `owner_id`, type/moderation/feature не mass-assignятся из public form. Title ID повторно проходит `CatalogTitlePolicy::interact`/visible query, collection UUID batch сравнивается с полным owner-scoped manageable set, item IDs проверяются внутри locked collection. Report разрешён verified non-owner только для directly public-viewable target и имеет отдельный limiter/deduplication key; moderator decision повторно проверяет gate уже после row lock, поэтому stale Livewire payload не обходит актуальную authority/state boundary.
 
 Private и pending/rejected/hidden/deleted records не дают redirect/canonical metadata постороннему: slug history resolution всегда завершается policy до `301`. Covers повторяют ту же policy. Unlisted — direct-link visibility, не access token и не секретное хранилище; owner management всё равно policy-protected. Collaborators/ownership transfer/follows/collection likes отсутствуют, поэтому не симулируются UI-флагами.
 
@@ -79,3 +79,21 @@ Private и pending/rejected/hidden/deleted records не дают redirect/canoni
 `CatalogTitleReviewPolicy` и focused actions повторно проверяют actor, origin, ownership, target visibility, status/deletion/merge, email verification, active review-only restriction и shared directional block. Client не выбирает author, target class, moderation status, verified flag или rating owner. Delete intentionally remains available to the owner when review creation is globally disabled or the user becomes restricted, so privacy removal cannot be trapped by a feature flag.
 
 `/profile/reviews` and review preference/history actions use only current authenticated user. `/admin/reviews` has route gate plus component/action policy. Public `/reviews/{review}` accepts only a positive stable ID, resolves alias, reauthorizes review and current title, then redirects; hidden/deleted/blocked state returns safe not-found and cannot be used as an IDOR oracle. Review restriction affects only review create/edit/restore/vote/report and never login, comments, playback, rating, watchlist, progress, collection or account deletion.
+
+## Матрица доступа тегов
+
+| Действие | Guest | Authenticated unverified | Verified owner/user | Catalog admin/editor |
+| --- | --- | --- | --- | --- |
+| Читать eligible global tag/page/API | да | да | да | да |
+| Читать personal tag/assignment | нет | только собственное read API/UI | только собственное | не раскрывается вне отдельной account/privacy процедуры |
+| Create/edit/delete/restore personal | нет | нет | только own stable UUID | не подменяет owner action |
+| Assign/remove personal on title | нет | нет | только own active tag + interactable title | не превращает tag в global metadata |
+| Create/edit/archive/restore global | нет | нет | нет | `manage-catalog` + `TagPolicy` |
+| Translate/alias/synonym/provider moderation | нет | нет | нет | `manage-catalog` + current-record reauthorization |
+| Assign/remove global или merge | нет | нет | нет | `manage-catalog`, eligible exact IDs, transaction/audit |
+
+`TagPolicy::view` разрешает только public approved non-internal non-archived non-merged tag; URL resolver дополнительно требует visible title и до policy result не раскрывает canonical slug/count. `TagPolicy` mutations и `/admin/tags` route gate используют `manage-catalog`; Livewire `boot()` повторяет gate на каждом hydration, а service повторно authorizes конкретные source/target/tag/title records. Public requests не могут задавать type, visibility, moderation, code, alias target, provider mapping или arbitrary model class.
+
+`UserTagPolicy` derives ownership from `user_tags.user_id`; non-owner view отвечает как not found. Create/update/restore/assign требуют verified email, owner передаётся в service только из current auth context. API/Livewire принимают UUID tags, но полный requested set сравнивается с owner-scoped active query; title повторно проходит `CatalogTitlePolicy::interact`/`visibleTo(user)`. Delete своей записи остаётся explicit non-GET action, repeat delete/remove idempotent; soft-deleted tag нельзя назначить.
+
+Public user tags, unlisted tags, community global assignment, tag reporting и season/episode assignment отсутствуют как policy surface, потому что продукт их не поддерживает. Administrator не получает отдельную UI-выгрузку private personal labels/counts; account export/delete выполняются только существующим current-user account boundary.

@@ -76,7 +76,7 @@ final readonly class CatalogSearchSuggestion
             ->limit(self::CANDIDATE_LIMIT)
             ->get()
             ->map(function (CatalogTitle $title) use ($query): CatalogTitle {
-                $best = collect(explode("\n", (string) $title->suggestion_names))
+                $best = collect(explode("\n", (string) $title->getAttribute('suggestion_names')))
                     ->map(fn (string $name): array => [
                         'name' => $this->normalizer->key($name),
                         'similarity' => $this->similarity($query->normalized, $name),
@@ -91,15 +91,30 @@ final readonly class CatalogSearchSuggestion
                 return $title;
             })
             ->filter(
-                fn (CatalogTitle $title): bool => (float) $title->suggestion_similarity >= self::MINIMUM_SIMILARITY,
+                fn (CatalogTitle $title): bool => $this->suggestionSimilarity($title) >= self::MINIMUM_SIMILARITY,
             )
-            ->sortBy([
-                [fn (CatalogTitle $title): float => (float) $title->suggestion_similarity, 'desc'],
-                [fn (CatalogTitle $title): string => $this->normalizer->key($title->display_title), 'asc'],
-                [fn (CatalogTitle $title): int => (int) $title->id, 'asc'],
-            ])
+            ->sort(fn (CatalogTitle $left, CatalogTitle $right): int => $this->compareSuggestions($left, $right))
             ->take(self::RESULT_LIMIT)
             ->values();
+    }
+
+    private function compareSuggestions(CatalogTitle $left, CatalogTitle $right): int
+    {
+        $similarityOrder = $this->suggestionSimilarity($right) <=> $this->suggestionSimilarity($left);
+
+        if ($similarityOrder !== 0) {
+            return $similarityOrder;
+        }
+
+        $titleOrder = $this->normalizer->key($left->display_title)
+            <=> $this->normalizer->key($right->display_title);
+
+        return $titleOrder !== 0 ? $titleOrder : $left->getKey() <=> $right->getKey();
+    }
+
+    private function suggestionSimilarity(CatalogTitle $title): float
+    {
+        return (float) $title->getAttribute('suggestion_similarity');
     }
 
     /** @return list<string> */

@@ -16,6 +16,7 @@ use App\Services\Collections\CatalogCollectionResolver;
 use App\Services\Collections\CatalogCollectionService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
@@ -47,6 +48,8 @@ final class CatalogCollectionDashboard extends Component
         $this->setCollectionLocale(null);
         $this->visibility = (string) config('catalog-collections.default_visibility', 'private');
         $this->creationPublicId = (string) Str::uuid();
+        $status = Session::pull('catalog_collection_status');
+        $this->status = is_string($status) ? $status : null;
     }
 
     public function create(CatalogCollectionService $service): void
@@ -72,7 +75,7 @@ final class CatalogCollectionDashboard extends Component
 
         $this->reset(['name', 'description', 'type', 'showCreate']);
         $this->visibility = (string) config('catalog-collections.default_visibility', 'private');
-        $this->status = __('collections.status.created');
+        Session::flash('catalog_collection_status', __('collections.status.created'));
         $this->redirectRoute('collections.edit', ['collectionPublicId' => $collection->public_id], navigate: true);
     }
 
@@ -104,14 +107,23 @@ final class CatalogCollectionDashboard extends Component
     public function render(CatalogCollectionQuery $collections): View
     {
         $user = $this->user();
+        $typeOptions = Gate::forUser($user)->allows('createEditorial', CatalogCollection::class)
+            ? [CatalogCollectionType::User, CatalogCollectionType::Editorial]
+            : [CatalogCollectionType::User];
 
         return view('livewire.collections.catalog-collection-dashboard', [
             'collections' => $collections->ownedBy($user),
             'deletedCollections' => $collections->ownedBy($user, true),
-            'visibilityOptions' => CatalogCollectionVisibility::cases(),
-            'typeOptions' => Gate::forUser($user)->allows('createEditorial', CatalogCollection::class)
-                ? [CatalogCollectionType::User, CatalogCollectionType::Editorial]
-                : [CatalogCollectionType::User],
+            'visibilityOptions' => array_map(static fn (CatalogCollectionVisibility $option): array => [
+                'value' => $option->value,
+                'label' => $option->label(),
+                'hint' => __('collections.visibility.'.$option->value.'_hint'),
+            ], CatalogCollectionVisibility::cases()),
+            'typeOptions' => array_map(static fn (CatalogCollectionType $option): array => [
+                'value' => $option->value,
+                'label' => $option->label(),
+            ], $typeOptions),
+            'showTypeSelector' => count($typeOptions) > 1,
             'canCreate' => Gate::forUser($user)->allows('create', CatalogCollection::class),
             'restorationDays' => max(1, (int) config('catalog-collections.restoration_days', 30)),
         ])->extends('layouts.app', [

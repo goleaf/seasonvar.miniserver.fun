@@ -19,6 +19,7 @@ return new class extends Migration
 
             $table->unique(['comment_id', 'user_id'], 'comment_reactions_comment_user_unique');
             $table->index(['comment_id', 'type'], 'comment_reactions_totals_idx');
+            $table->index(['user_id', 'comment_id', 'type'], 'comment_reactions_user_current_idx');
             $table->index(['user_id', 'created_at', 'id'], 'comment_reactions_user_export_idx');
         });
 

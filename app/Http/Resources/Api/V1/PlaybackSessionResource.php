@@ -26,7 +26,7 @@ final class PlaybackSessionResource extends JsonResource
             'episode' => $this->episode === null ? null : [
                 'id' => (int) $this->episode->id,
                 'season_id' => (int) $this->episode->season_id,
-                'number' => $this->episode->number === null ? null : (int) $this->episode->number,
+                'number' => (int) $this->episode->number,
                 'kind' => $this->episode->kind->value,
                 'title' => $this->episode->title,
             ],

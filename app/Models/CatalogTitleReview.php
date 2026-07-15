@@ -9,6 +9,8 @@ use App\Enums\ReviewModerationReason;
 use App\Enums\ReviewOrigin;
 use App\Enums\ReviewStatus;
 use App\Policies\CatalogTitleReviewPolicy;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UsePolicy;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,6 +18,37 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property int $id
+ * @property int $catalog_title_id
+ * @property int|null $source_page_id
+ * @property int|null $user_id
+ * @property ReviewOrigin $origin
+ * @property string|null $author
+ * @property string|null $review_title
+ * @property string $body
+ * @property string $body_hash
+ * @property string|null $original_body_hash
+ * @property bool $is_spoiler
+ * @property bool $is_verified_watch
+ * @property ReviewStatus $status
+ * @property int $version
+ * @property CarbonImmutable|null $edited_at
+ * @property ReviewDeletionReason|null $deletion_reason
+ * @property int|null $deleted_by_id
+ * @property int|null $moderated_by_id
+ * @property ReviewModerationReason|null $moderation_reason
+ * @property string|null $moderator_note
+ * @property CarbonImmutable|null $moderated_at
+ * @property string|null $ownership_key
+ * @property string|null $submission_key
+ * @property int|null $merged_into_id
+ * @property string|null $status_before_merge
+ * @property string|null $deletion_reason_before_merge
+ * @property CarbonImmutable|null $ownership_released_at
+ * @property CarbonInterface|null $published_at
+ * @property CarbonImmutable|null $deleted_at
+ */
 #[UsePolicy(CatalogTitleReviewPolicy::class)]
 #[Fillable([
     'catalog_title_id',

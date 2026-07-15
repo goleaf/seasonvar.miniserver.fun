@@ -51,7 +51,14 @@ final class CreateComment
         $existing = Comment::query()->withTrashed()->where('submission_key', $submissionKey)->first();
 
         if ($existing !== null) {
-            return $existing;
+            return $this->assertMatchingSubmission(
+                $existing,
+                $target->type,
+                $target->id,
+                $normalizedBody,
+                $isSpoiler,
+                $replyToId,
+            );
         }
 
         $replyTo = $this->replyTo($replyToId, $target->type, $target->id, $user);
@@ -84,13 +91,30 @@ final class CreateComment
             $existing = Comment::query()->withTrashed()->where('submission_key', $submissionKey)->first();
 
             if ($existing !== null) {
-                return [$existing, false];
+                return [
+                    $this->assertMatchingSubmission(
+                        $existing,
+                        $target->type,
+                        $target->id,
+                        $normalizedBody,
+                        $isSpoiler,
+                        $replyTo?->id,
+                    ),
+                    false,
+                ];
             }
+
+            $lockedTarget = $this->targets->resolve(
+                $target->type,
+                $target->id,
+                $user,
+                lock: true,
+            );
 
             $lockedReplyTo = $this->replyTo(
                 $replyTo?->id,
-                $target->type,
-                $target->id,
+                $lockedTarget->type,
+                $lockedTarget->id,
                 $user,
                 lock: true,
             );
@@ -100,8 +124,8 @@ final class CreateComment
 
             $this->antiSpam->assertNotDuplicate(
                 $user,
-                $target->type,
-                $target->id,
+                $lockedTarget->type,
+                $lockedTarget->id,
                 $lockedParentId,
                 $normalizedBody,
             );
@@ -110,9 +134,9 @@ final class CreateComment
                 ['submission_key' => $submissionKey],
                 [
                     'user_id' => $user->id,
-                    'target_type' => $target->type,
-                    'target_id' => $target->id,
-                    'catalog_title_id' => $target->catalogTitleId,
+                    'target_type' => $lockedTarget->type,
+                    'target_id' => $lockedTarget->id,
+                    'catalog_title_id' => $lockedTarget->catalogTitleId,
                     'parent_id' => $lockedParentId,
                     'reply_to_id' => $lockedReplyTo?->id,
                     'body' => $normalizedBody->value,
@@ -198,5 +222,25 @@ final class CreateComment
         }
 
         return hash('sha256', $user->id.':'.$targetKey.':'.Str::lower($submissionToken));
+    }
+
+    private function assertMatchingSubmission(
+        Comment $comment,
+        CommentTargetType $targetType,
+        int $targetId,
+        CommentBody $body,
+        bool $isSpoiler,
+        ?int $replyToId,
+    ): Comment {
+        if ($comment->target_type !== $targetType
+            || (int) $comment->target_id !== $targetId
+            || $comment->body !== $body->value
+            || $comment->body_hash !== $body->hash
+            || $comment->is_spoiler !== $isSpoiler
+            || $comment->reply_to_id !== $replyToId) {
+            throw new CommentActionException('comments.errors.invalid_submission');
+        }
+
+        return $comment;
     }
 }

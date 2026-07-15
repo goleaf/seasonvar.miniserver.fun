@@ -62,7 +62,7 @@ final class ModerateCatalogTitleReview
 
         $this->rateLimiter->hit('moderate', $moderator, 'review:'.$review->id);
 
-        /** @var array{review: CatalogTitleReview, changed: bool, before: string, was_public: bool} $result */
+        /** @var array{review: CatalogTitleReview, changed: bool, was_public: bool, status_changed: bool, spoiler_changed: bool} $result */
         $result = DB::transaction(function () use (
             $review,
             $moderator,
@@ -75,6 +75,10 @@ final class ModerateCatalogTitleReview
             Gate::forUser($moderator)->authorize('moderate', $locked);
             $before = $this->audit->review($locked);
             $wasPublic = $locked->status === ReviewStatus::Published && ! $locked->isDeleted();
+            $statusChanged = $locked->status !== $status;
+            $spoilerChanged = $isSpoiler !== null && $locked->is_spoiler !== $isSpoiler;
+            $reasonChanged = $locked->moderation_reason !== $reason;
+            $noteChanged = $locked->moderator_note !== $privateNote;
 
             if ($locked->status === $status
                 && $locked->moderation_reason === $reason
@@ -83,8 +87,9 @@ final class ModerateCatalogTitleReview
                 return [
                     'review' => $locked,
                     'changed' => false,
-                    'before' => $before,
                     'was_public' => $wasPublic,
+                    'status_changed' => false,
+                    'spoiler_changed' => false,
                 ];
             }
 
@@ -106,12 +111,26 @@ final class ModerateCatalogTitleReview
             }
 
             $locked->forceFill($updates)->save();
+            $this->auditRecorder->record(
+                $moderator,
+                AdminAuditAction::ReviewModerated,
+                $locked,
+                $before,
+                $this->audit->review($locked),
+                [
+                    ...($statusChanged ? ['review_status'] : []),
+                    ...($spoilerChanged ? ['is_spoiler'] : []),
+                    ...($reasonChanged ? ['moderation_reason'] : []),
+                    ...($noteChanged ? ['moderator_note'] : []),
+                ],
+            );
 
             return [
                 'review' => $locked,
                 'changed' => true,
-                'before' => $before,
                 'was_public' => $wasPublic,
+                'status_changed' => $statusChanged,
+                'spoiler_changed' => $spoilerChanged,
             ];
         }, attempts: 3);
 
@@ -121,22 +140,20 @@ final class ModerateCatalogTitleReview
             return $review;
         }
 
-        $this->auditRecorder->record(
-            $moderator,
-            AdminAuditAction::ReviewModerated,
-            $review,
-            $result['before'],
-            $this->audit->review($review),
-            ['review_status', 'is_spoiler', 'moderation_reason', 'moderator_note'],
-        );
         $isPublic = $review->status === ReviewStatus::Published && ! $review->isDeleted();
         $visibilityChanged = $result['was_public'] !== $isPublic;
-        $this->cache->titleChanged(
-            (int) $review->catalog_title_id,
-            recommendations: $visibilityChanged,
-            api: $visibilityChanged && $review->origin === ReviewOrigin::Provider,
-        );
-        $this->notifications->moderationChanged($review, $moderator);
+
+        if ($result['status_changed'] || $result['spoiler_changed']) {
+            $this->cache->titleChanged(
+                (int) $review->catalog_title_id,
+                recommendations: $visibilityChanged,
+                api: $visibilityChanged && $review->origin === ReviewOrigin::Provider,
+            );
+        }
+
+        if ($result['status_changed']) {
+            $this->notifications->moderationChanged($review, $moderator);
+        }
 
         return $review;
     }

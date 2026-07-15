@@ -201,9 +201,7 @@ final class CatalogCollectionItemService
             return [$manageable, $changedIds];
         }, attempts: 3);
 
-        foreach ($manageable->whereIn('id', $changed) as $collection) {
-            $this->cache->changed($collection);
-        }
+        $this->cache->changedMany($manageable->whereIn('id', $changed));
 
         return $changed;
     }
@@ -267,7 +265,7 @@ final class CatalogCollectionItemService
         $this->cache->changed($collection);
     }
 
-    public function move(User $actor, CatalogCollection $collection, int $itemId, int $direction): void
+    public function move(User $actor, CatalogCollection $collection, int $itemId, int $direction): bool
     {
         Gate::forUser($actor)->authorize('manageItems', $collection);
         $this->rateLimiter->ensure($actor, 'reorder', 'order');
@@ -319,6 +317,8 @@ final class CatalogCollectionItemService
         if ($changed) {
             $this->cache->changed($collection);
         }
+
+        return $changed;
     }
 
     public function mergeTitle(CatalogTitle $canonical, CatalogTitle $duplicate): void

@@ -172,6 +172,7 @@ final class UserLibraryPage extends Component
             ),
             'continue-watching' => $data['continueWatching'] = $this->activity->continueWatching($user, 24),
             'history' => $data['history'] = $this->activity->history($user, 12, 'historyPage'),
+            default => abort(404),
         };
 
         return view('livewire.library.user-library-page', $data)

@@ -73,9 +73,13 @@ final class CatalogHomeSnapshotCache
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
         $videoTitleIds = $this->titles->visibleTo(null)
-            ->whereHas('licensedMedia', fn (Builder $query): Builder => $query
-                ->published()
-                ->forAvailableReleases(null))
+            ->whereIn(
+                'catalog_titles.id',
+                LicensedMedia::query()
+                    ->published()
+                    ->forAvailableReleases(null)
+                    ->select('licensed_media.catalog_title_id'),
+            )
             ->latest('indexed_at')
             ->orderByDesc('id')
             ->limit(8)
@@ -104,7 +108,7 @@ final class CatalogHomeSnapshotCache
             ->get()
             ->map(fn ($bucket): array => [
                 'year' => (int) $bucket->year,
-                'titles_count' => (int) $bucket->titles_count,
+                'titles_count' => (int) $bucket->getAttribute('titles_count'),
             ])
             ->all();
         $subtitleTag = Tag::query()

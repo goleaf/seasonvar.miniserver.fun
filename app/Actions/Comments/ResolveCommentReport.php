@@ -46,7 +46,7 @@ final class ResolveCommentReport
             throw new CommentActionException('comments.errors.moderator_note_too_long', ['maximum' => 2_000]);
         }
 
-        [$report, $beforeVersion, $changed] = DB::transaction(function () use (
+        [$report, $changed] = DB::transaction(function () use (
             $report,
             $moderator,
             $status,
@@ -57,7 +57,7 @@ final class ResolveCommentReport
             if ($locked->status === $status
                 && $locked->private_note === $privateNote
                 && $locked->resolved_at !== null) {
-                return [$locked, $this->audit->report($locked), false];
+                return [$locked, false];
             }
 
             if (! $locked->status->isOpen()) {
@@ -73,18 +73,19 @@ final class ResolveCommentReport
                 'resolved_at' => now(),
             ])->save();
 
-            return [$locked, $beforeVersion, true];
-        }, attempts: 3);
-
-        if ($changed) {
             $this->auditRecorder->record(
                 $moderator,
                 AdminAuditAction::CommentReportResolved,
-                $report,
+                $locked,
                 $beforeVersion,
-                $this->audit->report($report),
+                $this->audit->report($locked),
                 ['report_status', 'moderator_note'],
             );
+
+            return [$locked, true];
+        }, attempts: 3);
+
+        if ($changed) {
             $this->notifications->reportResolved($report);
         }
 

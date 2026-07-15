@@ -18,8 +18,8 @@ use App\Models\CatalogTitleReviewRestriction;
 use App\Models\CatalogTitleReviewVote;
 use App\Models\User;
 use App\Services\Catalog\CatalogTitleQuery as CatalogVisibilityQuery;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
 final class CatalogTitleReviewQuery
@@ -31,7 +31,10 @@ final class CatalogTitleReviewQuery
         private readonly CatalogVisibilityQuery $titles,
     ) {}
 
-    /** @return LengthAwarePaginator<int, ReviewItemData> */
+    /**
+     * @param  list<int>  $revealedReviewIds
+     * @return LengthAwarePaginator<int, ReviewItemData>
+     */
     public function forTitle(
         CatalogTitle $title,
         ?User $viewer,
@@ -67,19 +70,21 @@ final class CatalogTitleReviewQuery
             ->withQueryString();
         $reviews = $paginator->getCollection();
         $votes = $this->viewerVotes($reviews, $viewer);
-        $paginator->setCollection($this->presenter->collection(
-            $reviews,
+
+        return $paginator->through(fn (CatalogTitleReview $review): ReviewItemData => $this->presenter->item(
+            $review,
             $viewer,
             $context,
-            $votes,
-            $revealedReviewIds,
-            $highlightedReviewId,
+            $votes[(int) $review->id] ?? null,
+            in_array((int) $review->id, $revealedReviewIds, true),
+            $highlightedReviewId === (int) $review->id,
         ));
-
-        return $paginator;
     }
 
-    /** @return LengthAwarePaginator<int, ReviewItemData> */
+    /**
+     * @param  list<int>  $revealedReviewIds
+     * @return LengthAwarePaginator<int, ReviewItemData>
+     */
     public function forAuthor(
         User $author,
         ReviewSort $sort,
@@ -101,16 +106,14 @@ final class CatalogTitleReviewQuery
         $paginator = $query
             ->paginate(max(1, (int) config('reviews.profile_per_page', 12)), pageName: $pageName)
             ->withQueryString();
-        $reviews = $paginator->getCollection();
-        $paginator->setCollection($this->presenter->collection(
-            $reviews,
+
+        return $paginator->through(fn (CatalogTitleReview $review): ReviewItemData => $this->presenter->item(
+            $review,
             $author,
             $context,
-            [],
-            $revealedReviewIds,
+            null,
+            in_array((int) $review->id, $revealedReviewIds, true),
         ));
-
-        return $paginator;
     }
 
     public function pageForPublicReview(
@@ -180,14 +183,17 @@ final class CatalogTitleReviewQuery
         string $pageName = 'reviewPage',
     ): LengthAwarePaginator {
         $context = $this->relationships->context($moderator);
-        $query = $this->communityQuery()
+        $query = $this->communityQuery(includePrivate: true)
             ->whereNull('catalog_title_reviews.merged_into_id')
             ->when($attentionOnly, fn (Builder $query): Builder => $query
                 ->where(function (Builder $query): void {
                     $query
                         ->where('catalog_title_reviews.status', ReviewStatus::Pending->value)
                         ->orWhereHas('reports', fn (Builder $query): Builder => $query
-                            ->where('status', ReviewReportStatus::Open->value));
+                            ->whereIn('status', [
+                                ReviewReportStatus::Open->value,
+                                ReviewReportStatus::Reviewed->value,
+                            ]));
                 }))
             ->when($status !== null, fn (Builder $query): Builder => $query
                 ->where('catalog_title_reviews.status', $status->value))
@@ -224,7 +230,10 @@ final class CatalogTitleReviewQuery
             ])
             ->withCount([
                 'reports as open_reports_count' => fn (Builder $query): Builder => $query
-                    ->where('status', ReviewReportStatus::Open->value),
+                    ->whereIn('status', [
+                        ReviewReportStatus::Open->value,
+                        ReviewReportStatus::Reviewed->value,
+                    ]),
             ])
             ->orderByDesc('open_reports_count')
             ->latest('catalog_title_reviews.created_at')
@@ -238,10 +247,12 @@ final class CatalogTitleReviewQuery
             ->active()
             ->whereIn('user_id', $reviewModels->pluck('user_id')->filter()->unique())
             ->latest('starts_at')
+            ->latest('id')
             ->get()
             ->unique('user_id')
             ->keyBy('user_id');
-        $items = $reviewModels->map(function (CatalogTitleReview $review) use (
+
+        return $paginator->through(function (CatalogTitleReview $review) use (
             $moderator,
             $context,
             $restrictions,
@@ -252,6 +263,7 @@ final class CatalogTitleReviewQuery
             return new AdminReviewItemData(
                 review: $item,
                 authorUserId: $review->user_id !== null ? (int) $review->user_id : null,
+                moderationReason: $review->moderation_reason?->value,
                 moderatorNote: filled($review->moderator_note) ? (string) $review->moderator_note : null,
                 openReportCount: (int) $review->getAttribute('open_reports_count'),
                 reports: $review->reports->map(fn ($report): array => [
@@ -270,12 +282,12 @@ final class CatalogTitleReviewQuery
                     'type' => $restriction->type->label(),
                     'reason' => $restriction->reason_code->label(),
                     'expires_at' => $restriction->expires_at?->translatedFormat('d.m.Y H:i'),
+                    'private_note' => filled($restriction->private_note)
+                        ? (string) $restriction->private_note
+                        : null,
                 ] : null,
             );
         });
-        $paginator->setCollection($items);
-
-        return $paginator;
     }
 
     /** @return Builder<CatalogTitleReview> */
@@ -283,11 +295,11 @@ final class CatalogTitleReviewQuery
     {
         $context = $this->relationships->context($viewer);
 
-        return $this->communityQuery()
+        return CatalogTitleReview::query()
             ->whereKey($reviewId)
-            ->where('catalog_title_reviews.status', ReviewStatus::Published->value)
-            ->whereNull('catalog_title_reviews.deleted_at')
-            ->whereNull('catalog_title_reviews.merged_into_id')
+            ->where('status', ReviewStatus::Published->value)
+            ->whereNull('deleted_at')
+            ->whereNull('merged_into_id')
             ->when(
                 ! $context->isModerator && ($context->blockedUserIds !== [] || $context->mutedUserIds !== []),
                 fn (Builder $query): Builder => $this->excludeHiddenAuthors($query, $context),
@@ -323,19 +335,49 @@ final class CatalogTitleReviewQuery
     }
 
     /** @return Builder<CatalogTitleReview> */
-    private function communityQuery(): Builder
+    private function communityQuery(bool $includePrivate = false): Builder
     {
-        return CatalogTitleReview::query()
-            ->select('catalog_title_reviews.*')
+        $query = CatalogTitleReview::query()
+            ->select($includePrivate ? ['catalog_title_reviews.*'] : $this->presentationColumns())
             ->leftJoin('catalog_title_user_states as review_rating_state', function ($join): void {
                 $join
                     ->on('review_rating_state.user_id', '=', 'catalog_title_reviews.user_id')
                     ->on('review_rating_state.catalog_title_id', '=', 'catalog_title_reviews.catalog_title_id');
             })
             ->addSelect('review_rating_state.rating as review_rating');
+
+        return $query;
     }
 
-    /** @param Builder<CatalogTitleReview> $query */
+    /** @return list<string> */
+    private function presentationColumns(): array
+    {
+        return [
+            'catalog_title_reviews.id',
+            'catalog_title_reviews.catalog_title_id',
+            'catalog_title_reviews.user_id',
+            'catalog_title_reviews.origin',
+            'catalog_title_reviews.author',
+            'catalog_title_reviews.review_title',
+            'catalog_title_reviews.body',
+            'catalog_title_reviews.is_spoiler',
+            'catalog_title_reviews.is_verified_watch',
+            'catalog_title_reviews.status',
+            'catalog_title_reviews.version',
+            'catalog_title_reviews.edited_at',
+            'catalog_title_reviews.deletion_reason',
+            'catalog_title_reviews.ownership_key',
+            'catalog_title_reviews.merged_into_id',
+            'catalog_title_reviews.published_at',
+            'catalog_title_reviews.created_at',
+            'catalog_title_reviews.deleted_at',
+        ];
+    }
+
+    /**
+     * @param  Builder<CatalogTitleReview>  $query
+     * @return Builder<CatalogTitleReview>
+     */
     private function excludeHiddenAuthors(Builder $query, ReviewViewerContext $context): Builder
     {
         $hidden = collect([...$context->blockedUserIds, ...$context->mutedUserIds])->unique()->values()->all();
@@ -371,7 +413,7 @@ final class CatalogTitleReviewQuery
         $query
             ->with([
                 'authorAccount:id,name',
-                'catalogTitle' => fn (Builder $query): Builder => $query
+                'catalogTitle' => fn ($query) => $query
                     ->withTrashed()
                     ->select(['id', 'slug', 'title', 'original_title']),
             ]);
@@ -435,7 +477,10 @@ final class CatalogTitleReviewQuery
 
         return CatalogTitleReviewVote::query()
             ->where('user_id', $viewer->id)
-            ->whereIn('catalog_title_review_id', $reviews->modelKeys())
+            ->whereIn(
+                'catalog_title_review_id',
+                $reviews->map(fn (CatalogTitleReview $review): int => (int) $review->id)->all(),
+            )
             ->get(['catalog_title_review_id', 'type'])
             ->mapWithKeys(fn (CatalogTitleReviewVote $vote): array => [
                 (int) $vote->catalog_title_review_id => $vote->type,

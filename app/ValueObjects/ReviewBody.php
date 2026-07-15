@@ -7,6 +7,7 @@ namespace App\ValueObjects;
 use App\Exceptions\Reviews\ReviewActionException;
 use App\Support\UserPlainText;
 use Illuminate\Support\Str;
+use Stringable;
 
 final readonly class ReviewBody
 {
@@ -18,7 +19,20 @@ final readonly class ReviewBody
 
     public static function from(mixed $input): self
     {
+        if (! is_string($input)
+            && ! is_int($input)
+            && ! is_float($input)
+            && ! $input instanceof Stringable) {
+            throw new ReviewActionException('reviews.errors.body_required');
+        }
+
         $raw = (string) $input;
+        $minimum = max(1, (int) config('reviews.body.minimum_length', 100));
+        $maximum = max($minimum, (int) config('reviews.body.maximum_length', 12_000));
+
+        if (strlen($raw) > max(64_000, $maximum * 8)) {
+            throw new ReviewActionException('reviews.errors.body_too_long', ['maximum' => $maximum]);
+        }
 
         if (! mb_check_encoding($raw, 'UTF-8')
             || preg_match('/[\x{0000}-\x{0008}\x{000B}\x{000C}\x{000E}-\x{001F}\x{007F}-\x{009F}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', $raw) === 1) {
@@ -26,8 +40,6 @@ final readonly class ReviewBody
         }
 
         $value = UserPlainText::description($input) ?? '';
-        $minimum = max(1, (int) config('reviews.body.minimum_length', 100));
-        $maximum = max($minimum, (int) config('reviews.body.maximum_length', 12_000));
 
         if ($value === '') {
             throw new ReviewActionException('reviews.errors.body_required');

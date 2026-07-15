@@ -1,12 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Jobs;
 
 use App\Services\Notifications\SeasonvarImportFailureNotifier;
 use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use Illuminate\Bus\Queueable;
+use Illuminate\Cache\Repository as CacheRepository;
+use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Cache\Repository;
+use Illuminate\Contracts\Cache\Store;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -14,6 +19,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use LogicException;
 use RuntimeException;
 use Throwable;
 
@@ -43,7 +49,7 @@ class RunSeasonvarImport implements ShouldBeUnique, ShouldQueue
     public function handle(SeasonvarImportPipeline $pipeline): void
     {
         $lockSeconds = (int) config('seasonvar.import.lock_seconds', 604800);
-        $lock = $this->uniqueVia()->lock(self::LOCK_KEY, $lockSeconds);
+        $lock = $this->lockStore()->lock(self::LOCK_KEY, $lockSeconds);
 
         if (! $lock->get()) {
             $this->release(self::LOCK_RELEASE_DELAY);
@@ -85,6 +91,23 @@ class RunSeasonvarImport implements ShouldBeUnique, ShouldQueue
     public function uniqueVia(): Repository
     {
         return Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'));
+    }
+
+    private function lockStore(): Store&LockProvider
+    {
+        $repository = $this->uniqueVia();
+
+        if (! $repository instanceof CacheRepository) {
+            throw new LogicException('Seasonvar lock cache repository is unavailable.');
+        }
+
+        $store = $repository->getStore();
+
+        if (! $store instanceof LockProvider) {
+            throw new LogicException('Seasonvar lock cache store does not support atomic locks.');
+        }
+
+        return $store;
     }
 
     public function failed(?Throwable $exception): void

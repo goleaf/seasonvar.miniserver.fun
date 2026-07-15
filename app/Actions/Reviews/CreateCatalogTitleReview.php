@@ -74,6 +74,7 @@ final class CreateCatalogTitleReview
         $this->assertNoExistingReview($ownershipKey);
         $this->restrictions->assertCanReview($user);
         $this->antiSpam->assertNotCopied($user, $normalizedBody);
+        $this->rateLimiter->hit('create_global', $user, 'global');
         $this->rateLimiter->hit('create', $user, $target->key());
         $status = $this->antiSpam->decision($user, $normalizedBody) === ReviewAntiSpamDecision::Review
             ? ReviewStatus::Pending

@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $licensed_media_id
  * @property int $position_seconds
  * @property int $duration_seconds
- * @property int $progress_percent
+ * @property int|null $progress_percent
  * @property CarbonInterface|null $first_started_at
  * @property CarbonInterface|null $completed_at
  * @property CarbonInterface $last_watched_at

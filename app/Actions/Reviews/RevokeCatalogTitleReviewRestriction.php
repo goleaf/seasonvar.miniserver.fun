@@ -12,6 +12,7 @@ use App\Services\Admin\AdminAuditRecorder;
 use App\Services\Reviews\ReviewModerationAudit;
 use App\Services\Reviews\ReviewRateLimiter;
 use App\Services\Reviews\ReviewSchema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 final class RevokeCatalogTitleReviewRestriction
@@ -37,20 +38,31 @@ final class RevokeCatalogTitleReviewRestriction
         }
 
         $this->rateLimiter->hit('restrict', $moderator, 'restriction:'.$restriction->id);
-        $beforeVersion = $this->audit->restriction($restriction);
-        $restriction->forceFill([
-            'revoked_by_id' => $moderator->id,
-            'revoked_at' => now(),
-        ])->save();
-        $this->auditRecorder->record(
-            $moderator,
-            AdminAuditAction::ReviewRestrictionRevoked,
-            $restriction,
-            $beforeVersion,
-            $this->audit->restriction($restriction),
-            ['revoked_at'],
-        );
 
-        return $restriction;
+        return DB::transaction(function () use ($restriction, $moderator): CatalogTitleReviewRestriction {
+            $locked = CatalogTitleReviewRestriction::query()
+                ->lockForUpdate()
+                ->findOrFail($restriction->id);
+
+            if ($locked->revoked_at !== null) {
+                return $locked;
+            }
+
+            $beforeVersion = $this->audit->restriction($locked);
+            $locked->forceFill([
+                'revoked_by_id' => $moderator->id,
+                'revoked_at' => now(),
+            ])->save();
+            $this->auditRecorder->record(
+                $moderator,
+                AdminAuditAction::ReviewRestrictionRevoked,
+                $locked,
+                $beforeVersion,
+                $this->audit->restriction($locked),
+                ['revoked_at'],
+            );
+
+            return $locked;
+        }, attempts: 3);
     }
 }

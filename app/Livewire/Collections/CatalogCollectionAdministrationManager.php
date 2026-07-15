@@ -6,6 +6,8 @@ namespace App\Livewire\Collections;
 
 use App\Enums\CatalogCollectionModerationStatus;
 use App\Enums\CatalogCollectionReportStatus;
+use App\Enums\CatalogCollectionType;
+use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollectionReport;
 use App\Models\User;
 use App\Services\Collections\CatalogCollectionModerationService;
@@ -61,22 +63,68 @@ final class CatalogCollectionAdministrationManager extends Component
     ): void {
         $collection = $resolver->byPublicId($publicId, true);
         $actor = $this->user();
-        CatalogCollectionReport::query()
+        $limit = max(1, min(500, (int) config('catalog-collections.report_resolution_batch_size', 100)));
+        $reports = CatalogCollectionReport::query()
             ->whereBelongsTo($collection, 'collection')
             ->where('status', CatalogCollectionReportStatus::Open->value)
             ->orderBy('id')
-            ->eachById(fn (CatalogCollectionReport $report) => $moderation->resolveReport(
+            ->limit($limit)
+            ->get();
+
+        $reports->each(fn (CatalogCollectionReport $report) => $moderation->resolveReport(
                 $actor,
                 $report,
                 CatalogCollectionReportStatus::Resolved,
-            ), 100);
-        $this->notice = __('collections.admin.saved');
+            ));
+        $hasMore = CatalogCollectionReport::query()
+            ->whereBelongsTo($collection, 'collection')
+            ->where('status', CatalogCollectionReportStatus::Open->value)
+            ->exists();
+        $this->notice = $hasMore
+            ? __('collections.admin.report_batch_saved', ['count' => $limit])
+            : __('collections.admin.saved');
     }
 
     public function render(CatalogCollectionQuery $collections): View
     {
+        $paginator = $collections->moderationQueue($this->search);
+
+        foreach ($paginator->getCollection() as $collection) {
+            $totalItems = (int) ($collection->total_items_count ?? 0);
+            $openReports = (int) ($collection->open_reports_count ?? 0);
+            $collection->setAttribute('presentation_type_label', $collection->type->label());
+            $collection->setAttribute('presentation_visibility_label', $collection->visibility->label());
+            $collection->setAttribute('presentation_moderation_label', $collection->moderation_status->label());
+            $collection->setAttribute(
+                'presentation_owner_label',
+                $collection->owner?->name ?: __('collections.admin.system_owner'),
+            );
+            $collection->setAttribute('presentation_items_label', trans_choice(
+                'collections.page.items',
+                $totalItems,
+                ['count' => $totalItems],
+            ));
+            $collection->setAttribute(
+                'presentation_open_reports_label',
+                __('collections.admin.open_reports', ['count' => $openReports]),
+            );
+            $collection->setAttribute('presentation_deleted', $collection->trashed());
+            $collection->setAttribute('presentation_has_open_reports', $openReports > 0);
+            $collection->setAttribute(
+                'presentation_can_feature',
+                $collection->type === CatalogCollectionType::Editorial
+                    && $collection->visibility === CatalogCollectionVisibility::Public
+                    && $collection->moderation_status === CatalogCollectionModerationStatus::Approved,
+            );
+            $collection->setAttribute('presentation_feature_next', $collection->is_featured ? 'false' : 'true');
+            $collection->setAttribute(
+                'presentation_feature_label',
+                $collection->is_featured ? __('collections.admin.unfeature') : __('collections.admin.feature'),
+            );
+        }
+
         return view('livewire.collections.catalog-collection-administration-manager', [
-            'collections' => $collections->moderationQueue($this->search),
+            'collections' => $paginator,
         ])->extends('layouts.app', [
             'title' => __('collections.admin.title'),
             'seo' => [

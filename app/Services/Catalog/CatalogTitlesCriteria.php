@@ -217,6 +217,10 @@ final readonly class CatalogTitlesCriteria
     /**
      * @param  list<int>|null  $years
      * @param  array<string, list<string>>|null  $filterSlugs
+     * @param  array<string, list<int>>|null  $selectedTaxonomyIds
+     * @param  array<string, list<int>>|null  $excludedTaxonomyIds
+     * @param  list<string>|null  $publicationTypes
+     * @param  list<string>|null  $subtitleAvailability
      */
     private function copy(
         ?array $years = null,
@@ -269,10 +273,8 @@ final readonly class CatalogTitlesCriteria
         $supportedTypes = CatalogFilterType::values();
 
         return collect($idsByType)
-            ->filter(fn (mixed $ids, string $type): bool => in_array($type, $supportedTypes, true) && is_array($ids))
+            ->filter(fn (array $ids, string $type): bool => in_array($type, $supportedTypes, true) && $ids !== [])
             ->map(fn (array $ids): array => collect($ids)
-                ->filter(fn (mixed $id): bool => is_int($id) || (is_string($id) && ctype_digit($id)))
-                ->map(fn (int|string $id): int => (int) $id)
                 ->filter(fn (int $id): bool => $id > 0)
                 ->unique()
                 ->take(self::MAX_SELECTIONS)

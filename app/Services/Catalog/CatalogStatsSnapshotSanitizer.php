@@ -13,6 +13,7 @@ class CatalogStatsSnapshotSanitizer
     private const HIDDEN_VALUE = 'скрыто';
 
     /**
+     * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
     public function sanitize(array $data): array
@@ -83,7 +84,7 @@ class CatalogStatsSnapshotSanitizer
     {
         preg_match_all('~https?://[^\s<>"\']+~iu', $value, $matches);
 
-        foreach ($matches[0] ?? [] as $url) {
+        foreach ($matches[0] as $url) {
             $host = parse_url($url, PHP_URL_HOST);
 
             if (! is_string($host) || trim($host) === '') {

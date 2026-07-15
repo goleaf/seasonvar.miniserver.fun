@@ -6,6 +6,7 @@ namespace App\Livewire\Collections;
 
 use App\DTOs\CatalogCollectionData;
 use App\Enums\CatalogCollectionVisibility;
+use App\Models\CatalogCollection;
 use App\Models\CatalogTitle;
 use App\Models\User;
 use App\Services\Catalog\CatalogTitleQuery;
@@ -105,13 +106,24 @@ final class CatalogCollectionMembershipManager extends Component
     public function render(CatalogCollectionQuery $collections): View
     {
         $user = auth()->user();
+        $manageableCollections = $this->open && $user instanceof User
+            ? $collections->manageableForTitle($user, $this->catalogTitleId)
+            : collect();
+        $manageableCollections->each(fn (CatalogCollection $collection) => $collection->setAttribute(
+            'visibility_label',
+            $collection->visibility->label(),
+        ));
 
         return view('livewire.collections.catalog-collection-membership-manager', [
             'authenticated' => $user instanceof User,
-            'manageableCollections' => $this->open && $user instanceof User
-                ? $collections->manageableForTitle($user, $this->catalogTitleId)
-                : collect(),
-            'visibilityOptions' => CatalogCollectionVisibility::cases(),
+            'manageableCollections' => $manageableCollections,
+            'selectedCountLabel' => __('collections.membership.selected', [
+                'count' => count($this->selectedCollectionPublicIds),
+            ]),
+            'visibilityOptions' => array_map(static fn (CatalogCollectionVisibility $option): array => [
+                'value' => $option->value,
+                'label' => $option->label(),
+            ], CatalogCollectionVisibility::cases()),
         ]);
     }
 

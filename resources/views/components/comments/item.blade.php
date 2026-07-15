@@ -59,7 +59,7 @@
         </div>
     </header>
 
-    <div class="mt-3 min-w-0 sm:pl-[3.25rem]">
+    <div class="mt-3 min-w-0 sm:pl-[3.25rem]" aria-live="polite">
         @if ($comment->isUnavailable)
             <div class="rounded-control bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-500" role="note">
                 <span class="inline-flex items-center gap-2"><x-ui.icon name="fa-solid fa-eye-slash" />{{ $comment->unavailableMessage }}</span>
@@ -69,6 +69,7 @@
                 <p class="text-sm font-semibold leading-6 text-amber-900">{{ __('comments.spoiler.warning') }}</p>
                 <button
                     type="button"
+                    data-comment-spoiler-toggle
                     wire:click="toggleSpoiler({{ $comment->id }})"
                     wire:loading.attr="disabled"
                     wire:target="toggleSpoiler({{ $comment->id }})"
@@ -99,6 +100,7 @@
                     @if ($comment->isSpoiler && $comment->spoilerRevealed)
                         <button
                             type="button"
+                            data-comment-spoiler-toggle
                             wire:click="toggleSpoiler({{ $comment->id }})"
                             wire:loading.attr="disabled"
                             aria-expanded="true"

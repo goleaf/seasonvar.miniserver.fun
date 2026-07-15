@@ -21,9 +21,12 @@ abstract class TestCase extends BaseTestCase
             'cache-architecture.framework_events.enabled' => false,
             'cache-architecture.warming.enabled' => false,
             'cache-architecture.page_cache.warming_enabled' => false,
+            // RefreshDatabase applies optional domain migrations before each test.
+            'catalog-collections.schema_available' => true,
             'playback.allowed_hosts' => ['11cdn.org', 'media.example.com'],
             'playback.enforce_public_dns' => false,
             'security.external_playlist_enforce_public_dns' => false,
+            'tags.canonical_schema' => true,
         ]);
 
         Cache::store('array')->clear();

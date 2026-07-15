@@ -18,7 +18,17 @@ final class TagSchema
         }
 
         try {
-            return $this->available = Schema::hasTable('tag_translations');
+            return $this->available = Schema::hasColumns('tags', [
+                'public_id',
+                'type',
+                'visibility',
+                'moderation_status',
+                'normalized_name_hash',
+            ])
+                && Schema::hasTable('tag_translations')
+                && Schema::hasTable('tag_aliases')
+                && Schema::hasTable('user_tags')
+                && Schema::hasTable('catalog_title_user_tag');
         } catch (Throwable) {
             return $this->available = false;
         }

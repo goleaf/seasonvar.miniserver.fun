@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire;
 
 use App\Enums\CatalogFilterType;
@@ -75,7 +77,7 @@ class CatalogSeries extends Component
             }
 
             $this->optionSearch[$filterType] = Str::limit(
-                Str::squish((string) ($this->optionSearch[$filterType] ?? '')),
+                Str::squish($this->optionSearch[$filterType]),
                 80,
                 '',
             );
@@ -303,7 +305,7 @@ class CatalogSeries extends Component
 
     public function render(): View
     {
-        $data = $this->catalogPage;
+        $data = $this->catalogPage();
         $titles = $data['titles'];
 
         if ($titles->currentPage() > $titles->lastPage()) {

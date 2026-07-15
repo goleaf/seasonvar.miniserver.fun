@@ -355,8 +355,10 @@ final class CatalogTitleReviews extends Component
             abort_if($context->hides($review->user_id), 404);
 
             if (($user = $this->user()) instanceof User) {
+                $rateLimiter->hit('reveal_global', $user, 'global');
                 $rateLimiter->hit('reveal', $user, 'review:'.$review->id);
             } else {
+                $rateLimiter->hitGuest('reveal_global', (string) request()->ip(), 'global');
                 $rateLimiter->hitGuest('reveal', (string) request()->ip(), 'review:'.$review->id);
             }
 

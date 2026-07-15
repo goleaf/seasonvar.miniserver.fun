@@ -6,6 +6,7 @@ namespace App\Services\Reviews;
 
 use App\Enums\ReviewDeletionReason;
 use App\Enums\ReviewOrigin;
+use App\Enums\ReviewReportStatus;
 use App\Enums\ReviewStatus;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleReview;
@@ -115,19 +116,18 @@ final class ReviewMergeService
 
     private function mergeLegacyReview(CatalogTitleReview $review, CatalogTitle $canonical): void
     {
-        CatalogTitleReview::query()->updateOrCreate(
-            [
-                'catalog_title_id' => $canonical->id,
-                'body_hash' => $review->body_hash,
-            ],
-            [
-                'source_page_id' => $review->source_page_id,
-                'author' => $review->author,
-                'body' => $review->body,
-                'published_at' => $review->published_at,
-            ],
-        );
-        $review->delete();
+        $collision = CatalogTitleReview::query()
+            ->where('catalog_title_id', $canonical->id)
+            ->where('body_hash', $review->body_hash)
+            ->whereKeyNot($review->id)
+            ->exists();
+
+        $review->forceFill([
+            'catalog_title_id' => $canonical->id,
+            'body_hash' => $collision
+                ? hash('sha256', 'legacy-title-merge:'.$review->id.':'.$review->body_hash)
+                : $review->body_hash,
+        ])->save();
     }
 
     private function archiveMergedReview(
@@ -245,7 +245,7 @@ final class ReviewMergeService
 
         CatalogTitleReviewVote::query()
             ->where('catalog_title_review_id', $legacy->id)
-            ->eachById(function (CatalogTitleReviewVote $vote) use ($canonical): void {
+            ->eachById(function (CatalogTitleReviewVote $vote) use ($canonical, $legacy): void {
                 $duplicateVote = CatalogTitleReviewVote::query()
                     ->where('catalog_title_review_id', $canonical->id)
                     ->where('user_id', $vote->user_id)
@@ -264,6 +264,7 @@ final class ReviewMergeService
             ->where('catalog_title_review_id', $legacy->id)
             ->eachById(function (CatalogTitleReviewReport $report) use ($canonical): void {
                 $deduplicationKey = null;
+                $duplicateExists = false;
 
                 if ($report->reporter_id !== null && $report->deduplication_key !== null) {
                     $candidate = $this->identity->reportKey(
@@ -278,11 +279,18 @@ final class ReviewMergeService
                     $deduplicationKey = $duplicateExists ? null : $candidate;
                 }
 
-                $report->forceFill([
+                $updates = [
                     'catalog_title_review_id' => $canonical->id,
                     'deduplication_key' => $deduplicationKey,
                     'updated_at' => now(),
-                ])->save();
+                ];
+
+                if ($duplicateExists) {
+                    $updates['status'] = ReviewReportStatus::Dismissed;
+                    $updates['resolved_at'] = $report->resolved_at ?? now();
+                }
+
+                $report->forceFill($updates)->save();
             });
     }
 

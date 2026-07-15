@@ -64,9 +64,9 @@ class CatalogStatsPosterUrlGuard
 
         $addresses = filter_var($host, FILTER_VALIDATE_IP) !== false
             ? [$host]
-            : (gethostbynamel($host) ?: []);
+            : (@gethostbynamel($host) ?: []);
 
-        $ipv6Records = dns_get_record($host, DNS_AAAA);
+        $ipv6Records = @dns_get_record($host, DNS_AAAA);
         if (is_array($ipv6Records)) {
             foreach ($ipv6Records as $record) {
                 if (is_string($record['ipv6'] ?? null)) {

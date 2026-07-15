@@ -31,7 +31,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property CatalogCollectionVisibility $visibility
  * @property CatalogCollectionModerationStatus $moderation_status
  * @property CatalogCollectionSort $sort_mode
- * @property string $content_locale
+ * @property string|null $content_locale
  * @property bool $is_featured
  * @property string|null $cover_disk
  * @property string|null $cover_path

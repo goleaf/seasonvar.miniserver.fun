@@ -8,13 +8,14 @@ use App\DTOs\TagPageData;
 use App\Enums\TagModerationStatus;
 use App\Models\Tag;
 use App\Support\PlainText;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
 final readonly class TagPagePresenter
 {
     public function __construct(private TagQuery $tags) {}
 
-    /** @param Collection<string, Tag> $activeTaxonomies */
+    /** @param Collection<string, Model> $activeTaxonomies */
     public function present(?string $routeFilterType, Collection $activeTaxonomies, int $publicTitleCount): ?TagPageData
     {
         if ($routeFilterType !== 'tag') {

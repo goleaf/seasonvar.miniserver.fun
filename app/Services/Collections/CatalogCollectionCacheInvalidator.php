@@ -15,7 +15,34 @@ final class CatalogCollectionCacheInvalidator
 
     public function changed(?CatalogCollection $collection = null): void
     {
-        $invalidate = function () use ($collection): void {
+        $this->changedIds($collection !== null && is_int($collection->getKey())
+            ? [$collection->getKey()]
+            : []);
+    }
+
+    /** @param iterable<CatalogCollection> $collections */
+    public function changedMany(iterable $collections): void
+    {
+        $ids = [];
+
+        foreach ($collections as $collection) {
+            if (is_int($collection->getKey())) {
+                $ids[] = $collection->getKey();
+            }
+        }
+
+        if ($ids === []) {
+            return;
+        }
+
+        $this->changedIds($ids);
+    }
+
+    /** @param list<int> $collectionIds */
+    private function changedIds(array $collectionIds): void
+    {
+        $collectionIds = array_values(array_unique($collectionIds));
+        $invalidate = function () use ($collectionIds): void {
             $this->versions->bump(CacheDomain::Collections);
             $this->versions->bump(CacheDomain::Homepage);
             $this->versions->bump(CacheDomain::Sitemap);
@@ -23,8 +50,8 @@ final class CatalogCollectionCacheInvalidator
             $this->versions->bump(CacheDomain::Recommendations);
             $this->versions->bump(CacheDomain::Api);
 
-            if ($collection !== null && is_int($collection->getKey())) {
-                $this->versions->bump(CacheDomain::Collections, 'collection:'.$collection->getKey());
+            foreach ($collectionIds as $collectionId) {
+                $this->versions->bump(CacheDomain::Collections, 'collection:'.$collectionId);
             }
         };
 

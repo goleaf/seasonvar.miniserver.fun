@@ -50,9 +50,9 @@ final class ReviewAggregateService
             ->first();
 
         return new ReviewAggregateData(
-            publicCount: (int) ($row?->public_count ?? 0),
-            ratedCount: (int) ($row?->rated_count ?? 0),
-            ratingAverage: $row?->rating_average !== null ? round((float) $row->rating_average, 1) : null,
+            publicCount: (int) ($row->public_count ?? 0),
+            ratedCount: (int) ($row->rated_count ?? 0),
+            ratingAverage: $row->rating_average !== null ? round((float) $row->rating_average, 1) : null,
         );
     }
 }

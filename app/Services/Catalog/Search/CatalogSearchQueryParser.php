@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Catalog\Search;
 
 use Illuminate\Support\Collection;
@@ -62,7 +64,7 @@ final class CatalogSearchQueryParser
     }
 
     /**
-     * @param  Collection<int, string>  $terms
+     * @param  Collection<int, non-empty-string>  $terms
      */
     private function ftsExpression(Collection $terms): string
     {
@@ -76,7 +78,7 @@ final class CatalogSearchQueryParser
     }
 
     /**
-     * @param  Collection<int, string>  $terms
+     * @param  Collection<int, non-empty-string>  $terms
      * @return list<string>
      */
     private function exactNameHashes(Collection $terms): array

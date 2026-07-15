@@ -10,9 +10,13 @@ use Illuminate\Support\Str;
 
 final class CatalogCollectionResolver
 {
+    public function __construct(private readonly CatalogCollectionSchema $schema) {}
+
     /** @return array{collection: CatalogCollection, historical: bool} */
     public function resolve(string $slug): array
     {
+        abort_unless($this->schema->available(), 404);
+
         $normalized = Str::lower(trim($slug));
         abort_if($normalized === '' || mb_strlen($normalized) > 180, 404);
 
@@ -31,6 +35,7 @@ final class CatalogCollectionResolver
 
     public function byPublicId(string $publicId, bool $withTrashed = false): CatalogCollection
     {
+        abort_unless($this->schema->available(), 404);
         abort_unless(Str::isUuid($publicId), 404);
         $query = CatalogCollection::query();
 

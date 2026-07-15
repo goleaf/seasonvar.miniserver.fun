@@ -40,31 +40,46 @@ final class SetCommentReaction
         }
 
         $this->rateLimiter->hit('reaction', $user, $target->key());
-        /** @var array{0: CommentReaction|null, 1: bool} $result */
-        $result = DB::transaction(function () use ($comment, $user, $type): array {
+        /** @var array{0: CommentReaction|null, 1: bool, 2: Comment} $result */
+        $result = DB::transaction(function () use ($comment, $user, $type, $target): array {
+            User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
+            $this->targets->resolve($target->type, $target->id, $user, lock: true);
+            $lockedComment = Comment::query()
+                ->withTrashed()
+                ->lockForUpdate()
+                ->findOrFail($comment->id);
+
+            if ($lockedComment->target_type !== $target->type
+                || (int) $lockedComment->target_id !== $target->id) {
+                throw new CommentActionException('comments.errors.target_unavailable');
+            }
+
+            Gate::forUser($user)->authorize('react', $lockedComment);
+            $this->relationships->assertCanInteract($user, $lockedComment->user_id);
+
             if ($type === null) {
                 $deleted = CommentReaction::query()
-                    ->where('comment_id', $comment->id)
+                    ->where('comment_id', $lockedComment->id)
                     ->where('user_id', $user->id)
                     ->delete();
 
-                return [null, $deleted > 0];
+                return [null, $deleted > 0, $lockedComment];
             }
 
             $current = CommentReaction::query()
-                ->where('comment_id', $comment->id)
+                ->where('comment_id', $lockedComment->id)
                 ->where('user_id', $user->id)
                 ->lockForUpdate()
                 ->first();
 
             if ($current?->type === $type) {
-                return [$current, false];
+                return [$current, false, $lockedComment];
             }
 
             $timestamp = now();
             CommentReaction::query()->upsert(
                 [[
-                    'comment_id' => $comment->id,
+                    'comment_id' => $lockedComment->id,
                     'user_id' => $user->id,
                     'type' => $type->value,
                     'created_at' => $timestamp,
@@ -75,14 +90,14 @@ final class SetCommentReaction
             );
 
             $reaction = CommentReaction::query()
-                ->where('comment_id', $comment->id)
+                ->where('comment_id', $lockedComment->id)
                 ->where('user_id', $user->id)
                 ->firstOrFail();
 
-            return [$reaction, true];
+            return [$reaction, true, $lockedComment];
         }, attempts: 3);
 
-        [$reaction, $changed] = $result;
+        [$reaction, $changed, $comment] = $result;
 
         if (! $changed) {
             return $reaction?->type;

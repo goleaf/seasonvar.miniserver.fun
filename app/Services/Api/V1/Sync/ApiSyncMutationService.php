@@ -173,7 +173,7 @@ final class ApiSyncMutationService
                 'progress_percent' => $progress->progress_percent === null ? null : (int) $progress->progress_percent,
                 'completed' => $progress->completed_at !== null,
                 'completed_at' => $progress->completed_at?->toJSON(),
-                'last_watched_at' => $progress->last_watched_at?->toJSON(),
+                'last_watched_at' => $progress->last_watched_at->toJSON(),
             ],
         );
     }
@@ -201,19 +201,31 @@ final class ApiSyncMutationService
     /** @return array{in_watchlist: bool, rating: int|null, versions: array{watchlist: int, rating: int}} */
     private function stateData(?CatalogTitleUserState $state): array
     {
+        if ($state === null) {
+            return [
+                'in_watchlist' => false,
+                'rating' => null,
+                'versions' => [
+                    'watchlist' => 0,
+                    'rating' => 0,
+                ],
+            ];
+        }
+
         return [
-            'in_watchlist' => $state?->in_watchlist ?? false,
-            'rating' => $state?->rating,
+            'in_watchlist' => $state->in_watchlist,
+            'rating' => $state->rating,
             'versions' => [
-                'watchlist' => (int) ($state?->watchlist_version ?? 0),
-                'rating' => (int) ($state?->rating_version ?? 0),
+                'watchlist' => $state->watchlist_version,
+                'rating' => $state->rating_version,
             ],
         ];
     }
 
     private function duplicate(string $mutationId, ApiSyncMutation $receipt): ApiSyncMutationResult
     {
-        $stored = is_array($receipt->result) ? $receipt->result : [];
+        $result = $receipt->getAttribute('result');
+        $stored = is_array($result) ? $result : [];
         $resourceVersion = $stored['resource_version'] ?? null;
         $data = $stored['data'] ?? [];
 

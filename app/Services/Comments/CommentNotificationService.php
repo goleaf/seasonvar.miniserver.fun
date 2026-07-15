@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Comments;
 
 use App\Enums\CommentNotificationType;
+use App\Enums\CommentStatus;
 use App\Models\Comment;
 use App\Models\CommentNotificationPreference;
 use App\Models\CommentReaction;
@@ -30,9 +31,15 @@ final class CommentNotificationService
             }
 
             $reply->loadMissing(['parent.author:id,name', 'replyTo.author:id,name']);
-            $recipient = $reply->reply_to_id !== null
-                ? $reply->replyTo?->author
-                : $reply->parent?->author;
+            $replyTo = $reply->reply_to_id !== null ? $reply->replyTo : $reply->parent;
+
+            if ($replyTo === null
+                || $replyTo->status !== CommentStatus::Published
+                || $replyTo->deleted_at !== null) {
+                return;
+            }
+
+            $recipient = $replyTo->author;
 
             if (! $recipient instanceof User || ! $this->allows($recipient, $actor, 'reply_notifications')) {
                 return;
@@ -135,7 +142,8 @@ final class CommentNotificationService
 
     private function preference(User $user): CommentNotificationPreference
     {
-        return CommentNotificationPreference::query()->firstOrCreate(['user_id' => $user->id]);
+        return CommentNotificationPreference::query()->find($user->id)
+            ?? new CommentNotificationPreference(['user_id' => $user->id]);
     }
 
     private function deliver(User $recipient, string $deduplicationKey, CommentActivityNotification $notification): void

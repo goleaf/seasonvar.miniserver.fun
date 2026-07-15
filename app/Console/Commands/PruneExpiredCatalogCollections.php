@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Models\CatalogCollection;
 use App\Services\Collections\CatalogCollectionCoverService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 final class PruneExpiredCatalogCollections extends Command
@@ -37,18 +38,26 @@ final class PruneExpiredCatalogCollections extends Command
         $pruned = 0;
 
         foreach ($ids as $id) {
-            $collection = CatalogCollection::query()
-                ->withTrashed()
-                ->whereKey((int) $id)
-                ->where('deleted_at', '<=', $cutoff)
-                ->first();
+            $deleted = DB::transaction(function () use ($covers, $cutoff, $id): bool {
+                $collection = CatalogCollection::query()
+                    ->withTrashed()
+                    ->whereKey((int) $id)
+                    ->where('deleted_at', '<=', $cutoff)
+                    ->lockForUpdate()
+                    ->first();
 
-            if (! $collection instanceof CatalogCollection) {
-                continue;
+                if (! $collection instanceof CatalogCollection) {
+                    return false;
+                }
+
+                $covers->deleteWithCollection($collection);
+
+                return true;
+            }, attempts: 3);
+
+            if ($deleted) {
+                $pruned++;
             }
-
-            $covers->deleteWithCollection($collection);
-            $pruned++;
         }
 
         $this->components->info("Pruned {$pruned} expired catalog collections.");

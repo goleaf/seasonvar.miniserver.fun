@@ -83,26 +83,41 @@ final class RestrictCatalogTitleReviewer
             $active = CatalogTitleReviewRestriction::query()
                 ->active()
                 ->where('user_id', $reviewer->id)
+                ->lockForUpdate()
                 ->latest('id')
                 ->first();
 
             if ($active !== null
                 && $active->type === $type
                 && $active->reason_code === $reason
+                && $active->private_note === $privateNote
                 && $this->sameDuration($active, $durationDays)) {
                 return $active;
             }
 
-            CatalogTitleReviewRestriction::query()
+            $activeRestrictions = CatalogTitleReviewRestriction::query()
                 ->active()
                 ->where('user_id', $reviewer->id)
-                ->update([
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($activeRestrictions as $activeRestriction) {
+                $beforeVersion = $this->audit->restriction($activeRestriction);
+                $activeRestriction->forceFill([
                     'revoked_by_id' => $moderator->id,
                     'revoked_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                ])->save();
+                $this->auditRecorder->record(
+                    $moderator,
+                    AdminAuditAction::ReviewRestrictionRevoked,
+                    $activeRestriction,
+                    $beforeVersion,
+                    $this->audit->restriction($activeRestriction),
+                    ['revoked_at'],
+                );
+            }
 
-            return CatalogTitleReviewRestriction::query()->create([
+            $restriction = CatalogTitleReviewRestriction::query()->create([
                 'user_id' => $reviewer->id,
                 'moderator_id' => $moderator->id,
                 'type' => $type,
@@ -113,9 +128,6 @@ final class RestrictCatalogTitleReviewer
                     ? now()->addDays((int) $durationDays)
                     : null,
             ]);
-        }, attempts: 3);
-
-        if ($restriction->wasRecentlyCreated) {
             $this->auditRecorder->record(
                 $moderator,
                 AdminAuditAction::ReviewRestrictionApplied,
@@ -124,7 +136,9 @@ final class RestrictCatalogTitleReviewer
                 $this->audit->restriction($restriction),
                 ['restriction_type', 'reason_code', 'starts_at', 'expires_at', 'moderator_note'],
             );
-        }
+
+            return $restriction;
+        }, attempts: 3);
 
         return $restriction;
     }

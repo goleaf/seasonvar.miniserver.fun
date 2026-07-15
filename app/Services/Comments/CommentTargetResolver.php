@@ -25,6 +25,7 @@ final class CommentTargetResolver
         int $targetId,
         ?User $viewer,
         ?string $interfaceLocale = null,
+        bool $lock = false,
     ): CommentTarget {
         $type = is_string($type) ? CommentTargetType::tryFrom($type) : $type;
 
@@ -33,10 +34,10 @@ final class CommentTargetResolver
         }
 
         return match ($type) {
-            CommentTargetType::Title => $this->title($targetId, $viewer),
-            CommentTargetType::Season => $this->season($targetId, $viewer),
-            CommentTargetType::Episode => $this->episode($targetId, $viewer),
-            CommentTargetType::Collection => $this->collection($targetId, $viewer, $interfaceLocale),
+            CommentTargetType::Title => $this->title($targetId, $viewer, $lock),
+            CommentTargetType::Season => $this->season($targetId, $viewer, $lock),
+            CommentTargetType::Episode => $this->episode($targetId, $viewer, $lock),
+            CommentTargetType::Collection => $this->collection($targetId, $viewer, $interfaceLocale, $lock),
         };
     }
 
@@ -45,12 +46,17 @@ final class CommentTargetResolver
         return $this->resolve($comment->target_type, (int) $comment->target_id, $viewer, $interfaceLocale);
     }
 
-    private function title(int $targetId, ?User $viewer): CommentTarget
+    private function title(int $targetId, ?User $viewer, bool $lock): CommentTarget
     {
-        $title = $this->titles
+        $query = $this->titles
             ->visibleTo($viewer)
-            ->select(['id', 'slug', 'title', 'original_title'])
-            ->findOrFail($targetId);
+            ->select(['id', 'slug', 'title', 'original_title']);
+
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        $title = $query->findOrFail($targetId);
 
         return new CommentTarget(
             type: CommentTargetType::Title,
@@ -61,14 +67,19 @@ final class CommentTargetResolver
         );
     }
 
-    private function season(int $targetId, ?User $viewer): CommentTarget
+    private function season(int $targetId, ?User $viewer, bool $lock): CommentTarget
     {
-        $season = Season::query()
+        $query = Season::query()
             ->select(['id', 'catalog_title_id', 'number', 'kind', 'title', 'publication_status', 'audience', 'available_from', 'available_until'])
             ->availableTo($viewer)
             ->whereIn('catalog_title_id', $this->titles->visibleTo($viewer)->select('id'))
-            ->with(['catalogTitle:id,slug,title,original_title'])
-            ->findOrFail($targetId);
+            ->with(['catalogTitle:id,slug,title,original_title']);
+
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        $season = $query->findOrFail($targetId);
         $title = $season->catalogTitle;
 
         return new CommentTarget(
@@ -87,17 +98,22 @@ final class CommentTargetResolver
         );
     }
 
-    private function episode(int $targetId, ?User $viewer): CommentTarget
+    private function episode(int $targetId, ?User $viewer, bool $lock): CommentTarget
     {
-        $episode = Episode::query()
+        $query = Episode::query()
             ->select(['id', 'season_id', 'number', 'kind', 'title', 'publication_status', 'audience', 'available_from', 'available_until'])
             ->availableTo($viewer)
             ->whereIn('season_id', Season::query()
                 ->availableTo($viewer)
                 ->whereIn('catalog_title_id', $this->titles->visibleTo($viewer)->select('id'))
                 ->select('id'))
-            ->with(['season:id,catalog_title_id,number,kind,title', 'season.catalogTitle:id,slug,title,original_title'])
-            ->findOrFail($targetId);
+            ->with(['season:id,catalog_title_id,number,kind,title', 'season.catalogTitle:id,slug,title,original_title']);
+
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        $episode = $query->findOrFail($targetId);
         $season = $episode->season;
         $title = $season->catalogTitle;
 
@@ -119,12 +135,22 @@ final class CommentTargetResolver
         );
     }
 
-    private function collection(int $targetId, ?User $viewer, ?string $interfaceLocale): CommentTarget
+    private function collection(
+        int $targetId,
+        ?User $viewer,
+        ?string $interfaceLocale,
+        bool $lock,
+    ): CommentTarget
     {
-        $collection = CatalogCollection::query()
+        $query = CatalogCollection::query()
             ->select(['id', 'slug', 'name', 'owner_id', 'type', 'visibility', 'moderation_status', 'deleted_at'])
-            ->with('translations:id,catalog_collection_id,locale,name')
-            ->findOrFail($targetId);
+            ->with('translations:id,catalog_collection_id,locale,name');
+
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        $collection = $query->findOrFail($targetId);
 
         if (! Gate::forUser($viewer)->allows('view', $collection) || ! Route::has('collections.show')) {
             throw (new ModelNotFoundException)->setModel(CatalogCollection::class, [$targetId]);

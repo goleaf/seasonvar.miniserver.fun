@@ -49,9 +49,15 @@ Standalone default DBs: cache 1, queues 2, sessions 3, locks 5, broadcasting 6. 
 
 ## Обсуждения
 
-`COMMENTS_ENABLED=true` включает UI только при наличии полной additive schema; `CommentSchema` всё равно проверяет comments/engagement/relationship tables и безопасно показывает disabled state при неполном deploy. Body limits, pagination, edit/restore windows, anti-spam и rate-limit budgets принадлежат versioned `config/comments.php`, а не environment. Их нельзя расширять client parameter-ом.
+`COMMENTS_ENABLED=true` включает UI/writes только при наличии полной additive schema. `CommentSchema` fail-closed проверяет обязательные columns в canonical comment table и все engagement/relationship/notification tables; неполный deploy показывает disabled state. Schema capability намеренно не зависит от feature flag: при `false` уже сохранённые rows всё равно участвуют в private export/deletion, merge reconciliation и collection privacy retirement. Body limits, pagination, edit/restore windows, anti-spam и rate-limit budgets принадлежат versioned `config/comments.php`, а не environment. Их нельзя расширять client parameter-ом.
 
 Database notifications синхронны и не требуют новой queue/worker. Existing cache/session/RateLimiter store используется без отдельного connector. После изменения `COMMENTS_ENABLED` или config необходимо пересобрать config cache; `.env` не редактируется приложением и secrets в comment config отсутствуют.
+
+## Теги
+
+`TAG_CANONICAL_SCHEMA` по умолчанию пуст. В этом режиме `TagSchema` безопасно определяет полный набор canonical columns/tables и сохраняет legacy reads до завершения additive migrations. `true` можно выставить только после schema verification, `false` — только как кратковременный управляемый rollback/diagnostic override; это не product feature flag и не замена migration.
+
+Tag label/description/batch/restoration/search/rate/reserved-name bounds находятся в versioned `config/tags.php`, не в request и не требуют секретов. Personal data использует existing database/cache/auth stores, public snapshots — existing `CacheDomain::Tags`; новая queue/cron/connector не нужна. После изменения override/config обязательны `config:cache` и graceful process reload.
 
 ## Проверка после изменения
 

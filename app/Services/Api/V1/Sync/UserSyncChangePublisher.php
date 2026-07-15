@@ -50,11 +50,15 @@ final class UserSyncChangePublisher
 
     private function publish(User $user, string $type, ?string $key, string $operation): void
     {
-        if ($user->id === null || ($key !== null && mb_strlen($key) > ApiSyncChange::MAX_RESOURCE_KEY_LENGTH)) {
+        $userId = $user->getKey();
+
+        if (! is_int($userId)
+            || $userId < 1
+            || ($key !== null && mb_strlen($key) > ApiSyncChange::MAX_RESOURCE_KEY_LENGTH)) {
             return;
         }
 
-        $this->afterCommit(function () use ($user, $type, $key, $operation): void {
+        $this->afterCommit(function () use ($userId, $type, $key, $operation): void {
             if (! Schema::hasTable('api_sync_changes')) {
                 return;
             }
@@ -62,7 +66,7 @@ final class UserSyncChangePublisher
             try {
                 ApiSyncChange::query()->create([
                     'scope' => ApiSyncChange::SCOPE_USER,
-                    'user_id' => $user->id,
+                    'user_id' => $userId,
                     'resource_type' => $type,
                     'resource_key' => $key,
                     'operation' => $operation,

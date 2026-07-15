@@ -31,7 +31,7 @@ final class EpisodeNavigationResource extends JsonResource
         return [
             'id' => (int) $episode->id,
             'season_id' => (int) $episode->season_id,
-            'number' => $episode->number === null ? null : (int) $episode->number,
+            'number' => (int) $episode->number,
             'kind' => $episode->kind->value,
             'title' => $episode->title,
         ];

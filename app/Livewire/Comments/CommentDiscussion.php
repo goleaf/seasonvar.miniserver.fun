@@ -275,10 +275,15 @@ final class CommentDiscussion extends Component
 
     public function cancelReply(): void
     {
+        $commentId = $this->replyToCommentId;
         $this->replyToCommentId = null;
         $this->replyBody = '';
         $this->replyIsSpoiler = false;
         $this->resetValidation();
+
+        if ($commentId !== null) {
+            $this->dispatch('comment-action-completed', selector: '#comment-'.$commentId);
+        }
     }
 
     public function publishReply(CreateReply $create, CommentSchema $schema): void
@@ -340,11 +345,16 @@ final class CommentDiscussion extends Component
 
     public function cancelEdit(): void
     {
+        $commentId = $this->editingCommentId;
         $this->editingCommentId = null;
         $this->editBody = '';
         $this->editIsSpoiler = false;
         $this->editVersion = 0;
         $this->resetValidation();
+
+        if ($commentId !== null) {
+            $this->dispatch('comment-action-completed', selector: '#comment-'.$commentId);
+        }
     }
 
     public function saveEdit(UpdateComment $update, CommentSchema $schema): void
@@ -375,7 +385,6 @@ final class CommentDiscussion extends Component
 
         $this->cancelEdit();
         $this->notice = __('comments.success.updated');
-        $this->dispatch('comment-action-completed', selector: '#comment-'.$comment->id);
     }
 
     public function deleteComment(int $commentId, DeleteComment $delete, CommentSchema $schema): void
@@ -505,6 +514,7 @@ final class CommentDiscussion extends Component
 
         if ($result === true) {
             $this->notice = __('comments.success.blocked');
+            $this->dispatch('comment-action-completed', selector: '#comment-'.$commentId);
         }
     }
 
@@ -527,12 +537,14 @@ final class CommentDiscussion extends Component
 
         if ($result === true) {
             $this->notice = __('comments.success.muted');
+            $this->dispatch('comment-action-completed', selector: '#comment-'.$commentId);
         }
     }
 
     public function toggleSpoiler(int $commentId): void
     {
         $this->revealedSpoilers = $this->toggleId($this->revealedSpoilers, $commentId);
+        $this->dispatch('comment-spoiler-toggled', selector: '#comment-'.$commentId);
     }
 
     public function toggleBody(int $commentId): void

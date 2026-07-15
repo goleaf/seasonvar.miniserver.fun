@@ -22,11 +22,11 @@ final class RevokeCommentRestriction
     public function handle(User $moderator, int $restrictionId): CommentRestriction
     {
         Gate::forUser($moderator)->authorize('manage-comments');
-        [$restriction, $beforeVersion, $changed] = DB::transaction(function () use ($restrictionId, $moderator): array {
+        return DB::transaction(function () use ($restrictionId, $moderator): CommentRestriction {
             $locked = CommentRestriction::query()->lockForUpdate()->findOrFail($restrictionId);
 
             if ($locked->revoked_at !== null) {
-                return [$locked, $this->audit->restriction($locked), false];
+                return $locked;
             }
 
             $beforeVersion = $this->audit->restriction($locked);
@@ -35,20 +35,16 @@ final class RevokeCommentRestriction
                 'revoked_at' => now(),
             ])->save();
 
-            return [$locked, $beforeVersion, true];
-        }, attempts: 3);
-
-        if ($changed) {
             $this->auditRecorder->record(
                 $moderator,
                 AdminAuditAction::CommentRestrictionRevoked,
-                $restriction,
+                $locked,
                 $beforeVersion,
-                $this->audit->restriction($restriction),
+                $this->audit->restriction($locked),
                 ['revoked_at'],
             );
-        }
 
-        return $restriction;
+            return $locked;
+        }, attempts: 3);
     }
 }

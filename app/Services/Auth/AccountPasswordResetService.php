@@ -20,16 +20,18 @@ final class AccountPasswordResetService
     {
         $email = Str::lower(Str::squish($email));
         $user = User::query()->whereRaw('lower(email) = ?', [$email])->first();
+        $recipient = $user instanceof User ? $user->email : $email;
 
-        Password::sendResetLink(['email' => $user?->email ?? $email]);
+        Password::sendResetLink(['email' => $recipient]);
     }
 
     public function reset(string $email, string $token, string $password): void
     {
         $email = Str::lower(Str::squish($email));
         $user = User::query()->whereRaw('lower(email) = ?', [$email])->first();
+        $recipient = $user instanceof User ? $user->email : $email;
         $status = Password::reset([
-            'email' => $user?->email ?? $email,
+            'email' => $recipient,
             'token' => $token,
             'password' => $password,
             'password_confirmation' => $password,

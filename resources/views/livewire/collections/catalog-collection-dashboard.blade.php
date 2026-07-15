@@ -38,22 +38,22 @@
                     <div class="mt-2 grid gap-2 sm:grid-cols-3">
                         @foreach ($visibilityOptions as $option)
                             <label class="flex min-h-24 cursor-pointer gap-3 rounded-control border border-slate-200 p-3 has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50">
-                                <input type="radio" wire:model="visibility" value="{{ $option->value }}" class="mt-1 h-5 w-5 border-slate-300 text-emerald-700 focus:ring-emerald-600">
+                                <input type="radio" wire:model="visibility" value="{{ $option['value'] }}" class="mt-1 h-5 w-5 border-slate-300 text-emerald-700 focus:ring-emerald-600">
                                 <span class="min-w-0">
-                                    <span class="block font-bold text-slate-800">{{ $option->label() }}</span>
-                                    <span class="mt-1 block text-xs leading-5 text-slate-500">{{ __("collections.visibility.{$option->value}_hint") }}</span>
+                                    <span class="block font-bold text-slate-800">{{ $option['label'] }}</span>
+                                    <span class="mt-1 block text-xs leading-5 text-slate-500">{{ $option['hint'] }}</span>
                                 </span>
                             </label>
                         @endforeach
                     </div>
                     <x-form.input-error for="visibility" />
                 </fieldset>
-                @if (count($typeOptions) > 1)
+                @if ($showTypeSelector)
                     <div>
                         <label for="new-collection-type" class="block text-sm font-bold text-slate-700">{{ __('collections.form.type') }}</label>
                         <select id="new-collection-type" wire:model="type" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
                             @foreach ($typeOptions as $option)
-                                <option value="{{ $option->value }}">{{ $option->label() }}</option>
+                                <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -83,8 +83,10 @@
                     <div wire:key="owned-collection-{{ $collection->public_id }}" class="min-w-0">
                         <x-collections.collection-card :collection="$collection" management />
                         <button type="button" wire:click="delete('{{ $collection->public_id }}')" wire:confirm="{{ __('collections.confirmations.delete') }}" wire:loading.attr="disabled" wire:target="delete('{{ $collection->public_id }}')" class="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:cursor-wait disabled:opacity-60">
-                            <x-ui.icon name="fa-solid fa-trash-can" />
-                            <span>{{ __('collections.actions.delete') }}</span>
+                            <x-ui.icon name="fa-solid fa-trash-can" wire:loading.remove wire:target="delete('{{ $collection->public_id }}')" />
+                            <x-ui.icon name="fa-solid fa-spinner fa-spin" wire:loading wire:target="delete('{{ $collection->public_id }}')" />
+                            <span wire:loading.remove wire:target="delete('{{ $collection->public_id }}')">{{ __('collections.actions.delete') }}</span>
+                            <span wire:loading wire:target="delete('{{ $collection->public_id }}')">{{ __('collections.actions.deleting') }}</span>
                         </button>
                     </div>
                 @endforeach
@@ -106,14 +108,20 @@
                         </div>
                         <div class="flex flex-wrap gap-2">
                             @if ($collection->is_restorable)
-                                <button type="button" wire:click="restore('{{ $collection->public_id }}')" wire:loading.attr="disabled" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 sm:flex-none">
-                                    <x-ui.icon name="fa-solid fa-rotate-left" />{{ __('collections.actions.restore') }}
+                                <button type="button" wire:click="restore('{{ $collection->public_id }}')" wire:loading.attr="disabled" wire:target="restore('{{ $collection->public_id }}')" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 sm:flex-none">
+                                    <x-ui.icon name="fa-solid fa-rotate-left" wire:loading.remove wire:target="restore('{{ $collection->public_id }}')" />
+                                    <x-ui.icon name="fa-solid fa-spinner fa-spin" wire:loading wire:target="restore('{{ $collection->public_id }}')" />
+                                    <span wire:loading.remove wire:target="restore('{{ $collection->public_id }}')">{{ __('collections.actions.restore') }}</span>
+                                    <span wire:loading wire:target="restore('{{ $collection->public_id }}')">{{ __('collections.actions.restoring') }}</span>
                                 </button>
                             @else
                                 <span class="inline-flex min-h-11 items-center rounded-control bg-slate-100 px-3 text-xs font-bold text-slate-500">{{ __('collections.dashboard.restore_expired') }}</span>
                             @endif
-                            <button type="button" wire:click="forceDelete('{{ $collection->public_id }}')" wire:confirm="{{ __('collections.confirmations.delete_forever') }}" wire:loading.attr="disabled" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700 hover:bg-rose-100 sm:flex-none">
-                                <x-ui.icon name="fa-solid fa-trash" />{{ __('collections.actions.delete_forever') }}
+                            <button type="button" wire:click="forceDelete('{{ $collection->public_id }}')" wire:confirm="{{ __('collections.confirmations.delete_forever') }}" wire:loading.attr="disabled" wire:target="forceDelete('{{ $collection->public_id }}')" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700 hover:bg-rose-100 sm:flex-none">
+                                <x-ui.icon name="fa-solid fa-trash" wire:loading.remove wire:target="forceDelete('{{ $collection->public_id }}')" />
+                                <x-ui.icon name="fa-solid fa-spinner fa-spin" wire:loading wire:target="forceDelete('{{ $collection->public_id }}')" />
+                                <span wire:loading.remove wire:target="forceDelete('{{ $collection->public_id }}')">{{ __('collections.actions.delete_forever') }}</span>
+                                <span wire:loading wire:target="forceDelete('{{ $collection->public_id }}')">{{ __('collections.actions.deleting') }}</span>
                             </button>
                         </div>
                     </article>

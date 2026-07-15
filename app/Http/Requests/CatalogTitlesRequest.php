@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Requests;
 
 use App\Enums\CatalogFilterType;
@@ -150,7 +152,7 @@ class CatalogTitlesRequest extends FormRequest
             $value = trim((string) $value);
             $normalized[$key] = match ($key) {
                 'q' => app(CatalogSearchNormalizer::class)->display($value),
-                'sort' => CatalogSort::tryFrom($value)?->value ?? CatalogSort::Updated->value,
+                'sort' => $this->normalizedSort($value),
                 default => $value,
             };
         }
@@ -400,7 +402,10 @@ class CatalogTitlesRequest extends FormRequest
         return is_array($value) ? array_values($value) : [$value];
     }
 
-    /** @param array<mixed> $values @return list<mixed> */
+    /**
+     * @param  array<array-key, mixed>  $values
+     * @return list<mixed>
+     */
     private function normalizeRepeatedValues(array $values): array
     {
         $normalized = [];
@@ -424,6 +429,13 @@ class CatalogTitlesRequest extends FormRequest
         }
 
         return $normalized;
+    }
+
+    private function normalizedSort(string $value): string
+    {
+        $sort = CatalogSort::tryFrom($value);
+
+        return $sort === null ? CatalogSort::Updated->value : $sort->value;
     }
 
     /** @return list<string> */

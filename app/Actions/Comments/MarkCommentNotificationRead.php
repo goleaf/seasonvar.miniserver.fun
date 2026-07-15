@@ -7,6 +7,7 @@ namespace App\Actions\Comments;
 use App\Exceptions\Comments\CommentActionException;
 use App\Models\User;
 use App\Services\Comments\CommentSchema;
+use Illuminate\Support\Str;
 
 final class MarkCommentNotificationRead
 {
@@ -16,6 +17,10 @@ final class MarkCommentNotificationRead
     {
         if (! $this->schema->notificationsAvailable()) {
             throw new CommentActionException('comments.errors.action_unavailable');
+        }
+
+        if (! Str::isUuid($notificationId)) {
+            throw new CommentActionException('comments.errors.comment_not_found');
         }
 
         $notification = $user->notifications()

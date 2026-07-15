@@ -18,11 +18,16 @@ final class CatalogCollectionAccountService
         private readonly CatalogCollectionCacheInvalidator $cache,
         private readonly PrivateUploadStorage $uploads,
         private readonly CommentTargetLifecycleService $comments,
+        private readonly CatalogCollectionSchema $schema,
     ) {}
 
     /** @return list<array<string, mixed>> */
     public function export(User $user): array
     {
+        if (! $this->schema->available()) {
+            return [];
+        }
+
         return CatalogCollection::query()
             ->withTrashed()
             ->where('owner_id', $user->id)
@@ -77,6 +82,10 @@ final class CatalogCollectionAccountService
 
     public function purgeOwned(User $user): void
     {
+        if (! $this->schema->available()) {
+            return;
+        }
+
         $collections = CatalogCollection::query()
             ->withTrashed()
             ->where('owner_id', $user->id)

@@ -15,7 +15,6 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Laravel\Sanctum\PersonalAccessToken;
 
 final class AccountController extends Controller
 {
@@ -42,7 +41,7 @@ final class AccountController extends Controller
             $this->user($request),
             $request->currentPassword(),
             $request->newPassword(),
-            $currentToken instanceof PersonalAccessToken ? (int) $currentToken->getKey() : null,
+            (int) $currentToken->getKey(),
         );
 
         return response()->json(['data' => [

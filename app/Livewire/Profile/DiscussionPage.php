@@ -153,19 +153,48 @@ final class DiscussionPage extends Component
     ): View {
         $available = $schema->writable();
         $notificationsAvailable = $schema->notificationsAvailable();
-        $reviewNotificationsAvailable = $reviewSchema->notificationsAvailable();
+        $reviewNotificationsAvailable = false;
+        $reviewNotificationsFailed = false;
+        $reviewNotificationItems = null;
+        $queryFailed = false;
+        $activity = null;
+        $notifications = null;
+        $blocks = [];
+        $mutes = [];
+
+        if ($available) {
+            try {
+                $activity = $query->activity($this->user());
+                $notifications = $notificationsAvailable ? $query->notifications($this->user()) : null;
+                $blocks = $query->blocks($this->user());
+                $mutes = $query->mutes($this->user());
+            } catch (Throwable $exception) {
+                report($exception);
+                $queryFailed = true;
+            }
+        }
+
+        try {
+            $reviewNotificationsAvailable = $reviewSchema->notificationsAvailable();
+            $reviewNotificationItems = $reviewNotificationsAvailable
+                ? $reviewNotifications->forUser($this->user())
+                : null;
+        } catch (Throwable $exception) {
+            report($exception);
+            $reviewNotificationsFailed = true;
+        }
 
         return view('livewire.profile.discussion-page', [
             'available' => $available,
+            'queryFailed' => $queryFailed,
             'notificationsAvailable' => $notificationsAvailable,
-            'activity' => $available ? $query->activity($this->user()) : null,
-            'notifications' => $notificationsAvailable ? $query->notifications($this->user()) : null,
+            'activity' => $activity,
+            'notifications' => $notifications,
             'reviewNotificationsAvailable' => $reviewNotificationsAvailable,
-            'reviewNotifications' => $reviewNotificationsAvailable
-                ? $reviewNotifications->forUser($this->user())
-                : null,
-            'blocks' => $available ? $query->blocks($this->user()) : [],
-            'mutes' => $available ? $query->mutes($this->user()) : [],
+            'reviewNotificationsFailed' => $reviewNotificationsFailed,
+            'reviewNotifications' => $reviewNotificationItems,
+            'blocks' => $blocks,
+            'mutes' => $mutes,
             'preferenceOptions' => [
                 'replyNotifications' => __('comments.notifications.reply_preference'),
                 'reactionNotifications' => __('comments.notifications.reaction_preference'),

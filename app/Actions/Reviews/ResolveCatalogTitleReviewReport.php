@@ -41,7 +41,8 @@ final class ResolveCatalogTitleReviewReport
 
         $status = is_string($status) ? ReviewReportStatus::tryFrom($status) : $status;
 
-        if (! $status instanceof ReviewReportStatus || $status === ReviewReportStatus::Open) {
+        if (! $status instanceof ReviewReportStatus
+            || ! in_array($status, [ReviewReportStatus::Resolved, ReviewReportStatus::Dismissed], true)) {
             throw new ReviewActionException('reviews.errors.invalid_report_status');
         }
 
@@ -56,7 +57,7 @@ final class ResolveCatalogTitleReviewReport
         $this->assertTransitionAllowed($report, $status);
         $this->rateLimiter->hit('moderate', $moderator, 'report:'.$report->id);
 
-        /** @var array{report: CatalogTitleReviewReport, changed: bool, before: string, final: bool} $result */
+        /** @var array{report: CatalogTitleReviewReport, changed: bool, final: bool} $result */
         $result = DB::transaction(function () use ($report, $moderator, $status, $privateNote): array {
             $locked = CatalogTitleReviewReport::query()->lockForUpdate()->findOrFail($report->id);
             $locked->loadMissing('review');
@@ -66,7 +67,6 @@ final class ResolveCatalogTitleReviewReport
                 return [
                     'report' => $locked,
                     'changed' => false,
-                    'before' => $this->audit->report($locked),
                     'final' => $this->isFinal($status),
                 ];
             }
@@ -74,6 +74,8 @@ final class ResolveCatalogTitleReviewReport
             $this->assertTransitionAllowed($locked, $status);
             $before = $this->audit->report($locked);
             $isFinal = $this->isFinal($status);
+            $statusChanged = $locked->status !== $status;
+            $noteChanged = $locked->private_note !== $privateNote;
             $locked->forceFill([
                 'moderator_id' => $moderator->id,
                 'status' => $status,
@@ -81,11 +83,21 @@ final class ResolveCatalogTitleReviewReport
                 'deduplication_key' => $isFinal ? null : $locked->deduplication_key,
                 'resolved_at' => $isFinal ? ($locked->resolved_at ?? now()) : null,
             ])->save();
+            $this->auditRecorder->record(
+                $moderator,
+                AdminAuditAction::ReviewReportResolved,
+                $locked,
+                $before,
+                $this->audit->report($locked),
+                [
+                    ...($statusChanged ? ['report_status'] : []),
+                    ...($noteChanged ? ['moderator_note'] : []),
+                ],
+            );
 
             return [
                 'report' => $locked,
                 'changed' => true,
-                'before' => $before,
                 'final' => $isFinal,
             ];
         }, attempts: 3);
@@ -95,14 +107,6 @@ final class ResolveCatalogTitleReviewReport
             return $report;
         }
 
-        $this->auditRecorder->record(
-            $moderator,
-            AdminAuditAction::ReviewReportResolved,
-            $report,
-            $result['before'],
-            $this->audit->report($report),
-            ['report_status', 'moderator_note'],
-        );
         if ($result['final']) {
             $this->notifications->reportResolved($report, $moderator);
         }

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 return [
+    'schema_available' => env('CATALOG_COLLECTION_SCHEMA_AVAILABLE'),
     'default_visibility' => 'private',
     'restoration_days' => 30,
     'prune_batch_size' => 200,
@@ -11,6 +12,7 @@ return [
     'seo_title_max_length' => 180,
     'seo_description_max_length' => 500,
     'report_details_max_length' => 2_000,
+    'report_resolution_batch_size' => 100,
     'items_per_page' => 24,
     'maximum_items_per_collection' => 5_000,
     'maximum_collections_per_user' => 100,

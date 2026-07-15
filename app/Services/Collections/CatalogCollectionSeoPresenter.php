@@ -75,6 +75,11 @@ final class CatalogCollectionSeoPresenter
             $description = trim($description.' '.__('collections.seo.owner_suffix', ['owner' => $owner->name]));
         }
 
+        $ownerPublicId = $owner?->getAttribute('public_id');
+        $ownerUrl = is_string($ownerPublicId) && $ownerPublicId !== ''
+            ? route('profiles.collections', ['userPublicId' => $ownerPublicId])
+            : null;
+
         $publiclyIndexable = $collection->visibility === CatalogCollectionVisibility::Public
             && $collection->isPubliclyViewable()
             && $count > 0;
@@ -111,11 +116,11 @@ final class CatalogCollectionSeoPresenter
                 'image' => $image,
                 'numberOfItems' => $count,
                 'inLanguage' => $contentLanguage,
-                'creator' => $owner === null ? null : [
+                'creator' => $owner === null ? null : array_filter([
                     '@type' => 'Person',
                     'name' => $owner->name,
-                    'url' => route('profiles.collections', ['userPublicId' => $owner->public_id]),
-                ],
+                    'url' => $ownerUrl,
+                ], fn (mixed $value): bool => $value !== null && $value !== ''),
             ], fn (mixed $value): bool => $value !== null && $value !== '');
         }
 

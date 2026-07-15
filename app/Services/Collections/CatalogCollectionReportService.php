@@ -10,6 +10,7 @@ use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionReport;
 use App\Models\User;
 use App\Support\UserPlainText;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
@@ -32,24 +33,29 @@ final class CatalogCollectionReportService
             throw ValidationException::withMessages(['reportDetails' => [__('collections.validation.report_details')]]);
         }
 
-        $key = hash('sha256', implode('|', [
-            $reporter->id,
-            $collection->id,
-            $collection->content_version,
-            $reason->value,
-        ]));
-        $report = CatalogCollectionReport::query()->firstOrCreate([
-            'deduplication_key' => $key,
-        ], [
-            'catalog_collection_id' => $collection->id,
-            'collection_public_id' => $collection->public_id,
-            'collection_content_version' => $collection->content_version,
-            'reporter_id' => $reporter->id,
-            'reason' => $reason,
-            'details' => $details,
-            'status' => CatalogCollectionReportStatus::Open,
-        ]);
+        return DB::transaction(function () use ($reporter, $collection, $reason, $details): bool {
+            $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
+            Gate::forUser($reporter)->authorize('report', $locked);
+            $key = hash('sha256', implode('|', [
+                $reporter->id,
+                $locked->id,
+                $locked->content_version,
+                $reason->value,
+            ]));
+            $timestamp = now();
 
-        return $report->wasRecentlyCreated;
+            return CatalogCollectionReport::query()->insertOrIgnore([
+                'catalog_collection_id' => $locked->id,
+                'collection_public_id' => $locked->public_id,
+                'collection_content_version' => $locked->content_version,
+                'reporter_id' => $reporter->id,
+                'reason' => $reason->value,
+                'details' => $details,
+                'status' => CatalogCollectionReportStatus::Open->value,
+                'deduplication_key' => $key,
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ]) === 1;
+        }, attempts: 3);
     }
 }

@@ -52,6 +52,7 @@ final class SetCatalogTitleReviewVote
         $target = $this->targets->fromReview($review, $user);
         $this->restrictions->assertCanReview($user);
         $this->relationships->assertCanInteract($user, $review->user_id);
+        $this->rateLimiter->hit('vote_global', $user, 'global');
         $this->rateLimiter->hit('vote', $user, 'review:'.$review->id);
 
         $vote = DB::transaction(function () use ($review, $user, $type): ?CatalogTitleReviewVote {

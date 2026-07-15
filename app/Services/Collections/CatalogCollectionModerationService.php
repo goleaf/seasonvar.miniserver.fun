@@ -28,42 +28,70 @@ final class CatalogCollectionModerationService
     public function moderate(User $actor, CatalogCollection $collection, CatalogCollectionModerationStatus $status): CatalogCollection
     {
         Gate::forUser($actor)->authorize('moderate', CatalogCollection::class);
-        $before = $this->fingerprint($collection);
-
-        DB::transaction(function () use ($collection, $status): void {
+        $result = DB::transaction(function () use ($actor, $collection, $status): array {
             $locked = CatalogCollection::query()->withTrashed()->lockForUpdate()->findOrFail($collection->id);
-            $locked->moderation_status = $status;
-            $locked->is_featured = $locked->is_featured
+            Gate::forUser($actor)->authorize('moderate', CatalogCollection::class);
+            $featured = $locked->is_featured
                 && $status === CatalogCollectionModerationStatus::Approved
                 && $locked->visibility === CatalogCollectionVisibility::Public;
-            $locked->published_at = $status === CatalogCollectionModerationStatus::Approved
-                && $locked->visibility === CatalogCollectionVisibility::Public
-                ? ($locked->published_at ?? now())
-                : null;
-            $locked->content_version++;
-            $locked->save();
+            $shouldBePublished = $status === CatalogCollectionModerationStatus::Approved
+                && $locked->visibility === CatalogCollectionVisibility::Public;
+            $publishedAt = $shouldBePublished ? ($locked->published_at ?? now()) : null;
+            $moderationChanged = $locked->moderation_status !== $status;
+            $featuredChanged = $locked->is_featured !== $featured;
+            $changed = $moderationChanged
+                || $featuredChanged
+                || ($shouldBePublished && $locked->published_at === null)
+                || (! $shouldBePublished && $locked->published_at !== null);
+
+            if (! $changed) {
+                return ['collection' => $locked, 'changed' => false];
+            }
+
+            $before = $this->fingerprint($locked);
+            $changedFields = array_values(array_filter([
+                $moderationChanged ? 'moderation_status' : null,
+                $featuredChanged ? 'is_featured' : null,
+            ]));
+
+            if ($changedFields === []) {
+                $changedFields = ['moderation_status'];
+            }
+
+            $locked->forceFill([
+                'moderation_status' => $status,
+                'is_featured' => $featured,
+                'published_at' => $publishedAt,
+                'content_version' => $locked->content_version + 1,
+            ])->save();
+            $this->audit->record(
+                $actor,
+                AdminAuditAction::CollectionModerated,
+                $locked,
+                $before,
+                $this->fingerprint($locked),
+                $changedFields,
+            );
+
+            return ['collection' => $locked, 'changed' => true];
         }, attempts: 3);
 
-        $collection = CatalogCollection::query()->withTrashed()->findOrFail($collection->id);
-        $this->audit->record(
-            $actor,
-            AdminAuditAction::CollectionModerated,
-            $collection,
-            $before,
-            $this->fingerprint($collection),
-            ['moderation_status'],
-        );
-        $this->cache->changed($collection);
+        /** @var CatalogCollection $collection */
+        $collection = $result['collection'];
 
-        return $collection;
+        if ($result['changed']) {
+            $this->cache->changed($collection);
+        }
+
+        return $collection->refresh();
     }
 
     public function feature(User $actor, CatalogCollection $collection, bool $featured): CatalogCollection
     {
         Gate::forUser($actor)->authorize('feature', $collection);
-        $before = '';
-        $collection = DB::transaction(function () use (&$before, $collection, $featured): CatalogCollection {
+        $result = DB::transaction(function () use ($actor, $collection, $featured): array {
             $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->id);
+            Gate::forUser($actor)->authorize('feature', $locked);
 
             if ($featured && ($locked->type !== CatalogCollectionType::Editorial
                 || $locked->visibility !== CatalogCollectionVisibility::Public
@@ -71,23 +99,33 @@ final class CatalogCollectionModerationService
                 throw ValidationException::withMessages(['feature' => [__('collections.errors.feature_requires_public')]]);
             }
 
+            if ($locked->is_featured === $featured) {
+                return ['collection' => $locked, 'changed' => false];
+            }
+
             $before = $this->fingerprint($locked);
             $locked->forceFill([
                 'is_featured' => $featured,
                 'content_version' => $locked->content_version + 1,
             ])->save();
+            $this->audit->record(
+                $actor,
+                AdminAuditAction::CollectionFeatured,
+                $locked,
+                $before,
+                $this->fingerprint($locked),
+                ['is_featured'],
+            );
 
-            return $locked;
+            return ['collection' => $locked, 'changed' => true];
         }, attempts: 3);
-        $this->audit->record(
-            $actor,
-            AdminAuditAction::CollectionFeatured,
-            $collection,
-            $before,
-            $this->fingerprint($collection),
-            ['is_featured'],
-        );
-        $this->cache->changed($collection);
+
+        /** @var CatalogCollection $collection */
+        $collection = $result['collection'];
+
+        if ($result['changed']) {
+            $this->cache->changed($collection);
+        }
 
         return $collection->refresh();
     }
@@ -100,34 +138,41 @@ final class CatalogCollectionModerationService
     ): CatalogCollectionReport {
         Gate::forUser($actor)->authorize('moderate', CatalogCollection::class);
         abort_if($status === CatalogCollectionReportStatus::Open, 422);
-        $collection = $report->collection()->withTrashed()->firstOrFail();
-        $before = $this->fingerprint($collection);
         $note = UserPlainText::description($note);
 
-        DB::transaction(function () use ($actor, $report, $status, $note): void {
+        $result = DB::transaction(function () use ($actor, $report, $status, $note): CatalogCollectionReport {
             $locked = CatalogCollectionReport::query()->lockForUpdate()->findOrFail($report->id);
+            $lockedCollection = $locked->collection()->withTrashed()->lockForUpdate()->firstOrFail();
+            Gate::forUser($actor)->authorize('moderate', CatalogCollection::class);
+
+            if ($locked->status !== CatalogCollectionReportStatus::Open) {
+                return $locked;
+            }
+
+            $before = $this->fingerprint($lockedCollection);
             $locked->forceFill([
                 'moderator_id' => $actor->id,
                 'status' => $status,
                 'resolution_note' => $note,
                 'resolved_at' => now(),
             ])->save();
+            $this->audit->record(
+                $actor,
+                AdminAuditAction::CollectionReportResolved,
+                $lockedCollection,
+                $before,
+                hash('sha256', implode('|', [
+                    $this->fingerprint($lockedCollection),
+                    (string) $locked->id,
+                    $status->value,
+                ])),
+                ['report_status'],
+            );
+
+            return $locked;
         }, attempts: 3);
 
-        $this->audit->record(
-            $actor,
-            AdminAuditAction::CollectionReportResolved,
-            $collection,
-            $before,
-            hash('sha256', implode('|', [
-                $this->fingerprint($collection),
-                (string) $report->id,
-                $status->value,
-            ])),
-            ['report_status'],
-        );
-
-        return $report->refresh();
+        return $result->refresh();
     }
 
     public function fingerprint(CatalogCollection $collection): string

@@ -13,12 +13,12 @@
                     @if ($collection->is_featured)
                         <x-ui.status-pill variant="warning">{{ __('collections.page.featured') }}</x-ui.status-pill>
                     @endif
-                    @if ($collection->type->value === 'editorial')
-                        <x-ui.status-pill variant="success">{{ $collection->type->label() }}</x-ui.status-pill>
+                    @if ($isEditorial)
+                        <x-ui.status-pill variant="success">{{ $collectionTypeLabel }}</x-ui.status-pill>
                     @endif
                     @if ($canManage)
-                        <x-ui.status-pill variant="muted">{{ $collection->visibility->label() }}</x-ui.status-pill>
-                        <x-ui.status-pill variant="muted">{{ $collection->moderation_status->label() }}</x-ui.status-pill>
+                        <x-ui.status-pill variant="muted">{{ $collectionVisibilityLabel }}</x-ui.status-pill>
+                        <x-ui.status-pill variant="muted">{{ $collectionModerationLabel }}</x-ui.status-pill>
                     @endif
                 </div>
                 <h1 class="mt-3 break-words text-2xl font-black tracking-tight text-slate-800 sm:text-4xl">{{ $collection->display_name }}</h1>
@@ -26,15 +26,15 @@
                     <p class="mt-4 whitespace-pre-line break-words text-sm leading-7 text-slate-600">{{ $collection->display_description }}</p>
                 @endif
                 <dl class="mt-5 flex flex-wrap gap-x-6 gap-y-3 text-sm">
-                    @if ($collection->owner)
+                    @if ($ownerUrl !== null && $collection->owner)
                         <div>
                             <dt class="font-bold text-slate-500">{{ __('collections.page.owner') }}</dt>
-                            <dd class="mt-1"><a href="{{ route('profiles.collections', ['userPublicId' => $collection->owner->public_id]) }}" class="break-words font-black text-emerald-700 hover:text-emerald-600">{{ $collection->owner->name }}</a></dd>
+                            <dd class="mt-1"><a href="{{ $ownerUrl }}" class="break-words font-black text-emerald-700 hover:text-emerald-600">{{ $collection->owner->name }}</a></dd>
                         </div>
                     @endif
                     <div>
                         <dt class="font-bold text-slate-500">{{ __('collections.form.sort_mode') }}</dt>
-                        <dd class="mt-1 font-black text-slate-700">{{ $collection->sort_mode->label() }}</dd>
+                        <dd class="mt-1 font-black text-slate-700">{{ $collectionSortLabel }}</dd>
                     </div>
                     <div>
                         <dt class="font-bold text-slate-500">{{ __('collections.page.updated_label') }}</dt>
@@ -42,7 +42,7 @@
                     </div>
                     <div>
                         <dt class="font-bold text-slate-500">{{ __('collections.page.item_count_label') }}</dt>
-                        <dd class="mt-1 font-black text-slate-700">{{ trans_choice('collections.page.items', $canManage ? $collection->total_items_count : $collection->visible_items_count, ['count' => $canManage ? $collection->total_items_count : $collection->visible_items_count]) }}</dd>
+                        <dd class="mt-1 font-black text-slate-700">{{ $headerItemCountLabel }}</dd>
                     </div>
                 </dl>
 
@@ -52,7 +52,7 @@
                             <x-ui.icon name="fa-solid fa-pen-to-square" />{{ __('collections.actions.manage') }}
                         </a>
                     @endif
-                    @if ($collection->visibility->value !== 'private')
+                    @if ($canShare)
                         <button type="button" data-collection-share data-share-url="{{ $canonicalUrl }}" data-share-title="{{ $collection->display_name }}" data-copy-label="{{ __('collections.actions.copy_link') }}" data-share-success="{{ __('collections.sharing.copied') }}" data-share-error="{{ __('collections.sharing.failed') }}" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200 sm:flex-none">
                             <x-ui.icon name="fa-solid fa-share-nodes" />{{ __('collections.actions.share') }}
                         </button>
@@ -72,13 +72,7 @@
             </div>
         </div>
         <div class="border-t border-slate-200 bg-slate-50 px-5 py-3 text-sm font-semibold text-slate-600 sm:px-6">
-            @if ($collection->visibility->value === 'private')
-                <span class="inline-flex items-center gap-2"><x-ui.icon name="fa-solid fa-lock text-slate-400" />{{ __('collections.page.private_notice') }}</span>
-            @elseif ($collection->visibility->value === 'unlisted')
-                <span class="inline-flex items-center gap-2"><x-ui.icon name="fa-solid fa-link text-slate-400" />{{ __('collections.page.unlisted_notice') }}</span>
-            @else
-                <span class="inline-flex items-center gap-2"><x-ui.icon name="fa-solid fa-earth-europe text-slate-400" />{{ __('collections.page.public_notice') }}</span>
-            @endif
+            <span class="inline-flex items-center gap-2"><x-ui.icon :name="$visibilityIcon" />{{ $visibilityNotice }}</span>
         </div>
     </article>
 
@@ -86,6 +80,12 @@
         <x-form.status-message :message="$notice" />
     @endif
     <x-form.input-error for="collection" />
+
+    <div wire:loading.delay wire:target="removeItem,submitReport" role="status" aria-live="polite">
+        <div class="flex items-center gap-2 rounded-control bg-sky-50 px-4 py-3 text-sm font-bold text-sky-700">
+            <x-ui.icon name="fa-solid fa-spinner fa-spin" />{{ __('collections.page.loading') }}
+        </div>
+    </div>
 
     <x-ui.panel :title="__('collections.form.filters_title')" icon="fa-solid fa-sliders">
         <form wire:submit="applyFilters" class="grid gap-4" aria-label="{{ __('collections.accessibility.filters') }}">
@@ -115,7 +115,7 @@
                     <label for="collection-filter-sort" class="block text-sm font-bold text-slate-700">{{ __('collections.form.sort_mode') }}</label>
                     <select id="collection-filter-sort" wire:model.live="sort" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
                         @foreach ($sortOptions as $option)
-                            <option value="{{ $option->value }}">{{ $option->label() }}</option>
+                            <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -135,7 +135,7 @@
         </div>
     </div>
 
-    <x-ui.panel :title="trans_choice('collections.page.items', $items->total(), ['count' => $items->total()])" icon="fa-solid fa-clapperboard" :pad="false">
+    <x-ui.panel :title="$itemResultTitle" icon="fa-solid fa-clapperboard" :pad="false">
         @if ($items->isEmpty())
             <div class="p-8 text-center">
                 <p class="text-sm font-semibold text-slate-600">{{ $hasFilters ? __('collections.page.no_results') : __('collections.page.empty') }}</p>
@@ -207,9 +207,9 @@
                     <div>
                         <label for="collection-report-reason" class="block text-sm font-bold text-slate-700">{{ __('collections.reports.reason') }}</label>
                         <select id="collection-report-reason" wire:model="reportReason" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
-                            @foreach ($reportReasons as $reason)
-                                <option value="{{ $reason->value }}">{{ $reason->label() }}</option>
-                            @endforeach
+                        @foreach ($reportReasons as $reason)
+                            <option value="{{ $reason['value'] }}">{{ $reason['label'] }}</option>
+                        @endforeach
                         </select>
                     </div>
                     <div>

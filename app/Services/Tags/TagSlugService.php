@@ -50,11 +50,16 @@ final readonly class TagSlugService
         }
 
         TagSlug::query()->where('slug', $nextSlug)->whereBelongsTo($tag)->delete();
-        TagSlug::query()->firstOrCreate([
+        $history = TagSlug::query()->firstOrCreate([
             'slug' => (string) $tag->slug,
         ], [
             'tag_id' => $tag->id,
         ]);
+
+        if ((int) $history->tag_id !== (int) $tag->id) {
+            throw ValidationException::withMessages(['slug' => [__('tags.validation.slug_unique')]]);
+        }
+
         $tag->slug = $nextSlug;
     }
 

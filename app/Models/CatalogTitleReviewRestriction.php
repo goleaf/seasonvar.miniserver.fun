@@ -6,11 +6,24 @@ namespace App\Models;
 
 use App\Enums\ReviewRestrictionReason;
 use App\Enums\ReviewRestrictionType;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property int $id
+ * @property int $user_id
+ * @property int|null $moderator_id
+ * @property int|null $revoked_by_id
+ * @property ReviewRestrictionType $type
+ * @property ReviewRestrictionReason $reason_code
+ * @property string|null $private_note
+ * @property CarbonImmutable $starts_at
+ * @property CarbonImmutable|null $expires_at
+ * @property CarbonImmutable|null $revoked_at
+ */
 #[Fillable([
     'user_id',
     'moderator_id',

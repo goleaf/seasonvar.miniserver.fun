@@ -86,6 +86,7 @@
                 @endforelse
             </div>
             <p class="mt-2 text-xs font-bold text-slate-500" role="status" aria-live="polite">{{ __('tags.selector.selected', ['count' => count($draftPublicIds)]) }}</p>
+            @error('tags') <p role="alert" class="mt-2 text-sm font-bold text-rose-700">{{ $message }}</p> @enderror
 
             <form wire:submit="createAndSelect" class="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                 <x-form.field

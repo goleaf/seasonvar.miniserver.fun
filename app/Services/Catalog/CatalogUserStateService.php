@@ -46,9 +46,9 @@ class CatalogUserStateService
             ->first();
 
         return new CatalogUserStateSummary(
-            watchlistCount: (int) ($aggregate?->watchlist_count ?? 0),
-            ratingCount: (int) ($aggregate?->rating_count ?? 0),
-            ratingAverage: $aggregate?->rating_average !== null ? (float) $aggregate->rating_average : null,
+            watchlistCount: (int) ($aggregate->watchlist_count ?? 0),
+            ratingCount: (int) ($aggregate->rating_count ?? 0),
+            ratingAverage: $aggregate->rating_average !== null ? (float) $aggregate->rating_average : null,
         );
     }
 
@@ -262,7 +262,9 @@ class CatalogUserStateService
                 ->whereBelongsTo($catalogTitle)
                 ->lockForUpdate()
                 ->first();
-            $version = $versionsAvailable ? (int) ($state?->{$versionColumn} ?? 0) : 0;
+            $version = $versionsAvailable && $state !== null
+                ? (int) $state->getAttribute($versionColumn)
+                : 0;
 
             if (! $versionsAvailable && $expectedVersion !== null) {
                 return ['applied' => false, 'state' => $state, 'version' => 0];

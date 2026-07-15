@@ -47,7 +47,7 @@ return new class extends Migration
                 'comments_author_activity_idx',
             );
             $table->index(
-                ['user_id', 'target_type', 'target_id', 'body_hash', 'created_at'],
+                ['user_id', 'target_type', 'target_id', 'parent_id', 'body_hash', 'created_at'],
                 'comments_duplicate_window_idx',
             );
             $table->index(['catalog_title_id', 'status', 'deleted_at'], 'comments_title_cache_idx');

@@ -64,8 +64,16 @@ final class CatalogUserCardStateLoader
             $latestProgress = $progress->get($title->id);
             $progressPercent = $latestProgress?->progress_percent;
 
-            $title->setAttribute('user_in_watchlist', (bool) ($state?->in_watchlist ?? false));
-            $title->setAttribute('user_rating', $state?->rating === null ? null : (int) $state->rating);
+            $title->setAttribute(
+                'user_in_watchlist',
+                $state instanceof CatalogTitleUserState && $state->in_watchlist,
+            );
+            $title->setAttribute(
+                'user_rating',
+                $state instanceof CatalogTitleUserState && $state->rating !== null
+                    ? (int) $state->rating
+                    : null,
+            );
             $title->setAttribute('user_progress_percent', $progressPercent === null ? null : (int) $progressPercent);
             $title->setAttribute(
                 'user_primary_action',

@@ -342,17 +342,16 @@ final readonly class TagService
                 ->get(['id']);
             $existing = TagSynonym::query()
                 ->where('relationship', $relationship->value)
-                ->where('tag_id', $tag->id)
-                ->where('related_tag_id', $related->id)
+                ->where(function ($query) use ($tag, $related, $bidirectional): void {
+                    $query->where(fn ($query) => $query
+                        ->where('tag_id', $tag->id)
+                        ->where('related_tag_id', $related->id))
+                        ->orWhere(fn ($query) => $query
+                            ->where('tag_id', $related->id)
+                            ->where('related_tag_id', $tag->id)
+                            ->when(! $bidirectional, fn ($query) => $query->where('is_bidirectional', true)));
+                })
                 ->first();
-
-            if ($existing === null && $bidirectional) {
-                $existing = TagSynonym::query()
-                    ->where('relationship', $relationship->value)
-                    ->where('tag_id', $related->id)
-                    ->where('related_tag_id', $tag->id)
-                    ->first();
-            }
 
             if ($existing !== null) {
                 if ($bidirectional && ! $existing->is_bidirectional) {
@@ -708,7 +707,7 @@ final readonly class TagService
 
         $code = $data->code === null || trim($data->code) === '' ? null : Str::lower(trim($data->code));
 
-        if ($code !== null && preg_match('/^[a-z][a-z0-9._-]{1,119}$/D', $code) !== 1) {
+        if ($code !== null && preg_match('/^[a-z][a-z0-9._-]{0,119}$/D', $code) !== 1) {
             throw ValidationException::withMessages(['code' => [__('tags.validation.code')]]);
         }
 
@@ -739,6 +738,10 @@ final readonly class TagService
     {
         if ($tag->archived_at !== null) {
             throw ValidationException::withMessages(['tag' => [__('tags.errors.archived_read_only')]]);
+        }
+
+        if ($tag->type !== TagType::Imported && $data->type === TagType::Imported) {
+            throw ValidationException::withMessages(['type' => [__('tags.validation.imported_transition')]]);
         }
 
         if (in_array($data->moderationStatus, [TagModerationStatus::Merged, TagModerationStatus::Archived], true)) {
@@ -834,17 +837,30 @@ final readonly class TagService
                 ? $slug
                 : null;
 
-        return TagAlias::query()->firstOrCreate([
-            'locale' => $locale,
-            'normalized_name_hash' => $hash,
-        ], [
-            'tag_id' => $tag->id,
-            'name' => $name,
-            'normalized_name' => $normalized,
-            'slug' => $slug,
-            'source' => $source,
-            'moderation_status' => TagModerationStatus::Approved,
-        ]);
+        try {
+            $alias = TagAlias::query()->firstOrCreate([
+                'locale' => $locale,
+                'normalized_name_hash' => $hash,
+            ], [
+                'tag_id' => $tag->id,
+                'name' => $name,
+                'normalized_name' => $normalized,
+                'slug' => $slug,
+                'source' => $source,
+                'moderation_status' => TagModerationStatus::Approved,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            $alias = TagAlias::query()
+                ->where('locale', $locale)
+                ->where('normalized_name_hash', $hash)
+                ->first();
+        }
+
+        if (! $alias instanceof TagAlias || (int) $alias->tag_id !== (int) $tag->id) {
+            throw ValidationException::withMessages(['alias' => [__('tags.errors.alias_conflict')]]);
+        }
+
+        return $alias;
     }
 
     private function moveAssignments(Tag $source, Tag $target): void
@@ -1015,11 +1031,10 @@ final readonly class TagService
                                 ->where('tag_id', $tagId)
                                 ->where('related_tag_id', $relatedId));
 
-                            if ($synonym->is_bidirectional) {
-                                $query->orWhere(fn ($query) => $query
+                            $query->orWhere(fn ($query) => $query
                                     ->where('tag_id', $relatedId)
-                                    ->where('related_tag_id', $tagId));
-                            }
+                                    ->where('related_tag_id', $tagId)
+                                    ->when(! $synonym->is_bidirectional, fn ($query) => $query->where('is_bidirectional', true)));
                         })
                         ->whereKeyNot($synonym->id)
                         ->first();

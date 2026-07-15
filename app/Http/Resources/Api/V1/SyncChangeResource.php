@@ -21,7 +21,7 @@ final class SyncChangeResource extends JsonResource
             'type' => (string) $this->resource_type,
             'key' => $key,
             'operation' => (string) $this->operation,
-            'changed_at' => $this->changed_at?->copy()->utc()->toISOString(),
+            'changed_at' => $this->changed_at->copy()->utc()->toISOString(),
             'title_slug' => $this->when($titleSlug !== null, $titleSlug),
             'episode_id' => $this->when($episodeId !== null, $episodeId),
             'links' => [

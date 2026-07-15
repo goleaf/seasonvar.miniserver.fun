@@ -17,6 +17,7 @@ use App\Services\Catalog\CatalogAdministrationQuery;
 use App\Services\Catalog\CatalogAdministrationService;
 use App\Services\Catalog\CatalogTaxonomyRegistry;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
@@ -726,7 +727,10 @@ final class CatalogAdministrationManager extends Component
         $this->mediaVersion = $this->administration->mediaVersion($media);
     }
 
-    /** @param array<string, mixed> $form @return array<string, mixed> */
+    /**
+     * @param  array<string, mixed>  $form
+     * @return array<string, mixed>
+     */
     private function normalizedReleaseInput(array $form, bool $includeTitle): array
     {
         $input = [
@@ -855,7 +859,13 @@ final class CatalogAdministrationManager extends Component
         $this->titleVersion = $this->administration->titleVersion($this->selectedTitle());
     }
 
-    /** @return array<string, array{label: string, selected: Collection, options: Collection}> */
+    /**
+     * @return array<string, array{
+     *     label: string,
+     *     selected: Collection<int, Model>,
+     *     options: Collection<int, Model>
+     * }>
+     */
     private function relationGroups(CatalogTitle $title): array
     {
         $labels = [

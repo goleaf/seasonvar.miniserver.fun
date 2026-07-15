@@ -8,6 +8,12 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property int $legacy_review_id
+ * @property int $canonical_review_id
+ * @property int|null $legacy_catalog_title_id
+ * @property string $reason
+ */
 #[Fillable(['legacy_review_id', 'canonical_review_id', 'legacy_catalog_title_id', 'reason'])]
 final class CatalogTitleReviewAlias extends Model
 {

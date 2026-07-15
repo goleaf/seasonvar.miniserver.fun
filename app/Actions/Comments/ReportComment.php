@@ -13,6 +13,7 @@ use App\Services\Comments\CommentRateLimiter;
 use App\Services\Comments\CommentRelationshipService;
 use App\Services\Comments\CommentTargetResolver;
 use App\Support\UserPlainText;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
@@ -50,16 +51,44 @@ final class ReportComment
         $this->rateLimiter->hit('report', $user, $target->key());
         $deduplicationKey = hash('sha256', $user->id.':'.$comment->id.':'.$category->value);
 
-        $report = CommentReport::query()->firstOrCreate([
-            'deduplication_key' => $deduplicationKey,
-        ], [
-            'comment_id' => $comment->id,
-            'reporter_id' => $user->id,
-            'category' => $category,
-            'details' => $details,
-        ]);
+        /** @var array{0: CommentReport, 1: bool} $result */
+        $result = DB::transaction(function () use (
+            $comment,
+            $user,
+            $category,
+            $details,
+            $deduplicationKey,
+            $target,
+        ): array {
+            User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
+            $this->targets->resolve($target->type, $target->id, $user, lock: true);
+            $lockedComment = Comment::query()
+                ->withTrashed()
+                ->lockForUpdate()
+                ->findOrFail($comment->id);
 
-        if (! $report->wasRecentlyCreated) {
+            if ($lockedComment->target_type !== $target->type
+                || (int) $lockedComment->target_id !== $target->id) {
+                throw new CommentActionException('comments.errors.target_unavailable');
+            }
+
+            Gate::forUser($user)->authorize('report', $lockedComment);
+            $this->relationships->assertCanInteract($user, $lockedComment->user_id);
+            $report = CommentReport::query()->firstOrCreate([
+                'deduplication_key' => $deduplicationKey,
+            ], [
+                'comment_id' => $lockedComment->id,
+                'reporter_id' => $user->id,
+                'category' => $category,
+                'details' => $details,
+            ]);
+
+            return [$report, $report->wasRecentlyCreated];
+        }, attempts: 3);
+
+        [$report, $created] = $result;
+
+        if (! $created) {
             throw new CommentActionException('comments.errors.duplicate_report');
         }
 

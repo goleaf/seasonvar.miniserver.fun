@@ -21,6 +21,7 @@ use App\Models\CommentRestriction;
 use App\Models\User;
 use App\Services\Comments\CommentModerationQuery;
 use App\Services\Comments\CommentSchema;
+use App\Support\UserPlainText;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -211,13 +212,27 @@ final class CommentAdministrationManager extends Component
     public function render(CommentModerationQuery $query, CommentSchema $schema): View
     {
         $available = $schema->writable();
+        $queryFailed = false;
+        $comments = null;
+        $selectedThread = null;
+
+        if ($available) {
+            try {
+                $comments = $query->paginate($this->status, $this->target, $this->author);
+                $selectedThread = $this->selectedCommentId !== null
+                    ? $query->threadContext($this->selectedCommentId, $this->user())
+                    : null;
+            } catch (Throwable $exception) {
+                report($exception);
+                $queryFailed = true;
+            }
+        }
 
         return view('livewire.comments.comment-administration-manager', [
             'available' => $available,
-            'comments' => $available ? $query->paginate($this->status, $this->target, $this->author) : null,
-            'selectedThread' => $available && $this->selectedCommentId !== null
-                ? $query->threadContext($this->selectedCommentId, $this->user())
-                : null,
+            'queryFailed' => $queryFailed,
+            'comments' => $comments,
+            'selectedThread' => $selectedThread,
             'statusOptions' => CommentStatus::cases(),
             'targetOptions' => CommentTargetType::cases(),
             'moderationReasons' => CommentModerationReason::cases(),
@@ -251,7 +266,7 @@ final class CommentAdministrationManager extends Component
         }
 
         $this->author = Str::limit(
-            Str::squish(Str::replace(['\\', '%', '_'], '', $this->author)),
+            Str::replace(['\\', '%', '_'], '', UserPlainText::name($this->author)),
             120,
             '',
         );

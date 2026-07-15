@@ -232,14 +232,21 @@ return new class extends Migration
     private function normalized(string $value): string
     {
         $normalized = class_exists(Normalizer::class)
+            ? Normalizer::normalize($value, Normalizer::FORM_C)
+            : $value;
+        $value = $normalized === false ? $value : $normalized;
+        $value = strip_tags(html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $value = str_replace(["\u{00A0}", "\u{2007}", "\u{202F}"], ' ', $value);
+        $value = preg_replace('/[\p{Cc}\p{Cf}]+/u', '', $value) ?? '';
+        $value = preg_replace('/^\s*#+\s*/u', '', $value) ?? $value;
+        $value = Str::squish($value);
+        $normalized = class_exists(Normalizer::class)
             ? Normalizer::normalize($value, Normalizer::FORM_KC)
             : $value;
         $value = $normalized === false ? $value : $normalized;
-        $value = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $value = strip_tags($value);
-        $value = preg_replace('/[\p{Cf}\p{Cc}]+/u', '', $value) ?? '';
         $value = preg_replace('/\p{Pd}+/u', '-', $value) ?? $value;
-        $value = preg_replace('/^\s*#+\s*/u', '', $value) ?? $value;
+        $value = preg_replace('/\s*[-‐‑‒–—―]\s*/u', '-', $value) ?? $value;
+        $value = preg_replace('/\s*([:;,\/|])\s*/u', '$1', $value) ?? $value;
 
         return mb_strtolower(Str::squish($value));
     }

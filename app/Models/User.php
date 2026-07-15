@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -128,7 +129,9 @@ class User extends Authenticatable implements MustVerifyEmailContract
     protected static function booted(): void
     {
         static::creating(function (self $user): void {
-            $user->public_id ??= (string) Str::uuid();
+            if (Schema::hasColumn($user->getTable(), 'public_id')) {
+                $user->public_id ??= (string) Str::uuid();
+            }
         });
     }
 

@@ -26,7 +26,7 @@ final class ViewingHistoryResource extends JsonResource
             'completed' => $this->completed_at !== null,
             'completed_at' => $this->completed_at?->toJSON(),
             'first_started_at' => $this->first_started_at?->toJSON(),
-            'last_watched_at' => $this->last_watched_at?->toJSON(),
+            'last_watched_at' => $this->last_watched_at->toJSON(),
             'is_accessible' => (bool) $this->resource->getAttribute('is_accessible'),
             'title' => $title === null ? null : [
                 'id' => (int) $title->id,
@@ -37,14 +37,14 @@ final class ViewingHistoryResource extends JsonResource
             ],
             'season' => $season === null ? null : [
                 'id' => (int) $season->id,
-                'number' => $season->number === null ? null : (int) $season->number,
+                'number' => (int) $season->number,
                 'title' => $season->title,
                 'deleted' => $season->deleted_at !== null,
             ],
             'episode' => $episode === null ? null : [
                 'id' => (int) $episode->id,
                 'season_id' => (int) $episode->season_id,
-                'number' => $episode->number === null ? null : (int) $episode->number,
+                'number' => (int) $episode->number,
                 'title' => $episode->title,
                 'deleted' => $episode->deleted_at !== null,
             ],

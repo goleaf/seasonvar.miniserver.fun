@@ -54,16 +54,17 @@ final readonly class CatalogCollectionCardViewModel
         public bool $management = false,
     ) {
         $owner = $collection->relationLoaded('owner') ? $collection->getRelation('owner') : null;
+        $ownerPublicId = $owner instanceof User ? $owner->getAttribute('public_id') : null;
         $this->url = $management
             ? route('collections.edit', ['collectionPublicId' => $collection->public_id])
             : route('collections.show', ['collectionSlug' => $collection->slug]);
-        $this->ownerUrl = ! $owner instanceof User || $owner->public_id === null
+        $this->ownerUrl = ! is_string($ownerPublicId) || $ownerPublicId === ''
             ? null
-            : route('profiles.collections', ['userPublicId' => $owner->public_id]);
+            : route('profiles.collections', ['userPublicId' => $ownerPublicId]);
         $this->imageUrl = $covers->url($collection)
             ?? (is_string($collection->getAttribute('fallback_poster_url')) ? $collection->getAttribute('fallback_poster_url') : null);
         $this->name = (string) $collection->display_name;
-        $this->description = PlainText::clean($collection->display_description);
+        $this->description = PlainText::clean($collection->display_description, 180);
         $this->itemCount = (int) ($management
             ? ($collection->total_items_count ?? 0)
             : ($collection->visible_items_count ?? 0));

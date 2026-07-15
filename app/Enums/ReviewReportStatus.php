@@ -15,4 +15,9 @@ enum ReviewReportStatus: string
     {
         return __('reviews.reports.statuses.'.$this->value);
     }
+
+    public function isOpen(): bool
+    {
+        return in_array($this, [self::Open, self::Reviewed], true);
+    }
 }

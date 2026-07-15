@@ -67,7 +67,10 @@ final readonly class CatalogSearchDocumentBuilder
         }
     }
 
-    /** @param Collection<int, mixed> $values */
+    /**
+     * @param  Collection<int, mixed>  $values
+     * @return Collection<int, non-falsy-string>
+     */
     private function sortedUniqueText(Collection $values): Collection
     {
         return $values
@@ -85,11 +88,15 @@ final readonly class CatalogSearchDocumentBuilder
         return $variant === $value ? $value : $value."\n".$variant;
     }
 
-    /** @param Collection<int, string> $values */
+    /**
+     * @param  Collection<int, non-falsy-string>  $values
+     * @return Collection<int, non-falsy-string>
+     */
     private function withYoVariants(Collection $values): Collection
     {
         return $values
             ->flatMap(fn (string $value): array => explode("\n", $this->withYoVariant($value)))
+            ->filter()
             ->unique()
             ->values();
     }

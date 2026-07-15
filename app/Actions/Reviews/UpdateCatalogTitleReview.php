@@ -59,6 +59,7 @@ final class UpdateCatalogTitleReview
         $normalizedRating = ReviewRating::from($rating);
         $this->restrictions->assertCanReview($user);
         $this->antiSpam->assertNotCopied($user, $normalizedBody, (int) $review->id);
+        $this->rateLimiter->hit('edit_global', $user, 'global');
         $this->rateLimiter->hit('edit', $user, $target->key());
 
         if ($expectedVersion < 1 || (int) $review->version !== $expectedVersion) {

@@ -15,8 +15,8 @@ final class UserTitleStateResource extends JsonResource
     /** @return array<string, mixed> */
     public function toArray(Request $request): array
     {
-        /** @var CatalogTitleUserState|null $state */
-        $state = $this->resource['state'];
+        $storedState = $this->resource['state'] ?? null;
+        $state = $storedState instanceof CatalogTitleUserState ? $storedState : null;
         /** @var CatalogUserStateSummary $summary */
         $summary = $this->resource['summary'];
         /** @var array{minimum: int, maximum: int} $ratingRange */
@@ -25,11 +25,11 @@ final class UserTitleStateResource extends JsonResource
         $primaryAction = $this->resource['primary_action'];
 
         return [
-            'in_watchlist' => $state?->in_watchlist ?? false,
+            'in_watchlist' => $state instanceof CatalogTitleUserState && $state->in_watchlist,
             'rating' => $state?->rating,
             'versions' => [
-                'watchlist' => $state?->watchlist_version ?? 0,
-                'rating' => $state?->rating_version ?? 0,
+                'watchlist' => $state === null ? 0 : $state->watchlist_version,
+                'rating' => $state === null ? 0 : $state->rating_version,
             ],
             'aggregate' => [
                 'watchlist_count' => $summary->watchlistCount,

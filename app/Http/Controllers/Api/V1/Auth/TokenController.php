@@ -70,12 +70,6 @@ final class TokenController extends Controller
 
     private function currentToken(Request $request): PersonalAccessToken
     {
-        $token = $this->user($request)->currentAccessToken();
-
-        if (! $token instanceof PersonalAccessToken) {
-            throw new AuthenticationException;
-        }
-
-        return $token;
+        return $this->user($request)->currentAccessToken();
     }
 }

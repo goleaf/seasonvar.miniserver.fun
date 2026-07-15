@@ -12,7 +12,6 @@ use App\Models\User;
 use App\Services\Api\V1\Sync\ApiSyncReadiness;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final readonly class UserLibraryQuery
 {
@@ -72,20 +71,24 @@ final readonly class UserLibraryQuery
             $query->selectRaw('0 AS watchlist_version, 0 AS rating_version');
         }
 
-        return $query->with(['catalogTitle' => fn (BelongsTo $query): BelongsTo => $query
-            ->select([
-                'id',
-                'slug',
-                'title',
-                'original_title',
-                'type',
-                'year',
-                'description',
-                'poster_url',
-                'indexed_at',
-            ])
-            ->with($this->taxonomies->cardSummaryLoads())
-            ->withCount($this->titles->publicCardCounts($user))]);
+        return $query->with([
+            'catalogTitle' => function ($relation) use ($user): void {
+                $relation->getQuery()
+                    ->select([
+                        'id',
+                        'slug',
+                        'title',
+                        'original_title',
+                        'type',
+                        'year',
+                        'description',
+                        'poster_url',
+                        'indexed_at',
+                    ])
+                    ->with($this->taxonomies->cardSummaryLoads())
+                    ->withCount($this->titles->publicCardCounts($user));
+            },
+        ]);
     }
 
     /**

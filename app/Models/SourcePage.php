@@ -17,6 +17,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property Carbon|null $import_claimed_at
  * @property Carbon|null $import_claim_expires_at
+ * @property list<string>|null $missing_data_flags
  */
 #[Fillable([
     'source_id',

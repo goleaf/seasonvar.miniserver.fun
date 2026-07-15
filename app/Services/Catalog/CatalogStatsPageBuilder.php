@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Catalog;
 
 use App\Enums\SeasonvarPageType;
@@ -219,7 +221,7 @@ class CatalogStatsPageBuilder
      * @return array{
      *     totals: array{public_urls: int, external_url_fields: int},
      *     summary_sections: list<array{title: string, icon: string, rows: list<array{label: string, value: mixed, display: string, meta: string|null}>}>,
-     *     route_rows: Collection<int, array{label: string, address: string, kind: string, scope: string, generated_count: int, generated_display: string}>,
+     *     route_rows: list<array{name: string, uri: string, label: string, address: string, kind: string, scope: string, generated_count: int, generated_display: string}>,
      *     internal_link_rows: Collection<int, array{label: string, place: string, route: string, count: int, count_display: string, meta: string}>,
      *     external_url_field_rows: Collection<int, array{label: string, field: string, total_display: string, filled_display: string, unique_display: string, absolute_display: string, empty_display: string, coverage: string}>
      * }
@@ -302,12 +304,12 @@ class CatalogStatsPageBuilder
 
     /**
      * @param  array{totals: array{indexes: int, expected_indexes: int, missing_expected_indexes: int}}  $databaseOptimization
-     * @param  Collection<int, array{id: string, mode: string, status: string, status_class: string, status_tone: string, options: list<string>, cycles: string, discovery: string, discovery_meta: string, pages: string, pages_meta: string, failed: string, media: string, media_meta: string, media_extra: string, maintenance: list<string>, started_at: string, finished_at: string, duration: string}>  $recentImportRuns
+     * @param  list<array{id: string, mode: string, status: string, status_class: string, status_tone: string, options: list<string>, cycles: string, discovery: string, discovery_meta: string, pages: string, pages_meta: string, failed: string, media: string, media_meta: string, media_extra: string, maintenance: list<string>, started_at: string, finished_at: string, duration: string}>  $recentImportRuns
      * @return list<array{label: string, value: string, meta: string, icon: string, tone: string}>
      */
-    private function statsHealthCards(int $catalogTitles, int $media, int $publishedMedia, array $databaseOptimization, Collection $recentImportRuns): array
+    private function statsHealthCards(int $catalogTitles, int $media, int $publishedMedia, array $databaseOptimization, array $recentImportRuns): array
     {
-        $latestRun = $recentImportRuns->first();
+        $latestRun = $recentImportRuns[0] ?? null;
         $posters = $this->presentCount('catalog_titles', 'poster_url');
         $failedPages = $this->whereCount('source_pages', fn (QueryBuilder $query): QueryBuilder => $query
             ->where('parse_status', 'failed')
@@ -376,9 +378,9 @@ class CatalogStatsPageBuilder
     }
 
     /**
-     * @return Collection<int, array{id: int, title: string, year: string, label: string, meta: string, href: string, poster_src: string|null, icon: string, tone: string}>
+     * @return list<array{id: int, title: string, original_title: string|null, year: string, label: string, meta: string, href: string, poster_src: string|null, icon: string, tone: string}>
      */
-    private function statsPosterRows(): Collection
+    private function statsPosterRows(): array
     {
         return $this->titles->visibleTo(null)
             ->select(['id', 'slug', 'title', 'original_title', 'year', 'poster_url', 'indexed_at'])
@@ -397,13 +399,14 @@ class CatalogStatsPageBuilder
                 'fa-solid fa-clock',
                 'sky',
             ))
-            ->values();
+            ->values()
+            ->all();
     }
 
     /**
-     * @return Collection<int, array{id: int, title: string, year: string, label: string, meta: string, href: string, poster_src: string|null, icon: string, tone: string}>
+     * @return list<array{id: int, title: string, original_title: string|null, year: string, label: string, meta: string, href: string, poster_src: string|null, icon: string, tone: string}>
      */
-    private function statsIssueRows(): Collection
+    private function statsIssueRows(): array
     {
         $withoutPublishedMedia = $this->titles->visibleTo(null)
             ->select(['id', 'slug', 'title', 'original_title', 'year', 'poster_url', 'indexed_at'])
@@ -439,7 +442,8 @@ class CatalogStatsPageBuilder
             ->merge($withoutDescription)
             ->unique('id')
             ->take(8)
-            ->values();
+            ->values()
+            ->all();
     }
 
     /**
@@ -572,9 +576,9 @@ class CatalogStatsPageBuilder
     }
 
     /**
-     * @return Collection<int, array{id: string, mode: string, status: string, status_class: string, status_tone: string, options: list<string>, cycles: string, discovery: string, discovery_meta: string, pages: string, pages_meta: string, failed: string, media: string, media_meta: string, media_extra: string, maintenance: list<string>, started_at: string, finished_at: string, duration: string}>
+     * @return list<array{id: string, mode: string, status: string, status_class: string, status_tone: string, options: list<string>, cycles: string, discovery: string, discovery_meta: string, pages: string, pages_meta: string, failed: string, media: string, media_meta: string, media_extra: string, maintenance: list<string>, started_at: string, finished_at: string, duration: string}>
      */
-    private function recentImportRuns(): Collection
+    private function recentImportRuns(): array
     {
         return SeasonvarImportRun::query()
             ->latest('id')
@@ -600,27 +604,36 @@ class CatalogStatsPageBuilder
                 'finished_at',
                 'updated_at',
             ])
-            ->map(fn (SeasonvarImportRun $run): array => [
-                'id' => '#'.$run->id,
-                'mode' => $this->displayValue('seasonvar_import_runs', 'mode', $run->mode),
-                'status' => $this->displayValue('seasonvar_import_runs', 'status', $run->status),
-                'status_class' => $this->runStatusClass((string) $run->status),
-                'status_tone' => $this->runStatusTone((string) $run->status),
-                'options' => $this->runOptionLabels($run),
-                'cycles' => $this->formatStat((int) $run->cycles),
-                'discovery' => $this->formatStat((int) $run->discovered).' / '.$this->formatStat((int) $run->stored),
-                'discovery_meta' => 'найдено / сохранено',
-                'pages' => $this->formatStat((int) $run->selected).' / '.$this->formatStat((int) $run->parsed),
-                'pages_meta' => 'выбрано / обновлено',
-                'failed' => $this->formatStat((int) $run->failed),
-                'media' => $this->formatStat((int) $run->media_attached).' / '.$this->formatStat((int) $run->media_updated),
-                'media_meta' => 'добавлено / обновлено',
-                'media_extra' => 'пропущено: '.$this->formatStat((int) $run->media_skipped).', ошибок: '.$this->formatStat((int) $run->media_failed),
-                'maintenance' => $this->runMaintenanceRows($run->summary),
-                'started_at' => $this->dateValue($run->started_at),
-                'finished_at' => $this->dateValue($run->finished_at),
-                'duration' => $this->durationValue($run->started_at, $run->finished_at),
-            ]);
+            ->map(fn (SeasonvarImportRun $run): array => $this->importRunRow($run))
+            ->all();
+    }
+
+    /**
+     * @return array{id: string, mode: string, status: string, status_class: string, status_tone: string, options: list<string>, cycles: string, discovery: string, discovery_meta: string, pages: string, pages_meta: string, failed: string, media: string, media_meta: string, media_extra: string, maintenance: list<string>, started_at: string, finished_at: string, duration: string}
+     */
+    private function importRunRow(SeasonvarImportRun $run): array
+    {
+        return [
+            'id' => '#'.$run->id,
+            'mode' => $this->displayValue('seasonvar_import_runs', 'mode', $run->mode),
+            'status' => $this->displayValue('seasonvar_import_runs', 'status', $run->status),
+            'status_class' => $this->runStatusClass((string) $run->status),
+            'status_tone' => $this->runStatusTone((string) $run->status),
+            'options' => $this->runOptionLabels($run),
+            'cycles' => $this->formatStat((int) $run->cycles),
+            'discovery' => $this->formatStat((int) $run->discovered).' / '.$this->formatStat((int) $run->stored),
+            'discovery_meta' => 'найдено / сохранено',
+            'pages' => $this->formatStat((int) $run->selected).' / '.$this->formatStat((int) $run->parsed),
+            'pages_meta' => 'выбрано / обновлено',
+            'failed' => $this->formatStat((int) $run->failed),
+            'media' => $this->formatStat((int) $run->media_attached).' / '.$this->formatStat((int) $run->media_updated),
+            'media_meta' => 'добавлено / обновлено',
+            'media_extra' => 'пропущено: '.$this->formatStat((int) $run->media_skipped).', ошибок: '.$this->formatStat((int) $run->media_failed),
+            'maintenance' => $this->runMaintenanceRows($run->summary),
+            'started_at' => $this->dateValue($run->started_at),
+            'finished_at' => $this->dateValue($run->finished_at),
+            'duration' => $this->durationValue($run->started_at, $run->finished_at),
+        ];
     }
 
     private function runStatusClass(string $status): string
@@ -754,9 +767,9 @@ class CatalogStatsPageBuilder
 
     /**
      * @param  array<string, int>  $generatedCounts
-     * @return Collection<int, array{label: string, address: string, kind: string, scope: string, generated_count: int, generated_display: string}>
+     * @return list<array{name: string, uri: string, label: string, address: string, kind: string, scope: string, generated_count: int, generated_display: string}>
      */
-    private function routeRows(array $generatedCounts): Collection
+    private function routeRows(array $generatedCounts): array
     {
         return $this->namedGetRoutes()
             ->map(function (RouteDefinition $route) use ($generatedCounts): array {
@@ -775,7 +788,8 @@ class CatalogStatsPageBuilder
                 ];
             })
             ->sortBy([['kind', 'asc'], ['name', 'asc']])
-            ->values();
+            ->values()
+            ->all();
     }
 
     /**
@@ -783,7 +797,7 @@ class CatalogStatsPageBuilder
      */
     private function namedGetRoutes(): Collection
     {
-        return collect(Route::getRoutes())
+        return collect(Route::getRoutes()->getRoutes())
             ->filter(fn (RouteDefinition $route): bool => $route->getName() !== null && in_array('GET', $route->methods(), true))
             ->values();
     }
@@ -1000,7 +1014,7 @@ class CatalogStatsPageBuilder
      *     summary_sections: list<array{title: string, icon: string, rows: list<array{label: string, value: mixed, display: string, meta: string|null}>}>,
      *     expected_index_rows: Collection<int, array{label: string, table: string, columns: string, present: bool, status: string}>,
      *     index_rows: Collection<int, array{label: string, records_display: string, indexes_display: string, secondary_display: string, unique_display: string, coverage: string}>,
-     *     issue_rows: Collection<int, array{label: string, table: string, columns: string, present: bool, status: string}>
+     *     issue_rows: Collection<int, array{label: string, table: string, columns: string, present: false, status: string}>
      * }
      */
     private function databaseOptimizationStats(Collection $databaseTables): array
@@ -1224,7 +1238,7 @@ class CatalogStatsPageBuilder
     }
 
     /**
-     * @return list<array{title: string, icon: string, rows: Collection<int, array{label: string, value: mixed, total: int}>}>
+     * @return list<array{title: string, icon: string, rows: list<array{label: string, value: mixed, total: int, total_display: string, meta: string|null}>}>
      */
     private function groupSections(): array
     {
@@ -1307,9 +1321,9 @@ class CatalogStatsPageBuilder
     }
 
     /**
-     * @return Collection<int, array{label: string, value: mixed, total: int, total_display: string, meta?: string|null}>
+     * @return list<array{label: string, value: mixed, total: int, total_display: string, meta: string|null}>
      */
-    private function ratingProviderRows(): Collection
+    private function ratingProviderRows(): array
     {
         return DB::table('catalog_title_ratings')
             ->selectRaw('provider as value, COUNT(*) as total, AVG(rating) as average_rating')
@@ -1317,19 +1331,19 @@ class CatalogStatsPageBuilder
             ->orderByDesc('total')
             ->orderBy('provider')
             ->get()
-            ->map(fn (object $row): array => [
-                'label' => $this->displayValue('catalog_title_ratings', 'provider', $row->value),
-                'value' => $row->value,
-                'total' => (int) $row->total,
-                'total_display' => $this->formatStat((int) $row->total),
-                'meta' => $row->average_rating === null ? null : 'средняя '.number_format((float) $row->average_rating, 2, '.', ' '),
-            ]);
+            ->map(fn (object $row): array => $this->groupRow(
+                $this->displayValue('catalog_title_ratings', 'provider', $row->value),
+                $row->value,
+                (int) $row->total,
+                $row->average_rating === null ? null : 'средняя '.number_format((float) $row->average_rating, 2, '.', ' '),
+            ))
+            ->all();
     }
 
     /**
-     * @return Collection<int, array{label: string, value: mixed, total: int, total_display: string}>
+     * @return list<array{label: string, value: mixed, total: int, total_display: string, meta: string|null}>
      */
-    private function missingDataFlagRows(): Collection
+    private function missingDataFlagRows(): array
     {
         $flags = [];
 
@@ -1347,13 +1361,13 @@ class CatalogStatsPageBuilder
         ksort($flags);
 
         return collect($flags)
-            ->map(fn (int $total, string $flag): array => [
-                'label' => $this->displayValue('source_pages', 'missing_data_flags', $flag),
-                'value' => $flag,
-                'total' => $total,
-                'total_display' => $this->formatStat($total),
-            ])
-            ->values();
+            ->map(fn (int $total, string $flag): array => $this->groupRow(
+                $this->displayValue('source_pages', 'missing_data_flags', $flag),
+                $flag,
+                $total,
+            ))
+            ->values()
+            ->all();
     }
 
     /**
@@ -1413,9 +1427,9 @@ class CatalogStatsPageBuilder
     }
 
     /**
-     * @return Collection<int, array{label: string, value: mixed, total: int, total_display: string}>
+     * @return list<array{label: string, value: mixed, total: int, total_display: string, meta: string|null}>
      */
-    private function groupedCounts(string $table, string $column): Collection
+    private function groupedCounts(string $table, string $column): array
     {
         return DB::table($table)
             ->selectRaw($column.' as value, COUNT(*) as total')
@@ -1423,12 +1437,26 @@ class CatalogStatsPageBuilder
             ->orderByDesc('total')
             ->orderBy($column)
             ->get()
-            ->map(fn (object $row): array => [
-                'label' => $this->displayValue($table, $column, $row->value),
-                'value' => $row->value,
-                'total' => (int) $row->total,
-                'total_display' => $this->formatStat((int) $row->total),
-            ]);
+            ->map(fn (object $row): array => $this->groupRow(
+                $this->displayValue($table, $column, $row->value),
+                $row->value,
+                (int) $row->total,
+            ))
+            ->all();
+    }
+
+    /**
+     * @return array{label: string, value: mixed, total: int, total_display: string, meta: string|null}
+     */
+    private function groupRow(string $label, mixed $value, int $total, ?string $meta = null): array
+    {
+        return [
+            'label' => $label,
+            'value' => $value,
+            'total' => $total,
+            'total_display' => $this->formatStat($total),
+            'meta' => $meta,
+        ];
     }
 
     private function tableCount(string $table): int

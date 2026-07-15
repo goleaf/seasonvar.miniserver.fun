@@ -10,7 +10,6 @@ use App\Models\Episode;
 use App\Models\EpisodeViewProgress;
 use App\Models\Season;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -173,9 +172,11 @@ final class CatalogViewingActivityQuery
                 'summary',
             ])
             ->with([
-                'season' => fn (BelongsTo $query): BelongsTo => $query
-                    ->availableTo($user)
-                    ->select(['id', 'catalog_title_id', 'number', 'kind', 'sort_order', 'title']),
+                'season' => function ($relation) use ($user): void {
+                    $relation->getQuery()
+                        ->availableTo($user)
+                        ->select(['id', 'catalog_title_id', 'number', 'kind', 'sort_order', 'title']);
+                },
             ])
             ->get()
             ->keyBy('id');
@@ -223,15 +224,21 @@ final class CatalogViewingActivityQuery
                 'last_watched_at',
             ])
             ->with([
-                'catalogTitle' => fn (BelongsTo $query): BelongsTo => $query
-                    ->withTrashed()
-                    ->select(['id', 'slug', 'title', 'poster_url', 'deleted_at']),
-                'episode' => fn (BelongsTo $query): BelongsTo => $query
-                    ->withTrashed()
-                    ->select(['id', 'season_id', 'number', 'title', 'deleted_at']),
-                'episode.season' => fn (BelongsTo $query): BelongsTo => $query
-                    ->withTrashed()
-                    ->select(['id', 'catalog_title_id', 'number', 'title', 'deleted_at']),
+                'catalogTitle' => function ($relation): void {
+                    $relation->getQuery()
+                        ->withTrashed()
+                        ->select(['id', 'slug', 'title', 'poster_url', 'deleted_at']);
+                },
+                'episode' => function ($relation): void {
+                    $relation->getQuery()
+                        ->withTrashed()
+                        ->select(['id', 'season_id', 'number', 'title', 'deleted_at']);
+                },
+                'episode.season' => function ($relation): void {
+                    $relation->getQuery()
+                        ->withTrashed()
+                        ->select(['id', 'catalog_title_id', 'number', 'title', 'deleted_at']);
+                },
             ])
             ->orderByDesc('last_watched_at')
             ->orderByDesc('id')

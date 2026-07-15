@@ -39,7 +39,8 @@ final class CommentDiscussionQuery
         ?int $focusedCommentId = null,
         ?string $interfaceLocale = null,
     ): LengthAwarePaginator {
-        $query = $this->topLevelVisibilityQuery($target, $viewer, $focusedCommentId);
+        $focusedRootId = $this->focusedRootId($target, $viewer, $focusedCommentId);
+        $query = $this->topLevelVisibilityQuery($target, $viewer, $focusedRootId);
         $this->addPresentationRelations($query, $viewer);
         $this->sort($query, $sort);
         $paginator = $query->paginate(
@@ -198,13 +199,13 @@ final class CommentDiscussionQuery
     private function topLevelVisibilityQuery(
         CommentTarget $target,
         ?User $viewer,
-        ?int $focusedCommentId = null,
+        ?int $focusedRootId = null,
     ): Builder {
         return Comment::query()
             ->withTrashed()
             ->forTarget($target->type, $target->id)
             ->whereNull('parent_id')
-            ->where(function (Builder $query) use ($viewer, $focusedCommentId): void {
+            ->where(function (Builder $query) use ($viewer, $focusedRootId): void {
                 $query->where(function (Builder $query): void {
                     $query
                         ->where('status', CommentStatus::Published->value)
@@ -233,22 +234,28 @@ final class CommentDiscussionQuery
                     });
                 }
 
-                if ($focusedCommentId !== null) {
-                    $query->orWhere(function (Builder $query) use ($focusedCommentId, $viewer): void {
-                        $query->whereKey($focusedCommentId)->where(function (Builder $query) use ($viewer): void {
-                            $query->where('status', CommentStatus::Published->value);
-
-                            if ($viewer !== null) {
-                                $query->orWhere('user_id', $viewer->id);
-                            }
-                        });
-                    });
-
-                    if ($viewer !== null && Gate::forUser($viewer)->allows('manage-comments')) {
-                        $query->orWhere('id', $focusedCommentId);
-                    }
+                if ($focusedRootId !== null) {
+                    $query->orWhere('id', $focusedRootId);
                 }
             });
+    }
+
+    private function focusedRootId(CommentTarget $target, ?User $viewer, ?int $focusedCommentId): ?int
+    {
+        if ($focusedCommentId === null || $focusedCommentId < 1) {
+            return null;
+        }
+
+        $focused = Comment::query()
+            ->withTrashed()
+            ->forTarget($target->type, $target->id)
+            ->find($focusedCommentId, ['id', 'user_id', 'parent_id', 'status', 'deleted_at']);
+
+        if ($focused === null || ! Gate::forUser($viewer)->allows('view', $focused)) {
+            return null;
+        }
+
+        return (int) ($focused->parent_id ?? $focused->id);
     }
 
     /** @param Builder<Comment> $query */

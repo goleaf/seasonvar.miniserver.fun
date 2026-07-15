@@ -9,6 +9,12 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property int $id
+ * @property int $catalog_title_review_id
+ * @property int $user_id
+ * @property ReviewVoteType $type
+ */
 #[Fillable(['catalog_title_review_id', 'user_id', 'type'])]
 final class CatalogTitleReviewVote extends Model
 {

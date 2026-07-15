@@ -22,6 +22,11 @@
         <div class="rounded-panel border border-slate-200 bg-white p-6 text-center shadow-panel">
             <p class="text-sm font-semibold text-slate-600">{{ __('comments.states.comments_disabled') }}</p>
         </div>
+    @elseif ($queryFailed)
+        <div class="rounded-panel border border-rose-200 bg-white p-6 text-center shadow-panel" role="alert">
+            <x-ui.icon name="fa-solid fa-triangle-exclamation text-2xl text-rose-600" />
+            <p class="mt-3 text-sm font-semibold text-slate-700">{{ __('comments.states.query_failed') }}</p>
+        </div>
     @else
         <section class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5" aria-labelledby="comment-moderation-filters">
             <h2 id="comment-moderation-filters" class="text-lg font-black text-slate-800">{{ __('comments.admin.queue') }}</h2>
@@ -123,7 +128,7 @@
         @endif
     @endif
 
-    @if ($selectedCommentId !== null)
+    @if (! $queryFailed && $selectedCommentId !== null)
         <dialog data-comment-dialog data-comment-dialog-open class="max-h-[calc(100vh-2rem)] w-[min(48rem,calc(100%-2rem))] overflow-y-auto rounded-panel border-0 bg-white p-0 shadow-2xl backdrop:bg-slate-950/60" aria-labelledby="comment-moderation-dialog-title">
             <div class="p-5 sm:p-6">
                 <div class="flex items-start justify-between gap-4">

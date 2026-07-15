@@ -46,7 +46,7 @@
 
 ## Представление коллекций
 
-`x-collections.collection-card` получает eager-loaded `CatalogCollection` summary и `CatalogCollectionCardViewModel`; Blade не считает visibility/count/URL и не запрашивает owner/cover/items. Collection item rows переиспользуют `x-catalog.title-card`, prepared collection item attributes и stable `wire:key` по item ID. Public count и owner count подготовлены query-object раздельно.
+`x-collections.collection-card` получает eager-loaded `CatalogCollection` summary и `CatalogCollectionCardViewModel`; Blade не считает visibility/count/URL и не запрашивает owner/cover/items. ViewModel превращает описание в escaped plain-text excerpt длиной не более 180 Unicode-символов, поэтому карточка не рендерит пользовательский HTML и не раздувается длинным текстом. Collection item rows переиспользуют `x-catalog.title-card`, prepared collection item attributes и stable `wire:key` по item ID. Public count и owner count подготовлены query-object раздельно.
 
 Collection Livewire views содержат только passive loops/conditions над prepared values. Locked UUID/title IDs остаются в component, policy and criteria — в PHP. Нет `@php`, model/service/database calls, inline CSS или inline business JavaScript. Empty/search-empty/unavailable/moderation/status/loading/error/report/share/delete/restore states имеют реальные controls или safe text; absent likes/follows/collaboration не изображаются неработающими кнопками.
 
@@ -60,8 +60,16 @@ Composer/reply/edit/report/moderation controls имеют реальные submi
 
 ## Представление отзывов
 
-`CatalogTitleReviews` передаёт `x-reviews.item` immutable `ReviewItemData`, criteria/paginator and bounded form scalars; Eloquent model graphs не являются Livewire public state. Stable `wire:key`/anchor uses review ID. Presenter заранее вычисляет scope, title/body/excerpt, author/rating/verified/status/edited, vote totals/current vote, permissions and direct URL; Blade не вызывает models/services/database и не рассчитывает aggregate, verification, spoiler or authorization.
+`CatalogTitleReviews` передаёт `x-reviews.review-card` immutable `ReviewItemData`, criteria/paginator and bounded form scalars; Eloquent model graphs не являются Livewire public state. Stable `wire:key`/anchor uses review ID. Presenter заранее вычисляет scope, title/body/excerpt, author/rating/verified/status/edited, vote totals/current vote, permissions and direct URL; Blade не вызывает models/services/database и не рассчитывает aggregate, verification, spoiler or authorization.
 
 Unrevealed spoiler title/body равны `null` и отсутствуют в DOM/screen-reader tree, а translated warning/reveal server action загружает их заново. Hidden/deleted/blocked records never render body/private reason. User/provider text is escaped with preserved line breaks and wrapping; no `{!! !!}`, auto-link, Markdown or provider HTML. Rating uses normal labelled select fallback and textual value, not color-only stars.
 
 Composer/edit/report/preferences/helpfulness/delete/restore/moderation controls map to real actions with error/success/loading/disabled/confirm states and retain drafts on recoverable failure. `resources/js/reviews.js` only stores account-, target- and edit-scoped 24-hour session drafts, restores focus/direct highlight and respects reduced motion; policy, validation and writes remain PHP. The opaque account scope prevents a draft from one signed-in account appearing to another account in the same browser session. No Volt, `@php`, inline CSS, inline business JavaScript or query from Blade is introduced.
+
+## Представление тегов
+
+Public tag page data готовят `TagPagePresenter`, `TagSeoPresenter` и existing `CatalogTitlesPageBuilder`; Blade получает `TagPageData`, paginator/card view data и prepared filter state. Description/aliases/related/count/canonical/JSON-LD не вычисляются в template. `x-ui.taxonomy-chip` получает eager-loaded tag and route helper URL, добавляет textual accessible public-tag label и не выполняет relation query.
+
+`PersonalTagManager`/`PersonalTagSelector` держат public state только в bounded strings, booleans, locked title/UUID/version and draft UUID list. Owner tags/counts/title cards разрешает `PersonalTagLibraryQuery`, writes — `PersonalTagService`; templates loops only prepared rows. Private badge не имеет public link, personal text escaped, stable `wire:key` uses opaque UUID.
+
+Admin view receives bounded query results, enum options and merge impact from `TagAdministrationQuery`; it does not resolve aliases, normalize names, authorize, count usage or query provider mappings in Blade. Loading/empty/error/confirmation state maps to real Livewire action. No tag template introduces Volt, `@php`, raw HTML, inline CSS, inline business JavaScript, DB/facade/service call or complete Eloquent graph public serialization.

@@ -28,11 +28,7 @@ final class CatalogHomeResource extends JsonResource
             'featured_titles' => TitleCardResource::collection(data_get($this->resource, 'featuredTitles', collect())),
             'titles_with_video' => TitleCardResource::collection(data_get($this->resource, 'videoTitles', collect())),
             'latest_releases' => LatestReleaseResource::collection(data_get($this->resource, 'latestMedia', collect())),
-            'year_buckets' => collect(data_get($this->resource, 'yearBuckets', collect()))
-                ->map(static fn (object $bucket): array => [
-                    'year' => (int) $bucket->year,
-                    'titles_count' => (int) $bucket->titles_count,
-                ])->values()->all(),
+            'year_buckets' => $this->yearBuckets(data_get($this->resource, 'yearBuckets')),
             'genres' => CatalogTaxonomyResource::collection(data_get($this->resource, 'genres', collect())),
             'countries' => CatalogTaxonomyResource::collection(data_get($this->resource, 'countries', collect())),
             'subtitle_tag' => $subtitleTag === null ? null : [
@@ -42,5 +38,28 @@ final class CatalogHomeResource extends JsonResource
                 'titles_count' => (int) $subtitleTag->catalog_titles_count,
             ],
         ];
+    }
+
+    /** @return list<array{year: int, titles_count: int}> */
+    private function yearBuckets(mixed $buckets): array
+    {
+        if (! is_iterable($buckets)) {
+            return [];
+        }
+
+        $rows = [];
+
+        foreach ($buckets as $bucket) {
+            if (! is_object($bucket)) {
+                continue;
+            }
+
+            $rows[] = [
+                'year' => (int) data_get($bucket, 'year', 0),
+                'titles_count' => (int) data_get($bucket, 'titles_count', 0),
+            ];
+        }
+
+        return $rows;
     }
 }

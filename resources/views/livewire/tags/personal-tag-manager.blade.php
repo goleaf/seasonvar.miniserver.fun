@@ -17,6 +17,16 @@
         @if ($status !== null)
             <p role="status" aria-live="polite" class="mt-4 rounded-control bg-emerald-50 p-3 text-sm font-bold text-emerald-700">{{ $status }}</p>
         @endif
+        @if ($errors->any())
+            <div role="alert" aria-live="assertive" class="mt-4 rounded-control bg-rose-50 p-3 text-sm text-rose-800">
+                <p class="font-black">{{ __('tags.states.error') }}</p>
+                <ul class="mt-2 list-disc space-y-1 pl-5">
+                    @foreach ($errors->all() as $message)
+                        <li>{{ $message }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
     </x-ui.panel>
 
     <div class="grid min-w-0 gap-5 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
@@ -34,12 +44,13 @@
 
                         <div>
                             <label for="personal-tag-language" class="block text-sm font-bold text-slate-700">{{ __('tags.fields.language') }}</label>
-                            <select id="personal-tag-language" wire:model="contentLocale" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-base text-slate-800 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100">
+                            <select id="personal-tag-language" wire:model="contentLocale" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-base text-slate-800 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100" @error('contentLocale') aria-invalid="true" aria-describedby="personal-tag-language-error" @enderror>
                                 <option value="">{{ __('tags.fields.language_unspecified') }}</option>
                                 @foreach ($supportedLocales as $locale)
                                     <option value="{{ $locale }}">{{ __('tags.locales.'.$locale) }}</option>
                                 @endforeach
                             </select>
+                            @error('contentLocale') <p id="personal-tag-language-error" role="alert" class="mt-1 text-sm font-bold text-rose-700">{{ $message }}</p> @enderror
                             <p class="mt-2 text-xs leading-5 text-slate-500">{{ __('tags.personal_page.original_language') }}</p>
                         </div>
 

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -94,7 +96,8 @@ class CatalogTitleRecommendation extends Model
      */
     public function reasonLabels(): array
     {
-        $reasons = is_array($this->reasons) ? $this->reasons : [];
+        $storedReasons = $this->getAttribute('reasons');
+        $reasons = is_array($storedReasons) ? $storedReasons : [];
 
         return collect($reasons)
             ->map(fn (mixed $details, string $reason): array => [

@@ -13,7 +13,6 @@ use App\Models\User;
 use App\Services\Reviews\ReviewCacheInvalidator;
 use App\Services\Reviews\ReviewRateLimiter;
 use App\Services\Reviews\ReviewSchema;
-use App\Services\Reviews\ReviewTargetResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
@@ -21,7 +20,6 @@ final class DeleteCatalogTitleReview
 {
     public function __construct(
         private readonly ReviewSchema $schema,
-        private readonly ReviewTargetResolver $targets,
         private readonly ReviewRateLimiter $rateLimiter,
         private readonly ReviewCacheInvalidator $cache,
     ) {}
@@ -39,8 +37,7 @@ final class DeleteCatalogTitleReview
         }
 
         Gate::forUser($user)->authorize('delete', $review);
-        $target = $this->targets->fromReview($review, $user);
-        $this->rateLimiter->hit('delete', $user, $target->key());
+        $this->rateLimiter->hit('delete', $user, 'title:'.$review->catalog_title_id);
 
         /** @var array{0: CatalogTitleReview, 1: bool, 2: bool} $result */
         $result = DB::transaction(function () use ($review, $user): array {

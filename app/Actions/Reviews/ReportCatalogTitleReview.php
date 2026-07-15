@@ -72,6 +72,7 @@ final class ReportCatalogTitleReview
             return $existing;
         }
 
+        $this->rateLimiter->hit('report_global', $user, 'global');
         $this->rateLimiter->hit('report', $user, 'review:'.$review->id);
 
         return DB::transaction(function () use (

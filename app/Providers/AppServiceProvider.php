@@ -37,7 +37,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scopedIf(CatalogCollectionSchema::class);
         $this->app->scopedIf(CommentSchema::class);
         $this->app->scopedIf(ReviewSchema::class);
-        $this->app->singletonIf(TagSchema::class);
+        $this->app->scopedIf(TagSchema::class);
     }
 
     /**

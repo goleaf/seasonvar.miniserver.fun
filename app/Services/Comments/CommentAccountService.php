@@ -115,6 +115,7 @@ final class CommentAccountService
             ->where('user_id', $user->id)
             ->update([
                 'user_id' => null,
+                'submission_key' => null,
                 'updated_at' => now(),
             ]);
         if ($this->schema->engagementAvailable()) {

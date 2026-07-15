@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
 #[Fillable([
-    'public_id', 'user_id', 'name', 'normalized_name', 'normalized_name_hash', 'description', 'content_locale',
+    'public_id', 'name', 'normalized_name', 'normalized_name_hash', 'description', 'content_locale',
     'content_version',
 ])]
 final class UserTag extends Model

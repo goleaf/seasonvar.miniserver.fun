@@ -20,7 +20,9 @@ class PlaybackSourceController extends Controller
         $user = $request->user();
         $user = $user instanceof User ? $user : null;
 
-        abort_unless((int) $request->query('viewer', -1) === (int) ($user?->id ?? 0), 403);
+        $viewerId = $user === null ? 0 : (int) $user->getKey();
+
+        abort_unless((int) $request->query('viewer', -1) === $viewerId, 403);
 
         return $sources->response($licensedMedia, $user);
     }

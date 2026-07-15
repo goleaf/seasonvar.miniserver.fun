@@ -23,6 +23,11 @@
             <x-ui.icon name="fa-solid fa-comment-slash text-2xl text-slate-400" />
             <p class="mt-3 text-sm font-semibold text-slate-600">{{ __('comments.states.comments_disabled') }}</p>
         </div>
+    @elseif ($queryFailed)
+        <div class="rounded-panel border border-rose-200 bg-white p-6 text-center shadow-panel" role="alert">
+            <x-ui.icon name="fa-solid fa-triangle-exclamation text-2xl text-rose-600" />
+            <p class="mt-3 text-sm font-semibold text-slate-700">{{ __('comments.states.query_failed') }}</p>
+        </div>
     @else
         <section aria-labelledby="discussion-activity-title" class="rounded-panel border border-slate-200 bg-white shadow-panel">
             <div class="border-b border-slate-200 p-4 sm:p-5">
@@ -98,11 +103,13 @@
         <section aria-labelledby="review-notifications-title" class="rounded-panel border border-slate-200 bg-white shadow-panel">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4 sm:p-5">
                 <h2 id="review-notifications-title" class="flex items-center gap-2 text-lg font-black text-slate-800"><x-ui.icon name="fa-solid fa-star-half-stroke text-emerald-700" />{{ __('reviews.notifications.title') }}</h2>
-                @if ($reviewNotificationsAvailable)
+                @if ($reviewNotificationsAvailable && ! $reviewNotificationsFailed)
                     <button type="button" wire:click="markAllReviewNotificationsRead" wire:loading.attr="disabled" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 text-sm font-bold text-slate-700 hover:bg-slate-100"><x-ui.icon name="fa-solid fa-check-double" />{{ __('reviews.notifications.mark_all_read') }}</button>
                 @endif
             </div>
-            @if (! $reviewNotificationsAvailable || $reviewNotifications->isEmpty())
+            @if ($reviewNotificationsFailed)
+                <p class="p-6 text-sm font-semibold text-rose-700" role="alert">{{ __('comments.states.query_failed') }}</p>
+            @elseif (! $reviewNotificationsAvailable || $reviewNotifications === null || $reviewNotifications->isEmpty())
                 <p class="p-6 text-sm font-semibold text-slate-600">{{ __('reviews.notifications.empty') }}</p>
             @else
                 <ol class="divide-y divide-slate-200">

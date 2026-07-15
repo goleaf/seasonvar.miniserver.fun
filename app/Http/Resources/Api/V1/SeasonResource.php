@@ -20,7 +20,7 @@ final class SeasonResource extends JsonResource
 
         return [
             'id' => (int) $this->id,
-            'number' => $this->number === null ? null : (int) $this->number,
+            'number' => (int) $this->number,
             'kind' => $this->kind->value,
             'title' => $this->title,
             'latest_episode_released_at' => $this->latest_episode_released_at?->toDateString(),

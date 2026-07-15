@@ -22,6 +22,16 @@
         @if ($notice !== null)
             <p role="status" aria-live="polite" class="mt-4 rounded-control bg-emerald-50 p-3 text-sm font-bold text-emerald-700">{{ $notice }}</p>
         @endif
+        @if ($errors->any())
+            <div role="alert" aria-live="assertive" class="mt-4 rounded-control bg-rose-50 p-3 text-sm text-rose-800">
+                <p class="font-black">{{ __('tags.states.error') }}</p>
+                <ul class="mt-2 list-disc space-y-1 pl-5">
+                    @foreach ($errors->all() as $message)
+                        <li>{{ $message }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
     </x-ui.panel>
 
     <div class="grid min-w-0 gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
@@ -162,7 +172,8 @@
                                     <x-form.field for="admin-tag-short-description-{{ $locale }}" :label="__('tags.admin.short_description')" wire:model="translationForms.{{ $locale }}.short_description" maxlength="500" />
                                     <div>
                                         <label for="admin-tag-description-{{ $locale }}" class="block text-sm font-bold text-slate-700">{{ __('tags.fields.description') }}</label>
-                                        <textarea id="admin-tag-description-{{ $locale }}" wire:model="translationForms.{{ $locale }}.description" maxlength="10000" rows="5" class="mt-2 min-h-32 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"></textarea>
+                                        <textarea id="admin-tag-description-{{ $locale }}" wire:model="translationForms.{{ $locale }}.description" maxlength="10000" rows="5" @if ($errors->has('translationForms.'.$locale.'.description')) aria-invalid="true" aria-describedby="admin-tag-description-{{ $locale }}-error" @endif class="mt-2 min-h-32 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"></textarea>
+                                        <x-form.input-error :for="'translationForms.'.$locale.'.description'" :id="'admin-tag-description-'.$locale.'-error'" />
                                     </div>
                                     <div class="grid gap-3 sm:grid-cols-2">
                                         <x-form.field for="admin-tag-seo-title-{{ $locale }}" :label="__('tags.admin.seo_title')" wire:model="translationForms.{{ $locale }}.seo_title" maxlength="180" />
@@ -200,10 +211,11 @@
                             <form wire:submit="addAlias" class="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_110px_auto] sm:items-end">
                                 <x-form.field for="admin-tag-alias-name" :label="__('tags.fields.aliases')" wire:model="aliasName" maxlength="80" required />
                                 <label class="text-sm font-bold text-slate-700">{{ __('tags.fields.language') }}
-                                    <select wire:model="aliasLocale" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-2 py-2 font-normal">
+                                    <select wire:model="aliasLocale" @if ($errors->has('aliasLocale')) aria-invalid="true" aria-describedby="admin-tag-alias-locale-error" @endif class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-2 py-2 font-normal">
                                         <option value="und">—</option>
                                         @foreach ($supportedLocales as $locale)<option value="{{ $locale }}">{{ $locale }}</option>@endforeach
                                     </select>
+                                    <x-form.input-error for="aliasLocale" id="admin-tag-alias-locale-error" />
                                 </label>
                                 <button type="submit" wire:loading.attr="disabled" wire:target="addAlias" class="inline-flex min-h-11 items-center justify-center rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-50">{{ __('tags.actions.add') }}</button>
                             </form>

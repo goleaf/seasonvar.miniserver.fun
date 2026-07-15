@@ -22,8 +22,8 @@ final class CatalogTitleResource extends JsonResource
         $primaryAction = $this->resource->getAttribute('api_primary_action');
         /** @var CatalogUserStateSummary $ratingSummary */
         $ratingSummary = $this->resource->getAttribute('api_rating_summary');
-        /** @var CatalogTitleUserState|null $userState */
-        $userState = $this->resource->getAttribute('api_user_state');
+        $storedUserState = $this->resource->getAttribute('api_user_state');
+        $userState = $storedUserState instanceof CatalogTitleUserState ? $storedUserState : null;
         $counts = (array) $this->resource->getAttribute('api_counts');
 
         return [
@@ -74,7 +74,7 @@ final class CatalogTitleResource extends JsonResource
                 'playable' => $primaryAction->isPlayable(),
             ],
             'user_state' => $this->when($request->user() !== null, [
-                'in_watchlist' => $userState?->in_watchlist ?? false,
+                'in_watchlist' => $userState instanceof CatalogTitleUserState && $userState->in_watchlist,
                 'rating' => $userState?->rating,
             ]),
             'links' => [

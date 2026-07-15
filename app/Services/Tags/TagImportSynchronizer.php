@@ -135,14 +135,19 @@ final readonly class TagImportSynchronizer
             $fallbackSlug,
         );
         $mappedTag = $mapping instanceof TagProviderMapping ? $mapping->tag : null;
-        $matchedAlias = TagAlias::query()
+        $matchedAliasTagIds = TagAlias::query()
             ->where('normalized_name_hash', $hash)
             ->whereIn('moderation_status', [
                 TagModerationStatus::Pending->value,
                 TagModerationStatus::Approved->value,
             ])
-            ->first();
-        $aliasTag = $matchedAlias instanceof TagAlias ? $matchedAlias->tag : null;
+            ->select('tag_id')
+            ->distinct()
+            ->limit(2)
+            ->pluck('tag_id');
+        $aliasTag = $matchedAliasTagIds->count() === 1
+            ? Tag::query()->find($matchedAliasTagIds->first())
+            : null;
         $tag = $mappedTag
             ?? ($sourceUrl === null ? null : Tag::query()->where('source_url', $sourceUrl)->first())
             ?? Tag::query()->where('normalized_name_hash', $hash)->first()
@@ -201,7 +206,27 @@ final readonly class TagImportSynchronizer
             if ($tag->type === TagType::Imported
                 && $tag->source === TagSource::Seasonvar
                 && $tag->moderation_status === TagModerationStatus::Pending) {
-                $attributes['name'] = $this->relationNames->preferredName('tag', $tag->canonicalName(), $name);
+                $preferredName = $this->relationNames->preferredName('tag', $tag->canonicalName(), $name);
+                $preferredNormalized = $this->normalizer->comparison($preferredName);
+                $preferredHash = hash('sha256', $preferredNormalized);
+                $identityConflict = Tag::query()
+                    ->whereKeyNot($tag->id)
+                    ->where('normalized_name_hash', $preferredHash)
+                    ->exists()
+                    || TagAlias::query()
+                        ->where('tag_id', '!=', $tag->id)
+                        ->where('normalized_name_hash', $preferredHash)
+                        ->exists();
+
+                if (! $identityConflict) {
+                    $attributes['name'] = $preferredName;
+                    $attributes['normalized_name'] = $preferredNormalized;
+                    $attributes['normalized_name_hash'] = $preferredHash;
+                    TagAlias::query()
+                        ->whereBelongsTo($tag)
+                        ->where('normalized_name_hash', $preferredHash)
+                        ->delete();
+                }
             }
 
             if ($attributes !== []) {
@@ -209,10 +234,6 @@ final readonly class TagImportSynchronizer
             }
 
             $changed = $before !== $tag->only(['name', 'source_url', 'normalized_name', 'normalized_name_hash']);
-        }
-
-        foreach ([$name, ...$aliases] as $alias) {
-            $changed = $this->storeProviderAlias($tag, $alias, $providerKey) || $changed;
         }
 
         $mappingStatus = $tag->moderation_status === TagModerationStatus::Approved
@@ -231,6 +252,25 @@ final readonly class TagImportSynchronizer
             'confidence' => $sourceUrl === null ? 80 : 100,
             'last_seen_at' => now(),
         ]);
+
+        if ($storedMapping->status === TagProviderMappingStatus::Rejected) {
+            $storedMapping->forceFill(['raw_label' => $name, 'last_seen_at' => now()])->save();
+
+            return null;
+        }
+
+        if ($storedMapping->tag_id !== null && (int) $storedMapping->tag_id !== (int) $tag->id) {
+            $mappedTag = Tag::query()->find($storedMapping->tag_id);
+
+            if (! $mappedTag instanceof Tag) {
+                return null;
+            }
+
+            $tag = $mappedTag;
+            $created = false;
+            $changed = false;
+        }
+
         $storedMapping->forceFill([
             'tag_id' => $tag->id,
             'raw_label' => $name,
@@ -241,8 +281,8 @@ final readonly class TagImportSynchronizer
             'last_seen_at' => now(),
         ])->save();
 
-        if ($storedMapping->status === TagProviderMappingStatus::Rejected) {
-            return null;
+        foreach ([$name, ...$aliases] as $alias) {
+            $changed = $this->storeProviderAlias($tag, $alias, $providerKey) || $changed;
         }
 
         return [
@@ -342,18 +382,29 @@ final readonly class TagImportSynchronizer
             return false;
         }
 
-        $alias = TagAlias::query()->firstOrCreate([
-            'locale' => 'und',
-            'normalized_name_hash' => $hash,
-        ], [
-            'tag_id' => $tag->id,
-            'name' => $name,
-            'normalized_name' => $normalized,
-            'slug' => null,
-            'source' => TagAliasSource::Provider,
-            'source_key' => $providerKey,
-            'moderation_status' => TagModerationStatus::Pending,
-        ]);
+        try {
+            $alias = TagAlias::query()->firstOrCreate([
+                'locale' => 'und',
+                'normalized_name_hash' => $hash,
+            ], [
+                'tag_id' => $tag->id,
+                'name' => $name,
+                'normalized_name' => $normalized,
+                'slug' => null,
+                'source' => TagAliasSource::Provider,
+                'source_key' => $providerKey,
+                'moderation_status' => TagModerationStatus::Pending,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            $alias = TagAlias::query()
+                ->where('locale', 'und')
+                ->where('normalized_name_hash', $hash)
+                ->first();
+        }
+
+        if (! $alias instanceof TagAlias || (int) $alias->tag_id !== (int) $tag->id) {
+            return false;
+        }
 
         return $alias->wasRecentlyCreated;
     }

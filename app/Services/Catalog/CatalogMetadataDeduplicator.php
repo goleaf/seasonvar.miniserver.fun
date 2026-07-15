@@ -2,12 +2,9 @@
 
 namespace App\Services\Catalog;
 
-use App\Models\CatalogTitle;
 use App\Models\Taxonomy;
 use App\Services\Catalog\Search\CatalogSearchIndexer;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Support\Facades\DB;
 
 class CatalogMetadataDeduplicator
@@ -42,7 +39,6 @@ class CatalogMetadataDeduplicator
                 $typeResult = $this->deduplicateRelation(
                     $type,
                     $config['model'],
-                    $config['relation'],
                     $chunkSize,
                     $affectedTitleIds,
                 );
@@ -86,16 +82,14 @@ class CatalogMetadataDeduplicator
     private function deduplicateRelation(
         string $type,
         string $modelClass,
-        string $relationName,
         int $chunkSize,
         array &$affectedTitleIds,
     ): array {
         $result = $this->emptyTypeResult();
-        /** @var BelongsToMany<Model, CatalogTitle, Pivot, 'pivot'> $relation */
-        $relation = (new CatalogTitle)->{$relationName}();
-        $pivotTable = $relation->getTable();
-        $titleKey = $relation->getForeignPivotKeyName();
-        $relatedKey = $relation->getRelatedPivotKeyName();
+        $pivot = $this->taxonomies->pivot($type);
+        $pivotTable = $pivot['table'];
+        $titleKey = $pivot['title_key'];
+        $relatedKey = $pivot['related_key'];
         $modelTable = (new $modelClass)->getTable();
         $this->resetIdentityTable();
 
@@ -108,7 +102,7 @@ class CatalogMetadataDeduplicator
 
                 foreach ($records as $record) {
                     $recordId = (int) $record->getKey();
-                    $name = $this->names->normalize((string) $record->name);
+                    $name = $this->names->normalize((string) $record->getAttribute('name'));
 
                     if (! $this->names->isValid($type, $name)) {
                         $invalidIds[] = $recordId;
@@ -119,10 +113,10 @@ class CatalogMetadataDeduplicator
                     $identityRows[] = [
                         'relation_id' => $recordId,
                         'canonical_key' => $this->names->canonicalKey($type, $name),
-                        'current_key' => $record->slug,
-                        'identity_key' => $record->slug,
+                        'current_key' => $record->getAttribute('slug'),
+                        'identity_key' => $record->getAttribute('slug'),
                         'normalized_name' => $name,
-                        'source_url' => $record->source_url,
+                        'source_url' => $record->getAttribute('source_url'),
                     ];
                 }
 
@@ -165,7 +159,7 @@ class CatalogMetadataDeduplicator
                     (string) $identity->normalized_name,
                 ),
             );
-            $sourceUrl = $identities->firstWhere('relation_id', $canonicalId)?->source_url
+            $sourceUrl = $identities->firstWhere('relation_id', $canonicalId)->source_url
                 ?? $identities->first(fn (object $identity): bool => $identity->source_url !== null)?->source_url;
             $canonicalCurrentKey = (string) $identities->firstWhere('relation_id', $canonicalId)?->current_key;
 
@@ -299,6 +293,7 @@ class CatalogMetadataDeduplicator
     /**
      * @param  class-string<Model>  $modelClass
      * @param  array<int, int>  $duplicateMap
+     * @param  list<string>  $previousCanonicalKeys
      * @param  array<string, int>  $result
      * @param  array<int, true>  $affectedTitleIds
      */
@@ -342,7 +337,10 @@ class CatalogMetadataDeduplicator
         });
     }
 
-    /** @param array<int, true> $affectedTitleIds */
+    /**
+     * @param  list<int>  $relationIds
+     * @param  array<int, true>  $affectedTitleIds
+     */
     private function rememberAffectedTitles(
         string $pivotTable,
         string $titleKey,

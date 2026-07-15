@@ -121,7 +121,7 @@ class CatalogSearchIndexer
     }
 
     /**
-     * @param  Collection<int, int>  $ids
+     * @param  Collection<int, int<1, max>>  $ids
      * @param  array{requested: int, indexed: int, unchanged: int, deleted: int}  $result
      */
     private function indexChunk(Collection $ids, array &$result): void
@@ -139,9 +139,10 @@ class CatalogSearchIndexer
         $missingIds = $ids->diff($visibleIds);
 
         if ($missingIds->isNotEmpty()) {
-            $result['deleted'] += CatalogTitleSearchDocument::query()
+            $deleted = CatalogTitleSearchDocument::query()
                 ->whereKey($missingIds)
                 ->delete();
+            $result['deleted'] += (int) $deleted;
         }
 
         if ($titles->isEmpty()) {

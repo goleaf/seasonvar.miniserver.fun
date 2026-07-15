@@ -6,6 +6,7 @@ namespace App\Livewire\Profile;
 
 use App\Enums\ReviewSort;
 use App\Enums\ReviewStatus;
+use App\Exceptions\Reviews\ReviewActionException;
 use App\Models\CatalogTitleReview;
 use App\Models\CatalogTitleReviewNotificationPreference;
 use App\Models\User;
@@ -132,6 +133,7 @@ final class ReviewHistoryPage extends Component
             Gate::forUser($this->user())->authorize('view', $review);
             abort_unless((int) $review->user_id === (int) $this->user()->id, 404);
             $targets->fromReview($review, $this->user());
+            $rateLimiter->hit('reveal_global', $this->user(), 'global');
             $rateLimiter->hit('reveal', $this->user(), 'review:'.$review->id);
             $this->revealedReviewIds = collect([...$this->revealedReviewIds, $reviewId])
                 ->unique()
@@ -241,6 +243,12 @@ final class ReviewHistoryPage extends Component
     private function handleFailure(Throwable $exception): void
     {
         $this->statusMessage = null;
+
+        if ($exception instanceof ReviewActionException) {
+            $this->actionError = __($exception->translationKey, $exception->replace);
+
+            return;
+        }
 
         if ($exception instanceof AuthorizationException) {
             $this->actionError = __('reviews.errors.forbidden');

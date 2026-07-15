@@ -12,6 +12,7 @@ use App\Services\Comments\CommentCacheInvalidator;
 use App\Services\Comments\CommentRateLimiter;
 use App\Services\Comments\CommentTargetResolver;
 use App\ValueObjects\CommentBody;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 final class UpdateComment
@@ -35,38 +36,68 @@ final class UpdateComment
         $target = $this->targets->fromComment($comment, $user);
         $normalizedBody = CommentBody::from($body);
         $this->rateLimiter->hit('edit', $user, $target->key());
-        $this->antiSpam->assertNotDuplicate(
+
+        /** @var array{0: Comment, 1: bool} $result */
+        $result = DB::transaction(function () use (
             $user,
-            $target->type,
-            $target->id,
-            $comment->parent_id,
+            $target,
+            $comment,
             $normalizedBody,
-            (int) $comment->id,
-        );
+            $isSpoiler,
+            $expectedVersion,
+        ): array {
+            User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
+            $this->targets->resolve($target->type, $target->id, $user, lock: true);
+            $locked = Comment::query()
+                ->withTrashed()
+                ->lockForUpdate()
+                ->findOrFail($comment->id);
+            $this->assertSameTarget($locked, $target->type->value, $target->id);
+            Gate::forUser($user)->authorize('update', $locked);
 
-        if ($expectedVersion < 1 || (int) $comment->version !== $expectedVersion) {
-            throw new CommentActionException('comments.errors.stale_edit');
-        }
+            if ($locked->body === $normalizedBody->value
+                && $locked->body_hash === $normalizedBody->hash
+                && $locked->is_spoiler === $isSpoiler) {
+                return [$locked, false];
+            }
 
-        $updated = Comment::query()
-            ->whereKey($comment->id)
-            ->where('version', $expectedVersion)
-            ->whereNull('deleted_at')
-            ->update([
+            if ($expectedVersion < 1 || (int) $locked->version !== $expectedVersion) {
+                throw new CommentActionException('comments.errors.stale_edit');
+            }
+
+            $this->antiSpam->assertNotDuplicate(
+                $user,
+                $target->type,
+                $target->id,
+                $locked->parent_id,
+                $normalizedBody,
+                (int) $locked->id,
+            );
+
+            $locked->forceFill([
                 'body' => $normalizedBody->value,
                 'body_hash' => $normalizedBody->hash,
                 'is_spoiler' => $isSpoiler,
                 'version' => $expectedVersion + 1,
                 'edited_at' => now(),
-                'updated_at' => now(),
-            ]);
+            ])->save();
 
-        if ($updated !== 1) {
-            throw new CommentActionException('comments.errors.stale_edit');
+            return [$locked, true];
+        }, attempts: 3);
+
+        [$comment, $changed] = $result;
+
+        if ($changed) {
+            $this->cache->targetChanged($target);
         }
 
-        $this->cache->targetChanged($target);
+        return $comment;
+    }
 
-        return $comment->refresh();
+    private function assertSameTarget(Comment $comment, string $targetType, int $targetId): void
+    {
+        if ($comment->target_type->value !== $targetType || (int) $comment->target_id !== $targetId) {
+            throw new CommentActionException('comments.errors.target_unavailable');
+        }
     }
 }

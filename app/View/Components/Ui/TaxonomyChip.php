@@ -76,6 +76,22 @@ final class TaxonomyChip extends Component
         return $classes.' '.$stateClasses;
     }
 
+    public function ariaLabel(ComponentSlot $slot): ?string
+    {
+        if ($this->filterType() !== 'tag') {
+            return null;
+        }
+
+        $label = __('tags.accessibility.system_badge', ['tag' => $this->label($slot)]);
+
+        if (is_numeric($this->count)) {
+            $count = (int) $this->count;
+            $label .= ' · '.trans_choice('tags.page.count', $count, ['count' => $count]);
+        }
+
+        return $label;
+    }
+
     public function render(): View
     {
         return view('components.ui.taxonomy-chip');

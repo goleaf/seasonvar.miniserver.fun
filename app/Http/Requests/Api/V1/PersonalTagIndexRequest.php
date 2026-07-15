@@ -19,6 +19,15 @@ final class PersonalTagIndexRequest extends FormRequest
         return ['q' => ['nullable', 'string', 'max:80']];
     }
 
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return [
+            'q.string' => __('tags.validation.search'),
+            'q.max' => __('tags.validation.search'),
+        ];
+    }
+
     public function search(): string
     {
         $value = $this->validated('q');

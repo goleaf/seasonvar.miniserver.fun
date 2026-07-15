@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Services\Auth;
 
 use App\Models\User;
+use Illuminate\Auth\SessionGuard;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\ValidationException;
-use InvalidArgumentException;
+use LogicException;
 
 final class BrowserSessionService
 {
@@ -23,14 +25,19 @@ final class BrowserSessionService
 
     public function logoutOtherDevices(User $user, string $password, string $currentSessionId): void
     {
-        try {
-            Auth::guard('web')->logoutOtherDevices($password);
-        } catch (InvalidArgumentException) {
+        $guard = Auth::guard('web');
+
+        if (! $guard instanceof SessionGuard) {
+            throw new LogicException('The web guard must use the session driver.');
+        }
+
+        if (! Hash::check($password, $user->getAuthPassword())) {
             throw ValidationException::withMessages([
                 'current_password' => ['Текущий пароль указан неверно.'],
             ]);
         }
 
+        $guard->logoutOtherDevices($password);
         $user->refresh();
         $this->synchronizeCurrentPasswordHash($user);
         $this->deleteOtherDatabaseSessions($user, $currentSessionId);

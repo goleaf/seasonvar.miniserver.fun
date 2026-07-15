@@ -1,5 +1,5 @@
 @if ($url())
-    <a href="{{ $url() }}" {{ $attributes->merge(['class' => $classes().' relative z-10 min-h-11']) }}>
+    <a href="{{ $url() }}" @if ($ariaLabel($slot)) aria-label="{{ $ariaLabel($slot) }}" @endif {{ $attributes->merge(['class' => $classes().' relative z-10 min-h-11']) }}>
         @if ($iconClass())
             <x-ui.icon name="{{ $iconClass() }} text-[0.85em]" />
         @endif
@@ -9,7 +9,7 @@
         @endif
     </a>
 @else
-    <span {{ $attributes->merge(['class' => $classes()]) }}>
+    <span @if ($ariaLabel($slot)) aria-label="{{ $ariaLabel($slot) }}" @endif {{ $attributes->merge(['class' => $classes()]) }}>
         @if ($iconClass())
             <x-ui.icon name="{{ $iconClass() }} text-[0.85em]" />
         @endif

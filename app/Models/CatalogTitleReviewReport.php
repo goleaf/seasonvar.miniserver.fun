@@ -6,10 +6,23 @@ namespace App\Models;
 
 use App\Enums\ReviewReportCategory;
 use App\Enums\ReviewReportStatus;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property int $id
+ * @property int $catalog_title_review_id
+ * @property int|null $reporter_id
+ * @property int|null $moderator_id
+ * @property ReviewReportCategory $category
+ * @property string|null $details
+ * @property ReviewReportStatus $status
+ * @property string|null $private_note
+ * @property string|null $deduplication_key
+ * @property CarbonImmutable|null $resolved_at
+ */
 #[Fillable([
     'catalog_title_review_id',
     'reporter_id',

@@ -20,11 +20,11 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(
-                ['notifiable_type', 'notifiable_id', 'created_at', 'id'],
+                ['notifiable_type', 'notifiable_id', 'type', 'created_at', 'id'],
                 'notifications_recipient_list_idx',
             );
             $table->index(
-                ['notifiable_type', 'notifiable_id', 'read_at'],
+                ['notifiable_type', 'notifiable_id', 'type', 'read_at'],
                 'notifications_recipient_unread_idx',
             );
         });

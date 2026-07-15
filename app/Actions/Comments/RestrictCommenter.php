@@ -95,7 +95,7 @@ final class RestrictCommenter
                     'updated_at' => now(),
                 ]);
 
-            return CommentRestriction::query()->create([
+            $restriction = CommentRestriction::query()->create([
                 'user_id' => $restrictedUser->id,
                 'moderator_id' => $moderator->id,
                 'type' => $type,
@@ -104,9 +104,7 @@ final class RestrictCommenter
                 'starts_at' => now(),
                 'expires_at' => $durationDays !== null ? now()->addDays($durationDays) : null,
             ]);
-        }, attempts: 3);
 
-        if ($restriction->wasRecentlyCreated) {
             $this->auditRecorder->record(
                 $moderator,
                 AdminAuditAction::CommentRestrictionApplied,
@@ -115,7 +113,9 @@ final class RestrictCommenter
                 $this->audit->restriction($restriction),
                 ['restriction_type', 'reason_code', 'starts_at', 'expires_at', 'moderator_note'],
             );
-        }
+
+            return $restriction;
+        }, attempts: 3);
 
         return $restriction;
     }

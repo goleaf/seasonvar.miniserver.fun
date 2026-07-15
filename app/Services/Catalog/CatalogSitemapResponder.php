@@ -263,11 +263,7 @@ class CatalogSitemapResponder
             if ($this->collectionSchema->available()) {
                 $this->collections->publicSitemapQuery()
                     ->cursor()
-                    ->each(function (Model $collection): void {
-                        if (! $collection instanceof CatalogCollection) {
-                            return;
-                        }
-
+                    ->each(function (CatalogCollection $collection): void {
                         $cover = $collection->cover_path !== null && $collection->cover_version > 0
                             ? route('collections.cover', [
                                 'publicId' => $collection->public_id,

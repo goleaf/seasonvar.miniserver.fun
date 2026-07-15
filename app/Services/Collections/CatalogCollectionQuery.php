@@ -21,9 +21,9 @@ use App\Services\Catalog\CatalogTitleQuery;
 use App\Services\Catalog\CatalogUserCardStateLoader;
 use App\Services\Catalog\Search\CatalogSearchNormalizer;
 use App\Services\Comments\CommentRelationshipService;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
 final class CatalogCollectionQuery
@@ -44,6 +44,12 @@ final class CatalogCollectionQuery
         int $perPage = 18,
         string $pageName = 'collectionsPage',
     ): LengthAwarePaginator {
+        $perPage = max(6, min(36, $perPage));
+
+        if (! $this->schema->available()) {
+            return $this->emptyPaginator($perPage, $pageName);
+        }
+
         $search = $this->search->display(mb_substr($search, 0, 100));
         $query = $this->summaryQuery()
             ->publiclyListed()
@@ -64,7 +70,7 @@ final class CatalogCollectionQuery
             default => $query->orderByDesc('is_featured')->orderByDesc('updated_at'),
         };
 
-        return $query->orderByDesc('id')->paginate(max(6, min(36, $perPage)), pageName: $pageName);
+        return $query->orderByDesc('id')->paginate($perPage, pageName: $pageName);
     }
 
     /** @return Collection<int, CatalogCollection> */
@@ -98,6 +104,13 @@ final class CatalogCollectionQuery
     /** @return LengthAwarePaginator<int, CatalogCollection> */
     public function ownedBy(User $owner, bool $withTrashed = false, int $perPage = 18): LengthAwarePaginator
     {
+        $perPage = max(6, min(36, $perPage));
+        $pageName = $withTrashed ? 'deletedCollectionsPage' : 'myCollectionsPage';
+
+        if (! $this->schema->available()) {
+            return $this->emptyPaginator($perPage, $pageName);
+        }
+
         $query = $this->summaryQuery()
             ->where('owner_id', $owner->id)
             ->when($withTrashed, fn (Builder $query): Builder => $query->withTrashed()->whereNotNull('deleted_at'))
@@ -106,7 +119,7 @@ final class CatalogCollectionQuery
         $paginator = $query
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
-            ->paginate(max(6, min(36, $perPage)), pageName: $withTrashed ? 'deletedCollectionsPage' : 'myCollectionsPage');
+            ->paginate($perPage, pageName: $pageName);
 
         if ($withTrashed) {
             $cutoff = now()->subDays(max(1, (int) config('catalog-collections.restoration_days', 30)));
@@ -122,13 +135,19 @@ final class CatalogCollectionQuery
     /** @return LengthAwarePaginator<int, CatalogCollection> */
     public function publicByOwner(User $owner, int $perPage = 18): LengthAwarePaginator
     {
+        $perPage = max(6, min(36, $perPage));
+
+        if (! $this->schema->available()) {
+            return $this->emptyPaginator($perPage, 'profileCollectionsPage');
+        }
+
         return $this->summaryQuery()
             ->publiclyListed()
             ->where('owner_id', $owner->id)
             ->orderByDesc('is_featured')
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
-            ->paginate(max(6, min(36, $perPage)), pageName: 'profileCollectionsPage');
+            ->paginate($perPage, pageName: 'profileCollectionsPage');
     }
 
     /** @return array{total: int, public: int, unlisted: int, private: int} */
@@ -215,6 +234,7 @@ final class CatalogCollectionQuery
     {
         $titleIds = CatalogCollectionItem::query()
             ->whereBelongsTo($collection, 'collection')
+            ->whereIn('catalog_title_id', $this->visibleTitleIds())
             ->select('catalog_title_id');
 
         return $this->summaryQuery()
@@ -370,6 +390,12 @@ final class CatalogCollectionQuery
     /** @return LengthAwarePaginator<int, CatalogCollection> */
     public function moderationQueue(string $search = '', int $perPage = 20): LengthAwarePaginator
     {
+        $perPage = max(10, min(50, $perPage));
+
+        if (! $this->schema->available()) {
+            return $this->emptyPaginator($perPage, 'collectionAdminPage');
+        }
+
         $search = $this->search->display(mb_substr($search, 0, 100));
 
         return $this->summaryQuery()
@@ -386,7 +412,7 @@ final class CatalogCollectionQuery
             ->orderByRaw('CASE WHEN moderation_status = ? THEN 0 ELSE 1 END', [CatalogCollectionModerationStatus::Pending->value])
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
-            ->paginate(max(10, min(50, $perPage)), pageName: 'collectionAdminPage');
+            ->paginate($perPage, pageName: 'collectionAdminPage');
     }
 
     /** @return Builder<CatalogCollection> */
@@ -441,5 +467,17 @@ final class CatalogCollectionQuery
             app()->currentLocale(),
             (string) config('catalog-collections.default_locale', 'ru'),
         ]));
+    }
+
+    /** @return LengthAwarePaginator<int, CatalogCollection> */
+    private function emptyPaginator(int $perPage, string $pageName): LengthAwarePaginator
+    {
+        $page = max(1, LengthAwarePaginator::resolveCurrentPage($pageName));
+
+        return new LengthAwarePaginator([], 0, $perPage, $page, [
+            'path' => request()->url(),
+            'query' => request()->query(),
+            'pageName' => $pageName,
+        ]);
     }
 }

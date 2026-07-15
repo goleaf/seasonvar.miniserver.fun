@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Auth\AccountService;
 use App\Services\Auth\BrowserSessionService;
 use App\Services\Auth\MobileTokenService;
+use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Auth;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
+use LogicException;
 
 final class SecurityPage extends Component
 {
@@ -144,7 +146,13 @@ final class SecurityPage extends Component
             return;
         }
 
-        Auth::guard('web')->logoutCurrentDevice();
+        $guard = Auth::guard('web');
+
+        if (! $guard instanceof SessionGuard) {
+            throw new LogicException('The web guard must use the session driver.');
+        }
+
+        $guard->logoutCurrentDevice();
         Session::invalidate();
         Session::regenerateToken();
         $this->redirectRoute('home');

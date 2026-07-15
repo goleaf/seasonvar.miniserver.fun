@@ -9,8 +9,10 @@
         </div>
         @if ($authenticated)
             <button type="button" data-collection-dialog-trigger wire:click="openSelector" wire:loading.attr="disabled" wire:target="openSelector" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60 sm:w-auto">
-                <x-ui.icon name="fa-solid fa-folder-plus" />
-                <span>{{ __('collections.actions.add') }}</span>
+                <x-ui.icon name="fa-solid fa-folder-plus" wire:loading.remove wire:target="openSelector" />
+                <x-ui.icon name="fa-solid fa-spinner fa-spin" wire:loading wire:target="openSelector" />
+                <span wire:loading.remove wire:target="openSelector">{{ __('collections.actions.add') }}</span>
+                <span wire:loading wire:target="openSelector">{{ __('collections.page.loading') }}</span>
             </button>
         @else
             <a href="{{ route('login') }}" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 sm:w-auto">
@@ -50,7 +52,7 @@
                                         <input type="checkbox" wire:model="selectedCollectionPublicIds" value="{{ $manageable->public_id }}" class="h-5 w-5 shrink-0 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600">
                                         <span class="min-w-0 flex-1">
                                             <span class="block break-words text-sm font-black text-slate-800">{{ $manageable->display_name }}</span>
-                                            <span class="mt-1 block text-xs font-semibold text-slate-500">{{ $manageable->visibility->label() }}</span>
+                                            <span class="mt-1 block text-xs font-semibold text-slate-500">{{ $manageable->visibility_label }}</span>
                                         </span>
                                     </label>
                                 @endforeach
@@ -58,10 +60,15 @@
                         </fieldset>
                     @endif
                     <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
-                        <span class="text-sm font-bold text-slate-500" aria-live="polite">{{ __('collections.membership.selected', ['count' => count($selectedCollectionPublicIds)]) }}</span>
+                        <span class="text-sm font-bold text-slate-500" aria-live="polite">{{ $selectedCountLabel }}</span>
                         <div class="flex w-full gap-2 sm:w-auto">
                             <button type="button" data-collection-dialog-close wire:click="closeSelector" class="inline-flex min-h-11 flex-1 items-center justify-center rounded-control bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200 sm:flex-none">{{ __('collections.actions.cancel') }}</button>
-                            <button type="submit" wire:loading.attr="disabled" wire:target="apply" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60 sm:flex-none"><x-ui.icon name="fa-solid fa-check" />{{ __('collections.actions.apply') }}</button>
+                            <button type="submit" wire:loading.attr="disabled" wire:target="apply" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60 sm:flex-none">
+                                <x-ui.icon name="fa-solid fa-check" wire:loading.remove wire:target="apply" />
+                                <x-ui.icon name="fa-solid fa-spinner fa-spin" wire:loading wire:target="apply" />
+                                <span wire:loading.remove wire:target="apply">{{ __('collections.actions.apply') }}</span>
+                                <span wire:loading wire:target="apply">{{ __('collections.page.loading') }}</span>
+                            </button>
                         </div>
                     </div>
                 </form>
@@ -79,12 +86,17 @@
                             <label for="collection-membership-new-visibility" class="block text-sm font-bold text-slate-700">{{ __('collections.form.visibility') }}</label>
                             <select id="collection-membership-new-visibility" wire:model="newVisibility" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
                                 @foreach ($visibilityOptions as $option)
-                                    <option value="{{ $option->value }}">{{ $option->label() }}</option>
+                                    <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
                                 @endforeach
                             </select>
                             <x-form.input-error for="newVisibility" />
                         </div>
-                        <button type="submit" wire:loading.attr="disabled" wire:target="createAndAdd" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-800 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-700 disabled:cursor-wait disabled:opacity-60"><x-ui.icon name="fa-solid fa-folder-plus" />{{ __('collections.actions.create_and_add') }}</button>
+                        <button type="submit" wire:loading.attr="disabled" wire:target="createAndAdd" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-800 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-700 disabled:cursor-wait disabled:opacity-60">
+                            <x-ui.icon name="fa-solid fa-folder-plus" wire:loading.remove wire:target="createAndAdd" />
+                            <x-ui.icon name="fa-solid fa-spinner fa-spin" wire:loading wire:target="createAndAdd" />
+                            <span wire:loading.remove wire:target="createAndAdd">{{ __('collections.actions.create_and_add') }}</span>
+                            <span wire:loading wire:target="createAndAdd">{{ __('collections.page.loading') }}</span>
+                        </button>
                     </form>
                 </details>
             </div>

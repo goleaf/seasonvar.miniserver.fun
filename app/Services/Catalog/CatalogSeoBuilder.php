@@ -4,6 +4,7 @@ namespace App\Services\Catalog;
 
 use App\DTOs\CatalogDirectoryDefinition;
 use App\Models\CatalogTitle;
+use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Support\CatalogTitleDisplayName;
@@ -294,6 +295,7 @@ class CatalogSeoBuilder
             ->merge($visibleAliases)
             ->map(fn (mixed $name): string => PlainText::clean($name))
             ->filter()
+            ->map(fn (string $name): string => $name)
             ->unique(fn (string $name): string => CatalogTitleDisplayName::comparisonKey($name))
             ->values();
         $rating = $catalogTitle->relationLoaded('ratings')
@@ -428,7 +430,7 @@ class CatalogSeoBuilder
 
             return route('titles.taxonomy', [
                 'type' => $filterType,
-                'taxonomy' => $taxonomy->slug,
+                'taxonomy' => (string) $taxonomy->getAttribute('slug'),
                 ...$pageQuery,
             ]);
         }
@@ -491,7 +493,7 @@ class CatalogSeoBuilder
 
     /**
      * @param  Collection<string, Collection<int, Model>>  $taxonomiesByType
-     * @return Collection<int, string>
+     * @return Collection<int, non-falsy-string>
      */
     private function taxonomyNames(Collection $taxonomiesByType, string $type): Collection
     {
@@ -500,6 +502,7 @@ class CatalogSeoBuilder
             ->pluck('name')
             ->map(fn (mixed $name): string => PlainText::clean($name))
             ->filter()
+            ->map(fn (string $name): string => $name)
             ->unique()
             ->values();
     }
@@ -795,7 +798,7 @@ class CatalogSeoBuilder
         foreach ($activeTaxonomies as $filterType => $taxonomy) {
             $links->push([
                 'name' => $this->catalogFilteredTitle(collect([$filterType => $taxonomy])),
-                'url' => route('titles.taxonomy', ['type' => $filterType, 'taxonomy' => $taxonomy->slug]),
+                'url' => route('titles.taxonomy', ['type' => $filterType, 'taxonomy' => (string) $taxonomy->getAttribute('slug')]),
             ]);
         }
 
@@ -811,10 +814,10 @@ class CatalogSeoBuilder
     }
 
     /**
-     * @param  Collection<int, string>  $genres
-     * @param  Collection<int, string>  $countries
-     * @param  Collection<int, string>  $actors
-     * @param  Collection<int, string>  $directors
+     * @param  Collection<int, covariant string>  $genres
+     * @param  Collection<int, covariant string>  $countries
+     * @param  Collection<int, covariant string>  $actors
+     * @param  Collection<int, covariant string>  $directors
      * @return list<string>
      */
     private function titleSeoText(
@@ -860,7 +863,7 @@ class CatalogSeoBuilder
             foreach ($taxonomiesByType->get($type, collect())->take(3) as $taxonomy) {
                 $links->push([
                     'name' => $this->catalogFilteredTitle(collect([$type => $taxonomy])),
-                    'url' => route('titles.taxonomy', ['type' => $type, 'taxonomy' => $taxonomy->slug]),
+                    'url' => route('titles.taxonomy', ['type' => $type, 'taxonomy' => (string) $taxonomy->getAttribute('slug')]),
                 ]);
             }
         }
@@ -957,12 +960,12 @@ class CatalogSeoBuilder
     }
 
     /**
-     * @param  Collection<int, string>  $alternateNames
-     * @param  Collection<int, string>  $genres
-     * @param  Collection<int, string>  $countries
-     * @param  Collection<int, string>  $actors
-     * @param  Collection<int, string>  $directors
-     * @return Collection<int, string>
+     * @param  Collection<int, covariant string>  $alternateNames
+     * @param  Collection<int, covariant string>  $genres
+     * @param  Collection<int, covariant string>  $countries
+     * @param  Collection<int, covariant string>  $actors
+     * @param  Collection<int, covariant string>  $directors
+     * @return Collection<int, non-empty-string>
      */
     private function titleKeywordCollection(
         CatalogTitle $catalogTitle,
@@ -1033,14 +1036,15 @@ class CatalogSeoBuilder
             ->filter()
             ->map(fn (string $keyword): string => trim(preg_replace('/\s+/u', ' ', $keyword) ?: $keyword))
             ->filter(fn (string $keyword): bool => $keyword !== '' && mb_strlen($keyword) <= 120)
+            ->map(fn (string $keyword): string => $keyword)
             ->unique(fn (string $keyword): string => Str::lower($keyword))
             ->values();
     }
 
     /**
-     * @param  Collection<int, string>  $keywords
-     * @param  Collection<int, string>  $genres
-     * @param  Collection<int, string>  $countries
+     * @param  Collection<int, covariant string>  $keywords
+     * @param  Collection<int, covariant string>  $genres
+     * @param  Collection<int, covariant string>  $countries
      * @return list<string>
      */
     private function titleSearchPhrases(
@@ -1081,8 +1085,8 @@ class CatalogSeoBuilder
     }
 
     /**
-     * @param  Collection<int, string>  $genres
-     * @param  Collection<int, string>  $countries
+     * @param  Collection<int, covariant string>  $genres
+     * @param  Collection<int, covariant string>  $countries
      * @return list<array{question: string, answer: string}>
      */
     private function titleFaqItems(
@@ -1164,11 +1168,9 @@ class CatalogSeoBuilder
     {
         return $seasons
             ->values()
-            ->map(fn ($season): array => $this->withoutEmpty([
+            ->map(fn (Season $season): array => $this->withoutEmpty([
                 '@type' => 'CreativeWorkSeason',
-                'name' => $season->number !== null
-                    ? __('catalog.release.season', ['number' => $season->number])
-                    : __('catalog.release.season_without_number'),
+                'name' => __('catalog.release.season', ['number' => $season->number]),
                 'seasonNumber' => (int) $season->number,
                 'numberOfEpisodes' => $season->relationLoaded('episodes')
                     ? $season->episodes->count()
@@ -1185,11 +1187,11 @@ class CatalogSeoBuilder
     private function episodeItemListJsonLd(CatalogTitle $catalogTitle, Collection $seasons): array
     {
         $episodes = $seasons
-            ->filter(fn ($season): bool => $season->relationLoaded('episodes'))
-            ->flatMap(fn ($season): Collection => $season->episodes
+            ->filter(fn (Season $season): bool => $season->relationLoaded('episodes'))
+            ->flatMap(fn (Season $season): Collection => $season->episodes
                 ->sortBy('number')
                 ->values()
-                ->map(fn ($episode): array => [
+                ->map(fn (Episode $episode): array => [
                     'season' => $season,
                     'episode' => $episode,
                 ]))
@@ -1212,10 +1214,8 @@ class CatalogSeoBuilder
                     'position' => $index + 1,
                     'item' => $this->withoutEmpty([
                         '@type' => 'TVEpisode',
-                        'name' => PlainText::clean($item['episode']->title) ?: ($item['episode']->number !== null
-                            ? __('catalog.release.episode', ['number' => $item['episode']->number])
-                            : __('catalog.release.episode_without_number')),
-                        'episodeNumber' => $item['episode']->number !== null ? (int) $item['episode']->number : null,
+                        'name' => PlainText::clean($item['episode']->title) ?: __('catalog.release.episode', ['number' => $item['episode']->number]),
+                        'episodeNumber' => $item['episode']->number,
                         'partOfSeason' => [
                             '@type' => 'CreativeWorkSeason',
                             'seasonNumber' => (int) $item['season']->number,
@@ -1295,10 +1295,10 @@ class CatalogSeoBuilder
     }
 
     /**
-     * @param  Collection<int, string>  $genres
-     * @param  Collection<int, string>  $countries
-     * @param  Collection<int, string>  $actors
-     * @param  Collection<int, string>  $directors
+     * @param  Collection<int, covariant string>  $genres
+     * @param  Collection<int, covariant string>  $countries
+     * @param  Collection<int, covariant string>  $actors
+     * @param  Collection<int, covariant string>  $directors
      * @return list<array{title: string, items: list<string>}>
      */
     private function titleKeywordClusters(

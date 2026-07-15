@@ -8,12 +8,12 @@
                 </a>
                 <h1 class="mt-2 break-words text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">{{ __('collections.actions.edit') }}: {{ $collection->display_name }}</h1>
                 <div class="mt-3 flex flex-wrap gap-2">
-                    <x-ui.status-pill variant="muted">{{ $collection->type->label() }}</x-ui.status-pill>
-                    <x-ui.status-pill variant="muted">{{ $collection->visibility->label() }}</x-ui.status-pill>
-                    <x-ui.status-pill variant="muted">{{ $collection->moderation_status->label() }}</x-ui.status-pill>
+                    <x-ui.status-pill variant="muted">{{ $collectionTypeLabel }}</x-ui.status-pill>
+                    <x-ui.status-pill variant="muted">{{ $collectionVisibilityLabel }}</x-ui.status-pill>
+                    <x-ui.status-pill variant="muted">{{ $collectionModerationLabel }}</x-ui.status-pill>
                 </div>
             </div>
-            @if ($collection->isPubliclyViewable())
+            @if ($canOpenPublicPage)
                 <a href="{{ route('collections.show', ['collectionSlug' => $collection->slug]) }}" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200 sm:w-auto">
                     <x-ui.icon name="fa-solid fa-arrow-up-right-from-square" />
                     <span>{{ __('collections.actions.open_public_page') }}</span>
@@ -28,19 +28,19 @@
     <x-form.input-error for="collection" />
     <x-form.input-error for="order" />
 
-    @if ($collection->moderation_status->value === 'pending')
+    @if ($isPendingModeration)
         <x-form.status-message :message="__('collections.moderation.notice_pending')" variant="warning" />
     @endif
 
     <div class="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <x-ui.panel :title="__('collections.actions.edit')" icon="fa-solid fa-pen-to-square">
             <form wire:submit="save" class="space-y-5" novalidate>
-                @if ($collection->type->value === 'editorial')
+                @if ($isEditorial)
                     <fieldset>
                         <legend class="text-sm font-bold text-slate-700">{{ __('collections.editorial.translation_language') }}</legend>
                         <div class="mt-2 flex flex-wrap gap-2">
                             @foreach ($supportedLocales as $locale)
-                                <button type="button" wire:click="selectEditorialLocale('{{ $locale }}')" @class(['inline-flex min-h-11 items-center rounded-control px-4 text-sm font-black', 'bg-emerald-700 text-white' => $contentLocale === $locale, 'bg-slate-100 text-slate-700 hover:bg-slate-200' => $contentLocale !== $locale])>{{ __('collections.locale.'.$locale) }}</button>
+                                <button type="button" wire:click="selectEditorialLocale('{{ $locale['value'] }}')" @class(['inline-flex min-h-11 items-center rounded-control px-4 text-sm font-black', 'bg-emerald-700 text-white' => $contentLocale === $locale['value'], 'bg-slate-100 text-slate-700 hover:bg-slate-200' => $contentLocale !== $locale['value']])>{{ $locale['label'] }}</button>
                             @endforeach
                         </div>
                         <p class="mt-2 text-xs leading-5 text-slate-500">{{ __('collections.editorial.translation_hint') }}</p>
@@ -57,7 +57,7 @@
                         <label for="collection-edit-visibility" class="block text-sm font-bold text-slate-700">{{ __('collections.form.visibility') }}</label>
                         <select id="collection-edit-visibility" wire:model="visibility" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
                             @foreach ($visibilityOptions as $option)
-                                <option value="{{ $option->value }}">{{ $option->label() }}</option>
+                                <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
                             @endforeach
                         </select>
                         <x-form.input-error for="visibility" />
@@ -66,13 +66,13 @@
                         <label for="collection-edit-sort" class="block text-sm font-bold text-slate-700">{{ __('collections.form.sort_mode') }}</label>
                         <select id="collection-edit-sort" wire:model="sortMode" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100">
                             @foreach ($sortOptions as $option)
-                                <option value="{{ $option->value }}">{{ $option->label() }}</option>
+                                <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
                             @endforeach
                         </select>
                         <x-form.input-error for="sortMode" />
                     </div>
                 </div>
-                @if ($collection->type->value === 'editorial')
+                @if ($isEditorial)
                     <div class="grid gap-4 rounded-control bg-slate-50 p-4">
                         <h3 class="font-black text-slate-800">{{ __('collections.editorial.seo_fields') }}</h3>
                         <x-form.field :label="__('collections.editorial.seo_title')" for="collection-editorial-seo-title" wire:model="seoTitle" />
@@ -104,14 +104,18 @@
                     <input type="file" wire:model="cover" accept="image/jpeg,image/png,image/webp" class="block w-full text-sm text-slate-600 file:mr-3 file:min-h-11 file:rounded-control file:border-0 file:bg-slate-100 file:px-3 file:py-2.5 file:font-bold file:text-slate-700 hover:file:bg-slate-200">
                     <x-form.input-error for="cover" />
                     <button type="submit" wire:loading.attr="disabled" wire:target="cover,uploadCover" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-800 px-3 py-2.5 text-sm font-bold text-white hover:bg-slate-700 disabled:cursor-wait disabled:opacity-60">
-                        <x-ui.icon name="fa-solid fa-upload" />
-                        <span>{{ __('collections.actions.upload_cover') }}</span>
+                        <x-ui.icon name="fa-solid fa-upload" wire:loading.remove wire:target="cover,uploadCover" />
+                        <x-ui.icon name="fa-solid fa-spinner fa-spin" wire:loading wire:target="cover,uploadCover" />
+                        <span wire:loading.remove wire:target="cover,uploadCover">{{ __('collections.actions.upload_cover') }}</span>
+                        <span wire:loading wire:target="cover,uploadCover">{{ __('collections.page.loading') }}</span>
                     </button>
                 </form>
-                @if ($collection->cover_path)
-                    <button type="button" wire:click="removeCover" wire:confirm="{{ __('collections.confirmations.remove_cover') }}" wire:loading.attr="disabled" class="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-rose-50 px-3 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-100">
-                        <x-ui.icon name="fa-solid fa-trash-can" />
-                        <span>{{ __('collections.actions.remove_cover') }}</span>
+                @if ($hasCover)
+                    <button type="button" wire:click="removeCover" wire:confirm="{{ __('collections.confirmations.remove_cover') }}" wire:loading.attr="disabled" wire:target="removeCover" class="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-rose-50 px-3 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:cursor-wait disabled:opacity-60">
+                        <x-ui.icon name="fa-solid fa-trash-can" wire:loading.remove wire:target="removeCover" />
+                        <x-ui.icon name="fa-solid fa-spinner fa-spin" wire:loading wire:target="removeCover" />
+                        <span wire:loading.remove wire:target="removeCover">{{ __('collections.actions.remove_cover') }}</span>
+                        <span wire:loading wire:target="removeCover">{{ __('collections.page.loading') }}</span>
                     </button>
                 @endif
             </x-ui.panel>
@@ -128,7 +132,7 @@
         </div>
     </div>
 
-    <x-ui.panel :title="trans_choice('collections.page.items', $collection->total_items_count, ['count' => $collection->total_items_count])" :subtitle="__('collections.ordering.hint')" icon="fa-solid fa-list-ol" :pad="false">
+    <x-ui.panel :title="$itemsTitle" :subtitle="__('collections.ordering.hint')" icon="fa-solid fa-list-ol" :pad="false">
         @if ($items->isEmpty())
             <div class="p-8 text-center">
                 <p class="text-sm font-semibold text-slate-600">{{ __('collections.page.empty') }}</p>
@@ -142,11 +146,11 @@
                     <li wire:key="collection-edit-item-{{ $item->collection_item_id }}" class="relative min-w-0">
                         <x-catalog.title-card :title="$item" layout="list" :show-description="false" readable />
                         <div class="relative z-20 flex flex-wrap gap-2 border-t border-slate-100 px-3 pb-3 pt-2 sm:px-4 md:pl-28">
-                            <span class="inline-flex min-h-11 items-center rounded-control bg-slate-50 px-3 text-xs font-bold text-slate-500">{{ __('collections.page.position', ['position' => $item->collection_position]) }}</span>
-                            <button type="button" wire:click="moveItem({{ $item->collection_item_id }}, -1)" wire:loading.attr="disabled" aria-label="{{ __('collections.accessibility.reorder_item', ['title' => $item->display_title]) }} — {{ __('collections.actions.move_up') }}" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-slate-100 px-3 text-sm font-bold text-slate-700 hover:bg-slate-200 sm:flex-none">
+                            <span class="inline-flex min-h-11 items-center rounded-control bg-slate-50 px-3 text-xs font-bold text-slate-500">{{ $item->collection_position_label }}</span>
+                            <button type="button" wire:click="moveItem({{ $item->collection_item_id }}, -1)" wire:loading.attr="disabled" @disabled(! $item->collection_can_move_up) aria-label="{{ $item->collection_move_up_label }}" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-slate-100 px-3 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none">
                                 <x-ui.icon name="fa-solid fa-arrow-up" />{{ __('collections.actions.move_up') }}
                             </button>
-                            <button type="button" wire:click="moveItem({{ $item->collection_item_id }}, 1)" wire:loading.attr="disabled" aria-label="{{ __('collections.accessibility.reorder_item', ['title' => $item->display_title]) }} — {{ __('collections.actions.move_down') }}" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-slate-100 px-3 text-sm font-bold text-slate-700 hover:bg-slate-200 sm:flex-none">
+                            <button type="button" wire:click="moveItem({{ $item->collection_item_id }}, 1)" wire:loading.attr="disabled" @disabled(! $item->collection_can_move_down) aria-label="{{ $item->collection_move_down_label }}" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-slate-100 px-3 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none">
                                 <x-ui.icon name="fa-solid fa-arrow-down" />{{ __('collections.actions.move_down') }}
                             </button>
                             <button type="button" wire:click="removeItem({{ $item->id }})" wire:confirm="{{ __('collections.confirmations.remove_item') }}" wire:loading.attr="disabled" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-rose-50 px-3 text-sm font-bold text-rose-700 hover:bg-rose-100 sm:flex-none">

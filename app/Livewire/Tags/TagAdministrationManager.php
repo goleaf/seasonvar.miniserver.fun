@@ -140,7 +140,7 @@ final class TagAdministrationManager extends Component
             'tagForm.visibility' => ['required', Rule::enum(TagVisibility::class)],
             'tagForm.moderation_status' => ['required', Rule::enum(TagModerationStatus::class)],
             'tagForm.source' => ['required', Rule::enum(TagSource::class)],
-        ])->validate()['tagForm'];
+        ], $this->validationMessages())->validate()['tagForm'];
         $data = new TagData(
             name: (string) $validated['name'],
             code: is_string($validated['code'] ?? null) ? $validated['code'] : null,
@@ -161,14 +161,14 @@ final class TagAdministrationManager extends Component
     public function saveTranslation(string $locale): void
     {
         abort_unless(in_array($locale, config('tags.supported_locales', []), true), 404);
-        $form = $this->translationForms[$locale] ?? [];
-        $validated = Validator::make(['translation' => $form], [
-            'translation.label' => ['required', 'string', 'max:80'],
-            'translation.short_description' => ['nullable', 'string', 'max:500'],
-            'translation.description' => ['nullable', 'string', 'max:10000'],
-            'translation.seo_title' => ['nullable', 'string', 'max:180'],
-            'translation.seo_description' => ['nullable', 'string', 'max:320'],
-        ])->validate()['translation'];
+        $key = 'translationForms.'.$locale;
+        $validated = Validator::make(['translationForms' => $this->translationForms], [
+            $key.'.label' => ['required', 'string', 'max:80'],
+            $key.'.short_description' => ['nullable', 'string', 'max:500'],
+            $key.'.description' => ['nullable', 'string', 'max:10000'],
+            $key.'.seo_title' => ['nullable', 'string', 'max:180'],
+            $key.'.seo_description' => ['nullable', 'string', 'max:320'],
+        ], $this->validationMessages())->validate()['translationForms'][$locale];
         $this->tags->saveTranslation($this->user(), $this->selectedTag(), $locale, $validated);
         $this->fillTagForm($this->query->tag((string) $this->selectedPublicId) ?? $this->selectedTag());
         $this->notice = __('tags.admin.translation_saved');
@@ -176,11 +176,23 @@ final class TagAdministrationManager extends Component
 
     public function addAlias(): void
     {
+        $supportedLocales = config('tags.supported_locales', []);
+        $supportedLocales = is_array($supportedLocales)
+            ? array_values(array_filter($supportedLocales, is_string(...)))
+            : [];
+        $validated = Validator::make([
+            'aliasName' => $this->aliasName,
+            'aliasLocale' => $this->aliasLocale,
+        ], [
+            'aliasName' => ['required', 'string', 'max:80'],
+            'aliasLocale' => ['required', 'string', Rule::in(['und', ...$supportedLocales])],
+        ], $this->validationMessages())->validate();
+
         $this->tags->addAlias(
             $this->user(),
             $this->selectedTag(),
-            $this->aliasName,
-            $this->aliasLocale,
+            (string) $validated['aliasName'],
+            (string) $validated['aliasLocale'],
             TagAliasSource::Editorial,
         );
         $this->aliasName = '';
@@ -296,7 +308,7 @@ final class TagAdministrationManager extends Component
             'mergeCandidates' => $this->query->candidates($this->mergeSearch, $tag),
             'titleOptions' => $tag === null ? collect() : $this->query->titleOptions($tag, $this->titleSearch),
             'assignedTitles' => $tag === null ? collect() : $this->query->assignedTitles($tag),
-            'tagTypes' => $tag === null
+            'tagTypes' => $tag === null || $tag->type !== TagType::Imported
                 ? array_values(array_filter(TagType::cases(), fn (TagType $type): bool => $type !== TagType::Imported))
                 : TagType::cases(),
             'visibilities' => TagVisibility::cases(),
@@ -372,6 +384,18 @@ final class TagAdministrationManager extends Component
         $this->mergeSearch = '';
         $this->mergeTarget = null;
         $this->titleSearch = '';
+    }
+
+    /** @return array<string, string> */
+    private function validationMessages(): array
+    {
+        return [
+            'required' => __('tags.validation.required'),
+            'string' => __('tags.validation.string'),
+            'max' => __('tags.validation.max'),
+            'enum' => __('tags.validation.choice'),
+            'in' => __('tags.validation.choice'),
+        ];
     }
 
     private function user(): User

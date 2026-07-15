@@ -21,7 +21,7 @@ final class EpisodeResource extends JsonResource
         return [
             'id' => (int) $this->id,
             'season_id' => (int) $this->season_id,
-            'number' => $this->number === null ? null : (int) $this->number,
+            'number' => (int) $this->number,
             'kind' => $this->kind->value,
             'title' => $this->title,
             'released_at' => $this->released_at?->toDateString(),

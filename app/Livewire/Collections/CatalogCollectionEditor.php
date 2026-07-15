@@ -21,6 +21,7 @@ use App\Support\Uploads\PrivateImageUploadRules;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -65,6 +66,8 @@ final class CatalogCollectionEditor extends Component
         Gate::authorize('update', $collection);
         $this->contentLocale = $this->interfaceLocale;
         $this->fillCollection($collection);
+        $status = Session::pull('catalog_collection_status');
+        $this->status = is_string($status) ? $status : null;
     }
 
     public function selectEditorialLocale(string $locale, CatalogCollectionResolver $resolver): void
@@ -107,7 +110,7 @@ final class CatalogCollectionEditor extends Component
             type: $collection->type,
             contentLocale: $collection->type->value === 'editorial'
                 ? $validated['contentLocale']
-                : ($collection->content_locale ?? $this->interfaceLocale),
+                : $collection->content_locale,
             seoTitle: $collection->type->value === 'editorial' && $validated['seoTitle'] !== ''
                 ? $validated['seoTitle']
                 : null,
@@ -150,7 +153,14 @@ final class CatalogCollectionEditor extends Component
     public function moveItem(int $itemId, int $direction, CatalogCollectionResolver $resolver, CatalogCollectionItemService $items): void
     {
         $collection = $resolver->byPublicId($this->collectionPublicId);
-        $items->move($this->user(), $collection, $itemId, $direction);
+        $changed = $items->move($this->user(), $collection, $itemId, $direction);
+
+        if (! $changed) {
+            $this->status = __('collections.status.order_unchanged');
+
+            return;
+        }
+
         $this->contentVersion = $collection->refresh()->content_version;
         $this->status = __('collections.status.order_updated');
     }
@@ -158,6 +168,7 @@ final class CatalogCollectionEditor extends Component
     public function delete(CatalogCollectionResolver $resolver, CatalogCollectionService $service): void
     {
         $service->delete($this->user(), $resolver->byPublicId($this->collectionPublicId));
+        Session::flash('catalog_collection_status', __('collections.status.deleted'));
         $this->redirectRoute('collections.mine', navigate: true);
     }
 
@@ -173,16 +184,48 @@ final class CatalogCollectionEditor extends Component
             sort: CatalogCollectionSort::Manual,
             perPage: 24,
         ));
+        $totalItems = (int) ($collection->total_items_count ?? 0);
+
+        foreach ($items->getCollection() as $item) {
+            $position = (int) $item->getAttribute('collection_position');
+            $item->setAttribute('collection_position_label', __('collections.page.position', ['position' => $position]));
+            $item->setAttribute('collection_can_move_up', $position > 1);
+            $item->setAttribute('collection_can_move_down', $position < $totalItems);
+            $item->setAttribute('collection_move_up_label', __('collections.accessibility.reorder_item', [
+                'title' => $item->display_title,
+            ]).' — '.__('collections.actions.move_up'));
+            $item->setAttribute('collection_move_down_label', __('collections.accessibility.reorder_item', [
+                'title' => $item->display_title,
+            ]).' — '.__('collections.actions.move_down'));
+        }
+        $isEditorial = $collection->type->value === 'editorial';
 
         return view('livewire.collections.catalog-collection-editor', [
             'collection' => $collection,
             'items' => $items,
             'unavailableItems' => $query->unavailableItems($collection, $user),
-            'visibilityOptions' => CatalogCollectionVisibility::cases(),
-            'sortOptions' => CatalogCollectionSort::cases(),
+            'collectionTypeLabel' => $collection->type->label(),
+            'collectionVisibilityLabel' => $collection->visibility->label(),
+            'collectionModerationLabel' => $collection->moderation_status->label(),
+            'isEditorial' => $isEditorial,
+            'isPendingModeration' => $collection->moderation_status->value === 'pending',
+            'canOpenPublicPage' => $collection->isPubliclyViewable(),
+            'hasCover' => is_string($collection->cover_path) && $collection->cover_path !== '',
+            'itemsTitle' => trans_choice('collections.page.items', $totalItems, ['count' => $totalItems]),
+            'visibilityOptions' => array_map(static fn (CatalogCollectionVisibility $option): array => [
+                'value' => $option->value,
+                'label' => $option->label(),
+            ], CatalogCollectionVisibility::cases()),
+            'sortOptions' => array_map(static fn (CatalogCollectionSort $option): array => [
+                'value' => $option->value,
+                'label' => $option->label(),
+            ], CatalogCollectionSort::cases()),
             'coverUrl' => $covers->url($collection),
             'maximumCoverMegabytes' => round((int) config('uploads.max_image_kilobytes', 2048) / 1024, 1),
-            'supportedLocales' => $this->collectionLocales(),
+            'supportedLocales' => array_map(static fn (string $locale): array => [
+                'value' => $locale,
+                'label' => __('collections.locale.'.$locale),
+            ], $this->collectionLocales()),
         ])->extends('layouts.app', [
             'title' => __('collections.actions.edit').' — '.$collection->display_name,
             'seo' => [

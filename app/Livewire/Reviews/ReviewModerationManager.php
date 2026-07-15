@@ -8,6 +8,7 @@ use App\Actions\Reviews\ModerateCatalogTitleReview;
 use App\Actions\Reviews\ResolveCatalogTitleReviewReport;
 use App\Actions\Reviews\RestrictCatalogTitleReviewer;
 use App\Actions\Reviews\RevokeCatalogTitleReviewRestriction;
+use App\DTOs\Reviews\AdminReviewItemData;
 use App\Enums\ReviewModerationReason;
 use App\Enums\ReviewRestrictionReason;
 use App\Enums\ReviewRestrictionType;
@@ -55,6 +56,9 @@ final class ReviewModerationManager extends Component
 
     /** @var array<int, string> */
     public array $moderationNotes = [];
+
+    /** @var array<int, string> */
+    public array $reportNotes = [];
 
     /** @var array<int, bool> */
     public array $spoilerFlags = [];
@@ -131,7 +135,6 @@ final class ReviewModerationManager extends Component
 
     public function resolveReport(
         int $reportId,
-        int $reviewId,
         string $status,
         ResolveCatalogTitleReviewReport $action,
     ): void {
@@ -140,7 +143,7 @@ final class ReviewModerationManager extends Component
                 $this->user(),
                 $reportId,
                 $status,
-                $this->moderationNotes[$reviewId] ?? null,
+                $this->reportNotes[$reportId] ?? null,
             );
             $this->statusMessage = __('reviews.messages.moderated');
             $this->actionError = null;
@@ -190,7 +193,7 @@ final class ReviewModerationManager extends Component
     {
         Gate::authorize('manage-reviews');
         $this->sanitizeFilters();
-        $paginator = new LengthAwarePaginator([], 0, max(1, (int) config('reviews.admin_per_page', 20)));
+        $paginator = $this->emptyPaginator();
         $this->queryFailed = false;
 
         if ($this->schema->writable()) {
@@ -218,6 +221,7 @@ final class ReviewModerationManager extends Component
                 ['value' => 'attention', 'label' => __('reviews.moderation.attention')],
                 ...$this->enumOptions(ReviewStatus::cases()),
             ],
+            'reviewStatusOptions' => $this->enumOptions(ReviewStatus::cases()),
             'moderationReasonOptions' => $this->enumOptions(ReviewModerationReason::cases()),
             'restrictionTypeOptions' => $this->enumOptions(ReviewRestrictionType::cases()),
             'restrictionReasonOptions' => $this->enumOptions(ReviewRestrictionReason::cases()),
@@ -262,12 +266,20 @@ final class ReviewModerationManager extends Component
         $this->targetSearch = mb_substr(UserPlainText::name($this->targetSearch), 0, 160);
     }
 
+    /** @param LengthAwarePaginator<int, AdminReviewItemData> $reviews */
     private function prepareForms(LengthAwarePaginator $reviews): void
     {
-        $reviewIds = collect($reviews->items())
-            ->map(fn ($item): int => $item->review->id)
+        $items = collect($reviews->items());
+        $reviewIds = $items
+            ->map(fn (AdminReviewItemData $item): int => $item->review->id)
             ->all();
         $visibleKeys = array_fill_keys($reviewIds, true);
+        $reports = $items
+            ->flatMap(fn (AdminReviewItemData $item): array => $item->reports);
+        $visibleReportKeys = array_fill_keys(
+            $reports->pluck('id')->map(fn (mixed $id): int => (int) $id)->all(),
+            true,
+        );
 
         foreach ([
             'moderationStatuses',
@@ -281,27 +293,49 @@ final class ReviewModerationManager extends Component
         ] as $property) {
             $this->{$property} = array_intersect_key($this->{$property}, $visibleKeys);
         }
+        $this->reportNotes = array_intersect_key($this->reportNotes, $visibleReportKeys);
 
         foreach ($reviews as $item) {
             $id = $item->review->id;
             $this->moderationStatuses[$id] ??= $item->review->status;
-            $this->moderationReasons[$id] ??= ReviewModerationReason::Approved->value;
+            $this->moderationReasons[$id] ??= $item->moderationReason
+                ?? ReviewModerationReason::Approved->value;
             $this->moderationNotes[$id] ??= $item->moderatorNote ?? '';
             $this->spoilerFlags[$id] ??= $item->review->isSpoiler;
             $this->restrictionTypes[$id] ??= ReviewRestrictionType::Temporary->value;
             $this->restrictionReasons[$id] ??= ReviewRestrictionReason::RepeatedViolations->value;
             $this->restrictionDurations[$id] ??= '7';
             $this->restrictionNotes[$id] ??= '';
+
+            foreach ($item->reports as $report) {
+                $this->reportNotes[$report['id']] ??= $report['private_note'] ?? '';
+            }
         }
     }
 
-    /** @param array<int, object> $cases */
+    /**
+     * @param  list<ReviewStatus|ReviewModerationReason|ReviewRestrictionType|ReviewRestrictionReason>  $cases
+     * @return list<array{value: string, label: string}>
+     */
     private function enumOptions(array $cases): array
     {
-        return collect($cases)->map(fn (object $case): array => [
-            'value' => $case->value,
-            'label' => $case->label(),
-        ])->all();
+        return array_map(
+            static fn (ReviewStatus|ReviewModerationReason|ReviewRestrictionType|ReviewRestrictionReason $case): array => [
+                'value' => $case->value,
+                'label' => $case->label(),
+            ],
+            $cases,
+        );
+    }
+
+    /** @return LengthAwarePaginator<int, AdminReviewItemData> */
+    private function emptyPaginator(): LengthAwarePaginator
+    {
+        return new LengthAwarePaginator(
+            [],
+            0,
+            max(1, (int) config('reviews.admin_per_page', 20)),
+        );
     }
 
     private function handleFailure(Throwable $exception): void

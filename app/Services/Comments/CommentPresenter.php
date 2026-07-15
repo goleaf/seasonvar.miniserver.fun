@@ -56,7 +56,7 @@ final class CommentPresenter
             $body = Str::limit($body, $collapseAfter);
         }
 
-        $authorUnavailable = $hiddenByViewer || $isDeleted || $comment->author === null;
+        $authorUnavailable = ! $bodyMayBeRead || $comment->author === null;
         $author = new CommentAuthorData(
             id: $authorUnavailable ? null : $authorId,
             name: $authorUnavailable
@@ -91,10 +91,10 @@ final class CommentPresenter
         $canReact = $viewer !== null && Gate::forUser($viewer)->allows('react', $comment) && ! $hiddenByViewer;
         $canReport = $viewer !== null && Gate::forUser($viewer)->allows('report', $comment) && ! $hiddenByViewer;
         $canManageRelationship = $viewer !== null
+            && $bodyMayBeRead
+            && $isPublished
             && $authorId !== null
-            && $authorId !== (int) $viewer->id
-            && ! $isDeleted
-            && ! $hiddenByViewer;
+            && $authorId !== (int) $viewer->id;
 
         return new CommentItemData(
             id: (int) $comment->id,
@@ -127,7 +127,7 @@ final class CommentPresenter
             canReport: $canReport,
             canBlock: $canManageRelationship,
             canMute: $canManageRelationship,
-            directUrl: Gate::forUser($viewer)->allows('view', $comment)
+            directUrl: ! $hiddenByViewer && Gate::forUser($viewer)->allows('view', $comment)
                 ? $this->directUrl($comment, $interfaceLocale)
                 : null,
             isFocused: $focusedCommentId === (int) $comment->id,

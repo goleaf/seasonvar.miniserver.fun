@@ -34,9 +34,22 @@ class CatalogController extends Controller
             return redirect()->route('titles.show', $catalogTitle, 301);
         }
 
+        $seo = $this->titlePage->seo($catalogTitle, $request->user());
+
+        if ($request->hasAny([
+            'review',
+            'reviewPage',
+            'review_sort',
+            'review_rating',
+            'review_spoiler',
+            'review_verified',
+        ])) {
+            $seo['robots'] = 'noindex,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
+        }
+
         return view('catalog.show', [
             'title' => $catalogTitle,
-            'seo' => $this->titlePage->seo($catalogTitle, $request->user()),
+            'seo' => $seo,
         ]);
     }
 

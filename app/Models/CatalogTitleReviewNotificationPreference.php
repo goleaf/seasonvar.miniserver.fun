@@ -8,6 +8,12 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property int $user_id
+ * @property bool $helpful_notifications
+ * @property bool $moderation_notifications
+ * @property bool $report_notifications
+ */
 #[Fillable([
     'user_id',
     'helpful_notifications',

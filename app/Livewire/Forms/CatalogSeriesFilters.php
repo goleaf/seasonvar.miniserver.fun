@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Livewire\Forms;
 
 use App\Http\Requests\CatalogTitlesRequest;
@@ -40,51 +42,67 @@ class CatalogSeriesFilters extends Form
     #[Url(as: 'q', history: true, except: '')]
     public string|int|null $search = '';
 
+    /** @var list<int|string> */
     #[Url(as: 'year', history: true, except: [])]
     public array $years = [];
 
+    /** @var list<string> */
     #[Url(history: true, except: [])]
     public array $genre = [];
 
+    /** @var list<string> */
     #[Url(history: true, except: [])]
     public array $country = [];
 
+    /** @var list<string> */
     #[Url(history: true, except: [])]
     public array $actor = [];
 
+    /** @var list<string> */
     #[Url(history: true, except: [])]
     public array $director = [];
 
+    /** @var list<string> */
     #[Url(as: 'age_rating', history: true, except: [])]
     public array $age_rating = [];
 
+    /** @var list<string> */
     #[Url(history: true, except: [])]
     public array $translation = [];
 
+    /** @var list<string> */
     #[Url(history: true, except: [])]
     public array $status = [];
 
+    /** @var list<string> */
     #[Url(history: true, except: [])]
     public array $network = [];
 
+    /** @var list<string> */
     #[Url(history: true, except: [])]
     public array $studio = [];
 
+    /** @var list<string> */
     #[Url(history: true, except: [])]
     public array $tag = [];
 
+    /** @var list<string> */
     #[Url(as: 'exclude_country', history: true, except: [])]
     public array $excludeCountry = [];
 
+    /** @var list<string> */
     #[Url(as: 'exclude_genre', history: true, except: [])]
     public array $excludeGenre = [];
 
+    /** @var list<string> */
     #[Url(as: 'quality', history: true, except: [])]
     public array $qualities = [];
 
+    /** @var list<string> */
     #[Url(as: 'publication_type', history: true, except: [])]
     public array $publicationTypes = [];
 
+    /** @var list<string> */
     #[Url(history: true, except: [])]
     public array $subtitles = [];
 
