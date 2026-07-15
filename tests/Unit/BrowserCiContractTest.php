@@ -30,6 +30,8 @@ final class BrowserCiContractTest extends TestCase
         $this->assertStringContainsString("process.env.PLAYWRIGHT_RUNTIME_NAME || 'browser'", $config);
         $this->assertStringContainsString('output/playwright/${runtimeName}.sqlite', $config);
         $this->assertStringContainsString('BROWSER_TEST_DATABASE', $config);
+        $this->assertStringContainsString('output/playwright/${runtimeName}-test-results', $config);
+        $this->assertStringContainsString('output/playwright/${runtimeName}-report', $config);
         $this->assertStringContainsString('APP_CONFIG_CACHE', $config);
         $this->assertStringContainsString('output/playwright/${runtimeName}-config.php', $config);
         $this->assertStringContainsString('APP_ROUTES_CACHE', $config);

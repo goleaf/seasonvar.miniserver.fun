@@ -7,6 +7,28 @@ const isSameOrigin = (requestUrl, baseURL) => (
     new URL(requestUrl).origin === new URL(baseURL).origin
 );
 
+const isExpectedCatalogPollAbort = (request) => {
+    if (request.failure()?.errorText !== 'net::ERR_ABORTED') {
+        return false;
+    }
+
+    if (!/^\/livewire-[^/]+\/update$/.test(new URL(request.url()).pathname)) {
+        return false;
+    }
+
+    try {
+        const payload = request.postDataJSON();
+
+        return payload.components?.some((component) => (
+            component.calls?.some((call) => (
+                call.method === 'refreshCatalog' && call.metadata?.type === 'poll'
+            ))
+        )) === true;
+    } catch {
+        return false;
+    }
+};
+
 const installBrowserGuard = async (page, baseURL) => {
     const sameOriginFailures = [];
     const consoleErrors = [];
@@ -28,7 +50,7 @@ const installBrowserGuard = async (page, baseURL) => {
         }
     });
     page.on('requestfailed', (request) => {
-        if (isSameOrigin(request.url(), baseURL)) {
+        if (isSameOrigin(request.url(), baseURL) && !isExpectedCatalogPollAbort(request)) {
             sameOriginFailures.push(`${request.failure()?.errorText || 'request failed'} ${request.url()}`);
         }
     });
@@ -132,6 +154,7 @@ test('verified player exposes saved progress and Continue Watching', async ({ pa
     await expect(player).toHaveAttribute('data-progress-position', '120');
     await expect(player).toHaveAttribute('data-progress-session', /.+/);
     await assertResponsivePage(page);
+    await page.waitForLoadState('networkidle');
 
     await page.goto('/library/continue-watching');
     await expect(page.getByRole('heading', { level: 2, name: 'Продолжить просмотр' })).toBeVisible();

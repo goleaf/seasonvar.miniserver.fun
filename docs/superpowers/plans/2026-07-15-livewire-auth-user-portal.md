@@ -855,7 +855,7 @@ Expected before final UI fixes: any failure names the exact missing/incorrect au
 
 Fix only failures demonstrated by the browser test. Preserve light theme, no internal scroll, full text and 44×44 controls.
 
-- [ ] **Step 4: Run full verification**
+- [x] **Step 4: Run full verification**
 
 ```bash
 ./vendor/bin/pint --dirty --format agent
@@ -870,7 +870,7 @@ git status --short --branch
 
 Expected: Pint leaves no unexpected changes; PHPUnit, build and browser suite exit 0; audits report no unresolved high-severity production vulnerability introduced by this work; branch is `main`.
 
-- [ ] **Step 5: Commit final browser coverage and verify clean tree**
+- [x] **Step 5: Commit final browser coverage and verify clean tree**
 
 ```bash
 git add tests/browser resources/views resources/js resources/css

@@ -18,10 +18,10 @@ export default defineConfig({
     expect: {
         timeout: 8_000,
     },
-    outputDir: 'output/playwright/test-results',
+    outputDir: `output/playwright/${runtimeName}-test-results`,
     reporter: [
         ['line'],
-        ['html', { outputFolder: 'output/playwright/report', open: 'never' }],
+        ['html', { outputFolder: `output/playwright/${runtimeName}-report`, open: 'never' }],
     ],
     use: {
         baseURL,
