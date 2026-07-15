@@ -54,7 +54,7 @@ class CatalogTitlesPageBuilder
         bool $invalidInput = false,
         array $facetSearch = [],
         bool $includeFacets = true,
-        bool $includeDescription = false,
+        bool $includeDescription = true,
     ): array {
         $context = $this->context($request, $type, $taxonomy, $invalidInput);
         $search = $context['search'];
@@ -66,7 +66,6 @@ class CatalogTitlesPageBuilder
         $criteria = $context['criteria'];
         $sortOption = $context['sortOption'];
         $sort = $context['sort'];
-        $view = $context['view'];
         $perPage = $context['perPage'];
         $filterTypes = $context['filterTypes'];
         $activeTaxonomies = $context['activeTaxonomies'];
@@ -81,7 +80,7 @@ class CatalogTitlesPageBuilder
         $cardLoads = $this->taxonomies->cardSummaryLoads();
         $cardColumns = ['id', 'slug', 'title', 'original_title', 'type', 'year', 'poster_url', 'indexed_at'];
 
-        if ($view === 'list' || $includeDescription) {
+        if ($includeDescription) {
             $cardColumns[] = 'description';
         }
 
@@ -90,11 +89,9 @@ class CatalogTitlesPageBuilder
             ? $this->query->filteredTitles($criteria, $request->user())->count()
             : null;
         $cardCounts = $this->query->publicCardCounts($request->user());
-        $cardRelations = $view === 'list'
-            ? array_merge([
-                'latestSeason' => fn ($query) => $query->select(['seasons.id', 'seasons.catalog_title_id', 'seasons.number']),
-            ], $cardLoads)
-            : $cardLoads;
+        $cardRelations = array_merge([
+            'latestSeason' => fn ($query) => $query->select(['seasons.id', 'seasons.catalog_title_id', 'seasons.number']),
+        ], $cardLoads);
 
         if ($rankSearch) {
             $catalogTitleIds = $this->query->filteredTitles(
@@ -189,7 +186,6 @@ class CatalogTitlesPageBuilder
             'titles' => $catalogTitles,
             'search' => $search,
             'sort' => $sort,
-            'view' => $view,
             'perPage' => $perPage,
             'year' => $year,
             'requestedYear' => $requestedYear,
@@ -279,7 +275,6 @@ class CatalogTitlesPageBuilder
         $years = $criteria->years;
         $sortOption = $criteria->sort;
         $sort = $sortOption->value;
-        $view = $criteria->view;
         $perPage = $criteria->perPage;
         $filterTypes = $this->taxonomies->filterTypes();
         $legacyType = $request->legacyType($filterTypes);
@@ -398,7 +393,6 @@ class CatalogTitlesPageBuilder
             invalidFilterSlugs: $invalidFilterSlugs,
             titleContext: $titleContext,
             selectedFilterSlugs: $selectedFilterSlugs,
-            view: $view,
             perPage: $perPage,
             catalogQueryState: $catalogQueryState,
             excludedTaxonomies: $excludedTaxonomies,
@@ -416,7 +410,6 @@ class CatalogTitlesPageBuilder
             'years' => $years,
             'sortOption' => $sortOption,
             'sort' => $sort,
-            'view' => $view,
             'perPage' => $perPage,
             'filterTypes' => $filterTypes,
             'activeTaxonomies' => $activeTaxonomies,

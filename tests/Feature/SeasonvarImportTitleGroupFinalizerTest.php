@@ -45,7 +45,7 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         Http::preventStrayRequests();
     }
 
-    public function test_finalizer_releases_while_a_page_is_not_terminal(): void
+    public function test_finalizer_returns_without_polling_while_a_page_is_not_terminal(): void
     {
         $title = $this->titleWithSeasonUrls([1, 2]);
         $group = app(SeasonvarImportTitleGroupDispatcher::class)
@@ -54,12 +54,12 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
 
         $this->app->call([$job, 'handle']);
 
-        $job->assertReleased(delay: 7);
+        $job->assertNotReleased();
         $this->assertSame('running', $group->fresh()->status->value);
         $this->assertSame(0, $group->fresh()->applied_pages);
     }
 
-    public function test_finalizer_releases_while_a_terminal_page_still_has_a_live_claim(): void
+    public function test_finalizer_returns_without_polling_while_a_terminal_page_still_has_a_live_claim(): void
     {
         $title = $this->titleWithSeasonUrls([1]);
         $group = app(SeasonvarImportTitleGroupDispatcher::class)
@@ -75,7 +75,7 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
 
         $this->app->call([$job, 'handle']);
 
-        $job->assertReleased(delay: 7);
+        $job->assertNotReleased();
         $this->assertSame('running', $group->fresh()->status->value);
         $this->assertSame(0, $group->fresh()->applied_pages);
     }

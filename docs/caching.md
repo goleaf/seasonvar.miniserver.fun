@@ -1,6 +1,8 @@
 # Кеширование и Redis/Memcached
 
-Обновлено: 13.07.2026
+Обновлено: 15.07.2026
+
+Production snapshot 15.07.2026: Redis/Memcached transports отвечают, но `cache-warm` worker не установлен, health state прогрева — `unknown`, а существующая очередь прогрева не должна запускаться без проверки deduplication/drain impact. Scoped health теперь честно видит 26235 cache-warm и 6586 import pending jobs вместо старого default-only zero; запущенные pools начнут публиковать новые heartbeat только после verified restart. Установка versioned unit относится к production-blocker plan после исправления importer lifecycle; отсутствие evictions не является доказательством корректной инвалидации.
 
 ## Неподвижные границы
 
@@ -125,7 +127,7 @@ Deployment increments `CACHE_SCHEMA_VERSION` when key meaning changes and `CACHE
 - Redis queues unavailable: dispatch throws/fails visibly; jobs are not reported as accepted. DB remains authoritative and jobs remain idempotent.
 - Rebuild lock contention: safe stale is served; without stale, wait is bounded and raises `CacheRebuildTimeout` instead of issuing the same expensive query.
 
-`/health/ready` and `app:health` distinguish database, Redis cache/sessions/queues/locks, Memcached, queue heartbeat, Horizon state and last warming state. Redis cache status includes safe memory/eviction counters, while Memcached status aggregates hit/miss, eviction, item, byte and connection counters without server addresses. Cache/Memcached outages and an absent worker heartbeat make the aggregate status `degraded`; database/session/queue/lock failures make it `failed`. A missing heartbeat does not make the transport itself unready, but it must never produce a false `ok`. Endpoint is private/no-store, does not start a session and never returns hostnames or credentials.
+`/health/ready` and `app:health` distinguish database, Redis cache/sessions/queues/locks, Memcached, queue heartbeat, Horizon state and last warming state. Redis cache status includes safe memory/eviction counters, while Memcached status aggregates hit/miss, eviction, item, byte and connection counters without server addresses. Queue health has four fixed low-cardinality entries: `default`, `cache_warm`, `seasonvar_import`, `seasonvar_title_refresh`; each reports connection/queue label, pending/delayed/reserved, oldest pending age and scoped heartbeat/last-processing timestamps. Worker loops refresh liveness even while idle, throttled to at most one cache write per queue every 5–30 seconds; processing refreshes immediately. `CACHE_DEFAULT_QUEUE_BUSY_THRESHOLD` and `CACHE_WARM_QUEUE_BUSY_THRESHOLD` control documented backlog degradation thresholds. Missing heartbeat plus work is `failed`, an empty unserved queue is `idle`, and a live over-threshold queue is `degraded`. Cache/Memcached outages and worker failures degrade aggregate application health; database/session/queue/lock transport failures make traffic readiness fail. CLI `app:health` exits nonzero for any state other than `ok`, so deployment/monitoring cannot accept `degraded`; HTTP `/health/ready` remains 200 while `ready=true`, so a usable web node is not ejected solely for a background-pool failure. A missing worker heartbeat does not masquerade as a transport outage, but it must never produce a false `ok`. Endpoint is private/no-store, does not start a session and never returns hostnames or credentials.
 
 ## Observability и alerts
 

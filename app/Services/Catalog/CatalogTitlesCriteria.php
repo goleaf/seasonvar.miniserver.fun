@@ -42,7 +42,6 @@ final readonly class CatalogTitlesCriteria
         public array $publicationTypes,
         public ?string $updatedPeriod,
         public ?string $letter,
-        public string $view,
         public int $perPage,
         public CatalogSort $sort,
         public ?int $titleContextId,
@@ -78,7 +77,6 @@ final readonly class CatalogTitlesCriteria
             publicationTypes: $request->publicationTypes(),
             updatedPeriod: $request->updatedPeriod(),
             letter: $request->letter(),
-            view: $request->view(),
             perPage: $request->perPage(),
             sort: ! $request->query->has('sort') && $search->isReady()
                 ? CatalogSort::Relevance
@@ -252,7 +250,6 @@ final readonly class CatalogTitlesCriteria
             publicationTypes: $publicationTypes ?? $this->publicationTypes,
             updatedPeriod: $this->updatedPeriod,
             letter: $this->letter,
-            view: $this->view,
             perPage: $this->perPage,
             sort: $this->sort,
             titleContextId: $this->titleContextId,

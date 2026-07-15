@@ -10,6 +10,7 @@ use App\Models\CatalogSearchIndexState;
 use App\Models\SeasonvarImportRun;
 use App\Services\Catalog\Search\CatalogSearchIndexer;
 use App\Services\Seasonvar\SeasonvarImportProcessInspector;
+use Closure;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -36,17 +37,27 @@ final class DeploymentReadinessChecker
     public function check(): array
     {
         return [
-            $this->environmentCheck(),
-            $this->debugCheck(),
-            $this->loggingCheck(),
-            $this->migrationsCheck(),
-            $this->sqliteIntegrityCheck(),
-            $this->requiredIndexesCheck(),
-            $this->searchIndexCheck(),
-            $this->cacheTransportsCheck(),
-            $this->failedJobsCheck(),
-            $this->importerProcessCheck(),
+            $this->timed(fn (): DeploymentCheck => $this->environmentCheck()),
+            $this->timed(fn (): DeploymentCheck => $this->debugCheck()),
+            $this->timed(fn (): DeploymentCheck => $this->loggingCheck()),
+            $this->timed(fn (): DeploymentCheck => $this->migrationsCheck()),
+            $this->timed(fn (): DeploymentCheck => $this->sqliteIntegrityCheck()),
+            $this->timed(fn (): DeploymentCheck => $this->requiredIndexesCheck()),
+            $this->timed(fn (): DeploymentCheck => $this->searchIndexCheck()),
+            $this->timed(fn (): DeploymentCheck => $this->cacheTransportsCheck()),
+            $this->timed(fn (): DeploymentCheck => $this->failedJobsCheck()),
+            $this->timed(fn (): DeploymentCheck => $this->importerProcessCheck()),
         ];
+    }
+
+    /** @param Closure(): DeploymentCheck $check */
+    private function timed(Closure $check): DeploymentCheck
+    {
+        $startedAt = hrtime(true);
+        $result = $check();
+        $durationMs = (int) round((hrtime(true) - $startedAt) / 1_000_000);
+
+        return $result->withDuration($durationMs);
     }
 
     private function environmentCheck(): DeploymentCheck

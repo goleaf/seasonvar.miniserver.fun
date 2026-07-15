@@ -2,6 +2,8 @@
 
 ## 2026-07-15
 
+- Reopened the production-readiness program with a repository/runtime-wide evidence baseline and living phased plan. New dependency, database, security, performance, frontend, Livewire and playback reports record verified state, exact gates, rollback and remaining risks; the baseline exposed production debug mode, two pending migrations, overlapping import cycles, a 24.45-second SQLite-heavy deployment preflight, misleading queue health, a missing cache-warm worker, passive-Blade violations and full-scope static-analysis debt without suppressing them.
+- Made production diagnostics truthful and measurable: deployment checks expose safe per-check millisecond durations without payloads or paths, and queue health now reports fixed low-cardinality metrics plus independently scoped idle/processing heartbeats for default, cache-warm, Seasonvar import and title-refresh pools. Heartbeats are read directly so a long-lived process cannot memoize liveness past TTL; operational CLI health fails on degraded while HTTP traffic readiness stays distinct, and live checks surface the real 32k+ backlog instead of a false default-queue green.
 - Added the complete Livewire session-authenticated user portal: Russian registration/login/verification/password recovery, profile and security self-service, device/session/account controls, and a unified filterable `/library/*` for watchlist, ratings, Continue Watching and history. Web and mobile now share account/library services; verified-email policies guard every personal mutation, catalog cards receive bounded query-free personalization, and `/api/v1/me/library/summary` plus documented library filters complete the private API surface.
 
 ## 2026-07-14

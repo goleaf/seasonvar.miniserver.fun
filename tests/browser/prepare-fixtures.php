@@ -8,6 +8,7 @@ use App\Models\CatalogTitleUserState;
 use App\Models\Country;
 use App\Models\Episode;
 use App\Models\EpisodeViewProgress;
+use App\Models\Genre;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
@@ -48,12 +49,14 @@ if (Artisan::call('migrate', ['--force' => true]) !== 0) {
     exit(1);
 }
 
+$posterUrl = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22300%22 viewBox=%220 0 200 300%22%3E%3Crect width=%22200%22 height=%22300%22 fill=%22%23047857%22/%3E%3Ccircle cx=%22100%22 cy=%22105%22 r=%2248%22 fill=%22%23d1fae5%22/%3E%3Cpath d=%22M48 250c8-54 34-81 52-81s44 27 52 81%22 fill=%22%23d1fae5%22/%3E%3C/svg%3E';
+
 $title = CatalogTitle::factory()->create([
     'slug' => 'browser-smoke',
     'title' => 'Browser Smoke',
     'original_title' => 'Browser Smoke Original',
     'description' => 'Детерминированная карточка для локальной проверки браузера.',
-    'poster_url' => null,
+    'poster_url' => $posterUrl,
     'type' => 'show',
 ]);
 $russia = Country::query()->create([
@@ -61,6 +64,11 @@ $russia = Country::query()->create([
     'slug' => 'rossiia',
 ]);
 $title->countries()->attach($russia);
+$genre = Genre::query()->create([
+    'name' => 'Браузерная драма',
+    'slug' => 'brauzernaia-drama',
+]);
+$title->genres()->attach($genre);
 $turkey = Country::query()->create([
     'name' => 'Турция',
     'slug' => 'turciia',
@@ -70,6 +78,7 @@ CatalogTitle::factory()->count(30)->sequence(
     fn (Sequence $sequence): array => [
         'title' => sprintf('Турецкий браузерный сериал %02d', $sequence->index + 1),
         'slug' => sprintf('turkish-browser-title-%02d', $sequence->index + 1),
+        'poster_url' => $posterUrl,
         'indexed_at' => now()->subMinutes($sequence->index + 1),
     ],
 )->create()->each(fn (CatalogTitle $catalogTitle) => $catalogTitle->countries()->attach($turkey));

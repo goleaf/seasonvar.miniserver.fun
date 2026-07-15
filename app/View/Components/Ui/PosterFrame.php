@@ -7,6 +7,8 @@ use Illuminate\View\Component;
 
 class PosterFrame extends Component
 {
+    public string $fit;
+
     public string $loading;
 
     public function __construct(
@@ -14,8 +16,10 @@ class PosterFrame extends Component
         public string $alt = '',
         public string $emptyLabel = 'Нет постера',
         string $loading = 'lazy',
+        string $fit = 'cover',
         public bool $overscan = true,
     ) {
+        $this->fit = in_array($fit, ['cover', 'contain'], true) ? $fit : 'cover';
         $this->loading = in_array($loading, ['lazy', 'eager'], true) ? $loading : 'lazy';
     }
 
@@ -26,7 +30,17 @@ class PosterFrame extends Component
 
     public function frameClasses(): string
     {
-        return 'relative isolate overflow-hidden'.($this->hasImage() ? '' : ' bg-slate-100');
+        return 'relative isolate overflow-hidden'.($this->hasImage() && $this->fit === 'cover' ? '' : ' bg-slate-100');
+    }
+
+    public function imageClasses(): string
+    {
+        return collect([
+            'absolute inset-0 h-full w-full',
+            $this->fit === 'cover' && $this->overscan ? 'scale-[1.02]' : null,
+            $this->fit === 'contain' ? 'object-contain' : 'object-cover',
+            'object-center',
+        ])->filter()->implode(' ');
     }
 
     public function render(): View

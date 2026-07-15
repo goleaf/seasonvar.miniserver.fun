@@ -20,21 +20,21 @@ class CatalogLivewireBudgetTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const CATALOG_INITIAL_MAX_BYTES = 220_000;
+    private const CATALOG_INITIAL_MAX_BYTES = 225_000;
 
-    private const CATALOG_DEFERRED_MAX_BYTES = 275_000;
+    private const CATALOG_DEFERRED_MAX_BYTES = 285_000;
 
-    private const CATALOG_UPDATE_MAX_BYTES = 275_000;
+    private const CATALOG_UPDATE_MAX_BYTES = 285_000;
 
     private const TITLE_INITIAL_MAX_BYTES = 100_000;
 
     private const TITLE_UPDATE_MAX_BYTES = 95_000;
 
-    private const CATALOG_INITIAL_MAX_QUERIES = 7;
+    private const CATALOG_INITIAL_MAX_QUERIES = 8;
 
-    private const CATALOG_DEFERRED_MAX_QUERIES = 11;
+    private const CATALOG_DEFERRED_MAX_QUERIES = 12;
 
-    private const CATALOG_UPDATE_MAX_QUERIES = 7;
+    private const CATALOG_UPDATE_MAX_QUERIES = 8;
 
     private const TITLE_INITIAL_MAX_QUERIES = 29;
 

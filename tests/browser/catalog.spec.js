@@ -60,7 +60,6 @@ const assertTouchTargets = async (page) => {
     const undersized = await page.locator([
         '[data-catalog-unified-filters] > summary',
         '[data-catalog-sort-option]',
-        '[data-catalog-view-option]',
         '[data-catalog-page-size-option]',
         '[data-catalog-alphabet-option]',
     ].join(',')).evaluateAll((controls) => controls
@@ -86,6 +85,59 @@ const assertAccessibility = async (page) => {
     expect(blockingViolations).toEqual([]);
 };
 
+const auditRenderedPage = async (page, testInfo, label, path, { listPoster = false } = {}) => {
+    const response = await page.goto(path);
+
+    expect(response?.status()).toBe(200);
+    await expect(page.locator('h1')).toHaveCount(1);
+    await assertPageGeometry(page);
+
+    const poster = page.locator('[data-ui-poster-layout="list"] [data-ui-poster-frame] img').first();
+    let posterMetrics = null;
+
+    if (listPoster) {
+        await poster.scrollIntoViewIfNeeded();
+        await expect(poster).toBeVisible();
+        await expect.poll(() => poster.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
+        posterMetrics = await poster.evaluate((image) => {
+            const frame = image.closest('[data-ui-poster-card-media]');
+            const frameBox = frame?.getBoundingClientRect();
+
+            return {
+                frameHeight: frameBox?.height ?? null,
+                frameWidth: frameBox?.width ?? null,
+                naturalHeight: image.naturalHeight,
+                naturalWidth: image.naturalWidth,
+                objectFit: window.getComputedStyle(image).objectFit,
+            };
+        });
+
+        expect(posterMetrics.objectFit).toBe('contain');
+        expect(posterMetrics.naturalWidth).toBeGreaterThan(0);
+        expect(posterMetrics.frameWidth).toBeGreaterThanOrEqual(64);
+        expect(posterMetrics.frameHeight / posterMetrics.frameWidth).toBeCloseTo(1.5, 1);
+    }
+
+    const metrics = {
+        finalUrl: page.url(),
+        h1: (await page.locator('h1').innerText()).trim(),
+        headings: await page.locator('h2').allInnerTexts(),
+        horizontalOverflow: await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+        poster: posterMetrics,
+        status: response?.status(),
+        viewport: page.viewportSize(),
+    };
+
+    await testInfo.attach(label + '-metrics', {
+        body: JSON.stringify(metrics, null, 2),
+        contentType: 'application/json',
+    });
+    await page.screenshot({
+        path: testInfo.outputPath(label + '.png'),
+        fullPage: false,
+    });
+};
+
 test('catalog keeps URL state, unified filters and responsive geometry', async ({ page, baseURL }) => {
     const browserErrors = await installNetworkGuard(page, baseURL);
 
@@ -95,6 +147,9 @@ test('catalog keeps URL state, unified filters and responsive geometry', async (
     await expect(page.locator('#catalog-search')).toHaveValue('Browser Smoke');
     await expect(page).toHaveURL(/q=Browser(?:%20|\+)Smoke/);
     await expect(page.locator('[data-catalog-card]')).toHaveCount(1);
+    await expect(page.locator('[data-catalog-results-list]')).toBeVisible();
+    await expect(page.locator('[data-ui-poster-layout="list"]')).toHaveCount(1);
+    await expect(page.locator('[data-catalog-view-option]')).toHaveCount(0);
 
     const filters = page.locator('#catalog-filters');
 
@@ -194,6 +249,30 @@ test('title page renders the player shell without local asset failures', async (
     await expect(page.locator('video.js-catalog-player')).toHaveCount(1);
     await assertPageGeometry(page);
     await assertAccessibility(page);
+    expect(browserErrors.localAssetFailures).toEqual([]);
+    expect(browserErrors.consoleErrors).toEqual([]);
+    expect(browserErrors.pageErrors).toEqual([]);
+});
+
+test('list-only surfaces keep uncropped posters across responsive viewports', async ({ page, baseURL }, testInfo) => {
+    test.setTimeout(60_000);
+    const browserErrors = await installNetworkGuard(page, baseURL);
+
+    await auditRenderedPage(page, testInfo, 'home', '/', { listPoster: true });
+    await auditRenderedPage(page, testInfo, 'titles', '/titles?q=Browser%20Smoke', { listPoster: true });
+    await expect(page.locator('[data-catalog-view-option]')).toHaveCount(0);
+    await auditRenderedPage(page, testInfo, 'genres', '/genres');
+    await expect(page.locator('[data-directory-results-list]')).toBeVisible();
+    await auditRenderedPage(page, testInfo, 'title', '/titles/browser-smoke');
+
+    await page.goto('/login');
+    await page.getByLabel('Электронная почта').fill('browser@example.com');
+    await page.getByLabel('Пароль', { exact: true }).fill('Browser-Strong-Password-42!');
+    await page.getByRole('button', { name: 'Войти' }).click();
+    await expect(page).toHaveURL(/\/library(?:\/|$)/);
+    await auditRenderedPage(page, testInfo, 'library', '/library/watchlist', { listPoster: true });
+    await expect(page.locator('[data-library-watchlist-list]')).toBeVisible();
+
     expect(browserErrors.localAssetFailures).toEqual([]);
     expect(browserErrors.consoleErrors).toEqual([]);
     expect(browserErrors.pageErrors).toEqual([]);

@@ -1,65 +1,52 @@
 # Verification report
 
-Проверено: 13.07.2026. Все команды выполнены из `/www/wwwroot/seasonvar.miniserver.fun`. Production `.env`, credentials, raw media URLs и private log payload не выводились.
+Проверено: 15.07.2026 на `main` commit `70df36b` до новых modernization changes. Этот документ фиксирует baseline, а не заявляет завершение production rollout.
 
-## Backend и code quality
+## Passed baseline
 
-| Команда | Результат |
+| Gate | Result |
 | --- | --- |
-| `php artisan test` | final pass: 603 tests, 592 passed, 11 skipped, 4141 assertions, 79.060 s |
-| `./vendor/bin/phpunit` | final pass: те же 603/592/11, 4141 assertions, 79.549 s |
-| Focused route/UI/recommendation/import-maintenance suite | pass: 155 tests, 1363 assertions |
-| Focused MCP command suite | pass: 3 tests, 16 assertions |
-| `./vendor/bin/pint --test --format agent` | pass; ранее полный Pint исправил 2 существовавших format deviations |
-| `composer validate --no-check-publish` | pass; Composer сообщил только ожидаемое отключение plugins в root/non-interactive CLI |
-| `composer check-platform-reqs` | pass для PHP 8.5.8 и extensions |
-| `composer audit --no-interaction` | pass, advisories не найдены |
-| `php artisan project:docs-refresh --check` | pass, документация актуальна |
-| `git diff --check` | pass |
+| `php artisan test` | 826 tests; 815 passed, 11 skipped; 6751 assertions; 93.554 s |
+| Focused browser CI contract | 2 tests, 41 assertions |
+| `PLAYWRIGHT_RUNTIME_NAME=audit-baseline npm run test:browser` | 18/18 passed; 1.4 min |
+| `./vendor/bin/pint --test --format agent` | pass |
+| PHP syntax lint | exit 0 |
+| Configured `vendor/bin/phpstan analyse` | 0 diagnostics |
+| Full `app/` Larastan level 6 | 547 diagnostics; not suppressed, modernization backlog |
+| `composer validate --strict` | pass; root/plugin warning only |
+| `composer audit --locked` | 0 advisories |
+| `npm audit --audit-level=high` | 0 vulnerabilities |
+| `npm run build` | pass, Vite 8.1.4 in 2.51 s |
 
-Первый baseline был 560 tests: 546 passed, 3 failed, 11 skipped, 3806 assertions. Исправлены только доказанные причины: Redis session connection при array driver и два production-minified Livewire asset assertions. Valid tests не удалялись и meaningful assertions не ослаблялись.
+Build assets: app CSS 154.51 kB / 32.90 gzip; app JS 8.51/3.61; player JS 11.73/3.84; Plyr lazy 111.81/32.86; HLS light lazy 331.90/104.61.
 
-Во время финальной проверки параллельные route-filter и recommendation задачи увеличили suite сначала до 580, затем до 603 tests. Первый промежуточный запуск увидел 3 RED до появления implementation; следующие два выявили дублирующий `@checked` рядом с `wire:model.live` в пяти checkbox. После удаления второго источника состояния focused 5/5, расширенный focused 155/155 и оба полных runners прошли. Browser подтвердил, что Livewire после hydration выставляет DOM property `checked=true` без конфликтующего HTML-атрибута. Падения не скрывались и тесты не удалялись.
+## Production checks that are not green
 
-## Frontend
+| Check | Exact evidence | Status |
+| --- | --- | --- |
+| Environment | production, debug enabled | Blocker; environment owner action required |
+| Laravel caches | config/events not cached; routes/views cached | Blocker after safe environment setup |
+| Migrations | two pending | Blocker until writer stop + verified backup |
+| Import lifecycle | 11 active runs, 8037 pending, 4 reserved, 5670 claims, oldest pending 2117 s | Blocker |
+| Health truthfulness | New scoped check reports `failed`: 32821 pending, 4 reserved; cache-warm oldest age 151156 s and import oldest age 3162 s | Code verified; worker restart/cache-warm installation still pending |
+| Deployment check | Instrumented full run: 24.45 s wall, SQLite quick/FK 23655 ms, remaining checks 0–303 ms; integrity pass; safe exit 1 for debug, 2 migrations and stale FTS | Finite but expensive; `duration_ms` verified; retain >=30 s operational budget |
+| Cache worker | versioned unit exists in Git but no process/installed unit | Blocker for cache-warm readiness |
+| Blade passive boundary | 41 `request()` and 1 `config()` calls | Architecture acceptance not met |
+| Public storage | link absent | Verify need; not automatically a blocker |
 
-| Команда | Результат |
-| --- | --- |
-| `npm run build` | pass, Vite 8.1.4; app CSS 154.98 kB (32.98 kB gzip), app JS 8.90 kB (3.69 kB gzip), player JS 11.65 kB (3.82 kB gzip), lazy hls.js 331.90 kB (104.61 kB gzip) |
-| `npm audit --audit-level=high` | pass, 0 vulnerabilities |
+## Browser evidence
 
-## Database и operations
+The deterministic suite covers guest and authenticated portal, registration/login/private navigation, saved player progress/Continue Watching, catalog URL/filter state, route taxonomy removal, directory alphabet/search, title player shell, desktop/mobile geometry and accessibility assertions. Same-origin request failures and console errors fail the suite; expected aborted Livewire poll during navigation is recognized only by parsed poll method metadata.
 
-- В явно созданной temporary SQLite: full migrate pass; `2026_07_13_171455_create_catalog_relation_source_identities_table` получила статус `Ran`; её собственный `down()` отработал и вернул `Pending`. Temporary DB удалена.
-- Финальный live `php artisan migrate:status`: все ранее существовавшие migrations имеют `Ran`; добавленная параллельным commit migration `2026_07_13_171455_create_catalog_relation_source_identities_table` остаётся `Pending` и не применялась автономно.
-- Read-only `PRAGMA quick_check` вернул `ok`; `PRAGMA foreign_key_check` не вернул нарушений.
-- `php artisan app:health --json`: `status=ok`, `ready=true`; DB, Redis cache/session/queue/locks, Memcached и queue workers `ok`; Horizon `not_configured`, cache warm timestamp `unknown`.
-- Финальный `php artisan seasonvar:import --status`: active run `#742` имеет status `running`, 9646 pending, 9 delayed, 4 reserved jobs и 3949 live claims; поэтому deployment contract запрещает применять pending migration до завершения jobs и verified backup. Импорт и destructive DB commands в рамках этой проверки не запускались.
-- Последние 1000 строк Laravel daily log содержали 51 high-severity записи только от intentional negative test fixtures (`unsupported-*`, queue unavailable, prepared/finalizer exceptions); `local.ERROR/CRITICAL/ALERT/EMERGENCY` — 0. Raw contexts не публиковались.
+## Safety
 
-## HTTP и browser
+No `.env` edit, destructive database command, queue clear, failed-job payload dump, media download, new production dependency, branch/worktree or force push occurred in the baseline phase. Concurrent unrelated working-tree changes are excluded from these results until their own RED/GREEN cycle completes.
 
-- `curl` к `/` и `/titles`: HTTP/2 200, HTML, security headers и `Content-Security-Policy-Report-Only` с fixed directives. `/api/titles`: HTTP/2 200 JSON без CSP header.
-- Playwright managed Chromium, desktop 1440×1000: `/titles` SSR/Livewire loaded; search `Мемуары книжного духа` updated URL and returned exact card; title page exposed canonical, H1, season/episode navigation and one player shell.
-- Mobile 390×844: `scrollWidth=clientWidth=390`, horizontal overflow отсутствует; первый Tab focused skip link `Перейти к содержанию`.
-- Повторный Playwright QA на route-country странице подтвердил desktop/mobile overflow `0`, открытие native dialog и route checkbox `checked=true` после Livewire hydration при `checkedAttribute=false`.
-- Recommendation QA на реальной title page подтвердил один `data-recommendation-list`, 12 ranked rows, H1 и отсутствие горизонтального overflow; screenshot проверен визуально.
-- Network: application/assets/Livewire requests succeeded; signed playback endpoint redirected and licensed provider responded with partial content. Media не скачивалась/сохранялась приложением и playback button не нажималась.
-- Console pass после включения report-only CSP: 0 errors, 0 warnings; page ready `complete`, canonical correct, no desktop overflow.
+## Verified modernization increment
 
-## MCP
-
-- `codex mcp list`: project `laravel-boost`, `context7`, `playwright` enabled с правильными cwd/commands. Pre-existing user-level GitHub entry только появился в списке; он не вызывался и не изменялся.
-- `php artisan integrations:doctor --strict --json`: exit 0, 7 ok, 7 optional warnings, 0 missing. Boost/Context7/Playwright required checks `ok`.
-- `npx -y @playwright/mcp@latest --version`: `0.0.78`; managed Chromium fallback запущен headless isolated без persistent profile.
-- Boost, Context7 и Playwright прошли MCP initialize/tools-list handshakes; Boost application info и Context7 query прошли, Playwright сообщил 24 tools.
-- Первый Boost application-info вызов упал, потому что child process не наследовал `--env=local`; добавлен `APP_ENV=local`, исходная проверка прошла.
-- Первый Playwright CLI запуск искал отсутствующий branded Chrome; применён executable из managed Playwright Chromium cache, smoke повторён успешно.
-- Official Codex manual helper вернул `Manual response is missing x-content-sha256`; ошибка не повторялась циклом, а MCP/config status подтверждён локальными `codex mcp list`, strict doctor и protocol checks.
-- Проверка `timeout ...; test $? -eq 124` дала ложный exit 1, потому что закрытый stdin передал MCP процессу EOF и он корректно завершился раньше timeout. Повтор `APP_ENV=local php artisan boost:mcp --env=local </dev/null` дал exit 0.
-
-## Не выполнялось
-
-- Static analysis не запускался: PHPStan/Larastan/Psalm не установлены. Новый analyser и baseline suppression не добавлялись.
-- GitHub API/MCP, PR, remote push, production data deletion, media download/transcode и `.env` edit не выполнялись.
-- Новые MCP tables не могут hot-load в уже запущенный Codex process; protocol/CLI verification завершена, а `docs/tooling/next-codex-session.md` описывает restart check.
+- Queue health RED/GREEN: separate backlog without a matching pool heartbeat fails; an idle loop records liveness for every listened queue.
+- `QueueWorkerObservabilityTest` + `InfrastructureHealthCheckTest`: 7 passed, 49 assertions, включая expiry regression, которая запрещает memoized stale heartbeat.
+- Deployment timing RED/GREEN: every JSON check has a non-negative integer `duration_ms`; text output also shows the duration without diagnostic details.
+- CLI/HTTP policy regression: operational `app:health` exits 1 for `degraded`, while `/health/ready` remains HTTP 200 when critical traffic transports are ready; response remains private/no-store and path-free.
+- Combined preflight/queue/health increment: 12 passed, 88 assertions; changed-scope Larastan 0; targeted Pint pass.
+- Live read-only `app:health --json`: `degraded`, `ready=true`, exit 1; queue component `failed`, 32325 pending across four named queues and no secret/path leakage. Current long-running workers still run pre-rollout code, so missing scoped heartbeat remains expected until restart.

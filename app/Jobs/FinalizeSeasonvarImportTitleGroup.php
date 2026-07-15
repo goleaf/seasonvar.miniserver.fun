@@ -20,6 +20,7 @@ use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarCatalogParser;
 use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
+use App\Services\Seasonvar\SeasonvarImportFinalizationDispatcher;
 use App\Services\Seasonvar\SeasonvarImportGroupKey;
 use App\Services\Seasonvar\SeasonvarImportRunRecorder;
 use App\Services\Seasonvar\SeasonvarTitleManifestBuilder;
@@ -28,7 +29,7 @@ use App\Services\Seasonvar\SeasonvarUrl;
 use DateTimeInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Cache\Repository;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -40,7 +41,7 @@ use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
-final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQueue
+final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Dispatchable;
     use InteractsWithQueue;
@@ -78,16 +79,22 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
         CatalogSyncChangePublisher $syncChanges,
         SeasonvarImportGroupKey $groupKeys,
         SeasonvarUrl $urls,
+        SeasonvarImportFinalizationDispatcher $finalizers,
     ): void {
         $group = $this->group();
 
-        if ($group === null || $group->status->isTerminal()) {
+        if ($group === null) {
+            return;
+        }
+
+        if ($group->status->isTerminal()) {
+            $finalizers->globalRun($group->run);
+
             return;
         }
 
         if (! $this->allPagesTerminal($group)) {
             $runs->heartbeat($group->seasonvar_import_run_id);
-            $this->release($this->releaseDelay());
 
             return;
         }
@@ -111,13 +118,18 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
         try {
             $group = $this->group();
 
-            if ($group === null || $group->status->isTerminal()) {
+            if ($group === null) {
+                return;
+            }
+
+            if ($group->status->isTerminal()) {
+                $finalizers->globalRun($group->run);
+
                 return;
             }
 
             if (! $this->allPagesTerminal($group)) {
                 $runs->heartbeat($group->seasonvar_import_run_id);
-                $this->release($this->releaseDelay());
 
                 return;
             }
@@ -136,6 +148,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
 
             if ($validRows->isEmpty()) {
                 $this->finishWithoutPreparedPages($group, $invalidPages, $refreshStates);
+                $finalizers->globalRun($group->run);
 
                 return;
             }
@@ -212,6 +225,8 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
                     $refreshStates->partial($catalogTitle->id, $group->seasonvar_import_run_id);
                 }
             }
+
+            $finalizers->globalRun($group->run);
         } catch (Throwable $exception) {
             if (! $syncChangePublished && $catalogTitleForSync !== null) {
                 $syncChanges->publishUpsert($catalogTitleForSync);
@@ -271,6 +286,8 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUnique, ShouldQ
         if ($group->catalog_title_id !== null && $this->isVisitorRun($group->run)) {
             app(CatalogTitleRefreshStateStore::class)->failed($group->catalog_title_id);
         }
+
+        app(SeasonvarImportFinalizationDispatcher::class)->globalRun($group->run);
 
         Log::error('Группа сезонов Seasonvar не финализирована.', [
             'group_id' => $this->groupId,

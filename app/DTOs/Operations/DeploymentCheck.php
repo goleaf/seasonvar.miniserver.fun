@@ -14,6 +14,7 @@ final readonly class DeploymentCheck
         public string $status,
         public string $message,
         public array $metadata = [],
+        public int $durationMs = 0,
     ) {}
 
     public function failed(): bool
@@ -21,8 +22,19 @@ final readonly class DeploymentCheck
         return $this->status === 'fail';
     }
 
+    public function withDuration(int $durationMs): self
+    {
+        return new self(
+            name: $this->name,
+            status: $this->status,
+            message: $this->message,
+            metadata: $this->metadata,
+            durationMs: max(0, $durationMs),
+        );
+    }
+
     /**
-     * @return array{name: string, status: string, message: string, metadata: array<string, bool|int|string|null>}
+     * @return array{name: string, status: string, message: string, metadata: array<string, bool|int|string|null>, duration_ms: int}
      */
     public function toArray(): array
     {
@@ -31,6 +43,7 @@ final readonly class DeploymentCheck
             'status' => $this->status,
             'message' => $this->message,
             'metadata' => $this->metadata,
+            'duration_ms' => $this->durationMs,
         ];
     }
 }

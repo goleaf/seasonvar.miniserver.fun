@@ -16,7 +16,7 @@
                 </p>
 
                 <a href="{{ route('titles.index') }}" class="mt-5 inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100">
-                    <x-ui.icon name="fa-solid fa-table-cells-large" />
+                    <x-ui.icon name="fa-solid fa-list-ul" />
                     <span>Открыть каталог</span>
                     <x-ui.icon name="fa-solid fa-arrow-right text-xs" />
                 </a>
@@ -44,7 +44,7 @@
                             'bg-emerald-50 text-emerald-700' => request()->routeIs('titles.*'),
                             'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('titles.*'),
                         ]) @if (request()->routeIs('titles.*')) aria-current="page" @endif>
-                            <x-ui.icon name="fa-solid fa-table-cells-large text-slate-400" />
+                            <x-ui.icon name="fa-solid fa-list-ul text-slate-400" />
                             <span>Каталог</span>
                         </a>
                     </li>

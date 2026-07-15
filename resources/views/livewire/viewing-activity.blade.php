@@ -47,12 +47,12 @@
                     <p class="mt-1 text-sm leading-6 text-slate-500">{{ __('catalog.viewing.continue_empty_hint') }}</p>
                 </div>
             @else
-                <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+                <div data-viewing-continue-list class="divide-y divide-slate-200">
                     @foreach ($continueWatching as $item)
                         <x-ui.poster-card
                             :src="$item->title->poster_url"
                             alt="Постер {{ $item->title->display_title }}"
-                            layout="horizontal"
+                            layout="list"
                             data-continue-watching-card
                             wire:key="continue-watching-{{ $item->title->id }}"
                         >
@@ -116,7 +116,7 @@
                 <p class="mt-1 text-sm leading-6 text-slate-500">{{ __('catalog.viewing.history_empty_hint') }}</p>
             </div>
         @else
-            <div class="space-y-2 p-4">
+            <div data-viewing-history-list class="divide-y divide-slate-200">
                 @foreach ($history as $progress)
                     <x-ui.poster-card
                         :src="$progress->is_accessible && $progress->catalogTitle ? $progress->catalogTitle->poster_url : null"

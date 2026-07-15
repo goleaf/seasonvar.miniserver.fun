@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Seasonvar;
 
+use App\DTOs\Seasonvar\SeasonvarImportStartResultData;
 use App\Enums\SeasonvarImportStatus;
 use App\Enums\SeasonvarPageType;
-use App\Jobs\FinalizeSeasonvarQueuedImport;
 use App\Jobs\ImportSeasonvarSourcePage;
 use App\Models\CatalogTitle;
 use App\Models\SeasonvarImportRun;
@@ -24,27 +26,23 @@ class SeasonvarQueuedImportDispatcher
         private readonly SeasonvarImportGroupKey $groupKeys,
         private readonly SeasonvarImportErrorSanitizer $errors,
         private readonly CatalogCacheInvalidator $cacheInvalidator,
+        private readonly SeasonvarGlobalImportRunCoordinator $globalRuns,
+        private readonly SeasonvarImportFinalizationDispatcher $finalizers,
     ) {}
 
     /** @param list<string>|null $pageTypes */
-    public function dispatch(bool $force = false, bool $discover = true, ?array $pageTypes = null): SeasonvarImportRun
+    public function dispatch(bool $force = false, bool $discover = true, ?array $pageTypes = null): SeasonvarImportStartResultData
     {
-        $run = SeasonvarImportRun::query()->create([
-            'mode' => 'sitemap',
-            'execution_mode' => 'queue',
-            'status' => SeasonvarImportStatus::Queued->value,
-            'force' => $force,
-            'forever' => false,
-            'last_heartbeat_at' => now(),
-            'summary' => [
-                'discover' => $discover,
-                'provider' => 'seasonvar',
-                'page_types' => $pageTypes,
-            ],
-        ]);
+        $result = $this->globalRuns->acquire($force, $discover, $pageTypes);
+
+        if (! $result->created) {
+            return $result;
+        }
+
+        $run = $result->run;
 
         try {
-            return $this->dispatchRun($run);
+            return new SeasonvarImportStartResultData($this->dispatchRun($run), true);
         } catch (Throwable $exception) {
             $run->fill([
                 'status' => SeasonvarImportStatus::Failed->value,
@@ -140,11 +138,10 @@ class SeasonvarQueuedImportDispatcher
 
         $run->save();
 
-        FinalizeSeasonvarQueuedImport::dispatch($run->id)
-            ->onConnection((string) config('seasonvar.queue.connection', 'redis'))
-            ->onQueue((string) config('seasonvar.queue.queue', 'seasonvar-import'))
-            ->delay(now()->addSeconds(max(1, (int) config('seasonvar.queue.finalizer_delay_seconds', 60))))
-            ->afterCommit();
+        $this->finalizers->globalRun(
+            $run,
+            max(1, (int) config('seasonvar.queue.finalizer_delay_seconds', 60)),
+        );
 
         return $run->refresh();
     }

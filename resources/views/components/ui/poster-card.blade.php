@@ -9,7 +9,8 @@
             :alt="$alt"
             :empty-label="$emptyLabel"
             :loading="$loading"
-            :overscan="$layout !== 'recommendation'"
+            :fit="$layout === 'stats' ? 'cover' : 'contain'"
+            :overscan="$layout === 'stats'"
             class="h-full w-full"
         />
     </div>

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\DTOs\Seasonvar\SeasonvarImportStartResultData;
 use App\Exceptions\Seasonvar\SeasonvarSourceRequestException;
 use App\Jobs\FinalizeSeasonvarImportTitleGroup;
 use App\Jobs\FinalizeSeasonvarQueuedImport;
@@ -16,6 +17,7 @@ use App\Models\SourcePage;
 use App\Models\User;
 use App\Services\Catalog\CatalogCacheInvalidator;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
+use App\Services\Seasonvar\SeasonvarGlobalImportRunCoordinator;
 use App\Services\Seasonvar\SeasonvarImportAdminService;
 use App\Services\Seasonvar\SeasonvarImportFailureClassifier;
 use App\Services\Seasonvar\SeasonvarImportGroupKey;
@@ -24,6 +26,8 @@ use App\Services\Seasonvar\SeasonvarImportRunRecorder;
 use App\Services\Seasonvar\SeasonvarImportTitleGroupDispatcher;
 use App\Services\Seasonvar\SeasonvarPageClaimManager;
 use App\Services\Seasonvar\SeasonvarQueuedImportDispatcher;
+use Illuminate\Contracts\Bus\Dispatcher as BusDispatcher;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -73,6 +77,14 @@ class SeasonvarParallelImportTest extends TestCase
         $this->assertSame(86400, config('seasonvar.queue.claim_seconds'));
         $this->assertSame(24, config('seasonvar.import.refresh_after_hours'));
         $this->assertSame('IMMEDIATE', config('database.connections.sqlite.transaction_mode'));
+        $this->assertInstanceOf(
+            ShouldBeUniqueUntilProcessing::class,
+            new FinalizeSeasonvarImportTitleGroup(1),
+        );
+        $this->assertInstanceOf(
+            ShouldBeUniqueUntilProcessing::class,
+            new FinalizeSeasonvarQueuedImport(1),
+        );
     }
 
     public function test_admin_start_is_queued_once_with_safe_scalar_job_payload(): void
@@ -102,6 +114,79 @@ class SeasonvarParallelImportTest extends TestCase
                 && ! str_contains(serialize($job), 'admin@example.com')
                 && ! str_contains(serialize($job), 'seasonvar.ru/');
         });
+    }
+
+    public function test_admin_and_cli_dispatcher_share_one_global_run_boundary(): void
+    {
+        config([
+            'seasonvar.admin_emails' => ['admin@example.com'],
+            'seasonvar.queue.lock_store' => 'array',
+        ]);
+        Queue::fake();
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+
+        $adminStart = app(SeasonvarImportAdminService::class)->start($admin, discover: false);
+        $cliStart = app(SeasonvarQueuedImportDispatcher::class)->dispatch(discover: false);
+
+        $this->assertTrue($adminStart->created);
+        $this->assertFalse($cliStart->created);
+        $this->assertTrue($cliStart->run->is($adminStart->run));
+        $this->assertSame(1, SeasonvarImportRun::query()
+            ->where('mode', 'sitemap')
+            ->where('execution_mode', 'queue')
+            ->whereIn('status', ['queued', 'running'])
+            ->count());
+        Queue::assertPushedTimes(StartSeasonvarQueuedImport::class, 1);
+        Queue::assertNotPushed(PrepareSeasonvarImportTitlePage::class);
+    }
+
+    public function test_admin_start_marks_the_run_failed_when_coordinator_dispatch_is_rejected(): void
+    {
+        config([
+            'seasonvar.admin_emails' => ['admin@example.com'],
+            'seasonvar.queue.lock_store' => 'array',
+        ]);
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+        $bus = $this->createMock(BusDispatcher::class);
+        $bus->expects($this->once())
+            ->method('dispatch')
+            ->willThrowException(new RuntimeException(
+                'token=private-token https://seasonvar.ru/private',
+            ));
+        $this->app->instance(BusDispatcher::class, $bus);
+
+        try {
+            app(SeasonvarImportAdminService::class)->start($admin, discover: false);
+            $this->fail('A rejected coordinator dispatch must remain visible to the caller.');
+        } catch (RuntimeException) {
+            $run = SeasonvarImportRun::query()->sole();
+
+            $this->assertSame('failed', $run->status);
+            $this->assertNotNull($run->finished_at);
+            $this->assertStringNotContainsString('private-token', (string) $run->last_error);
+            $this->assertStringNotContainsString('seasonvar.ru', (string) $run->last_error);
+        }
+    }
+
+    public function test_targeted_title_refresh_does_not_block_a_global_import_run(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        $targeted = SeasonvarImportRun::query()->create([
+            'mode' => 'url',
+            'execution_mode' => 'queue',
+            'status' => 'running',
+            'started_at' => now(),
+        ]);
+
+        $global = app(SeasonvarGlobalImportRunCoordinator::class)->acquire(
+            force: false,
+            discover: false,
+        );
+
+        $this->assertTrue($global->created);
+        $this->assertFalse($global->run->is($targeted));
+        $this->assertSame('sitemap', $global->run->mode);
+        $this->assertSame('queued', $global->run->status);
     }
 
     public function test_import_dashboard_uses_bounded_aggregate_queries(): void
@@ -529,8 +614,9 @@ class SeasonvarParallelImportTest extends TestCase
             ]);
         });
 
-        $run = app(SeasonvarQueuedImportDispatcher::class)->dispatch(discover: false);
-        $secondRun = app(SeasonvarQueuedImportDispatcher::class)->dispatch(discover: false);
+        $started = app(SeasonvarQueuedImportDispatcher::class)->dispatch(discover: false);
+        $duplicate = app(SeasonvarQueuedImportDispatcher::class)->dispatch(discover: false);
+        $run = $started->run;
 
         Queue::assertPushedOn('seasonvar-import', PrepareSeasonvarImportTitlePage::class);
         Queue::assertPushed(
@@ -548,7 +634,14 @@ class SeasonvarParallelImportTest extends TestCase
         $this->assertSame(1, $run->titleGroups()->count());
         $this->assertSame(2, $run->preparedPages()->count());
         $this->assertSame(2, SourcePage::query()->where('import_claim_run_id', $run->id)->count());
-        $this->assertSame('completed', $secondRun->fresh()->status);
+        $this->assertTrue($started->created);
+        $this->assertFalse($duplicate->created);
+        $this->assertTrue($duplicate->run->is($run));
+        $this->assertSame(1, SeasonvarImportRun::query()
+            ->where('mode', 'sitemap')
+            ->where('execution_mode', 'queue')
+            ->whereIn('status', ['queued', 'running'])
+            ->count());
         $this->assertEqualsCanonicalizing(
             $pages->pluck('id')->all(),
             SourcePage::query()->where('import_claim_run_id', $run->id)->pluck('id')->all(),
@@ -580,7 +673,7 @@ class SeasonvarParallelImportTest extends TestCase
         $run = app(SeasonvarQueuedImportDispatcher::class)->dispatch(
             discover: false,
             pageTypes: ['actor'],
-        );
+        )->run;
 
         Queue::assertPushedTimes(ImportSeasonvarSourcePage::class, 1);
         Queue::assertNotPushed(PrepareSeasonvarImportTitlePage::class);
@@ -591,6 +684,7 @@ class SeasonvarParallelImportTest extends TestCase
     public function test_legacy_page_job_processes_non_serial_handlers_without_a_title_group(): void
     {
         config(['seasonvar.queue.lock_store' => 'array']);
+        Queue::fake();
         $run = $this->queuedRun();
         $source = Source::factory()->create([
             'code' => 'seasonvar',
@@ -639,6 +733,10 @@ class SeasonvarParallelImportTest extends TestCase
         $this->assertSame(1, $run->fresh()->parsed);
         $this->assertFalse($claims->owns($page->id, $run->id, (string) $token));
         $this->assertSame(0, $run->titleGroups()->count());
+        Queue::assertPushed(
+            FinalizeSeasonvarQueuedImport::class,
+            fn (FinalizeSeasonvarQueuedImport $job): bool => $job->importRunId === $run->id,
+        );
     }
 
     public function test_dispatcher_recovers_expired_claim_before_queuing_page(): void
@@ -660,8 +758,9 @@ class SeasonvarParallelImportTest extends TestCase
         $claims = app(SeasonvarPageClaimManager::class);
         $this->assertNotNull($claims->claim($page, $oldRun->id, 60));
         $page->update(['import_claim_expires_at' => now()->subSecond()]);
+        $oldRun->update(['status' => 'failed', 'finished_at' => now()]);
 
-        $run = app(SeasonvarQueuedImportDispatcher::class)->dispatch(discover: false);
+        $run = app(SeasonvarQueuedImportDispatcher::class)->dispatch(discover: false)->run;
 
         Queue::assertPushed(PrepareSeasonvarImportTitlePage::class, function (PrepareSeasonvarImportTitlePage $job) use ($page): bool {
             return SeasonvarImportPreparedPage::query()->find($job->preparedPageId)?->source_page_id === $page->id;
@@ -669,7 +768,7 @@ class SeasonvarParallelImportTest extends TestCase
         $this->assertSame($run->id, $page->fresh()->import_claim_run_id);
     }
 
-    public function test_global_finalizer_waits_while_a_title_group_is_nonterminal(): void
+    public function test_global_finalizer_returns_without_polling_while_a_title_group_is_nonterminal(): void
     {
         config(['seasonvar.queue.lock_store' => 'array']);
         $run = $this->queuedRun();
@@ -690,10 +789,10 @@ class SeasonvarParallelImportTest extends TestCase
             app(CatalogCacheInvalidator::class),
         );
 
-        $job->assertReleased(delay: 60);
+        $job->assertNotReleased();
     }
 
-    public function test_finalizer_waits_while_run_has_live_claims(): void
+    public function test_global_finalizer_returns_without_polling_while_run_has_live_claims(): void
     {
         config(['seasonvar.queue.lock_store' => 'array']);
         $run = $this->queuedRun();
@@ -711,7 +810,7 @@ class SeasonvarParallelImportTest extends TestCase
             app(CatalogCacheInvalidator::class),
         );
 
-        $job->assertReleased(delay: 60);
+        $job->assertNotReleased();
     }
 
     public function test_finalizer_waits_while_another_catalog_finalization_holds_the_global_lock(): void
@@ -772,7 +871,7 @@ class SeasonvarParallelImportTest extends TestCase
         $dispatcher->shouldReceive('dispatch')
             ->once()
             ->with(false, false)
-            ->andReturn($run);
+            ->andReturn(new SeasonvarImportStartResultData($run, true));
         $this->app->instance(SeasonvarQueuedImportDispatcher::class, $dispatcher);
 
         $this->artisan('seasonvar:import', [
@@ -780,6 +879,27 @@ class SeasonvarParallelImportTest extends TestCase
             '--no-discovery' => true,
         ])
             ->expectsOutputToContain('поставлено в очередь: 2')
+            ->assertExitCode(0);
+    }
+
+    public function test_queued_command_explains_that_an_active_global_run_was_reused(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        $run = $this->queuedRun();
+        $dispatcher = Mockery::mock(SeasonvarQueuedImportDispatcher::class);
+        $dispatcher->shouldReceive('dispatch')
+            ->once()
+            ->with(false, false)
+            ->andReturn(new SeasonvarImportStartResultData($run, false));
+        $this->app->instance(SeasonvarQueuedImportDispatcher::class, $dispatcher);
+
+        $this->artisan('seasonvar:import', [
+            '--queued' => true,
+            '--no-discovery' => true,
+        ])
+            ->expectsOutputToContain(
+                "Активный глобальный запуск #{$run->id} уже имеет статус «Выполняется». Новый запуск не создан.",
+            )
             ->assertExitCode(0);
     }
 

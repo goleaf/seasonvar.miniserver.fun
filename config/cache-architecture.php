@@ -26,6 +26,8 @@ return [
     'operations' => [
         'warming_state_retention_seconds' => (int) env('CACHE_WARMING_STATE_RETENTION_SECONDS', 604_800),
         'queue_worker_heartbeat_seconds' => (int) env('CACHE_QUEUE_WORKER_HEARTBEAT_SECONDS', 120),
+        'default_queue_busy_threshold' => (int) env('CACHE_DEFAULT_QUEUE_BUSY_THRESHOLD', 100),
+        'cache_warm_queue_busy_threshold' => (int) env('CACHE_WARM_QUEUE_BUSY_THRESHOLD', 1_000),
         'health_probe_seconds' => (int) env('CACHE_HEALTH_PROBE_SECONDS', 10),
     ],
 

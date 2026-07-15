@@ -34,7 +34,13 @@ final class CheckDeploymentReadiness extends Command
             $this->line($ready ? 'Deployment readiness: ready' : 'Deployment readiness: failed');
 
             foreach ($checks as $check) {
-                $this->line(sprintf('%-24s %-8s %s', $check->name, $check->status, $check->message));
+                $this->line(sprintf(
+                    '%-24s %-8s %6d ms  %s',
+                    $check->name,
+                    $check->status,
+                    $check->durationMs,
+                    $check->message,
+                ));
             }
         }
 

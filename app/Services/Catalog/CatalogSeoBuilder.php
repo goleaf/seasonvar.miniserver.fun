@@ -464,7 +464,6 @@ class CatalogSeoBuilder
             'quality',
             'updated',
             'letter',
-            'view',
             'per_page',
         ];
 

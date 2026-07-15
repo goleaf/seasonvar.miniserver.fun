@@ -144,7 +144,7 @@ class CatalogTitlesRequestTest extends TestCase
         $this->assertSame(['available', 'missing'], $request->subtitleAvailability());
         $this->assertSame('month', $request->updatedPeriod());
         $this->assertSame('Ж', $request->letter());
-        $this->assertSame('list', $request->view());
+        $this->assertArrayNotHasKey('view', $request->catalogQueryState());
         $this->assertSame(48, $request->perPage());
         $this->assertSame(CatalogSort::ImdbRating, $request->sort());
     }
@@ -193,7 +193,6 @@ class CatalogTitlesRequestTest extends TestCase
         $this->assertSame(['serial', 'anime'], $criteria->publicationTypes);
         $this->assertSame(['available'], $criteria->subtitleAvailability);
         $this->assertSame(CatalogSort::YearDesc, $criteria->sort);
-        $this->assertSame('list', $criteria->view);
         $this->assertSame(48, $criteria->perPage);
         $this->assertSame(42, $criteria->titleContextId);
         $this->assertTrue($criteria->hasContentFilters());

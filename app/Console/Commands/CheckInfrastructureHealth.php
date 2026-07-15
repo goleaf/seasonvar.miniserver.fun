@@ -27,6 +27,6 @@ final class CheckInfrastructureHealth extends Command
             }
         }
 
-        return $result['ready'] ? self::SUCCESS : self::FAILURE;
+        return $result['status'] === 'ok' ? self::SUCCESS : self::FAILURE;
     }
 }

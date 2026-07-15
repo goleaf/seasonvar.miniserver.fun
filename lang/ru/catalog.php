@@ -75,10 +75,7 @@ return [
         'found_label' => 'Найдено',
         'page_label' => 'На странице',
         'sort_label' => 'Сортировка',
-        'view_label' => 'Вид каталога',
         'page_size_label' => 'Карточек на странице',
-        'view_grid' => 'Сетка',
-        'view_list' => 'Список',
         'alphabet' => [
             'label' => 'Алфавит',
             'all' => 'Все',

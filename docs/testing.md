@@ -1,6 +1,6 @@
 # Тестирование
 
-Обновлено: 14.07.2026
+Обновлено: 15.07.2026
 
 ## Стек
 
@@ -42,6 +42,23 @@
 - `CatalogBladeComponentTest` проверяет shareable season/episode/media profile links, active markers, active-season anchor и сохранение playback variant между сериями без загрузки остальных сезонов.
 - `CatalogAdvancedFilterTest` сравнивает paginator total с фактическими ID, проверяет OR-внутри/AND-между группами, own-group-excluded счетчики relation/year/publication/subtitle фасетов, bounded top-N после контекста, выбранные нулевые значения, постоянный query budget и свежесть после publish/unpublish, soft delete/restore, pivot/media и episode lifecycle изменений.
 
+## Test matrix
+
+| Риск / journey | Primary automated evidence | Дополнительный gate |
+| --- | --- | --- |
+| Home/catalog/filter/search/directory/title | Feature + query-budget tests | Playwright desktop/mobile + console/network guard |
+| Seasons/episodes/previous-next/player source | Playback/navigation feature tests | Deterministic HLS/MP4/subtitle browser matrix — pending |
+| Progress/Continue Watching/history/watchlist/rating | Policy/service/API/Livewire tests | Authenticated browser journey |
+| Auth/verification/password/profile/devices | Web/API feature tests | Desktop/mobile Playwright |
+| Admin catalog/import control | Policy/Livewire/optimistic version tests | Browser loading/authorization smoke — pending |
+| Import/parser/sitemap/media checks | `Http::fake`, stray-request prevention, queue/DB tests | Optional real provider integration only when explicitly enabled |
+| API contract/privacy | Route/OpenAPI/Resource/error/owner/query-delta tests | HTTP smoke after deploy |
+| Cache/queue/health/deployment | Infrastructure fake + optional Redis/Memcached tests | Production read-only preflight/heartbeat/status |
+| SEO/sitemap/feed/robots | Response/stream/schema tests | Browser canonical/JSON-LD parse and search tooling checks |
+| Blade/Tailwind/a11y | Static Blade/visual-system tests | Build + axe + responsive viewport matrix |
+
+Every fixed defect receives a regression that first fails for the demonstrated reason. Tests are not weakened or deleted to make a gate pass.
+
 ## Команды
 
 ```bash
@@ -49,12 +66,13 @@ php artisan test --filter=SpecificTestName
 php artisan test
 ./vendor/bin/phpunit
 ./vendor/bin/pint path/to/ChangedFile.php --format agent
+./vendor/bin/phpstan analyse --no-progress --memory-limit=1G
 composer test
 php artisan project:docs-refresh --check
 npm run test:browser:install
 npm run test:browser
 ```
 
-`npm run build` нужен только при изменениях Vite, JS/CSS, Blade-разметки с asset assumptions или frontend assets. Browser artifacts сохраняются только в ignored `output/playwright/`. `vendor/bin/pest`, `npm run lint`, PHPStan и Rector сейчас не установлены.
+`npm run build` нужен при изменениях Vite, JS/CSS, Tailwind/Blade class usage, asset assumptions или frontend dependencies. Browser artifacts сохраняются только в ignored `output/playwright/`. Pest, `npm run lint` и Rector не установлены. Larastan установлен: configured bounded scope обязан оставаться зелёным, а полный application scope расширяется пакетами без suppression baseline.
 
 Датированный baseline, исправленные regressions, browser smoke и финальные exact counts записываются в `docs/audits/verification-report.md`. Production Livewire может выдавать как `livewire.js`, так и `livewire.min.js`; asset tests обязаны проверять официальный URL/id и singleton, а не жёстко фиксировать build mode.

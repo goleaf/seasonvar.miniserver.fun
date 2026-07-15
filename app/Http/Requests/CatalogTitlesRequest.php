@@ -58,7 +58,6 @@ class CatalogTitlesRequest extends FormRequest
             'publication_type.*' => ['string', 'distinct:strict', Rule::enum(CatalogPublicationType::class)],
             'updated' => ['nullable', Rule::in(['day', 'week', 'month', 'year'])],
             'letter' => ['nullable', 'string', 'regex:/^(?:latin|[A-Za-zА-Яа-яЁё]|#)$/iu'],
-            'view' => ['nullable', Rule::in(['grid', 'list'])],
             'per_page' => ['nullable', 'integer', Rule::in([24, 48, 96])],
         ];
 
@@ -135,7 +134,7 @@ class CatalogTitlesRequest extends FormRequest
             $normalized[$key] = $this->normalizeRepeatedValues($values);
         }
 
-        foreach (['q', 'title', 'sort', 'type', 'taxonomy', 'year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_source', 'rating_min', 'votes_min', 'video', 'updated', 'letter', 'view', 'per_page'] as $key) {
+        foreach (['q', 'title', 'sort', 'type', 'taxonomy', 'year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_source', 'rating_min', 'votes_min', 'video', 'updated', 'letter', 'per_page'] as $key) {
             if (! $this->query->has($key)) {
                 continue;
             }
@@ -303,11 +302,6 @@ class CatalogTitlesRequest extends FormRequest
         return $this->scalarStringList('quality');
     }
 
-    public function view(): string
-    {
-        return $this->nullableString('view') ?? 'grid';
-    }
-
     public function perPage(): int
     {
         return $this->nullableInt('per_page') ?? 24;
@@ -319,7 +313,7 @@ class CatalogTitlesRequest extends FormRequest
         $keys = array_merge(
             ['year', 'exclude_country', 'exclude_genre', 'quality', 'publication_type', 'subtitles'],
             CatalogFilterType::values(),
-            ['year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_source', 'rating_min', 'votes_min', 'video', 'updated', 'letter', 'view', 'per_page'],
+            ['year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_source', 'rating_min', 'votes_min', 'video', 'updated', 'letter', 'per_page'],
         );
 
         return collect($keys)

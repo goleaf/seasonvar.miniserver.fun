@@ -175,6 +175,15 @@ class BladeTemplateTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/\b(?:border|ring|shadow|rounded|p[trblxy]?)-/', $image[0]);
     }
 
+    public function test_poster_frame_supports_uncropped_contain_without_overscan(): void
+    {
+        $this->blade('<x-ui.poster-frame src="https://media.example.com/poster.jpg" alt="Постер сериала" fit="contain" :overscan="false" class="aspect-[2/3]" />')
+            ->assertSee('data-ui-poster-frame', false)
+            ->assertSee('absolute inset-0 h-full w-full object-contain object-center', false)
+            ->assertDontSee('object-cover', false)
+            ->assertDontSee('scale-[1.02]', false);
+    }
+
     public function test_poster_frame_keeps_the_same_boundary_for_missing_artwork(): void
     {
         $this->blade('<x-ui.poster-frame alt="Постер сериала" empty-label="Постер пока не добавлен" class="aspect-[2/3]" />')
@@ -184,9 +193,9 @@ class BladeTemplateTest extends TestCase
             ->assertDontSee('data-ui-poster-image', false);
     }
 
-    public function test_poster_card_exposes_one_shell_and_strict_layout_markers(): void
+    public function test_poster_card_exposes_list_layouts_without_a_public_grid_layout(): void
     {
-        foreach (['grid', 'horizontal', 'compact'] as $layout) {
+        foreach (['list', 'compact', 'recommendation', 'stats'] as $layout) {
             $this->blade(
                 '<x-ui.poster-card :layout="$layout" alt="Постер"><p>Описание</p></x-ui.poster-card>',
                 ['layout' => $layout],
@@ -199,7 +208,13 @@ class BladeTemplateTest extends TestCase
         }
 
         $this->blade('<x-ui.poster-card layout="unsupported" alt="Постер">Описание</x-ui.poster-card>')
-            ->assertSee('data-ui-poster-layout="grid"', false);
+            ->assertSee('data-ui-poster-layout="list"', false);
+
+        $this->blade('<x-ui.poster-card layout="grid" alt="Постер">Описание</x-ui.poster-card>')
+            ->assertSee('data-ui-poster-layout="list"', false);
+
+        $this->assertFileExists(resource_path('views/components/catalog/title-card-list.blade.php'));
+        $this->assertFileDoesNotExist(resource_path('views/components/catalog/title-card-grid.blade.php'));
     }
 
     public function test_catalog_count_translations_follow_russian_and_english_plural_rules(): void

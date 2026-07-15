@@ -63,34 +63,28 @@ class CatalogVisualSystemTest extends TestCase
             ->assertSee('data-home-metrics', false);
     }
 
-    public function test_home_latest_updates_uses_a_five_column_natural_height_responsive_grid(): void
+    public function test_home_latest_updates_uses_one_grouped_list_without_a_duplicate_feed(): void
     {
+        $latestWithoutPoster = CatalogTitle::factory()->create([
+            'title' => 'Последний тайтл без постера',
+            'poster_url' => null,
+            'indexed_at' => now(),
+        ]);
+        CatalogTitle::factory()->create([
+            'title' => 'Предыдущий тайтл с постером',
+            'poster_url' => 'https://media.example.com/previous.jpg',
+            'indexed_at' => now()->subDay(),
+        ]);
+
         $response = $this->get(route('home'));
 
-        $response->assertOk();
-
-        $matched = preg_match(
-            '/<div data-home-latest-updates-grid class="([^"]+)"/',
-            $response->getContent(),
-            $matches,
-        );
-
-        $this->assertSame(1, $matched);
-
-        $classes = explode(' ', $matches[1]);
-
-        foreach ([
-            'items-start',
-            'sm:grid-cols-2',
-            'md:grid-cols-3',
-            'lg:grid-cols-4',
-            'xl:grid-cols-5',
-            '[&>[data-catalog-card]]:h-auto',
-        ] as $class) {
-            $this->assertContains($class, $classes);
-        }
-
-        $this->assertNotContains('auto-rows-fr', $classes);
+        $response
+            ->assertOk()
+            ->assertSee('data-home-latest-updates-list', false)
+            ->assertSee('data-ui-poster-layout="list"', false)
+            ->assertSeeText($latestWithoutPoster->title)
+            ->assertDontSee('data-home-latest-updates-grid', false)
+            ->assertDontSeeText('Лента обновлений по датам');
     }
 
     public function test_catalog_heading_does_not_repeat_the_generated_collection_explanation(): void
@@ -101,6 +95,25 @@ class CatalogVisualSystemTest extends TestCase
             ->assertOk()
             ->assertDontSeeText('сериалов в подборке')
             ->assertDontSeeText('Текстовый поиск проверяет только основное, оригинальное и альтернативные названия; остальные параметры задаются отдельными фильтрами.');
+    }
+
+    public function test_directory_results_use_one_divided_list_instead_of_card_columns(): void
+    {
+        $genre = Genre::query()->create([
+            'name' => 'Исторический детектив',
+            'slug' => 'istoricheskii-detektiv',
+        ]);
+        CatalogTitle::factory()->create()->genres()->attach($genre);
+
+        $response = $this->get(route('genres.index'));
+
+        $response
+            ->assertOk()
+            ->assertSee('data-directory-results-list', false)
+            ->assertSee('divide-y divide-slate-200', false)
+            ->assertSeeText('Исторический детектив')
+            ->assertDontSee('sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6', false)
+            ->assertDontSee('min-h-28', false);
     }
 
     public function test_title_page_places_player_before_secondary_reference_metadata(): void
@@ -215,8 +228,8 @@ class CatalogVisualSystemTest extends TestCase
         $title->genres()->attach($genre);
         $title->load(['genres', 'countries', 'seasons']);
 
-        $cardHtml = Blade::render('<x-catalog.title-card :title="$title" layout="grid" />', ['title' => $title]);
-        $rowHtml = Blade::render('<x-catalog.title-card :title="$title" layout="horizontal" />', ['title' => $title]);
+        $cardHtml = Blade::render('<x-catalog.title-card :title="$title" layout="list" />', ['title' => $title]);
+        $rowHtml = Blade::render('<x-catalog.title-card :title="$title" layout="compact" />', ['title' => $title]);
         $showUrl = route('titles.show', $title);
         $genreUrl = route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => $genre->slug]);
 
@@ -271,12 +284,12 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('wire:submit="applyFilters"', $content);
         $this->assertStringContainsString('wire:loading.delay', $content);
         $this->assertStringNotContainsString('wire:loading.delay.flex', $content);
-        $this->assertStringContainsString('wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll,previousPage,nextPage,gotoPage"', $content);
+        $this->assertStringContainsString('wire:target="filters.search,applySearch,applyFilters,sortBy,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll,previousPage,nextPage,gotoPage"', $content);
         $this->assertStringContainsString('wire:loading', $content);
         $this->assertStringContainsString('wire:key="catalog-title-', $content);
         $this->assertStringContainsString('wire:click.prevent="nextPage(\'page\')"', $content);
         $this->assertStringContainsString(
-            'wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll,previousPage,nextPage,gotoPage" class="hidden absolute',
+            'wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll,previousPage,nextPage,gotoPage" class="hidden absolute',
             $content,
         );
     }
@@ -311,9 +324,11 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringNotContainsString('max-h-dvh', $content);
         $this->assertStringNotContainsString('overflow-y-auto', $content);
         $this->assertStringNotContainsString('lg:grid-cols-[260px_minmax(0,1fr)]', $content);
-        $this->assertStringContainsString('data-catalog-mobile-view-controls', $content);
+        $this->assertStringNotContainsString('data-catalog-mobile-view-controls', $content);
+        $this->assertStringNotContainsString('data-catalog-view-option', $content);
         $this->assertStringContainsString('data-catalog-mobile-page-size-controls', $content);
-        $this->assertStringContainsString('wire:click.prevent="setView(\'grid\')"', $content);
+        $this->assertStringNotContainsString('setView', $content);
+        $this->assertStringContainsString('data-catalog-results-list', $content);
         $this->assertStringContainsString('wire:click.prevent="setPerPage(48)"', $content);
         $this->assertStringContainsString('wire:init="__lazyLoadIsland"', $content);
         $this->assertStringContainsString('name=catalog-live', $content);
@@ -510,14 +525,16 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringNotContainsString('ring-1 ring-slate-200', $html);
     }
 
-    public function test_recommendation_poster_disables_overscan_for_the_wide_crop(): void
+    public function test_recommendation_poster_uses_an_uncropped_portrait_frame(): void
     {
         $html = Blade::render(
-            '<x-ui.poster-frame src="https://media.example.com/poster.jpg" alt="Постер" :overscan="false" class="aspect-[16/10]" />',
+            '<x-ui.poster-card src="https://media.example.com/poster.jpg" alt="Постер" layout="recommendation">Описание</x-ui.poster-card>',
         );
 
-        $this->assertStringContainsString('aspect-[16/10]', $html);
-        $this->assertStringContainsString('object-cover object-center', $html);
+        $this->assertStringContainsString('aspect-[2/3]', $html);
+        $this->assertStringContainsString('object-contain object-center', $html);
+        $this->assertStringNotContainsString('aspect-[16/10]', $html);
+        $this->assertStringNotContainsString('object-cover', $html);
         $this->assertStringNotContainsString('scale-[1.02]', $html);
     }
 

@@ -132,15 +132,7 @@
                 </div>
 
                 <div class="mt-3 hidden flex-wrap items-center gap-2 text-xs font-bold lg:flex">
-                    <span class="text-slate-600">Вид:</span>
-                    @foreach (['grid' => 'Сетка', 'list' => 'Список'] as $viewKey => $viewLabel)
-                        <a data-catalog-view-option href="{{ route('titles.index', $filterView->viewQuery($viewKey)) }}" rel="nofollow" wire:click.prevent="setView('{{ $viewKey }}')" @class([
-                            'inline-flex min-h-11 items-center rounded-full px-3 py-2',
-                            'bg-emerald-50 text-emerald-700' => $view === $viewKey,
-                            'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $view !== $viewKey,
-                        ])>{{ $viewLabel }}</a>
-                    @endforeach
-                    <span class="ml-2 text-slate-600">На странице:</span>
+                    <span class="text-slate-600">На странице:</span>
                     @foreach ([24, 48, 96] as $pageSize)
                         <a data-catalog-page-size-option href="{{ route('titles.index', $filterView->perPageQuery($pageSize)) }}" rel="nofollow" wire:click.prevent="setPerPage({{ $pageSize }})" @class([
                             'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 py-2 tabular-nums',
@@ -172,19 +164,7 @@
                             </a>
                         @endforeach
                     </div>
-                    <div data-catalog-mobile-view-controls class="mt-3 border-t border-slate-200 pt-3">
-                        <div class="text-xs font-black uppercase tracking-wide text-slate-400">{{ __('catalog.catalog.view_label') }}</div>
-                        <div class="mt-2 flex flex-wrap gap-2">
-                            @foreach (['grid' => __('catalog.catalog.view_grid'), 'list' => __('catalog.catalog.view_list')] as $viewKey => $viewLabel)
-                                <a href="{{ route('titles.index', $filterView->viewQuery($viewKey)) }}" rel="nofollow" wire:click.prevent="setView('{{ $viewKey }}')" @class([
-                                    'inline-flex min-h-11 items-center rounded-full px-3 py-2 text-xs font-bold',
-                                    'bg-emerald-50 text-emerald-700' => $view === $viewKey,
-                                    'bg-white text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => $view !== $viewKey,
-                                ])>{{ $viewLabel }}</a>
-                            @endforeach
-                        </div>
-                    </div>
-                    <div data-catalog-mobile-page-size-controls class="mt-3">
+                    <div data-catalog-mobile-page-size-controls class="mt-3 border-t border-slate-200 pt-3">
                         <div class="text-xs font-black uppercase tracking-wide text-slate-400">{{ __('catalog.catalog.page_size_label') }}</div>
                         <div class="mt-2 flex flex-wrap gap-2">
                             @foreach ([24, 48, 96] as $pageSize)
@@ -218,22 +198,15 @@
 
             @island(name: 'catalog-live', with: $this->catalogPage)
             <div data-catalog-results class="relative scroll-mt-40 sm:scroll-mt-44 lg:scroll-mt-48">
-                <div wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll,previousPage,nextPage,gotoPage" class="hidden absolute inset-x-0 top-0 z-20 rounded-panel bg-white text-sm font-bold text-emerald-700" role="status" aria-live="polite">
+                <div wire:loading.delay wire:target="filters.search,applySearch,applyFilters,sortBy,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll,previousPage,nextPage,gotoPage" class="hidden absolute inset-x-0 top-0 z-20 rounded-panel bg-white text-sm font-bold text-emerald-700" role="status" aria-live="polite">
                     <div class="flex min-h-24 items-center justify-center">
                         <x-ui.icon name="fa-solid fa-spinner fa-spin" />
                         <span class="ml-2">Обновляем каталог…</span>
                     </div>
                 </div>
-                <div wire:loading.class="opacity-50" wire:target="filters.search,applySearch,applyFilters,sortBy,setView,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll,previousPage,nextPage,gotoPage" @class([
-                'divide-y divide-slate-200 overflow-hidden rounded-panel border border-slate-200 bg-white' => $view === 'list',
-                'grid auto-rows-fr gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-4' => $view !== 'list',
-            ])>
+                <div data-catalog-results-list wire:loading.class="opacity-50" wire:target="filters.search,applySearch,applyFilters,sortBy,setPerPage,setLetter,resetGroup,resetAdvanced,resetAdvancedFilters,clearSearch,resetAll,previousPage,nextPage,gotoPage" class="divide-y divide-slate-200 overflow-hidden rounded-panel border border-slate-200 bg-white">
                 @forelse ($titles as $catalogTitle)
-                    @if ($view === 'list')
-                        <x-catalog.title-card wire:key="catalog-title-{{ $catalogTitle->id }}" :title="$catalogTitle" layout="horizontal" readable />
-                    @else
-                        <x-catalog.title-card wire:key="catalog-title-{{ $catalogTitle->id }}" :title="$catalogTitle" />
-                    @endif
+                    <x-catalog.title-card wire:key="catalog-title-{{ $catalogTitle->id }}" :title="$catalogTitle" layout="list" readable />
                 @empty
                     <x-ui.panel class="col-span-full border-dashed">
                         <div class="flex flex-col gap-4">
@@ -303,7 +276,7 @@
                                     </a>
                                 @endif
                                 <a href="{{ route('titles.index') }}" wire:click.prevent="resetAll" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-50 px-4 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100">
-                                    <x-ui.icon name="fa-solid fa-table-cells-large" />
+                                    <x-ui.icon name="fa-solid fa-list-ul" />
                                     <span>Показать весь каталог</span>
                                 </a>
                             </div>

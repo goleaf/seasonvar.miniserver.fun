@@ -39,7 +39,7 @@
                 'bg-emerald-50 text-emerald-700' => request()->routeIs('titles.*'),
                 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('titles.*'),
             ]) @if (request()->routeIs('titles.*')) aria-current="page" @endif>
-                <x-ui.icon name="fa-solid fa-table-cells-large" />
+                <x-ui.icon name="fa-solid fa-list-ul" />
                 <span class="sr-only xl:not-sr-only">Каталог</span>
             </a>
             @guest

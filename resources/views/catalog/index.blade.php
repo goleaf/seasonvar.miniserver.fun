@@ -15,11 +15,18 @@
         <section class="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)] 2xl:grid-cols-[320px_minmax(0,1fr)]">
             <div class="min-w-0 space-y-5 xl:order-2">
                 <x-ui.panel title="Последние обновления" icon="fa-solid fa-clock-rotate-left" :pad="false">
-                    <div data-home-latest-updates-grid class="grid items-start gap-3 p-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 [&>[data-catalog-card]]:h-auto">
-                        @forelse ($featuredTitles as $catalogTitle)
-                            <x-catalog.title-card :title="$catalogTitle" />
+                    <div data-home-latest-updates-list class="divide-y divide-slate-200">
+                        @forelse ($latestByDate as $date => $titlesForDate)
+                            <div class="flex items-center gap-2 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600">
+                                <x-ui.icon name="fa-solid fa-calendar-days text-slate-400" />
+                                <span>{{ $date }}</span>
+                            </div>
+
+                            @foreach ($titlesForDate as $catalogTitle)
+                                <x-catalog.title-card :title="$catalogTitle" layout="list" :show-description="false" />
+                            @endforeach
                         @empty
-                            <div class="col-span-full rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+                            <div class="p-6 text-sm text-slate-500">
                                 Сериалы пока не добавлены.
                             </div>
                         @endforelse
@@ -27,11 +34,11 @@
                 </x-ui.panel>
 
                 <x-ui.panel title="Новые серии" icon="fa-solid fa-circle-play" :pad="false">
-                    <div class="grid gap-3 p-3 lg:grid-cols-2">
+                    <div class="divide-y divide-slate-200">
                         @forelse ($latestMedia as $media)
                             <x-catalog.latest-media-card :media="$media" />
                         @empty
-                            <div class="rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500 lg:col-span-2">
+                            <div class="p-6 text-sm text-slate-500">
                                 Новых серий пока нет.
                             </div>
                         @endforelse
@@ -39,31 +46,12 @@
                 </x-ui.panel>
 
                 <x-ui.panel title="Сейчас можно смотреть" icon="fa-solid fa-file-video" :pad="false">
-                    <div class="grid auto-rows-fr gap-3 p-3 sm:grid-cols-2 xl:grid-cols-4">
-                        @forelse ($videoTitles as $catalogTitle)
-                            <x-catalog.title-card :title="$catalogTitle" />
-                        @empty
-                            <div class="col-span-full rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">
-                                Видео пока нет.
-                            </div>
-                        @endforelse
-                    </div>
-                </x-ui.panel>
-
-                <x-ui.panel title="Лента обновлений по датам" icon="fa-solid fa-calendar-days" :pad="false">
                     <div class="divide-y divide-slate-200">
-                        @forelse ($latestByDate as $date => $titlesForDate)
-                            <div class="flex items-center gap-2 bg-slate-50 px-4 py-2 text-sm font-bold text-slate-600">
-                                <x-ui.icon name="fa-solid fa-calendar-days text-slate-400" />
-                                <span>{{ $date }}</span>
-                            </div>
-
-                            @foreach ($titlesForDate->take(8) as $catalogTitle)
-                                <x-catalog.title-card :title="$catalogTitle" layout="horizontal" :show-description="false" />
-                            @endforeach
+                        @forelse ($videoTitles as $catalogTitle)
+                            <x-catalog.title-card :title="$catalogTitle" layout="list" :show-description="false" />
                         @empty
                             <div class="p-6 text-sm text-slate-500">
-                                Сериалы пока не добавлены.
+                                Видео пока нет.
                             </div>
                         @endforelse
                     </div>

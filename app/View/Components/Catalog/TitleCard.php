@@ -11,7 +11,7 @@ use Illuminate\View\Component;
 
 class TitleCard extends Component
 {
-    private const LAYOUTS = ['grid', 'horizontal', 'compact', 'recommendation'];
+    private const LAYOUTS = ['list', 'compact', 'recommendation'];
 
     public int $seasonsCount;
 
@@ -41,7 +41,7 @@ class TitleCard extends Component
 
     public function __construct(
         public CatalogTitle $title,
-        string $layout = 'grid',
+        string $layout = 'list',
         public bool $showDescription = true,
         public bool $readable = false,
         public ?int $rank = null,
@@ -53,7 +53,7 @@ class TitleCard extends Component
         /** @var array{type: string, label: string, url: string}|null */
         ?array $userPrimaryAction = null,
     ) {
-        $this->layout = in_array($layout, self::LAYOUTS, true) ? $layout : 'grid';
+        $this->layout = in_array($layout, self::LAYOUTS, true) ? $layout : 'list';
         $this->seasonsCount = (int) ($title->seasons_count ?? ($title->relationLoaded('seasons') ? $title->seasons->count() : 0));
         $this->episodesCount = (int) ($title->episodes_count ?? 0);
         $this->mediaCount = (int) ($title->published_media_count ?? $title->licensed_media_count ?? 0);
@@ -70,15 +70,14 @@ class TitleCard extends Component
             ->merge($title->relationLoaded('ageRatings') ? $title->ageRatings : collect())
             ->merge($title->relationLoaded('translations') ? $title->translations : collect())
             ->merge($title->relationLoaded('tags') ? $title->tags : collect())
-            ->take($this->layout === 'grid' ? 3 : 4);
+            ->take(4);
     }
 
     public function render(): View
     {
         return view(match ($this->layout) {
-            'grid' => 'components.catalog.title-card-grid',
             'recommendation' => 'components.catalog.title-card-recommendation',
-            default => 'components.catalog.title-card-horizontal',
+            default => 'components.catalog.title-card-list',
         });
     }
 

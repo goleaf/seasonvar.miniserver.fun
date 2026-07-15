@@ -7,7 +7,7 @@
             loading="{{ $loading }}"
             decoding="async"
             referrerpolicy="no-referrer"
-            class="absolute inset-0 h-full w-full{{ $overscan ? ' scale-[1.02]' : '' }} object-cover object-center"
+            class="{{ $imageClasses() }}"
         >
     @else
         <span class="grid h-full min-h-20 w-full place-items-center px-2 text-center text-xs font-semibold text-slate-600">

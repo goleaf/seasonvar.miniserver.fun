@@ -9,6 +9,17 @@ use Tests\TestCase;
 
 final class InfrastructureHealthCheckTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config([
+            'cache-architecture.warming.connection' => 'sync',
+            'queue.default' => 'sync',
+            'seasonvar.queue.connection' => 'sync',
+        ]);
+    }
+
     public function test_missing_worker_heartbeat_marks_an_otherwise_ready_service_as_degraded(): void
     {
         config([

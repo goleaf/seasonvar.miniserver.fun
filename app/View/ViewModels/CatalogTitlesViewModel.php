@@ -110,7 +110,6 @@ class CatalogTitlesViewModel
         public readonly array $invalidFilterSlugs,
         public readonly ?CatalogTitle $titleContext,
         array $selectedFilterSlugs = [],
-        public readonly string $view = 'grid',
         public readonly int $perPage = 24,
         array $catalogQueryState = [],
         ?Collection $excludedTaxonomies = null,
@@ -235,10 +234,6 @@ class CatalogTitlesViewModel
             $query['sort'] = $this->sort;
         }
 
-        if ($this->view !== 'grid') {
-            $query['view'] = $this->view;
-        }
-
         if ($this->perPage !== 24) {
             $query['per_page'] = $this->perPage;
         }
@@ -272,12 +267,6 @@ class CatalogTitlesViewModel
             $query['sort'] = $this->sort;
         } else {
             unset($query['sort']);
-        }
-
-        if ($this->view !== 'grid') {
-            $query['view'] = $this->view;
-        } else {
-            unset($query['view']);
         }
 
         if ($this->perPage !== 24) {
@@ -410,20 +399,6 @@ class CatalogTitlesViewModel
         }
 
         return trim((string) $value);
-    }
-
-    /** @return array<string, mixed> */
-    public function viewQuery(string $view): array
-    {
-        $query = $this->sortQuery($this->sort);
-
-        if ($view === 'grid') {
-            unset($query['view']);
-        } else {
-            $query['view'] = $view;
-        }
-
-        return $query;
     }
 
     /** @return array<string, mixed> */
@@ -639,10 +614,6 @@ class CatalogTitlesViewModel
             $query['sort'] = $this->sort;
         }
 
-        if ($this->view !== 'grid') {
-            $query['view'] = $this->view;
-        }
-
         if ($this->perPage !== 24) {
             $query['per_page'] = $this->perPage;
         }
@@ -701,10 +672,6 @@ class CatalogTitlesViewModel
 
         if ($this->invalidYear) {
             $query['year'] = $this->requestedYear;
-        }
-
-        if ($this->view !== 'grid') {
-            $query['view'] = $this->view;
         }
 
         if ($this->perPage !== 24) {
@@ -774,10 +741,6 @@ class CatalogTitlesViewModel
 
         if ($this->sort !== 'updated') {
             $query['sort'] = $this->sort;
-        }
-
-        if ($this->view !== 'grid') {
-            $query['view'] = $this->view;
         }
 
         if ($this->perPage !== 24) {

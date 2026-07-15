@@ -118,6 +118,7 @@ class CatalogPageTest extends TestCase
 
         $this->get(route('genres.index'))
             ->assertOk()
+            ->assertSee('data-directory-results-list', false)
             ->assertSeeText('1 значение')
             ->assertSeeText('1 сериал')
             ->assertSeeText('Научная фантастика')
@@ -728,7 +729,6 @@ class CatalogPageTest extends TestCase
             ->assertSet('filters.search', '')
             ->assertSet('filters.genre', [])
             ->assertSet('filters.sort', 'updated')
-            ->assertSet('filters.view', 'grid')
             ->assertSet('filters.perPage', 24);
     }
 
@@ -1024,7 +1024,7 @@ class CatalogPageTest extends TestCase
 
         $content = $this->get(route('home'))->assertOk()->getContent();
         $sectionStart = strpos($content, 'Сейчас можно смотреть');
-        $sectionEnd = strpos($content, 'Лента обновлений по датам', $sectionStart ?: 0);
+        $sectionEnd = strpos($content, '<aside class="space-y-4 xl:order-1">', $sectionStart ?: 0);
 
         $this->assertIsInt($sectionStart);
         $this->assertIsInt($sectionEnd);
@@ -1444,7 +1444,6 @@ class CatalogPageTest extends TestCase
 
         Livewire::test(CatalogSeries::class)
             ->call('sortBy', ['title_asc'])
-            ->call('setView', ['list'])
             ->call('setPerPage', ['96'])
             ->call('setLetter', ['A'])
             ->call('removeYear', ['2026'])
@@ -1504,14 +1503,15 @@ class CatalogPageTest extends TestCase
             ->assertOk()
             ->assertSee('data-ui-poster-card', false)
             ->assertSee('data-ui-poster-frame', false)
+            ->assertSee('data-ui-poster-layout="list"', false)
             ->assertSee('aspect-[2/3]', false)
-            ->assertSee('object-cover', false)
-            ->assertSee('scale-[1.02]', false)
-            ->assertDontSee('object-contain', false)
+            ->assertSee('object-contain', false)
+            ->assertDontSee('object-cover', false)
+            ->assertDontSee('scale-[1.02]', false)
             ->assertDontSee('ring-1 ring-slate-200', false);
     }
 
-    public function test_titles_list_layout_selects_and_renders_the_description(): void
+    public function test_titles_always_render_the_list_layout_and_description(): void
     {
         CatalogTitle::factory()->create([
             'title' => 'Сериал с описанием в списке',
@@ -1519,10 +1519,25 @@ class CatalogPageTest extends TestCase
             'description' => 'Полное описание для горизонтальной карточки.',
         ]);
 
-        $this->get(route('titles.index', ['view' => 'list']))
+        $this->get(route('titles.index', ['view' => 'grid']))
             ->assertOk()
-            ->assertSee('data-ui-poster-layout="horizontal"', false)
+            ->assertSee('data-ui-poster-layout="list"', false)
+            ->assertDontSee('data-catalog-view-option', false)
             ->assertSeeText('Полное описание для горизонтальной карточки.');
+    }
+
+    public function test_titles_list_rows_show_the_latest_regular_season(): void
+    {
+        $title = CatalogTitle::factory()->create([
+            'title' => 'Сериал с последним сезоном',
+            'slug' => 'serial-s-poslednim-sezonom',
+        ]);
+        Season::factory()->for($title)->create(['number' => 1]);
+        Season::factory()->for($title)->create(['number' => 4]);
+
+        $this->get(route('titles.index'))
+            ->assertOk()
+            ->assertSeeText('Сезон 4');
     }
 
     public function test_title_page_server_renders_safe_localized_metadata_without_inferring_content_language(): void
@@ -1589,7 +1604,7 @@ class CatalogPageTest extends TestCase
         $content = $this->get(route('titles.index'))->assertOk()->getContent();
 
         $this->assertMatchesRegularExpression('/<a[^>]*data-catalog-sort-option[^>]*rel="nofollow"[^>]*>/', $content);
-        $this->assertMatchesRegularExpression('/<a[^>]*data-catalog-view-option[^>]*rel="nofollow"[^>]*>/', $content);
+        $this->assertStringNotContainsString('data-catalog-view-option', $content);
         $this->assertMatchesRegularExpression('/<a[^>]*data-catalog-alphabet-option[^>]*rel="nofollow"[^>]*>/', $content);
         $this->assertStringContainsString('href="'.route('titles.show', $catalogTitle).'"', $content);
         $this->assertDoesNotMatchRegularExpression('/<a[^>]*href="'.preg_quote(route('titles.show', $catalogTitle), '/').'"[^>]*rel="nofollow"/', $content);
@@ -3046,6 +3061,7 @@ class CatalogPageTest extends TestCase
             ->test(ViewingActivity::class)
             ->assertSeeText('Продолжаемый сериал')
             ->assertSeeText('Продолжить с 02:00')
+            ->assertSeeHtml('data-viewing-continue-list')
             ->assertSeeHtml('data-ui-poster-card')
             ->assertSeeHtml('data-ui-poster-frame')
             ->assertSeeHtml('wire:key="continue-watching-'.$continuingTitle->id.'"')
@@ -3183,6 +3199,7 @@ class CatalogPageTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(ViewingActivity::class)
+            ->assertSeeHtml('data-viewing-history-list')
             ->assertSeeText('История владельца')
             ->assertDontSeeText('Самая старая серия истории')
             ->call('setPage', 2, 'historyPage')

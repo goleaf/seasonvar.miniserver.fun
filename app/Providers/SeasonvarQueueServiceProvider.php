@@ -25,6 +25,7 @@ class SeasonvarQueueServiceProvider extends ServiceProvider
         Queue::failing($monitor->failed(...));
         Queue::failing($heartbeat->failed(...));
         Queue::before($heartbeat->processing(...));
+        Queue::looping($heartbeat->looping(...));
         Event::listen(QueueBusy::class, $monitor->busy(...));
     }
 }

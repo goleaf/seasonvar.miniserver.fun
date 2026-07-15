@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Console\Commands;
 
 use App\Console\Commands\Concerns\OutputsSeasonvarProgress;
@@ -13,12 +15,15 @@ use App\Services\Seasonvar\SeasonvarPageHandlerRegistry;
 use App\Services\Seasonvar\SeasonvarQueuedImportDispatcher;
 use App\Services\Seasonvar\SeasonvarQueueStatus;
 use App\Services\Seasonvar\SeasonvarSourceInventory;
+use Illuminate\Cache\Repository as CacheRepository;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
-use Illuminate\Contracts\Cache\Repository;
+use Illuminate\Contracts\Cache\LockProvider;
+use Illuminate\Contracts\Cache\Store;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use LogicException;
 use Throwable;
 
 #[Signature('seasonvar:import {url? : Ссылка страницы seasonvar.ru для обновления одной страницы} {--force : Обновить данные даже если страница не изменилась} {--forever : Работать циклами без остановки} {--sleep= : Пауза между циклами в секундах} {--no-discovery : Не обновлять карту сайта в этом запуске} {--queued : Поставить подходящие страницы в Redis-очередь для параллельной обработки} {--status : Показать состояние Redis-очереди и последнего запуска без импорта} {--inventory-only : Инвентаризировать типы URL из карты сайта без разбора и изменения каталога} {--page-type=* : Обрабатывать только явно включённые типы страниц, например serial или rss}')]
@@ -142,7 +147,7 @@ class ImportSeasonvar extends Command
 
     private function recoverUnconfirmedLock(
         SeasonvarImportProcessInspector $processInspector,
-        Repository $lockStore,
+        Store&LockProvider $lockStore,
         int $lockSeconds,
     ): bool {
         $runningRuns = SeasonvarImportRun::query()
@@ -268,7 +273,7 @@ class ImportSeasonvar extends Command
         }
 
         try {
-            $run = $pageTypes === null
+            $result = $pageTypes === null
                 ? $dispatcher->dispatch(
                     force: (bool) $this->option('force'),
                     discover: ! (bool) $this->option('no-discovery'),
@@ -278,6 +283,18 @@ class ImportSeasonvar extends Command
                     discover: ! (bool) $this->option('no-discovery'),
                     pageTypes: $pageTypes,
                 );
+
+            $run = $result->run;
+
+            if (! $result->created) {
+                $this->warn(sprintf(
+                    'Активный глобальный запуск #%d уже имеет статус «%s». Новый запуск не создан.',
+                    $run->id,
+                    $run->statusValue()->label(),
+                ));
+
+                return self::SUCCESS;
+            }
 
             $this->info(sprintf(
                 'Запуск #%d: поставлено в очередь: %d страниц.',
@@ -295,9 +312,21 @@ class ImportSeasonvar extends Command
         }
     }
 
-    private function lockStore(): Repository
+    private function lockStore(): Store&LockProvider
     {
-        return Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'));
+        $repository = Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'));
+
+        if (! $repository instanceof CacheRepository) {
+            throw new LogicException('Seasonvar lock cache repository is unavailable.');
+        }
+
+        $store = $repository->getStore();
+
+        if (! $store instanceof LockProvider) {
+            throw new LogicException('Seasonvar lock cache store does not support atomic locks.');
+        }
+
+        return $store;
     }
 
     private function handleStatus(SeasonvarQueueStatus $queueStatus): int

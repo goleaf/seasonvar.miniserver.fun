@@ -77,7 +77,7 @@
                     <x-ui.poster-card
                         :src="$title['poster_src']"
                         alt="Постер {{ $title['title'] }}"
-                        layout="grid"
+                        layout="stats"
                         wire:key="poster-{{ $title['id'] }}"
                     >
                         <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">

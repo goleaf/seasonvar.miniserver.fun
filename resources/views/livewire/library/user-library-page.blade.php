@@ -133,20 +133,23 @@
                         <p class="mt-1 text-sm text-slate-500">Измените фильтры или добавьте тайтл из каталога.</p>
                     </div>
                 @else
-                    <div class="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div data-library-watchlist-list class="divide-y divide-slate-200">
                         @foreach ($watchlist as $state)
-                            <article wire:key="watchlist-{{ $state->id }}" class="flex min-w-0 flex-col gap-3">
+                            <article wire:key="watchlist-{{ $state->id }}" class="min-w-0">
                                 <x-catalog.title-card
                                     :title="$state->catalogTitle"
+                                    layout="list"
                                     :show-description="false"
                                     :user-in-watchlist="(bool) $state->in_watchlist"
                                     :user-rating="$state->rating"
                                 />
                                 @if ($canInteract)
-                                    <button type="button" wire:click="setWatchlist({{ $state->catalog_title_id }}, false)" wire:confirm="Удалить тайтл из списка?" class="relative z-10 inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700 hover:bg-rose-100">
-                                        <x-ui.icon name="fa-solid fa-bookmark-slash" />
-                                        <span>Удалить из списка</span>
-                                    </button>
+                                    <div class="px-3 pb-3 sm:px-4 sm:pb-4">
+                                        <button type="button" wire:click="setWatchlist({{ $state->catalog_title_id }}, false)" wire:confirm="Удалить тайтл из списка?" class="relative z-10 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700 hover:bg-rose-100 sm:w-auto">
+                                            <x-ui.icon name="fa-solid fa-bookmark-slash" />
+                                            <span>Удалить из списка</span>
+                                        </button>
+                                    </div>
                                 @endif
                             </article>
                         @endforeach
@@ -165,17 +168,18 @@
                         <p class="mt-1 text-sm text-slate-500">Оценить тайтл можно на его странице.</p>
                     </div>
                 @else
-                    <div class="grid gap-4 p-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div data-library-ratings-list class="divide-y divide-slate-200">
                         @foreach ($ratings as $state)
-                            <article wire:key="rating-{{ $state->id }}" class="flex min-w-0 flex-col gap-3">
+                            <article wire:key="rating-{{ $state->id }}" class="min-w-0">
                                 <x-catalog.title-card
                                     :title="$state->catalogTitle"
+                                    layout="list"
                                     :show-description="false"
                                     :user-in-watchlist="(bool) $state->in_watchlist"
                                     :user-rating="$state->rating"
                                 />
                                 @if ($canInteract)
-                                    <label class="relative z-10 block">
+                                    <label class="relative z-10 block px-3 pb-3 sm:px-4 sm:pb-4">
                                         <span class="mb-1.5 block text-sm font-bold text-slate-700">Ваша оценка</span>
                                         <select wire:change="setRating({{ $state->catalog_title_id }}, $event.target.value)" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2.5 text-sm font-bold text-slate-700 outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100">
                                             <option value="">Удалить оценку</option>
@@ -202,9 +206,9 @@
                         <p class="mt-1 text-sm text-slate-500">Откройте доступный эпизод, и он появится здесь.</p>
                     </div>
                 @else
-                    <div class="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
+                    <div data-library-continue-list class="divide-y divide-slate-200">
                         @foreach ($continueWatching as $item)
-                            <x-ui.poster-card :src="$item->title->poster_url" alt="Постер {{ $item->title->display_title }}" layout="horizontal" wire:key="continue-watching-{{ $item->title->id }}">
+                            <x-ui.poster-card :src="$item->title->poster_url" alt="Постер {{ $item->title->display_title }}" layout="list" wire:key="continue-watching-{{ $item->title->id }}">
                                 <p class="text-xs font-semibold text-slate-500">
                                     {{ $item->episode->season?->number !== null ? 'Сезон '.$item->episode->season->number : 'Специальный сезон' }}
                                     <span aria-hidden="true"> · </span>
@@ -242,7 +246,7 @@
                             </button>
                         </div>
                     @endif
-                    <div class="space-y-3 p-4">
+                    <div data-library-history-list class="divide-y divide-slate-200">
                         @foreach ($history as $progress)
                             <x-ui.poster-card :src="$progress->is_accessible && $progress->catalogTitle ? $progress->catalogTitle->poster_url : null" :alt="$progress->is_accessible && $progress->catalogTitle ? 'Постер '.$progress->catalogTitle->display_title : 'Недоступный эпизод'" layout="compact" wire:key="history-{{ $progress->id }}">
                                 <div class="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">

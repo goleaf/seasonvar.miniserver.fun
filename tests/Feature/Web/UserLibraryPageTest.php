@@ -69,6 +69,8 @@ final class UserLibraryPageTest extends TestCase
             ->call('applyFilters')
             ->assertHasNoErrors()
             ->assertSet('filters.query', 'Нужный')
+            ->assertSeeHtml('data-library-watchlist-list')
+            ->assertSeeHtml('data-ui-poster-layout="list"')
             ->assertSeeText('Нужный сериал')
             ->assertDontSeeText('Другое аниме')
             ->call('setWatchlist', $wanted->id, false)
@@ -100,6 +102,8 @@ final class UserLibraryPageTest extends TestCase
             ->set('filters.direction', 'desc')
             ->call('applyFilters')
             ->assertHasNoErrors()
+            ->assertSeeHtml('data-library-ratings-list')
+            ->assertSeeHtml('data-ui-poster-layout="list"')
             ->assertDontSeeText('Чужая оценка');
 
         $this->assertLessThan(
@@ -153,11 +157,16 @@ final class UserLibraryPageTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(UserLibraryPage::class, ['section' => 'continue-watching'])
+            ->assertSeeHtml('data-library-continue-list')
+            ->assertSeeHtml('data-ui-poster-layout="list"')
+            ->assertSeeHtml('object-contain')
             ->assertSeeText('Просмотр владельца')
             ->assertDontSeeText('Чужой просмотр');
 
         Livewire::actingAs($user)
             ->test(UserLibraryPage::class, ['section' => 'history'])
+            ->assertSeeHtml('data-library-history-list')
+            ->assertSeeHtml('data-ui-poster-layout="compact"')
             ->assertSeeText('Просмотр владельца')
             ->assertDontSeeText('Чужой просмотр')
             ->call('removeHistoryItem', $foreignProgress->id)
@@ -187,7 +196,11 @@ final class UserLibraryPageTest extends TestCase
     /** @return array{CatalogTitle, Episode} */
     private function watchableTitle(string $slug, string $titleText): array
     {
-        $title = CatalogTitle::factory()->create(['slug' => $slug, 'title' => $titleText]);
+        $title = CatalogTitle::factory()->create([
+            'slug' => $slug,
+            'title' => $titleText,
+            'poster_url' => 'https://media.example.com/'.$slug.'.jpg',
+        ]);
         $season = Season::factory()->for($title, 'catalogTitle')->create(['number' => 1]);
         $episode = Episode::factory()->for($season)->create(['number' => 1]);
         LicensedMedia::factory()->create([

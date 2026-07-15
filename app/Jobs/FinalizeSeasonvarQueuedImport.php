@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Jobs;
 
 use App\Models\SeasonvarImportRun;
@@ -12,7 +14,7 @@ use App\Services\Seasonvar\SeasonvarPageClaimManager;
 use DateTimeInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Cache\Repository;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -22,7 +24,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-class FinalizeSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
+class FinalizeSeasonvarQueuedImport implements ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Dispatchable;
     use InteractsWithQueue;
@@ -53,20 +55,22 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
     ): void {
         $run = SeasonvarImportRun::query()->find($this->importRunId);
 
-        if ($run === null || $run->status !== 'running' || $run->execution_mode !== 'queue') {
+        if ($run === null
+            || $run->mode !== 'sitemap'
+            || $run->status !== 'running'
+            || $run->execution_mode !== 'queue'
+        ) {
             return;
         }
 
         if ($claims->outstandingForRun($run->id) > 0) {
             $runs->heartbeat($run->id);
-            $this->release($this->releaseDelay());
 
             return;
         }
 
         if ($this->hasActiveTitleGroups($run->id)) {
             $runs->heartbeat($run->id);
-            $this->release($this->releaseDelay());
 
             return;
         }
@@ -83,20 +87,21 @@ class FinalizeSeasonvarQueuedImport implements ShouldBeUnique, ShouldQueue
         try {
             $run->refresh();
 
-            if ($run->status !== 'running' || $run->execution_mode !== 'queue') {
+            if ($run->mode !== 'sitemap'
+                || $run->status !== 'running'
+                || $run->execution_mode !== 'queue'
+            ) {
                 return;
             }
 
             if ($claims->outstandingForRun($run->id) > 0) {
                 $runs->heartbeat($run->id);
-                $this->release($this->releaseDelay());
 
                 return;
             }
 
             if ($this->hasActiveTitleGroups($run->id)) {
                 $runs->heartbeat($run->id);
-                $this->release($this->releaseDelay());
 
                 return;
             }

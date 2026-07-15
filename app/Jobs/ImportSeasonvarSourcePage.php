@@ -6,6 +6,7 @@ use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use App\Services\Seasonvar\SeasonvarCatalogImporter;
 use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
+use App\Services\Seasonvar\SeasonvarImportFinalizationDispatcher;
 use App\Services\Seasonvar\SeasonvarImportGroupKey;
 use App\Services\Seasonvar\SeasonvarImportRunRecorder;
 use App\Services\Seasonvar\SeasonvarImportTitleGroupDispatcher;
@@ -60,7 +61,9 @@ class ImportSeasonvarSourcePage implements ShouldQueue
         ?SeasonvarCatalogImporter $importer = null,
         ?SeasonvarImportRunRecorder $runs = null,
         ?SeasonvarImportGroupKey $groupKeys = null,
+        ?SeasonvarImportFinalizationDispatcher $finalizers = null,
     ): void {
+        $finalizers ??= app(SeasonvarImportFinalizationDispatcher::class);
         $run = SeasonvarImportRun::query()
             ->whereKey($this->importRunId)
             ->where('execution_mode', 'queue')
@@ -81,17 +84,20 @@ class ImportSeasonvarSourcePage implements ShouldQueue
 
         if ($page === null) {
             $claims->release($this->sourcePageId, $this->importRunId, $this->claimToken);
+            $finalizers->globalRun($run);
 
             return;
         }
 
         if ($page->page_type !== 'serial') {
             $this->handleNonSerialPage(
+                $run,
                 $page,
                 $claims,
                 $importer ?? app(SeasonvarCatalogImporter::class),
                 $runs ?? app(SeasonvarImportRunRecorder::class),
                 $groupKeys ?? app(SeasonvarImportGroupKey::class),
+                $finalizers,
             );
 
             return;
@@ -106,11 +112,13 @@ class ImportSeasonvarSourcePage implements ShouldQueue
     }
 
     private function handleNonSerialPage(
+        SeasonvarImportRun $run,
         SourcePage $page,
         SeasonvarPageClaimManager $claims,
         SeasonvarCatalogImporter $importer,
         SeasonvarImportRunRecorder $runs,
         SeasonvarImportGroupKey $groupKeys,
+        SeasonvarImportFinalizationDispatcher $finalizers,
     ): void {
         if (! $claims->extend(
             $page->id,
@@ -154,6 +162,7 @@ class ImportSeasonvarSourcePage implements ShouldQueue
         } finally {
             if ($releaseClaim) {
                 $claims->release($page->id, $this->importRunId, $this->claimToken);
+                $finalizers->globalRun($run);
             }
 
             $lock->release();
@@ -183,6 +192,12 @@ class ImportSeasonvarSourcePage implements ShouldQueue
 
         if ($released) {
             app(SeasonvarImportRunRecorder::class)->addCounters($this->importRunId, ['failed' => 1]);
+        }
+
+        $run = SeasonvarImportRun::query()->find($this->importRunId);
+
+        if ($run !== null) {
+            app(SeasonvarImportFinalizationDispatcher::class)->globalRun($run);
         }
 
         Log::error('Страница Seasonvar не обработана queue worker.', [

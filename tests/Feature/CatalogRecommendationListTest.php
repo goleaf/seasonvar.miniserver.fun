@@ -72,7 +72,7 @@ class CatalogRecommendationListTest extends TestCase
         $this->assertNull($items->first()->score);
     }
 
-    public function test_title_page_renders_one_ranked_recommendation_list_with_wide_posters(): void
+    public function test_title_page_renders_one_ranked_recommendation_list_with_uncropped_portrait_posters(): void
     {
         $source = CatalogTitle::factory()->create(['title' => 'Главный сериал']);
         $first = $this->recommendableTitle('Первый точный совет', [
@@ -92,7 +92,10 @@ class CatalogRecommendationListTest extends TestCase
         $this->assertSame(1, substr_count($html, 'data-recommendation-list'));
         $this->assertSame(2, substr_count($html, 'data-recommendation-row'));
         $this->assertStringContainsString('data-ui-poster-layout="recommendation"', $html);
-        $this->assertStringContainsString('aspect-[16/10]', $html);
+        $this->assertStringContainsString('aspect-[2/3]', $html);
+        $this->assertStringContainsString('object-contain object-center', $html);
+        $this->assertStringNotContainsString('aspect-[16/10]', $html);
+        $this->assertStringNotContainsString('scale-[1.02]', $html);
         $this->assertStringContainsString('Романтика', $html);
         $this->assertStringContainsString('Легкая история любви', $html);
         $this->assertStringContainsString('data-recommendation-rank="1"', $html);

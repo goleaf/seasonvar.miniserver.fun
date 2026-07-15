@@ -124,16 +124,6 @@ class CatalogSeries extends Component
         $this->resetPage();
     }
 
-    public function setView(mixed $view): void
-    {
-        if (! in_array($view, ['grid', 'list'], true)) {
-            return;
-        }
-
-        $this->filters->view = $view;
-        $this->resetPage();
-    }
-
     public function setPerPage(mixed $perPage): void
     {
         $perPage = filter_var($perPage, FILTER_VALIDATE_INT);

@@ -36,8 +36,8 @@ class CatalogBladeComponentTest extends TestCase
         $catalogTitle->countries()->attach($country->id);
         $catalogTitle->load(['genres', 'countries', 'seasons']);
 
-        $cardHtml = Blade::render('<x-catalog.title-card :title="$title" layout="grid" />', ['title' => $catalogTitle]);
-        $rowHtml = Blade::render('<x-catalog.title-card :title="$title" layout="horizontal" />', ['title' => $catalogTitle]);
+        $cardHtml = Blade::render('<x-catalog.title-card :title="$title" layout="list" />', ['title' => $catalogTitle]);
+        $rowHtml = Blade::render('<x-catalog.title-card :title="$title" layout="compact" />', ['title' => $catalogTitle]);
 
         foreach ([$cardHtml, $rowHtml] as $html) {
             $this->assertStringContainsString('<article', $html);
@@ -59,7 +59,7 @@ class CatalogBladeComponentTest extends TestCase
             $queries[] = $query->sql;
         });
 
-        Blade::render('<x-catalog.title-card :title="$title" layout="grid" />', ['title' => $catalogTitle]);
+        Blade::render('<x-catalog.title-card :title="$title" layout="list" />', ['title' => $catalogTitle]);
 
         $this->assertSame([], $queries);
     }
@@ -107,8 +107,8 @@ class CatalogBladeComponentTest extends TestCase
         ]);
 
         foreach ([
-            Blade::render('<x-catalog.title-card :title="$title" layout="grid" />', ['title' => $title]),
-            Blade::render('<x-catalog.title-card :title="$title" layout="horizontal" />', ['title' => $title]),
+            Blade::render('<x-catalog.title-card :title="$title" layout="list" />', ['title' => $title]),
+            Blade::render('<x-catalog.title-card :title="$title" layout="compact" />', ['title' => $title]),
         ] as $html) {
             $this->assertStringContainsString('Королевские гонки РуПола', $html);
             $this->assertStringContainsString(e("RuPaul's Drag Race"), $html);
@@ -125,7 +125,7 @@ class CatalogBladeComponentTest extends TestCase
             'title' => 'Мир/Дружба',
             'original_title' => 'World Friendship',
         ]);
-        $slashHtml = Blade::render('<x-catalog.title-card :title="$title" layout="grid" />', ['title' => $slashTitle]);
+        $slashHtml = Blade::render('<x-catalog.title-card :title="$title" layout="list" />', ['title' => $slashTitle]);
 
         $this->assertStringContainsString('Мир/Дружба', $slashHtml);
     }

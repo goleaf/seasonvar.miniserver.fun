@@ -120,6 +120,9 @@ final class CheckDeploymentReadinessCommandTest extends TestCase
         $this->assertArrayHasKey('name', $decoded['checks'][0]);
         $this->assertArrayHasKey('status', $decoded['checks'][0]);
         $this->assertArrayHasKey('message', $decoded['checks'][0]);
+        $this->assertArrayHasKey('duration_ms', $decoded['checks'][0]);
+        $this->assertIsInt($decoded['checks'][0]['duration_ms']);
+        $this->assertGreaterThanOrEqual(0, $decoded['checks'][0]['duration_ms']);
         $this->assertStringNotContainsString('private-token', $output);
         $this->assertStringNotContainsString('private exception text', $output);
     }

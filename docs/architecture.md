@@ -1,6 +1,39 @@
 # Архитектура приложения
 
-Обновлено: 14.07.2026
+Обновлено: 15.07.2026
+
+## Целевая архитектура и data flow
+
+Цель — сохранить Laravel-native слои и текущие доменные сервисы, уменьшая только доказанные god boundaries. Не вводится универсальный repository/action/interface слой.
+
+HTTP/API read flow:
+
+`Route → middleware → Form Request/route binding → controller orchestration → focused query/page builder → ViewModel/API Resource/Response → response`.
+
+HTTP mutation flow:
+
+`Route → middleware → Form Request authorize+validate → typed input when data crosses layers → focused service/action → short transaction → after-commit invalidation/event → Resource/redirect`.
+
+Livewire mutation flow:
+
+`Component action → locked identifier resolution → policy/gate → Livewire Form validation → typed input → focused service/action → short transaction → after-commit cache invalidation → prepared component state → passive Blade`.
+
+Import flow:
+
+`seasonvar:import → one global lifecycle decision → bounded page jobs → guarded HTTP → parser DTO → semantic fingerprint → title-group fan-in → short catalog transaction/upserts → terminal run version → scoped FTS/recommendation/cache work`.
+
+Playback flow:
+
+`Page/API → entitlement → episode/media resolver → short-lived signed viewer grant → delivery reauthorization → allowlisted provider redirect → browser player → throttled monotonic progress service`.
+
+Target boundaries:
+
+- Blade receives scalars/arrays/DTOs/view models and prepared flags/classes/URLs only. Route checks, config reads, services, queries, authorization, formatting derivation and state mutations do not belong in templates.
+- Models own relationships/casts/scopes/small predicates, not importer/admin workflows.
+- Actions represent meaningful mutations; cohesive technical capabilities stay services.
+- Slow network calls never occur inside a DB transaction.
+- After-commit invalidation and derived work share one operation-owned boundary; user state and signed playback data never enter public shared cache.
+- Expected domain failures use stable exceptions/error codes; internal exception text is never an API/Livewire user message.
 
 ## Контроллеры
 

@@ -8,7 +8,6 @@ use App\Enums\SeasonvarImportStatus;
 use App\Enums\SeasonvarImportTitleGroupStatus;
 use App\Enums\SeasonvarPageType;
 use App\Enums\SeasonvarPreparedPageStatus;
-use App\Jobs\FinalizeSeasonvarImportTitleGroup;
 use App\Jobs\PrepareSeasonvarImportTitlePage;
 use App\Models\CatalogTitle;
 use App\Models\SeasonvarImportPreparedPage;
@@ -24,6 +23,7 @@ final class SeasonvarImportTitleGroupDispatcher
     public function __construct(
         private readonly SeasonvarUrl $seasonvarUrl,
         private readonly SeasonvarImportGroupKey $groupKeys,
+        private readonly SeasonvarImportFinalizationDispatcher $finalizers,
     ) {}
 
     public function start(CatalogTitle $title, string $queue): SeasonvarImportTitleGroup
@@ -69,11 +69,7 @@ final class SeasonvarImportTitleGroupDispatcher
 
         $this->addUrls($group, $urls);
         $group->update(['status' => SeasonvarImportTitleGroupStatus::Running]);
-        FinalizeSeasonvarImportTitleGroup::dispatch($group->id)
-            ->onConnection((string) config('seasonvar.queue.connection', 'redis'))
-            ->onQueue($queue)
-            ->delay(now()->addSeconds($this->finalizerDelaySeconds()))
-            ->afterCommit();
+        $this->finalizers->titleGroup($group, $this->finalizerDelaySeconds());
 
         return $group->fresh();
     }
@@ -160,11 +156,7 @@ final class SeasonvarImportTitleGroupDispatcher
         $this->attachUrl($group, (int) $page->source_id, $page->url);
 
         if ($group->wasRecentlyCreated) {
-            FinalizeSeasonvarImportTitleGroup::dispatch($group->id)
-                ->onConnection((string) config('seasonvar.queue.connection', 'redis'))
-                ->onQueue($queue)
-                ->delay(now()->addSeconds($this->finalizerDelaySeconds()))
-                ->afterCommit();
+            $this->finalizers->titleGroup($group, $this->finalizerDelaySeconds());
         }
 
         return $group->preparedPages()->where('source_page_id', $page->id)->firstOrFail();

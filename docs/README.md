@@ -1,6 +1,6 @@
 # Карта документации проекта
 
-Обновлено: 14.07.2026
+Обновлено: 15.07.2026
 
 Этот файл — единый индекс проектной документации. У каждого контракта есть один основной файл-владелец; остальные документы должны ссылаться на него, а не копировать длинные правила. `README.md` остаётся точкой входа, `AGENTS.md` содержит только обязательные инструкции для агентов, а история изменений ведётся только в `CHANGELOG.md`.
 
@@ -25,7 +25,8 @@
 | Код и интерфейс | [`CODE_STANDARDS.md`](CODE_STANDARDS.md), [`UI_STANDARDS.md`](UI_STANDARDS.md) | Правила PHP/Laravel и визуальные/a11y соглашения без смешивания доменных контрактов. |
 | Локальная разработка и Git | [`development.md`](development.md) | Установка, единственная ветка `main`, versioned hooks и локальные команды проверки. |
 | Тесты и CI | [`testing.md`](testing.md), [`ci.md`](ci.md) | PHPUnit-паттерны, доступные проверки и точный GitHub Actions pipeline. |
-| Датированные аудиты и модернизация | [`audits/current-state-audit.md`](audits/current-state-audit.md), [`plans/laravel-video-portal-modernization.md`](plans/laravel-video-portal-modernization.md) | Environment, security/performance evidence, MCP/research decisions и статусы текущего прохода. |
+| Датированные аудиты и модернизация | [`audits/current-state-audit.md`](audits/current-state-audit.md), [`audits/dependency-report.md`](audits/dependency-report.md), [`audits/database-report.md`](audits/database-report.md), [`audits/security-audit.md`](audits/security-audit.md), [`audits/performance-audit.md`](audits/performance-audit.md), [`audits/frontend-report.md`](audits/frontend-report.md), [`audits/livewire-report.md`](audits/livewire-report.md), [`audits/video-playback-report.md`](audits/video-playback-report.md), [`plans/laravel-video-portal-modernization.md`](plans/laravel-video-portal-modernization.md) | Evidence snapshots различают confirmed/probable/intentional/proposed, implementation status, verification и remaining risk; living plan владеет выполнением. |
+| Dependency/runtime upgrades | [`upgrade.md`](upgrade.md) | Installed/latest compatibility, controlled package groups, gates и rollback. |
 | MCP runbook | [`tooling/mcp-setup.md`](tooling/mcp-setup.md) | Project Boost/Context7/Playwright transport, verification, errors и restart requirement. |
 | Production rollout | [`deployment.md`](deployment.md) | Environment, additive migrations, backup/maintenance order, workers, cache warmup и post-deploy checks. |
 | История изменений | [`CHANGELOG.md`](../CHANGELOG.md) | Пользовательские и архитектурные изменения в установленном формате. |

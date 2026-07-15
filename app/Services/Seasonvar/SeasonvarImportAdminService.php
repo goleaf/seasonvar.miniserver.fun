@@ -9,9 +9,9 @@ use App\Enums\SeasonvarImportStatus;
 use App\Jobs\StartSeasonvarQueuedImport;
 use App\Models\SeasonvarImportRun;
 use App\Models\User;
+use Illuminate\Contracts\Bus\Dispatcher as BusDispatcher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -19,11 +19,11 @@ use Throwable;
 
 final class SeasonvarImportAdminService
 {
-    private const START_LOCK = 'seasonvar-import-admin-start';
-
     public function __construct(
         private readonly SeasonvarPageClaimManager $claims,
         private readonly SeasonvarImportErrorSanitizer $errors,
+        private readonly SeasonvarGlobalImportRunCoordinator $globalRuns,
+        private readonly BusDispatcher $bus,
     ) {}
 
     public function start(
@@ -35,37 +35,24 @@ final class SeasonvarImportAdminService
         Gate::forUser($user)->authorize('manage-seasonvar-imports');
         $this->recoverStale();
 
-        $lock = Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'))
-            ->lock(self::START_LOCK, 15);
+        $result = $this->globalRuns->acquire(
+            force: $force,
+            discover: $discover,
+            requestedByUserId: (int) $user->id,
+            retryOfRunId: $retryOf?->id,
+        );
 
-        return $lock->block(5, function () use ($user, $force, $discover, $retryOf): SeasonvarImportStartResultData {
-            $active = $this->activeRun();
+        if ($result->created) {
+            try {
+                $this->bus->dispatch(new StartSeasonvarQueuedImport($result->run->id));
+            } catch (Throwable $exception) {
+                $this->markFailed($result->run, $exception);
 
-            if ($active !== null) {
-                return new SeasonvarImportStartResultData($active, false);
+                throw $exception;
             }
+        }
 
-            return DB::transaction(function () use ($user, $force, $discover, $retryOf): SeasonvarImportStartResultData {
-                $run = SeasonvarImportRun::query()->create([
-                    'mode' => 'sitemap',
-                    'execution_mode' => 'queue',
-                    'status' => SeasonvarImportStatus::Queued->value,
-                    'force' => $force,
-                    'forever' => false,
-                    'requested_by_user_id' => $user->id,
-                    'retry_of_run_id' => $retryOf?->id,
-                    'last_heartbeat_at' => now(),
-                    'summary' => [
-                        'discover' => $discover,
-                        'provider' => 'seasonvar',
-                    ],
-                ]);
-
-                StartSeasonvarQueuedImport::dispatch($run->id)->afterCommit();
-
-                return new SeasonvarImportStartResultData($run, true);
-            });
-        });
+        return $result;
     }
 
     public function retry(User $user, int $runId): SeasonvarImportStartResultData
@@ -190,7 +177,8 @@ final class SeasonvarImportAdminService
         $healthByStatus = $healthMetrics
             ->where('metric', 'health')
             ->mapWithKeys(fn (object $row): array => [(string) $row->value => (int) $row->aggregate]);
-        $mediaDueCount = (int) ($healthMetrics->firstWhere('metric', 'due')?->aggregate ?? 0);
+        $dueMetric = $healthMetrics->firstWhere('metric', 'due');
+        $mediaDueCount = is_object($dueMetric) ? (int) $dueMetric->aggregate : 0;
 
         return [
             'runs' => $runs->map(fn (SeasonvarImportRun $run): array => $this->present($run))->all(),
@@ -230,21 +218,9 @@ final class SeasonvarImportAdminService
             });
     }
 
-    private function activeRun(): ?SeasonvarImportRun
-    {
-        return SeasonvarImportRun::query()
-            ->where('execution_mode', 'queue')
-            ->whereIn('status', [SeasonvarImportStatus::Queued->value, SeasonvarImportStatus::Running->value])
-            ->latest('id')
-            ->first();
-    }
-
     private function hasActiveRun(): bool
     {
-        return SeasonvarImportRun::query()
-            ->where('execution_mode', 'queue')
-            ->whereIn('status', [SeasonvarImportStatus::Queued->value, SeasonvarImportStatus::Running->value])
-            ->exists();
+        return $this->globalRuns->hasActiveRun();
     }
 
     private function effectiveStatus(SeasonvarImportRun $run): SeasonvarImportStatus

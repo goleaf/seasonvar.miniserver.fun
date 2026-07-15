@@ -1,6 +1,6 @@
 # Деплой
 
-Обновлено: 14.07.2026
+Обновлено: 15.07.2026
 
 ## Mobile offline-sync rollout от 14.07.2026
 
@@ -230,14 +230,38 @@ php artisan queue:failed
 php artisan queue:retry all
 ```
 
-Добавьте в crontab пользователя `www` dispatcher с десятью запусками в сутки и read-only монитор очереди каждые пять минут:
+Исторически в crontab пользователя `www` был добавлен dispatcher с десятью запусками в сутки и read-only монитор очереди каждые пять минут:
 
 ```cron
 0 0,2,5,7,10,12,14,17,19,22 * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan seasonvar:import --queued >> storage/logs/seasonvar-cron.log 2>&1
 */5 * * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan queue:monitor 'redis:seasonvar-title-refresh,redis:seasonvar-import' --max=5000 >> storage/logs/seasonvar-queue-monitor.log 2>&1
 ```
 
-Повторный cron не дублирует живые jobs: coordinator lock сериализует постановку, а page lease защищает конкретный URL. Все страницы title group готовятся параллельно; только короткий fan-in apply сериализован по каноническому тайтлу. Каждая просроченная страница запрашивается заново и сравнивается по `content_hash`; видео не скачивается.
+15.07.2026 production evidence опровергло прежнее предположение о полном lifecycle deduplication: при этой частоте одновременно существовали 11 queued runs, 8037 pending jobs и 5670 live claims. Coordinator lock сериализует постановку, а page lease защищает URL, но это не гарантирует один non-terminal global run. До rollout lifecycle single-flight из living plan новые dispatch-частоты не добавлять; оператор должен наблюдать `seasonvar:import --status` и не запускать следующий цикл при существующем active run. Удалять/очищать уже поставленные jobs запрещено.
+
+## Server requirements snapshot 15.07.2026
+
+- Rocky Linux 10.2, x86_64, 4 physical cores Intel i5-6500T, 62 GiB RAM and 31 GiB swap.
+- NVMe-backed XFS root: 920 GiB, ~807 GiB available at audit time.
+- nginx 1.31.2 with observed HTTP/2, advertised HTTP/3 and HSTS; TLS renewal is owned by aaPanel cron.
+- PHP 8.5.8 FPM/CLI with required Laravel extensions, OPcache, Redis, Memcached, SQLite, GD, Imagick and PCNTL. FFmpeg/ffprobe were not confirmed and are not required while the application does not transcode.
+- Redis and Memcached listen locally; SQLite remains the catalog database. Current importer topology is 4 import + 8 title-refresh workers; cache-warm worker unit exists in Git but was not installed.
+- Runtime currently violates production gate: debug enabled, config/events not cached, two migrations pending. Instrumented read-only preflight is finite (24.45 s wall; SQLite quick/FK 23655 ms), so allow at least 30 s outside active writer load and do not treat the host as rollout-ready until all failed checks are resolved.
+
+## Exact deployment checklist
+
+1. Confirm `git status --short --branch` is clean `main` at a verified commit; record code/lock/asset manifest hashes.
+2. Confirm operator-set `APP_ENV=production`, `APP_DEBUG=false`, safe logging and all required secret-backed config without printing values.
+3. Confirm one importer lifecycle; stop cron dispatcher and all DB writers at a safe boundary.
+4. Create a timestamped SQLite backup outside Git; run quick/FK checks against the backup and record size/hash.
+5. Install Composer dependencies from lock and npm dependencies with `npm ci`; build production assets before switching traffic/code symlink where applicable.
+6. Run `migrate:status`, normal `migrate --force`, required FTS/derived rebuild only, then quick/FK/index checks.
+7. Build config/routes/events/views caches. Gracefully reload PHP-FPM and issue `queue:restart`; process manager must restart every required pool.
+8. Run `app:deployment-check --json` with a documented >=30 s budget for the current database, then require exit 0 and `status=ok` from `app:health --json`; separately verify HTTP `/health/ready`, import/queue status, public/API smoke and critical Playwright smoke.
+9. Resume exactly one dispatch profile; verify import, title-refresh and cache-warm heartbeat/backlog plus one completed cycle.
+10. Observe error rate, DB/WAL/disk growth, queue oldest age and response p95 through the rollback window.
+
+Rollback: stop dispatch/writers, restore previous code and lock-built assets/config cache. If migrations/data changed and compatible code rollback is impossible, restore the verified SQLite backup before starting the previous workers. Never combine old code with a partially migrated/derived schema, never use force push, and never delete failed/backlog jobs as a rollback shortcut.
 
 Sitemap-тесты используют отдельный каталог `storage/app/seasonvar/tests/*` и не очищают рабочее зеркало `storage/app/seasonvar/sitemaps`. Это устраняет файловую гонку между безопасными inventory-запусками и PHPUnit; полный тестовый набор всё равно не следует запускать на production во время ресурсоёмкого импорта.
 
@@ -259,7 +283,9 @@ php artisan app:deployment-check
 php artisan app:deployment-check --json
 ```
 
-Команда ничего не мигрирует, не очищает и не перезапускает. Она проверяет production/debug/logging, pending migrations, SQLite quick/FK checks и обязательные индексы, состояние FTS, production cache/session/queue profile, безопасную агрегатную сводку failed jobs и профиль процесса импортёра. Ненулевой exit code означает, что traffic или writers возвращать нельзя. JSON содержит только стабильные имена проверок, статусы, русские сообщения и scalar counts; failed-job payload, exception text, URL и токены не выводятся.
+Команда ничего не мигрирует, не очищает и не перезапускает. Она проверяет production/debug/logging, pending migrations, SQLite quick/FK checks и обязательные индексы, состояние FTS, production cache/session/queue profile, безопасную агрегатную сводку failed jobs и профиль процесса импортёра. Ненулевой exit code означает, что traffic или writers возвращать нельзя. JSON содержит только стабильные имена проверок, статусы, русские сообщения, scalar counts и целочисленный `duration_ms` каждого check; failed-job payload, exception text, URL и токены не выводятся.
+
+На live SQLite >14 GB instrumented run занял 24.45 s wall time: quick/FK path — 23655 ms, каждый прочий check — 0–303 ms. Внешний `timeout 25s` поэтому дал ложное впечатление зависания. Не снижайте полноту integrity-проверки: запускайте preflight вне активной write-нагрузки с бюджетом >=30 s и отслеживайте рост `duration_ms` вместе с размером базы.
 
 Атомарный порядок maintenance: preflight → дождаться безопасной точки одного `seasonvar:import --forever` и остановить writers → backup SQLite → `migrate:status` и обычный `migrate --force` → при необходимости штатный FTS rebuild/cache warm → `config:cache` → перезапуск PHP-FPM и единственного importer process → повторный preflight, `app:health --json` и гостевой HTTP smoke. `queue:retry`/`queue:forget` остаются отдельным ручным решением после сверки run state и claims; preflight их не вызывает.
 

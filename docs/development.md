@@ -1,6 +1,6 @@
 # Разработка
 
-Обновлено: 14.07.2026
+Обновлено: 15.07.2026
 
 ## Локальная установка
 
@@ -8,7 +8,7 @@
 
 - PHP 8.5 с `pdo_sqlite`, `sqlite3`, `mbstring`, `dom`, `fileinfo`, `redis` и `memcached`.
 - Composer 2.
-- Node 26 и npm 11.
+- Node 26 и npm 12.
 - SQLite для локальной базы и тестов.
 - Redis и Memcached для production-like integration tests, health и cache benchmarks; обычный PHPUnit остаётся воспроизводимым с array store.
 
@@ -66,7 +66,7 @@ bash -n .githooks/pre-commit .githooks/pre-push .githooks/post-commit .githooks/
 - `php artisan seasonvar:import --forever --sleep=60` — непрерывный локальный цикл импорта.
 - `php artisan seasonvar:import "https://seasonvar.ru/..." --force` — принудительное обновление одной страницы.
 - `php artisan integrations:doctor` — read-only диагностика MCP, Google, CLI tools и проектных skills без вывода секретов.
-- `php artisan app:health` — readiness по DB, Redis workloads, Memcached, workers и прогреву.
+- `php artisan app:health` — operational health по DB, Redis workloads, Memcached, workers и прогреву; `degraded`/`failed` возвращают ненулевой exit, даже если HTTP traffic readiness ещё true.
 - `php artisan cache:warm-catalog` — синхронный bounded warm; `--queue` ставит unique job в `cache-warm`, а `--refresh` планово пересобирает текущие warmable keys под lock, не удаляя читаемый snapshot до успеха.
 - `php artisan cache:metrics` — low-cardinality hit/miss/rebuild/failure snapshot без raw keys.
 - `php artisan api:sync-prune` — bounded очистка transport-журнала offline-sync: changes старше 30 дней и idempotency receipts старше 90 дней; до additive migration завершается безопасным no-op.

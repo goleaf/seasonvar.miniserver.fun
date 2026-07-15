@@ -157,7 +157,7 @@
                 @foreach ($itemsByDecade as $itemDecade => $decadeItems)
                     <section aria-labelledby="decade-{{ $itemDecade }}">
                         <h3 id="decade-{{ $itemDecade }}" class="text-lg font-black text-slate-800">{{ $itemDecade }}-е</h3>
-                        <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+                        <div data-directory-results-list class="mt-3 divide-y divide-slate-200 overflow-hidden rounded-panel border border-slate-200 bg-white">
                             @foreach ($decadeItems as $item)
                                 <div wire:key="{{ $item->item_key }}">
                                     <x-catalog.directory-card :item="$item" :directory="$definition" />
@@ -168,7 +168,7 @@
                 @endforeach
             </div>
         @else
-            <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+            <div data-directory-results-list class="mt-4 divide-y divide-slate-200 overflow-hidden rounded-panel border border-slate-200 bg-white">
                 @foreach ($items as $item)
                     <div wire:key="{{ $item->item_key }}">
                         <x-catalog.directory-card :item="$item" :directory="$definition" />

@@ -75,10 +75,7 @@ return [
         'found_label' => 'Found',
         'page_label' => 'On this page',
         'sort_label' => 'Sort',
-        'view_label' => 'Catalog view',
         'page_size_label' => 'Cards per page',
-        'view_grid' => 'Grid',
-        'view_list' => 'List',
         'alphabet' => [
             'label' => 'Alphabet',
             'all' => 'All',

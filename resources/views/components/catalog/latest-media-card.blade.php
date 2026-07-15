@@ -1,9 +1,8 @@
 <x-ui.poster-card
     :src="$title->poster_url"
     :alt="$posterAlt()"
-    layout="horizontal"
+    layout="list"
     data-home-latest-media-card
-    class="shadow-sm shadow-slate-200/60 hover:border-emerald-300"
 >
     <h3 class="font-bold leading-5 text-slate-700">
         <a href="{{ $url() }}" class="break-words after:absolute after:inset-0 group-hover:text-emerald-700">
