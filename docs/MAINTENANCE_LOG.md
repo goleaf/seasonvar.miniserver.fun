@@ -287,4 +287,5 @@
 - `2026_07_13_210000_create_admin_audit_events_table.php`
 - `2026_07_14_120408_create_personal_access_tokens_table.php`
 - `2026_07_14_164423_create_api_sync_tables_and_add_state_versions.php`
+- `2026_07_15_000000_add_user_library_query_indexes.php`
 <!-- project-docs:end -->
