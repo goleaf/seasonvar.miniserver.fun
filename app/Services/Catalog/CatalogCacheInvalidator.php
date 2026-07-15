@@ -17,6 +17,7 @@ final class CatalogCacheInvalidator
 {
     private const PUBLIC_DOMAINS = [
         CacheDomain::Homepage,
+        CacheDomain::CatalogPages,
         CacheDomain::CatalogFacets,
         CacheDomain::CatalogStats,
         CacheDomain::Api,
@@ -27,6 +28,7 @@ final class CatalogCacheInvalidator
     public function __construct(
         private readonly CacheVersionRegistry $versions,
         private readonly CacheTelemetry $telemetry,
+        private readonly CatalogCacheWarmRequestStore $warmRequests,
     ) {}
 
     /** @param iterable<int, int|string> $titleIds */
@@ -63,6 +65,10 @@ final class CatalogCacheInvalidator
             $this->versions->bump(CacheDomain::TitleDetail, 'title:'.$titleId);
         }
 
+        if ($titleIds === []) {
+            $this->versions->bump(CacheDomain::TitleDetail);
+        }
+
         if ((bool) config('cache-architecture.warming.enabled', true)) {
             $job = (new WarmCatalogCaches)
                 ->onConnection((string) config('cache-architecture.warming.connection', 'redis'))
@@ -70,6 +76,7 @@ final class CatalogCacheInvalidator
                 ->afterCommit();
 
             try {
+                $this->warmRequests->request($titleIds, refresh: $titleIds === []);
                 Bus::dispatch($job);
             } catch (Throwable $exception) {
                 $this->telemetry->increment(CacheDomain::Operational, 'warming-dispatch-failure');

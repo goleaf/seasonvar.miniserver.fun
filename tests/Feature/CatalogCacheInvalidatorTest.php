@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Jobs\WarmCatalogCaches;
 use App\Services\Catalog\CatalogCacheInvalidator;
+use App\Services\Catalog\CatalogCacheWarmRequestStore;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheVersionRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -24,6 +25,7 @@ final class CatalogCacheInvalidatorTest extends TestCase
         $versions = app(CacheVersionRegistry::class);
         $before = collect([
             CacheDomain::Homepage,
+            CacheDomain::CatalogPages,
             CacheDomain::CatalogFacets,
             CacheDomain::CatalogStats,
             CacheDomain::Api,
@@ -45,9 +47,42 @@ final class CatalogCacheInvalidatorTest extends TestCase
         }
 
         $this->assertGreaterThan($titleVersion, $versions->version(CacheDomain::TitleDetail, 'title:17'));
+        $work = app(CatalogCacheWarmRequestStore::class)->claim(10);
+        $this->assertNotNull($work);
+        $this->assertEqualsCanonicalizing([17, 23], $work->titleIds);
         Queue::assertPushed(
             WarmCatalogCaches::class,
             fn (WarmCatalogCaches $job): bool => ! $job->refresh,
         );
+    }
+
+    public function test_unknown_title_invalidation_bumps_global_title_generation_and_records_refresh_work(): void
+    {
+        config(['cache-architecture.warming.enabled' => true]);
+        Queue::fake();
+        $versions = app(CacheVersionRegistry::class);
+        $before = $versions->version(CacheDomain::TitleDetail);
+
+        app(CatalogCacheInvalidator::class)->catalogChanged();
+
+        $this->assertGreaterThan($before, $versions->version(CacheDomain::TitleDetail));
+        $work = app(CatalogCacheWarmRequestStore::class)->claim(10);
+        $this->assertNotNull($work);
+        $this->assertTrue($work->refresh);
+        $this->assertSame([], $work->titleIds);
+        Queue::assertPushed(WarmCatalogCaches::class, 1);
+    }
+
+    public function test_rolled_back_invalidation_does_not_create_warm_intent(): void
+    {
+        config(['cache-architecture.warming.enabled' => true]);
+        Queue::fake();
+
+        DB::beginTransaction();
+        app(CatalogCacheInvalidator::class)->catalogChanged([91]);
+        DB::rollBack();
+
+        $this->assertNull(app(CatalogCacheWarmRequestStore::class)->claim(10));
+        Queue::assertNothingPushed();
     }
 }

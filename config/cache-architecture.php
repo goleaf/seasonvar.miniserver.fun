@@ -23,6 +23,26 @@ return [
     'version_retention_seconds' => (int) env('CACHE_VERSION_RETENTION_SECONDS', 31_536_000),
     'run_infrastructure_tests' => env('RUN_CACHE_INFRASTRUCTURE_TESTS', false),
 
+    'page_cache' => [
+        'enabled' => env('PUBLIC_PAGE_CACHE_ENABLED', true),
+        'max_payload_bytes' => (int) env('PUBLIC_PAGE_CACHE_MAX_PAYLOAD_BYTES', 850_000),
+        'max_query_length' => (int) env('PUBLIC_PAGE_CACHE_MAX_QUERY_LENGTH', 2_048),
+        'max_query_fields' => (int) env('PUBLIC_PAGE_CACHE_MAX_QUERY_FIELDS', 24),
+        'max_query_values' => (int) env('PUBLIC_PAGE_CACHE_MAX_QUERY_VALUES', 24),
+        'max_query_value_length' => (int) env('PUBLIC_PAGE_CACHE_MAX_QUERY_VALUE_LENGTH', 160),
+        'manifest_limit' => (int) env('PUBLIC_PAGE_CACHE_MANIFEST_LIMIT', 250),
+        'manifest_retention_seconds' => (int) env('PUBLIC_PAGE_CACHE_MANIFEST_RETENTION_SECONDS', 2_592_000),
+        'max_manifest_url_length' => (int) env('PUBLIC_PAGE_CACHE_MAX_MANIFEST_URL_LENGTH', 2_048),
+        'warming_enabled' => env('PUBLIC_PAGE_CACHE_WARMING_ENABLED', true),
+        'warm_base_url' => env('PUBLIC_PAGE_CACHE_WARM_BASE_URL', env('APP_URL', 'http://localhost')),
+        'warm_url_limit' => (int) env('PUBLIC_PAGE_CACHE_WARM_URL_LIMIT', 100),
+        'warm_title_limit' => (int) env('PUBLIC_PAGE_CACHE_WARM_TITLE_LIMIT', 250),
+        'warm_connect_timeout_seconds' => (int) env('PUBLIC_PAGE_CACHE_WARM_CONNECT_TIMEOUT_SECONDS', 2),
+        'warm_timeout_seconds' => (int) env('PUBLIC_PAGE_CACHE_WARM_TIMEOUT_SECONDS', 10),
+        'warm_retry_times' => (int) env('PUBLIC_PAGE_CACHE_WARM_RETRY_TIMES', 2),
+        'warm_retry_milliseconds' => (int) env('PUBLIC_PAGE_CACHE_WARM_RETRY_MILLISECONDS', 100),
+    ],
+
     'operations' => [
         'warming_state_retention_seconds' => (int) env('CACHE_WARMING_STATE_RETENTION_SECONDS', 604_800),
         'queue_worker_heartbeat_seconds' => (int) env('CACHE_QUEUE_WORKER_HEARTBEAT_SECONDS', 120),
@@ -41,7 +61,12 @@ return [
         'connection' => env('CACHE_WARM_QUEUE_CONNECTION', 'redis'),
         'queue' => env('CACHE_WARM_QUEUE', 'cache-warm'),
         'timeout' => (int) env('CACHE_WARM_TIMEOUT', 300),
-        'unique_seconds' => (int) env('CACHE_WARM_UNIQUE_SECONDS', 300),
+        'unique_seconds' => (int) env('CACHE_WARM_UNIQUE_SECONDS', 604_800),
+        'request_retention_seconds' => (int) env('CACHE_WARM_REQUEST_RETENTION_SECONDS', 604_800),
+        'request_title_limit' => (int) env('CACHE_WARM_REQUEST_TITLE_LIMIT', 5_000),
+        'request_batch_title_limit' => (int) env('CACHE_WARM_REQUEST_BATCH_TITLE_LIMIT', 250),
+        'request_lock_seconds' => (int) env('CACHE_WARM_REQUEST_LOCK_SECONDS', 10),
+        'request_lock_wait_seconds' => (int) env('CACHE_WARM_REQUEST_LOCK_WAIT_SECONDS', 2),
     ],
 
     'domains' => [
@@ -55,6 +80,15 @@ return [
             'jitter_percent' => 10,
         ],
         'catalog-facets' => [
+            'fresh' => 300,
+            'stale' => 1_800,
+            'hot' => 120,
+            'negative' => 30,
+            'lock' => 90,
+            'wait_milliseconds' => 500,
+            'jitter_percent' => 10,
+        ],
+        'catalog-pages' => [
             'fresh' => 300,
             'stale' => 1_800,
             'hot' => 120,

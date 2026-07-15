@@ -7,6 +7,7 @@ namespace App\Support\Cache;
 enum CacheDomain: string
 {
     case Homepage = 'homepage';
+    case CatalogPages = 'catalog-pages';
     case CatalogFacets = 'catalog-facets';
     case CatalogStats = 'catalog-stats';
     case TitleDetail = 'title-detail';

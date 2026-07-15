@@ -7,11 +7,13 @@ namespace Tests\Feature;
 use App\DTOs\Seasonvar\SeasonvarCatalogData;
 use App\DTOs\Seasonvar\SeasonvarPreparedCatalogPage;
 use App\Jobs\FinalizeSeasonvarImportTitleGroup;
+use App\Jobs\WarmCatalogCaches;
 use App\Models\ApiSyncChange;
 use App\Models\CatalogTitle;
 use App\Models\Season;
 use App\Models\SeasonvarImportPreparedPage;
 use App\Models\Source;
+use App\Services\Catalog\CatalogCacheWarmRequestStore;
 use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
 use App\Services\Seasonvar\SeasonvarCatalogParser;
 use App\Services\Seasonvar\SeasonvarImportTitleGroupDispatcher;
@@ -82,6 +84,7 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
 
     public function test_finalizer_applies_shuffled_pages_to_one_title_and_completes_manifest(): void
     {
+        config(['cache-architecture.warming.enabled' => true]);
         $title = $this->titleWithSeasonUrls([9, 1, 2]);
         $group = app(SeasonvarImportTitleGroupDispatcher::class)
             ->start($title, 'seasonvar-title-refresh');
@@ -112,6 +115,10 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
             'completed',
             app(CatalogTitleRefreshStateStore::class)->read($title->id)->status?->value,
         );
+        $warmWork = app(CatalogCacheWarmRequestStore::class)->claim(10);
+        $this->assertNotNull($warmWork);
+        $this->assertSame([$title->id], $warmWork->titleIds);
+        Queue::assertPushed(WarmCatalogCaches::class, 1);
     }
 
     public function test_finalizer_publishes_one_invalidation_when_merge_fails_after_pages_commit(): void

@@ -19,6 +19,7 @@ abstract class TestCase extends BaseTestCase
             'cache-architecture.stores.metrics' => 'array',
             'cache-architecture.framework_events.enabled' => false,
             'cache-architecture.warming.enabled' => false,
+            'cache-architecture.page_cache.warming_enabled' => false,
             'playback.allowed_hosts' => ['11cdn.org', 'media.example.com'],
             'playback.enforce_public_dns' => false,
             'security.external_playlist_enforce_public_dns' => false,

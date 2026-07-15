@@ -21,18 +21,21 @@ Production environment должен соответствовать `docs/environ
 3. `php artisan migrate --force` только после read-only `migrate:status`/backup; текущие `180000` и `190000` migrations additive/reversible.
 4. При несовместимой семантике ключа увеличить `CACHE_SCHEMA_VERSION`, при payload/serializer change — `CACHE_FORMAT_VERSION`. Не выполнять scan/flush.
 5. `php artisan optimize` для config/events/routes/views. Не использовать обычный `optimize:clear`, потому что default application store shared.
-6. `php artisan cache:warm-catalog --queue --refresh`, дождаться job и проверить `php artisan cache:metrics --json`.
-7. `php artisan queue:restart`; перезапустить systemd import/cache-warm workers. Reverb/Horizon/Octane отсутствуют и не требуют reload.
-8. `php artisan app:health --json`, public API conditional GET, sitemap GET/HEAD и три warm smoke requests.
+6. Сначала развернуть код с `ShouldBeUniqueUntilProcessing`, pending warm store и no-op обработкой legacy jobs; затем `php artisan cache:warm-catalog --queue --refresh` записывает единый intent.
+7. `php artisan queue:restart`; перезапустить уже установленные import workers. Cache-warm worker запускать только по отдельной проверке ниже. Reverb/Horizon/Octane отсутствуют и не требуют reload.
+8. `php artisan app:health --json`, public API conditional GET, sitemap GET/HEAD и два запроса к `/`, `/titles` и title page; второй гостевой ответ должен иметь `X-Seasonvar-Page-Cache: HIT`.
 9. Вернуть traffic/writers и наблюдать queue wait, cache failure/lock timeout, Redis memory, Memcached evictions и warm p95.
 
-Установить cache-warm worker:
+Установка cache-warm unit не означает немедленный запуск. Сначала read-only проверить `php artisan app:health --json`, размер/возраст `cache_warm`, отсутствие конфликтующего worker и importer/SQLite contention. Историческую очередь не очищать и массово не retry-ить: новый код безопасно превращает jobs без pending intent в no-op. После наблюдаемого dry pass установить unit и запустить один изолированный процесс:
 
 ```bash
 sudo cp deploy/systemd/seasonvar-cache-warm-worker.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now seasonvar-cache-warm-worker.service
+sudo systemctl enable seasonvar-cache-warm-worker.service
+sudo systemctl start seasonvar-cache-warm-worker.service
 ```
+
+Unit слушает только `cache-warm` и имеет bounded timeout/memory/max-time/max-jobs. После запуска дождаться уменьшения backlog, проверить heartbeat/warming state, `cache:metrics --json` и повторные guest HIT. При росте SQLite wait/CPU/ошибок остановить unit штатно; pending intent сохранится и не требует flush.
 
 `/health/ready` разрешается только monitoring/load-balancer boundary и не раскрывает topology. Failed Redis sessions/queues/locks делает readiness failed; Redis cache/Memcached outage — degraded и требует снижения traffic/устранения причины до исчерпания cold-path capacity.
 

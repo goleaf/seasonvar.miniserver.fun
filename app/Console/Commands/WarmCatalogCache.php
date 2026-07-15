@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Jobs\WarmCatalogCaches;
 use App\Services\Catalog\CatalogCacheWarmer;
+use App\Services\Catalog\CatalogCacheWarmRequestStore;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -14,11 +15,12 @@ use Illuminate\Console\Command;
 #[Description('Прогревает ограниченный набор критических публичных кэшей каталога')]
 final class WarmCatalogCache extends Command
 {
-    public function handle(CatalogCacheWarmer $warmer): int
+    public function handle(CatalogCacheWarmer $warmer, CatalogCacheWarmRequestStore $requests): int
     {
         $refresh = (bool) $this->option('refresh');
 
         if ((bool) $this->option('queue')) {
+            $requests->request(refresh: $refresh);
             WarmCatalogCaches::dispatch($refresh)
                 ->onConnection((string) config('cache-architecture.warming.connection', 'redis'))
                 ->onQueue((string) config('cache-architecture.warming.queue', 'cache-warm'));

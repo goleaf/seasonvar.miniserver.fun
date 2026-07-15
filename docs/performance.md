@@ -86,9 +86,10 @@
 - Title detail fixture с 12 публичными рекомендациями ограничивает Livewire shell: initial response — не более 100 000 bytes и 29 запросов; повторный refresh update — не более 95 000 bytes и 23 запросов. Контрольные значения при введении gate: 86 547 / 83 041 bytes.
 - Бюджеты измеряют полное HTTP-тело, включая Livewire snapshot/effects, и запрещают сериализацию `CatalogTitle` collection и provider `source_url`. Это regression ceilings на bounded fixtures, а не production p95/SLA.
 - Независимый facet gate сохраняет 11 запросов полного page-builder при росте actor options с 1 до 20; title gate выполняется на максимальной публичной recommendation collection, поэтому query ceilings не растут на каждый видимый элемент.
+- Full-response regression отдельно доказывает: второй гостевой `GET /` получает `HIT` без SQL к catalog tables, а title HIT выполняет не более одного catalog query, необходимого текущему implicit route binding. Это test fixture contract, не production p95.
 
 - Production-like localhost baseline до tiered-cache на 34 319 опубликованных тайтлах: первый `GET /` — 24,731 s, `/titles` — 3,265 s, одна title page — 0,785 s. Это одиночные cold observations, не p95.
-- После version bump без предварительного warm: `GET /` — 3,836 s (−84,5% к исходному cold observation), `/titles` — 2,819 s (−13,7%), title page — 0,886 s. Title detail намеренно не включён в shared application cache; небольшая разница считается runtime variance, а не regression proof.
+- Исторически до full-response cache после version bump без предварительного warm: `GET /` — 3,836 s (−84,5% к исходному cold observation), `/titles` — 2,819 s (−13,7%), title page — 0,886 s. Эти cold observations больше не описывают текущий повторный гостевой HIT и не считаются новым SLA.
 - После `cache:warm-catalog`, 20 последовательных localhost requests: homepage mean 244 ms, p50 217 ms, p95 361 ms, max/p99 sample 404 ms; catalog mean 314 ms, p50 286 ms, p95 454 ms, max 491 ms; title mean 718 ms, p50 670 ms, p95 977 ms, max 1014 ms.
 - Direct page-builder measurement: warm homepage — 23 queries/39,32 ms SQLite/152,38 ms wall против cold namespace 25 queries/854,21 ms SQLite/1383,55 ms wall. Warm default catalog builder выполняет 7 queries/211,51 ms SQLite/301,02 ms wall; прежний regression budget без cross-request cache был 11 queries.
 - На интервале cold bump + warmup + 20 homepage/20 catalog requests layer lookup delta составил 177 hits и 68 misses, то есть 72,2% instrumented layer hit ratio. Homepage delta — 68,7%, facets — 76,0%. Счётчик включает последовательные hot/shared/stale lookups и не равен CDN hit ratio.
@@ -102,7 +103,7 @@
 
 ## Cache boundaries
 
-- Homepage, default public facets и `/stats` используют compact tiered snapshots с Redis version/lock/stale и Memcached hot copy. Authenticated/non-default facet context bypass-ит shared snapshot.
+- Гостевые homepage, deterministic catalog/directory, `/stats` и title HTML используют sanitized full-response tier поверх compact cold-path snapshots. Authenticated, free-search и Livewire update context bypass-ят shared HTML.
 - Progress, history, Continue Watching, private user state, arbitrary search и signed playback URL не кэшируются между пользователями. DTO playback создаётся на каждый authorized resolve и ограничен `playback.signed_url_ttl_seconds`.
 - Bulk/admin/import writes проходят after-commit `CatalogCacheInvalidator`, который bump-ит доменные версии один раз и ставит deduplicated warm job. Full-store flush и wildcard scan не используются.
 - Key/TTL/store/failure/metrics контракт принадлежит `caching.md`; этот документ фиксирует SQL cold path и измерения, а не дублирует cache policy.

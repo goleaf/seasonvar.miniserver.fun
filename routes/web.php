@@ -29,7 +29,9 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
-Route::get('/', [CatalogController::class, 'index'])->name('home');
+Route::get('/', [CatalogController::class, 'index'])
+    ->middleware('public.page:homepage')
+    ->name('home');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', LoginPage::class)->name('login');
@@ -88,6 +90,7 @@ Route::get('/health/ready', InfrastructureHealthController::class)
     ->withoutMiddleware($publicDocumentMiddleware)
     ->name('health.ready');
 Route::get('/stats', [CatalogController::class, 'stats'])
+    ->middleware('public.page:stats')
     ->name('stats');
 Route::get('/stats/poster/{catalogTitle:slug}', [CatalogController::class, 'statsPoster'])
     ->name('stats.poster');
@@ -99,6 +102,7 @@ Route::get('/playback/{licensedMedia}', PlaybackSourceController::class)
 foreach (CatalogDirectoryRegistry::routeMap() as $directory => $config) {
     Route::get('/'.$config['path'], CatalogDirectoryBrowser::class)
         ->defaults('directory', $directory)
+        ->middleware('public.page:catalog')
         ->name($directory.'.index');
     Route::get('/'.$config['path'].'/{value}', CatalogDirectoryRedirectController::class)
         ->defaults('directory', $directory)
@@ -106,6 +110,7 @@ foreach (CatalogDirectoryRegistry::routeMap() as $directory => $config) {
 }
 
 Route::get('/titles', CatalogSeries::class)
+    ->middleware('public.page:catalog')
     ->name('titles.index');
 Route::get('/admin/imports', SeasonvarImportManager::class)
     ->middleware('can:manage-seasonvar-imports')
@@ -115,12 +120,16 @@ Route::get('/admin/catalog', CatalogAdministrationManager::class)
     ->name('admin.catalog');
 Route::get('/titles/year/{year}', CatalogSeries::class)
     ->where('year', '(?:19|20)\d{2}')
+    ->middleware('public.page:catalog')
     ->name('titles.year');
 Route::get('/titles/{type}/{taxonomy}', CatalogSeries::class)
     ->where('type', CatalogFilterType::routePattern())
     ->where('taxonomy', '[a-z0-9][a-z0-9-]*')
+    ->middleware('public.page:catalog')
     ->name('titles.taxonomy');
-Route::get('/titles/{catalogTitle:slug}', [CatalogController::class, 'show'])->name('titles.show');
+Route::get('/titles/{catalogTitle:slug}', [CatalogController::class, 'show'])
+    ->middleware('public.page:title')
+    ->name('titles.show');
 
 Route::fallback(function (Request $request) {
     if ($request->is('api/*')) {
