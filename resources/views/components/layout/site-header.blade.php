@@ -27,9 +27,9 @@
 
         <nav aria-label="Основная навигация" class="order-2 col-span-2 flex flex-wrap items-center justify-end gap-1.5 text-sm font-bold sm:col-span-1 lg:order-3">
             @foreach ($header['navigation'] as $item)
-                <a href="{{ $item['url'] }}" class="{{ $item['class'] }}" @if ($item['aria_current'] !== null) aria-current="{{ $item['aria_current'] }}" @endif>
-                    <x-ui.icon :name="$item['icon']" />
-                    <span class="sr-only xl:not-sr-only">{{ $item['label'] }}</span>
+                <a href="{{ $item->url }}" class="{{ $item->className }}" @if ($item->ariaCurrent !== null) aria-current="{{ $item->ariaCurrent }}" @endif>
+                    <x-ui.icon :name="$item->icon" />
+                    <span class="sr-only xl:not-sr-only">{{ $item->label }}</span>
                 </a>
             @endforeach
             @if ($header['show_logout'])

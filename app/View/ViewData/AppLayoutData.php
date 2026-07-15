@@ -7,6 +7,7 @@ namespace App\View\ViewData;
 use App\DTOs\CatalogDirectoryDefinition;
 use App\Services\Catalog\CatalogDirectoryRegistry;
 use App\Support\PlainText;
+use App\View\ViewModels\LayoutNavigationItem;
 use Illuminate\Contracts\Auth\Access\Gate;
 use Illuminate\Contracts\Translation\Translator;
 use Illuminate\Http\Request;
@@ -103,7 +104,7 @@ final class AppLayoutData
         }
 
         $catalogDirectoryLinks = $this->directories->all()
-            ->map(fn (CatalogDirectoryDefinition $directory): array => $this->directoryLink($directory))
+            ->map(fn (CatalogDirectoryDefinition $directory): LayoutNavigationItem => $this->directoryLink($directory))
             ->values();
         $layoutFooterServiceLinks = [
             $this->footerLink('stats', 'fa-solid fa-chart-simple text-slate-400', 'Статистика каталога', $this->request->routeIs('stats')),
@@ -1682,60 +1683,51 @@ final class AppLayoutData
         return $data;
     }
 
-    /**
-     * @return array{url: string, icon: string, label: string, class: string, aria_current: string|null}
-     */
-    private function headerLink(string $routeName, string $icon, string $label, bool $active): array
+    private function headerLink(string $routeName, string $icon, string $label, bool $active): LayoutNavigationItem
     {
-        return [
-            'url' => $this->route($routeName),
-            'icon' => $icon,
-            'label' => $label,
-            'class' => self::HEADER_LINK_CLASS.' '.($active
+        return new LayoutNavigationItem(
+            url: $this->route($routeName),
+            icon: $icon,
+            label: $label,
+            className: self::HEADER_LINK_CLASS.' '.($active
                 ? 'bg-emerald-50 text-emerald-700'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700'),
-            'aria_current' => $active ? 'page' : null,
-        ];
+            ariaCurrent: $active ? 'page' : null,
+        );
     }
 
-    /**
-     * @param  array<string, mixed>  $parameters
-     * @return array{url: string, icon: string, label: string, class: string, aria_current: string|null}
-     */
+    /** @param array<string, mixed> $parameters */
     private function footerLink(
         string $routeName,
         string $icon,
         string $label,
         bool $active,
         array $parameters = [],
-    ): array {
-        return [
-            'url' => $this->route($routeName, $parameters),
-            'icon' => $icon,
-            'label' => $label,
-            'class' => self::FOOTER_LINK_CLASS.' '.($active
+    ): LayoutNavigationItem {
+        return new LayoutNavigationItem(
+            url: $this->route($routeName, $parameters),
+            icon: $icon,
+            label: $label,
+            className: self::FOOTER_LINK_CLASS.' '.($active
                 ? 'bg-emerald-50 text-emerald-700'
                 : 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700'),
-            'aria_current' => $active ? 'page' : null,
-        ];
+            ariaCurrent: $active ? 'page' : null,
+        );
     }
 
-    /**
-     * @return array{url: string, icon: string, title: string, class: string, aria_current: string|null}
-     */
-    private function directoryLink(CatalogDirectoryDefinition $directory): array
+    private function directoryLink(CatalogDirectoryDefinition $directory): LayoutNavigationItem
     {
         $active = $this->request->routeIs($directory->key.'.*');
 
-        return [
-            'url' => $this->route($directory->indexRouteName),
-            'icon' => $directory->icon.' shrink-0 text-slate-400',
-            'title' => $directory->title,
-            'class' => 'flex min-h-11 min-w-0 items-center gap-2 py-2 text-sm font-semibold transition hover:text-emerald-700 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 '.($active
+        return new LayoutNavigationItem(
+            url: $this->route($directory->indexRouteName),
+            icon: $directory->icon.' shrink-0 text-slate-400',
+            label: $directory->title,
+            className: 'flex min-h-11 min-w-0 items-center gap-2 py-2 text-sm font-semibold transition hover:text-emerald-700 hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200 '.($active
                 ? 'text-emerald-700'
                 : 'text-slate-600'),
-            'aria_current' => $active ? 'page' : null,
-        ];
+            ariaCurrent: $active ? 'page' : null,
+        );
     }
 
     /** @param array<string, mixed> $parameters */

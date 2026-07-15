@@ -5,7 +5,7 @@
 ## Правило без inline PHP
 
 - В файлах `resources/views/**/*.blade.php` нельзя использовать `@php`, `@endphp`, `<?php` и `<?=`.
-- Blade не вызывает Eloquent/database, Cache/Redis/Memcached, service container, `env()`, filesystem и не готовит переменные closure/collection transformations. Это относится и к Livewire Blade views.
+- Blade не вызывает Eloquent/database, Cache/Redis/Memcached, service container, `env()`, `request()`, `config()`, auth/gate directives, filesystem и не готовит переменные closure/collection transformations. Это относится и к Livewire Blade views.
 - Volt и anonymous Livewire PHP внутри Blade запрещены; component class и view всегда находятся в отдельных файлах.
 - Blade-шаблоны должны оставаться декларативными: обычные директивы `@if`, `@foreach`, `@class`, `@isset`, компоненты и безопасный вывод `{{ }}`.
 - Request-specific данные готовятся в контроллере или action-классе.
@@ -15,7 +15,7 @@
 
 ## Текущая структура
 
-- `App\View\ViewData\AppLayoutData` готовит SEO, JSON-LD, метаданные и поисковые блоки для `layouts.app` через view composer в `AppServiceProvider`.
+- `App\View\ViewData\AppLayoutData` готовит SEO, JSON-LD, метаданные и поисковые блоки для `layouts.app` через view composer в `AppServiceProvider`. Он также один раз за request формирует header/footer URL, active/audience/permission state и полные Tailwind class maps как immutable `LayoutNavigationItem`; Blade только итерирует готовые элементы.
 - `App\View\ViewModels\CatalogTitlesViewModel` готовит подписи фильтров и параметры ссылок каталога.
 - `App\Support\CatalogAlphabet` без запросов к базе задаёт канонический порядок символов, кириллицы и `A`–`Z`; `CatalogTitlesViewModel` и `CatalogDirectoryPageBuilder` передают Blade готовые группы. Query-free компонент `x-catalog.alphabet-filter` только выводит эти группы и готовые query-ссылки каталога.
 - `App\Livewire\CatalogSeries` разделяет render-local данные на computed `catalogPage` и `catalogFacets`; Eloquent-коллекции не хранятся в публичных properties. Связанные Livewire islands `catalog-live` атомарно обновляют фильтры и карточки, а первый SSR не вычисляет facets. Карточки и строки используют `catalog-title-{id}` как стабильный `wire:key`.

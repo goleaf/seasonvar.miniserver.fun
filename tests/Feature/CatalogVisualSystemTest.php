@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\CatalogTitle;
 use App\Models\Genre;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\File;
@@ -27,6 +28,31 @@ class CatalogVisualSystemTest extends TestCase
             ->assertSee('aria-current="page"', false)
             ->assertSee('data-site-footer', false)
             ->assertSee('<main id="main-content"', false);
+    }
+
+    public function test_shell_navigation_receives_prepared_audience_and_permission_links(): void
+    {
+        config(['seasonvar.admin_emails' => ['admin@example.com']]);
+        $viewer = User::factory()->create(['email' => 'viewer@example.com']);
+        $admin = User::factory()->create(['email' => 'admin@example.com']);
+
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('href="'.route('login').'"', false)
+            ->assertSee('href="'.route('register').'"', false)
+            ->assertDontSee('href="'.route('library.index').'"', false)
+            ->assertDontSee('href="'.route('admin.imports').'"', false);
+
+        $this->actingAs($viewer)->get(route('home'))
+            ->assertOk()
+            ->assertSee('href="'.route('library.index').'"', false)
+            ->assertSee('href="'.route('profile.security').'"', false)
+            ->assertDontSee('href="'.route('login').'"', false)
+            ->assertDontSee('href="'.route('admin.imports').'"', false);
+
+        $this->actingAs($admin)->get(route('home'))
+            ->assertOk()
+            ->assertSee('href="'.route('admin.imports').'"', false);
     }
 
     public function test_site_footer_has_responsive_brand_navigation_and_service_regions(): void

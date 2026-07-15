@@ -31,7 +31,7 @@ Build assets: app CSS 154.51 kB / 32.90 gzip; app JS 8.51/3.61; player JS 11.73/
 | Health truthfulness | New scoped check reports `failed`: 32821 pending, 4 reserved; cache-warm oldest age 151156 s and import oldest age 3162 s | Code verified; worker restart/cache-warm installation still pending |
 | Deployment check | Instrumented full run: 24.45 s wall, SQLite quick/FK 23655 ms, remaining checks 0–303 ms; integrity pass; safe exit 1 for debug, 2 migrations and stale FTS | Finite but expensive; `duration_ms` verified; retain >=30 s operational budget |
 | Cache worker | versioned unit exists in Git but no process/installed unit | Blocker for cache-warm readiness |
-| Blade passive boundary | 41 `request()` and 1 `config()` calls | Architecture acceptance not met |
+| Blade passive boundary | Baseline 41 `request()` + 1 `config()`; current strengthened scan has zero request/config/auth/gate/facade/container/application-static violations across 52 files | Code, full PHPUnit and 21/21 browser scenarios verified |
 | Public storage | link absent | Verify need; not automatically a blocker |
 
 ## Browser evidence
@@ -53,3 +53,4 @@ No `.env` edit, destructive database command, queue clear, failed-job payload du
 - Import lifecycle RED/GREEN: admin/CLI/repeated dispatch shares one atomic active global run while targeted title refresh remains independent; rejected dispatch becomes a sanitized terminal failure.
 - Finalizer RED/GREEN: incomplete siblings/live claims return without polling release; terminal page/group completion signals deduplicated `ShouldBeUniqueUntilProcessing` finalizers; unique ten-minute watchdog restores lost signals in bounded batches.
 - Importer increment: 52 tests, 266 assertions; changed model/job/service Larastan 0 with `--memory-limit=1G`; targeted Pint pass; `schedule:list` confirms `*/10 * * * * seasonvar-import-finalization-watchdog`.
+- Passive Blade increment: shared typed navigation state removes route/auth/config decisions from templates; 42 shell/auth/Blade tests / 339 assertions, broader 120/1126 catalog set and full 840/6882 suite pass; `view:cache`, Vite build and changed-scope Larastan pass. The 21/21 desktop/mobile/tablet browser matrix passes. Build output: app CSS 156.01/33.09 gzip, app JS 8.51/3.61; lazy player chunks unchanged.

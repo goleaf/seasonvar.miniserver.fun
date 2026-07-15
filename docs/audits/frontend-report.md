@@ -14,12 +14,12 @@
 
 | ID | Класс | Наблюдение | Изменение | Статус | Verification / риск |
 | --- | --- | --- | --- | --- | --- |
-| FE-01 | Confirmed problem | 41 `request()` и 1 `config()` в Blade | Передавать active flags/class maps/max length из view data/components | Pending P1 | Zero-tolerance Blade contract + full browser suite |
+| FE-01 | Confirmed problem, fixed | Baseline: 41 `request()`, 1 `config()` and auth/gate directives in Blade | Prepared request/config/audience/permission/class state plus zero-tolerance scan | Implemented and browser verified | Zero matches in 52 Blade; 42 tests/339 assertions; `view:cache`, build and 21/21 desktop/mobile/tablet scenarios pass |
 | FE-02 | Confirmed problem | Layout 784 lines renders many non-standard SEO meta/content blocks | Remove unreachable/no-value blocks, retain canonical/OpenGraph/JSON-LD | Pending P4 | SEO snapshots and browser metadata checks required |
 | FE-03 | Confirmed problem | JSON-LD encoded inside Blade | Prepare an already hex-safe JSON scalar before render; retain one explicitly reviewed raw script boundary | Pending P1 | Validate JSON parse and XSS payload tests |
 | FE-04 | Confirmed problem | CSP is report-only with broad HTTPS origins and inline style allowance | Inventory actual asset/provider origins, staged tightening | Pending security | Enforcement can break playback if rushed |
 | FE-05 | Confirmed problem | HLS chunk is the largest asset | Keep lazy; inspect whether `hls.light` features match used capabilities | Planned measurement | Do not remove required subtitle/audio/error support blindly |
-| FE-06 | Probable | Header/footer active-state markup duplicated | Shared prepared navigation view model/component API | Pending P1 | Preserve auth/admin conditional links and 44px targets |
+| FE-06 | Confirmed problem, fixed | Header/footer active-state/audience markup duplicated | Shared immutable `LayoutNavigationItem` schema composed by request presenter | Implemented and browser verified | Guest/viewer/admin regression plus 21/21 browser scenarios preserve auth/admin visibility, responsive geometry and 44px targets |
 | FE-07 | Intentional | Light-only UI; no dark mode implementation | Preserve unless product explicitly requires dark mode | Accepted | User requested capable design generally, but project UI standard is light source of truth |
 | FE-08 | Intentional | JavaScript owns browser-only player/dialog/navigation cleanup only | Preserve | Accepted | No custom AJAX replacement of Livewire |
 

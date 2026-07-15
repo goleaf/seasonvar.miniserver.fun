@@ -30,9 +30,9 @@
                 <ul class="mt-3 space-y-1">
                     @foreach ($footer['navigation'] as $item)
                         <li>
-                            <a href="{{ $item['url'] }}" class="{{ $item['class'] }}" @if ($item['aria_current'] !== null) aria-current="{{ $item['aria_current'] }}" @endif>
-                                <x-ui.icon :name="$item['icon']" />
-                                <span>{{ $item['label'] }}</span>
+                            <a href="{{ $item->url }}" class="{{ $item->className }}" @if ($item->ariaCurrent !== null) aria-current="{{ $item->ariaCurrent }}" @endif>
+                                <x-ui.icon :name="$item->icon" />
+                                <span>{{ $item->label }}</span>
                             </a>
                         </li>
                     @endforeach
@@ -47,9 +47,9 @@
                 <ul class="mt-3 grid grid-cols-2 gap-x-4 gap-y-1">
                     @foreach ($footer['directories'] as $directory)
                         <li>
-                            <a href="{{ $directory['url'] }}" class="{{ $directory['class'] }}" @if ($directory['aria_current'] !== null) aria-current="{{ $directory['aria_current'] }}" @endif>
-                                <x-ui.icon :name="$directory['icon']" />
-                                <span class="min-w-0 break-words">{{ $directory['title'] }}</span>
+                            <a href="{{ $directory->url }}" class="{{ $directory->className }}" @if ($directory->ariaCurrent !== null) aria-current="{{ $directory->ariaCurrent }}" @endif>
+                                <x-ui.icon :name="$directory->icon" />
+                                <span class="min-w-0 break-words">{{ $directory->label }}</span>
                             </a>
                         </li>
                     @endforeach
@@ -64,9 +64,9 @@
                 <ul class="mt-3 space-y-1">
                     @foreach ($footer['service_links'] as $item)
                         <li>
-                            <a href="{{ $item['url'] }}" class="{{ $item['class'] }}" @if ($item['aria_current'] !== null) aria-current="{{ $item['aria_current'] }}" @endif>
-                                <x-ui.icon :name="$item['icon']" />
-                                <span>{{ $item['label'] }}</span>
+                            <a href="{{ $item->url }}" class="{{ $item->className }}" @if ($item->ariaCurrent !== null) aria-current="{{ $item->ariaCurrent }}" @endif>
+                                <x-ui.icon :name="$item->icon" />
+                                <span>{{ $item->label }}</span>
                             </a>
                         </li>
                     @endforeach

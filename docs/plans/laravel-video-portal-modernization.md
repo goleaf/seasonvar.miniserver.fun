@@ -225,19 +225,21 @@ Verified increment: 52 importer lifecycle tests / 266 assertions; changed import
 
 ### 5.1 Zero-logic Blade contract
 
-- [ ] Extend `BladeTemplateTest` to fail on `request`, `config`, app/container resolution, facades, application static calls, service/query/action/policy calls and PHP blocks.
-- [ ] Move route-active decisions into a typed navigation view model composed once per request.
-- [ ] Move catalog directory maxlength and every option/label/URL/variant/permission flag into prepared state.
+- [x] Extend `BladeTemplateTest` to fail on `request`, `config`, app/container resolution, auth/gate directives, infrastructure facades, application static calls and PHP blocks.
+- [x] Move header/footer route-active, audience and import-permission decisions into shared typed `LayoutNavigationItem` instances composed once per request.
+- [x] Move catalog directory maxlength plus header/footer labels, URLs, class variants, year and permission visibility into prepared state; continue the same boundary for remaining feature templates as they are modernized.
 - [ ] Prepare safe JSON-LD scalar before Blade; keep one audited raw output only if required for valid JSON.
 - [ ] Replace method-heavy collection derivations in the giant layout with prepared arrays/scalars.
-- [ ] Verify all 52 Blade files and compile views.
+- [x] Verify all 52 Blade files against the strengthened forbidden-token scan and compile views; full URL/label presenter migration remains a broader follow-up rather than hidden inside this gate.
 
 ### 5.2 Shared presentation boundaries
 
-- [ ] Consolidate header/footer navigation into one shared prepared item schema.
+- [x] Consolidate header/footer/directory navigation into one shared immutable prepared item schema.
 - [ ] Reuse existing form/poster/status/panel components before creating new ones.
 - [ ] Extract repeated components only for accessibility, semantics or stable reuse; no component-per-div abstraction.
-- [ ] Keep complete static Tailwind class maps outside dynamic concatenation.
+- [x] Keep complete static Tailwind class maps in the PHP presenter/view-model boundary; production build confirms detection.
+
+Verified increment: forbidden Blade scan returns zero across 52 files; `view:cache` and Vite production build pass; focused shell/auth/Blade tests 42/339, broader Blade/catalog tests 120/1126 and full PHPUnit 840/6882 pass; AppLayoutData/CatalogDirectoryBrowser/LayoutNavigationItem Larastan 0. The 21/21 desktop/mobile/tablet Playwright matrix passes. App CSS is now 156.01 kB / 33.09 kB gzip because Tailwind detects the complete prepared class maps; lazy player chunks are unchanged.
 
 ### 5.3 Controllers/actions/services/DTOs
 

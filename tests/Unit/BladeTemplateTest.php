@@ -58,7 +58,8 @@ class BladeTemplateTest extends TestCase
 
                 return preg_match('/<\?(?:php|=)/i', $contents) === 1
                     || preg_match('/\b(?:Auth|Cache|Gate|Redis|Storage|DB)::|\b(?:cache|config|request|resolve|app)\s*\(|::query\s*\(/', $contents) === 1
-                    || preg_match('/@(?:auth|guest|can|cannot|canany|cannotany)\b/i', $contents) === 1;
+                    || preg_match('/\bnew\s+\\\\?App\\\\|\\\\?App\\\\[A-Za-z0-9_\\\\]+::/', $contents) === 1
+                    || preg_match('/@(?:auth|guest|can|cannot|canany|cannotany|inject|use)\b/i', $contents) === 1;
             })
             ->map(fn (SplFileInfo $file): string => str_replace(base_path().'/', '', $file->getPathname()))
             ->values()
