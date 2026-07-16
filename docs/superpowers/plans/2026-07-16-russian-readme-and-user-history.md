@@ -158,13 +158,15 @@ git diff --check
 
 Существующее состояние было сохранено в именованном stash. После появления новых параллельных изменений файлы задачи изолируются точным списком staged-путей без временного удаления активных чужих файлов; перед commit ещё раз проверяются `git status --short --branch` и `git diff --cached --name-only`.
 
-- [ ] **Шаг 4: Создать атомарный коммит в main**
+- [x] **Шаг 4: Создать атомарный коммит в main**
 
 ```bash
 git add README.md AGENTS.md .githooks/pre-commit scripts/check-readme-policy.sh tests/Unit/ReadmePolicyScriptTest.php docs/README.md docs/development.md docs/superpowers/specs/2026-07-16-russian-readme-and-user-history-design.md docs/superpowers/plans/2026-07-16-russian-readme-and-user-history.md
 git commit -m "docs: add Russian user-facing project roadmap"
 ```
 
-- [ ] **Шаг 5: Вернуть постороннее рабочее состояние и отправить коммит**
+- [x] **Шаг 5: Вернуть постороннее рабочее состояние и отправить коммит**
 
 После безопасного восстановления чужих изменений проверить, что они сохранились, затем отправить новый `main` в `origin` и сравнить локальный и удалённый SHA.
+
+Итог выполнения: девять файлов реализации вошли в коммит `5a84293` и были подтверждены в `origin/main`; параллельные изменения не вошли в этот коммит и сохранили своё staged/unstaged состояние.
