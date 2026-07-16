@@ -102,23 +102,43 @@
                 @endforeach
             </div>
             <nav class="mt-5" aria-label="{{ __('profiles.pagination') }}">{{ $items->links() }}</nav>
-        @elseif (in_array($tab, ['reviews', 'comments'], true))
+        @elseif ($tab === 'reviews')
             <div class="space-y-4">
                 @foreach ($items as $item)
                     <article class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
                         <div class="flex flex-wrap items-start justify-between gap-3">
                             <div class="min-w-0">
-                                @if ($item['title'] ?? null)<h2 class="break-words text-lg font-black text-slate-900">{{ $item['title'] }}</h2>@endif
-                                @if ($item['target_url'] && $item['target_title'])<a href="{{ $item['target_url'] }}" class="mt-1 inline-flex min-h-9 items-center gap-2 break-words text-sm font-bold text-emerald-700 hover:text-emerald-600"><x-ui.icon name="fa-solid fa-clapperboard" />{{ $item['target_title'] }}</a>@endif
+                                @if ($item->title)<h2 class="break-words text-lg font-black text-slate-900">{{ $item->title }}</h2>@endif
+                                @if ($item->targetUrl && $item->targetTitle)<a href="{{ $item->targetUrl }}" class="mt-1 inline-flex min-h-9 items-center gap-2 break-words text-sm font-bold text-emerald-700 hover:text-emerald-600"><x-ui.icon name="fa-solid fa-clapperboard" />{{ $item->targetTitle }}</a>@endif
                             </div>
-                            <span class="text-xs font-semibold text-slate-500">{{ $item['published_at'] }}</span>
+                            <span class="text-xs font-semibold text-slate-500">{{ $item->publishedAt }}</span>
                         </div>
-                        @if ($item['is_spoiler'])
+                        @if ($item->isSpoiler)
                             <p class="mt-4 rounded-control bg-amber-50 px-3 py-3 text-sm font-semibold text-amber-900"><x-ui.icon name="fa-solid fa-eye-slash" /> {{ __('profiles.spoiler_hidden') }}</p>
-                        @elseif ($item['excerpt'])
-                            <p class="mt-4 whitespace-pre-line break-words text-sm leading-7 text-slate-700">{{ $item['excerpt'] }}</p>
+                        @elseif ($item->excerpt)
+                            <p class="mt-4 whitespace-pre-line break-words text-sm leading-7 text-slate-700">{{ $item->excerpt }}</p>
                         @endif
-                        <a href="{{ $item['direct_url'] }}" class="mt-4 inline-flex min-h-10 items-center text-sm font-bold text-slate-600 hover:text-emerald-700">{{ __('profiles.actions.open') }}</a>
+                        <a href="{{ $item->directUrl }}" class="mt-4 inline-flex min-h-10 items-center text-sm font-bold text-slate-600 hover:text-emerald-700">{{ __('profiles.actions.open') }}</a>
+                    </article>
+                @endforeach
+            </div>
+            <nav class="mt-5" aria-label="{{ __('profiles.pagination') }}">{{ $items->links() }}</nav>
+        @elseif ($tab === 'comments')
+            <div class="space-y-4">
+                @foreach ($items as $item)
+                    <article class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                @if ($item->targetUrl && $item->targetTitle)<a href="{{ $item->targetUrl }}" class="mt-1 inline-flex min-h-9 items-center gap-2 break-words text-sm font-bold text-emerald-700 hover:text-emerald-600"><x-ui.icon name="fa-solid fa-clapperboard" />{{ $item->targetTitle }}</a>@endif
+                            </div>
+                            <span class="text-xs font-semibold text-slate-500">{{ $item->publishedAt }}</span>
+                        </div>
+                        @if ($item->isSpoiler)
+                            <p class="mt-4 rounded-control bg-amber-50 px-3 py-3 text-sm font-semibold text-amber-900"><x-ui.icon name="fa-solid fa-eye-slash" /> {{ __('profiles.spoiler_hidden') }}</p>
+                        @elseif ($item->excerpt)
+                            <p class="mt-4 whitespace-pre-line break-words text-sm leading-7 text-slate-700">{{ $item->excerpt }}</p>
+                        @endif
+                        <a href="{{ $item->directUrl }}" class="mt-4 inline-flex min-h-10 items-center text-sm font-bold text-slate-600 hover:text-emerald-700">{{ __('profiles.actions.open') }}</a>
                     </article>
                 @endforeach
             </div>
@@ -126,10 +146,10 @@
         @else
             <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($items as $item)
-                    @if ($item['url'] && $item['title'])
-                        <a href="{{ $item['url'] }}" class="flex min-w-0 gap-3 rounded-panel border border-slate-200 bg-white p-3 shadow-panel hover:border-emerald-200">
-                            @if ($item['poster_url'])<img src="{{ $item['poster_url'] }}" alt="" loading="lazy" class="h-24 w-16 shrink-0 rounded-control object-cover">@endif
-                            <span class="min-w-0"><span class="block break-words font-black text-slate-900">{{ $item['title'] }}</span>@if ($item['year'])<span class="mt-1 block text-xs font-bold text-slate-500">{{ $item['year'] }}</span>@endif</span>
+                    @if ($item->url && $item->title)
+                        <a href="{{ $item->url }}" class="flex min-w-0 gap-3 rounded-panel border border-slate-200 bg-white p-3 shadow-panel hover:border-emerald-200">
+                            @if ($item->posterUrl)<img src="{{ $item->posterUrl }}" alt="" loading="lazy" class="h-24 w-16 shrink-0 rounded-control object-cover">@endif
+                            <span class="min-w-0"><span class="block break-words font-black text-slate-900">{{ $item->title }}</span>@if ($item->year)<span class="mt-1 block text-xs font-bold text-slate-500">{{ $item->year }}</span>@endif</span>
                         </a>
                     @endif
                 @endforeach

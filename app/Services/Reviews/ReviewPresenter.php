@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Reviews;
 
+use App\DTOs\Reviews\PublicReviewActivityData;
 use App\DTOs\Reviews\ReviewItemData;
 use App\DTOs\Reviews\ReviewViewerContext;
 use App\Enums\ReviewOrigin;
@@ -138,6 +139,25 @@ final class ReviewPresenter
                 && Gate::forUser($viewer)->allows('report', $review),
             canModerate: $writable && Gate::forUser($viewer)->allows('moderate', $review),
             version: (int) ($review->version ?? 1),
+        );
+    }
+
+    public function publicAuthorItem(CatalogTitleReview $review): PublicReviewActivityData
+    {
+        $title = $review->relationLoaded('catalogTitle') ? $review->catalogTitle : null;
+        $isSpoiler = (bool) $review->is_spoiler;
+
+        return new PublicReviewActivityData(
+            id: (int) $review->id,
+            title: $isSpoiler || ! filled($review->review_title)
+                ? null
+                : (string) $review->review_title,
+            excerpt: $isSpoiler ? null : Str::limit((string) $review->body, 420),
+            isSpoiler: $isSpoiler,
+            targetTitle: $title instanceof CatalogTitle ? $title->display_title : null,
+            targetUrl: $title instanceof CatalogTitle ? route('titles.show', $title) : null,
+            directUrl: route('reviews.show', ['review' => $review->id]),
+            publishedAt: ($review->published_at ?? $review->created_at)?->diffForHumans() ?? '',
         );
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Reviews;
 
 use App\DTOs\Reviews\AdminReviewItemData;
+use App\DTOs\Reviews\PublicReviewActivityData;
 use App\DTOs\Reviews\ReviewCriteria;
 use App\DTOs\Reviews\ReviewItemData;
 use App\DTOs\Reviews\ReviewViewerContext;
@@ -134,6 +135,65 @@ final class CatalogTitleReviewQuery
             null,
             in_array((int) $review->id, $revealedReviewIds, true),
         ));
+    }
+
+    /** @return LengthAwarePaginator<int, PublicReviewActivityData> */
+    public function forPublicAuthor(
+        int $authorId,
+        ?User $viewer,
+        int $perPage,
+        string $pageName = 'reviewsPage',
+    ): LengthAwarePaginator {
+        $perPage = max(1, $perPage);
+
+        if ($authorId < 1 || ! $this->schema->communityAvailable()) {
+            return new LengthAwarePaginator([], 0, $perPage, options: ['pageName' => $pageName]);
+        }
+
+        return CatalogTitleReview::query()
+            ->where('user_id', $authorId)
+            ->publiclyVisible()
+            ->whereIn(
+                'catalog_title_id',
+                $this->titles->visibleTo($viewer)->select('catalog_titles.id'),
+            )
+            ->with([
+                'catalogTitle' => fn ($query) => $query
+                    ->select(['id', 'slug', 'title', 'original_title']),
+            ])
+            ->latest('published_at')
+            ->orderByDesc('id')
+            ->paginate(
+                $perPage,
+                [
+                    'id',
+                    'catalog_title_id',
+                    'review_title',
+                    'body',
+                    'is_spoiler',
+                    'published_at',
+                    'created_at',
+                ],
+                $pageName,
+            )
+            ->withQueryString()
+            ->through(fn (CatalogTitleReview $review): PublicReviewActivityData => $this->presenter->publicAuthorItem($review));
+    }
+
+    public function publicCountForAuthor(int $authorId, ?User $viewer): int
+    {
+        if ($authorId < 1 || ! $this->schema->communityAvailable()) {
+            return 0;
+        }
+
+        return CatalogTitleReview::query()
+            ->where('user_id', $authorId)
+            ->publiclyVisible()
+            ->whereIn(
+                'catalog_title_id',
+                $this->titles->visibleTo($viewer)->select('catalog_titles.id'),
+            )
+            ->count();
     }
 
     public function pageForPublicReview(

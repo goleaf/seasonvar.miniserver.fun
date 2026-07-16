@@ -784,7 +784,7 @@ Must remain semantically unchanged: provider `catalog_title_reviews`, imported r
 
 ## Task 13 — canonical serial reviews, ratings and moderation
 
-Status: implementation and owner documentation complete; final verification in progress on 2026-07-15. This is the only Task 13 implementation plan. It extends the deployed `catalog_title_reviews` domain in place and does not introduce a competing review table.
+Status: implementation, owner documentation, post-Task-14 integration verification and scoped `main` commit complete on 2026-07-16. Push was attempted against the configured HTTPS remote and the same GitHub repository over SSH, but this environment has neither valid HTTPS credentials nor an SSH key; remote publication remains an external credential blocker. This is the only Task 13 implementation plan. It extends the deployed `catalog_title_reviews` domain in place and does not introduce a competing review table.
 
 ### Audited baseline and discovered risks
 
@@ -831,6 +831,8 @@ Status: implementation and owner documentation complete; final verification in p
 - [x] Direct-link browser acceptance found both that a lazy child request does not retain the outer title request's `review` query parameter and that a missing hash target cannot trigger viewport-lazy loading. `CatalogTitleDetail` now captures the positive stable review ID once in a locked property, passes it into the review island and disables viewport deferral only for that direct-link request, so canonical redirects load, focus and highlight the correct `review-{id}` without trusting hydrated client state; ordinary title pages remain lazy and shared-cache safe.
 - [x] Pagination acceptance with 16 mixed user/provider rows found that Livewire's fallback paginator inherited a relative original path and omitted active review criteria. Title, private history and moderation paginators now set their canonical named-route path and append only validated sort/filter values; page 1/2 and browser back/forward preserve deterministic state without duplicate `titles/titles/...` URLs.
 - [x] Isolated privacy acceptance exercised shared block/mute filtering plus account export/deletion. Blocked voting failed server-side and blocked/muted direct links returned safe 404s; export contained only the owner's review/vote fields, while deletion preserved anonymized review/report evidence and removed rating, vote, notification, preference, restriction and reporter/deduplication linkage.
+- [x] The Task 14 profile domain intentionally superseded the original “no public author directory” limitation with explicit per-section privacy. Its first integration queried and projected reviews inside `PublicUserProfileQuery`, repeated the public visibility/spoiler excerpt rules and hid only the body excerpt while still returning a spoiler review title. The 2026-07-16 re-audit therefore found both competing read/presentation logic and a spoiler-title disclosure in public profile cards. Public profile review rows and counts must delegate to the canonical review query/presenter, which omits both title and excerpt for spoilers, while profile services retain only profile authorization and section-privacy orchestration.
+- [x] The legacy read-only review API still negotiated `ru|en` through `SetApiLocale`, but its page/per-page validation messages were hard-coded in Russian. The response shape and route remain unchanged; only validation presentation must move to the existing review translation catalog so the already-supported locale is honored.
 
 ### Canonical domain contract
 
@@ -874,8 +876,10 @@ Status: implementation and owner documentation complete; final verification in p
 - [x] Integrate title page, private profile history, administration, routes/anchors, legacy API compatibility, title merge, recommendations and SEO/noindex policy.
 - [x] Add complete Russian/English interface catalogs and accessible mobile-first Livewire/Blade controls with server-side spoiler reveal, loading/empty/error/confirmation states and no Blade queries/business JS.
 - [x] Update topic-owner documentation, maintenance log and English changelog; record known limitations and the complete manual acceptance checklist.
-- [ ] Run only allowed static/Pint/route/schema/query/translation/security/cache/SEO/Vite/browser diagnostics; do not create or run automated tests for Task 13.
-- [ ] Reread Task 13 and all changed/directly-related files, inspect final diff/status on `main`, commit completed work and push configured remote.
+- [x] Normalize the later Task 14 public-profile integration through `CatalogTitleReviewQuery`/`ReviewPresenter`, including the matching public count, and localize legacy review API validation without changing the API contract.
+- [x] Run only allowed static/Pint/route/schema/query/translation/security/cache/SEO/Vite/browser diagnostics; do not create or run automated tests for Task 13.
+- [x] Reread Task 13 and all changed/directly-related files, inspect final diff/status on `main` and commit the scoped implementation.
+- [ ] Push configured remote: attempted on 2026-07-16; HTTPS returned HTTP 401/no anonymous write access and the same GitHub repository rejected SSH with `Permission denied (publickey)`. Retry the existing local `main` after credentials are restored; no force push or remote change is required.
 
 ### Expected files and protected boundaries
 

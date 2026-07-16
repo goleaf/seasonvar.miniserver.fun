@@ -8,7 +8,6 @@ use App\DTOs\Profiles\PublicUserProfileData;
 use App\Enums\CatalogWatchStatus;
 use App\Enums\CommentStatus;
 use App\Models\CatalogCollection;
-use App\Models\CatalogTitleReview;
 use App\Models\CatalogTitleUserState;
 use App\Models\Comment;
 use App\Models\User;
@@ -16,6 +15,7 @@ use App\Models\UserBlock;
 use App\Models\UserMute;
 use App\Models\UserProfile;
 use App\Services\Catalog\CatalogTitleQuery;
+use App\Services\Reviews\CatalogTitleReviewQuery;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
@@ -24,6 +24,7 @@ final class PublicUserProfilePresenter
     public function __construct(
         private readonly UserProfileMediaService $media,
         private readonly CatalogTitleQuery $titles,
+        private readonly CatalogTitleReviewQuery $reviews,
     ) {}
 
     public function present(UserProfile $profile, ?User $viewer): PublicUserProfileData
@@ -78,11 +79,7 @@ final class PublicUserProfilePresenter
 
         return [
             'reviews' => $sections['reviews']
-                ? CatalogTitleReview::query()
-                    ->where('user_id', $profile->user_id)
-                    ->whereIn('catalog_title_id', clone $visibleTitleIds)
-                    ->publiclyVisible()
-                    ->count()
+                ? $this->reviews->publicCountForAuthor((int) $profile->user_id, $viewer)
                 : 0,
             'comments' => $sections['comments']
                 ? Comment::query()

@@ -126,7 +126,7 @@ Task 12 не добавляет comment endpoints в legacy или `/api/v1`: т
 
 ## Отзывы пользователей и API
 
-Existing `GET /api/v1/titles/{titleSlug}/reviews` and route name remain backward-compatible read-only provider-review feed. `CatalogReviewQuery` explicitly filters `origin=provider,status=published,deleted_at IS NULL,merged_into_id IS NULL` when the additive schema is ready; before migration `ReviewSchema` preserves the legacy query. Response fields/pagination do not expose source page, hashes, user/account IDs, votes, reports, moderation, rating state or viewer overlays.
+Existing `GET /api/v1/titles/{titleSlug}/reviews` and route name remain backward-compatible read-only provider-review feed. `CatalogReviewQuery` explicitly filters `origin=provider,status=published,deleted_at IS NULL,merged_into_id IS NULL` when the additive schema is ready; before migration `ReviewSchema` preserves the legacy query. Response fields/pagination do not expose source page, hashes, user/account IDs, votes, reports, moderation, rating state or viewer overlays. `SetApiLocale` continues to allow only supported `ru|en`; page/per-page validation messages now use the paired review catalog without changing status codes, keys or response shape.
 
 Community review create/edit/delete/vote/report/moderation/history are web Livewire only and intentionally absent from mobile API/OpenAPI. This avoids silently broadening token abilities, caching or privacy semantics. A future mobile contract must reuse existing review actions/policy/DTO, declare private/no-store responses and never mix imported provider ratings with portal review score.
 

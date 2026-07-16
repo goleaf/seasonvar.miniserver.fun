@@ -77,7 +77,7 @@ Admin view receives bounded query results, enum options and merge impact from `T
 
 ## Представление профилей пользователей
 
-`resources/views/livewire/profile/public-profile-page.blade.php` renders only prepared `PublicUserProfileData` and selected paginator rows. Privacy/count/authorization/SEO are computed in typed PHP, spoiler bodies are absent until their canonical discussion/review page handles reveal, and watch cards contain only safe title-level data. `profile-page.blade.php` remains owner-only and receives prepared options/URLs/limits; it does not resolve models/services/config or arbitrary privacy fields. Author links in comment/review/collection components are optional prepared URLs and never cause Blade queries.
+`resources/views/livewire/profile/public-profile-page.blade.php` renders only prepared `PublicUserProfileData` and typed selected-paginator DTOs. Privacy/authorization/SEO are computed in profile PHP; review rows/count delegate to `CatalogTitleReviewQuery` and `ReviewPresenter`, so both spoiler title and body are absent from the public card until the canonical review page handles reveal. Comment and watch projections remain typed, watch cards contain only safe title-level data, and no paginator array shape is interpreted as a domain rule in Blade. `profile-page.blade.php` remains owner-only and receives prepared options/URLs/limits; it does not resolve models/services/config or arbitrary privacy fields. Author links in comment/review/collection components are optional prepared URLs and never cause Blade queries.
 
 ## Представление настроек аккаунта
 

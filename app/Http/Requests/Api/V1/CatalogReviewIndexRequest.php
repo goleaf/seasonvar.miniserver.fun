@@ -26,11 +26,11 @@ final class CatalogReviewIndexRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'page.integer' => 'Номер страницы должен быть целым числом.',
-            'page.min' => 'Номер страницы должен быть не меньше 1.',
-            'per_page.integer' => 'Размер страницы должен быть целым числом.',
-            'per_page.min' => 'Размер страницы должен быть не меньше 1.',
-            'per_page.max' => 'Размер страницы не должен быть больше 50.',
+            'page.integer' => __('reviews.api_validation.page_integer'),
+            'page.min' => __('reviews.api_validation.page_min'),
+            'per_page.integer' => __('reviews.api_validation.per_page_integer'),
+            'per_page.min' => __('reviews.api_validation.per_page_min'),
+            'per_page.max' => __('reviews.api_validation.per_page_max'),
         ];
     }
 
