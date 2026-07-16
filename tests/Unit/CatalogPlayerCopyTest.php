@@ -26,9 +26,12 @@ final class CatalogPlayerCopyTest extends TestCase
             ], array_keys($payloads[$locale]['runtime']));
             $this->assertSame([
                 'restart', 'rewind', 'play', 'pause', 'fastForward', 'seek',
-                'played', 'buffered', 'currentTime', 'duration', 'volume',
+                'seekLabel', 'played', 'buffered', 'currentTime', 'duration', 'volume',
                 'mute', 'unmute', 'enableCaptions', 'disableCaptions',
-                'enterFullscreen', 'exitFullscreen', 'settings', 'pip',
+                'download', 'enterFullscreen', 'exitFullscreen', 'frameTitle',
+                'captions', 'settings', 'pip', 'menuBack', 'speed', 'normal',
+                'quality', 'loop', 'start', 'end', 'all', 'reset', 'disabled',
+                'enabled', 'advertisement',
             ], array_keys($payloads[$locale]['controls']));
             $this->assertNotContains('', Arr::flatten($payloads[$locale]));
         }
