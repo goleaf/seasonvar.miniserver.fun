@@ -27,8 +27,19 @@ clear_laravel_cache_artifacts() {
     php artisan config:clear --no-interaction >/dev/null 2>&1 || true
     php artisan route:clear --no-interaction >/dev/null 2>&1 || true
     php artisan view:clear --no-interaction >/dev/null 2>&1 || true
-    rm -f "$APP_EVENTS_CACHE" "$APP_PACKAGES_CACHE" "$APP_SERVICES_CACHE"
+    rm -f \
+        "$APP_CONFIG_CACHE" \
+        "$APP_EVENTS_CACHE" \
+        "$APP_PACKAGES_CACHE" \
+        "$APP_ROUTES_CACHE" \
+        "$APP_SERVICES_CACHE"
+
+    if [[ -d "$VIEW_COMPILED_PATH" ]]; then
+        find "$VIEW_COMPILED_PATH" -maxdepth 1 -type f -delete
+    fi
 }
+
+clear_laravel_cache_artifacts
 
 run_laravel_cache_validation() (
     mkdir -p "$ci_output_root" "$VIEW_COMPILED_PATH"
@@ -38,16 +49,18 @@ run_laravel_cache_validation() (
     php artisan view:cache --no-interaction
 )
 
-run_backend() {
+run_backend() (
+    trap clear_laravel_cache_artifacts EXIT
     composer validate --strict
     composer audit
+    clear_laravel_cache_artifacts
     ./vendor/bin/pint --test --format=agent
     find app bootstrap config database routes tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
     composer analyse
     php artisan project:docs-refresh --check --no-interaction
     run_laravel_cache_validation
     php artisan test
-}
+)
 
 run_frontend() {
     npm audit --audit-level=high
@@ -55,9 +68,16 @@ run_frontend() {
 }
 
 run_browser() {
+    local browser_database="${BROWSER_TEST_DATABASE:-$repo_root/output/playwright/browser.sqlite}"
+
+    if [[ "$browser_database" != /* ]]; then
+        browser_database="$repo_root/$browser_database"
+    fi
+
     export APP_URL="${PLAYWRIGHT_APP_URL:-http://127.0.0.1:8013}"
     export DB_CONNECTION=sqlite
-    export DB_DATABASE="${BROWSER_TEST_DATABASE:-output/playwright/browser.sqlite}"
+    export DB_DATABASE="$browser_database"
+    export BROWSER_TEST_DATABASE="$browser_database"
     export PLAYBACK_ALLOWED_HOSTS="${PLAYBACK_ALLOWED_HOSTS:-media.example.com}"
     export PLAYBACK_ENFORCE_PUBLIC_DNS="${PLAYBACK_ENFORCE_PUBLIC_DNS:-false}"
 

@@ -64,6 +64,8 @@ final class CiQualityGateContractTest extends TestCase
 
         $this->assertStringContainsString('run_laravel_cache_validation', $qualityGate);
         $this->assertStringContainsString('trap clear_laravel_cache_artifacts EXIT', $qualityGate);
+        $this->assertGreaterThanOrEqual(3, substr_count($qualityGate, 'clear_laravel_cache_artifacts'));
+        $this->assertStringContainsString('find "$VIEW_COMPILED_PATH" -maxdepth 1 -type f -delete', $qualityGate);
     }
 
     public function test_unknown_profile_is_rejected_without_running_a_check(): void
@@ -73,6 +75,24 @@ final class CiQualityGateContractTest extends TestCase
 
         $this->assertSame(2, $process->getExitCode());
         $this->assertStringContainsString('Неизвестный профиль проверки CI', $process->getErrorOutput());
+    }
+
+    public function test_backend_profile_cleans_isolated_artifacts_after_all_backend_checks(): void
+    {
+        $qualityGate = File::get(base_path('scripts/ci-check.sh'));
+        $pint = json_decode(File::get(base_path('pint.json')), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertStringContainsString("run_backend() (\n    trap clear_laravel_cache_artifacts EXIT", $qualityGate);
+        $this->assertContains('output', $pint['exclude']);
+    }
+
+    public function test_browser_profile_exports_one_absolute_fixture_database_path(): void
+    {
+        $qualityGate = File::get(base_path('scripts/ci-check.sh'));
+
+        $this->assertStringContainsString('$repo_root/output/playwright/browser.sqlite', $qualityGate);
+        $this->assertStringContainsString('export DB_DATABASE="$browser_database"', $qualityGate);
+        $this->assertStringContainsString('export BROWSER_TEST_DATABASE="$browser_database"', $qualityGate);
     }
 
     public function test_pre_push_runs_the_same_local_quality_gate_before_upload(): void
