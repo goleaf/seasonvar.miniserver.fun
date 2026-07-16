@@ -12,6 +12,8 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
 
         $this->withoutVite();
+        $this->app->setLocale((string) config('account-settings.default_locale', 'ru'));
+        $this->withHeader('Accept-Language', 'ru');
         config([
             'cache-architecture.stores.hot' => 'array',
             'cache-architecture.stores.domain' => 'array',

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Catalog;
 
 use App\DTOs\CatalogRecommendationExplanation;
+use App\Enums\CatalogRecommendationReason;
 use App\Enums\CatalogRecommendationType;
 use App\Enums\CatalogTitleRelationType;
 
@@ -64,6 +65,32 @@ final class CatalogRecommendationPresenter
             ->all();
     }
 
+    /** @return list<CatalogRecommendationExplanation> */
+    public function storedSimilarityExplanations(mixed $storedReasons): array
+    {
+        $reasons = is_array($storedReasons) ? $storedReasons : [];
+
+        return collect($reasons)
+            ->map(fn (mixed $details, string $reason): array => [
+                'reason' => $reason,
+                'score' => is_array($details) ? max(0, (int) ($details['score'] ?? 0)) : 0,
+            ])
+            ->sort(function (array $left, array $right): int {
+                $score = $right['score'] <=> $left['score'];
+
+                return $score !== 0 ? $score : $left['reason'] <=> $right['reason'];
+            })
+            ->map(fn (array $item): ?CatalogRecommendationExplanation => $this->storedExplanation($item['reason']))
+            ->filter()
+            ->unique(fn (CatalogRecommendationExplanation $explanation): string => $explanation->reason->value.'|'.json_encode(
+                $explanation->parameters,
+                JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE,
+            ))
+            ->take(4)
+            ->values()
+            ->all();
+    }
+
     public function relation(CatalogTitleRelationType $type): string
     {
         return __("recommendations.relations.{$type->value}");
@@ -91,6 +118,42 @@ final class CatalogRecommendationPresenter
             'reviews',
             'published_media',
             'source_signal',
+            'collection_signal',
         ], true) ? $reason : null;
+    }
+
+    private function storedExplanation(string $reason): ?CatalogRecommendationExplanation
+    {
+        if (str_starts_with($reason, 'theme_')) {
+            $theme = __("recommendations.similarity_reasons.{$reason}");
+
+            if ($theme === "recommendations.similarity_reasons.{$reason}") {
+                return null;
+            }
+
+            return new CatalogRecommendationExplanation(
+                CatalogRecommendationReason::SimilarTheme,
+                ['theme' => $theme],
+            );
+        }
+
+        $mapped = match ($reason) {
+            'genre' => CatalogRecommendationReason::SimilarGenres,
+            'tag' => CatalogRecommendationReason::SimilarTags,
+            'director' => CatalogRecommendationReason::SharedDirector,
+            'actor' => CatalogRecommendationReason::SharedActor,
+            'network' => CatalogRecommendationReason::SharedNetwork,
+            'studio' => CatalogRecommendationReason::SharedStudio,
+            'translation' => CatalogRecommendationReason::SharedTranslation,
+            'country' => CatalogRecommendationReason::SameCountry,
+            'status' => CatalogRecommendationReason::SameStatus,
+            'age_rating' => CatalogRecommendationReason::SimilarAgeRating,
+            'year' => CatalogRecommendationReason::NearbyYear,
+            'source_signal' => CatalogRecommendationReason::ImportedRelation,
+            'collection_signal' => CatalogRecommendationReason::SharedEditorialCollection,
+            default => null,
+        };
+
+        return $mapped !== null ? new CatalogRecommendationExplanation($mapped) : null;
     }
 }

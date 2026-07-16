@@ -86,7 +86,10 @@ class ImportSeasonvarSourcePage implements ShouldQueue
             return;
         }
 
-        $page = SourcePage::query()->with(['source', 'catalogTitle'])->find($this->sourcePageId);
+        $page = SourcePage::query()->with([
+            'source:id,code,base_url,crawl_delay_seconds',
+            'catalogTitle:id,source_id,source_page_id,source_url,source_url_hash',
+        ])->find($this->sourcePageId);
 
         if ($page === null) {
             $claims->release($this->sourcePageId, $this->importRunId, $this->claimToken);

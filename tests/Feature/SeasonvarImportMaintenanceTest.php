@@ -7,6 +7,7 @@ use App\Models\Actor;
 use App\Models\CatalogRelationSourceIdentity;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
+use App\Models\CatalogTitleRecommendationSignal;
 use App\Models\Country;
 use App\Models\Episode;
 use App\Models\Genre;
@@ -17,6 +18,7 @@ use App\Models\SeasonvarImportRun;
 use App\Models\Source;
 use App\Models\SourcePage;
 use App\Models\SourcePageSnapshot;
+use App\Models\Studio;
 use App\Models\Taxonomy;
 use App\Models\Translation;
 use App\Services\Catalog\CatalogMetadataDeduplicator;
@@ -425,6 +427,7 @@ class SeasonvarImportMaintenanceTest extends TestCase
         config([
             'seasonvar.media_check.enabled' => false,
             'seasonvar.recommendations.min_score' => 600,
+            'recommendations.similarity_v6.allow_activation_without_golden' => true,
         ]);
 
         $genre = Genre::query()->create([
@@ -434,6 +437,14 @@ class SeasonvarImportMaintenanceTest extends TestCase
         $actor = Actor::query()->create([
             'name' => 'Общий актер',
             'slug' => 'obshii-akter-rekomendacij',
+        ]);
+        $secondActor = Actor::query()->create([
+            'name' => 'Второй общий актер',
+            'slug' => 'vtoroi-obshii-akter-rekomendacij',
+        ]);
+        $studio = Studio::query()->create([
+            'name' => 'Общая студия',
+            'slug' => 'obshhaia-studiia-rekomendacij',
         ]);
         $catalogTitle = CatalogTitle::factory()->create([
             'title' => 'Импортный главный сериал',
@@ -447,12 +458,32 @@ class SeasonvarImportMaintenanceTest extends TestCase
         ]);
         $catalogTitle->genres()->attach($genre->id);
         $recommendedTitle->genres()->attach($genre->id);
-        $catalogTitle->actors()->attach($actor->id);
-        $recommendedTitle->actors()->attach($actor->id);
+        $catalogTitle->actors()->attach([$actor->id, $secondActor->id]);
+        $recommendedTitle->actors()->attach([$actor->id, $secondActor->id]);
+        $catalogTitle->studios()->attach($studio->id);
+        $recommendedTitle->studios()->attach($studio->id);
         LicensedMedia::factory()->create([
             'catalog_title_id' => $recommendedTitle->id,
             'status' => 'published',
             'published_at' => now(),
+        ]);
+        CatalogTitleRecommendationSignal::query()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'source' => 'seasonvar_info',
+            'signal_type' => 'taxonomy_genre',
+            'signal_key' => 'detektiv',
+            'signal_value' => 'Детектив',
+            'weight' => 120,
+            'observed_at' => now(),
+        ]);
+        CatalogTitleRecommendationSignal::query()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'source' => 'seasonvar_related',
+            'signal_type' => 'provider_recommendation',
+            'signal_key' => (string) $recommendedTitle->id,
+            'signal_value' => 'Проверенная связь',
+            'weight' => 900,
+            'observed_at' => now(),
         ]);
 
         $this->artisan('seasonvar:import', ['--no-discovery' => true])
@@ -466,15 +497,61 @@ class SeasonvarImportMaintenanceTest extends TestCase
 
         $this->assertNotNull($recommendation);
         $this->assertSame(1, $recommendation->rank);
-        $this->assertSame('v4', $recommendation->algorithm_version);
+        $this->assertSame('v6', $recommendation->algorithm_version);
         $this->assertSame('full', $run->summary['last_recommendations']['mode']);
-        $this->assertSame('v4', $run->summary['last_recommendations']['algorithm_version']);
+        $this->assertSame('v6', $run->summary['last_recommendations']['algorithm_version']);
         $this->assertSame(2, $run->summary['last_recommendations']['titles']);
         $this->assertSame(1, $run->summary['last_recommendations']['titles_with_recommendations']);
         $this->assertSame(1, $run->summary['last_recommendations']['titles_without_recommendations']);
         $this->assertSame(12, $run->summary['last_recommendations']['max_per_title']);
         $this->assertGreaterThan(0, $run->summary['last_recommendations']['stored']);
         $this->assertGreaterThanOrEqual(0, $run->summary['last_recommendations']['duration_ms']);
+        $this->assertTrue($run->summary['last_recommendation_signal_prune']['executed']);
+        $this->assertSame(1, $run->summary['last_recommendation_signal_prune']['checked']);
+        $this->assertSame(1, $run->summary['last_recommendation_signal_prune']['deleted']);
+        $this->assertDatabaseMissing('catalog_title_recommendation_signals', [
+            'catalog_title_id' => $catalogTitle->id,
+            'source' => 'seasonvar_info',
+            'signal_type' => 'taxonomy_genre',
+        ]);
+        $this->assertDatabaseHas('catalog_title_recommendation_signals', [
+            'catalog_title_id' => $catalogTitle->id,
+            'source' => 'seasonvar_related',
+            'signal_type' => 'provider_recommendation',
+        ]);
+    }
+
+    public function test_it_keeps_generic_signals_when_v6_shadow_build_is_not_activated(): void
+    {
+        Http::preventStrayRequests();
+        config([
+            'seasonvar.media_check.enabled' => false,
+            'recommendations.similarity_v6.allow_activation_without_golden' => false,
+        ]);
+
+        $catalogTitle = CatalogTitle::factory()->create();
+        CatalogTitleRecommendationSignal::query()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'source' => 'seasonvar_info',
+            'signal_type' => 'release_year',
+            'signal_key' => '2024',
+            'signal_value' => '2024',
+            'weight' => 25,
+            'observed_at' => now(),
+        ]);
+
+        $this->artisan('seasonvar:import', ['--no-discovery' => true])
+            ->assertExitCode(0);
+
+        $run = SeasonvarImportRun::query()->latest('id')->firstOrFail();
+
+        $this->assertFalse($run->summary['last_recommendations']['activated']);
+        $this->assertFalse($run->summary['last_recommendation_signal_prune']['executed']);
+        $this->assertDatabaseHas('catalog_title_recommendation_signals', [
+            'catalog_title_id' => $catalogTitle->id,
+            'source' => 'seasonvar_info',
+            'signal_type' => 'release_year',
+        ]);
     }
 
     public function test_it_cleans_invalid_catalog_relation_names_during_import_cycle(): void
@@ -1156,6 +1233,11 @@ class SeasonvarImportMaintenanceTest extends TestCase
             'status' => 'published',
             'check_status' => 'not_checked',
             'checked_at' => null,
+            'file_size_bytes' => 128_000_000,
+            'file_size_checked_at' => now(),
+            'file_size_check_status' => 'known',
+            'file_size_source' => 'content-length',
+            'file_size_http_status' => 200,
             'published_at' => now(),
         ]);
         $mediaUpdatedAt = $media->updated_at?->toDateTimeString();
@@ -1465,9 +1547,16 @@ class SeasonvarImportMaintenanceTest extends TestCase
         ])->assertExitCode(0);
 
         $unrelatedMedia->refresh();
+        $targetTitle = CatalogTitle::query()->where('external_id', '47915')->firstOrFail();
+        $run = SeasonvarImportRun::query()->latest('id')->firstOrFail();
 
         $this->assertNull($unrelatedMedia->quality);
         $this->assertNull($unrelatedMedia->format);
+        $this->assertSame($targetTitle->id, $run->summary['last_targeted_catalog_title_id']);
+        $this->assertDatabaseHas('catalog_recommendation_dirty_titles', [
+            'catalog_title_id' => $targetTitle->id,
+            'reason' => 'targeted-import',
+        ]);
     }
 
     public function test_it_backfills_all_missing_media_metadata_across_chunks(): void

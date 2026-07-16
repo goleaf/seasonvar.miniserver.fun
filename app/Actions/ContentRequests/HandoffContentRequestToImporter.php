@@ -28,7 +28,9 @@ final readonly class HandoffContentRequestToImporter
 
     public function handle(User $moderator, int $requestId): ContentRequest
     {
-        $request = ContentRequest::query()->with('sourceLinks')->findOrFail($requestId);
+        $request = ContentRequest::query()
+            ->with('sourceLinks:id,content_request_id,url,provider')
+            ->findOrFail($requestId);
         Gate::forUser($moderator)->authorize('moderate', $request);
 
         if (! in_array($request->status, [ContentRequestStatus::Approved, ContentRequestStatus::Planned, ContentRequestStatus::InProgress], true)) {

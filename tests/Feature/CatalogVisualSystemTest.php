@@ -24,8 +24,8 @@ class CatalogVisualSystemTest extends TestCase
             ->assertOk()
             ->assertSee('href="#main-content"', false)
             ->assertSee('data-site-header', false)
-            ->assertSee('aria-label="Поиск по названию"', false)
-            ->assertSee('placeholder="Название сериала"', false)
+            ->assertSee('aria-label="Поиск по каталогу"', false)
+            ->assertSee('placeholder="Введите название или раздел"', false)
             ->assertSee('aria-label="Основная навигация"', false)
             ->assertSee('aria-current="page"', false)
             ->assertSee('data-site-footer', false)
@@ -431,8 +431,8 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringNotContainsString('Найти в группе', $content);
         $this->assertStringNotContainsString('data-catalog-filter-search', $content);
         $this->assertSame(0, substr_count($content, 'data-catalog-people-combobox'));
-        $this->assertSame(0, substr_count($content, 'role="combobox"'));
-        $this->assertSame(0, substr_count($content, 'role="listbox"'));
+        $this->assertSame(1, substr_count($content, 'role="combobox"'));
+        $this->assertSame(1, substr_count($content, 'role="listbox"'));
         $this->assertStringContainsString('aria-current="true"', $content);
         $this->assertStringNotContainsString('Применить выбранное', $content);
         $this->assertLessThan(250_000, strlen($content));
@@ -443,9 +443,9 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('data-catalog-filter-groups', $filterTemplate);
         $this->assertStringContainsString('columns-1', $filterTemplate);
         $this->assertStringContainsString('break-inside-avoid rounded-control border border-slate-200 bg-white p-3', $filterTemplate);
-        $this->assertStringContainsString('<span>Годы</span>', $filterTemplate);
-        $this->assertStringContainsString('<span>Тип публикации</span>', $filterTemplate);
-        $this->assertStringContainsString('<span>Субтитры</span>', $filterTemplate);
+        $this->assertStringContainsString("__('catalog.catalog.filters.years')", $filterTemplate);
+        $this->assertStringContainsString("__('catalog.catalog.filters.publication_type')", $filterTemplate);
+        $this->assertStringContainsString("__('catalog.catalog.filters.subtitles')", $filterTemplate);
         $this->assertStringContainsString('@foreach ($filterView->typeLabels as $filterType => $label)', $filterTemplate);
         $this->assertStringNotContainsString('<form', $filterTemplate);
         $this->assertStringContainsString('wire:model.live="filters.{{ $filterType }}"', $filterTemplate);
@@ -453,7 +453,7 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringNotContainsString('wire:loading.delay.flex', $filterTemplate);
         $this->assertDoesNotMatchRegularExpression('/wire:model\.live=.*@checked/m', $filterTemplate);
         $this->assertSame(4, substr_count($filterTemplate, 'wire:replace.self'));
-        $this->assertStringContainsString('Обновляем подборку', $filterTemplate);
+        $this->assertStringContainsString("__('catalog.catalog.filters.updating')", $filterTemplate);
 
         $catalogTemplate = file_get_contents(resource_path('views/catalog/titles.blade.php'));
 

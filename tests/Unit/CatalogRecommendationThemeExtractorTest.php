@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use App\Services\Catalog\CatalogRecommendationThemeExtractor;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class CatalogRecommendationThemeExtractorTest extends TestCase
@@ -48,5 +49,38 @@ class CatalogRecommendationThemeExtractorTest extends TestCase
 
         $this->assertSame('Шоу-бизнес', $normalizedThemes['show_business']);
         $this->assertLessThanOrEqual(8, count($boundedThemes));
+    }
+
+    /**
+     * @param  list<string>  $present
+     * @param  list<string>  $missing
+     */
+    #[DataProvider('themeCorpus')]
+    public function test_it_matches_whole_tokens_and_phrases_without_substring_collisions(
+        string $text,
+        array $present,
+        array $missing,
+    ): void {
+        $themes = app(CatalogRecommendationThemeExtractor::class)->extract(null, null, $text);
+
+        foreach ($present as $theme) {
+            $this->assertArrayHasKey($theme, $themes);
+        }
+
+        foreach ($missing as $theme) {
+            $this->assertArrayNotHasKey($theme, $themes);
+        }
+    }
+
+    /**
+     * @return iterable<string, array{text: string, present: list<string>, missing: list<string>}>
+     */
+    public static function themeCorpus(): iterable
+    {
+        $cases = require dirname(__DIR__).'/Fixtures/recommendations/theme-corpus.php';
+
+        foreach ($cases as $name => $case) {
+            yield $name => $case;
+        }
     }
 }

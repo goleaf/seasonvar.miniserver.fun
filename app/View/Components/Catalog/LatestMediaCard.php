@@ -118,9 +118,7 @@ class LatestMediaCard extends Component
             'season_label' => $season?->number !== null
                 ? __('catalog.release.season', ['number' => $season->number])
                 : null,
-            'episode_label' => $episode->number !== null
-                ? __('catalog.release.episode', ['number' => $episode->number])
-                : __('catalog.release.episode_without_number'),
+            'episode_label' => __('catalog.release.episode', ['number' => $episode->number]),
             'update_type' => 'new_episode',
             'update_type_label' => __('home.update_types.new_episode'),
             'title' => filled($episode->title) ? (string) $episode->title : null,

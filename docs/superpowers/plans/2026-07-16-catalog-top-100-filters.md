@@ -220,7 +220,7 @@ git commit -m "feat: define Top 100 filter contract"
 - Preserves: `CatalogTopListQuery::hasItems(CatalogTopListCategory): bool` for sitemap callers.
 - Produces: `CatalogTopListPageBuilder::data(CatalogTopListCategory, ?User, bool, CatalogTopListFilters): array`.
 
-- [ ] **Step 1: Добавить failing feature tests**
+- [x] **Step 1: Добавить failing feature tests**
 
 В `CatalogTopListPageTest` создать Литву и США, присоединить страны к трём rankable titles с годами `2009`, `2015`, `2022`, затем запросить:
 
@@ -241,13 +241,13 @@ $response
 
 В существующем тесте лимита присоединить страну к 101-й по score карточке и доказать, что запрос по этой стране возвращает её. Это фиксирует применение фильтра до `LIMIT 100`.
 
-- [ ] **Step 2: Запустить feature tests и подтвердить RED**
+- [x] **Step 2: Запустить feature tests и подтвердить RED**
 
 Run: `php artisan test --filter='CatalogTopListPageTest::test_top_list_filters|CatalogTopListPageTest::test_page_is_capped'`
 
 Expected: FAIL, потому что controller/query игнорируют фильтры.
 
-- [ ] **Step 3: Передать DTO через controller и page builder**
+- [x] **Step 3: Передать DTO через controller и page builder**
 
 ```php
 public function show(CatalogTopListRequest $request, CatalogTopListCategory $category): View
@@ -266,7 +266,7 @@ public function localized(
 
 Private `view()` передаёт `$request->filters()` четвёртым аргументом `CatalogTopListPageBuilder::data()`.
 
-- [ ] **Step 4: Применить DTO внутри ranking query**
+- [x] **Step 4: Применить DTO внутри ranking query**
 
 Добавить nullable DTO в public `items()`, создать `$filters ??= CatalogTopListFilters::empty()` и передать его в `rankedRows()`. В `rankedRows()` сформировать context так:
 
@@ -282,13 +282,13 @@ $context = new CatalogRecommendationContext(
 
 `hasItems()` вызывает `rankedRows($category, 1, CatalogTopListFilters::empty())`, поэтому sitemap остаётся основан на базовых категориях.
 
-- [ ] **Step 5: Запустить feature tests и подтвердить GREEN**
+- [x] **Step 5: Запустить feature tests и подтвердить GREEN**
 
 Run: `php artisan test --filter=CatalogTopListPageTest`
 
 Expected: PASS; country/year filters меняют состав и порядок до лимита.
 
-- [ ] **Step 6: Проверить SQL форму**
+- [x] **Step 6: Проверить SQL форму**
 
 Run: `php artisan test --filter=test_movie_classification_groups_episode_counts_once`
 
@@ -312,7 +312,7 @@ Expected: PASS; grouped episode subquery сохраняется, per-title corre
 - Produces page data keys: `filterForm`, `emptyState`, query-preserving `categoryLinks`.
 - Consumes in SEO: `CatalogTopListFilters $filters`.
 
-- [ ] **Step 1: Написать failing UI/SEO tests**
+- [x] **Step 1: Написать failing UI/SEO tests**
 
 Проверить в одном feature test:
 
@@ -329,13 +329,13 @@ $response
 
 Для фильтрованного запроса проверить canonical без query, `noindex,follow`, отсутствие `ItemList` и наличие reset URL. Для пустого filtered result проверить тексты «По выбранным условиям ничего не найдено» и «Сбросить фильтры».
 
-- [ ] **Step 2: Запустить tests и подтвердить RED**
+- [x] **Step 2: Запустить tests и подтвердить RED**
 
 Run: `php artisan test --filter='CatalogTopListPageTest::test_filtered|CatalogTopListPageTest::test_top_list_filter_form'`
 
 Expected: FAIL, потому что form state и filtered SEO ещё не подготовлены.
 
-- [ ] **Step 3: Реализовать bounded country options service**
+- [x] **Step 3: Реализовать bounded country options service**
 
 ```php
 public function countries(): Collection
@@ -354,11 +354,11 @@ public function countries(): Collection
 }
 ```
 
-- [ ] **Step 4: Подготовить form и empty state в page builder**
+- [x] **Step 4: Подготовить form и empty state в page builder**
 
 `filterForm` содержит `action`, `resetUrl`, `yearFrom`, `yearTo`, `country`, `countries`, `maximumYear`, `active`. Category URLs объединяют route parameters с `$filters->query()`. `emptyState` выбирает filtered или base translation keys и готовый action URL.
 
-- [ ] **Step 5: Сделать filtered SEO неиндексируемым**
+- [x] **Step 5: Сделать filtered SEO неиндексируемым**
 
 В `CatalogTopListSeoBuilder::build()` добавить `CatalogTopListFilters $filters`. Условие:
 
@@ -370,15 +370,15 @@ $indexable = ! $filters->active()
 
 Canonical остаётся route URL без query. `alternates` и `jsonLd` выводятся только при `$indexable`.
 
-- [ ] **Step 6: Добавить пассивную GET-форму в Blade**
+- [x] **Step 6: Добавить пассивную GET-форму в Blade**
 
 Вставить после category navigation `<section data-top-list-filters>` с одним `<form method="GET">`. Использовать responsive grid `sm:grid-cols-2 xl:grid-cols-[minmax(8rem,10rem)_minmax(8rem,10rem)_minmax(14rem,1fr)_auto]`, native inputs/select, `x-form.input-error`, emerald primary button и плоский reset link. Все значения и URL брать только из `$filterForm`.
 
-- [ ] **Step 7: Добавить ru/en copy**
+- [x] **Step 7: Добавить ru/en copy**
 
 Добавить паритетные ключи `filters.*`, `empty_filtered_*`, `empty_filtered_action`, а также validation/attribute keys из Task 1. Русский текст не использует импортную или техническую терминологию.
 
-- [ ] **Step 8: Запустить focused tests и подтвердить GREEN**
+- [x] **Step 8: Запустить focused tests и подтвердить GREEN**
 
 Run: `php artisan test --filter='CatalogTopListPageTest|PublicPageCachePolicyTest|AppLayoutOptionalNavigationTest'`
 
@@ -403,21 +403,21 @@ Expected: PASS; базовые SEO assertions не изменены, filtered qu
 - Preserves: catalog cache key includes normalized `year_from`, `year_to`, `country`.
 - Documents: filters are applied before ranking and filtered pages are `noindex`.
 
-- [ ] **Step 1: Добавить cache characterization test**
+- [x] **Step 1: Добавить cache characterization test**
 
 Создать три `PublicPageCachePolicy` contexts для `top.show`: одинаковые query keys в разном порядке должны иметь одинаковый hash, а другая страна или диапазон — другой hash. Route parameter category передавать как `CatalogTopListCategory::Movies` и проверить, что dimension содержит backed enum value `movies`.
 
-- [ ] **Step 2: Запустить cache test**
+- [x] **Step 2: Запустить cache test**
 
 Run: `php artisan test tests/Unit/PublicPageCachePolicyTest.php`
 
 Expected: PASS без production cache code changes, потому что allowlist уже содержит эти query keys.
 
-- [ ] **Step 3: Обновить owner docs и README**
+- [x] **Step 3: Обновить owner docs и README**
 
 В README описать фильтры в списке возможностей и добавить посетительскую запись от `16.07.2026` в последнем разделе второго уровня. В CHANGELOG и owner docs зафиксировать request/DTO/query/SEO/cache contract, отсутствие новой схемы и применение условий до `LIMIT 100`.
 
-- [ ] **Step 4: Проверить managed documentation**
+- [x] **Step 4: Проверить managed documentation**
 
 Run: `php artisan project:docs-refresh --check --no-interaction`
 
@@ -430,13 +430,13 @@ Expected: exit 0. Если check сообщает drift, запустить `php
 **Files:**
 - Verify all changed files from Tasks 1–4.
 
-- [ ] **Step 1: Запустить Pint**
+- [x] **Step 1: Запустить Pint**
 
 Run: `./vendor/bin/pint --dirty --format agent`
 
 Expected: exit 0.
 
-- [ ] **Step 2: Запустить focused suite**
+- [x] **Step 2: Запустить focused suite**
 
 Run: `php artisan test --filter='CatalogTopListPageTest|CatalogTopListFiltersTest|PublicPageCachePolicyTest|PublicCacheRouteSafetyTest|AppLayoutOptionalNavigationTest'`
 

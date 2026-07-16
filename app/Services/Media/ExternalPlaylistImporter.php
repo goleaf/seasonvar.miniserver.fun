@@ -128,7 +128,10 @@ final class ExternalPlaylistImporter
         $entries = $this->parse($content, $baseUrl);
         $titles = $forcedTitle === null
             ? $this->candidateTitles($entries)
-            : new EloquentCollection([$forcedTitle->loadMissing(['seasons.episodes'])]);
+            : new EloquentCollection([$forcedTitle->loadMissing([
+                'seasons:id,catalog_title_id,number,kind',
+                'seasons.episodes:id,season_id,number,kind',
+            ])]);
         $result = [
             'total' => count($entries),
             'imported' => 0,
@@ -357,7 +360,7 @@ final class ExternalPlaylistImporter
         $candidateIds = [];
 
         CatalogTitle::query()
-            ->select(['id', 'slug', 'title', 'original_title'])
+            ->select(['id', 'slug', 'title', 'original_title', 'source_url_hash'])
             ->chunkById(self::TITLE_MATCH_CHUNK_SIZE, function (EloquentCollection $titles) use ($entries, &$candidateIds): void {
                 foreach ($titles as $title) {
                     foreach ($entries as $entry) {
@@ -375,8 +378,12 @@ final class ExternalPlaylistImporter
         }
 
         return CatalogTitle::query()
+            ->select(['id', 'slug', 'title', 'original_title', 'source_url_hash'])
             ->whereKey(array_values($candidateIds))
-            ->with(['seasons.episodes'])
+            ->with([
+                'seasons:id,catalog_title_id,number,kind',
+                'seasons.episodes:id,season_id,number,kind',
+            ])
             ->orderBy('id')
             ->get();
     }

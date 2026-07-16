@@ -135,10 +135,11 @@ Offline evaluator считает:
 - concentration: top candidate frequency и долю кандидатов с ≥100 входящими связями;
 - intra-list diversity;
 - explanation faithfulness;
+- долю явно оценённых строк golden pool (`judgment coverage`), чтобы не считать неразмеченные пары нерелевантными;
 - churn относительно active version;
 - duration и peak memory rebuild.
 
-`v6` не активируется, если ухудшает `nDCG@12`, availability или количество пустых выдач сверх явно записанного допуска. Первоначальный допуск: availability не ниже 100%, `nDCG@12` не ниже baseline, empty-source count не растёт; остальные метрики публикуются в summary для ручной оценки.
+`v6` не активируется, если build не содержит ни одной строки либо ухудшает `nDCG@12`, availability или количество пустых выдач сверх явно записанного допуска. Первоначальный допуск: candidate rows > 0, availability не ниже 100%, `nDCG@12` не ниже baseline, empty-source count не растёт, а `judgment coverage` golden pool не ниже 80%. Явный override отсутствующей локальной golden-разметки не отменяет требования непустой, доступной и объяснимой выдачи. Неразмеченные пары исключаются из Precision/nDCG, а не получают вымышленную оценку `0`; остальные метрики публикуются в summary для ручной оценки.
 
 ## Shadow build и активация
 

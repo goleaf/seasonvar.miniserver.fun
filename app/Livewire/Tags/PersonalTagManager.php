@@ -25,8 +25,6 @@ final class PersonalTagManager extends Component
 
     public string $description = '';
 
-    public ?string $contentLocale = null;
-
     #[Locked]
     public ?string $editingPublicId = null;
 
@@ -56,9 +54,6 @@ final class PersonalTagManager extends Component
 
     public function mount(): void
     {
-        $this->contentLocale = in_array(app()->getLocale(), config('tags.supported_locales', []), true)
-            ? app()->getLocale()
-            : null;
         $this->tags->purgeExpired($this->user());
 
         if ($this->selectedPublicId !== null && $this->tagQuery->owned($this->user(), $this->selectedPublicId) === null) {
@@ -87,7 +82,6 @@ final class PersonalTagManager extends Component
         $this->editingVersion = (int) $tag->content_version;
         $this->name = (string) $tag->name;
         $this->description = (string) ($tag->description ?? '');
-        $this->contentLocale = $tag->content_locale;
         $this->status = null;
         $this->resetValidation();
     }
@@ -101,7 +95,7 @@ final class PersonalTagManager extends Component
     public function save(): void
     {
         $user = $this->user();
-        $data = new PersonalTagData($this->name, $this->description, $this->contentLocale);
+        $data = new PersonalTagData($this->name, $this->description, 'ru');
 
         if ($this->editingPublicId === null) {
             $tag = $this->tags->create($user, $data);
@@ -167,7 +161,6 @@ final class PersonalTagManager extends Component
             'restorableTags' => $this->tagQuery->restorable($user),
             'selectedTag' => $selectedTag,
             'taggedTitles' => $selectedTag === null ? null : $this->tagQuery->titles($user, $selectedTag),
-            'supportedLocales' => config('tags.supported_locales', []),
             'canInteract' => $user->hasVerifiedEmail(),
         ])->extends('layouts.app', [
             'title' => __('tags.personal_page.title'),
@@ -185,9 +178,6 @@ final class PersonalTagManager extends Component
     {
         $this->name = '';
         $this->description = '';
-        $this->contentLocale = in_array(app()->getLocale(), config('tags.supported_locales', []), true)
-            ? app()->getLocale()
-            : null;
         $this->editingPublicId = null;
         $this->editingVersion = null;
         $this->resetValidation();

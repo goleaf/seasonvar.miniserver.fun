@@ -42,7 +42,9 @@ final class CatalogSearchQueryParser
         $terms = $tokens
             ->reject(fn (string $term): bool => $year !== null && $term === (string) $year)
             ->reject(fn (string $term): bool => $this->isStopWord($term))
-            ->filter(fn (string $term): bool => preg_match('/^\d+$/', $term) === 1 || mb_strlen($term) >= 2)
+            ->filter(fn (string $term): bool => preg_match('/^\d+$/', $term) === 1
+                || mb_strlen($term) >= 2
+                || ($tokens->count() === 1 && mb_strlen($term) === 1))
             ->unique()
             ->take(8)
             ->values();

@@ -44,7 +44,7 @@ final readonly class UpdateContentRequest
             $request->explanation = $this->optional($data['explanation'] ?? null, 4_000);
             $request->audio_language = $this->language($data['audio_language'] ?? null);
             $request->subtitle_language = $this->language($data['subtitle_language'] ?? null);
-            $request->loadMissing('externalIdentifiers');
+            $request->loadMissing('externalIdentifiers:id,content_request_id,provider,normalized_identifier');
             $identity = $this->identity->forRequest($request);
             $duplicate = ContentRequest::query()
                 ->where('active_identity_key', $identity)

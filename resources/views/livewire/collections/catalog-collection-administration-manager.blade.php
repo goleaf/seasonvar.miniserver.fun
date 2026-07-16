@@ -4,6 +4,31 @@
         <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{{ __('collections.admin.description') }}</p>
     </header>
 
+    @if ($sourceSyncSummary !== null)
+        <section data-collection-source-sync-summary class="rounded-panel border border-slate-200 bg-white p-5 shadow-panel sm:p-6" aria-labelledby="collection-source-sync-title">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <h2 id="collection-source-sync-title" class="text-lg font-black text-slate-800">{{ __('collections.sync.title') }}</h2>
+                    <p class="mt-1 text-sm leading-6 text-slate-600">{{ __('collections.sync.description') }}</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <x-ui.status-pill :variant="$sourceSyncSummary['status_variant']">{{ $sourceSyncSummary['status_label'] }}</x-ui.status-pill>
+                    <time datetime="{{ $sourceSyncSummary['completed_at_iso'] }}" class="text-xs font-semibold text-slate-500">
+                        {{ __('collections.sync.completed_at', ['date' => $sourceSyncSummary['completed_at_label']]) }}
+                    </time>
+                </div>
+            </div>
+            <dl class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                @foreach ($sourceSyncSummary['metrics'] as $metric)
+                    <div class="rounded-control bg-slate-50 px-3 py-3">
+                        <dt class="text-xs font-bold text-slate-500">{{ $metric['label'] }}</dt>
+                        <dd class="mt-1 text-lg font-black text-slate-800">{{ $metric['value'] }}</dd>
+                    </div>
+                @endforeach
+            </dl>
+        </section>
+    @endif
+
     @if ($notice)
         <x-form.status-message :message="$notice" />
     @endif

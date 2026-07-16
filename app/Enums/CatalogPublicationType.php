@@ -12,13 +12,7 @@ enum CatalogPublicationType: string
 
     public function label(): string
     {
-        return match ($this) {
-            self::Serial => 'Сериал',
-            self::Show => 'Передача',
-            self::Anime => 'Аниме',
-            self::Documentary => 'Документальное',
-            self::Unknown => 'Не определено',
-        };
+        return (string) __("catalog.catalog.publication_types.{$this->value}");
     }
 
     /** @return list<string> */

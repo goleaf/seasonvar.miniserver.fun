@@ -11,6 +11,7 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use InvalidArgumentException;
 use Psr\Http\Message\StreamInterface;
 use Throwable;
 
@@ -32,13 +33,25 @@ final class PoliteHttpClient
         ?callable $progress = null,
         array $headers = [],
         ?int $maxResponseBytes = null,
+        ?string $httpVersion = null,
     ): Response {
+        $transportOptions = [];
+
+        if ($httpVersion !== null) {
+            if (! in_array($httpVersion, ['1.0', '1.1', '2.0'], true)) {
+                throw new InvalidArgumentException('Неподдерживаемая версия HTTP для внешнего запроса.');
+            }
+
+            $transportOptions['version'] = $httpVersion;
+        }
+
         return $this->request(
             $url,
             $delaySeconds,
             $progress,
             $headers,
             $maxResponseBytes,
+            $transportOptions,
         );
     }
 
@@ -136,6 +149,13 @@ final class PoliteHttpClient
             ->filter(fn (string $value): bool => trim($value) !== '')
             ->map(fn (string $value): string => trim($value))
             ->all();
+
+        if (isset($transportOptions['version'])) {
+            $transportOptions['sink'] = new BoundedResponseSink($maxResponseBytes);
+        } else {
+            $transportOptions['stream'] = true;
+        }
+
         $response = Http::withHeaders([
             'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'User-Agent' => 'SeasonvarCatalog/0.1 (+https://seasonvar.miniserver.fun)',
@@ -143,7 +163,6 @@ final class PoliteHttpClient
         ])
             ->withOptions($transportOptions)
             ->withoutRedirecting()
-            ->withOptions(['stream' => true])
             ->timeout(20)
             ->connectTimeout(10)
             ->retry(2, 1000, $this->shouldRetry(...), throw: false)

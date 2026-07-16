@@ -12,6 +12,7 @@ use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionItem;
+use App\Models\CatalogCollectionSyncRun;
 use App\Models\CatalogStatus;
 use App\Models\CatalogTitle;
 use App\Models\Country;
@@ -421,6 +422,44 @@ final class CatalogCollectionQuery
             ->paginate($perPage, pageName: 'collectionAdminPage');
     }
 
+    /**
+     * @return array{status: string, counters: array{collections_processed: int, pages: int, items: int, matched: int, ambiguous: int, unmatched: int}, completed_at_label: string, completed_at_iso: string}|null
+     */
+    public function latestSourceSyncSummary(): ?array
+    {
+        if (! $this->schema->sourceSyncAvailable()) {
+            return null;
+        }
+
+        $run = CatalogCollectionSyncRun::query()
+            ->select(['id', 'status', 'counters', 'started_at', 'completed_at'])
+            ->where('provider', 'hdrezka')
+            ->latest('started_at')
+            ->latest('id')
+            ->limit(1)
+            ->first();
+
+        if ($run === null) {
+            return null;
+        }
+
+        $rawCounters = is_array($run->counters) ? $run->counters : [];
+        $counters = [];
+
+        foreach (['collections_processed', 'pages', 'items', 'matched', 'ambiguous', 'unmatched'] as $key) {
+            $counters[$key] = max(0, (int) ($rawCounters[$key] ?? 0));
+        }
+
+        $timestamp = $run->completed_at ?? $run->started_at;
+
+        return [
+            'status' => $run->status->value,
+            'counters' => $counters,
+            'completed_at_label' => $timestamp->format('d.m.Y H:i'),
+            'completed_at_iso' => $timestamp->toAtomString(),
+        ];
+    }
+
     /** @return Builder<CatalogCollection> */
     public function publicSitemapQuery(): Builder
     {
@@ -443,7 +482,7 @@ final class CatalogCollectionQuery
             ->select('catalog_titles.poster_url')
             ->limit(1);
 
-        return CatalogCollection::query()
+        $query = CatalogCollection::query()
             ->select('catalog_collections.*')
             ->selectSub($fallbackPoster, 'fallback_poster_url')
             ->with('owner:id,public_id,name')
@@ -458,6 +497,14 @@ final class CatalogCollectionQuery
                 'items as visible_items_count' => fn (Builder $query): Builder => $query
                     ->whereIn('catalog_title_id', $this->visibleTitleIds()),
             ]);
+
+        if ($this->schema->sourceSyncAvailable()) {
+            $query->withExists(['sourceRecord as has_import_source']);
+        } else {
+            $query->selectRaw('0 as has_import_source');
+        }
+
+        return $query;
     }
 
     /** @return Builder<CatalogTitle> */

@@ -21,7 +21,7 @@
             </h2>
             <p class="mt-1 break-words text-sm font-bold text-slate-700">{{ $issue->targetLabel }}</p>
             @if ($issue->summary)
-                <p class="mt-2 line-clamp-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600">{{ $issue->summary }}</p>
+                <p class="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-600">{{ $issue->summary }}</p>
             @endif
             @if ($staff && $issue->requesterName)
                 <p class="mt-2 text-xs text-slate-500">{{ __('issues.admin.requester') }}: {{ $issue->requesterName }}</p>

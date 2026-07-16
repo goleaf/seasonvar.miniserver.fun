@@ -132,6 +132,14 @@ final class AppLayoutData
                     $this->request->routeIs('collections.mine', 'collections.edit'),
                 );
             }
+            if ($this->router->has('profile.show')) {
+                $layoutHeaderNavigation[] = $this->headerLink(
+                    'profile.show',
+                    'fa-solid fa-user',
+                    __('catalog.navigation.profile'),
+                    $this->request->routeIs('profile.show'),
+                );
+            }
             if ($this->router->has('settings.index')) {
                 $layoutHeaderNavigation[] = $this->headerLink(
                     'settings.index',
@@ -319,20 +327,9 @@ final class AppLayoutData
         }
         $layoutHeader = [
             'home_url' => $layoutHomeUrl,
-            'search_url' => $this->route('titles.index'),
+            'search_url' => $this->navigationRoute('search.index'),
             'navigation' => $layoutHeaderNavigation,
             'show_logout' => $isAuthenticated,
-            'locale_switch_url' => $this->route('locale.switch'),
-            'locales' => collect((array) config('catalog-collections.supported_locales', []))
-                ->filter(fn (mixed $locale): bool => is_string($locale) && $locale !== '')
-                ->map(fn (string $locale): array => [
-                    'code' => $locale,
-                    'label' => $this->localeLabel($locale),
-                    'active' => $locale === $interfaceLocale,
-                    'return_to' => $this->localizedRoutes->targetFor($this->request, $locale),
-                ])
-                ->values()
-                ->all(),
         ];
         $layoutFooter = [
             'home_url' => $layoutHomeUrl,
@@ -365,9 +362,9 @@ final class AppLayoutData
         }
 
         $canonicalUrl = $this->nullableString($seo['canonical'] ?? null) ?? $this->urls->current();
-        $layoutSearchValue = $this->request->query('q', '');
+        $layoutSearchValue = $this->request->old('q', $this->request->query('q', ''));
         $layoutSearchQuery = is_scalar($layoutSearchValue)
-            ? mb_substr(Str::squish((string) $layoutSearchValue), 0, 160)
+            ? mb_substr(Str::squish((string) $layoutSearchValue), 0, 80)
             : '';
         $robots = $this->nullableString($seo['robots'] ?? null)
             ?? 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
@@ -577,16 +574,6 @@ final class AppLayoutData
         $value = trim((string) $value);
 
         return $value !== '' ? $value : null;
-    }
-
-    private function localeLabel(string $locale): string
-    {
-        $key = 'catalog.locale.names.'.$locale;
-        $label = $this->translator->get($key);
-
-        return is_string($label) && $label !== '' && $label !== $key
-            ? $label
-            : Str::upper($locale);
     }
 
     /** @return list<array{name: string, url: string}> */

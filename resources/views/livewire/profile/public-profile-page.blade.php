@@ -148,7 +148,7 @@
                 @foreach ($items as $item)
                     @if ($item->url && $item->title)
                         <a href="{{ $item->url }}" class="flex min-w-0 gap-3 rounded-panel border border-slate-200 bg-white p-3 shadow-panel hover:border-emerald-200">
-                            @if ($item->posterUrl)<img src="{{ $item->posterUrl }}" alt="" loading="lazy" class="h-24 w-16 shrink-0 rounded-control object-cover">@endif
+                            @if ($item->posterUrl)<x-ui.poster-frame :src="$item->posterUrl" alt="" fit="contain" :overscan="false" class="h-24 w-16 shrink-0 rounded-control" />@endif
                             <span class="min-w-0"><span class="block break-words font-black text-slate-900">{{ $item->title }}</span>@if ($item->year)<span class="mt-1 block text-xs font-bold text-slate-500">{{ $item->year }}</span>@endif</span>
                         </a>
                     @endif

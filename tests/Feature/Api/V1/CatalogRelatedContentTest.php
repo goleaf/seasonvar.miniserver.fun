@@ -55,11 +55,17 @@ final class CatalogRelatedContentTest extends TestCase
         $this->assertCount(5, $items->where('type', 'actor'));
         $this->assertCount(5, $items->where('type', 'director'));
 
-        foreach (['q=A', 'q='.str_repeat('a', 81)] as $query) {
-            $this->getJson('/api/v1/search/suggestions?'.$query)
-                ->assertUnprocessable()
-                ->assertJsonPath('code', 'validation_failed');
-        }
+        $this->getJson('/api/v1/search/suggestions?q=A')
+            ->assertOk()
+            ->assertJsonPath('meta.query', 'A');
+
+        $this->getJson('/api/v1/search/suggestions?scope=header_portal&q=A')
+            ->assertUnprocessable()
+            ->assertJsonPath('code', 'validation_failed');
+
+        $this->getJson('/api/v1/search/suggestions?q='.str_repeat('a', 81))
+            ->assertUnprocessable()
+            ->assertJsonPath('code', 'validation_failed');
     }
 
     public function test_recommendations_are_ranked_visible_and_hide_scoring_internals(): void
@@ -72,12 +78,17 @@ final class CatalogRelatedContentTest extends TestCase
             'slug' => 'hidden-recommendation',
             'publication_status' => PublicationStatus::Hidden,
         ]);
+        LicensedMedia::factory()->for($first)->create(['status' => 'published']);
+        LicensedMedia::factory()->for($second)->create(['status' => 'published']);
 
         $this->storeRecommendation($source, $second, 2, 700, [
             'actor' => ['count' => 1, 'score' => 180],
         ]);
         $this->storeRecommendation($source, $first, 1, 900, [
-            'theme_romance' => ['score' => 360],
+            'theme_romance' => ['score' => 400],
+            'director' => ['count' => 1, 'score' => 350],
+            'actor' => ['count' => 2, 'score' => 300],
+            'country' => ['count' => 1, 'score' => 250],
             'private-algorithm-marker' => ['score' => 9999],
         ]);
         $this->storeRecommendation($source, $hidden, 3, 990, [
@@ -88,7 +99,12 @@ final class CatalogRelatedContentTest extends TestCase
             ->assertOk()
             ->assertJsonCount(2, 'data')
             ->assertJsonPath('data.0.rank', 1)
-            ->assertJsonPath('data.0.reasons.0', 'Романтика')
+            ->assertJsonPath('data.0.reasons', [
+                'Романтика',
+                'Общий режиссёр',
+                'Общие актёры',
+                'Та же страна производства',
+            ])
             ->assertJsonPath('data.0.title.slug', 'first-recommendation')
             ->assertJsonPath('data.1.rank', 2)
             ->assertJsonPath('data.1.title.slug', 'second-recommendation')
@@ -148,9 +164,14 @@ final class CatalogRelatedContentTest extends TestCase
         $this->getJson('/api/openapi.json')
             ->assertOk()
             ->assertJsonPath('paths./api/v1/search/suggestions.get.operationId', 'getSearchSuggestions')
+            ->assertJsonPath('paths./api/v1/search/suggestions.get.parameters.1.name', 'scope')
+            ->assertJsonPath('paths./api/v1/search/suggestions.get.parameters.1.schema.enum.0', 'header_titles')
+            ->assertJsonPath('paths./api/v1/search/suggestions.get.parameters.1.schema.enum.1', 'header_portal')
             ->assertJsonPath('paths./api/v1/titles/{titleSlug}/recommendations.get.operationId', 'getCatalogTitleRecommendations')
             ->assertJsonPath('paths./api/v1/titles/{titleSlug}/reviews.get.operationId', 'getCatalogTitleReviews')
             ->assertJsonPath('components.schemas.SearchSuggestion.required.0', 'type')
+            ->assertJsonPath('components.schemas.SearchSuggestion.properties.poster_url.format', 'uri')
+            ->assertJsonPath('components.schemas.SearchSuggestion.properties.seasons_count.minimum', 0)
             ->assertJsonPath('components.schemas.CatalogReview.required.0', 'id');
     }
 
@@ -164,7 +185,6 @@ final class CatalogRelatedContentTest extends TestCase
             ->assertJsonPath('paths./api/v1/me/sync.post.operationId', 'pushUserSyncMutations')
             ->assertJsonPath('components.schemas.SyncPushRequest.properties.operations.maxItems', 50)
             ->assertJsonPath('components.schemas.SyncMutationResult.properties.status.enum.0', 'applied')
-            ->assertJsonPath('components.schemas.UserTitleState.required.2', 'versions')
             ->assertJsonPath('components.schemas.UserStateVersions.required.0', 'watchlist')
             ->assertJsonPath('components.responses.SyncCursorExpired.content.application/json.examples.default.value.code', 'sync_cursor_expired')
             ->assertJsonPath('components.responses.SyncUnavailable.content.application/json.examples.default.value.code', 'sync_unavailable')
@@ -186,6 +206,7 @@ final class CatalogRelatedContentTest extends TestCase
         $resultProperties = $document['components']['schemas']['SyncMutationResult']['properties'];
         $libraryState = $document['components']['schemas']['UserLibraryItem']['properties']['state'];
 
+        $this->assertContains('versions', $document['components']['schemas']['UserTitleState']['required']);
         $this->assertContains('versions', $libraryState['required']);
         $this->assertSame(
             '#/components/schemas/UserStateVersions',

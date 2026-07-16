@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Catalog;
 
+use App\DTOs\CatalogTopListFilters;
 use App\DTOs\CatalogTopListItem;
 use App\Enums\CatalogTopListCategory;
 use Illuminate\Support\Collection;
@@ -18,6 +19,7 @@ final class CatalogTopListSeoBuilder
         CatalogTopListCategory $category,
         Collection $items,
         bool $localizedAlias,
+        CatalogTopListFilters $filters,
     ): array {
         $locale = app()->currentLocale();
         $defaultLocale = (string) config('catalog-collections.default_locale', 'ru');
@@ -25,7 +27,9 @@ final class CatalogTopListSeoBuilder
         $canonical = $localizedCanonical
             ? route('localized.top.show', ['locale' => $locale, 'category' => $category->value])
             : route('top.show', ['category' => $category->value]);
-        $indexable = $items->isNotEmpty() && (! $localizedAlias || $localizedCanonical);
+        $indexable = ! $filters->active()
+            && $items->isNotEmpty()
+            && (! $localizedAlias || $localizedCanonical);
         $title = $category->title();
         $description = $category->description();
         $itemListId = $canonical.'#top-list';

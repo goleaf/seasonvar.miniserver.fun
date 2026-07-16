@@ -18,6 +18,7 @@ final readonly class ContentRequestCacheInvalidator
         $invalidate = function () use ($publicId, $sitemap): void {
             try {
                 $this->versions->bump(CacheDomain::ContentRequests);
+                $this->versions->bump(CacheDomain::SearchSuggestions);
 
                 if ($publicId !== null) {
                     $this->versions->bump(CacheDomain::ContentRequests, 'request:'.$publicId);

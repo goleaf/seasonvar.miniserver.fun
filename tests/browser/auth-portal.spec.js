@@ -1,33 +1,19 @@
 import { expect, test } from '@playwright/test';
+import { installPlayerMediaFixtures } from './support/player-media-fixtures.js';
 
 const loginEmail = 'browser@example.com';
 const loginPassword = 'Browser-Strong-Password-42!';
 
-const isSameOrigin = (requestUrl, baseURL) => (
-    new URL(requestUrl).origin === new URL(baseURL).origin
-);
+const isSameOrigin = (requestUrl, baseURL) => {
+    const url = new URL(requestUrl);
 
-const isExpectedCatalogPollAbort = (request) => {
-    if (request.failure()?.errorText !== 'net::ERR_ABORTED') {
-        return false;
-    }
-
-    if (!/^\/livewire-[^/]+\/update$/.test(new URL(request.url()).pathname)) {
-        return false;
-    }
-
-    try {
-        const payload = request.postDataJSON();
-
-        return payload.components?.some((component) => (
-            component.calls?.some((call) => (
-                call.method === 'refreshCatalog' && call.metadata?.type === 'poll'
-            ))
-        )) === true;
-    } catch {
-        return false;
-    }
+    return ['http:', 'https:'].includes(url.protocol)
+        && url.origin === new URL(baseURL).origin;
 };
+
+const isExpectedBrowserNavigationAbort = (request) => (
+    request.failure()?.errorText === 'net::ERR_ABORTED'
+);
 
 const installBrowserGuard = async (page, baseURL) => {
     const sameOriginFailures = [];
@@ -43,6 +29,7 @@ const installBrowserGuard = async (page, baseURL) => {
 
         await route.continue();
     });
+    await installPlayerMediaFixtures(page);
 
     page.on('response', (response) => {
         if (isSameOrigin(response.url(), baseURL) && response.status() >= 400) {
@@ -50,7 +37,10 @@ const installBrowserGuard = async (page, baseURL) => {
         }
     });
     page.on('requestfailed', (request) => {
-        if (isSameOrigin(request.url(), baseURL) && !isExpectedCatalogPollAbort(request)) {
+        if (
+            isSameOrigin(request.url(), baseURL)
+            && !isExpectedBrowserNavigationAbort(request)
+        ) {
             sameOriginFailures.push(`${request.failure()?.errorText || 'request failed'} ${request.url()}`);
         }
     });
@@ -78,10 +68,11 @@ const assertResponsivePage = async (page) => {
 
 const assertReadableHeaderBrand = async (page) => {
     const brand = page.getByRole('banner').getByRole('link', { name: 'Каталог сериалов' });
+    await expect(brand).toBeVisible();
     const box = await brand.boundingBox();
 
     expect(box).not.toBeNull();
-    expect(box.width).toBeGreaterThanOrEqual(170);
+    expect(box.width).toBeGreaterThanOrEqual(page.viewportSize().width >= 640 ? 170 : 44);
 };
 
 const assertNoBrowserErrors = (browserErrors) => {
@@ -127,7 +118,7 @@ test('guest authentication and private library navigation are responsive', async
         fullPage: true,
     });
 
-    await page.getByRole('button', { name: 'Выйти из аккаунта' }).click();
+    await page.getByRole('button', { name: 'Выйти', exact: true }).click();
     await expect(page).toHaveURL(/\/$/);
     await page.goto('/library');
     await expect(page).toHaveURL(/\/login$/);

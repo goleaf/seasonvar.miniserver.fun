@@ -8,6 +8,7 @@ use App\DTOs\CatalogRecommendationContext;
 use App\DTOs\CatalogRecommendationExplanation;
 use App\DTOs\CatalogRecommendationItem;
 use App\DTOs\CatalogRecommendationResult;
+use App\Enums\CatalogPersonalizationConfidence;
 use App\Enums\CatalogRecommendationReason;
 use App\Enums\CatalogRecommendationSource;
 use App\Enums\CatalogRecommendationType;
@@ -34,6 +35,8 @@ final class CatalogRecommendationService
         private readonly CatalogTitleRelationService $relations,
         private readonly CatalogRecommendationRepeatSuppressor $repeats,
         private readonly CatalogRecommendationPresenter $presenter,
+        private readonly CatalogRecommendationExplorationMixer $exploration,
+        private readonly CatalogPersonalizationRollout $personalizationRollout,
     ) {}
 
     public function discover(CatalogRecommendationContext $context): CatalogRecommendationResult
@@ -45,6 +48,8 @@ final class CatalogRecommendationService
         $coldStart = false;
         $personalized = false;
         $displayType = $context->type;
+        $personalizationConfidence = null;
+        $preserveBlendOrder = false;
 
         if ($context->type === CatalogRecommendationType::Personalized) {
             $discoveryDemotions = $this->exclusions->discoveryDemotions($context);
@@ -52,41 +57,93 @@ final class CatalogRecommendationService
                 ...$hardExclusions,
                 ...$discoveryDemotions,
             ]));
-            $candidates = $context->user !== null
-                ? $this->personalized->candidates(
-                    $context,
-                    $personalizedExclusions,
-                )
-                : [];
-            $personalized = $candidates !== [];
+            if ($context->user !== null && $this->personalizationRollout->enabledFor($context->user)) {
+                $set = $this->personalized->candidateSet($context, $personalizedExclusions);
 
-            if ($candidates === [] && $hardExclusions !== $baseHardExclusions && $context->user !== null) {
-                $candidates = $this->personalized->candidates(
-                    $context,
-                    array_values(array_unique([
-                        ...$baseHardExclusions,
-                        ...$discoveryDemotions,
-                    ])),
-                );
-                $personalized = $candidates !== [];
-            }
-
-            if ($candidates === []) {
-                $coldStart = true;
-                $candidates = $this->coldStartCandidates($context, $personalizedExclusions);
-
-                if ($candidates === [] && $hardExclusions !== $baseHardExclusions) {
-                    $candidates = $this->coldStartCandidates($context, array_values(array_unique([
+                if ($set->candidates === [] && $hardExclusions !== $baseHardExclusions) {
+                    $set = $this->personalized->candidateSet($context, array_values(array_unique([
                         ...$baseHardExclusions,
                         ...$discoveryDemotions,
                     ])));
                 }
 
-                $displayType = match ($candidates[0]['source'] ?? null) {
-                    CatalogRecommendationSource::Editorial->value => CatalogRecommendationType::Editorial,
-                    CatalogRecommendationSource::Trending->value => CatalogRecommendationType::Trending,
-                    default => CatalogRecommendationType::Popular,
+                $personalizationConfidence = $set->confidence;
+                $fallbackExclusions = array_values(array_unique([
+                    ...$personalizedExclusions,
+                    ...$set->sourceTitleIds,
+                    ...array_column($set->candidates, 'id'),
+                ]));
+                $publicCandidates = $this->coldStartCandidates($context, $fallbackExclusions);
+
+                if ($publicCandidates === [] && $hardExclusions !== $baseHardExclusions) {
+                    $publicCandidates = $this->coldStartCandidates($context, array_values(array_unique([
+                        ...$baseHardExclusions,
+                        ...$discoveryDemotions,
+                        ...$set->sourceTitleIds,
+                        ...array_column($set->candidates, 'id'),
+                    ])));
+                }
+
+                $pageSize = $context->boundedPerPage();
+                $personalPerPage = match ($set->confidence) {
+                    CatalogPersonalizationConfidence::Cold => 0,
+                    CatalogPersonalizationConfidence::Low => (int) floor($pageSize * 0.25),
+                    CatalogPersonalizationConfidence::Medium => (int) floor($pageSize * 0.60),
+                    CatalogPersonalizationConfidence::High => $pageSize,
                 };
+                $personalLimit = min(count($set->candidates), $personalPerPage * $context->boundedPage());
+                $through = min(
+                    max(24, min(500, (int) config('recommendations.candidate_limit', 180))),
+                    ($context->boundedPage() * $pageSize) + 1,
+                );
+                $personalRows = array_slice($set->candidates, 0, $personalLimit);
+                $candidates = $this->blendPersonalCandidates(
+                    $personalRows,
+                    $publicCandidates,
+                    $through,
+                    $context->boundedPage() * $pageSize,
+                );
+                $candidates = $this->exploration->mix(
+                    $candidates,
+                    array_slice($set->candidates, $personalLimit),
+                    $through,
+                    $context->seed ?? (string) config('recommendations.personalized_v2.rollout_seed', 'personalized-v2')
+                        .'|'.$context->locale.'|'.$context->boundedPage(),
+                );
+                $personalized = $personalRows !== [];
+                $coldStart = $set->confidence === CatalogPersonalizationConfidence::Cold || ! $personalized;
+                $displayType = $set->confidence === CatalogPersonalizationConfidence::High
+                    && count($personalRows) >= $pageSize
+                    ? CatalogRecommendationType::Personalized
+                    : $this->fallbackDisplayType($publicCandidates);
+                $preserveBlendOrder = true;
+            } else {
+                $candidates = $context->user !== null
+                    ? $this->personalized->candidates($context, $personalizedExclusions)
+                    : [];
+                $personalized = $candidates !== [];
+
+                if ($candidates === [] && $hardExclusions !== $baseHardExclusions && $context->user !== null) {
+                    $candidates = $this->personalized->candidates($context, array_values(array_unique([
+                        ...$baseHardExclusions,
+                        ...$discoveryDemotions,
+                    ])));
+                    $personalized = $candidates !== [];
+                }
+
+                if ($candidates === []) {
+                    $coldStart = true;
+                    $candidates = $this->coldStartCandidates($context, $personalizedExclusions);
+
+                    if ($candidates === [] && $hardExclusions !== $baseHardExclusions) {
+                        $candidates = $this->coldStartCandidates($context, array_values(array_unique([
+                            ...$baseHardExclusions,
+                            ...$discoveryDemotions,
+                        ])));
+                    }
+
+                    $displayType = $this->fallbackDisplayType($candidates);
+                }
             }
         } else {
             $candidates = $this->cache->rememberPublic(
@@ -107,6 +164,12 @@ final class CatalogRecommendationService
         $candidates = $this->exclusions->applySoftDemotions($context, $candidates);
         $candidates = $this->availability->rerank($context, $candidates);
 
+        if ($preserveBlendOrder) {
+            usort($candidates, static fn (array $left, array $right): int => (($left['blend_position'] ?? PHP_INT_MAX) <=> ($right['blend_position'] ?? PHP_INT_MAX))
+                ?: ($right['score'] <=> $left['score'])
+                ?: ($right['id'] <=> $left['id']));
+        }
+
         return $this->result(
             context: $context,
             candidates: $candidates,
@@ -114,6 +177,7 @@ final class CatalogRecommendationService
             personalized: $personalized,
             coldStart: $coldStart,
             watchable: $context->type !== CatalogRecommendationType::Upcoming,
+            personalizationConfidence: $personalizationConfidence,
         );
     }
 
@@ -218,7 +282,7 @@ final class CatalogRecommendationService
     }
 
     /**
-     * @param  list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>  $candidates
+     * @param  list<array{id: int, score: int, source: string, reason: string, reasons?: list<array{reason: string, parameters?: array<string, scalar>}>, relation_type?: string|null}>  $candidates
      */
     private function result(
         CatalogRecommendationContext $context,
@@ -227,6 +291,7 @@ final class CatalogRecommendationService
         bool $personalized,
         bool $coldStart,
         bool $watchable,
+        ?CatalogPersonalizationConfidence $personalizationConfidence = null,
     ): CatalogRecommendationResult {
         $perPage = $context->boundedPerPage();
         $page = $context->boundedPage();
@@ -248,12 +313,15 @@ final class CatalogRecommendationService
                 title: $title,
                 type: $displayType,
                 source: $source,
-                explanations: [new CatalogRecommendationExplanation($reason)],
+                explanations: $this->rowExplanations($row, $reason),
                 rank: (($context->boundedPage() - 1) * $context->boundedPerPage()) + $index + 1,
                 score: (int) ($row['score'] ?? 0),
                 relationType: is_string($row['relation_type'] ?? null) ? $row['relation_type'] : null,
             );
         });
+        $hasDisplayedPersonalRow = collect($window)->contains(
+            fn (array $row): bool => str_starts_with((string) ($row['source'] ?? ''), 'user_'),
+        );
 
         return new CatalogRecommendationResult(
             requestedType: $context->type,
@@ -262,9 +330,78 @@ final class CatalogRecommendationService
             page: $page,
             perPage: $perPage,
             hasMore: $hasMore,
-            personalized: $personalized,
+            personalized: $personalized && $hasDisplayedPersonalRow,
             coldStart: $coldStart,
+            personalizationConfidence: $personalizationConfidence,
         );
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $personal
+     * @param  list<array<string, mixed>>  $public
+     * @return list<array<string, mixed>>
+     */
+    private function blendPersonalCandidates(
+        array $personal,
+        array $public,
+        int $limit,
+        int $displayLimit,
+    ): array {
+        $limit = max(0, $limit);
+        $displayLimit = min($limit, max(0, $displayLimit));
+        $personal = collect($personal)->unique('id')->values()->all();
+        $personalIds = array_fill_keys(array_column($personal, 'id'), true);
+        $public = collect($public)
+            ->reject(static fn (array $row): bool => isset($personalIds[(int) $row['id']]))
+            ->unique('id')
+            ->values()
+            ->all();
+        $personalCount = min(count($personal), $displayLimit);
+        $personalPositions = [];
+
+        for ($index = 0; $index < $personalCount; $index++) {
+            $position = (int) floor((($index + 1) * $displayLimit) / ($personalCount + 1));
+
+            while (isset($personalPositions[$position]) && $position < $displayLimit) {
+                $position++;
+            }
+
+            $personalPositions[min($displayLimit - 1, $position)] = true;
+        }
+
+        $blended = [];
+        $personalIndex = 0;
+        $publicIndex = 0;
+
+        for ($position = 0; $position < $limit; $position++) {
+            $usePersonal = $position < $displayLimit
+                && isset($personalPositions[$position])
+                && isset($personal[$personalIndex]);
+            $row = $usePersonal ? $personal[$personalIndex++] : ($public[$publicIndex++] ?? null);
+
+            if ($row === null && isset($personal[$personalIndex])) {
+                $row = $personal[$personalIndex++];
+            }
+
+            if ($row === null) {
+                break;
+            }
+
+            $row['blend_position'] = $position;
+            $blended[] = $row;
+        }
+
+        return $blended;
+    }
+
+    /** @param list<array<string, mixed>> $candidates */
+    private function fallbackDisplayType(array $candidates): CatalogRecommendationType
+    {
+        return match ($candidates[0]['source'] ?? null) {
+            CatalogRecommendationSource::Editorial->value => CatalogRecommendationType::Editorial,
+            CatalogRecommendationSource::Trending->value => CatalogRecommendationType::Trending,
+            default => CatalogRecommendationType::Popular,
+        };
     }
 
     /** @return list<array{id: int, score: int, source: string, reason: string}> */
@@ -286,12 +423,24 @@ final class CatalogRecommendationService
                 ->orderByDesc('score')
                 ->limit($limit * 2)
                 ->get(['recommended_title_id', 'score', 'reasons'])
-                ->map(fn (CatalogTitleRecommendation $row): array => [
-                    'id' => (int) $row->recommended_title_id,
-                    'score' => (int) $row->score,
-                    'source' => CatalogRecommendationSource::ContentSimilarity->value,
-                    'reason' => $this->storedSimilarityReason($row->reasons)->value,
-                ])
+                ->map(function (CatalogTitleRecommendation $row): array {
+                    $explanations = $this->presenter->storedSimilarityExplanations($row->reasons);
+                    $primary = $explanations[0]->reason ?? CatalogRecommendationReason::SimilarGenres;
+
+                    return [
+                        'id' => (int) $row->recommended_title_id,
+                        'score' => (int) $row->score,
+                        'source' => CatalogRecommendationSource::ContentSimilarity->value,
+                        'reason' => $primary->value,
+                        'reasons' => array_map(
+                            static fn (CatalogRecommendationExplanation $explanation): array => [
+                                'reason' => $explanation->reason->value,
+                                'parameters' => $explanation->parameters,
+                            ],
+                            $explanations,
+                        ),
+                    ];
+                })
                 ->all();
 
             if ($rows !== []) {
@@ -321,25 +470,35 @@ final class CatalogRecommendationService
             ->all();
     }
 
-    private function storedSimilarityReason(mixed $reasons): CatalogRecommendationReason
+    /**
+     * @param  array<string, mixed>  $row
+     * @return list<CatalogRecommendationExplanation>
+     */
+    private function rowExplanations(array $row, CatalogRecommendationReason $fallback): array
     {
-        $keys = is_array($reasons) ? array_keys($reasons) : [];
+        $encoded = is_array($row['reasons'] ?? null) ? $row['reasons'] : [];
+        $explanations = [];
 
-        foreach (['director', 'actor', 'tag', 'genre', 'studio', 'translation'] as $key) {
-            if (! in_array($key, $keys, true)) {
+        foreach (array_slice($encoded, 0, 4) as $item) {
+            if (! is_array($item)) {
                 continue;
             }
 
-            return match ($key) {
-                'director' => CatalogRecommendationReason::SharedDirector,
-                'actor' => CatalogRecommendationReason::SharedActor,
-                'tag' => CatalogRecommendationReason::SimilarTags,
-                'studio' => CatalogRecommendationReason::SharedStudio,
-                'translation' => CatalogRecommendationReason::SharedTranslation,
-                default => CatalogRecommendationReason::SimilarGenres,
-            };
+            $reason = CatalogRecommendationReason::tryFrom((string) ($item['reason'] ?? ''));
+
+            if ($reason === null) {
+                continue;
+            }
+
+            $parameters = collect(is_array($item['parameters'] ?? null) ? $item['parameters'] : [])
+                ->filter(fn (mixed $value, mixed $key): bool => is_string($key) && is_scalar($value))
+                ->mapWithKeys(fn (mixed $value, string $key): array => [$key => $value])
+                ->all();
+            $explanations[] = new CatalogRecommendationExplanation($reason, $parameters);
         }
 
-        return CatalogRecommendationReason::SimilarGenres;
+        return $explanations !== []
+            ? $explanations
+            : [new CatalogRecommendationExplanation($fallback)];
     }
 }

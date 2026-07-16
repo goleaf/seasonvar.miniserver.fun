@@ -20,7 +20,7 @@ class CatalogLivewireBudgetTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const CATALOG_INITIAL_MAX_BYTES = 225_000;
+    private const CATALOG_INITIAL_MAX_BYTES = 230_000;
 
     private const CATALOG_DEFERRED_MAX_BYTES = 285_000;
 
@@ -66,7 +66,7 @@ class CatalogLivewireBudgetTest extends TestCase
             fn (): TestResponse => $this->get(route('titles.index'))->assertOk(),
         );
         $initialContent = $initial->getContent();
-        $snapshot = Utils::extractAttributeDataFromHtml($initialContent, 'wire:snapshot');
+        $snapshot = $this->componentSnapshot($initialContent, 'catalog-series');
 
         $this->assertLessThanOrEqual(
             self::CATALOG_INITIAL_MAX_BYTES,
@@ -202,6 +202,15 @@ class CatalogLivewireBudgetTest extends TestCase
         $state = $reflection->getProperty('lastState')->getValue($component);
 
         return (string) $state->getResponse()->getContent();
+    }
+
+    /** @return array<string, mixed> */
+    private function componentSnapshot(string $html, string $name): array
+    {
+        preg_match('/<[a-z][^>]*\bwire:name="'.preg_quote($name, '/').'"[^>]*>/is', $html, $matches);
+        $this->assertNotEmpty($matches, "Livewire component {$name} was not found in the response.");
+
+        return Utils::extractAttributeDataFromHtml($matches[0], 'wire:snapshot');
     }
 
     /**

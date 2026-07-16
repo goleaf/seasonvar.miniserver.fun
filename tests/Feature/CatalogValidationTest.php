@@ -31,12 +31,18 @@ class CatalogValidationTest extends TestCase
             ->assertDontSeeText('Другой сериал');
     }
 
-    public function test_catalog_search_rejects_one_character_with_russian_validation_message(): void
+    public function test_catalog_search_allows_one_character_for_an_exact_title_match(): void
     {
+        $title = CatalogTitle::factory()->create([
+            'slug' => 'ya',
+            'title' => 'Я',
+        ]);
+
         $this
             ->get(route('titles.index', ['q' => 'я']))
             ->assertOk()
-            ->assertSeeText('Введите не менее 2 символов для поиска.');
+            ->assertSessionDoesntHaveErrors('q')
+            ->assertSee('href="'.route('titles.show', $title).'"', false);
     }
 
     public function test_catalog_search_allows_eighty_cyrillic_characters(): void
@@ -56,7 +62,7 @@ class CatalogValidationTest extends TestCase
         $this
             ->get(route('titles.index', ['q' => $longSearch]))
             ->assertOk()
-            ->assertSeeText('Поисковый запрос слишком длинный.');
+            ->assertSeeText('Поисковый запрос не должен быть длиннее 80 символов.');
     }
 
     public function test_catalog_safely_ignores_array_search_and_unsupported_sort_direction(): void
@@ -79,7 +85,7 @@ class CatalogValidationTest extends TestCase
             ->assertOk()
             ->assertSessionDoesntHaveErrors(['q', 'sort'])
             ->assertSeeText($visible->title)
-            ->assertSeeText('Недавно обновленные');
+            ->assertSeeText('Недавно обновлённые');
     }
 
     public function test_catalog_filter_request_rejects_malformed_filter_slug(): void
@@ -87,7 +93,7 @@ class CatalogValidationTest extends TestCase
         $this
             ->get(route('titles.index', ['genre' => 'Bad Slug']))
             ->assertOk()
-            ->assertSeeText('Поле жанр должно быть slug: строчные латинские буквы, цифры и дефисы, до 120 символов.');
+            ->assertSeeText('Поле Жанр должно быть slug: строчные латинские буквы, цифры и дефисы, до 120 символов.');
     }
 
     public function test_catalog_show_request_rejects_invalid_selected_episode_and_media_ids(): void

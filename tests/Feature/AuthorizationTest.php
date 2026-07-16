@@ -113,6 +113,47 @@ class AuthorizationTest extends TestCase
         $this->assertLessThanOrEqual($oneItemQueries + 1, $twelveItemQueries);
     }
 
+    public function test_authenticated_catalog_card_without_personal_state_has_no_open_action_or_empty_footer(): void
+    {
+        $user = User::factory()->create();
+        $title = CatalogTitle::factory()->create([
+            'title' => 'Карточка без персонального состояния',
+            'slug' => 'card-without-personal-state',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('titles.index'))
+            ->assertOk()
+            ->assertSee('href="'.route('titles.show', $title).'"', false)
+            ->assertDontSeeText('Открыть тайтл')
+            ->assertDontSee('data-user-card-state', false);
+    }
+
+    public function test_completed_card_progress_keeps_the_replay_action(): void
+    {
+        $user = User::factory()->create();
+        $title = CatalogTitle::factory()->create(['title' => 'Карточка повтора']);
+        $season = Season::factory()->for($title, 'catalogTitle')->create(['number' => 1]);
+        $episode = Episode::factory()->for($season)->create(['number' => 1]);
+        EpisodeViewProgress::query()->create([
+            'user_id' => $user->id,
+            'catalog_title_id' => $title->id,
+            'episode_id' => $episode->id,
+            'position_seconds' => 600,
+            'duration_seconds' => 600,
+            'progress_percent' => 100,
+            'first_started_at' => now()->subHour(),
+            'last_watched_at' => now(),
+            'completed_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('titles.index'))
+            ->assertOk()
+            ->assertSeeText('Смотреть снова')
+            ->assertDontSeeText('Открыть тайтл');
+    }
+
     private function createPersonalTitle(User $user, int $index): CatalogTitle
     {
         $title = CatalogTitle::factory()->create([

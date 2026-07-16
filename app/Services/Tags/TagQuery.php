@@ -33,6 +33,10 @@ final readonly class TagQuery
             ->with([
                 'translations' => fn ($query) => $query
                     ->whereIn('locale', $this->contentLocales())
+                    ->select([
+                        'id', 'tag_id', 'locale', 'label', 'short_description', 'description',
+                        'seo_title', 'seo_description',
+                    ])
                     ->orderBy('locale'),
             ]);
     }
@@ -56,20 +60,25 @@ final readonly class TagQuery
         }
 
         $slug = Str::slug($term);
-        $locales = ['und', ...$this->contentLocales()];
+        $searchLocales = collect((array) config('tags.supported_locales', []))
+            ->filter(fn (mixed $locale): bool => is_string($locale) && $locale !== '')
+            ->unique()
+            ->values()
+            ->all();
+        $aliasLocales = ['und', ...$searchLocales];
         $direct = $this->publicTags()
             ->withCount(['catalogTitles as public_titles_count' => fn (Builder $query): Builder => $this->constrainPublicTitles($query)])
             ->whereHas('catalogTitles', fn (Builder $query): Builder => $this->constrainPublicTitles($query))
-            ->where(function (Builder $query) use ($term, $comparisonTerm, $slug, $locales): void {
+            ->where(function (Builder $query) use ($term, $comparisonTerm, $slug, $searchLocales, $aliasLocales): void {
                 $query
                     ->where('tags.name', 'like', '%'.$term.'%')
                     ->orWhere('tags.normalized_name', 'like', '%'.$comparisonTerm.'%')
                     ->when($slug !== '', fn (Builder $query): Builder => $query->orWhere('tags.slug', 'like', '%'.$slug.'%'))
                     ->orWhereHas('translations', fn (Builder $query): Builder => $query
-                        ->whereIn('locale', $this->contentLocales())
+                        ->whereIn('locale', $searchLocales)
                         ->where('label', 'like', '%'.$term.'%'))
                     ->orWhereHas('aliases', fn (Builder $query): Builder => $query
-                        ->whereIn('locale', $locales)
+                        ->whereIn('locale', $aliasLocales)
                         ->where('moderation_status', TagModerationStatus::Approved->value)
                         ->where(fn (Builder $query): Builder => $query
                             ->where('name', 'like', '%'.$term.'%')

@@ -170,7 +170,7 @@ final readonly class TechnicalIssueQuery
                 'episode:id,season_id,number,kind,title',
                 'requester:id,name',
                 'mergedInto:id,public_id,public_number,status',
-                'diagnostic',
+                'diagnostic:id,technical_issue_id,browser_family,browser_major,operating_system,device_category,viewport_width,viewport_height,timezone,network_online,player_component,source_health_code',
             ])
             ->withCount([
                 'attachments' => fn (Builder $query) => $query->when(! $staff, fn (Builder $query) => $query

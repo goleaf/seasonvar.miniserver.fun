@@ -12,6 +12,7 @@ use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
 use App\Services\Catalog\CatalogEntitlementService;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 final class LicensedMediaDownloadEligibility
 {
@@ -52,9 +53,16 @@ final class LicensedMediaDownloadEligibility
         return $this->unavailableReason($user, $title, $media) === null;
     }
 
+    public function catalogTitle(LicensedMedia $media): ?CatalogTitle
+    {
+        $this->loadReleaseHierarchy($media);
+
+        return $media->catalogTitle instanceof CatalogTitle ? $media->catalogTitle : null;
+    }
+
     private function unavailableReason(User $user, CatalogTitle $title, LicensedMedia $media): ?string
     {
-        $media->loadMissing(['catalogTitle', 'season', 'episode.season']);
+        $this->loadReleaseHierarchy($media);
 
         if (! $this->relationshipsMatch($title, $media)) {
             return 'catalog.download.unavailable';
@@ -80,6 +88,28 @@ final class LicensedMediaDownloadEligibility
         }
 
         return null;
+    }
+
+    private function loadReleaseHierarchy(LicensedMedia $media): void
+    {
+        $media->loadMissing([
+            'catalogTitle' => fn (BelongsTo $query): BelongsTo => $query->select([
+                'id', 'is_published', 'publication_status', 'audience',
+                'available_from', 'available_until', 'deleted_at',
+            ]),
+            'season' => fn (BelongsTo $query): BelongsTo => $query->select([
+                'id', 'catalog_title_id', 'publication_status', 'audience',
+                'available_from', 'available_until', 'deleted_at',
+            ]),
+            'episode' => fn (BelongsTo $query): BelongsTo => $query->select([
+                'id', 'season_id', 'publication_status', 'audience',
+                'available_from', 'available_until', 'deleted_at',
+            ]),
+            'episode.season' => fn (BelongsTo $query): BelongsTo => $query->select([
+                'id', 'catalog_title_id', 'publication_status', 'audience',
+                'available_from', 'available_until', 'deleted_at',
+            ]),
+        ]);
     }
 
     private function relationshipsMatch(CatalogTitle $title, LicensedMedia $media): bool

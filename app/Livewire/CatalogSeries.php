@@ -120,7 +120,7 @@ class CatalogSeries extends Component
         $option = is_string($sort) ? CatalogSort::tryFrom($sort) : null;
 
         if ($option === null) {
-            $this->addError('sort', 'Выбрана неподдерживаемая сортировка.');
+            $this->addError('sort', __('catalog.search.validation.sort_supported'));
 
             return;
         }
@@ -319,7 +319,7 @@ class CatalogSeries extends Component
 
         return view('catalog.titles', $data)
             ->extends('layouts.app', [
-                'title' => $data['seo']['title'] ?? 'Сериалы',
+                'title' => $data['seo']['title'] ?? __('catalog.navigation.all_titles'),
                 'seo' => $data['seo'] ?? [],
             ])
             ->section('content');

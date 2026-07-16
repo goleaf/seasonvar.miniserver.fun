@@ -40,9 +40,18 @@
     "scripts": {
         "analyse": "phpstan analyse --memory-limit=1G",
         "ci:check": "bash scripts/ci-check.sh full",
-        "rector:check": "rector process --dry-run --config=rector.php",
-        "rector:fix": "rector process --config=rector.php",
-        "rector:max": "rector process --dry-run --config=rector-max.php",
+        "rector:check": [
+            "Composer\\Config::disableProcessTimeout",
+            "rector process --dry-run --config=rector.php"
+        ],
+        "rector:fix": [
+            "Composer\\Config::disableProcessTimeout",
+            "rector process --config=rector.php"
+        ],
+        "rector:max": [
+            "Composer\\Config::disableProcessTimeout",
+            "rector process --dry-run --config=rector-max.php"
+        ],
         "setup": [
             "composer install",
             "@hooks:install",

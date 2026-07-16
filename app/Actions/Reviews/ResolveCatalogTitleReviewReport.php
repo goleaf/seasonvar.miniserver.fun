@@ -46,7 +46,7 @@ final class ResolveCatalogTitleReviewReport
             throw new ReviewActionException('reviews.errors.invalid_report_status');
         }
 
-        $report = CatalogTitleReviewReport::query()->with('review')->findOrFail($reportId);
+        $report = CatalogTitleReviewReport::query()->with('review:id')->findOrFail($reportId);
         Gate::forUser($moderator)->authorize('moderate', $report->review);
         $privateNote = UserPlainText::description($privateNote);
 
@@ -60,7 +60,7 @@ final class ResolveCatalogTitleReviewReport
         /** @var array{report: CatalogTitleReviewReport, changed: bool, final: bool} $result */
         $result = DB::transaction(function () use ($report, $moderator, $status, $privateNote): array {
             $locked = CatalogTitleReviewReport::query()->lockForUpdate()->findOrFail($report->id);
-            $locked->loadMissing('review');
+            $locked->loadMissing('review:id');
             Gate::forUser($moderator)->authorize('moderate', $locked->review);
 
             if ($locked->status === $status && $locked->private_note === $privateNote) {

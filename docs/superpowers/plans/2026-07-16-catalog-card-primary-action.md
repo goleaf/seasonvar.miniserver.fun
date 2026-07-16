@@ -250,7 +250,7 @@ Expected: PHPUnit reports `0` failures; Pint and `git diff --check` exit `0`.
 Run:
 
 ```bash
-scripts/check-readme-policy.sh --working-tree
+scripts/check-readme-policy.sh README.md
 ```
 
 Expected: exit `0`.

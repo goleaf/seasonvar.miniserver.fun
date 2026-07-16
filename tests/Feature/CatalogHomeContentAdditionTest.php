@@ -176,10 +176,54 @@ class CatalogHomeContentAdditionTest extends TestCase
             ->assertSeeText('1080P')
             ->assertSeeText('720P')
             ->assertSeeText('480P')
-            ->assertSeeText('Профессиональный перевод / M3U8 / 15.07.2026')
-            ->assertSeeText('Оригинальная дорожка / MP4 / 15.07.2026')
-            ->assertSeeText('Субтитры / WEBM / 15.07.2026')
+            ->assertSeeText('Профессиональный перевод')
+            ->assertSeeText('Оригинальная дорожка')
+            ->assertSeeText('Субтитры')
+            ->assertSeeText('M3U8')
+            ->assertSeeText('MP4')
+            ->assertSeeText('WEBM')
+            ->assertSeeText('15 июл. 2026')
             ->assertSeeText('Видео для серии пока не добавлено.');
+    }
+
+    public function test_home_renders_new_media_for_an_older_episode(): void
+    {
+        $this->travelTo(now()->setDate(2026, 7, 15)->setTime(12, 0));
+
+        $catalogTitle = CatalogTitle::factory()->create([
+            'title' => 'Сериал со свежим видео',
+            'indexed_at' => now()->subYear(),
+        ]);
+        $season = Season::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'number' => 1,
+        ]);
+        $episode = Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => 4,
+            'title' => 'Старая серия с новым видео',
+            'created_at' => now()->subWeek(),
+            'updated_at' => now()->subWeek(),
+        ]);
+
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $catalogTitle->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'status' => 'published',
+            'quality' => '1080p',
+            'published_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        app(CatalogHomeSnapshotCache::class)->refresh();
+
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSeeText('Сериал со свежим видео')
+            ->assertSeeText('Старая серия с новым видео')
+            ->assertSeeText('1080P');
     }
 
     public function test_home_content_addition_queries_have_covering_indexes(): void

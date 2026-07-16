@@ -199,7 +199,7 @@ final class CatalogHomeContentAdditionQuery
                     ->select(['id', 'catalog_title_id', 'number', 'kind', 'sort_order', 'title']),
                 'episode' => fn ($query) => $query
                     ->availableTo(null)
-                    ->select(['id', 'season_id', 'number', 'kind', 'sort_order', 'title', 'released_at']),
+                    ->select(['id', 'season_id', 'number', 'kind', 'sort_order', 'title', 'released_at', 'created_at']),
             ]);
 
         $this->constrainCoordinates(

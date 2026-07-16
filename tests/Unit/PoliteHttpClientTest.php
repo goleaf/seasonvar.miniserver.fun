@@ -7,6 +7,7 @@ namespace Tests\Unit;
 use App\DTOs\VerifiedExternalUrlData;
 use App\Exceptions\Crawler\RemoteResponseTooLargeException;
 use App\Services\Crawler\PoliteHttpClient;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -100,5 +101,27 @@ final class PoliteHttpClientTest extends TestCase
         $this->assertSame('reusable', $first->body());
         $this->assertSame('reusable', $second->body());
         Http::assertSentCount(2);
+    }
+
+    public function test_it_can_use_http_two_without_losing_the_bounded_response_contract(): void
+    {
+        Http::preventStrayRequests();
+        $protocolVersion = null;
+        Http::fake(function (Request $request) use (&$protocolVersion) {
+            $protocolVersion = $request->toPsrRequest()->getProtocolVersion();
+
+            return Http::response('http-two', 200, ['Content-Type' => 'text/html']);
+        });
+
+        $response = app(PoliteHttpClient::class)->get(
+            'https://hdrezka.my/collections.html',
+            delaySeconds: 0,
+            maxResponseBytes: 8,
+            httpVersion: '2.0',
+        );
+
+        $this->assertSame('http-two', $response->body());
+        $this->assertSame('2.0', $protocolVersion);
+        Http::assertSentCount(1);
     }
 }

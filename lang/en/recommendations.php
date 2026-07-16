@@ -39,9 +39,11 @@ return [
     'reasons' => [
         'because_history' => 'Based on your viewing history', 'because_watchlist' => 'Based on titles in your watchlist',
         'because_status' => 'Based on your watch statuses', 'because_collection' => 'Based on titles in your collections', 'because_personal_tags' => 'Based on titles you tagged',
-        'because_rating' => 'Based on your high ratings', 'similar_genres' => 'Similar genres and topics', 'similar_tags' => 'Similar topic tags',
-        'shared_actor' => 'Shared cast', 'shared_director' => 'Shared director', 'shared_studio' => 'Shared studio',
-        'shared_translation' => 'A familiar translation is available', 'related_story' => ':relation', 'editorial' => 'Selected by editors',
+        'because_rating' => 'Based on your high ratings', 'new_for_you' => 'New for you', 'similar_genres' => 'Similar genres and topics', 'similar_theme' => ':theme', 'similar_tags' => 'Similar topic tags',
+        'shared_actor' => 'Shared cast', 'shared_director' => 'Shared director', 'shared_network' => 'Same network', 'shared_studio' => 'Shared studio',
+        'shared_translation' => 'A familiar translation is available', 'same_country' => 'Same country of production', 'same_status' => 'Same release status',
+        'similar_age_rating' => 'Similar age rating', 'nearby_year' => 'Nearby release year', 'imported_relation' => 'Related by source data',
+        'shared_editorial_collection' => 'Same collection', 'related_story' => ':relation', 'editorial' => 'Selected by editors',
         'trending' => 'Recent viewer interest', 'popular' => 'Sustained viewer interest', 'top_rated' => 'High rating with enough votes',
         'recently_added' => 'Recently published in the catalog', 'recently_updated' => 'A recent episode or video update',
         'upcoming' => 'A future release date', 'random' => 'Random discovery with the selected filters',
@@ -53,7 +55,7 @@ return [
     'similarity_reasons' => [
         'genre' => 'Genre', 'tag' => 'Tags', 'director' => 'Director', 'actor' => 'Cast', 'network' => 'Network', 'studio' => 'Studio',
         'translation' => 'Translation', 'status' => 'Status', 'country' => 'Country', 'age_rating' => 'Age rating', 'year' => 'Year', 'rating' => 'Rating',
-        'reviews' => 'Reviews', 'published_media' => 'Video', 'source_signal' => 'Provider data',
+        'reviews' => 'Reviews', 'published_media' => 'Video', 'source_signal' => 'Provider data', 'collection_signal' => 'Same collection',
         'theme_romance' => 'Romance', 'theme_relationships' => 'Relationships', 'theme_friendship' => 'Friendship', 'theme_youth' => 'Young characters',
         'theme_family' => 'Family', 'theme_workplace' => 'Workplace', 'theme_school' => 'School', 'theme_medical' => 'Medical', 'theme_legal' => 'Legal',
         'theme_crime' => 'Crime', 'theme_mystery' => 'Mystery', 'theme_fantasy' => 'Fantasy', 'theme_supernatural' => 'Supernatural',

@@ -6,6 +6,7 @@ namespace App\Services\Tags;
 
 use App\Models\CatalogTitle;
 use App\Models\Tag;
+use App\Models\TagSynonym;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -47,12 +48,30 @@ final readonly class TagAdministrationQuery
         $tag = Tag::query()
             ->where('public_id', $publicId)
             ->with([
-                'translations' => fn ($query) => $query->orderBy('locale'),
-                'aliases' => fn ($query) => $query->orderBy('locale')->orderBy('name'),
-                'synonyms' => fn ($query) => $query->with('relatedTag:id,public_id,name,slug')->orderBy('priority')->orderBy('id'),
-                'inverseSynonyms' => fn ($query) => $query->with('tag:id,public_id,name,slug')->orderBy('priority')->orderBy('id'),
-                'providerMappings' => fn ($query) => $query->orderBy('provider')->orderBy('provider_key'),
-                'historicalSlugs' => fn ($query) => $query->orderByDesc('created_at'),
+                'translations' => fn ($query) => $query
+                    ->select(['id', 'tag_id', 'locale', 'label', 'short_description', 'description', 'seo_title', 'seo_description'])
+                    ->orderBy('locale'),
+                'aliases' => fn ($query) => $query
+                    ->select(['id', 'tag_id', 'locale', 'name', 'source', 'moderation_status'])
+                    ->orderBy('locale')
+                    ->orderBy('name'),
+                'synonyms' => fn ($query) => $query
+                    ->select(['id', 'tag_id', 'related_tag_id', 'relationship', 'is_bidirectional', 'priority'])
+                    ->with('relatedTag:id,public_id,name,slug')
+                    ->orderBy('priority')
+                    ->orderBy('id'),
+                'inverseSynonyms' => fn ($query) => $query
+                    ->select(['id', 'tag_id', 'related_tag_id', 'relationship', 'is_bidirectional', 'priority'])
+                    ->with('tag:id,public_id,name,slug')
+                    ->orderBy('priority')
+                    ->orderBy('id'),
+                'providerMappings' => fn ($query) => $query
+                    ->select(['id', 'tag_id', 'provider', 'provider_key', 'raw_label', 'status'])
+                    ->orderBy('provider')
+                    ->orderBy('provider_key'),
+                'historicalSlugs' => fn ($query) => $query
+                    ->select(['id', 'tag_id', 'slug', 'created_at'])
+                    ->orderByDesc('created_at'),
                 'mergedInto:id,public_id,name,slug',
             ])
             ->withCount(['catalogTitles', 'translations', 'aliases', 'providerMappings'])
@@ -62,7 +81,17 @@ final readonly class TagAdministrationQuery
             return null;
         }
 
-        $relationships = $tag->synonyms
+        return $tag;
+    }
+
+    /** @return Collection<int, TagSynonym> */
+    public function displaySynonyms(?Tag $tag): Collection
+    {
+        if (! $tag instanceof Tag) {
+            return collect();
+        }
+
+        return $tag->synonyms
             ->concat($tag->inverseSynonyms)
             ->unique('id')
             ->sortBy([['priority', 'asc'], ['id', 'asc']])
@@ -73,9 +102,6 @@ final readonly class TagAdministrationQuery
                     : $synonym->tag;
                 $synonym->setAttribute('display_related_name', $related?->name);
             });
-        $tag->setRelation('displaySynonyms', $relationships);
-
-        return $tag;
     }
 
     /** @return Collection<int, Tag> */

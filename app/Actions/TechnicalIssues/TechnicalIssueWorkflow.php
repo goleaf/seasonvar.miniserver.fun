@@ -77,7 +77,7 @@ final readonly class TechnicalIssueWorkflow
                 }
             }
 
-            $locked->loadMissing('diagnostic');
+            $locked->loadMissing('diagnostic:id,technical_issue_id,browser_family,operating_system,device_category');
             $identity = $this->identity->fromIssue($locked);
             $collision = TechnicalIssue::query()
                 ->where('active_identity_key', $identity)
@@ -598,7 +598,7 @@ final readonly class TechnicalIssueWorkflow
             $locked->{$field} = $sanitized->value;
 
             if ($field !== 'resolution_summary') {
-                $locked->loadMissing('diagnostic');
+                $locked->loadMissing('diagnostic:id,technical_issue_id,browser_family,operating_system,device_category');
                 $identity = $this->identity->fromIssue($locked);
                 $locked->exact_identity_hash = $identity;
                 $locked->active_identity_key = $locked->status->isOpen() ? $identity : null;

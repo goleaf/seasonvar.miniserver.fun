@@ -6,14 +6,14 @@ namespace App\Services\Catalog\Api\V1;
 
 use App\Models\CatalogTitle;
 use App\Models\User;
-use App\Services\Catalog\CatalogTitleQuery;
 use App\Services\Catalog\Search\CatalogPeopleLookup;
-use App\Services\Catalog\Search\CatalogSearchQuery;
 use App\Services\Catalog\Search\CatalogSearchQueryParser;
-use App\Services\Catalog\Search\CatalogTitleSearch;
+use App\Services\Catalog\Search\CatalogTitleSuggestionQuery;
+use App\Services\Catalog\Search\HeaderSearchSuggestionCache;
+use App\Services\Catalog\Search\PortalSearchSuggestionQuery;
 use App\Services\Tags\TagQuery;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Number;
 
 final readonly class CatalogSearchSuggestionQuery
 {
@@ -21,17 +21,52 @@ final readonly class CatalogSearchSuggestionQuery
 
     public function __construct(
         private CatalogSearchQueryParser $parser,
-        private CatalogTitleSearch $search,
-        private CatalogTitleQuery $titles,
+        private CatalogTitleSuggestionQuery $titles,
         private CatalogPeopleLookup $people,
         private TagQuery $tags,
+        private PortalSearchSuggestionQuery $portal,
+        private HeaderSearchSuggestionCache $headerCache,
     ) {}
 
-    /** @return array{query: string, items: Collection<int, covariant array{type: string, public_id?: string, label: string, slug: string, title_slug: string|null, count: int}>} */
-    public function search(string $query, ?User $user): array
+    /** @return array{query: string, scope: string|null, items: Collection<int, array<string, mixed>>} */
+    public function search(string $query, ?User $user, ?string $scope = null): array
     {
         $parsed = $this->parser->parse($query);
-        $titleItems = $this->titleCandidates($parsed, $user)
+
+        if ($scope === 'header_titles') {
+            return [
+                'query' => $parsed->raw,
+                'scope' => $scope,
+                'items' => collect($this->headerCache->remember(
+                    $parsed->normalized,
+                    fn (): array => $this->titles->search($parsed, null, self::LIMIT_PER_TYPE)
+                        ->map(fn (CatalogTitle $title): array => $this->headerTitleItem($title))
+                        ->all(),
+                    $scope,
+                )),
+            ];
+        }
+
+        if ($scope === 'header_portal') {
+            return [
+                'query' => $parsed->raw,
+                'scope' => $scope,
+                'items' => collect($this->headerCache->remember(
+                    $parsed->normalized,
+                    fn (): array => $this->portal->search($parsed->raw)
+                        ->map(static fn (array $item): array => [
+                            ...$item,
+                            'slug' => '',
+                            'title_slug' => null,
+                            'count' => 0,
+                        ])
+                        ->all(),
+                    $scope,
+                )),
+            ];
+        }
+
+        $titleItems = $this->titles->search($parsed, $user, self::LIMIT_PER_TYPE)
             ->map(static fn (CatalogTitle $title): array => [
                 'type' => 'title',
                 'label' => $title->display_title,
@@ -62,53 +97,44 @@ final readonly class CatalogSearchSuggestionQuery
 
         return [
             'query' => $parsed->raw,
+            'scope' => null,
             'items' => $titleItems->concat($peopleItems)->concat($tagItems)->values(),
         ];
     }
 
-    /** @return Collection<int, CatalogTitle> */
-    private function titleCandidates(CatalogSearchQuery $query, ?User $user): Collection
+    /** @return array<string, mixed> */
+    private function headerTitleItem(CatalogTitle $title): array
     {
-        $candidateQuery = $this->search->candidateQuery($query);
-        $candidateIds = $candidateQuery?->limit(self::LIMIT_PER_TYPE)->pluck('catalog_title_id')
-            ->map(static fn (mixed $id): int => (int) $id)
-            ->values() ?? collect();
+        $seasons = (int) $title->getAttribute('seasons_count');
+        $episodes = (int) $title->getAttribute('episodes_count');
+        $details = collect([
+            $title->year === null ? null : (string) $title->year,
+            trans_choice('catalog.counts.seasons', $seasons, [
+                'count' => Number::format($seasons, locale: app()->currentLocale()),
+            ]),
+            trans_choice('catalog.counts.episodes', $episodes, [
+                'count' => Number::format($episodes, locale: app()->currentLocale()),
+            ]),
+        ])->filter(fn (mixed $value): bool => is_string($value) && $value !== '');
 
-        if ($candidateIds->isNotEmpty()) {
-            $titlesById = $this->titleSummaryQuery($user)
-                ->whereKey($candidateIds)
-                ->get()
-                ->keyBy('id');
-
-            return $candidateIds
-                ->map(fn (int $id): ?CatalogTitle => $titlesById->get($id))
-                ->filter()
-                ->values();
-        }
-
-        $search = str_replace(['%', '_'], '', $query->raw);
-
-        return $this->titleSummaryQuery($user)
-            ->where(function (Builder $builder) use ($search): void {
-                $builder
-                    ->where('title', 'like', "%{$search}%")
-                    ->orWhere('original_title', 'like', "%{$search}%")
-                    ->orWhereHas('aliases', fn (Builder $query): Builder => $query->where('name', 'like', "%{$search}%"));
-            })
-            ->orderBy('title')
-            ->orderBy('id')
-            ->limit(self::LIMIT_PER_TYPE)
-            ->get();
-    }
-
-    /** @return Builder<CatalogTitle> */
-    private function titleSummaryQuery(?User $user): Builder
-    {
-        return $this->titles->visibleTo($user)->select([
-            'id',
-            'slug',
-            'title',
-            'original_title',
-        ]);
+        return [
+            'id' => 'title-'.$title->id,
+            'type' => 'title',
+            'group' => 'titles',
+            'label' => $title->display_title,
+            'original_title' => $title->original_title !== $title->display_title
+                ? $title->original_title
+                : null,
+            'slug' => (string) $title->slug,
+            'title_slug' => (string) $title->slug,
+            'url' => route('titles.show', $title),
+            'meta' => $details->implode(' · '),
+            'poster_url' => $title->poster_url,
+            'year' => $title->year,
+            'seasons_count' => $seasons,
+            'episodes_count' => $episodes,
+            'content_type' => (string) $title->type,
+            'count' => 0,
+        ];
     }
 }

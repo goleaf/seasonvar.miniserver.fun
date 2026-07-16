@@ -68,6 +68,13 @@ return [
         'request_batch_title_limit' => (int) env('CACHE_WARM_REQUEST_BATCH_TITLE_LIMIT', 250),
         'request_lock_seconds' => (int) env('CACHE_WARM_REQUEST_LOCK_SECONDS', 10),
         'request_lock_wait_seconds' => (int) env('CACHE_WARM_REQUEST_LOCK_WAIT_SECONDS', 2),
+        'full_batch_url_limit' => (int) env('CACHE_WARM_FULL_BATCH_URL_LIMIT', 25),
+        'full_job_budget_seconds' => (int) env('CACHE_WARM_FULL_JOB_BUDGET_SECONDS', 180),
+        'full_request_delay_milliseconds' => (int) env('CACHE_WARM_FULL_REQUEST_DELAY_MILLISECONDS', 100),
+        'full_error_limit' => (int) env('CACHE_WARM_FULL_ERROR_LIMIT', 100),
+        'full_import_pause_seconds' => (int) env('CACHE_WARM_FULL_IMPORT_PAUSE_SECONDS', 300),
+        'full_stale_seconds' => (int) env('CACHE_WARM_FULL_STALE_SECONDS', 900),
+        'full_state_retention_seconds' => (int) env('CACHE_WARM_FULL_STATE_RETENTION_SECONDS', 2_592_000),
     ],
 
     'domains' => [

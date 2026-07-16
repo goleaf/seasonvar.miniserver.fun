@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
+use App\Enums\CatalogTopListCategory;
 use App\Models\CatalogTitle;
 use App\Models\User;
 use App\Support\Cache\CacheDomain;
@@ -59,6 +60,45 @@ final class PublicPageCachePolicyTest extends TestCase
         $this->assertSame('title:73', $context->versionScope);
         $this->assertSame($globalVersion, $context->dimensions['global_title_version']);
         $this->assertSame(['catalogTitle' => 'cache-title'], $context->dimensions['parameters']);
+    }
+
+    public function test_top_list_filter_queries_have_stable_and_distinct_cache_dimensions(): void
+    {
+        $policy = app(PublicPageCachePolicy::class);
+        $parameters = ['category' => CatalogTopListCategory::Movies];
+        $first = $policy->context($this->request(
+            'GET',
+            '/top/movies?year_from=2010&year_to=2020&country=litva',
+            'top.show',
+            $parameters,
+        ), 'catalog');
+        $reordered = $policy->context($this->request(
+            'GET',
+            '/top/movies?country=litva&year_to=2020&year_from=2010',
+            'top.show',
+            $parameters,
+        ), 'catalog');
+        $otherCountry = $policy->context($this->request(
+            'GET',
+            '/top/movies?year_from=2010&year_to=2020&country=latviya',
+            'top.show',
+            $parameters,
+        ), 'catalog');
+        $otherRange = $policy->context($this->request(
+            'GET',
+            '/top/movies?year_from=2011&year_to=2020&country=litva',
+            'top.show',
+            $parameters,
+        ), 'catalog');
+
+        $this->assertNotNull($first);
+        $this->assertNotNull($reordered);
+        $this->assertNotNull($otherCountry);
+        $this->assertNotNull($otherRange);
+        $this->assertSame(['category' => 'movies'], $first->dimensions['parameters']);
+        $this->assertSame($first->dimensions['query'], $reordered->dimensions['query']);
+        $this->assertNotSame($first->dimensions['query'], $otherCountry->dimensions['query']);
+        $this->assertNotSame($first->dimensions['query'], $otherRange->dimensions['query']);
     }
 
     public function test_it_bypasses_private_dynamic_or_unbounded_requests(): void

@@ -44,6 +44,7 @@ final class WebAccountManagementTest extends TestCase
             ->assertSeeText('Безопасность')
             ->assertSeeText('Устройства API');
         $this->get(route('home'))
+            ->assertSee('href="'.route('profile.show').'"', false)
             ->assertSee(route('settings.index'), false);
     }
 
@@ -59,6 +60,7 @@ final class WebAccountManagementTest extends TestCase
             ->test(ProfilePage::class)
             ->set('name', '  Иван   Иванов ')
             ->set('email', ' NEW@EXAMPLE.COM ')
+            ->set('currentPassword', 'password')
             ->call('saveProfile')
             ->assertHasNoErrors()
             ->assertSet('name', 'Иван Иванов')
@@ -143,6 +145,7 @@ final class WebAccountManagementTest extends TestCase
             ->assertSeeText('Планшет')
             ->assertDontSee($phone->accessToken->token)
             ->assertDontSee('mobile:write')
+            ->set('currentPassword', 'password')
             ->call('revokeDevice', $phone->accessToken->id)
             ->assertHasNoErrors()
             ->assertSet('deviceStatus', 'Устройство отключено.');
@@ -152,6 +155,7 @@ final class WebAccountManagementTest extends TestCase
 
         Livewire::actingAs($user)
             ->test(SecurityPage::class)
+            ->set('currentPassword', 'password')
             ->call('revokeAllDevices')
             ->assertSet('deviceStatus', 'Все устройства API отключены.');
 
@@ -166,6 +170,7 @@ final class WebAccountManagementTest extends TestCase
 
         Livewire::actingAs($owner)
             ->test(SecurityPage::class)
+            ->set('currentPassword', 'password')
             ->call('revokeDevice', $foreignToken->accessToken->id)
             ->assertNotFound();
 

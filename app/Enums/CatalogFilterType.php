@@ -33,17 +33,6 @@ enum CatalogFilterType: string
 
     public function label(): string
     {
-        return match ($this) {
-            self::Genre => 'жанр',
-            self::Country => 'страна',
-            self::Actor => 'актер',
-            self::Director => 'режиссер',
-            self::AgeRating => 'возрастное ограничение',
-            self::Translation => 'перевод',
-            self::Status => 'статус',
-            self::Network => 'канал',
-            self::Studio => 'студия',
-            self::Tag => 'метка',
-        };
+        return (string) __("catalog.taxonomy.{$this->value}");
     }
 }

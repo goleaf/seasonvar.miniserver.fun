@@ -1,6 +1,6 @@
 # Blade-шаблоны
 
-Обновлено: 15.07.2026
+Обновлено: 16.07.2026
 
 ## Правило без inline PHP
 
@@ -33,7 +33,9 @@
 - Повторяемая разметка живет в `resources/views/components`; если компонент вычисляет классы, ссылки или состояние, добавляйте класс в `app/View/Components`.
 - Общие UI-компоненты размещайте в пространстве `x-ui.*`, доменные элементы каталога - в `x-catalog.*`.
 - Компоненты форм размещайте в `x-form.*`; поисковые поля используют `x-form.search-field`, а ошибки - `x-form.input-error`.
-- `x-layout.site-header` выводит две независимые адаптивные полосы в одном семантическом header: бренд и глобальный поиск сверху, вся навигация снизу. Нижняя полоса использует перенос пунктов без внутренней прокрутки; подписи видимы с `sm`, а на телефоне доступные имена сохраняются рядом с иконками для экранных дикторов.
+- `x-layout.site-header` выводит две независимые адаптивные полосы в одном семантическом header: бренд и глобальный поиск сверху, вся навигация снизу. Нижняя полоса использует перенос пунктов без внутренней прокрутки; подписи видимы с `sm`, а на телефоне доступные имена сохраняются рядом с иконками для экранных дикторов. Переключателя языка в header нет.
+- `x-layout.header-search` рендерит query-free GET fallback, neutral input frame и пустые accessible result regions. Постеры, год и агрегаты тайтлов, группы портала и responsive limits добавляет `resources/js/header-search.js`; Blade не выполняет поиск и не сериализует Eloquent graph. Dropdown не имеет внутренней прокрутки и не выходит за viewport на mobile/tablet/desktop/TV.
+- `/search` получает query result DTO-like arrays/models только из `GlobalSearchPageQuery`; template не содержит `@php`, model/service/facade calls или SQL. Он выводит локализованный exact title count, server-prepared portal groups, safe error/empty/typo states и ссылки на canonical full catalogue/actor/tag pages. `CatalogTitlesViewModel` и `CatalogDirectoryPageBuilder` заранее готовят translated labels и locale-formatted counts для `/titles`, actor/tag directories и их Livewire updates.
 - Компоненты получают готовые модели, коллекции или ViewModel-объекты и не выполняют запросы к базе.
 - В компонентных шаблонах используйте `$attributes->merge()` или `$attributes->class()` для расширяемых классов и атрибутов.
 - `x-ui.poster-frame` — единственный Blade boundary для `<img>` каталожного постера: готовые URL, alt и `fit` передаются вызывающим слоем. Контентная строка использует `contain`, `2:3` и `overscan=false`; явно выбранный `cover` с 2% overscan остаётся для главного постера и технических миниатюр. Background появляется только у заглушки.
@@ -50,6 +52,8 @@
 `x-collections.collection-card` получает eager-loaded `CatalogCollection` summary и `CatalogCollectionCardViewModel`; Blade не считает visibility/count/URL и не запрашивает owner/cover/items. ViewModel превращает описание в escaped plain-text excerpt длиной не более 180 Unicode-символов, поэтому карточка не рендерит пользовательский HTML и не раздувается длинным текстом. Collection item rows переиспользуют `x-catalog.title-card`, prepared collection item attributes и stable `wire:key` по item ID. Public count и owner count подготовлены query-object раздельно.
 
 Collection Livewire views содержат только passive loops/conditions над prepared values. Locked UUID/title IDs остаются в component, policy and criteria — в PHP. Нет `@php`, model/service/database calls, inline CSS или inline business JavaScript. Empty/search-empty/unavailable/moderation/status/loading/error/report/share/delete/restore states имеют реальные controls или safe text; absent likes/follows/collaboration не изображаются неработающими кнопками.
+
+Editorial editor выводит одну форму без locale fieldset, RU/EN buttons и подписи «Русский»: locked PHP boundary загружает и сохраняет `ru`. Existing English translation rows остаются в базе, но не являются переключаемым authoring UI.
 
 ## Представление обсуждений
 
@@ -72,6 +76,8 @@ Composer/edit/report/preferences/helpfulness/delete/restore/moderation controls 
 Public tag page data готовят `TagPagePresenter`, `TagSeoPresenter` и existing `CatalogTitlesPageBuilder`; Blade получает `TagPageData`, paginator/card view data и prepared filter state. Description/aliases/related/count/canonical/JSON-LD не вычисляются в template. `x-ui.taxonomy-chip` получает eager-loaded tag and route helper URL, добавляет textual accessible public-tag label и не выполняет relation query.
 
 `PersonalTagManager`/`PersonalTagSelector` держат public state только в bounded strings, booleans, locked title/UUID/version and draft UUID list. Owner tags/counts/title cards разрешает `PersonalTagLibraryQuery`, writes — `PersonalTagService`; templates loops only prepared rows. Private badge не имеет public link, personal text escaped, stable `wire:key` uses opaque UUID.
+
+Personal tag manager не показывает content-language control и всегда передаёт `ru` в write DTO. Tag administration выводит одну русскую translation form и alias input без locale badge/select; подпись текущего языка не показывается, а существующие non-Russian rows не удаляются.
 
 Admin view receives bounded query results, enum options and merge impact from `TagAdministrationQuery`; it does not resolve aliases, normalize names, authorize, count usage or query provider mappings in Blade. Loading/empty/error/confirmation state maps to real Livewire action. No tag template introduces Volt, `@php`, raw HTML, inline CSS, inline business JavaScript, DB/facade/service call or complete Eloquent graph public serialization.
 
@@ -101,7 +107,9 @@ Homepage показывает не более одной recommendation section;
 
 `CatalogTopListPageBuilder` передаёт `catalog/top-list.blade.php` готовые category links, podium, основной список, count и SEO contract. Каждая строка — `CatalogTopListItem` с уже определёнными местом, источником рейтинга, форматированными оценкой/голосами и объясняющими признаками; Blade не вычисляет score, eligibility, category boundaries, URL или permissions и не обращается к базе.
 
-Шаблон переиспользует `x-catalog.title-card`, существующие panels/icons/focus styles и только безопасный escaped output. Отдельной Eloquent-сериализации, inline PHP/CSS/JS, client ranking и скрытого full list нет. `CollectionPage`/`ItemList`, canonical и hreflang строятся PHP SEO builder из того же упорядоченного набора, поэтому видимый порядок и structured data не расходятся.
+Тот же builder готовит `filterForm` и `emptyState`: action/reset URLs, scalar values, максимальный год и ограниченный список стран формирует PHP-сервис. Blade только выводит native GET controls и ошибки Form Request; database query, query-string parsing, route building и решение об индексировании в шаблоне отсутствуют.
+
+Шаблон переиспользует `x-catalog.title-card`, существующие panels/icons/focus styles и только безопасный escaped output. Отдельной Eloquent-сериализации, inline PHP/CSS/JS, client ranking и скрытого full list нет. `CollectionPage`/`ItemList`, canonical и hreflang строятся PHP SEO builder из того же упорядоченного набора, поэтому видимый порядок и structured data не расходятся; при активном фильтре builder оставляет clean canonical и переключает страницу в `noindex,follow` без alternate/structured-list разметки.
 
 ## Представления технических обращений
 

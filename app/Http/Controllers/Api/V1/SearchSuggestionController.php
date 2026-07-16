@@ -16,10 +16,17 @@ final class SearchSuggestionController extends Controller
         SearchSuggestionRequest $request,
         CatalogSearchSuggestionQuery $suggestions,
     ): AnonymousResourceCollection {
-        $result = $suggestions->search($request->queryValue(), $request->user());
+        $result = $suggestions->search(
+            $request->queryValue(),
+            $request->user(),
+            $request->scopeValue(),
+        );
 
         return SearchSuggestionResource::collection($result['items'])->additional([
-            'meta' => ['query' => $result['query']],
+            'meta' => [
+                'query' => $result['query'],
+                'scope' => $result['scope'],
+            ],
         ]);
     }
 }

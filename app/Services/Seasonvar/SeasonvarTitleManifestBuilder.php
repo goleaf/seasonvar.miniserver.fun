@@ -54,7 +54,11 @@ final class SeasonvarTitleManifestBuilder
 
     public function fromCatalog(CatalogTitle $title): SeasonvarTitleManifest
     {
-        $title->loadMissing(['seasons.episodes', 'licensedMedia']);
+        $title->loadMissing([
+            'seasons:id,catalog_title_id,kind,number,source_url_hash',
+            'seasons.episodes:id,season_id,kind,number',
+            'licensedMedia:id,catalog_title_id,playback_url',
+        ]);
         $seasonKeys = [];
         $episodeKeys = [];
         $mediaKeys = [];

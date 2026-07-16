@@ -33,7 +33,7 @@ final class LocalizedRouteResolver
         }
 
         $route = $request->route();
-        $routeName = $route?->getName();
+        $routeName = $route->getName();
 
         if (is_string($routeName) && $routeName !== '') {
             $localizedName = $routeName === 'home'
@@ -41,7 +41,7 @@ final class LocalizedRouteResolver
                 : (Str::startsWith($routeName, 'localized.') ? $routeName : 'localized.'.$routeName);
 
             if ($this->router->has($localizedName)) {
-                $parameters = collect($route?->parameters() ?? [])
+                $parameters = collect($route->parameters())
                     ->map(fn (mixed $value): mixed => $value instanceof Model ? $value->getRouteKey() : $value)
                     ->all();
                 $parameters['locale'] = $locale;

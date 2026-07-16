@@ -2,21 +2,38 @@
 
 namespace Tests\Unit;
 
+use App\Enums\CatalogTitleRelationSource;
+use App\Enums\CatalogTitleRelationType;
 use App\Enums\ContentAudience;
 use App\Models\Actor;
+use App\Models\CatalogRecommendationDirtyTitle;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
 use App\Models\CatalogTitleRecommendationSignal;
+use App\Models\CatalogTitleRelation;
 use App\Models\Country;
 use App\Models\Genre;
 use App\Models\LicensedMedia;
+use App\Models\Studio;
+use App\Services\Catalog\CatalogRecommendationDirtyTitleTracker;
 use App\Services\Catalog\CatalogTitleRecommendationBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class CatalogTitleRecommendationBuilderTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config([
+            'recommendations.similarity_v6.shadow_enabled' => true,
+            'recommendations.similarity_v6.allow_activation_without_golden' => true,
+        ]);
+    }
 
     public function test_rebuild_caps_profile_hydration_chunk_size_to_the_measured_memory_budget(): void
     {
@@ -53,6 +70,10 @@ class CatalogTitleRecommendationBuilderTest extends TestCase
             'name' => 'Иван Петров',
             'slug' => 'ivan-petrov',
         ]);
+        $secondActor = Actor::query()->create([
+            'name' => 'Анна Смирнова',
+            'slug' => 'anna-smirnova',
+        ]);
         $sourceTitle = CatalogTitle::factory()->create([
             'title' => 'Главный сериал',
             'slug' => 'glavnyi-serial',
@@ -60,14 +81,14 @@ class CatalogTitleRecommendationBuilderTest extends TestCase
         ]);
         $sourceTitle->genres()->attach($genre->id);
         $sourceTitle->countries()->attach($country->id);
-        $sourceTitle->actors()->attach($actor->id);
+        $sourceTitle->actors()->attach([$actor->id, $secondActor->id]);
         CatalogTitleRecommendationSignal::query()->create([
             'catalog_title_id' => $sourceTitle->id,
             'source' => 'seasonvar_info',
             'signal_type' => 'related_title',
             'signal_key' => 'detective-collection',
             'signal_value' => 'Подборка детективов',
-            'weight' => 120,
+            'weight' => 300,
             'observed_at' => now(),
         ]);
 
@@ -77,14 +98,14 @@ class CatalogTitleRecommendationBuilderTest extends TestCase
             'year' => 2008,
         ]);
         $strongTitle->genres()->attach($genre->id);
-        $strongTitle->actors()->attach($actor->id);
+        $strongTitle->actors()->attach([$actor->id, $secondActor->id]);
         CatalogTitleRecommendationSignal::query()->create([
             'catalog_title_id' => $strongTitle->id,
             'source' => 'seasonvar_info',
             'signal_type' => 'related_title',
             'signal_key' => 'detective-collection',
             'signal_value' => 'Подборка детективов',
-            'weight' => 120,
+            'weight' => 300,
             'observed_at' => now(),
         ]);
         LicensedMedia::factory()->create([
@@ -131,7 +152,7 @@ class CatalogTitleRecommendationBuilderTest extends TestCase
             ->get();
 
         $this->assertSame('full', $result['mode']);
-        $this->assertSame('v4', $result['algorithm_version']);
+        $this->assertSame('v6', $result['algorithm_version']);
         $this->assertSame(5, $result['titles']);
         $this->assertSame(1, $result['titles_with_recommendations']);
         $this->assertSame(4, $result['titles_without_recommendations']);
@@ -159,8 +180,8 @@ class CatalogTitleRecommendationBuilderTest extends TestCase
             'total' => $recommendations->first()->score,
         ], $recommendations->first()->scoreBreakdown());
         $this->assertContains('Жанр', $recommendations->first()->reasonLabels());
-        $this->assertContains('Актеры', $recommendations->first()->reasonLabels());
-        $this->assertContains('Источник', $recommendations->first()->reasonLabels());
+        $this->assertContains('Актёры', $recommendations->first()->reasonLabels());
+        $this->assertContains('Данные источника', $recommendations->first()->reasonLabels());
         $this->assertFalse(CatalogTitleRecommendation::query()
             ->where('catalog_title_id', $sourceTitle->id)
             ->whereIn('recommended_title_id', [$countryOnlyTitle->id, $sameYearTitle->id, $withoutVideoTitle->id])
@@ -219,7 +240,201 @@ class CatalogTitleRecommendationBuilderTest extends TestCase
         $this->assertLessThanOrEqual(3, (int) $largestStoredSet);
     }
 
-    public function test_relationship_comedy_ranks_above_unrelated_title_with_shared_actor(): void
+    public function test_canonical_provider_relation_reaches_a_watchable_target_without_shared_metadata(): void
+    {
+        $source = CatalogTitle::factory()->create([
+            'title' => 'Исходный тайтл',
+            'year' => 1995,
+        ]);
+        $target = CatalogTitle::factory()->create([
+            'title' => 'Связанный тайтл',
+            'year' => 2024,
+        ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $target->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        CatalogTitleRelation::query()->create([
+            'source_title_id' => $source->id,
+            'target_title_id' => $target->id,
+            'relation_type' => CatalogTitleRelationType::ProviderRelated,
+            'source' => CatalogTitleRelationSource::ImportedProvider,
+            'provider_key' => 'provider-related-1',
+            'priority' => 100,
+            'is_locked' => false,
+            'is_active' => true,
+        ]);
+
+        $result = app(CatalogTitleRecommendationBuilder::class)->rebuild();
+
+        $this->assertSame('v6', $result['algorithm_version']);
+        $this->assertDatabaseHas('catalog_title_recommendations', [
+            'catalog_title_id' => $source->id,
+            'recommended_title_id' => $target->id,
+            'source_score' => 650,
+        ]);
+    }
+
+    public function test_shared_editorial_collection_reaches_a_watchable_target_and_stores_its_own_reason(): void
+    {
+        config(['seasonvar.recommendations.min_score' => 1]);
+        $source = CatalogTitle::factory()->create(['year' => 2019]);
+        $candidate = CatalogTitle::factory()->create(['year' => 2024]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $candidate->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        foreach ([$source, $candidate] as $title) {
+            CatalogTitleRecommendationSignal::query()->create([
+                'catalog_title_id' => $title->id,
+                'source' => 'hdrezka',
+                'signal_type' => 'editorial_collection',
+                'signal_key' => 'award-winners',
+                'signal_value' => null,
+                'weight' => 280,
+                'observed_at' => now(),
+            ]);
+        }
+
+        app(CatalogTitleRecommendationBuilder::class)->rebuild();
+
+        $recommendation = CatalogTitleRecommendation::query()
+            ->where('catalog_title_id', $source->id)
+            ->where('recommended_title_id', $candidate->id)
+            ->firstOrFail();
+
+        $this->assertArrayHasKey('collection_signal', $recommendation->reasons);
+        $this->assertArrayNotHasKey('source_signal', $recommendation->reasons);
+        $this->assertGreaterThan(0, $recommendation->source_score);
+    }
+
+    public function test_scoped_rebuild_expands_dirty_neighbours_and_keeps_unrelated_rows_unchanged(): void
+    {
+        config(['seasonvar.recommendations.min_score' => 600]);
+        $genre = Genre::query()->create(['name' => 'Точечный детектив', 'slug' => 'tochechnyi-detektiv']);
+        $firstActor = Actor::query()->create(['name' => 'Первый точечный актёр', 'slug' => 'pervyi-tochechnyi-akter']);
+        $secondActor = Actor::query()->create(['name' => 'Второй точечный актёр', 'slug' => 'vtoroi-tochechnyi-akter']);
+        $studio = Studio::query()->create(['name' => 'Точечная студия', 'slug' => 'tochechnaia-studiia']);
+        $source = CatalogTitle::factory()->create(['title' => 'Исходный точечный сериал', 'year' => 2020]);
+        $oldCandidate = CatalogTitle::factory()->create(['title' => 'Первый точечный кандидат', 'year' => 2021]);
+
+        foreach ([$source, $oldCandidate] as $title) {
+            $title->genres()->attach($genre);
+            $title->actors()->attach([$firstActor->id, $secondActor->id]);
+            $title->studios()->attach($studio);
+        }
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $oldCandidate->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+
+        $unrelatedSource = CatalogTitle::factory()->create(['title' => 'Независимый источник']);
+        $unrelatedCandidate = CatalogTitle::factory()->create(['title' => 'Независимый кандидат']);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $unrelatedCandidate->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        CatalogTitleRelation::query()->create([
+            'source_title_id' => $unrelatedSource->id,
+            'target_title_id' => $unrelatedCandidate->id,
+            'relation_type' => CatalogTitleRelationType::ProviderRelated,
+            'source' => CatalogTitleRelationSource::ImportedProvider,
+            'provider_key' => 'unrelated-provider-link',
+            'priority' => 100,
+            'is_locked' => false,
+            'is_active' => true,
+        ]);
+
+        $builder = app(CatalogTitleRecommendationBuilder::class);
+        $builder->rebuild();
+        $unrelatedRowBefore = CatalogTitleRecommendation::query()
+            ->where('catalog_title_id', $unrelatedSource->id)
+            ->where('recommended_title_id', $unrelatedCandidate->id)
+            ->firstOrFail();
+        $this->travel(1)->second();
+
+        $newCandidate = CatalogTitle::factory()->create(['title' => 'Новый точечный кандидат', 'year' => 2021]);
+        $newCandidate->genres()->attach($genre);
+        $newCandidate->actors()->attach([$firstActor->id, $secondActor->id]);
+        $newCandidate->studios()->attach($studio);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $newCandidate->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        app(CatalogRecommendationDirtyTitleTracker::class)->mark($newCandidate->id, 'seasonvar-import');
+        app(CatalogRecommendationDirtyTitleTracker::class)->mark($unrelatedSource->id, 'manual-refresh');
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $result = $builder->rebuildDirty();
+        $queryCount = count(DB::getQueryLog());
+        DB::disableQueryLog();
+        $unrelatedRowAfter = CatalogTitleRecommendation::query()->findOrFail($unrelatedRowBefore->id);
+
+        $this->assertSame('scoped', $result['mode']);
+        $this->assertSame(2, $result['dirty_titles']);
+        $this->assertGreaterThanOrEqual(2, $result['affected_titles']);
+        $this->assertGreaterThanOrEqual(1, $result['changed_titles']);
+        $this->assertGreaterThanOrEqual(1, $result['unchanged_titles']);
+        $this->assertDatabaseHas('catalog_title_recommendations', [
+            'catalog_title_id' => $source->id,
+            'recommended_title_id' => $newCandidate->id,
+            'algorithm_version' => 'v6',
+        ]);
+        $this->assertSame($unrelatedRowBefore->updated_at?->toDateTimeString(), $unrelatedRowAfter->updated_at?->toDateTimeString());
+        $this->assertSame($unrelatedRowBefore->computed_at?->toDateTimeString(), $unrelatedRowAfter->computed_at?->toDateTimeString());
+        $this->assertLessThanOrEqual(60, $queryCount);
+        $this->assertDatabaseCount('catalog_recommendation_dirty_titles', 0);
+    }
+
+    public function test_dirty_queue_above_threshold_falls_back_to_full_shadow_build(): void
+    {
+        config([
+            'recommendations.similarity_v6.dirty_title_limit' => 2,
+            'seasonvar.recommendations.min_score' => 1,
+        ]);
+        $source = CatalogTitle::factory()->create();
+        $candidate = CatalogTitle::factory()->create();
+        $third = CatalogTitle::factory()->create();
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $candidate->id,
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        CatalogTitleRelation::query()->create([
+            'source_title_id' => $source->id,
+            'target_title_id' => $candidate->id,
+            'relation_type' => CatalogTitleRelationType::ProviderRelated,
+            'source' => CatalogTitleRelationSource::ImportedProvider,
+            'provider_key' => 'dirty-threshold-provider-link',
+            'priority' => 100,
+            'is_locked' => false,
+            'is_active' => true,
+        ]);
+        $builder = app(CatalogTitleRecommendationBuilder::class);
+        $initial = $builder->rebuild();
+        $tracker = app(CatalogRecommendationDirtyTitleTracker::class);
+
+        foreach ([$source, $candidate, $third] as $title) {
+            $tracker->mark($title->id, 'seasonvar-import');
+        }
+
+        $result = $builder->rebuildDirty();
+
+        $this->assertSame('full', $result['mode']);
+        $this->assertSame('dirty-limit-exceeded', $result['scope_fallback_reason']);
+        $this->assertNotSame($initial['build_id'], $result['build_id']);
+        $this->assertTrue($result['activated']);
+        $this->assertSame(0, CatalogRecommendationDirtyTitle::query()->count());
+    }
+
+    public function test_relationship_comedy_is_selected_while_unrelated_shared_actor_title_is_filtered(): void
     {
         config([
             'seasonvar.recommendations.min_score' => 300,
@@ -283,9 +498,9 @@ class CatalogTitleRecommendationBuilderTest extends TestCase
             ->orderBy('rank')
             ->get();
 
-        $this->assertSame('v4', $result['algorithm_version']);
+        $this->assertSame('v6', $result['algorithm_version']);
         $this->assertSame($topical->id, $recommendations->first()?->recommended_title_id);
-        $this->assertTrue($recommendations->contains('recommended_title_id', $actorOnly->id));
+        $this->assertFalse($recommendations->contains('recommended_title_id', $actorOnly->id));
         $this->assertArrayHasKey('theme_romance', $recommendations->first()?->reasons ?? []);
         $this->assertContains('Романтика', $recommendations->first()?->reasonLabels() ?? []);
     }
@@ -356,13 +571,11 @@ class CatalogTitleRecommendationBuilderTest extends TestCase
         }
 
         app(CatalogTitleRecommendationBuilder::class)->rebuild();
-        $recommendation = CatalogTitleRecommendation::query()
-            ->where('catalog_title_id', $source->id)
-            ->where('recommended_title_id', $candidate->id)
-            ->firstOrFail();
 
-        $this->assertSame(0, $recommendation->source_score);
-        $this->assertArrayNotHasKey('source_signal', $recommendation->reasons);
+        $this->assertDatabaseMissing('catalog_title_recommendations', [
+            'catalog_title_id' => $source->id,
+            'recommended_title_id' => $candidate->id,
+        ]);
     }
 
     public function test_diversity_reranking_keeps_the_highest_relevance_first(): void

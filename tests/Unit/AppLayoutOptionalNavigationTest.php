@@ -6,6 +6,7 @@ namespace Tests\Unit;
 
 use App\View\ViewData\AppLayoutData;
 use App\View\ViewModels\LayoutNavigationItem;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
 use Tests\TestCase;
 
@@ -13,6 +14,9 @@ final class AppLayoutOptionalNavigationTest extends TestCase
 {
     public function test_guest_layout_omits_navigation_for_unregistered_optional_routes(): void
     {
+        $homeRoute = $this->app->make(Router::class)->getRoutes()->getByName('home');
+        $this->app->make(Request::class)->setRouteResolver(static fn () => $homeRoute);
+
         $router = $this->createMock(Router::class);
         $router->method('has')->willReturn(false);
         $this->app->instance(Router::class, $router);

@@ -14,6 +14,8 @@ use App\Models\SeasonvarImportEvent;
 use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use App\Services\Catalog\CatalogMetadataDeduplicator;
+use App\Services\Catalog\CatalogRecommendationDirtyTitleTracker;
+use App\Services\Catalog\CatalogRecommendationSignalPruner;
 use App\Services\Catalog\CatalogTitleRecommendationBuilder;
 use App\Services\ContentRequests\ContentRequestImportRunLinker;
 use App\Services\Media\ExternalMediaMetadata;
@@ -41,6 +43,8 @@ class SeasonvarImportPipeline
         private readonly ExternalMediaMetadata $mediaMetadata,
         private readonly SeasonvarRefreshPlanner $refreshPlanner,
         private readonly CatalogTitleRecommendationBuilder $recommendations,
+        private readonly CatalogRecommendationDirtyTitleTracker $recommendationDirtyTitles,
+        private readonly CatalogRecommendationSignalPruner $recommendationSignalPruner,
         private readonly CatalogMetadataDeduplicator $metadataDeduplicator,
         private readonly SeasonvarImportStorageMaintenance $storageMaintenance,
         private readonly SeasonvarSourceAvailabilityBackfill $sourceAvailabilityBackfill,
@@ -225,7 +229,11 @@ class SeasonvarImportPipeline
             $mediaSizeBacklogResult = $this->refreshMediaFileSizeBacklog($loggedProgress);
             $relationCleanupResult = $this->metadataDeduplicator->run($loggedProgress);
             $mergeResult = $this->titleMerger->merge($loggedProgress);
-            $recommendationResult = $this->recommendations->rebuild($loggedProgress);
+            $recommendationResult = $this->recommendations->rebuildDirty($loggedProgress);
+            $recommendationSignalPruneResult = $this->pruneRecommendationSignalsAfterActivation(
+                $recommendationResult,
+                $loggedProgress,
+            );
 
             $this->addRunCounters($run, [
                 'cycles' => 1,
@@ -243,6 +251,7 @@ class SeasonvarImportPipeline
                 'last_relation_cleanup' => $relationCleanupResult,
                 'last_merge' => $mergeResult,
                 'last_recommendations' => $recommendationResult,
+                'last_recommendation_signal_prune' => $recommendationSignalPruneResult,
             ]);
 
             $run->refresh()->fill([
@@ -309,11 +318,17 @@ class SeasonvarImportPipeline
 
         if ($argument !== null) {
             $cycleResult = $this->runUrlCycle($run, $argument, $force, $progress);
+            $targetedCatalogTitleId = $cycleResult['catalog_title_id'];
+
+            if ($targetedCatalogTitleId !== null) {
+                $this->recommendationDirtyTitles->mark($targetedCatalogTitleId, 'targeted-import');
+            }
 
             $this->addRunCounters($run, [
                 'cycles' => 1,
             ], [
                 'targeted_maintenance_skipped' => true,
+                'last_targeted_catalog_title_id' => $targetedCatalogTitleId,
             ]);
 
             $progress('seasonvar-import-cycle-complete', [
@@ -399,7 +414,11 @@ class SeasonvarImportPipeline
             return;
         }
 
-        $recommendationResult = $this->recommendations->rebuild($progress);
+        $recommendationResult = $this->recommendations->rebuildDirty($progress);
+        $recommendationSignalPruneResult = $this->pruneRecommendationSignalsAfterActivation(
+            $recommendationResult,
+            $progress,
+        );
 
         $this->addRunCounters($run, [
             'cycles' => 1,
@@ -417,6 +436,7 @@ class SeasonvarImportPipeline
             'last_media_size_backlog' => $mediaSizeBacklogResult,
             'last_relation_cleanup' => $relationCleanupResult,
             'last_recommendations' => $recommendationResult,
+            'last_recommendation_signal_prune' => $recommendationSignalPruneResult,
         ]);
 
         $progress('seasonvar-import-cycle-complete', [
@@ -454,7 +474,56 @@ class SeasonvarImportPipeline
             'recommendation_titles_without_recommendations' => $recommendationResult['titles_without_recommendations'],
             'recommendations_stored' => $recommendationResult['stored'],
             'recommendations_duration_ms' => $recommendationResult['duration_ms'],
+            'recommendation_signals_pruned' => $recommendationSignalPruneResult['deleted'],
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $recommendationResult
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @return array{executed: bool, checked: int, deleted: int, failure: string|null}
+     */
+    private function pruneRecommendationSignalsAfterActivation(
+        array $recommendationResult,
+        ?callable $progress,
+    ): array {
+        $activatedShadowV6 = ($recommendationResult['algorithm_version'] ?? null) === 'v6'
+            && is_numeric($recommendationResult['build_id'] ?? null)
+            && (int) $recommendationResult['build_id'] > 0
+            && ($recommendationResult['activated'] ?? false) === true
+            && ($recommendationResult['gate_passed'] ?? false) === true;
+
+        if (! $activatedShadowV6) {
+            $result = [
+                'executed' => false,
+                'checked' => 0,
+                'deleted' => 0,
+                'failure' => null,
+            ];
+            $progress?->__invoke('catalog-recommendation-signals-prune-skipped', $result);
+
+            return $result;
+        }
+
+        try {
+            $pruned = $this->recommendationSignalPruner->prune($progress);
+
+            return [
+                'executed' => true,
+                ...$pruned,
+                'failure' => null,
+            ];
+        } catch (Throwable $exception) {
+            $result = [
+                'executed' => false,
+                'checked' => 0,
+                'deleted' => 0,
+                'failure' => $this->errors->fromException($exception),
+            ];
+            $progress?->__invoke('catalog-recommendation-signals-prune-failed', $result);
+
+            return $result;
+        }
     }
 
     /**
@@ -674,7 +743,7 @@ class SeasonvarImportPipeline
 
     /**
      * @param  callable(string, array<string, mixed>): void  $progress
-     * @return array{discovered: int, stored: int, selected: int, parsed: int, failed: int, media_attached: int, media_updated: int, media_skipped: int, media_failed: int, cleaned: int}
+     * @return array{discovered: int, stored: int, selected: int, parsed: int, failed: int, media_attached: int, media_updated: int, media_skipped: int, media_failed: int, cleaned: int, catalog_title_id: int|null}
      */
     private function runUrlCycle(SeasonvarImportRun $run, string $argument, bool $force, callable $progress): array
     {
@@ -733,6 +802,7 @@ class SeasonvarImportPipeline
             'media_skipped' => $mediaSkipped,
             'media_failed' => $mediaFailed,
             'cleaned' => 0,
+            'catalog_title_id' => $catalogTitle !== null ? (int) $catalogTitle->id : null,
         ];
     }
 
@@ -862,6 +932,7 @@ class SeasonvarImportPipeline
 
                 $availability = $this->mediaAvailabilityChecker->check($url, $progress);
                 $media = $this->mediaHealth->record($media, $availability);
+                $this->recommendationDirtyTitles->mark((int) $media->catalog_title_id, 'media-health');
 
                 $result['media_checked']++;
                 $result['media_updated']++;
@@ -1093,6 +1164,7 @@ class SeasonvarImportPipeline
 
                 $media->fill($updates)->save();
                 $result['media_updated']++;
+                $this->recommendationDirtyTitles->mark((int) $media->catalog_title_id, 'media-metadata');
 
                 $progress('seasonvar-media-metadata-updated', [
                     'licensed_media_id' => $media->id,
@@ -1372,6 +1444,10 @@ class SeasonvarImportPipeline
     private function catalogTitleForPage(SourcePage $page): ?CatalogTitle
     {
         return CatalogTitle::query()
+            ->select([
+                'id', 'source_id', 'source_page_id', 'external_id', 'title', 'original_title', 'type', 'year',
+                'description', 'poster_url', 'source_url', 'source_url_hash', 'content_hash', 'provider_field_values',
+            ])
             ->where('source_page_id', $page->id)
             ->orWhere(function ($query) use ($page): void {
                 $query->where('source_id', $page->source_id)
@@ -1379,7 +1455,7 @@ class SeasonvarImportPipeline
             })
             ->first()
             ?? Season::query()
-                ->with('catalogTitle')
+                ->with('catalogTitle:id,source_id,source_page_id,external_id,title,original_title,type,year,description,poster_url,source_url,source_url_hash,content_hash,provider_field_values')
                 ->where('source_url_hash', $page->url_hash)
                 ->first()
                 ?->catalogTitle;

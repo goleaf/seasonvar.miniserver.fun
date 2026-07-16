@@ -53,6 +53,12 @@ Standalone default DBs: cache 1, queues 2, sessions 3, locks 5, broadcasting 6. 
 
 `SEASONVAR_RECOMMENDATION_CHUNK_SIZE`, `MIN_SCORE`, `MAX_PER_TITLE`, `CANDIDATE_LIMIT` и `CANDIDATE_SCAN_PER_FEATURE` ограничивают локальную catalog-wide пересборку. `SEASONVAR_RECOMMENDATION_DIVERSITY_PENALTY` задаёт bounded MMR-штраф за повтор одинаковых тем и связей; default `120` не может изменить первый, самый релевантный результат. Эти параметры не включают HTTP и не меняют единственную публичную команду импорта.
 
+## Редакционные подборки
+
+`HDREZKA_COLLECTION_SYNC_ENABLED=false` является production kill switch отдельной синхронизации подборок. `SYNC_SCHEDULE`, `SYNC_DELAY_SECONDS`, `SYNC_MAX_RESPONSE_BYTES`, `SYNC_MAX_COLLECTIONS`, `SYNC_MAX_PAGES`, `SYNC_MAX_ITEMS`, `SYNC_LOCK_STORE` и `SYNC_LOCK_SECONDS` с тем же префиксом ограничивают расписание, сеть, объём обхода и single-flight. Они не расширяют точный HTTPS/host/path allowlist из versioned config.
+
+`HDREZKA_COLLECTION_RECOMMENDATION_REBUILD_ENABLED`, `..._QUEUE_CONNECTION`, `..._QUEUE`, `..._TIMEOUT` и `..._UNIQUE_SECONDS` управляют только after-sync scoped recommendation job; defaults переиспользуют Redis и `seasonvar-import`. `HDREZKA_COLLECTION_COVER_MAX_SOURCE_BYTES`, `..._MAX_SOURCE_DIMENSION`, `..._MAX_SOURCE_PIXELS`, `..._MAX_WIDTH`, `..._MAX_HEIGHT` и `..._WEBP_QUALITY` ограничивают декодирование и локальный WebP. Полный безопасный набор/defaults находится в `.env.example`; изменение требует `config:cache` и graceful reload PHP-FPM/scheduler/workers.
+
 ## Размер внешних видеофайлов
 
 `SEASONVAR_MEDIA_FILE_SIZE_ENABLED` включает bounded metadata inspection. `CONNECT_TIMEOUT`, `TIMEOUT`, `RETRY_TIMES`, `RETRY_SLEEP_MS`, `KNOWN_TTL`, `UNKNOWN_RETRY`, `FAILED_RETRY`, `BACKFILL_CHUNK_SIZE` и `MAX_CHECKS_PER_CYCLE` с тем же префиксом ограничивают сеть, freshness и catalogue backlog. `SEASONVAR_MEDIA_FILE_SIZE_SCHEDULED_BACKFILL_ENABLED` включает десятиминутное постепенное обслуживание legacy rows, а `SEASONVAR_MEDIA_FILE_SIZE_SCHEDULED_BACKFILL_LIMIT` задаёт размер одной пачки (default 20, дополнительно hard-clamped кодом). Defaults перечислены в `.env.example` и `config/seasonvar.php`; ни один параметр не разрешает чтение полного video body.

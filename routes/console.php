@@ -37,6 +37,13 @@ Schedule::command('catalog-collections:prune --limit='.(int) config('catalog-col
     ->withoutOverlapping(30)
     ->onOneServer();
 
+Schedule::command('catalog-collections:sync-hdrezka')
+    ->dailyAt((string) config('catalog-collection-imports.hdrezka.schedule', '03:37'))
+    ->name('hdrezka-editorial-collections-sync')
+    ->withoutOverlapping(360)
+    ->onOneServer()
+    ->when(static fn (): bool => (bool) config('catalog-collection-imports.hdrezka.enabled', false));
+
 Schedule::job(new WakeSeasonvarImportFinalizers)
     ->everyTenMinutes()
     ->name('seasonvar-import-finalization-watchdog')

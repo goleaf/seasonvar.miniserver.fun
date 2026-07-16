@@ -18,6 +18,12 @@
 
 Полный sitemap import имеет одну lifecycle start-boundary независимо от способа выполнения. `SeasonvarGlobalImportRunCoordinator` под коротким distributed lock ищет active `queued/running` sitemap-run среди `sync` и `queue`; новый sync run резервируется до входа в pipeline, а повторный CLI/admin/cron start безопасно переиспользует существующую строку без второго dispatch. Lock не удерживается во время HTTP, parsing или catalog writes. Targeted URL import, `--inventory-only` и `--status` не являются полным global cycle и сохраняют независимый контракт.
 
+## Отдельная синхронизация редакционных подборок
+
+`php artisan catalog-collections:sync-hdrezka` не является режимом `seasonvar:import`: команда обходит только индекс и pagination редакционных подборок HDRezka, сопоставляет карточки с уже существующими локальными тайтлами и обновляет collection membership/provenance. Она не создаёт и не обновляет `CatalogTitle`, season, episode или media, не сохраняет HTML/video body и не использует Seasonvar `SourcePage`/run identity. Единственной публичной командой импорта Seasonvar по-прежнему остаётся `php artisan seasonvar:import`.
+
+Полный security/matching/reconciliation/recommendation контракт принадлежит разделу «Синхронизация внешних редакционных подборок» в [`architecture.md`](architecture.md), таблицы и индексы — [`DATA_RELATIONS.md`](DATA_RELATIONS.md), rollout — [`deployment.md`](deployment.md). Здесь граница зафиксирована только для предотвращения смешивания двух независимых provider lifecycles.
+
 ## Retention и секреты
 
 Владелец технического retention — production operator runbook Seasonvar. `SeasonvarImportStorageMaintenance` применяет только существующие bounded окна: import events — 7 дней, source snapshots — 14 дней, terminal prepared groups — 7 дней через `SEASONVAR_IMPORT_*_RETENTION_DAYS`; при очистке snapshots всегда сохраняется детерминированная последняя копия. Failed jobs автоматически не удаляются, а пользовательская история, legal/admin audit и другие продуктовые данные не входят в importer prune без отдельной policy.
@@ -115,7 +121,7 @@ Parser boundary принимает реальные source-названия дл
 
 ## Полные и частичные ответы
 
-Parser фиксирует признаки `has_info_list`, `has_season_list` и `has_episode_script`. Отсутствие блока означает частичный ответ, а не удаление данных. Связи синхронизируются через additive `syncWithoutDetaching`, сезоны/серии/media только upsert-ятся, soft-deleted строки не восстанавливаются. Managed recommendation signals заменяются только при полном metadata snapshot. Политики удаления по complete snapshot пока нет; importer ничего не удаляет только из-за отсутствия записи в одном ответе.
+Parser фиксирует признаки `has_info_list`, `has_season_list` и `has_episode_script`. Отсутствие блока означает частичный ответ, а не удаление данных. Связи синхронизируются через additive `syncWithoutDetaching`, сезоны/серии/media только upsert-ятся, soft-deleted строки не восстанавливаются. Taxonomy/rating/year/page-quality не дублируются в recommendation signals; DTO сохраняет поле только для будущих проверенных `provider_recommendation`/`related_title`, а пустой набор никогда не удаляет такие существующие provenance rows. Политики удаления по complete snapshot пока нет; importer ничего не удаляет только из-за отсутствия записи в одном ответе.
 
 ## Версионированное восстановление metadata
 
@@ -127,11 +133,13 @@ Retention всегда оставляет snapshot с максимальным `
 
 ## Пересборка рекомендаций
 
-Алгоритм `v3` выполняет полную локальную пересборку без HTTP: хранит профили компактно, извлекает из названия и описания ограниченный словарь тем и строит bounded candidate pool по темам и информативным связям. Тема, тег, режиссёр, актёр, сеть или студия обязательны как сильное совпадение; общий жанр, страна, год и качество кандидата сами по себе не проводят пару через relevance gate. Вклад связи и темы умножается на ограниченный коэффициент обратной частоты, поэтому редкий общий признак важнее массового жанра. После точного scoring небольшой MMR-штраф разводит повторяющиеся результаты, не меняя самый релевантный первый тайтл. Rating, отзывы и опубликованное видео остаются только ограниченным quality tie-breaker; candidate без доступного опубликованного media не сохраняется.
+Алгоритм `v6` выполняет локальную сборку без HTTP: хранит профили компактно, сопоставляет темы по целым нормализованным tokens/phrases и строит bounded candidate pool по темам, редким комбинациям и информативным связям. Тема, тег, режиссёр, актёр, сеть или студия обязательны как сильное совпадение; общий жанр, страна, год и quality сами по себе не проводят пару через relevance gate. Вклад связи и темы зависит от document frequency и overlap, поэтому редкий общий признак важнее массового жанра. После точного scoring небольшой MMR-штраф разводит повторяющиеся результаты, не меняя самый релевантный первый тайтл. Rating, отзывы и опубликованное видео остаются ограниченным quality tie-breaker; candidate без доступного опубликованного media не сохраняется.
 
-Candidate maps используют packed IDs для жанров, тегов, режиссёров, актёров, сетей, студий, отдельных тем и пар `тема+страна`/`тема+жанр`. `SEASONVAR_RECOMMENDATION_CANDIDATE_LIMIT` ограничивает число профилей для точного scoring одного тайтла, `SEASONVAR_RECOMMENDATION_CANDIDATE_SCAN_PER_FEATURE` — детерминированную выборку одного признака, `SEASONVAR_RECOMMENDATION_DIVERSITY_PENALTY` — мягкий MMR-штраф, а `SEASONVAR_RECOMMENDATION_MAX_PER_TITLE` — итоговый список. Пересборка по-прежнему выполняется один раз в full cycle или queued finalizer через единственную публичную команду `php artisan seasonvar:import`; targeted URL import её не запускает.
+Candidate maps используют packed IDs для жанров, тегов, режиссёров, актёров, сетей, студий, отдельных тем и пар `тема+страна`/`тема+жанр`. `SEASONVAR_RECOMMENDATION_CANDIDATE_LIMIT` ограничивает число профилей для точного scoring одного тайтла, `SEASONVAR_RECOMMENDATION_DIVERSITY_PENALTY` — мягкий MMR-штраф, а `SEASONVAR_RECOMMENDATION_MAX_PER_TITLE` — итоговый список. Full result сначала попадает в shadow tables и активируется одной transaction только после golden gate; прежняя выдача остаётся доступной при отказе. Следующие циклы обрабатывают до 2 000 dirty titles и bounded соседей, не переписывая совпавший payload; overflow/version mismatch возвращает full shadow build. Targeted URL import только ставит title в эту очередь.
 
-Перед записью каждого набора builder повторно проверяет source и candidates через public boundary уже внутри write-транзакции. Это защищает длинный compact profile snapshot от concurrent targeted merge/delete: исчезнувшие ID отбрасываются, оставшиеся ranks перенумеровываются, а один внешний ключ не обрывает catalog-wide rebuild.
+После первой подтверждённой shadow activation v6 отдельный pruner удаляет только legacy `source=seasonvar_info` generic-типы пачками по 1 000. Provider/related signals и другие sources не входят в delete predicate. Если gate не прошёл, schema ещё не применена или rebuild завершился ошибкой, legacy rows сохраняются для повторной безопасной попытки.
+
+Full shadow activation повторно проверяет целостность набора и заменяет active rows атомарно. Scoped write ограничен профилями из той же public boundary, одной transaction на changed sources и FK cascade; failure не очищает dirty rows, поэтому следующий цикл повторяет работу.
 
 ## Порядок деплоя
 

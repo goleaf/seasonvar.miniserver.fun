@@ -29,6 +29,8 @@ use Livewire\WithPagination;
 
 final class TagAdministrationManager extends Component
 {
+    private const AUTHORING_LOCALE = 'ru';
+
     use WithPagination;
 
     public string $search = '';
@@ -42,8 +44,6 @@ final class TagAdministrationManager extends Component
     public array $translationForms = [];
 
     public string $aliasName = '';
-
-    public string $aliasLocale = 'und';
 
     public string $relationshipSearch = '';
 
@@ -158,9 +158,9 @@ final class TagAdministrationManager extends Component
         $this->notice = __('tags.admin.updated');
     }
 
-    public function saveTranslation(string $locale): void
+    public function saveTranslation(): void
     {
-        abort_unless(in_array($locale, config('tags.supported_locales', []), true), 404);
+        $locale = self::AUTHORING_LOCALE;
         $key = 'translationForms.'.$locale;
         $validated = Validator::make(['translationForms' => $this->translationForms], [
             $key.'.label' => ['required', 'string', 'max:80'],
@@ -176,23 +176,17 @@ final class TagAdministrationManager extends Component
 
     public function addAlias(): void
     {
-        $supportedLocales = config('tags.supported_locales', []);
-        $supportedLocales = is_array($supportedLocales)
-            ? array_values(array_filter($supportedLocales, is_string(...)))
-            : [];
         $validated = Validator::make([
             'aliasName' => $this->aliasName,
-            'aliasLocale' => $this->aliasLocale,
         ], [
             'aliasName' => ['required', 'string', 'max:80'],
-            'aliasLocale' => ['required', 'string', Rule::in(['und', ...$supportedLocales])],
         ], $this->validationMessages())->validate();
 
         $this->tags->addAlias(
             $this->user(),
             $this->selectedTag(),
             (string) $validated['aliasName'],
-            (string) $validated['aliasLocale'],
+            self::AUTHORING_LOCALE,
             TagAliasSource::Editorial,
         );
         $this->aliasName = '';
@@ -311,6 +305,7 @@ final class TagAdministrationManager extends Component
         return view('livewire.tags.tag-administration-manager', [
             'tagsPage' => $this->query->paginate($this->search, $this->moderationFilter),
             'selectedTag' => $tag,
+            'displaySynonyms' => $this->query->displaySynonyms($tag),
             'relationshipCandidates' => $this->query->candidates($this->relationshipSearch, $tag),
             'mergeCandidates' => $this->query->candidates($this->mergeSearch, $tag),
             'titleOptions' => $tag === null ? collect() : $this->query->titleOptions($tag, $this->titleSearch),
@@ -342,7 +337,6 @@ final class TagAdministrationManager extends Component
                 'value' => $source->value,
                 'label' => __('tags.sources.'.$source->value),
             ], TagSource::cases()),
-            'supportedLocales' => config('tags.supported_locales', []),
         ])->extends('layouts.app', [
             'title' => __('tags.admin.title'),
             'seo' => ['title' => __('tags.admin.title'), 'robots' => 'noindex,nofollow', 'alternates' => []],
@@ -372,8 +366,8 @@ final class TagAdministrationManager extends Component
         $this->tagVersion = $this->tags->version($tag);
         $forms = $this->emptyTranslationForms();
 
-        foreach ($tag->translations as $translation) {
-            $forms[$translation->locale] = [
+        foreach ($tag->translations->where('locale', self::AUTHORING_LOCALE) as $translation) {
+            $forms[self::AUTHORING_LOCALE] = [
                 'label' => (string) $translation->label,
                 'short_description' => (string) ($translation->short_description ?? ''),
                 'description' => (string) ($translation->description ?? ''),
@@ -388,25 +382,20 @@ final class TagAdministrationManager extends Component
     /** @return array<string, array<string, string>> */
     private function emptyTranslationForms(): array
     {
-        $locales = config('tags.supported_locales', []);
-
-        if (! is_array($locales)) {
-            return [];
-        }
-
-        return collect($locales)->filter(is_string(...))->mapWithKeys(fn (string $locale): array => [$locale => [
-            'label' => '',
-            'short_description' => '',
-            'description' => '',
-            'seo_title' => '',
-            'seo_description' => '',
-        ]])->all();
+        return [
+            self::AUTHORING_LOCALE => [
+                'label' => '',
+                'short_description' => '',
+                'description' => '',
+                'seo_title' => '',
+                'seo_description' => '',
+            ],
+        ];
     }
 
     private function resetSecondaryForms(): void
     {
         $this->aliasName = '';
-        $this->aliasLocale = 'und';
         $this->relationshipSearch = '';
         $this->relationshipTarget = null;
         $this->mergeSearch = '';

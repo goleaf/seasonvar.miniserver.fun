@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Catalog;
 
 use App\DTOs\CatalogRecommendationContext;
+use App\DTOs\CatalogTopListFilters;
 use App\DTOs\CatalogTopListItem;
 use App\Enums\CatalogRecommendationType;
 use App\Enums\CatalogTopListCategory;
@@ -37,9 +38,13 @@ final class CatalogTopListQuery
     ) {}
 
     /** @return Collection<int, CatalogTopListItem> */
-    public function items(CatalogTopListCategory $category, ?User $viewer): Collection
-    {
-        $rows = $this->rankedRows($category, self::LIMIT);
+    public function items(
+        CatalogTopListCategory $category,
+        ?User $viewer,
+        ?CatalogTopListFilters $filters = null,
+    ): Collection {
+        $filters ??= CatalogTopListFilters::empty();
+        $rows = $this->rankedRows($category, self::LIMIT, $filters);
         $ids = $rows
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
@@ -53,6 +58,7 @@ final class CatalogTopListQuery
             type: CatalogRecommendationType::TopRated,
             user: $viewer,
             locale: app()->currentLocale(),
+            filters: $filters->contextFilters(),
             ratingSource: 'kinopoisk',
         );
         $rankedRows = $rows->keyBy(fn (CatalogTitle $title): int => (int) $title->id);
@@ -104,16 +110,20 @@ final class CatalogTopListQuery
 
     public function hasItems(CatalogTopListCategory $category): bool
     {
-        return $this->rankedRows($category, 1)->isNotEmpty();
+        return $this->rankedRows($category, 1, CatalogTopListFilters::empty())->isNotEmpty();
     }
 
     /** @return Collection<int, CatalogTitle> */
-    private function rankedRows(CatalogTopListCategory $category, int $limit): Collection
-    {
+    private function rankedRows(
+        CatalogTopListCategory $category,
+        int $limit,
+        CatalogTopListFilters $filters,
+    ): Collection {
         $context = new CatalogRecommendationContext(
             type: CatalogRecommendationType::TopRated,
             user: null,
             locale: (string) config('catalog-collections.default_locale', 'ru'),
+            filters: $filters->contextFilters(),
             ratingSource: 'kinopoisk',
         );
         $ratingTable = (new CatalogTitleRating)->getTable();

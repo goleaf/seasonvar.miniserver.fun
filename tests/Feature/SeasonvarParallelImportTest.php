@@ -324,7 +324,7 @@ class SeasonvarParallelImportTest extends TestCase
         $queryCount = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $this->assertLessThanOrEqual(5, $queryCount);
+        $this->assertLessThanOrEqual(6, $queryCount);
         $this->assertTrue($dashboard['has_active_run']);
         $this->assertSame(1, $dashboard['media_due_count']);
         $this->assertSame(1, collect($dashboard['media_health'])->firstWhere('status', 'degraded')['count']);

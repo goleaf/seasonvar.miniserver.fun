@@ -55,6 +55,7 @@ run_backend() (
     trap clear_laravel_cache_artifacts EXIT
     composer validate --strict
     composer audit
+    bash scripts/check-changelog-policy.sh CHANGELOG.md
     clear_laravel_cache_artifacts
     ./vendor/bin/pint --test --format=agent
     composer rector:check
@@ -79,7 +80,12 @@ run_browser() (
         browser_database="$repo_root/$browser_database"
     fi
 
-    export APP_URL="${PLAYWRIGHT_APP_URL:-http://127.0.0.1:$browser_port}"
+    export APP_URL="http://127.0.0.1:$browser_port"
+    export CACHE_DOMAIN_STORE=array
+    export CACHE_HOT_STORE=array
+    export CACHE_LOCK_STORE=array
+    export CACHE_METRICS_STORE=array
+    export CACHE_VERSION_STORE=array
     export DB_CONNECTION=sqlite
     export DB_DATABASE="$browser_database"
     export BROWSER_TEST_DATABASE="$browser_database"

@@ -30,6 +30,8 @@ use Livewire\WithPagination;
 
 final class CatalogCollectionEditor extends Component
 {
+    private const AUTHORING_LOCALE = 'ru';
+
     use InteractsWithCollectionLocale;
     use WithFileUploads;
     use WithPagination;
@@ -48,7 +50,8 @@ final class CatalogCollectionEditor extends Component
 
     public string $sortMode = 'manual';
 
-    public string $contentLocale = 'ru';
+    #[Locked]
+    public string $contentLocale = self::AUTHORING_LOCALE;
 
     public string $seoTitle = '';
 
@@ -64,22 +67,10 @@ final class CatalogCollectionEditor extends Component
         $this->collectionPublicId = $collectionPublicId;
         $collection = $resolver->byPublicId($collectionPublicId);
         Gate::authorize('update', $collection);
-        $this->contentLocale = $this->interfaceLocale;
+        $this->contentLocale = self::AUTHORING_LOCALE;
         $this->fillCollection($collection);
         $status = Session::pull('catalog_collection_status');
         $this->status = is_string($status) ? $status : null;
-    }
-
-    public function selectEditorialLocale(string $locale, CatalogCollectionResolver $resolver): void
-    {
-        abort_unless(in_array($locale, $this->collectionLocales(), true), 404);
-        $collection = $resolver->byPublicId($this->collectionPublicId);
-        Gate::authorize('update', $collection);
-        abort_unless($collection->type->value === 'editorial', 404);
-        $this->contentLocale = $locale;
-        $this->fillCollection($collection);
-        $this->resetValidation();
-        $this->status = null;
     }
 
     public function save(CatalogCollectionResolver $resolver, CatalogCollectionService $service): void
@@ -89,7 +80,6 @@ final class CatalogCollectionEditor extends Component
             'description' => ['nullable', 'string', 'max:10000'],
             'visibility' => ['required', Rule::enum(CatalogCollectionVisibility::class)],
             'sortMode' => ['required', Rule::enum(CatalogCollectionSort::class)],
-            'contentLocale' => ['required', Rule::in($this->collectionLocales())],
             'seoTitle' => ['nullable', 'string', 'max:180'],
             'seoDescription' => ['nullable', 'string', 'max:500'],
         ], [
@@ -97,7 +87,6 @@ final class CatalogCollectionEditor extends Component
             'description.*' => __('collections.validation.description'),
             'visibility.*' => __('collections.validation.visibility'),
             'sortMode.*' => __('collections.validation.sort'),
-            'contentLocale.*' => __('collections.validation.locale'),
             'seoTitle.*' => __('collections.validation.seo_title'),
             'seoDescription.*' => __('collections.validation.seo_description'),
         ]);
@@ -109,7 +98,7 @@ final class CatalogCollectionEditor extends Component
             sortMode: CatalogCollectionSort::from($validated['sortMode']),
             type: $collection->type,
             contentLocale: $collection->type->value === 'editorial'
-                ? $validated['contentLocale']
+                ? self::AUTHORING_LOCALE
                 : $collection->content_locale,
             seoTitle: $collection->type->value === 'editorial' && $validated['seoTitle'] !== ''
                 ? $validated['seoTitle']
@@ -222,10 +211,6 @@ final class CatalogCollectionEditor extends Component
             ], CatalogCollectionSort::cases()),
             'coverUrl' => $covers->url($collection),
             'maximumCoverMegabytes' => round((int) config('uploads.max_image_kilobytes', 2048) / 1024, 1),
-            'supportedLocales' => array_map(static fn (string $locale): array => [
-                'value' => $locale,
-                'label' => __('collections.locale.'.$locale),
-            ], $this->collectionLocales()),
         ])->extends('layouts.app', [
             'title' => __('collections.actions.edit').' — '.$collection->display_name,
             'seo' => [
@@ -240,9 +225,9 @@ final class CatalogCollectionEditor extends Component
 
     private function fillCollection(CatalogCollection $collection): void
     {
-        $collection->loadMissing('translations');
+        $collection->loadMissing('translations:id,catalog_collection_id,locale,name,description,seo_title,seo_description');
         $translation = $collection->type->value === 'editorial'
-            ? $collection->translations->firstWhere('locale', $this->contentLocale)
+            ? $collection->translations->firstWhere('locale', self::AUTHORING_LOCALE)
             : null;
         $this->name = $translation instanceof CatalogCollectionTranslation ? $translation->name : $collection->name;
         $this->description = $translation instanceof CatalogCollectionTranslation

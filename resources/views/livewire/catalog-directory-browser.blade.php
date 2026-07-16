@@ -32,11 +32,11 @@
             <dl class="grid grid-cols-2 gap-3 sm:max-w-lg xl:min-w-[340px]">
                 <div class="rounded-control bg-slate-50 px-4 py-3">
                     <dt class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('catalog.directories.total_values') }}</dt>
-                    <dd class="mt-1 text-xl font-black text-slate-900">{{ trans_choice('catalog.directories.counts.values', $totalValues) }}</dd>
+                    <dd class="mt-1 text-xl font-black text-slate-900">{{ $totalValuesLabel }}</dd>
                 </div>
                 <div class="rounded-control bg-emerald-50 px-4 py-3">
                     <dt class="text-xs font-bold uppercase tracking-wide text-emerald-700">{{ __('catalog.directories.total_titles') }}</dt>
-                    <dd class="mt-1 text-xl font-black text-emerald-900">{{ trans_choice('catalog.counts.results', $totalTitles) }}</dd>
+                    <dd class="mt-1 text-xl font-black text-emerald-900">{{ $totalTitlesLabel }}</dd>
                 </div>
             </dl>
         </div>
@@ -121,7 +121,7 @@
                             'inline-flex min-h-11 items-center justify-center rounded-control px-4 text-sm font-bold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200',
                             'bg-emerald-700 text-white' => $decade === $availableDecade,
                             'bg-slate-100 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' => $decade !== $availableDecade,
-                        ]) aria-pressed="{{ $decade === $availableDecade ? 'true' : 'false' }}">{{ $availableDecade }}-е</button>
+                        ]) aria-pressed="{{ $decade === $availableDecade ? 'true' : 'false' }}">{{ __('catalog.directories.decade', ['decade' => $availableDecade]) }}</button>
                     @endforeach
                 </div>
             </div>
@@ -139,10 +139,10 @@
         <div class="flex flex-wrap items-end justify-between gap-3">
             <div>
                 <h2 id="directory-results" class="text-xl font-black text-slate-900">{{ __('catalog.directories.results') }}</h2>
-                <p class="mt-1 text-sm text-slate-600">{{ trans_choice('catalog.directories.counts.found', $items->total()) }}</p>
+                <p class="mt-1 text-sm text-slate-600">{{ $foundValuesLabel }}</p>
             </div>
             @if ($items->lastPage() > 1)
-                <p class="text-sm font-semibold text-slate-500">{{ __('catalog.directories.page', ['current' => $items->currentPage(), 'last' => $items->lastPage()]) }}</p>
+                <p class="text-sm font-semibold text-slate-500">{{ $pageLabel }}</p>
             @endif
         </div>
 
@@ -156,7 +156,7 @@
             <div class="mt-4 space-y-8">
                 @foreach ($itemsByDecade as $itemDecade => $decadeItems)
                     <section aria-labelledby="decade-{{ $itemDecade }}">
-                        <h3 id="decade-{{ $itemDecade }}" class="text-lg font-black text-slate-800">{{ $itemDecade }}-е</h3>
+                        <h3 id="decade-{{ $itemDecade }}" class="text-lg font-black text-slate-800">{{ __('catalog.directories.decade', ['decade' => $itemDecade]) }}</h3>
                         <div data-directory-results-list class="mt-3 divide-y divide-slate-200 overflow-hidden rounded-panel border border-slate-200 bg-white">
                             @foreach ($decadeItems as $item)
                                 <div wire:key="{{ $item->item_key }}">

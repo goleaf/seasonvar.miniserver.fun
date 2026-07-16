@@ -32,10 +32,14 @@ final class CatalogCollectionAccountService
         return CatalogCollection::query()
             ->withTrashed()
             ->where('owner_id', $user->id)
-            ->with(['translations', 'items' => fn ($query) => $query
-                ->with('catalogTitleWithTrashed:id,slug,title,original_title')
-                ->orderBy('position')
-                ->orderBy('id')])
+            ->with([
+                'translations:id,catalog_collection_id,locale,name,description,seo_title,seo_description',
+                'items' => fn ($query) => $query
+                    ->select(['id', 'catalog_collection_id', 'catalog_title_id', 'position', 'created_at'])
+                    ->with('catalogTitleWithTrashed:id,slug,title,original_title')
+                    ->orderBy('position')
+                    ->orderBy('id'),
+            ])
             ->orderBy('created_at')
             ->orderBy('id')
             ->get()

@@ -26,6 +26,8 @@ use Livewire\WithPagination;
 
 final class CatalogCollectionDashboard extends Component
 {
+    private const AUTHORING_LOCALE = 'ru';
+
     use InteractsWithCollectionLocale;
     use WithPagination;
 
@@ -73,7 +75,7 @@ final class CatalogCollectionDashboard extends Component
             visibility: CatalogCollectionVisibility::from($validated['visibility']),
             type: CatalogCollectionType::from($validated['type']),
             contentLocale: $validated['type'] === CatalogCollectionType::Editorial->value
-                ? $this->interfaceLocale
+                ? self::AUTHORING_LOCALE
                 : null,
             publicId: $this->creationPublicId,
         ));

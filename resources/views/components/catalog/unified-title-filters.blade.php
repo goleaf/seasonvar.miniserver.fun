@@ -99,8 +99,8 @@
                         <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.source') }}</span>
                         <select wire:model.live="filters.ratingSource" name="rating_source" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-52">
                             <option value="">{{ __('catalog.catalog.exact_filters.any_source') }}</option>
-                            <option value="kinopoisk" @selected($filterView->scalarState('rating_source') === 'kinopoisk')>КиноПоиск</option>
-                            <option value="imdb" @selected($filterView->scalarState('rating_source') === 'imdb')>IMDb</option>
+                            <option value="kinopoisk" @selected($filterView->scalarState('rating_source') === 'kinopoisk')>{{ __('catalog.catalog.advanced_filter_values.rating_kinopoisk') }}</option>
+                            <option value="imdb" @selected($filterView->scalarState('rating_source') === 'imdb')>{{ __('catalog.catalog.advanced_filter_values.rating_imdb') }}</option>
                         </select>
                     </label>
                     <label class="min-w-24 flex-1 text-xs font-bold text-slate-600 sm:flex-none">
@@ -148,8 +148,8 @@
             </fieldset>
         </div>
         <section aria-labelledby="catalog-facet-groups-title" class="border-t border-slate-200 pt-4">
-            <h3 id="catalog-facet-groups-title" class="text-base font-black text-slate-800">Фильтры каталога</h3>
-            <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-500">Выберите годы, тип материалов и характеристики сериала.</p>
+            <h3 id="catalog-facet-groups-title" class="text-base font-black text-slate-800">{{ __('catalog.catalog.filters.title') }}</h3>
+            <p class="mt-1 max-w-3xl text-sm leading-6 text-slate-500">{{ __('catalog.catalog.filters.description') }}</p>
 
             @if ($facetsLoaded)
                 <x-catalog.title-filters
@@ -162,7 +162,7 @@
             @else
                 <div data-catalog-facets-loading aria-live="polite" class="mt-3 flex min-h-24 items-center justify-center gap-2 rounded-control bg-white px-4 py-5 text-sm font-bold text-slate-600">
                     <x-ui.icon name="fa-solid fa-spinner fa-spin text-emerald-700" />
-                    <span>Загружаем фильтры…</span>
+                    <span>{{ __('catalog.catalog.filters.loading') }}</span>
                 </div>
             @endif
         </section>

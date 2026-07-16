@@ -279,6 +279,12 @@ class CatalogTitle extends Model
         return $this->hasMany(CatalogCollectionItem::class);
     }
 
+    /** @return HasMany<CatalogCollectionSourceItem, $this> */
+    public function collectionSourceItems(): HasMany
+    {
+        return $this->hasMany(CatalogCollectionSourceItem::class);
+    }
+
     /** @return HasMany<EpisodeViewProgress, $this> */
     public function viewProgress(): HasMany
     {

@@ -24,6 +24,9 @@
             @elseif ($card->editorial)
                 <x-ui.status-pill variant="warning">{{ $card->typeLabel }}</x-ui.status-pill>
             @endif
+            @if ($card->imported)
+                <x-ui.status-pill variant="success" icon="fa-solid fa-rotate">{{ $card->importedLabel }}</x-ui.status-pill>
+            @endif
         </div>
 
         <h2 class="mt-3 break-words text-lg font-black leading-snug text-slate-800">

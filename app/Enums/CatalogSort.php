@@ -19,20 +19,7 @@ enum CatalogSort: string
 
     public function label(): string
     {
-        return match ($this) {
-            self::Relevance => 'По релевантности',
-            self::Updated => 'Недавно обновленные',
-            self::YearDesc => 'Год: новые сначала',
-            self::YearAsc => 'Год: старые сначала',
-            self::EpisodesDesc => 'Серий: больше сначала',
-            self::SeasonsDesc => 'Сезонов: больше сначала',
-            self::VideoDesc => 'Видео: больше сначала',
-            self::TitleAsc => 'Название: А-я',
-            self::TitleDesc => 'Название: Я-а',
-            self::KinopoiskRating => 'Рейтинг КиноПоиска',
-            self::ImdbRating => 'Рейтинг IMDb',
-            self::Popularity => 'По популярности',
-        };
+        return (string) __("catalog.catalog.sorts.{$this->value}");
     }
 
     public function icon(): string

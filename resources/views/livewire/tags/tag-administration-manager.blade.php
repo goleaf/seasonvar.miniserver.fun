@@ -165,26 +165,23 @@
                 @if ($selectedTag->merged_into_id === null && $selectedTag->archived_at === null)
                     <x-ui.panel :title="__('tags.admin.translations')" icon="fa-solid fa-language">
                         <div class="space-y-5">
-                            @foreach ($supportedLocales as $locale)
-                                <form wire:key="admin-tag-translation-{{ $locale }}" wire:submit="saveTranslation('{{ $locale }}')" class="space-y-3 rounded-control border border-slate-200 p-3">
-                                    <h3 class="text-sm font-black text-slate-800">{{ __('tags.locales.'.$locale) }}</h3>
-                                    <x-form.field for="admin-tag-label-{{ $locale }}" :label="__('tags.fields.name')" wire:model="translationForms.{{ $locale }}.label" maxlength="80" required />
-                                    <x-form.field for="admin-tag-short-description-{{ $locale }}" :label="__('tags.admin.short_description')" wire:model="translationForms.{{ $locale }}.short_description" maxlength="500" />
+                                <form wire:key="admin-tag-translation-ru" wire:submit="saveTranslation" class="space-y-3 rounded-control border border-slate-200 p-3">
+                                    <x-form.field for="admin-tag-label-ru" :label="__('tags.fields.name')" wire:model="translationForms.ru.label" maxlength="80" required />
+                                    <x-form.field for="admin-tag-short-description-ru" :label="__('tags.admin.short_description')" wire:model="translationForms.ru.short_description" maxlength="500" />
                                     <div>
-                                        <label for="admin-tag-description-{{ $locale }}" class="block text-sm font-bold text-slate-700">{{ __('tags.fields.description') }}</label>
-                                        <textarea id="admin-tag-description-{{ $locale }}" wire:model="translationForms.{{ $locale }}.description" maxlength="10000" rows="5" @if ($errors->has('translationForms.'.$locale.'.description')) aria-invalid="true" aria-describedby="admin-tag-description-{{ $locale }}-error" @endif class="mt-2 min-h-32 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"></textarea>
-                                        <x-form.input-error :for="'translationForms.'.$locale.'.description'" :id="'admin-tag-description-'.$locale.'-error'" />
+                                        <label for="admin-tag-description-ru" class="block text-sm font-bold text-slate-700">{{ __('tags.fields.description') }}</label>
+                                        <textarea id="admin-tag-description-ru" wire:model="translationForms.ru.description" maxlength="10000" rows="5" @if ($errors->has('translationForms.ru.description')) aria-invalid="true" aria-describedby="admin-tag-description-ru-error" @endif class="mt-2 min-h-32 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800"></textarea>
+                                        <x-form.input-error for="translationForms.ru.description" id="admin-tag-description-ru-error" />
                                     </div>
                                     <div class="grid gap-3 sm:grid-cols-2">
-                                        <x-form.field for="admin-tag-seo-title-{{ $locale }}" :label="__('tags.admin.seo_title')" wire:model="translationForms.{{ $locale }}.seo_title" maxlength="180" />
-                                        <x-form.field for="admin-tag-seo-description-{{ $locale }}" :label="__('tags.admin.seo_description')" wire:model="translationForms.{{ $locale }}.seo_description" maxlength="320" />
+                                        <x-form.field for="admin-tag-seo-title-ru" :label="__('tags.admin.seo_title')" wire:model="translationForms.ru.seo_title" maxlength="180" />
+                                        <x-form.field for="admin-tag-seo-description-ru" :label="__('tags.admin.seo_description')" wire:model="translationForms.ru.seo_description" maxlength="320" />
                                     </div>
-                                    <button type="submit" wire:loading.attr="disabled" wire:target="saveTranslation('{{ $locale }}')" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-50">
+                                    <button type="submit" wire:loading.attr="disabled" wire:target="saveTranslation" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-50">
                                         <x-ui.icon name="fa-solid fa-floppy-disk" />
                                         <span>{{ __('tags.actions.save') }}</span>
                                     </button>
                                 </form>
-                            @endforeach
                         </div>
                     </x-ui.panel>
 
@@ -195,7 +192,6 @@
                                     <div wire:key="admin-tag-alias-{{ $alias->id }}" class="flex flex-wrap items-center justify-between gap-2 rounded-control bg-slate-50 p-2">
                                         <span class="min-w-0 break-words text-sm font-bold text-slate-700">
                                             {{ $alias->name }}
-                                            <span class="text-xs text-slate-500">{{ $alias->locale }}</span>
                                             <span class="mt-1 block text-xs font-bold text-slate-500">{{ $moderationStatusLabels[$alias->moderation_status->value] }}</span>
                                         </span>
                                         <span class="flex flex-wrap items-center gap-1">
@@ -208,15 +204,8 @@
                                     </div>
                                 @endforeach
                             </div>
-                            <form wire:submit="addAlias" class="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_110px_auto] sm:items-end">
+                            <form wire:submit="addAlias" class="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
                                 <x-form.field for="admin-tag-alias-name" :label="__('tags.fields.aliases')" wire:model="aliasName" maxlength="80" required />
-                                <label class="text-sm font-bold text-slate-700">{{ __('tags.fields.language') }}
-                                    <select wire:model="aliasLocale" @if ($errors->has('aliasLocale')) aria-invalid="true" aria-describedby="admin-tag-alias-locale-error" @endif class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-2 py-2 font-normal">
-                                        <option value="und">—</option>
-                                        @foreach ($supportedLocales as $locale)<option value="{{ $locale }}">{{ $locale }}</option>@endforeach
-                                    </select>
-                                    <x-form.input-error for="aliasLocale" id="admin-tag-alias-locale-error" />
-                                </label>
                                 <button type="submit" wire:loading.attr="disabled" wire:target="addAlias" class="inline-flex min-h-11 items-center justify-center rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-50">{{ __('tags.actions.add') }}</button>
                             </form>
                             @error('alias') <p role="alert" class="mt-2 text-sm font-bold text-rose-700">{{ $message }}</p> @enderror
@@ -224,7 +213,7 @@
 
                         <x-ui.panel :title="__('tags.fields.synonyms')" icon="fa-solid fa-diagram-project">
                             <div class="space-y-2">
-                                @foreach ($selectedTag->displaySynonyms as $synonym)
+                                @foreach ($displaySynonyms as $synonym)
                                     <div wire:key="admin-tag-synonym-{{ $synonym->id }}" class="flex flex-wrap items-center justify-between gap-2 rounded-control bg-slate-50 p-2">
                                         <span class="min-w-0 break-words text-sm font-bold text-slate-700">{{ $synonym->display_related_name }}</span>
                                         <button type="button" wire:click="removeRelationship({{ $synonym->id }})" wire:loading.attr="disabled" wire:target="removeRelationship({{ $synonym->id }})" aria-label="{{ __('tags.actions.remove') }}" class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control text-rose-700 hover:bg-rose-50 disabled:opacity-50"><x-ui.icon name="fa-solid fa-xmark" /></button>

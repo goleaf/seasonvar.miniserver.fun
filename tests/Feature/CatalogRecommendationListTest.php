@@ -29,8 +29,10 @@ class CatalogRecommendationListTest extends TestCase
             'actor' => ['count' => 1, 'score' => 230],
         ]);
         $this->storeRecommendation($source, $first, 1, 920, [
-            'theme_romance' => ['score' => 360],
-            'country' => ['count' => 1, 'score' => 110],
+            'theme_romance' => ['score' => 400],
+            'director' => ['count' => 1, 'score' => 350],
+            'actor' => ['count' => 2, 'score' => 300],
+            'country' => ['count' => 1, 'score' => 250],
         ]);
         $this->storeRecommendation($source, $third, 3, 700, [
             'genre' => ['count' => 1, 'score' => 180],
@@ -43,14 +45,19 @@ class CatalogRecommendationListTest extends TestCase
         $this->assertInstanceOf(CatalogRecommendationListItem::class, $items->first());
         $this->assertSame([$first->id, $second->id], $items->pluck('title.id')->all());
         $this->assertSame([1, 2], $items->pluck('rank')->all());
-        $this->assertSame(['Романтика', 'Страна'], $items->first()->reasonLabels);
+        $this->assertSame([
+            'Романтика',
+            'Общий режиссёр',
+            'Общие актёры',
+            'Та же страна производства',
+        ], $items->first()->reasonLabels);
         $this->assertSame(920, $items->first()->score);
         $this->assertArrayNotHasKey('recommendedTitleRecommendations', $data);
         $this->assertArrayNotHasKey('genreRecommendations', $data);
         $this->assertArrayNotHasKey('yearRecommendations', $data);
     }
 
-    public function test_page_builder_merges_and_deduplicates_genre_and_year_fallbacks(): void
+    public function test_page_builder_returns_a_deduplicated_watchable_genre_fallback(): void
     {
         config(['seasonvar.recommendations.max_per_title' => 4]);
         $genre = Genre::query()->create(['name' => 'Комедия', 'slug' => 'komediia-list']);
@@ -61,15 +68,17 @@ class CatalogRecommendationListTest extends TestCase
         $genreOnly = CatalogTitle::factory()->create(['title' => 'Только жанр', 'year' => 2019, 'indexed_at' => now()->subMinute()]);
         $genreOnly->genres()->attach($genre);
         $yearOnly = CatalogTitle::factory()->create(['title' => 'Только год', 'year' => 2020, 'indexed_at' => now()->subMinutes(2)]);
+        LicensedMedia::factory()->create(['catalog_title_id' => $both->id, 'status' => 'published']);
+        LicensedMedia::factory()->create(['catalog_title_id' => $genreOnly->id, 'status' => 'published']);
+        LicensedMedia::factory()->create(['catalog_title_id' => $yearOnly->id, 'status' => 'published']);
 
         $items = app(CatalogTitlePageBuilder::class)->data($source, null)['recommendationItems'];
 
-        $this->assertSame([$both->id, $genreOnly->id, $yearOnly->id], $items->pluck('title.id')->all());
-        $this->assertSame([1, 2, 3], $items->pluck('rank')->all());
-        $this->assertSame(['Похожий жанр', 'Тот же год'], $items->first()->reasonLabels);
-        $this->assertSame(['Похожий жанр'], $items->get(1)->reasonLabels);
-        $this->assertSame(['Тот же год'], $items->get(2)->reasonLabels);
-        $this->assertNull($items->first()->score);
+        $this->assertSame([$both->id, $genreOnly->id], $items->pluck('title.id')->all());
+        $this->assertSame([1, 2], $items->pluck('rank')->all());
+        $this->assertSame(['Похожие жанры и темы'], $items->first()->reasonLabels);
+        $this->assertSame(['Похожие жанры и темы'], $items->get(1)->reasonLabels);
+        $this->assertNotNull($items->first()->score);
     }
 
     public function test_title_page_renders_one_ranked_recommendation_list_with_uncropped_portrait_posters(): void

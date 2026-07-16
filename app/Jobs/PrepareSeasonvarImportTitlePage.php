@@ -65,7 +65,10 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
         SeasonvarImportFinalizationDispatcher $finalizers,
     ): void {
         $preparedRow = SeasonvarImportPreparedPage::query()
-            ->with(['group.run', 'sourcePage.source'])
+            ->with([
+                'group.run:id,status',
+                'sourcePage.source:id,code,base_url,crawl_delay_seconds',
+            ])
             ->findOrFail($this->preparedPageId);
 
         if (in_array($preparedRow->status, [
@@ -179,7 +182,7 @@ final class PrepareSeasonvarImportTitlePage implements ShouldBeUnique, ShouldQue
     public function failed(?Throwable $exception): void
     {
         $preparedRow = SeasonvarImportPreparedPage::query()
-            ->with('group')
+            ->with('group:id,seasonvar_import_run_id,queue_name')
             ->find($this->preparedPageId);
 
         if ($preparedRow === null) {

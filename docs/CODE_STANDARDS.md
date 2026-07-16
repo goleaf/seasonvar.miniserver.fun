@@ -17,6 +17,8 @@
 - Держать `php artisan seasonvar:import` единственной публичной командой импорта Seasonvar.
 - Предпочитать Eloquent-связи сырым запросам.
 - Загружать заранее все связи, которые используются Blade-страницами.
+- Любой literal eager load в `with()`, `load()` или `loadMissing()` обязан задавать проекцию связанных столбцов через colon syntax или `select()`. В проекцию всегда входят primary key связанной модели и foreign/local keys, необходимые Eloquent для сопоставления; список содержит только поля, которые читает query/presenter/action boundary.
+- Dynamic relation maps допустимы только через централизованные projection helpers. Единственное текущее исключение для полного relation aggregate — `SeasonvarTitleMerger`, который переносит и сравнивает доменные строки целиком; это исключение нельзя копировать в публичные, API, paginated, export или batch-read запросы.
 - Не выполнять запросы к базе внутри Blade-шаблонов.
 - Не использовать `@php`, `@endphp`, `<?php` или `<?=` в Blade; вычисления переносить в контроллеры, view-model, view-data классы или классы компонентов.
 - Blade и Blade component classes не выполняют database/Eloquent, Cache, Redis, Memcached, service resolution, filesystem или environment calls. Они получают готовые presentation data; raw `{!! !!}` допустим только после документированного strict sanitizer review.

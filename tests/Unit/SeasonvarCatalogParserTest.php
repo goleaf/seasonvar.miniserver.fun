@@ -357,7 +357,7 @@ class SeasonvarCatalogParserTest extends TestCase
         ], collect($data['media'])->pluck('url')->values()->all());
     }
 
-    public function test_it_builds_recommendation_signals_from_source_metadata(): void
+    public function test_it_keeps_canonical_metadata_without_building_generic_recommendation_signals(): void
     {
         $parser = app(SeasonvarCatalogParser::class);
 
@@ -385,19 +385,19 @@ class SeasonvarCatalogParserTest extends TestCase
             'https://seasonvar.ru/serial-51000-Tochnyj_detektiv-1-season.html',
         );
 
-        $signals = collect($data['recommendation_signals']);
-
-        $this->assertNotNull($signals->first(fn (array $signal): bool => $signal['source'] === 'seasonvar_info'
-            && $signal['signal_type'] === 'taxonomy_genre'
-            && $signal['signal_value'] === 'Детектив'
-            && $signal['weight'] === 120));
-        $this->assertNotNull($signals->first(fn (array $signal): bool => $signal['signal_type'] === 'rating'
-            && $signal['signal_key'] === 'kinopoisk'
-            && $signal['weight'] > 180));
-        $this->assertNotNull($signals->first(fn (array $signal): bool => $signal['signal_type'] === 'release_year'
-            && $signal['signal_key'] === '2021'
-            && $signal['weight'] === 25));
-        $this->assertCount(3, $signals->where('signal_type', 'page_quality'));
+        $this->assertSame([], $data['recommendation_signals']);
+        $this->assertSame(2021, $data['year']);
+        $this->assertNotNull(collect($data['taxonomies'])->first(
+            fn (array $taxonomy): bool => $taxonomy['type'] === 'genre' && $taxonomy['name'] === 'Детектив',
+        ));
+        $this->assertNotNull(collect($data['taxonomies'])->first(
+            fn (array $taxonomy): bool => $taxonomy['type'] === 'country' && $taxonomy['name'] === 'Испания',
+        ));
+        $this->assertNotNull(collect($data['ratings'])->first(
+            fn (array $rating): bool => $rating['provider'] === 'kinopoisk'
+                && $rating['rating'] === 8.2
+                && $rating['votes'] === 123,
+        ));
     }
 
     public function test_it_normalizes_root_relative_urls_against_the_site_origin(): void

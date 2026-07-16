@@ -82,7 +82,10 @@ final class AccountManagementTest extends TestCase
         Notification::assertNothingSent();
 
         $this->withToken($token->plainTextToken)
-            ->patchJson('/api/v1/me', ['email' => ' NEW@EXAMPLE.COM '])
+            ->patchJson('/api/v1/me', [
+                'email' => ' NEW@EXAMPLE.COM ',
+                'current_password' => 'password',
+            ])
             ->assertOk()
             ->assertJsonPath('data.email', 'new@example.com')
             ->assertJsonPath('data.email_verified', false)

@@ -31,6 +31,7 @@ use App\Models\SeasonvarImportEvent;
 use App\Models\SourcePage;
 use App\Models\SourcePageSnapshot;
 use App\Services\Api\V1\Sync\CatalogSyncChangePublisher;
+use App\Services\Catalog\CatalogRecommendationDirtyTitleTracker;
 use App\Services\Catalog\Search\CatalogSearchIndexer;
 use App\Services\Crawler\PoliteHttpClient;
 use App\Services\Media\ExternalMediaMetadata;
@@ -75,6 +76,7 @@ class SeasonvarCatalogImporter
         private readonly SeasonvarImportErrorSanitizer $errors,
         private readonly CatalogSearchIndexer $searchIndexer,
         private readonly CatalogSyncChangePublisher $syncChanges,
+        private readonly CatalogRecommendationDirtyTitleTracker $recommendationDirtyTitles,
     ) {}
 
     /**
@@ -129,7 +131,7 @@ class SeasonvarCatalogImporter
 
         if (is_numeric($argument)) {
             $pages = SourcePage::query()
-                ->with('source')
+                ->with('source:id,code,base_url,crawl_delay_seconds')
                 ->whereKey((int) $argument)
                 ->get();
 
@@ -194,7 +196,7 @@ class SeasonvarCatalogImporter
         }
 
         $page->save();
-        $page->load('source');
+        $page->load('source:id,code,base_url,crawl_delay_seconds');
 
         $this->report($progress, $wasExisting ? 'source-page-updated' : 'source-page-created', [
             'mode' => 'url-argument',
@@ -221,7 +223,7 @@ class SeasonvarCatalogImporter
         ]);
 
         $pages = SourcePage::query()
-            ->with('source')
+            ->with('source:id,code,base_url,crawl_delay_seconds')
             ->where('parse_status', 'pending')
             ->whereIn('page_type', $pageTypes)
             ->where(function (Builder $query): void {
@@ -592,6 +594,8 @@ class SeasonvarCatalogImporter
             $this->syncChanges->publishUpsert($catalogTitle);
         }
 
+        $this->recommendationDirtyTitles->mark($catalogTitle->id, 'seasonvar-import');
+
         $this->report($progress, 'page-parse-complete', [
             'source_page_id' => $page->id,
             'catalog_title_id' => $catalogTitle->id,
@@ -841,8 +845,10 @@ class SeasonvarCatalogImporter
     {
         $now = now();
         $managedSources = ['seasonvar_info'];
+        $managedTypes = ['provider_recommendation', 'related_title'];
         $rows = collect($signals)
             ->filter(fn (array $signal): bool => in_array($signal['source'], $managedSources, true))
+            ->filter(fn (array $signal): bool => in_array($signal['signal_type'], $managedTypes, true))
             ->filter(fn (array $signal): bool => trim($signal['signal_type']) !== '' && trim($signal['signal_key']) !== '' && (int) $signal['weight'] > 0)
             ->mapWithKeys(function (array $signal) use ($catalogTitle, $now): array {
                 $source = Str::substr($signal['source'], 0, 64);
@@ -862,30 +868,36 @@ class SeasonvarCatalogImporter
                 ]];
             });
 
+        if ($rows->isEmpty()) {
+            $this->report($progress, 'catalog-title-recommendation-signals-synced', [
+                'catalog_title_id' => $catalogTitle->id,
+                'signals' => 0,
+            ]);
+
+            return;
+        }
+
         CatalogTitleRecommendationSignal::query()
             ->where('catalog_title_id', $catalogTitle->id)
             ->whereIn('source', $managedSources)
-            ->when($rows->isNotEmpty(), function (Builder $query) use ($rows): void {
-                $query->whereNot(function (Builder $query) use ($rows): void {
-                    foreach ($rows as $row) {
-                        $query->orWhere(function (Builder $query) use ($row): void {
-                            $query
-                                ->where('source', $row['source'])
-                                ->where('signal_type', $row['signal_type'])
-                                ->where('signal_key', $row['signal_key']);
-                        });
-                    }
-                });
+            ->whereIn('signal_type', $managedTypes)
+            ->whereNot(function (Builder $query) use ($rows): void {
+                foreach ($rows as $row) {
+                    $query->orWhere(function (Builder $query) use ($row): void {
+                        $query
+                            ->where('source', $row['source'])
+                            ->where('signal_type', $row['signal_type'])
+                            ->where('signal_key', $row['signal_key']);
+                    });
+                }
             })
             ->delete();
 
-        if ($rows->isNotEmpty()) {
-            CatalogTitleRecommendationSignal::query()->upsert(
-                $rows->values()->all(),
-                ['catalog_title_id', 'source', 'signal_type', 'signal_key'],
-                ['signal_value', 'weight', 'observed_at', 'updated_at'],
-            );
-        }
+        CatalogTitleRecommendationSignal::query()->upsert(
+            $rows->values()->all(),
+            ['catalog_title_id', 'source', 'signal_type', 'signal_key'],
+            ['signal_value', 'weight', 'observed_at', 'updated_at'],
+        );
 
         $this->report($progress, 'catalog-title-recommendation-signals-synced', [
             'catalog_title_id' => $catalogTitle->id,

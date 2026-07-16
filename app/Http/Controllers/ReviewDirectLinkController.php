@@ -31,7 +31,7 @@ final class ReviewDirectLinkController extends Controller
 
         if ($record === null && $schema->writable()) {
             $alias = CatalogTitleReviewAlias::query()
-                ->with('canonicalReview')
+                ->with('canonicalReview:id,catalog_title_id,status,merged_into_id,deleted_at')
                 ->find($reviewId);
             $record = $alias?->canonicalReview;
         }

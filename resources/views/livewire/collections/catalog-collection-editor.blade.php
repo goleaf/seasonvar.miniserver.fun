@@ -35,17 +35,6 @@
     <div class="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <x-ui.panel :title="__('collections.actions.edit')" icon="fa-solid fa-pen-to-square">
             <form wire:submit="save" class="space-y-5" novalidate>
-                @if ($isEditorial)
-                    <fieldset>
-                        <legend class="text-sm font-bold text-slate-700">{{ __('collections.editorial.translation_language') }}</legend>
-                        <div class="mt-2 flex flex-wrap gap-2">
-                            @foreach ($supportedLocales as $locale)
-                                <button type="button" wire:click="selectEditorialLocale('{{ $locale['value'] }}')" @class(['inline-flex min-h-11 items-center rounded-control px-4 text-sm font-black', 'bg-emerald-700 text-white' => $contentLocale === $locale['value'], 'bg-slate-100 text-slate-700 hover:bg-slate-200' => $contentLocale !== $locale['value']])>{{ $locale['label'] }}</button>
-                            @endforeach
-                        </div>
-                        <p class="mt-2 text-xs leading-5 text-slate-500">{{ __('collections.editorial.translation_hint') }}</p>
-                    </fieldset>
-                @endif
                 <x-form.field :label="__('collections.form.name')" for="collection-edit-name" wire:model="name" required />
                 <div>
                     <label for="collection-edit-description" class="block text-sm font-bold text-slate-700">{{ __('collections.form.description') }}</label>

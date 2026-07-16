@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Cache;
 
+use App\Enums\CatalogRecommendationType;
 use App\Livewire\Forms\CatalogSeriesFilters;
 use App\Models\CatalogTitle;
 use App\Models\ContentRequest;
@@ -124,6 +125,7 @@ final class PublicPageCachePolicy
             'title' => $this->titleContext($request, $dimensions),
             'collections' => new PublicPageCacheContext(CacheDomain::Collections, $dimensions),
             'requests' => $this->contentRequestContext($request, $dimensions),
+            'discovery' => $this->discoveryContext($request, $dimensions),
             default => null,
         };
     }
@@ -176,6 +178,17 @@ final class PublicPageCachePolicy
         );
     }
 
+    /** @param array<string, mixed> $dimensions */
+    private function discoveryContext(Request $request, array $dimensions): ?PublicPageCacheContext
+    {
+        $type = $request->route('type');
+        $recommendationType = is_string($type) ? CatalogRecommendationType::tryFrom($type) : null;
+
+        return $recommendationType?->isIndexable() === true
+            ? new PublicPageCacheContext(CacheDomain::CatalogPages, $dimensions)
+            : null;
+    }
+
     /** @return array<string, mixed>|null */
     private function query(Request $request, string $profile): ?array
     {
@@ -198,6 +211,7 @@ final class PublicPageCachePolicy
             'title' => self::TITLE_QUERY_KEYS,
             'collections' => self::COLLECTION_QUERY_KEYS,
             'requests' => self::CONTENT_REQUEST_QUERY_KEYS,
+            'discovery' => ['page'],
             default => null,
         };
 

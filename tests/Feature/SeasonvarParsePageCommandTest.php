@@ -282,7 +282,7 @@ class SeasonvarParsePageCommandTest extends TestCase
             'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html' => Http::response($this->seasonPageHtml(4, [
                 1 => 'Пробуждение',
                 2 => 'Проверка',
-            ], ['https://media.example.com/kitchen/cernyi-spisok-na-kuxne-s04e02.mp4'])),
+            ], ['https://media.example.com/kitchen/cernyi-spisok-na-kuxne-s04e02.mp4'], ratingLine: 'КиноПоиск: 8.2 (123 голоса)')),
             'seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-1-season.html' => Http::response($this->seasonPageHtml(1, [
                 1 => 'Начало',
             ])),
@@ -310,6 +310,12 @@ class SeasonvarParsePageCommandTest extends TestCase
         ]);
         $this->assertDatabaseHas('translations', [
             'name' => 'Оригинал',
+        ]);
+        $this->assertDatabaseHas('catalog_title_ratings', [
+            'catalog_title_id' => $catalogTitle->id,
+            'provider' => 'kinopoisk',
+            'rating' => 8.2,
+            'votes' => 123,
         ]);
         $this->assertDatabaseHas('seasons', [
             'number' => 1,
@@ -347,27 +353,16 @@ class SeasonvarParsePageCommandTest extends TestCase
             'url' => 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-1-season.html',
             'parse_status' => 'parsed',
         ]);
-        $this->assertDatabaseHas('catalog_title_recommendation_signals', [
+        $this->assertDatabaseMissing('catalog_title_recommendation_signals', [
             'catalog_title_id' => $catalogTitle->id,
             'source' => 'seasonvar_info',
-            'signal_type' => 'taxonomy_genre',
-            'signal_value' => 'Кулинария',
-            'weight' => 120,
-        ]);
-        $this->assertDatabaseHas('catalog_title_recommendation_signals', [
-            'catalog_title_id' => $catalogTitle->id,
-            'source' => 'seasonvar_info',
-            'signal_type' => 'release_year',
-            'signal_key' => '2024',
-            'weight' => 25,
         ]);
         $this->assertDatabaseHas('catalog_title_search_documents', [
             'catalog_title_id' => $catalogTitle->id,
             'normalized_title_key' => 'черный список на кухне',
         ]);
-        $this->assertSame(3, CatalogTitleRecommendationSignal::query()
+        $this->assertSame(0, CatalogTitleRecommendationSignal::query()
             ->where('catalog_title_id', $catalogTitle->id)
-            ->where('signal_type', 'page_quality')
             ->count());
 
         $sourcePages = SourcePage::query()
@@ -1030,7 +1025,7 @@ class SeasonvarParsePageCommandTest extends TestCase
         $this->assertDatabaseCount('licensed_media', 1);
     }
 
-    public function test_partial_provider_page_does_not_remove_previous_recommendation_signals(): void
+    public function test_partial_provider_page_preserves_verified_external_recommendation_signals(): void
     {
         Http::preventStrayRequests();
         $url = 'https://seasonvar.ru/serial-47915-CHernyj_spisok_Na_kuhne-4-season.html';
@@ -1060,18 +1055,27 @@ class SeasonvarParsePageCommandTest extends TestCase
 
         $importer->parsePage($page);
         $title = CatalogTitle::query()->where('external_id', '47915')->firstOrFail();
-        $this->assertDatabaseHas('catalog_title_recommendation_signals', [
+        $this->assertDatabaseMissing('catalog_title_recommendation_signals', [
             'catalog_title_id' => $title->id,
-            'signal_type' => 'taxonomy_genre',
-            'signal_value' => 'Кулинария',
+            'source' => 'seasonvar_info',
+        ]);
+        CatalogTitleRecommendationSignal::query()->create([
+            'catalog_title_id' => $title->id,
+            'source' => 'seasonvar_related',
+            'signal_type' => 'provider_recommendation',
+            'signal_key' => 'serial-777',
+            'signal_value' => 'Проверенная связь',
+            'weight' => 900,
+            'observed_at' => now(),
         ]);
 
         $importer->parsePage($page->fresh(), force: true);
 
         $this->assertDatabaseHas('catalog_title_recommendation_signals', [
             'catalog_title_id' => $title->id,
-            'signal_type' => 'taxonomy_genre',
-            'signal_value' => 'Кулинария',
+            'source' => 'seasonvar_related',
+            'signal_type' => 'provider_recommendation',
+            'signal_key' => 'serial-777',
         ]);
     }
 
@@ -1473,6 +1477,7 @@ class SeasonvarParsePageCommandTest extends TestCase
         array $mediaUrls = [],
         array $seasonvarPlaylists = [],
         ?string $posterUrl = null,
+        ?string $ratingLine = null,
     ): string {
         $episodeItems = collect($episodes)
             ->mapWithKeys(fn (string $title, int $number): array => [
@@ -1483,6 +1488,7 @@ class SeasonvarParsePageCommandTest extends TestCase
         $mediaJson = json_encode($mediaUrls, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
         $playlistsJson = json_encode($seasonvarPlaylists, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
         $posterMeta = $posterUrl === null ? '' : '<meta property="og:image" content="'.$posterUrl.'">';
+        $ratingInfo = $ratingLine === null ? '' : "\n                        {$ratingLine}";
 
         return <<<HTML
             <html>
@@ -1499,7 +1505,7 @@ class SeasonvarParsePageCommandTest extends TestCase
                         Вышел: 2024
                         Перевод: Оригинал
                         Статус: идет
-                        Канал: Пятница
+                        Канал: Пятница{$ratingInfo}
                     </div>
                     <div class="pgs-seaslist">
                         <a href="/serial-47915-CHernyj_spisok_Na_kuhne-1-season.html">1 сезон (Оригинал)</a>

@@ -10,7 +10,7 @@ use Tests\TestCase;
 
 final class RectorIntegrationContractTest extends TestCase
 {
-    public function test_composer_exposes_safe_required_and_maximum_profiles(): void
+    public function test_composer_exposes_safe_required_and_maximum_profiles_without_process_timeout(): void
     {
         $composer = json_decode(
             File::get(base_path('composer.json')),
@@ -20,9 +20,20 @@ final class RectorIntegrationContractTest extends TestCase
 
         $this->assertArrayHasKey('rector/rector', $composer['require-dev']);
         $this->assertArrayHasKey('driftingly/rector-laravel', $composer['require-dev']);
-        $this->assertSame('rector process --dry-run --config=rector.php', $composer['scripts']['rector:check']);
-        $this->assertSame('rector process --config=rector.php', $composer['scripts']['rector:fix']);
-        $this->assertSame('rector process --dry-run --config=rector-max.php', $composer['scripts']['rector:max']);
+        $disableTimeout = 'Composer\\Config::disableProcessTimeout';
+
+        $this->assertSame([
+            $disableTimeout,
+            'rector process --dry-run --config=rector.php',
+        ], $composer['scripts']['rector:check']);
+        $this->assertSame([
+            $disableTimeout,
+            'rector process --config=rector.php',
+        ], $composer['scripts']['rector:fix']);
+        $this->assertSame([
+            $disableTimeout,
+            'rector process --dry-run --config=rector-max.php',
+        ], $composer['scripts']['rector:max']);
     }
 
     #[DataProvider('rectorConfigProvider')]

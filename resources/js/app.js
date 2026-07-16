@@ -5,6 +5,7 @@ import '../css/app.css';
 import { initializeCollectionInterfaces } from './collections.js';
 import { initializeCommentInterfaces } from './comments.js';
 import { initializeAccountPreferenceMigration, initializeAccountSettings } from './settings.js';
+import { initializeHeaderSearchInterfaces } from './header-search.js';
 import './reviews.js';
 import './issues.js';
 
@@ -486,6 +487,7 @@ const loadCatalogInterfaces = () => {
     initializeCommentInterfaces();
     initializeAccountSettings();
     initializeAccountPreferenceMigration();
+    initializeHeaderSearchInterfaces();
 };
 
 if (document.readyState === 'loading') {

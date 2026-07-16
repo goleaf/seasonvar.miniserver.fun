@@ -158,59 +158,62 @@ final readonly class TechnicalIssueAccountService
         }
 
         DB::transaction(function () use ($source, $target): void {
-            TechnicalIssue::query()->where('requester_id', $source->id)->with('diagnostic')->eachById(function (TechnicalIssue $issue) use ($target): void {
-                $issue->requester_id = $target->id;
-                $identity = $this->identity->fromIssue($issue, $target->id);
-                $canonical = ! $issue->status->isTerminal()
-                    ? TechnicalIssue::query()->where('active_identity_key', $identity)->whereKeyNot($issue->id)->first()
-                    : null;
-                $issue->exact_identity_hash = $identity;
+            TechnicalIssue::query()
+                ->where('requester_id', $source->id)
+                ->with('diagnostic:id,technical_issue_id,browser_family,operating_system,device_category')
+                ->eachById(function (TechnicalIssue $issue) use ($target): void {
+                    $issue->requester_id = $target->id;
+                    $identity = $this->identity->fromIssue($issue, $target->id);
+                    $canonical = ! $issue->status->isTerminal()
+                        ? TechnicalIssue::query()->where('active_identity_key', $identity)->whereKeyNot($issue->id)->first()
+                        : null;
+                    $issue->exact_identity_hash = $identity;
 
-                if ($canonical instanceof TechnicalIssue) {
-                    TechnicalIssueConfirmation::query()->where('technical_issue_id', $issue->id)->eachById(
-                        fn (TechnicalIssueConfirmation $confirmation) => TechnicalIssueConfirmation::query()->firstOrCreate(
-                            ['technical_issue_id' => $canonical->id, 'user_id' => $confirmation->user_id],
-                            ['verification_state' => $confirmation->verification_state],
-                        ),
-                    );
-                    TechnicalIssueFollower::query()->where('technical_issue_id', $issue->id)->eachById(
-                        fn (TechnicalIssueFollower $follow) => TechnicalIssueFollower::query()->firstOrCreate([
-                            'technical_issue_id' => $canonical->id,
-                            'user_id' => $follow->user_id,
-                        ]),
-                    );
-                    TechnicalIssueMerge::query()->firstOrCreate(
-                        ['duplicate_issue_id' => $issue->id],
-                        ['canonical_issue_id' => $canonical->id],
-                    );
-                    $this->occurrences->mergeIssues($issue, $canonical);
-                    $previous = $issue->status;
-                    $issue->status = TechnicalIssueStatus::Merged;
-                    $issue->merged_into_id = $canonical->id;
-                    $issue->resolution_type = TechnicalIssueResolutionType::Duplicate;
-                    $issue->resolution_summary = null;
-                    $issue->active_identity_key = null;
-                    TechnicalIssueStatusHistory::query()->firstOrCreate(
-                        ['idempotency_key' => hash('sha256', 'account-merge:'.$issue->id.':'.$canonical->id)],
-                        [
-                            'technical_issue_id' => $issue->id,
-                            'from_status' => $previous,
-                            'to_status' => TechnicalIssueStatus::Merged,
-                            'public_reason_code' => 'account_merged',
-                        ],
-                    );
-                    DB::afterCommit(fn () => $this->notifications->changed(
-                        $issue->id,
-                        TechnicalIssueNotificationType::Merged,
-                        canonicalPublicId: $canonical->public_id,
-                    ));
-                } else {
-                    $issue->active_identity_key = ! $issue->status->isTerminal() ? $identity : null;
-                }
+                    if ($canonical instanceof TechnicalIssue) {
+                        TechnicalIssueConfirmation::query()->where('technical_issue_id', $issue->id)->eachById(
+                            fn (TechnicalIssueConfirmation $confirmation) => TechnicalIssueConfirmation::query()->firstOrCreate(
+                                ['technical_issue_id' => $canonical->id, 'user_id' => $confirmation->user_id],
+                                ['verification_state' => $confirmation->verification_state],
+                            ),
+                        );
+                        TechnicalIssueFollower::query()->where('technical_issue_id', $issue->id)->eachById(
+                            fn (TechnicalIssueFollower $follow) => TechnicalIssueFollower::query()->firstOrCreate([
+                                'technical_issue_id' => $canonical->id,
+                                'user_id' => $follow->user_id,
+                            ]),
+                        );
+                        TechnicalIssueMerge::query()->firstOrCreate(
+                            ['duplicate_issue_id' => $issue->id],
+                            ['canonical_issue_id' => $canonical->id],
+                        );
+                        $this->occurrences->mergeIssues($issue, $canonical);
+                        $previous = $issue->status;
+                        $issue->status = TechnicalIssueStatus::Merged;
+                        $issue->merged_into_id = $canonical->id;
+                        $issue->resolution_type = TechnicalIssueResolutionType::Duplicate;
+                        $issue->resolution_summary = null;
+                        $issue->active_identity_key = null;
+                        TechnicalIssueStatusHistory::query()->firstOrCreate(
+                            ['idempotency_key' => hash('sha256', 'account-merge:'.$issue->id.':'.$canonical->id)],
+                            [
+                                'technical_issue_id' => $issue->id,
+                                'from_status' => $previous,
+                                'to_status' => TechnicalIssueStatus::Merged,
+                                'public_reason_code' => 'account_merged',
+                            ],
+                        );
+                        DB::afterCommit(fn () => $this->notifications->changed(
+                            $issue->id,
+                            TechnicalIssueNotificationType::Merged,
+                            canonicalPublicId: $canonical->public_id,
+                        ));
+                    } else {
+                        $issue->active_identity_key = ! $issue->status->isTerminal() ? $identity : null;
+                    }
 
-                $issue->version++;
-                $issue->save();
-            });
+                    $issue->version++;
+                    $issue->save();
+                });
             DB::table('technical_issue_messages')->where('author_id', $source->id)->update(['author_id' => $target->id]);
             DB::table('technical_issue_attachments')->where('uploader_id', $source->id)->update(['uploader_id' => $target->id]);
             TechnicalIssueConfirmation::query()->where('user_id', $source->id)->eachById(function (TechnicalIssueConfirmation $confirmation) use ($target): void {

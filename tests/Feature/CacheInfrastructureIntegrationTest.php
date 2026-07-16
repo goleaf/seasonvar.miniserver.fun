@@ -109,6 +109,16 @@ final class CacheInfrastructureIntegrationTest extends TestCase
                     'queue_workers',
                     'horizon',
                     'cache_warming',
+                    'full_cache_warming' => [
+                        'status',
+                        'estimated',
+                        'attempted',
+                        'warmed',
+                        'failed',
+                        'started_at',
+                        'updated_at',
+                        'finished_at',
+                    ],
                 ],
             ]);
         $response->assertJsonMissingPath('components.redis_limiter');

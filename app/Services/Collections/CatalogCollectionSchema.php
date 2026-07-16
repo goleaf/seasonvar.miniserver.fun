@@ -19,6 +19,8 @@ final class CatalogCollectionSchema
 
     private ?bool $available = null;
 
+    private ?bool $sourceSyncAvailable = null;
+
     public function available(): bool
     {
         $configured = config('catalog-collections.schema_available');
@@ -38,6 +40,26 @@ final class CatalogCollectionSchema
                 && Schema::hasColumn('users', 'public_id');
         } catch (Throwable) {
             return $this->available = false;
+        }
+    }
+
+    public function sourceSyncAvailable(): bool
+    {
+        $configured = config('catalog-collections.source_sync_schema_available');
+
+        if (is_bool($configured)) {
+            return $configured;
+        }
+
+        if ($this->sourceSyncAvailable !== null) {
+            return $this->sourceSyncAvailable;
+        }
+
+        try {
+            return $this->sourceSyncAvailable = Schema::hasTable('catalog_collection_sync_runs')
+                && Schema::hasTable('catalog_collection_sources');
+        } catch (Throwable) {
+            return $this->sourceSyncAvailable = false;
         }
     }
 }

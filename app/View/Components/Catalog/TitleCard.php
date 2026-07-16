@@ -77,12 +77,15 @@ class TitleCard extends Component
         $this->episodesLabel = $this->countLabel('catalog.counts.episodes', $this->episodesCount);
         $this->mediaLabel = $this->countLabel('catalog.counts.videos', $this->mediaCount);
         $this->latestSeason = $title->relationLoaded('latestSeason') ? $title->latestSeason : null;
-        $this->hasPersonalState = $userInWatchlist !== null || $title->hasAttribute('user_in_watchlist');
         $this->userInWatchlist = $userInWatchlist
             ?? ($title->hasAttribute('user_in_watchlist') && (bool) $title->getAttribute('user_in_watchlist'));
         $this->userRating = $userRating ?? $this->integerAttribute($title, 'user_rating');
         $this->userProgressPercent = $userProgressPercent ?? $this->integerAttribute($title, 'user_progress_percent');
         $this->userPrimaryAction = $userPrimaryAction ?? $this->primaryActionAttribute($title);
+        $this->hasPersonalState = $this->userInWatchlist
+            || $this->userRating !== null
+            || $this->userProgressPercent !== null
+            || $this->userPrimaryAction !== null;
         $this->cardRelations = collect()
             ->merge($title->relationLoaded('genres') ? $title->genres : collect())
             ->merge($title->relationLoaded('countries') ? $title->countries : collect())

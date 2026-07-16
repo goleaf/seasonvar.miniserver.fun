@@ -1862,7 +1862,7 @@ class CatalogPageTest extends TestCase
             ->assertDontSeeText('Видимый сериал');
     }
 
-    public function test_title_page_uses_one_readable_related_list_without_country_section(): void
+    public function test_title_page_uses_one_readable_similarity_list_without_country_section(): void
     {
         $catalogTitle = CatalogTitle::factory()->create([
             'title' => 'Черная лагуна',
@@ -1898,6 +1898,10 @@ class CatalogPageTest extends TestCase
             ->create([
                 'season_id' => $genreSeason->id,
             ]);
+        LicensedMedia::factory()->create([
+            'catalog_title_id' => $genreTitle->id,
+            'status' => 'published',
+        ]);
 
         CatalogTitle::factory()->create([
             'title' => 'Похожий сериал того же года',
@@ -1918,13 +1922,13 @@ class CatalogPageTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertSeeText('Советуем посмотреть')
-            ->assertSeeText('Похожий жанр')
-            ->assertSeeText('Тот же год')
+            ->assertSeeText('Похожие сериалы')
+            ->assertSeeText('Похожие жанры и темы')
             ->assertSeeText('Очень длинное название похожего сериала с переносом текста')
             ->assertSeeText('Long Original Related Series Title')
             ->assertSee('data-recommendation-list', false)
             ->assertSee('break-words', false)
+            ->assertDontSeeText('Похожий только по стране')
             ->assertDontSeeText('По похожим жанрам')
             ->assertDontSeeText('За 2007 год')
             ->assertDontSeeText('Похожие сериалы пока не подобраны')
@@ -1985,9 +1989,9 @@ class CatalogPageTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertSeeText('Советуем посмотреть')
-            ->assertSeeText('Совет № 1')
-            ->assertSeeText('Жанр')
+            ->assertSeeText('Похожие сериалы')
+            ->assertSeeText('Позиция 1')
+            ->assertSeeText('Похожие жанры и темы')
             ->assertSee('data-recommendation-list', false)
             ->assertDontSeeText('Ближайшие совпадения')
             ->assertDontSeeText('По жанрам')
@@ -2907,7 +2911,8 @@ class CatalogPageTest extends TestCase
             ->assertSee('data-player-status-icon', false)
             ->assertSee('data-player-status-text', false)
             ->assertSee('data-player-retry', false)
-            ->assertSee('type="application/x-mpegURL"', false);
+            ->assertSee('data-hls-src="', false)
+            ->assertDontSee('type="application/x-mpegURL"', false);
 
         $this->get(route('titles.show', [
             'catalogTitle' => $catalogTitle,

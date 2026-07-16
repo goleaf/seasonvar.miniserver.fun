@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Catalog;
 
+use App\DTOs\CatalogPersonalizedCandidateSet;
 use App\DTOs\CatalogRecommendationContext;
+use App\Enums\CatalogPersonalizationConfidence;
 use App\Enums\CatalogRecommendationReason;
 use App\Enums\CatalogRecommendationSource;
 use App\Enums\CatalogWatchStatus;
@@ -18,7 +20,77 @@ use Illuminate\Support\Facades\Schema;
 
 final class CatalogPersonalizedRecommendationQuery
 {
-    public function __construct(private readonly CatalogRecommendationVisibilityService $visibility) {}
+    public function __construct(
+        private readonly CatalogRecommendationVisibilityService $visibility,
+        private readonly CatalogPersonalPreferenceProfileBuilder $profiles,
+        private readonly CatalogRecommendationScoreNormalizer $normalizer,
+        private readonly CatalogPersonalizedCandidateScorer $scorer,
+        private readonly CatalogRecommendationFeatureExtractor $features,
+    ) {}
+
+    /** @param list<int> $excludedIds */
+    public function candidateSet(
+        CatalogRecommendationContext $context,
+        array $excludedIds,
+    ): CatalogPersonalizedCandidateSet {
+        $user = $context->user;
+
+        if (! $user instanceof User) {
+            return CatalogPersonalizedCandidateSet::cold();
+        }
+
+        $profile = $this->profiles->forUser($user);
+
+        if ($profile->confidence === CatalogPersonalizationConfidence::Cold) {
+            return CatalogPersonalizedCandidateSet::cold();
+        }
+
+        $range = $this->normalizer->forActiveBuild();
+
+        if ($range === null) {
+            return CatalogPersonalizedCandidateSet::cold();
+        }
+
+        $sourceIds = $profile->sourceTitleIds();
+        $recommendations = CatalogTitleRecommendation::query()
+            ->whereIn('catalog_title_id', $sourceIds)
+            ->where('algorithm_version', $range->algorithmVersion)
+            ->where('rank', '<=', 24)
+            ->orderBy('catalog_title_id')
+            ->orderBy('rank')
+            ->limit(min(4_000, max(240, count($sourceIds) * 24)))
+            ->get(['catalog_title_id', 'recommended_title_id', 'score', 'rank']);
+        $candidateFeatures = $profile->featureDemotions === []
+            ? []
+            : $this->features->forTitleIds($recommendations
+                ->pluck('recommended_title_id')
+                ->map(static fn (mixed $id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all());
+        $candidates = $this->scorer->score($profile, $recommendations, $range, $candidateFeatures);
+
+        if ($candidates !== []) {
+            $allExcluded = collect([...$excludedIds, ...$sourceIds])->unique()->values()->all();
+            $eligibleIds = $this->visibility
+                ->eligible($context, watchable: true, excludedIds: $allExcluded)
+                ->whereKey(array_column($candidates, 'id'))
+                ->pluck('catalog_titles.id')
+                ->map(static fn (mixed $id): int => (int) $id)
+                ->flip();
+            $candidates = collect($candidates)
+                ->filter(static fn (array $candidate): bool => $eligibleIds->has($candidate['id']))
+                ->take(max(24, min(500, (int) config('recommendations.candidate_limit', 180))))
+                ->values()
+                ->all();
+        }
+
+        return new CatalogPersonalizedCandidateSet(
+            candidates: $candidates,
+            confidence: $profile->confidence,
+            sourceTitleIds: $sourceIds,
+        );
+    }
 
     /**
      * @param  list<int>  $excludedIds

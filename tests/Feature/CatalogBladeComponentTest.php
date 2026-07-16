@@ -17,6 +17,22 @@ class CatalogBladeComponentTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_header_keeps_logo_and_autocomplete_above_the_wrapping_navigation(): void
+    {
+        $html = $this->get(route('home'))->assertOk()->getContent();
+        $primaryPosition = strpos($html, 'data-site-header-primary');
+        $searchPosition = strpos($html, 'data-header-search-autocomplete');
+        $navigationPosition = strpos($html, 'data-site-header-navigation');
+
+        $this->assertIsInt($primaryPosition);
+        $this->assertIsInt($searchPosition);
+        $this->assertIsInt($navigationPosition);
+        $this->assertLessThan($searchPosition, $primaryPosition);
+        $this->assertLessThan($navigationPosition, $searchPosition);
+        $this->assertSame(1, substr_count($html, 'data-header-search-autocomplete'));
+        $this->assertStringContainsString('flex-wrap', $html);
+    }
+
     public function test_title_card_and_list_row_render_relation_chips_as_links(): void
     {
         $catalogTitle = CatalogTitle::factory()->create([
@@ -47,6 +63,29 @@ class CatalogBladeComponentTest extends TestCase
             $this->assertStringContainsString('href="'.route('titles.taxonomy', ['type' => 'genre', 'taxonomy' => $genre->slug]).'"', $html);
             $this->assertStringContainsString('href="'.route('titles.taxonomy', ['type' => 'country', 'taxonomy' => $country->slug]).'"', $html);
         }
+    }
+
+    public function test_title_card_only_renders_visible_personal_state_and_never_an_open_title_action(): void
+    {
+        $title = CatalogTitle::factory()->make([
+            'title' => 'Персональное состояние карточки',
+            'slug' => 'personal-card-state',
+        ]);
+
+        $emptyHtml = Blade::render(
+            '<x-catalog.title-card :title="$title" :user-in-watchlist="false" layout="list" />',
+            ['title' => $title],
+        );
+        $ratedHtml = Blade::render(
+            '<x-catalog.title-card :title="$title" :user-rating="8" layout="list" />',
+            ['title' => $title],
+        );
+
+        $this->assertStringNotContainsString('data-user-card-state', $emptyHtml);
+        $this->assertStringNotContainsString('Открыть тайтл', $emptyHtml);
+        $this->assertStringContainsString('data-user-card-state', $ratedHtml);
+        $this->assertStringContainsString('data-user-rating="8"', $ratedHtml);
+        $this->assertStringNotContainsString('Открыть тайтл', $ratedHtml);
     }
 
     public function test_title_card_does_not_lazy_load_missing_relations(): void
@@ -103,7 +142,9 @@ class CatalogBladeComponentTest extends TestCase
         $this->assertStringContainsString('Новая серия', $html);
         $this->assertStringContainsString('Сезон 2', $html);
         $this->assertStringContainsString('7 серия', $html);
-        $this->assertStringContainsString('Профессиональный перевод / M3U8 / 13.07.2026', $html);
+        $this->assertStringContainsString('Профессиональный перевод', $html);
+        $this->assertStringContainsString('M3U8', $html);
+        $this->assertStringContainsString('13 июл. 2026', $html);
     }
 
     public function test_public_title_components_separate_matching_original_title_suffix(): void

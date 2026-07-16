@@ -186,7 +186,7 @@ final class SeasonvarCatalogParser
             'media' => $this->mediaCandidates($html, $xpath, $url, $currentSeasonNumber),
             'taxonomies' => $taxonomies,
             'ratings' => $ratings,
-            'recommendation_signals' => $this->recommendationSignals($taxonomies, $ratings, $year, $parseMeta),
+            'recommendation_signals' => [],
             'aliases' => $this->aliases($infoFields, $title, $originalTitle),
             'reviews' => $this->reviews($xpath),
             'parse_meta' => $parseMeta,
@@ -628,104 +628,6 @@ final class SeasonvarCatalogParser
         $votes = (int) preg_replace('/\D/u', '', $matches[1]);
 
         return $votes > 0 ? $votes : null;
-    }
-
-    /**
-     * @param  list<array{type: string, name: string, source_url: string|null}>  $taxonomies
-     * @param  list<array{provider: string, rating: float|null, votes: int|null, raw_value: string}>  $ratings
-     * @param  array{info_labels: list<string>, has_info_list: bool, has_season_list: bool, has_episode_script: bool, provider_availability_status: string|null}  $parseMeta
-     * @return list<array{source: string, signal_type: string, signal_key: string, signal_value: string|null, weight: int}>
-     */
-    private function recommendationSignals(array $taxonomies, array $ratings, ?int $year, array $parseMeta): array
-    {
-        $signals = [];
-
-        foreach ($taxonomies as $taxonomy) {
-            $weight = $this->taxonomySignalWeight($taxonomy['type']);
-
-            if ($weight <= 0) {
-                continue;
-            }
-
-            $this->addRecommendationSignal(
-                $signals,
-                'seasonvar_info',
-                'taxonomy_'.$taxonomy['type'],
-                $taxonomy['name'],
-                $taxonomy['name'],
-                $weight,
-            );
-        }
-
-        foreach ($ratings as $rating) {
-            if ($rating['rating'] === null) {
-                continue;
-            }
-
-            $votesWeight = $rating['votes'] !== null
-                ? min(80, (int) floor(log($rating['votes'] + 1) * 12))
-                : 0;
-            $this->addRecommendationSignal(
-                $signals,
-                'seasonvar_info',
-                'rating',
-                $rating['provider'],
-                $rating['raw_value'],
-                (int) round($rating['rating'] * 18) + $votesWeight,
-            );
-        }
-
-        if ($year !== null) {
-            $this->addRecommendationSignal($signals, 'seasonvar_info', 'release_year', (string) $year, (string) $year, 25);
-        }
-
-        foreach ([
-            'has_info_list' => 20,
-            'has_season_list' => 20,
-            'has_episode_script' => 20,
-        ] as $key => $weight) {
-            if ($parseMeta[$key]) {
-                $this->addRecommendationSignal($signals, 'seasonvar_info', 'page_quality', $key, '1', $weight);
-            }
-        }
-
-        return array_values($signals);
-    }
-
-    private function taxonomySignalWeight(string $type): int
-    {
-        return match ($type) {
-            'genre' => 120,
-            'tag' => 90,
-            'director' => 80,
-            'actor' => 60,
-            'network', 'studio' => 55,
-            'translation', 'status' => 35,
-            'country' => 20,
-            'age_rating' => 10,
-            default => 0,
-        };
-    }
-
-    /**
-     * @param  array<string, array{source: string, signal_type: string, signal_key: string, signal_value: string|null, weight: int}>  $signals
-     */
-    private function addRecommendationSignal(array &$signals, string $source, string $type, string $key, ?string $value, int $weight): void
-    {
-        $key = Str::slug(Str::lower($key)) ?: Str::substr(hash('sha256', $type.'|'.$key), 0, 24);
-
-        if ($weight <= 0 || $type === '' || $key === '') {
-            return;
-        }
-
-        $compoundKey = $source.'|'.$type.'|'.$key;
-        $signals[$compoundKey] = [
-            'source' => $source,
-            'signal_type' => Str::substr($type, 0, 64),
-            'signal_key' => Str::substr($key, 0, 128),
-            'signal_value' => $value !== null ? Str::substr(Str::squish($value), 0, 255) : null,
-            'weight' => $weight,
-        ];
     }
 
     /**

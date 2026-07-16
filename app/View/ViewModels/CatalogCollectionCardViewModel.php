@@ -34,6 +34,8 @@ final readonly class CatalogCollectionCardViewModel
 
     public bool $editorial;
 
+    public bool $imported;
+
     public string $visibilityLabel;
 
     public string $moderationStatusLabel;
@@ -49,6 +51,8 @@ final readonly class CatalogCollectionCardViewModel
     public string $itemCountLabel;
 
     public string $featuredLabel;
+
+    public string $importedLabel;
 
     public function __construct(
         CatalogCollection $collection,
@@ -82,6 +86,7 @@ final readonly class CatalogCollectionCardViewModel
         $this->updatedAtIso = $collection->updated_at?->toAtomString();
         $this->featured = (bool) $collection->is_featured;
         $this->editorial = $collection->type === CatalogCollectionType::Editorial;
+        $this->imported = (bool) $collection->getAttribute('has_import_source');
         $this->visibilityLabel = $collection->visibility->label();
         $this->moderationStatusLabel = $collection->moderation_status->label();
         $this->typeLabel = $collection->type->label();
@@ -92,5 +97,6 @@ final readonly class CatalogCollectionCardViewModel
             'count' => Number::format($this->itemCount, locale: app()->currentLocale()),
         ]);
         $this->featuredLabel = __('collections.page.featured');
+        $this->importedLabel = __('collections.page.automatically_updated');
     }
 }

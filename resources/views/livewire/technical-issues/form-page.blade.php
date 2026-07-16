@@ -124,7 +124,7 @@
                             @foreach ($screenshots as $index => $screenshot)
                                 <li wire:key="technical-screenshot-{{ $index }}-{{ $screenshot->getFilename() }}" class="flex min-w-0 items-center gap-3 rounded-control border border-slate-200 p-3">
                                     <img src="{{ $screenshot->temporaryUrl() }}" alt="{{ __('issues.attachments.preview_alt', ['number' => $index + 1]) }}" class="size-16 shrink-0 rounded-control bg-slate-100 object-cover">
-                                    <span class="min-w-0 flex-1 truncate text-sm text-slate-700">{{ __('issues.attachments.screenshot_name', ['number' => $index + 1]) }}</span>
+                                    <span class="min-w-0 flex-1 break-words text-sm text-slate-700">{{ __('issues.attachments.screenshot_name', ['number' => $index + 1]) }}</span>
                                     <button type="button" wire:click="removeScreenshot({{ $index }})" wire:loading.attr="disabled" class="min-h-11 shrink-0 rounded-control bg-slate-100 px-3 text-sm font-bold text-slate-700">{{ __('issues.actions.remove_attachment') }}</button>
                                 </li>
                             @endforeach

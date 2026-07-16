@@ -35,7 +35,7 @@ final class WebPasswordRecoveryTest extends TestCase
         $this->get(route('password.request'))
             ->assertOk()
             ->assertSeeText('Восстановление пароля');
-        $this->get(route('password.reset', ['token' => 'visible-reset-token']).'?email=user%40example.com')
+        $this->get(route('password.reset', ['token' => 'visibleresettoken']).'?email=user%40example.com')
             ->assertOk()
             ->assertSeeText('Новый пароль');
         $this->get(route('password.confirm'))
@@ -46,14 +46,15 @@ final class WebPasswordRecoveryTest extends TestCase
     {
         Notification::fake();
         $user = User::factory()->create(['email' => 'reset@example.com']);
+        $requestStatus = app(AccountPasswordResetService::class)->requestStatus();
 
         foreach ([' RESET@example.com ', 'missing@example.com'] as $email) {
             Livewire::test(ForgotPasswordPage::class)
                 ->set('form.email', $email)
                 ->call('sendResetLink')
                 ->assertHasNoErrors()
-                ->assertSet('status', AccountPasswordResetService::REQUEST_STATUS)
-                ->assertSeeText(AccountPasswordResetService::REQUEST_STATUS);
+                ->assertSet('status', $requestStatus)
+                ->assertSeeText($requestStatus);
         }
 
         Notification::assertSentToTimes($user, ResetAccountPassword::class, 1);
@@ -62,11 +63,11 @@ final class WebPasswordRecoveryTest extends TestCase
     public function test_human_reset_notification_uses_the_web_reset_form(): void
     {
         $user = User::factory()->create(['email' => 'reset-link@example.com']);
-        $message = (new ResetAccountPassword('plain-reset-token'))->toMail($user);
+        $message = (new ResetAccountPassword('plainresettoken'))->toMail($user);
 
         $this->assertIsString($message->actionUrl);
         $this->assertSame(
-            route('password.reset', ['token' => 'plain-reset-token'], absolute: false),
+            route('password.reset', ['token' => 'plainresettoken'], absolute: false),
             parse_url($message->actionUrl, PHP_URL_PATH),
         );
         parse_str((string) parse_url($message->actionUrl, PHP_URL_QUERY), $query);

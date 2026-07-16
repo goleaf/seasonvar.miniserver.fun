@@ -1,0 +1,257 @@
+{
+  "version": "v6-2026-07-16",
+  "limit": 12,
+  "grade_scale": {
+    "0": "нерелевантно",
+    "1": "частично релевантно",
+    "2": "сильное совпадение"
+  },
+  "sources": [
+    {
+      "slug": "vo-vse-tiazkiebreaking-bad",
+      "segment": "popular",
+      "grades": {"lucse-zvonite-solubetter-call-saul": 2}
+    },
+    {
+      "slug": "lucse-zvonite-solubetter-call-saul",
+      "segment": "popular",
+      "grades": {"vo-vse-tiazkiebreaking-bad": 2}
+    },
+    {
+      "slug": "druziafriends",
+      "segment": "popular",
+      "grades": {"dzouijoey": 2}
+    },
+    {
+      "slug": "dzouijoey",
+      "segment": "sparse",
+      "grades": {"druziafriends": 2}
+    },
+    {
+      "slug": "anatomiia-strastigreys-anatomy",
+      "segment": "empty_baseline",
+      "grades": {
+        "castnaia-praktikaprivate-practice": 2,
+        "anatomiia-strasti-vtoraia-komandagreys-anatomy-b-team": 2
+      }
+    },
+    {
+      "slug": "castnaia-praktikaprivate-practice",
+      "segment": "long_cast",
+      "grades": {"anatomiia-strastigreys-anatomy": 2}
+    },
+    {
+      "slug": "kak-ia-vstretil-vasu-mamuhow-i-met-your-mother",
+      "segment": "empty_baseline",
+      "grades": {"kak-ia-vstretila-vasego-papuhow-i-met-your-father": 2}
+    },
+    {
+      "slug": "kak-ia-vstretila-vasego-papuhow-i-met-your-father",
+      "segment": "popular",
+      "grades": {"kak-ia-vstretil-vasu-mamuhow-i-met-your-mother": 2}
+    },
+    {
+      "slug": "klinikascrubs",
+      "segment": "empty_baseline",
+      "grades": {
+        "doktor-xaushouse-md": 1,
+        "xorosii-doktor-2017the-good-doctor": 1
+      }
+    },
+    {
+      "slug": "ofisthe-office",
+      "segment": "popular",
+      "grades": {"parki-i-zony-otdyxaparks-and-recreation": 2}
+    },
+    {
+      "slug": "parki-i-zony-otdyxaparks-and-recreation",
+      "segment": "popular",
+      "grades": {"ofisthe-office": 2}
+    },
+    {
+      "slug": "doktor-xaushouse-md",
+      "segment": "long_cast",
+      "grades": {
+        "xorosii-doktor-2017the-good-doctor": 1,
+        "klinikascrubs": 1
+      }
+    },
+    {
+      "slug": "xorosii-doktor-2017the-good-doctor",
+      "segment": "popular",
+      "grades": {"doktor-xaushouse-md": 1}
+    },
+    {
+      "slug": "igra-prestolovgame-of-thrones",
+      "segment": "popular",
+      "grades": {
+        "dom-drakonahouse-of-the-dragon": 2,
+        "igra-prestolov-po-tu-storonugame-of-thrones-game-revealed": 2,
+        "rimrome": 1
+      }
+    },
+    {
+      "slug": "dom-drakonahouse-of-the-dragon",
+      "segment": "popular",
+      "grades": {"igra-prestolovgame-of-thrones": 2}
+    },
+    {
+      "slug": "narutonaruto",
+      "segment": "anime",
+      "grades": {
+        "naruto-uragannye-xronikinaruto-shippuuden": 2,
+        "boruto-novoe-pokolenie-narutoboruto-naruto-next-generations": 1
+      }
+    },
+    {
+      "slug": "naruto-uragannye-xronikinaruto-shippuuden",
+      "segment": "anime",
+      "grades": {
+        "narutonaruto": 2,
+        "boruto-novoe-pokolenie-narutoboruto-naruto-next-generations": 1
+      }
+    },
+    {
+      "slug": "boruto-novoe-pokolenie-narutoboruto-naruto-next-generations",
+      "segment": "anime",
+      "grades": {
+        "narutonaruto": 1,
+        "naruto-uragannye-xronikinaruto-shippuuden": 2
+      }
+    },
+    {
+      "slug": "klinok-rassekaiushhii-demonovkimetsu-no-yaiba",
+      "segment": "anime",
+      "grades": {
+        "istrebitel-demonov-poezd-beskonecnyikimetsu-no-yaiba-mugen-ressha-hen": 2,
+        "klinok-rassekaiushhii-demonov-beskonecnyi-zamokkimetsu-no-yaiba-movie-mugen-jou-hen": 2
+      }
+    },
+    {
+      "slug": "van-pisone-piece",
+      "segment": "anime",
+      "grades": {
+        "van-pis-ostrov-ryboliudeione-piece-gyojin-tou-hen": 2,
+        "van-pis-2023one-piece": 1
+      }
+    },
+    {
+      "slug": "vtorzenie-titanovshingeki-no-kyojin",
+      "segment": "anime",
+      "grades": {
+        "vtorzenie-gigantov-poteriannye-devuskishingeki-no-kyojin-lost-girls": 2,
+        "vtorzenie-titanov-srednei-skolyshingeki-kyojin-chugakko": 1
+      }
+    },
+    {
+      "slug": "tetrad-smerti-2006death-note",
+      "segment": "anime",
+      "grades": {
+        "tetrad-smerti-novoe-pokoleniedeath-note-new-generation": 1,
+        "tetrad-smerti-2015desu-noto": 1
+      }
+    },
+    {
+      "slug": "planeta-zemliaplanet-earth",
+      "segment": "documentary",
+      "grades": {
+        "planeta-zemlia-2planet-earth-ii": 2,
+        "planeta-zemlia-3planet-earth-iii": 2
+      }
+    },
+    {
+      "slug": "planeta-zemlia-2planet-earth-ii",
+      "segment": "documentary",
+      "grades": {
+        "planeta-zemliaplanet-earth": 2,
+        "planeta-zemlia-3planet-earth-iii": 2
+      }
+    },
+    {
+      "slug": "bbc-drevnii-rim-rascvet-i-padenie-imperiiancient-rome-the-rise-and-fall-of-an-empire",
+      "segment": "documentary",
+      "grades": {
+        "vosem-dnei-kotorye-sozdali-rimeight-days-that-made-rome": 2,
+        "rimrome": 1
+      }
+    },
+    {
+      "slug": "top-girtop-gear",
+      "segment": "show",
+      "grades": {
+        "top-gir-specvypusk-v-patagoniitop-gear-patagonia-special": 2,
+        "top-gir-ot-a-do-iatop-gear-from-a-to-z": 2,
+        "top-gir-amerikatop-gear-america": 1
+      }
+    },
+    {
+      "slug": "top-gir-amerikatop-gear-america",
+      "segment": "show",
+      "grades": {
+        "motortrend-top-gir-amerikamotortrend-top-gear-america": 2,
+        "top-girtop-gear": 1
+      }
+    },
+    {
+      "slug": "golos-amerikithe-voice",
+      "segment": "show",
+      "grades": {
+        "golos-deti": 1,
+        "ia-vizu-tvoi-golos-ssai-can-see-your-voice": 1
+      }
+    },
+    {
+      "slug": "deksterdexter",
+      "segment": "popular",
+      "grades": {
+        "dekster-novaia-krovdexter-new-blood": 2,
+        "dekster-pervorodnyi-grexdexter-original-sin": 2,
+        "dekster-voskreseniedexter-resurrection": 2
+      }
+    },
+    {
+      "slug": "fargofargo-2",
+      "segment": "popular",
+      "grades": {"nastoiashhii-detektivtrue-detective": 1}
+    },
+    {
+      "slug": "xranilishhe-13warehouse-13",
+      "segment": "lexical_collision",
+      "forbidden_themes": ["show_business"],
+      "grades": {"evrikaeureka": 2}
+    },
+    {
+      "slug": "h2o-prosto-dobav-vodyh2o-just-add-water",
+      "segment": "lexical_collision",
+      "forbidden_themes": ["fantasy"],
+      "grades": {"sekret-ostrova-makomako-mermaids": 2}
+    },
+    {
+      "slug": "nianiathe-nanny",
+      "segment": "lexical_collision",
+      "forbidden_themes": ["school"],
+      "grades": {"druziafriends": 1}
+    },
+    {
+      "slug": "dnevniki-krasnoi-tufelkired-shoe-diaries",
+      "segment": "lexical_collision",
+      "forbidden_themes": ["military"],
+      "grades": {"seks-v-bolsom-gorodesex-and-the-city": 1}
+    },
+    {
+      "slug": "vostocnyi-edemhigashi-no-eden",
+      "segment": "lexical_collision",
+      "forbidden_themes": ["sports"],
+      "grades": {"exo-terrorazankyo-no-terror": 1}
+    },
+    {
+      "slug": "soobshhestvocommunity",
+      "segment": "lexical_collision",
+      "forbidden_themes": ["family"],
+      "grades": {
+        "ofisthe-office": 1,
+        "parki-i-zony-otdyxaparks-and-recreation": 1
+      }
+    }
+  ]
+}

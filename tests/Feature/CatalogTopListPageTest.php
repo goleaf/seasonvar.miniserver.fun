@@ -9,6 +9,7 @@ use App\Enums\ContentAudience;
 use App\Enums\MediaHealthStatus;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRating;
+use App\Models\Country;
 use App\Models\Episode;
 use App\Models\Genre;
 use App\Models\LicensedMedia;
@@ -124,6 +125,105 @@ final class CatalogTopListPageTest extends TestCase
         $this->assertStringNotContainsString('(select count(*) from "episodes"', $rankingSql);
     }
 
+    public function test_top_list_filters_by_country_and_year_range_before_ranking(): void
+    {
+        $lithuania = Country::query()->create(['name' => 'Литва', 'slug' => 'litva']);
+        $unitedStates = Country::query()->create(['name' => 'США', 'slug' => 'ssha']);
+        $matching = $this->rankableTitle('Литовский сериал 2015', CatalogTopListCategory::Series);
+        $tooOld = $this->rankableTitle('Литовский сериал 2009', CatalogTopListCategory::Series);
+        $wrongCountry = $this->rankableTitle('Американский сериал 2015', CatalogTopListCategory::Series);
+        $matching->update(['year' => 2015]);
+        $tooOld->update(['year' => 2009]);
+        $wrongCountry->update(['year' => 2015]);
+        $matching->countries()->attach($lithuania);
+        $tooOld->countries()->attach($lithuania);
+        $wrongCountry->countries()->attach($unitedStates);
+
+        $response = $this->get(route('top.show', [
+            'category' => CatalogTopListCategory::Series->value,
+            'year_from' => 2010,
+            'year_to' => 2020,
+            'country' => $lithuania->slug,
+        ]));
+
+        $response
+            ->assertOk()
+            ->assertSee($matching->title)
+            ->assertDontSee($tooOld->title)
+            ->assertDontSee($wrongCountry->title);
+    }
+
+    public function test_top_list_filter_form_preserves_state_across_category_links_and_uses_filtered_seo(): void
+    {
+        $lithuania = Country::query()->create(['name' => 'Литва', 'slug' => 'litva']);
+        $matching = $this->rankableTitle('Литовский сериал с формой', CatalogTopListCategory::Series);
+        $matching->update(['year' => 2015]);
+        $matching->countries()->attach($lithuania);
+        $url = route('top.show', [
+            'category' => CatalogTopListCategory::Series->value,
+            'year_from' => 2010,
+            'year_to' => 2020,
+            'country' => $lithuania->slug,
+        ]);
+        $canonical = route('top.show', ['category' => CatalogTopListCategory::Series->value]);
+        $moviesUrl = route('top.show', [
+            'category' => CatalogTopListCategory::Movies->value,
+            'year_from' => 2010,
+            'year_to' => 2020,
+            'country' => $lithuania->slug,
+        ]);
+
+        $response = $this->get($url)->assertOk();
+
+        $response
+            ->assertSee('data-top-list-filters', false)
+            ->assertSee('name="year_from"', false)
+            ->assertSee('name="year_to"', false)
+            ->assertSee('name="country"', false)
+            ->assertSee('value="2010"', false)
+            ->assertSee('value="2020"', false)
+            ->assertSee('value="litva" selected', false)
+            ->assertSee($moviesUrl)
+            ->assertSee('<link rel="canonical" href="'.$canonical.'">', false)
+            ->assertSee('<meta name="robots" content="noindex,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">', false)
+            ->assertDontSee('"@type":"ItemList"', false)
+            ->assertDontSee('hreflang=', false);
+    }
+
+    public function test_filtered_empty_state_resets_to_the_current_top_list(): void
+    {
+        $lithuania = Country::query()->create(['name' => 'Литва', 'slug' => 'litva']);
+        $resetUrl = route('top.show', ['category' => CatalogTopListCategory::Movies->value]);
+
+        $response = $this->get(route('top.show', [
+            'category' => CatalogTopListCategory::Movies->value,
+            'country' => $lithuania->slug,
+        ]));
+
+        $response
+            ->assertOk()
+            ->assertSee('По выбранным условиям ничего не найдено')
+            ->assertSee('Сбросить фильтры')
+            ->assertSee($resetUrl, false)
+            ->assertDontSee('Сейчас в этой категории нет доступных тайтлов с оценками.');
+    }
+
+    public function test_top_list_rejects_unknown_country_and_inverted_year_range(): void
+    {
+        $url = route('top.show', ['category' => CatalogTopListCategory::Movies->value]);
+
+        $this
+            ->from($url)
+            ->get(route('top.show', [
+                'category' => CatalogTopListCategory::Movies->value,
+                'year_from' => 2020,
+                'year_to' => 2010,
+                'country' => 'neizvestnaya-strana',
+            ]))
+            ->assertRedirect($url)
+            ->assertSessionHasErrors(['year_from', 'country']);
+    }
+
     public function test_list_excludes_private_unrated_and_unwatchable_titles_even_for_authenticated_viewers(): void
     {
         $visible = $this->rankableTitle('Публичный доступный сериал', CatalogTopListCategory::Series);
@@ -151,6 +251,10 @@ final class CatalogTopListPageTest extends TestCase
     {
         $lowest = null;
         $highest = null;
+        $selectedCountry = Country::query()->create([
+            'name' => 'Страна нижней позиции',
+            'slug' => 'strana-nizhnei-pozicii',
+        ]);
 
         foreach (range(1, 101) as $number) {
             $title = $this->rankableTitle(
@@ -180,6 +284,16 @@ final class CatalogTopListPageTest extends TestCase
         $this->assertStringContainsString('Топ 100', $html);
         $this->assertStringContainsString('data-top-list-podium', $html);
         $this->assertStringContainsString('data-top-list-main', $html);
+
+        $lowest->countries()->attach($selectedCountry);
+        $filteredHtml = $this->get(route('top.show', [
+            'category' => CatalogTopListCategory::Series->value,
+            'country' => $selectedCountry->slug,
+        ]))->assertOk()->getContent();
+
+        $this->assertSame(1, substr_count($filteredHtml, 'data-top-list-row'));
+        $this->assertStringContainsString(route('titles.show', $lowest), $filteredHtml);
+        $this->assertStringNotContainsString(route('titles.show', $highest), $filteredHtml);
     }
 
     public function test_non_empty_top_lists_are_discoverable_in_static_sitemap_and_localized_route(): void

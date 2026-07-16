@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Catalog;
 
 use App\DTOs\CatalogRecommendationContext;
+use App\Enums\CatalogRecommendationReason;
 use App\Enums\CatalogRecommendationType;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheTtlPolicy;
@@ -19,9 +20,9 @@ final class CatalogRecommendationCache
     ) {}
 
     /**
-     * @param  Closure(): list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>  $rebuild
+     * @param  Closure(): list<array{id: int, score: int, source: string, reason: string, reasons?: list<array{reason: string, parameters?: array<string, scalar>}>, relation_type?: string|null}>  $rebuild
      * @param  list<int>  $excludedIds
-     * @return list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>
+     * @return list<array{id: int, score: int, source: string, reason: string, reasons?: list<array{reason: string, parameters: array<string, scalar>}>, relation_type?: string|null}>
      */
     public function rememberPublic(CatalogRecommendationContext $context, Closure $rebuild, array $excludedIds = []): array
     {
@@ -66,7 +67,7 @@ final class CatalogRecommendationCache
     }
 
     /**
-     * @return list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>
+     * @return list<array{id: int, score: int, source: string, reason: string, reasons?: list<array{reason: string, parameters: array<string, scalar>}>, relation_type?: string|null}>
      */
     private function normalize(mixed $value): array
     {
@@ -80,13 +81,52 @@ final class CatalogRecommendationCache
                 && is_numeric($row['score'] ?? null)
                 && is_string($row['source'] ?? null)
                 && is_string($row['reason'] ?? null))
-            ->map(fn (array $row): array => [
-                'id' => (int) $row['id'],
-                'score' => (int) $row['score'],
-                'source' => $row['source'],
-                'reason' => $row['reason'],
-                'relation_type' => is_string($row['relation_type'] ?? null) ? $row['relation_type'] : null,
-            ])
+            ->map(function (array $row): array {
+                $normalized = [
+                    'id' => (int) $row['id'],
+                    'score' => (int) $row['score'],
+                    'source' => $row['source'],
+                    'reason' => $row['reason'],
+                    'relation_type' => is_string($row['relation_type'] ?? null) ? $row['relation_type'] : null,
+                ];
+                $reasons = $this->normalizeReasons($row['reasons'] ?? []);
+
+                if ($reasons !== []) {
+                    $normalized['reasons'] = $reasons;
+                }
+
+                return $normalized;
+            })
+            ->values()
+            ->all();
+    }
+
+    /** @return list<array{reason: string, parameters: array<string, scalar>}> */
+    private function normalizeReasons(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        return collect($value)
+            ->filter(fn (mixed $item): bool => is_array($item)
+                && CatalogRecommendationReason::tryFrom((string) ($item['reason'] ?? '')) !== null)
+            ->map(function (array $item): array {
+                $parameters = collect(is_array($item['parameters'] ?? null) ? $item['parameters'] : [])
+                    ->filter(fn (mixed $parameter, mixed $key): bool => is_string($key) && is_scalar($parameter))
+                    ->mapWithKeys(fn (mixed $parameter, string $key): array => [$key => $parameter])
+                    ->all();
+
+                return [
+                    'reason' => (string) $item['reason'],
+                    'parameters' => $parameters,
+                ];
+            })
+            ->unique(fn (array $item): string => $item['reason'].'|'.json_encode(
+                $item['parameters'],
+                JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE,
+            ))
+            ->take(4)
             ->values()
             ->all();
     }

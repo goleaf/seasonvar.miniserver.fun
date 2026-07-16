@@ -102,6 +102,7 @@ final class CatalogCollectionCacheInvalidator
             $this->versions->bump(CacheDomain::Homepage);
             $this->versions->bump(CacheDomain::Sitemap);
             $this->versions->bump(CacheDomain::Api);
+            $this->versions->bump(CacheDomain::SearchSuggestions);
 
             if ($recommendationsChanged) {
                 $this->versions->bump(CacheDomain::Recommendations);

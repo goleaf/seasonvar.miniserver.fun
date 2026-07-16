@@ -14,11 +14,11 @@ use App\Http\Controllers\CatalogSitemapController;
 use App\Http\Controllers\CatalogTopListController;
 use App\Http\Controllers\CommentRedirectController;
 use App\Http\Controllers\DownloadLicensedMediaController;
+use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\InfrastructureHealthController;
 use App\Http\Controllers\MigrateAnonymousPreferencesController;
 use App\Http\Controllers\PlaybackSourceController;
 use App\Http\Controllers\ReviewDirectLinkController;
-use App\Http\Controllers\SwitchInterfaceLocaleController;
 use App\Http\Controllers\TechnicalIssueAttachmentController;
 use App\Http\Controllers\UserProfileMediaController;
 use App\Http\Middleware\SetSignedAuthenticationLocale;
@@ -79,14 +79,11 @@ $discoveryRouteTypes = collect(CatalogRecommendationType::values())
 Route::get('/', [CatalogController::class, 'index'])
     ->middleware('public.page:homepage')
     ->name('home');
+Route::get('/search', GlobalSearchController::class)->name('search.index');
 Route::get('/{locale}', [CatalogController::class, 'index'])
     ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
     ->middleware(['collection.locale', 'public.page:homepage'])
     ->name('localized.home');
-Route::post('/interface-locale', SwitchInterfaceLocaleController::class)
-    ->middleware('throttle:20,1')
-    ->name('locale.switch');
-
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', LoginPage::class)->name('login');
     if (config('authentication.registration.enabled', true)) {
@@ -248,6 +245,7 @@ Route::get('/playback/{licensedMedia}', PlaybackSourceController::class)
 Route::redirect('/discover', '/discover/popular', 302)->name('discover.default');
 Route::get('/discover/{type}', CatalogDiscoveryPage::class)
     ->whereIn('type', $discoveryRouteTypes)
+    ->middleware('public.page:discovery')
     ->name('discover.index');
 Route::redirect('/recommendations', '/discover/popular', 301)->name('legacy.recommendations.index');
 Route::redirect('/top', '/top/movies', 302)->name('top.default');
@@ -291,10 +289,12 @@ Route::get('/users/{username}', PublicProfilePage::class)
     ->name('users.show');
 Route::get('/profiles/{userPublicId}/collections', CatalogCollectionProfile::class)
     ->whereUuid('userPublicId')
-    ->middleware('public.page:collections')
     ->name('profiles.collections');
 
 Route::middleware('collection.locale')->group(function () use ($discoveryRouteTypes): void {
+    Route::get('/{locale}/search', GlobalSearchController::class)
+        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->name('localized.search.index');
     Route::get('/{locale}/requests', ContentRequestDirectory::class)
         ->whereIn('locale', config('content-requests.supported_locales', ['ru']))
         ->middleware('public.page:requests')
@@ -315,6 +315,7 @@ Route::middleware('collection.locale')->group(function () use ($discoveryRouteTy
     Route::get('/{locale}/discover/{type}', CatalogDiscoveryPage::class)
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->whereIn('type', $discoveryRouteTypes)
+        ->middleware('public.page:discovery')
         ->name('localized.discover.index');
     Route::get('/{locale}/top', function (string $locale) {
         return redirect()->route('localized.top.show', [
@@ -343,6 +344,7 @@ Route::middleware('collection.locale')->group(function () use ($discoveryRouteTy
         ->name('localized.comments.show');
     Route::get('/{locale}/collections', CatalogCollectionDirectory::class)
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->middleware('public.page:collections')
         ->name('localized.collections.index');
     Route::get('/{locale}/collections/{collectionSlug}', [CatalogCollectionController::class, 'localizedShow'])
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))

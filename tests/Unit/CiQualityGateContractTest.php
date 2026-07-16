@@ -111,6 +111,10 @@ final class CiQualityGateContractTest extends TestCase
         $this->assertStringContainsString('$repo_root/output/playwright/$ci_run_id/browser.sqlite', $qualityGate);
         $this->assertStringContainsString('export DB_DATABASE="$browser_database"', $qualityGate);
         $this->assertStringContainsString('export BROWSER_TEST_DATABASE="$browser_database"', $qualityGate);
+
+        foreach (['CACHE_DOMAIN_STORE', 'CACHE_HOT_STORE', 'CACHE_LOCK_STORE', 'CACHE_METRICS_STORE', 'CACHE_VERSION_STORE'] as $store) {
+            $this->assertStringContainsString("export {$store}=array", $qualityGate);
+        }
     }
 
     public function test_all_profiles_prepare_isolated_manifest_paths_before_artisan_bootstrap(): void
@@ -146,7 +150,23 @@ final class CiQualityGateContractTest extends TestCase
 
         $this->assertStringContainsString('export PLAYWRIGHT_PORT="$browser_port"', $qualityGate);
         $this->assertStringContainsString('export PLAYWRIGHT_RUNTIME_NAME="${PLAYWRIGHT_RUNTIME_NAME:-ci-$ci_run_id}"', $qualityGate);
-        $this->assertStringContainsString('http://127.0.0.1:$browser_port', $qualityGate);
+        $this->assertStringContainsString('export APP_URL="http://127.0.0.1:$browser_port"', $qualityGate);
+        $this->assertStringNotContainsString('PLAYWRIGHT_APP_URL', $qualityGate);
+    }
+
+    public function test_changelog_russian_policy_runs_before_commit_and_in_backend_ci(): void
+    {
+        $hook = File::get(base_path('.githooks/pre-commit'));
+        $qualityGate = File::get(base_path('scripts/ci-check.sh'));
+
+        $this->assertStringContainsString(
+            '"$repo_root/scripts/check-changelog-policy.sh" --staged',
+            $hook,
+        );
+        $this->assertStringContainsString(
+            'bash scripts/check-changelog-policy.sh CHANGELOG.md',
+            $qualityGate,
+        );
     }
 
     public function test_pre_push_runs_the_same_local_quality_gate_before_upload(): void

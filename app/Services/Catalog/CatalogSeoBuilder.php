@@ -193,27 +193,30 @@ class CatalogSeoBuilder
     ): array {
         $filterTitle = $this->catalogFilteredTitle($activeTaxonomies);
         $title = match (true) {
-            $search !== '' && $titleContext !== null => 'Поиск "'.$search.'" по сериалу '.$titleContext->display_title,
-            $search !== '' => 'Поиск "'.$search.'" - сериалы онлайн',
-            $filterTitle !== '' && $year !== null => $this->catalogFilteredTitle($activeTaxonomies, $year).' онлайн',
-            $filterTitle !== '' => $filterTitle.' онлайн',
-            $year !== null => 'Сериалы '.$year.' года онлайн',
-            $titleContext !== null => 'Подборка по сериалу '.$titleContext->display_title,
-            default => 'Все сериалы онлайн',
+            $search !== '' && $titleContext !== null => __('catalog.catalog.search_seo.title_query_context', ['query' => $search, 'title' => $titleContext->display_title]),
+            $search !== '' => __('catalog.catalog.search_seo.title_query', ['query' => $search]),
+            $filterTitle !== '' && $year !== null => __('catalog.catalog.search_seo.title_online', ['title' => $this->catalogFilteredTitle($activeTaxonomies, $year)]),
+            $filterTitle !== '' => __('catalog.catalog.search_seo.title_online', ['title' => $filterTitle]),
+            $year !== null => __('catalog.catalog.search_seo.title_year', ['year' => $year]),
+            $titleContext !== null => __('catalog.catalog.search_seo.title_context', ['title' => $titleContext->display_title]),
+            default => __('catalog.catalog.search_seo.title_all'),
         };
 
         if ($currentPage > 1) {
-            $title .= ' - страница '.$currentPage;
+            $title = __('catalog.catalog.search_seo.title_page', ['title' => $title, 'page' => $currentPage]);
         }
 
+        $totalLabel = trans_choice('catalog.counts.results_found', $total, [
+            'count' => Number::format($total, locale: app()->currentLocale()),
+        ]);
         $descriptionParts = collect([
-            $total.' сериалов найдено в каталоге.',
-            $titleContext !== null ? 'Показаны результаты по сериалу '.$titleContext->display_title.'.' : null,
+            __('catalog.catalog.search_seo.description_count', ['count' => $totalLabel]),
+            $titleContext !== null ? __('catalog.catalog.search_seo.description_context', ['title' => $titleContext->display_title]) : null,
             $activeTaxonomies->isNotEmpty() ? $this->catalogFilteredDescription($activeTaxonomies) : null,
-            $year !== null ? 'Учитывается год выхода '.$year.'.' : null,
-            $search !== '' ? 'Учитывается поисковый запрос '.$search.'.' : null,
-            $invalidYear ? 'Год '.$requestedYear.' не найден.' : null,
-            $invalidFilterSlugs !== [] ? 'Часть фильтров не найдена.' : null,
+            $year !== null ? __('catalog.catalog.search_seo.description_year', ['year' => $year]) : null,
+            $search !== '' ? __('catalog.catalog.search_seo.description_query', ['query' => $search]) : null,
+            $invalidYear ? __('catalog.catalog.search_seo.description_invalid_year', ['year' => $requestedYear]) : null,
+            $invalidFilterSlugs !== [] ? __('catalog.catalog.search_seo.description_invalid_filters') : null,
         ])->filter()->implode(' ');
         $canonical = $this->catalogCanonicalUrl($request, $activeTaxonomies, $year, $currentPage, $titleContext);
         $hasIndexableLandingShape = ($activeTaxonomies->isEmpty() && $year !== null)
@@ -221,11 +224,11 @@ class CatalogSeoBuilder
         $robots = $search === '' && $invalidFilterSlugs === [] && ! $invalidYear && $hasIndexableLandingShape && ! $this->hasComplexCatalogQuery($request)
             ? $this->indexRobots()
             : 'noindex,nofollow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
-        $keywords = collect(['сериалы онлайн', 'каталог сериалов', 'смотреть сериалы'])
+        $keywords = collect((array) __('catalog.catalog.search_seo.keywords'))
             ->when($titleContext !== null, fn (Collection $items): Collection => $items->push($titleContext->display_title))
             ->merge($activeTaxonomies->pluck('name'))
             ->merge($this->catalogSearchPhrases($search, $year, $activeTaxonomies))
-            ->when($year !== null, fn (Collection $items): Collection => $items->push('сериалы '.$year))
+            ->when($year !== null, fn (Collection $items): Collection => $items->push(__('catalog.catalog.search_seo.keyword_year', ['year' => $year])))
             ->filter()
             ->unique()
             ->values();
@@ -244,7 +247,7 @@ class CatalogSeoBuilder
             'next' => $nextPageUrl,
             'type' => 'website',
             'updated_time' => now()->toAtomString(),
-            'section' => 'Сериалы',
+            'section' => __('catalog.navigation.all_titles'),
             'tags' => $tags,
             'seo_text' => $this->catalogSeoText($total, $search, $year, $activeTaxonomies),
             'search_phrases' => $this->catalogSearchPhrases($search, $year, $activeTaxonomies),
@@ -256,8 +259,8 @@ class CatalogSeoBuilder
                 'slug' => $titleContext->slug,
             ],
             'breadcrumbs' => [
-                ['name' => 'Главная', 'url' => route('home')],
-                ['name' => 'Сериалы', 'url' => route('titles.index')],
+                ['name' => __('catalog.navigation.home'), 'url' => route('home')],
+                ['name' => __('catalog.navigation.all_titles'), 'url' => route('titles.index')],
             ],
             'jsonLd' => [
                 $this->organizationJsonLd(),
@@ -267,8 +270,8 @@ class CatalogSeoBuilder
                 $this->collectionPageJsonLd($title, $descriptionParts, $canonical),
                 $this->itemListJsonLd($pageTitles, $firstItemPosition, $title),
                 $this->breadcrumbJsonLd([
-                    ['name' => 'Главная', 'url' => route('home')],
-                    ['name' => 'Сериалы', 'url' => route('titles.index')],
+                    ['name' => __('catalog.navigation.home'), 'url' => route('home')],
+                    ['name' => __('catalog.navigation.all_titles'), 'url' => route('titles.index')],
                 ]),
             ],
         ];
@@ -297,9 +300,18 @@ class CatalogSeoBuilder
         $canonical = ! $hasInteractiveFilters && $currentPage > 1
             ? route($directory->indexRouteName, ['page' => $currentPage])
             : $baseUrl;
-        $title = $directory->title.($currentPage > 1 ? ' — страница '.$currentPage : '');
-        $description = $directory->description.' В справочнике '.trans_choice('catalog.directories.counts.values', $totalValues)
-            .', связанных с '.trans_choice('catalog.counts.results', $totalTitles).'.';
+        $title = $currentPage > 1
+            ? __('catalog.catalog.search_seo.directory_page_title', ['title' => $directory->title, 'page' => $currentPage])
+            : $directory->title;
+        $description = __('catalog.catalog.search_seo.directory_description', [
+            'description' => $directory->description,
+            'values' => trans_choice('catalog.directories.counts.values', $totalValues, [
+                'count' => Number::format($totalValues, locale: app()->currentLocale()),
+            ]),
+            'titles' => trans_choice('catalog.counts.results', $totalTitles, [
+                'count' => Number::format($totalTitles, locale: app()->currentLocale()),
+            ]),
+        ]);
         $breadcrumbs = [
             ['name' => __('catalog.navigation.home'), 'url' => route('home')],
             ['name' => __('catalog.navigation.all_titles'), 'url' => route('titles.index')],
@@ -319,8 +331,8 @@ class CatalogSeoBuilder
             'next' => $nextPageUrl,
             'type' => 'website',
             'updated_time' => now()->toAtomString(),
-            'section' => 'Справочники каталога',
-            'tags' => [$directory->title, 'каталог сериалов'],
+            'section' => __('catalog.directories.label'),
+            'tags' => [$directory->title, __('catalog.catalog.search_seo.catalog_tag')],
             'breadcrumbs' => $breadcrumbs,
             'related_links' => [
                 ['name' => __('catalog.navigation.all_titles'), 'url' => route('titles.index')],
@@ -617,22 +629,15 @@ class CatalogSeoBuilder
         $name = $this->taxonomyRecordName($record);
 
         if ($name === '') {
-            return 'по выбранному параметру';
+            return (string) __('catalog.catalog.filter_context.selected');
         }
 
-        return match ($filterType) {
-            'genre' => 'в жанре '.$name,
-            'country' => 'по стране производства '.$name,
-            'actor' => 'с актёром '.$name,
-            'director' => 'режиссёра '.$name,
-            'age_rating' => 'с возрастным рейтингом '.$name,
-            'translation' => 'с озвучкой '.$name,
-            'status' => 'со статусом '.$name,
-            'network' => 'телеканала '.$name,
-            'studio' => 'студии '.$name,
-            'tag' => 'по теме '.$name,
-            default => 'по параметру '.$name,
-        };
+        $key = in_array($filterType, [
+            'genre', 'country', 'actor', 'director', 'age_rating',
+            'translation', 'status', 'network', 'studio', 'tag',
+        ], true) ? $filterType : 'default';
+
+        return (string) __("catalog.catalog.filter_context.{$key}", ['name' => $name]);
     }
 
     /**
@@ -656,20 +661,22 @@ class CatalogSeoBuilder
         $contexts = $this->taxonomyContextPhrases($activeTaxonomies);
 
         if ($contexts->isEmpty()) {
-            return $year === null ? 'Сериалы по выбранным параметрам' : 'Сериалы '.$year.' года по выбранным параметрам';
+            return $year === null
+                ? (string) __('catalog.catalog.search_seo.filtered_default')
+                : (string) __('catalog.catalog.search_seo.filtered_default_year', ['year' => $year]);
         }
 
         if ($contexts->count() === 1) {
             return $year === null
-                ? 'Сериалы '.$contexts->first()
-                : 'Сериалы '.$year.' года '.$contexts->first();
+                ? (string) __('catalog.catalog.search_seo.filtered_single', ['context' => $contexts->first()])
+                : (string) __('catalog.catalog.search_seo.filtered_single_year', ['year' => $year, 'context' => $contexts->first()]);
         }
 
         $suffix = $contexts->implode(', ');
 
         return $year === null
-            ? 'Сериалы по выбранным параметрам — '.$suffix
-            : 'Сериалы '.$year.' года по выбранным параметрам — '.$suffix;
+            ? (string) __('catalog.catalog.search_seo.filtered_multiple', ['context' => $suffix])
+            : (string) __('catalog.catalog.search_seo.filtered_multiple_year', ['year' => $year, 'context' => $suffix]);
     }
 
     /** @param Collection<string, Model> $activeTaxonomies */
@@ -678,10 +685,10 @@ class CatalogSeoBuilder
         $contexts = $this->taxonomyContextPhrases($activeTaxonomies);
 
         if ($contexts->isEmpty()) {
-            return 'Показаны сериалы по выбранным параметрам.';
+            return (string) __('catalog.catalog.search_seo.filtered_description_default');
         }
 
-        return 'Показаны сериалы '.$contexts->implode(', ').'.';
+        return (string) __('catalog.catalog.search_seo.filtered_description', ['context' => $contexts->implode(', ')]);
     }
 
     /** @return array<string, mixed> */
@@ -695,7 +702,7 @@ class CatalogSeoBuilder
             'inLanguage' => str_replace('_', '-', app()->currentLocale()),
             'potentialAction' => [
                 '@type' => 'SearchAction',
-                'target' => route('titles.index').'?q={search_term_string}',
+                'target' => route('search.index').'?q={search_term_string}',
                 'query-input' => 'required name=search_term_string',
             ],
             'sameAs' => [
@@ -732,7 +739,7 @@ class CatalogSeoBuilder
                     '@type' => 'SiteNavigationElement',
                     'position' => 3,
                     'name' => __('catalog.navigation.search'),
-                    'url' => route('titles.index').'?q={search_term_string}',
+                    'url' => route('search.index').'?q={search_term_string}',
                 ],
                 [
                     '@type' => 'SiteNavigationElement',
@@ -867,16 +874,19 @@ class CatalogSeoBuilder
      */
     private function catalogSeoText(int $total, string $search, ?int $year, Collection $activeTaxonomies): array
     {
+        $count = trans_choice('catalog.counts.results_found', $total, [
+            'count' => Number::format($total, locale: app()->currentLocale()),
+        ]);
         $parts = collect([
-            $total.' сериалов найдено в текущей подборке каталога.',
-            $year !== null ? 'Подборка сфокусирована на сериалах '.$year.' года.' : null,
-            $search !== '' ? 'Поиск учитывает только основное, оригинальное и альтернативные названия.' : null,
+            __('catalog.catalog.search_seo.text_count', ['count' => $count]),
+            $year !== null ? __('catalog.catalog.search_seo.text_year', ['year' => $year]) : null,
+            $search !== '' ? __('catalog.catalog.search_seo.text_query') : null,
             $activeTaxonomies->isNotEmpty() ? $this->catalogFilteredDescription($activeTaxonomies) : null,
         ])->filter()->implode(' ');
 
         return [
-            $parts !== '' ? $parts : 'Каталог сериалов поддерживает фильтрацию по жанрам, странам, актерам, режиссерам, годам, переводам, статусам, каналам, студиям и тегам.',
-            'Все страницы формируются автоматически из актуальной базы: после обновления появляются постеры, описания, сезоны, серии, видео и SEO-данные.',
+            $parts !== '' ? $parts : __('catalog.catalog.search_seo.text_default'),
+            __('catalog.catalog.search_seo.text_freshness'),
         ];
     }
 
@@ -887,13 +897,13 @@ class CatalogSeoBuilder
     private function catalogRelatedLinks(string $search, ?int $year, Collection $activeTaxonomies): array
     {
         $links = collect([
-            ['name' => 'Все сериалы', 'url' => route('titles.index')],
-            ['name' => 'Сериалы '.now()->year.' года', 'url' => route('titles.year', ['year' => now()->year])],
+            ['name' => __('catalog.navigation.all_titles'), 'url' => route('titles.index')],
+            ['name' => __('catalog.catalog.search_seo.link_year', ['year' => now()->year]), 'url' => route('titles.year', ['year' => now()->year])],
         ]);
 
         if ($year !== null) {
-            $links->push(['name' => 'Сериалы '.($year - 1).' года', 'url' => route('titles.year', ['year' => $year - 1])]);
-            $links->push(['name' => 'Сериалы '.($year + 1).' года', 'url' => route('titles.year', ['year' => $year + 1])]);
+            $links->push(['name' => __('catalog.catalog.search_seo.link_year', ['year' => $year - 1]), 'url' => route('titles.year', ['year' => $year - 1])]);
+            $links->push(['name' => __('catalog.catalog.search_seo.link_year', ['year' => $year + 1]), 'url' => route('titles.year', ['year' => $year + 1])]);
         }
 
         foreach ($activeTaxonomies as $filterType => $taxonomy) {
@@ -904,7 +914,7 @@ class CatalogSeoBuilder
         }
 
         if ($search !== '') {
-            $links->push(['name' => 'Поиск по запросу '.$search, 'url' => route('titles.index', ['q' => $search])]);
+            $links->push(['name' => __('catalog.catalog.search_seo.link_query', ['query' => $search]), 'url' => route('titles.index', ['q' => $search])]);
         }
 
         return $links
@@ -982,38 +992,23 @@ class CatalogSeoBuilder
      */
     private function catalogSearchPhrases(string $search, ?int $year, Collection $activeTaxonomies): array
     {
-        $base = collect([
-            'смотреть сериалы онлайн',
-            'каталог сериалов онлайн',
-            'сериалы по жанрам',
-            'сериалы по странам',
-            'сериалы по актерам',
-        ]);
+        $base = collect((array) __('catalog.catalog.search_seo.phrases.base'));
 
         if ($search !== '') {
-            $base = $base->merge([
-                $search.' смотреть онлайн',
-                'сериалы похожие на '.$search,
-                $search.' все серии',
-            ]);
+            $base = $base->merge(collect((array) __('catalog.catalog.search_seo.phrases.query'))
+                ->map(fn (string $phrase): string => str_replace(':query', $search, $phrase)));
         }
 
         if ($year !== null) {
-            $base = $base->merge([
-                'сериалы '.$year.' года',
-                'смотреть сериалы '.$year.' онлайн',
-                'новые сериалы '.$year,
-            ]);
+            $base = $base->merge(collect((array) __('catalog.catalog.search_seo.phrases.year'))
+                ->map(fn (string $phrase): string => str_replace(':year', (string) $year, $phrase)));
         }
 
         foreach ($activeTaxonomies as $filterType => $taxonomy) {
             $context = $this->taxonomyContextPhrase($filterType, $taxonomy);
 
-            $base = $base->merge([
-                'сериалы '.$context.' онлайн',
-                'смотреть сериалы '.$context,
-                'лучшие сериалы '.$context,
-            ]);
+            $base = $base->merge(collect((array) __('catalog.catalog.search_seo.phrases.context'))
+                ->map(fn (string $phrase): string => str_replace(':context', $context, $phrase)));
         }
 
         return $base
@@ -1029,7 +1024,7 @@ class CatalogSeoBuilder
     private function catalogSeoHeading(string $search, ?int $year, Collection $activeTaxonomies): string
     {
         if ($search !== '') {
-            return 'Сериалы по запросу '.$search;
+            return (string) __('catalog.catalog.search_seo.heading_query', ['query' => $search]);
         }
 
         if ($activeTaxonomies->isNotEmpty() && $year !== null) {
@@ -1041,23 +1036,27 @@ class CatalogSeoBuilder
         }
 
         if ($year !== null) {
-            return 'Сериалы '.$year.' года смотреть онлайн';
+            return (string) __('catalog.catalog.search_seo.heading_year', ['year' => $year]);
         }
 
-        return 'Все сериалы онлайн';
+        return (string) __('catalog.catalog.search_seo.heading_all');
     }
 
     /** @param Collection<string, Model> $activeTaxonomies */
     private function catalogSeoLead(int $total, string $search, ?int $year, Collection $activeTaxonomies): string
     {
-        $parts = collect([
-            $total.' сериалов в подборке',
-            $year !== null ? 'за '.$year.' год' : null,
-            $search !== '' ? 'по запросу '.$search : null,
+        $count = trans_choice('catalog.counts.results', $total, [
+            'count' => Number::format($total, locale: app()->currentLocale()),
+        ]);
+        $scope = collect([
+            $year !== null ? __('catalog.catalog.search_seo.lead_year', ['year' => $year]) : null,
+            $search !== '' ? __('catalog.catalog.search_seo.lead_query', ['query' => $search]) : null,
             $activeTaxonomies->isNotEmpty() ? $this->taxonomyContextPhrases($activeTaxonomies)->implode(', ') : null,
         ])->filter()->implode(', ');
 
-        return ucfirst($parts).'. Текстовый поиск проверяет только основное, оригинальное и альтернативные названия; остальные параметры задаются отдельными фильтрами.';
+        return $scope === ''
+            ? (string) __('catalog.catalog.search_seo.lead', ['count' => $count])
+            : (string) __('catalog.catalog.search_seo.lead_scoped', ['count' => $count, 'scope' => $scope]);
     }
 
     /**
@@ -1372,23 +1371,25 @@ class CatalogSeoBuilder
 
         return [
             [
-                'title' => 'Смотреть онлайн',
-                'items' => collect(['смотреть сериалы онлайн', 'сериалы онлайн в хорошем качестве', 'все серии сериалов онлайн', 'все сезоны сериалов'])
-                    ->when($search !== '', fn (Collection $items): Collection => $items->push($search.' смотреть онлайн'))
+                'title' => __('catalog.catalog.search_seo.clusters.watch_title'),
+                'items' => collect((array) __('catalog.catalog.search_seo.clusters.watch_items'))
+                    ->when($search !== '', fn (Collection $items): Collection => $items->push(__('catalog.catalog.search_seo.clusters.query_item', ['query' => $search])))
                     ->values()
                     ->all(),
             ],
             [
-                'title' => 'Подборки',
-                'items' => collect(['сериалы по жанрам', 'сериалы по странам', 'сериалы по актерам', 'сериалы по режиссерам'])
-                    ->merge($taxonomyContexts->map(fn (string $context): string => 'сериалы '.$context.' онлайн'))
+                'title' => __('catalog.catalog.search_seo.clusters.collections_title'),
+                'items' => collect((array) __('catalog.catalog.search_seo.clusters.collections_items'))
+                    ->merge($taxonomyContexts->map(fn (string $context): string => __('catalog.catalog.search_seo.clusters.context_item', ['context' => $context])))
                     ->values()
                     ->all(),
             ],
             [
-                'title' => 'Годы и обновления',
-                'items' => collect(['новые сериалы', 'обновления сериалов', 'новые серии'])
-                    ->when($year !== null, fn (Collection $items): Collection => $items->push('сериалы '.$year.' года')->push('смотреть сериалы '.$year.' онлайн'))
+                'title' => __('catalog.catalog.search_seo.clusters.years_title'),
+                'items' => collect((array) __('catalog.catalog.search_seo.clusters.years_items'))
+                    ->when($year !== null, fn (Collection $items): Collection => $items
+                        ->push(__('catalog.catalog.search_seo.clusters.year_item', ['year' => $year]))
+                        ->push(__('catalog.catalog.search_seo.clusters.year_watch_item', ['year' => $year])))
                     ->values()
                     ->all(),
             ],

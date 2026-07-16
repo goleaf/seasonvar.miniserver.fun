@@ -79,7 +79,11 @@ final class SeasonvarImportTitleGroupDispatcher
      */
     public function addUrls(SeasonvarImportTitleGroup $group, array $urls): int
     {
-        $group->loadMissing(['catalogTitle.source', 'run', 'preparedPages.sourcePage']);
+        $group->loadMissing([
+            'catalogTitle:id,source_id,source_url',
+            'preparedPages:id,seasonvar_import_title_group_id,source_page_id',
+            'preparedPages.sourcePage:id,source_id',
+        ]);
         $sourceId = $group->catalog_title_id !== null
             ? $group->catalogTitle->source_id
             : $group->preparedPages->first()?->sourcePage->source_id;

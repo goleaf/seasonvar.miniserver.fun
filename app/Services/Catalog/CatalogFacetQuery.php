@@ -357,12 +357,12 @@ class CatalogFacetQuery
             return [
                 [
                     'value' => 'available',
-                    'label' => 'Есть',
+                    'label' => __('catalog.catalog.advanced_filter_values.available'),
                     'context_titles_count' => $counts['available'],
                 ],
                 [
                     'value' => 'missing',
-                    'label' => 'Нет',
+                    'label' => __('catalog.catalog.advanced_filter_values.missing'),
                     'context_titles_count' => $counts['missing'],
                 ],
             ];

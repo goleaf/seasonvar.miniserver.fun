@@ -70,16 +70,91 @@
             </div>
         </nav>
 
+        <section data-top-list-filters class="rounded-panel border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/70 sm:p-5" aria-labelledby="top-list-filters-title">
+            <div class="max-w-3xl">
+                <h2 id="top-list-filters-title" class="flex items-center gap-2 text-lg font-black text-slate-950">
+                    <x-ui.icon name="fa-solid fa-sliders text-emerald-700" />
+                    <span>{{ __('top_lists.filters.title') }}</span>
+                </h2>
+                <p id="top-list-filters-description" class="mt-1 text-sm leading-6 text-slate-600">
+                    {{ __('top_lists.filters.description') }}
+                </p>
+            </div>
+
+            <form method="GET" action="{{ $filterForm['action'] }}" aria-describedby="top-list-filters-description" class="mt-4 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(8rem,10rem)_minmax(8rem,10rem)_minmax(14rem,1fr)_auto] xl:items-end">
+                <div class="min-w-0">
+                    <label for="top-list-year-from" class="block text-sm font-bold text-slate-700">{{ __('top_lists.filters.year_from') }}</label>
+                    <input
+                        id="top-list-year-from"
+                        name="year_from"
+                        type="number"
+                        inputmode="numeric"
+                        min="1900"
+                        max="{{ $filterForm['maximumYear'] }}"
+                        value="{{ $filterForm['yearFrom'] }}"
+                        @if ($errors->has('year_from')) aria-invalid="true" aria-describedby="top-list-year-from-error" @endif
+                        class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
+                    >
+                    <x-form.input-error for="year_from" id="top-list-year-from-error" />
+                </div>
+
+                <div class="min-w-0">
+                    <label for="top-list-year-to" class="block text-sm font-bold text-slate-700">{{ __('top_lists.filters.year_to') }}</label>
+                    <input
+                        id="top-list-year-to"
+                        name="year_to"
+                        type="number"
+                        inputmode="numeric"
+                        min="1900"
+                        max="{{ $filterForm['maximumYear'] }}"
+                        value="{{ $filterForm['yearTo'] }}"
+                        @if ($errors->has('year_to')) aria-invalid="true" aria-describedby="top-list-year-to-error" @endif
+                        class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
+                    >
+                    <x-form.input-error for="year_to" id="top-list-year-to-error" />
+                </div>
+
+                <div class="min-w-0 sm:col-span-2 xl:col-span-1">
+                    <label for="top-list-country" class="block text-sm font-bold text-slate-700">{{ __('top_lists.filters.country') }}</label>
+                    <select
+                        id="top-list-country"
+                        name="country"
+                        @if ($errors->has('country')) aria-invalid="true" aria-describedby="top-list-country-error" @endif
+                        class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
+                    >
+                        <option value="">{{ __('top_lists.filters.all_countries') }}</option>
+                        @foreach ($filterForm['countries'] as $countryOption)
+                            <option value="{{ $countryOption['slug'] }}" @selected($filterForm['country'] === $countryOption['slug'])>{{ $countryOption['name'] }}</option>
+                        @endforeach
+                    </select>
+                    <x-form.input-error for="country" id="top-list-country-error" />
+                </div>
+
+                <div class="flex min-w-0 flex-col gap-2 sm:col-span-2 sm:flex-row xl:col-span-1">
+                    <button type="submit" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                        <x-ui.icon name="fa-solid fa-filter" />
+                        <span>{{ __('top_lists.filters.submit') }}</span>
+                    </button>
+                    @if ($filterForm['active'])
+                        <a href="{{ $filterForm['resetUrl'] }}" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-control border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                            <x-ui.icon name="fa-solid fa-xmark" />
+                            <span>{{ __('top_lists.filters.reset') }}</span>
+                        </a>
+                    @endif
+                </div>
+            </form>
+        </section>
+
         @if ($items->isEmpty())
             <section class="rounded-panel border border-slate-200 bg-white px-5 py-14 text-center shadow-sm shadow-slate-200/70" role="status">
                 <span class="mx-auto flex size-14 items-center justify-center rounded-full bg-slate-100 text-2xl text-slate-400">
-                    <x-ui.icon name="fa-solid fa-trophy" />
+                    <x-ui.icon :name="$emptyState['icon']" />
                 </span>
-                <h2 class="mt-4 text-xl font-black text-slate-900">{{ __('top_lists.empty_title') }}</h2>
-                <p class="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">{{ __('top_lists.empty_description') }}</p>
-                <a href="{{ route('titles.index') }}" class="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                <h2 class="mt-4 text-xl font-black text-slate-900">{{ $emptyState['title'] }}</h2>
+                <p class="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">{{ $emptyState['description'] }}</p>
+                <a href="{{ $emptyState['url'] }}" class="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
                     <x-ui.icon name="fa-solid fa-list-ul" />
-                    <span>{{ __('top_lists.empty_action') }}</span>
+                    <span>{{ $emptyState['action'] }}</span>
                 </a>
             </section>
         @else

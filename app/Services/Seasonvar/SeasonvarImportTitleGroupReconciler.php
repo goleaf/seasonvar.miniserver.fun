@@ -49,7 +49,7 @@ final class SeasonvarImportTitleGroupReconciler
             }
 
             $pages = SeasonvarImportPreparedPage::query()
-                ->with('sourcePage')
+                ->with('sourcePage:id,import_claim_token,import_claim_expires_at')
                 ->where('seasonvar_import_title_group_id', $lockedGroup->id)
                 ->orderBy('id')
                 ->lockForUpdate()

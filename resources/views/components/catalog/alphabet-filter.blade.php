@@ -6,7 +6,7 @@
 <nav
     data-catalog-alphabet-groups
     @if (! $mobile) data-catalog-desktop-alphabet @endif
-    aria-label="{{ $mobile ? 'Мобильный алфавитный переход по названиям' : 'Алфавитный переход по названиям' }}"
+    aria-label="{{ $mobile ? __('catalog.catalog.alphabet.mobile_navigation') : __('catalog.catalog.alphabet.navigation') }}"
     {{ $attributes }}
 >
     <div class="flex flex-wrap items-center gap-1.5">

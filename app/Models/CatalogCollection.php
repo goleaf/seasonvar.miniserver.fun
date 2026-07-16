@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -46,6 +47,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read string|null $display_seo_description
  * @property-read string|null $fallback_poster_url
  * @property-read bool $contains_title
+ * @property-read bool $has_import_source
  * @property-read bool $is_restorable
  * @property-read int|null $total_items_count
  * @property-read int|null $visible_items_count
@@ -86,6 +88,12 @@ final class CatalogCollection extends Model
     public function items(): HasMany
     {
         return $this->hasMany(CatalogCollectionItem::class)->orderBy('position')->orderBy('id');
+    }
+
+    /** @return HasOne<CatalogCollectionSource, $this> */
+    public function sourceRecord(): HasOne
+    {
+        return $this->hasOne(CatalogCollectionSource::class);
     }
 
     /** @return HasMany<CatalogCollectionSlug, $this> */

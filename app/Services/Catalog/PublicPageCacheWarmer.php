@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Services\Catalog;
 
+use App\DTOs\PublicCacheWarmTarget;
 use App\Enums\CatalogRecommendationType;
 use App\Models\CatalogTitle;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
+use InvalidArgumentException;
 use LogicException;
 use RuntimeException;
+use Throwable;
 
 final class PublicPageCacheWarmer
 {
@@ -46,33 +50,31 @@ final class PublicPageCacheWarmer
             ->unique()
             ->take($limit)
             ->values();
-        $http = Http::accept('text/html')
-            ->withHeaders(['X-Seasonvar-Cache-Warm' => '1'])
-            ->withUserAgent('Seasonvar-Cache-Warmer/1.0')
-            ->connectTimeout(max(1, (int) config('cache-architecture.page_cache.warm_connect_timeout_seconds', 2)))
-            ->timeout(max(1, (int) config('cache-architecture.page_cache.warm_timeout_seconds', 10)))
-            ->retry(
-                max(1, (int) config('cache-architecture.page_cache.warm_retry_times', 2)),
-                max(0, (int) config('cache-architecture.page_cache.warm_retry_milliseconds', 100)),
-                throw: false,
-            );
-        $succeeded = 0;
+        $result = $this->executeTargets(
+            $targets->map(fn (string $relativeUrl): PublicCacheWarmTarget => new PublicCacheWarmTarget($relativeUrl)),
+            failFast: true,
+            baseUrl: $baseUrl,
+        );
 
-        foreach ($targets as $relativeUrl) {
-            try {
-                $response = $http->get($baseUrl.$relativeUrl);
-            } catch (ConnectionException $exception) {
-                throw new RuntimeException('Self-прогрев публичной страницы не смог подключиться к приложению.', previous: $exception);
-            }
+        return ['attempted' => $result['attempted'], 'succeeded' => $result['succeeded']];
+    }
 
-            if (! $response->successful()) {
-                throw new RuntimeException("Self-прогрев публичной страницы вернул HTTP {$response->status()}.");
-            }
-
-            $succeeded++;
+    /**
+     * @param  iterable<array-key, PublicCacheWarmTarget>  $targets
+     * @return array{
+     *     attempted: int,
+     *     succeeded: int,
+     *     failed: int,
+     *     errors: list<array{fingerprint: string, status: int|null, exception: string|null}>
+     * }
+     */
+    public function warmTargets(iterable $targets): array
+    {
+        if (! (bool) config('cache-architecture.page_cache.warming_enabled', true)) {
+            return ['attempted' => 0, 'succeeded' => 0, 'failed' => 0, 'errors' => []];
         }
 
-        return ['attempted' => $targets->count(), 'succeeded' => $succeeded];
+        return $this->executeTargets($targets, failFast: false, baseUrl: $this->baseUrl());
     }
 
     /** @return list<string> */
@@ -155,6 +157,112 @@ final class PublicPageCacheWarmer
         }
 
         return $configuredOrigin;
+    }
+
+    /**
+     * @param  iterable<array-key, PublicCacheWarmTarget>  $targets
+     * @return array{
+     *     attempted: int,
+     *     succeeded: int,
+     *     failed: int,
+     *     errors: list<array{fingerprint: string, status: int|null, exception: string|null}>
+     * }
+     */
+    private function executeTargets(iterable $targets, bool $failFast, string $baseUrl): array
+    {
+        $attempted = 0;
+        $succeeded = 0;
+        $errors = [];
+
+        foreach ($targets as $target) {
+            $attempted++;
+
+            if (! $failFast && $attempted > 1) {
+                usleep(max(0, (int) config(
+                    'cache-architecture.warming.full_request_delay_milliseconds',
+                    100,
+                )) * 1_000);
+            }
+
+            if (! $this->validRelativeUrl($target->relativeUrl)) {
+                $exception = new InvalidArgumentException('Цель публичного прогрева должна быть безопасным relative URL.');
+
+                if ($failFast) {
+                    throw $exception;
+                }
+
+                $errors[] = $this->error($target->relativeUrl, null, $exception);
+
+                continue;
+            }
+
+            try {
+                $response = $this->http($target->accept)->get($baseUrl.$target->relativeUrl);
+            } catch (ConnectionException $exception) {
+                if ($failFast) {
+                    throw new RuntimeException(
+                        'Self-прогрев публичной страницы не смог подключиться к приложению.',
+                        previous: $exception,
+                    );
+                }
+
+                $errors[] = $this->error($target->relativeUrl, null, $exception);
+
+                continue;
+            }
+
+            if (! $response->successful()) {
+                if ($failFast) {
+                    throw new RuntimeException("Self-прогрев публичной страницы вернул HTTP {$response->status()}.");
+                }
+
+                $errors[] = $this->error($target->relativeUrl, $response->status(), null);
+
+                continue;
+            }
+
+            $succeeded++;
+        }
+
+        return [
+            'attempted' => $attempted,
+            'succeeded' => $succeeded,
+            'failed' => count($errors),
+            'errors' => $errors,
+        ];
+    }
+
+    private function http(string $accept): PendingRequest
+    {
+        return Http::accept($accept)
+            ->withHeaders(['X-Seasonvar-Cache-Warm' => '1'])
+            ->withUserAgent('Seasonvar-Cache-Warmer/1.0')
+            ->connectTimeout(max(1, (int) config('cache-architecture.page_cache.warm_connect_timeout_seconds', 2)))
+            ->timeout(max(1, (int) config('cache-architecture.page_cache.warm_timeout_seconds', 10)))
+            ->withOptions(['allow_redirects' => false])
+            ->retry(
+                max(1, (int) config('cache-architecture.page_cache.warm_retry_times', 2)),
+                max(0, (int) config('cache-architecture.page_cache.warm_retry_milliseconds', 100)),
+                throw: false,
+            );
+    }
+
+    /** @return array{fingerprint: string, status: int|null, exception: string|null} */
+    private function error(string $relativeUrl, ?int $status, ?Throwable $exception): array
+    {
+        return [
+            'fingerprint' => hash('sha256', $relativeUrl),
+            'status' => $status,
+            'exception' => $exception !== null ? $exception::class : null,
+        ];
+    }
+
+    private function validRelativeUrl(string $url): bool
+    {
+        return str_starts_with($url, '/')
+            && ! str_starts_with($url, '//')
+            && ! str_contains($url, "\n")
+            && ! str_contains($url, "\r");
     }
 
     private function origin(string $url): ?string

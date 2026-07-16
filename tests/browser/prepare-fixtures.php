@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Models\Actor;
+use App\Models\CatalogRecommendationBuild;
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleRecommendation;
 use App\Models\CatalogTitleUserState;
 use App\Models\Country;
 use App\Models\Episode;
@@ -12,6 +14,7 @@ use App\Models\Genre;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
+use App\Models\UserAccountSetting;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Facades\Artisan;
@@ -58,6 +61,7 @@ $title = CatalogTitle::factory()->create([
     'description' => 'Детерминированная карточка для локальной проверки браузера.',
     'poster_url' => $posterUrl,
     'type' => 'show',
+    'year' => 2025,
 ]);
 $russia = Country::query()->create([
     'name' => 'Россия',
@@ -69,6 +73,11 @@ $genre = Genre::query()->create([
     'slug' => 'brauzernaia-drama',
 ]);
 $title->genres()->attach($genre);
+$searchGenre = Genre::query()->create([
+    'name' => 'Browser Smoke category',
+    'slug' => 'browser-smoke-category',
+]);
+$title->genres()->attach($searchGenre);
 $turkey = Country::query()->create([
     'name' => 'Турция',
     'slug' => 'turciia',
@@ -143,11 +152,63 @@ LicensedMedia::factory()->create([
     'published_at' => now()->subMinute(),
 ]);
 
+$recommendedTitle = CatalogTitle::factory()->create([
+    'slug' => 'browser-recommended',
+    'title' => 'Рекомендованный браузерный сериал',
+    'original_title' => 'Browser Recommended',
+    'description' => 'Детерминированная рекомендация для проверки карточки и причины.',
+    'poster_url' => $posterUrl,
+    'type' => 'show',
+    'year' => 2024,
+]);
+$recommendedTitle->genres()->attach($genre);
+LicensedMedia::factory()->for($recommendedTitle)->create([
+    'status' => 'published',
+    'published_at' => now()->subMinute(),
+]);
+CatalogTitleRecommendation::query()->create([
+    'catalog_title_id' => $title->id,
+    'recommended_title_id' => $recommendedTitle->id,
+    'score' => 1_200,
+    'rank' => 1,
+    'algorithm_version' => 'v6',
+    'matched_features_count' => 1,
+    'metadata_score' => 1_120,
+    'quality_score' => 80,
+    'reasons' => ['genre' => ['count' => 1, 'ratio' => 1.0, 'score' => 1_120]],
+    'computed_at' => now(),
+]);
+CatalogRecommendationBuild::query()->create([
+    'algorithm_version' => 'v6',
+    'feature_version' => 'tokens-v2',
+    'status' => 'active',
+    'metrics' => [
+        'score_min' => 600,
+        'score_median' => 1_000,
+        'score_p95' => 1_600,
+    ],
+    'started_at' => now()->subMinutes(5),
+    'completed_at' => now()->subMinutes(4),
+    'activated_at' => now()->subMinutes(4),
+]);
+
 $user = User::factory()->create([
     'name' => 'Browser User',
     'email' => 'browser@example.com',
     'email_verified_at' => now()->subDay(),
     'password' => Hash::make('Browser-Strong-Password-42!'),
+]);
+
+$englishUser = User::factory()->create([
+    'name' => 'Browser English User',
+    'email' => 'browser-en@example.com',
+    'email_verified_at' => now()->subDay(),
+    'password' => Hash::make('Browser-Strong-Password-42!'),
+]);
+
+UserAccountSetting::query()->create([
+    'user_id' => $englishUser->id,
+    'locale' => 'en',
 ]);
 
 CatalogTitleUserState::query()->create([

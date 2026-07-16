@@ -62,13 +62,13 @@ class SeasonvarQueueStatusTest extends TestCase
             ->expectsOutputToContain('Очередь Seasonvar')
             ->expectsOutputToContain('Ожидают обработки')
             ->expectsOutputToContain('Активных queued runs')
-            ->expectsOutputToContain('Основной active/last run')
+            ->expectsOutputToContain('Глобальный active/last run')
             ->assertExitCode(0);
 
         $this->assertSame(1, SeasonvarImportRun::query()->count());
     }
 
-    public function test_it_reports_the_running_queue_run_with_the_most_live_claims(): void
+    public function test_it_reports_the_latest_active_global_run_independently_from_live_claim_ranking(): void
     {
         $dominantRun = $this->queuedRun([
             'selected' => 100,
@@ -92,19 +92,19 @@ class SeasonvarQueueStatusTest extends TestCase
 
         $status = app(SeasonvarQueueStatus::class)->read();
 
-        $this->assertSame($dominantRun->id, $status->runId);
+        $this->assertSame($newerRun->id, $status->runId);
         $this->assertSame(2, $status->activeRuns);
-        $this->assertSame(100, $status->selected);
-        $this->assertSame(40, $status->parsed);
-        $this->assertSame(3, $status->failed);
+        $this->assertSame(5, $status->selected);
+        $this->assertSame(0, $status->parsed);
+        $this->assertSame(0, $status->failed);
     }
 
-    public function test_it_counts_a_queued_coordinator_as_active_without_hiding_a_claimed_run(): void
+    public function test_it_counts_active_queue_runs_and_keeps_the_latest_global_coordinator_primary(): void
     {
         $running = $this->queuedRun();
         $page = SourcePage::factory()->create();
         $this->assertNotNull(app(SeasonvarPageClaimManager::class)->claim($page, $running->id, 3600));
-        SeasonvarImportRun::query()->create([
+        $coordinator = SeasonvarImportRun::query()->create([
             'mode' => 'sitemap',
             'execution_mode' => 'queue',
             'status' => 'queued',
@@ -114,7 +114,7 @@ class SeasonvarQueueStatusTest extends TestCase
         $status = app(SeasonvarQueueStatus::class)->read();
 
         $this->assertSame(2, $status->activeRuns);
-        $this->assertSame($running->id, $status->runId);
+        $this->assertSame($coordinator->id, $status->runId);
     }
 
     public function test_it_uses_the_newer_run_when_active_runs_have_equal_live_claims(): void

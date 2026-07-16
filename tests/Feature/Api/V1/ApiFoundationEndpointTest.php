@@ -50,6 +50,16 @@ final class ApiFoundationEndpointTest extends TestCase
         $this->assertStringContainsString('no-store', (string) $health->headers->get('Cache-Control'));
     }
 
+    public function test_v1_config_reports_the_locale_negotiated_for_the_request(): void
+    {
+        config(['app.locale' => 'ru']);
+
+        $this->withHeader('Accept-Language', 'en')
+            ->getJson('/api/v1/config')
+            ->assertOk()
+            ->assertJsonPath('data.locale', 'en');
+    }
+
     public function test_openapi_document_is_valid_json_and_describes_bearer_auth(): void
     {
         $this->getJson('/api/openapi.json')

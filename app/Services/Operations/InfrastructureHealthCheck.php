@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Services\Operations;
 
 use App\Services\Catalog\CacheWarmingState;
+use App\Services\Catalog\PublicCatalogWarmStateStore;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheKeyFactory;
+use Carbon\CarbonImmutable;
 use Illuminate\Cache\MemcachedStore;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +21,7 @@ final class InfrastructureHealthCheck
 {
     public function __construct(
         private readonly CacheWarmingState $warming,
+        private readonly PublicCatalogWarmStateStore $fullWarming,
         private readonly QueueWorkerHeartbeat $workers,
         private readonly CacheKeyFactory $keys,
     ) {}
@@ -38,10 +41,11 @@ final class InfrastructureHealthCheck
                 ? ['status' => 'unknown', 'message' => 'Проверка Horizon выполняется отдельным process monitor.']
                 : ['status' => 'not_configured'],
             'cache_warming' => $this->warmingState(),
+            'full_cache_warming' => $this->fullWarmingState(),
         ];
         $critical = ['database', 'redis_sessions', 'redis_queues', 'redis_locks'];
         $ready = collect($critical)->every(fn (string $component): bool => $components[$component]['status'] === 'ok');
-        $degraded = collect(['redis_cache', 'memcached', 'queue_workers', 'cache_warming'])
+        $degraded = collect(['redis_cache', 'memcached', 'queue_workers', 'cache_warming', 'full_cache_warming'])
             ->contains(fn (string $component): bool => in_array(
                 $components[$component]['status'],
                 $component === 'queue_workers'
@@ -181,6 +185,78 @@ final class InfrastructureHealthCheck
             'finished_at' => $state['finished_at'] ?? null,
             'duration_ms' => $state['duration_ms'] ?? null,
         ];
+    }
+
+    /** @return array<string, mixed> */
+    private function fullWarmingState(): array
+    {
+        try {
+            $state = $this->fullWarming->read();
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return [
+                'status' => 'failed',
+                ...$this->emptyFullWarmingMetrics(),
+                'message' => 'Состояние полного прогрева недоступно.',
+            ];
+        }
+
+        if ($state === null) {
+            return ['status' => 'idle', ...$this->emptyFullWarmingMetrics()];
+        }
+
+        $sourceStatus = (string) ($state['status'] ?? 'unknown');
+        $status = match ($sourceStatus) {
+            'queued', 'running' => $this->fullWarmingIsStale($state) ? 'degraded' : 'running',
+            'completed' => 'ok',
+            'completed_with_failures' => 'degraded',
+            'failed' => 'failed',
+            default => 'degraded',
+        };
+
+        return [
+            'status' => $status,
+            'estimated' => max(0, (int) ($state['estimated'] ?? 0)),
+            'attempted' => max(0, (int) ($state['attempted'] ?? 0)),
+            'warmed' => max(0, (int) ($state['warmed'] ?? 0)),
+            'failed' => max(0, (int) ($state['failed'] ?? 0)),
+            'started_at' => $state['started_at'] ?? null,
+            'updated_at' => $state['updated_at'] ?? null,
+            'finished_at' => $state['finished_at'] ?? null,
+        ];
+    }
+
+    /** @return array{estimated: int, attempted: int, warmed: int, failed: int, started_at: null, updated_at: null, finished_at: null} */
+    private function emptyFullWarmingMetrics(): array
+    {
+        return [
+            'estimated' => 0,
+            'attempted' => 0,
+            'warmed' => 0,
+            'failed' => 0,
+            'started_at' => null,
+            'updated_at' => null,
+            'finished_at' => null,
+        ];
+    }
+
+    /** @param array<string, mixed> $state */
+    private function fullWarmingIsStale(array $state): bool
+    {
+        $updatedAt = $state['updated_at'] ?? null;
+
+        if (! is_string($updatedAt)) {
+            return true;
+        }
+
+        try {
+            return CarbonImmutable::parse($updatedAt)->isBefore(
+                now()->subSeconds(max(60, (int) config('cache-architecture.warming.full_stale_seconds', 900))),
+            );
+        } catch (Throwable) {
+            return true;
+        }
     }
 
     /** @param callable(): bool $callback

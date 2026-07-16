@@ -3,6 +3,13 @@ import { installPlayerMediaFixtures } from './support/player-media-fixtures.js';
 
 const loginPassword = 'Browser-Strong-Password-42!';
 
+test.afterEach(async ({ page }) => {
+    await page.evaluate(() => {
+        window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: false }));
+    }).catch(() => {});
+    await page.unrouteAll({ behavior: 'ignoreErrors' });
+});
+
 const isSameOrigin = (requestUrl, baseURL) => {
     const url = new URL(requestUrl);
 
@@ -196,11 +203,13 @@ for (const locale of [
         await expect(currentVideo(page)).toHaveAttribute('data-player-ready', '1');
 
         const progress = await page.evaluate(() => {
-            const root = document.querySelector('[data-active-player-session]');
             const video = document.querySelector('video.js-catalog-player');
             const events = [];
 
-            root.addEventListener('catalog-progress', (event) => events.push(event.detail));
+            video.addEventListener('catalog-progress', (event) => {
+                events.push(event.detail);
+                event.stopPropagation();
+            });
             Object.defineProperties(video, {
                 currentTime: { configurable: true, writable: true, value: 10 },
                 duration: { configurable: true, value: 100 },

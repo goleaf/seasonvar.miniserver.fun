@@ -2,6 +2,8 @@
 
 - 16.07.2026: добавлены четыре канонические страницы Top 100 для фильмов, сериалов, аниме и мультфильмов. Один bounded query использует публичную watchable eligibility, рейтинги КиноПоиска/IMDb, статистическое сглаживание и stable tie-breaker; episode classification выполняет один grouped subquery вместо per-title correlated count, новые таблицы и внешние запросы не добавлены. SSR-витрина переиспользует карточки каталога, имеет RU/EN metadata, canonical/hreflang, синхронный `CollectionPage`/`ItemList`, пункт навигации и sitemap inclusion только для непустых категорий. Исправлена общая cache dimension backed enum routes, чтобы HTML категорий не пересекался.
 
+- 16.07.2026: Top 100 дополнен серверными фильтрами диапазона лет и страны без новой схемы, зависимости или JavaScript. Валидированный immutable DTO проходит от Form Request через page builder в общую visibility boundary до score и `LIMIT 100`; category links сохраняют условия, пустая выдача предлагает reset. Filtered SEO использует clean canonical и `noindex,follow` без `hreflang`/`ItemList`, а cache characterization подтверждает стабильный hash при перестановке query keys и разные hashes для других значений.
+
 - 16.07.2026: post-Task-14 reconciliation Task 12 удалил повторную public-profile comment projection без schema/route/UI/data migration. Published catalog-rooted rows и matching count теперь используют один `CommentProfileQuery`, а `CommentPresenter` единолично готовит bounded Unicode excerpt, canonical display title/direct URL и полностью исключает spoiler body. Профиль сохранил section privacy и pagination config; reactions, reports, moderation, blocks/mutes, cache keys и stored comments не менялись. PHP lint, exact Pint, focused Larastan, booted-container/runtime DTO probes, routes/schema, 234/234 locale parity, Blade compile, Vite build и managed Chromium desktop/mobile smoke прошли; raw loopback ожидаемо отклонён `TrustHosts`, production Host был локально mapped без ослабления middleware. Автотесты по запрету Task 12 не создавались и не запускались.
 
 - 16.07.2026: post-Task-14 интеграционный аудит Task 13 устранил единственную повторную public-profile review projection: `PublicUserProfileQuery` больше не вычисляет review visibility/excerpt самостоятельно, public rows/count делегированы `CatalogTitleReviewQuery`/`ReviewPresenter`, а spoiler-review не отдаёт профилю ни title, ни body excerpt. Legacy read-only API сохранил route/shape/provider-only semantics, но page/per-page validation теперь использует существующий RU/EN каталог. Read-only DB audit 73 131 rows дал ноль duplicate ownership/submission keys, duplicate votes, orphan targets и unknown statuses; schema/migrations/data/cache не менялись. Runtime DTO/HTTP locale probes, route/migration inspection, 223/223 translation/placeholder parity, PHP lint, Pint, focused Larastan, Blade compilation, managed-doc/source/diff checks и Vite 8.1.4 build прошли. Read-only Chromium на реальном `/reviews/{id}` redirect вернул 200 на `1440×1200` и `390×844`, stable highlight, no overflow и zero console/page/same-origin failures; automated tests по запрету Task 13 не создавались и не запускались.
@@ -380,6 +382,9 @@
 - `2026_07_16_220000_add_recommendation_release_event_index.php`
 - `2026_07_16_230000_add_recommendation_signal_timestamps.php`
 - `2026_07_16_230100_add_recommendation_signal_owner_indexes.php`
+- `2026_07_16_240000_create_catalog_recommendation_shadow_builds.php`
+- `2026_07_16_240100_create_catalog_recommendation_dirty_titles.php`
+- `2026_07_16_250000_create_catalog_collection_source_sync.php`
 <!-- project-docs:end -->
 
 ## 2026-07-16 — recommendation/discovery task 18

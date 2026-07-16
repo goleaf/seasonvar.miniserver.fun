@@ -32,6 +32,7 @@ final readonly class TagPagePresenter
             ->with(['aliases' => fn ($query) => $query
                 ->whereIn('locale', ['und', ...$this->tags->contentLocales()])
                 ->where('moderation_status', TagModerationStatus::Approved->value)
+                ->select(['id', 'tag_id', 'locale', 'name'])
                 ->orderBy('locale')
                 ->orderBy('name')])
             ->whereKey($selected->id)

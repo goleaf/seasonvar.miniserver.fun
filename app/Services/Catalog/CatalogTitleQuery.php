@@ -58,6 +58,28 @@ class CatalogTitleQuery
         return $this->entitlements->constrain($query, $user);
     }
 
+    /** @return Builder<CatalogTitle> */
+    public function matchingTitles(
+        CatalogSearchQuery $search,
+        ?User $user,
+        bool $rankSearch = true,
+    ): Builder {
+        $query = $rankSearch && mb_strlen($search->normalized) >= 2
+            ? $this->rankedSearchQuery($search, $user)
+            : null;
+        $query ??= $this->visibleTo($user);
+
+        if ($search->year !== null) {
+            $query->where('catalog_titles.year', $search->year);
+        }
+
+        if (! isset($this->rankedSearchAliases[spl_object_id($query)])) {
+            $this->applySearchFilter($query, $search, null, $user, null);
+        }
+
+        return $query;
+    }
+
     /**
      * @return Builder<CatalogTitle>
      */
@@ -336,6 +358,12 @@ class CatalogTitleQuery
             return;
         }
 
+        if (mb_strlen($search->normalized) < 2) {
+            $query->whereIn('catalog_titles.id', $this->searchCandidateIdsQuery($search, $user));
+
+            return;
+        }
+
         if (($matchingTitleIds = $this->titleSearch->matchingTitleIdsQuery($search)) !== null) {
             $query->whereIn('catalog_titles.id', $matchingTitleIds);
 
@@ -349,7 +377,7 @@ class CatalogTitleQuery
     private function searchCandidateIdsQuery(CatalogSearchQuery $search, ?User $user): Builder
     {
         $exactMatches = $this->exactTitleSearchQuery($search, $user);
-        if ($this->exactMatchExists($search, $user, $exactMatches)) {
+        if (mb_strlen($search->normalized) < 2 || $this->exactMatchExists($search, $user, $exactMatches)) {
             return $exactMatches;
         }
 
@@ -441,7 +469,7 @@ class CatalogTitleQuery
             ->select('catalog_title_id')
             ->where(function (Builder $query) use ($variants): void {
                 $variants->each(function (string $variant) use ($query): void {
-                    $query->orWhere('name', 'like', "%{$variant}%");
+                    $query->orWhereRaw("name LIKE ? ESCAPE '!'", [$this->containsPattern($variant)]);
                 });
             });
     }
@@ -451,8 +479,15 @@ class CatalogTitleQuery
      */
     private function orWhereCatalogNameMatches(Builder $query, string $variant): void
     {
-        $query->orWhere('title', 'like', "%{$variant}%")
-            ->orWhere('original_title', 'like', "%{$variant}%");
+        $pattern = $this->containsPattern($variant);
+
+        $query->orWhereRaw("title LIKE ? ESCAPE '!'", [$pattern])
+            ->orWhereRaw("original_title LIKE ? ESCAPE '!'", [$pattern]);
+    }
+
+    private function containsPattern(string $value): string
+    {
+        return '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $value).'%';
     }
 
     /**

@@ -47,14 +47,14 @@ class CatalogTitlesViewModelTest extends TestCase
 
         $this->assertSame([
             'relevance' => 'По релевантности',
-            'updated' => 'Недавно обновленные',
+            'updated' => 'Недавно обновлённые',
             'year_desc' => 'Год: новые сначала',
             'year_asc' => 'Год: старые сначала',
             'episodes_desc' => 'Серий: больше сначала',
             'seasons_desc' => 'Сезонов: больше сначала',
             'with_video' => 'Видео: больше сначала',
-            'title_asc' => 'Название: А-я',
-            'title_desc' => 'Название: Я-а',
+            'title_asc' => 'Название: А–Я',
+            'title_desc' => 'Название: Я–А',
             'kinopoisk_desc' => 'Рейтинг КиноПоиска',
             'imdb_desc' => 'Рейтинг IMDb',
             'popularity_desc' => 'По популярности',

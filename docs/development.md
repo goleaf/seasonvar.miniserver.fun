@@ -49,8 +49,9 @@ composer dev
 - Установить версионируемые hooks: `composer hooks:install`. Команда локально задаёт `core.hooksPath=.githooks`; `composer setup` выполняет её автоматически.
 - `pre-commit` блокирует commit вне `main`, unresolved conflicts, staged временные/debug-файлы, staged `.env`/credential paths, unstaged tracked changes и untracked files.
 - `pre-commit` также проверяет, что обычный текст `README.md` написан по-русски, содержит дорожную карту, заканчивается пользовательской историей и включён в staged diff при изменении кода, конфигурации, маршрутов, миграций, интерфейса или зависимостей.
+- `pre-commit` проверяет staged-версию `CHANGELOG.md`: обычный текст подробного технического журнала должен быть русским, а точные технические обозначения могут сохраняться в исходном написании. Сокращать, объединять или удалять прежние записи нельзя.
 - После каждого запроса нужно проверять актуальность `README.md`; датированная запись добавляется только при реальном изменении возможностей или дорожной карты, без пустых записей ради даты.
-- `pre-push` повторно проверяет `main`, unresolved conflicts и уже tracked временные/credential paths, затем требует clean working tree.
+- `pre-push` повторно проверяет `main`, unresolved conflicts и уже tracked временные/credential paths, требует clean working tree, затем запускает общий профиль `bash scripts/ci-check.sh pre-push` для backend и frontend.
 - Проверки только читают Git state и печатают причину отказа. Они не добавляют файлы, не исправляют код, не удаляют изменения и не зависят от персональных абсолютных путей. `.env.example` явно разрешён; реальные `.env`, private keys и credential JSON должны храниться вне Git.
 - Проверка secrets намеренно лёгкая и основана на очевидных именах путей; она не заменяет review staged diff или полноценный secret scanner CI для произвольно названных файлов.
 - `post-commit` запускает только управляемое обновление Markdown через `project:docs-refresh`; исходный PHP/Blade/JS код hook не редактирует, auto-push выключен без явного `SEASONVAR_DOCS_AUTO_PUSH=1`.
@@ -59,8 +60,10 @@ composer dev
 
 ```bash
 git config --local --get core.hooksPath
-bash -n .githooks/pre-commit .githooks/pre-push .githooks/post-commit .githooks/lib/git-guard.sh scripts/check-readme-policy.sh
+bash -n .githooks/pre-commit .githooks/pre-push .githooks/post-commit .githooks/lib/git-guard.sh scripts/check-readme-policy.sh scripts/check-changelog-policy.sh
+php -l scripts/check-changelog-policy.php
 scripts/check-readme-policy.sh README.md
+scripts/check-changelog-policy.sh CHANGELOG.md
 ```
 
 ## Команды проекта
@@ -68,6 +71,7 @@ scripts/check-readme-policy.sh README.md
 - `php artisan seasonvar:import` — единственная публичная команда импорта Seasonvar.
 - `php artisan seasonvar:import --forever --sleep=60` — непрерывный локальный цикл импорта.
 - `php artisan seasonvar:import "https://seasonvar.ru/..." --force` — принудительное обновление одной страницы.
+- `php artisan catalog-collections:sync-hdrezka --dry-run` — bounded read-only обход внешних редакционных подборок и проверка сопоставления с локальными тайтлами; требует включённый `HDREZKA_COLLECTION_SYNC_ENABLED` и не относится к Seasonvar import.
 - `php artisan integrations:doctor` — read-only диагностика MCP, Google, CLI tools и проектных skills без вывода секретов.
 - `php artisan app:health` — operational health по DB, Redis workloads, Memcached, workers и прогреву; `degraded`/`failed` возвращают ненулевой exit, даже если HTTP traffic readiness ещё true.
 - `php artisan app:failed-job-audit` — bounded read-only сопоставление historical finalizer rows с текущими run/group/claim states; `--json` даёт safe evidence, `--samples=0..10` ограничивает ID-only примеры на состояние. Команда не retry-ит, не забывает, не очищает и не dispatch-ит jobs.
@@ -81,11 +85,17 @@ scripts/check-readme-policy.sh README.md
 - `composer rector:check` — обязательный read-only Rector-профиль для всего собственного PHP-кода; ненулевой exit означает новый неприменённый diff или ошибку анализа.
 - `composer rector:fix` — явно применяет только обязательный профиль; после него нужно просмотреть diff, запустить Pint, Larastan и релевантные тесты.
 - `composer rector:max` — максимальный стабильный dry-run с PHP, Laravel 13, PHPUnit, type/dead-code/quality/style/naming/privatization наборами; команда намеренно может завершиться с exit `2`, если показывает плановый долг.
+
+Каждый `rector:*` script сначала вызывает `Composer\\Config::disableProcessTimeout`: это снимает только стандартный 300-секундный лимит дочернего Composer-процесса. Ограничения Rector worker, GitHub Actions job и внешнего runner сохраняются; для других Composer scripts тайм-аут не меняется.
 - `composer analyse` — запускает bounded Larastan/PHPStan по DTO, enums и критичным operational/admin boundaries без baseline и ignored errors.
 
 ## Проверки
 
 ```bash
+composer ci:check
+bash scripts/ci-check.sh backend
+bash scripts/ci-check.sh frontend
+bash scripts/ci-check.sh browser
 composer test
 composer rector:check
 composer rector:max
@@ -95,6 +105,12 @@ php artisan test --compact
 npm run build
 php artisan project:docs-refresh --check
 ```
+
+Для изменений синхронизации редакционных подборок сначала запускайте focused contract `php artisan test --filter=HdRezkaCollection`, затем recommendation tests, полный backend suite и frontend build. Внешний HTTP в PHPUnit всегда закрывается через `Http::preventStrayRequests()` и fixtures/`Http::fake()`; тесты не должны обращаться к живому HDRezka.
+
+`scripts/ci-check.sh` является единым источником команд для локальной проверки, `pre-push` и GitHub Actions. Профили `backend`, `frontend`, `browser`, `pre-push` и `full` используют одинаковые шаги в каждой среде; Laravel config/route/view cache проверяется только в ignored `output/ci`, поэтому локальный запуск не заменяет рабочий production cache. Backend выполняет `composer rector:check` после Pint и до синтаксиса/Larastan; CI никогда не запускает `rector:fix`. Производный файловый кеш находится в ignored `output/rector`, не содержит исходных данных и может быть удалён без изменения приложения. GitHub Actions выполняет три отдельных задания и загружает Playwright-отчёт даже при ошибке браузерной проверки.
+
+`EagerLoadProjectionContractTest` статически проверяет все literal `with()`, `load()` и `loadMissing()` в `app/`: новая связь должна использовать colon projection или closure `select()` с ключами сопоставления. Runtime `EagerLoadProjectionTest` дополнительно проверяет SQL публичных тегов, account export подборок и tag administration. Полный aggregate `SeasonvarTitleMerger` — явное mutation-only исключение; расширять allowlist без отдельного архитектурного обоснования нельзя.
 
 Pest и `npm run lint` сейчас не установлены. Rector 2 использует `rector.php` как нулевой обязательный gate, а `rector-max.php` сохраняет весь текущий модернизационный backlog видимым без baseline. Правила из первого полного аудита, затрагивающие сотни файлов (`readonly`, типы констант, PHP callables и Laravel property attributes), перечислены по классам только в skip обязательного профиля и остаются активными в maximum; их следует применять отдельными небольшими партиями. Larastan/PHPStan применяется как ограниченный high-value gate; расширять paths нужно постепенно и только с нулём ignored errors.
 

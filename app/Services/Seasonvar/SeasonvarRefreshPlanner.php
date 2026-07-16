@@ -180,7 +180,7 @@ final class SeasonvarRefreshPlanner
             $chunkSize = $this->handlers->chunkSize($type);
             $refreshAfter = now()->subHours($this->handlers->refreshHours($type));
             $query = SourcePage::query()
-                ->with('source')
+                ->with('source:id,code,base_url,crawl_delay_seconds')
                 ->where('page_type', $type->value)
                 ->where(function (Builder $query): void {
                     $query->whereNull('import_claim_token')
@@ -238,7 +238,7 @@ final class SeasonvarRefreshPlanner
     private function baseQuery(?int $importRunId): Builder
     {
         return SourcePage::query()
-            ->with('source')
+            ->with('source:id,code,base_url,crawl_delay_seconds')
             ->where('page_type', 'serial')
             ->where(function (Builder $query): void {
                 $query->whereNull('import_claim_token')

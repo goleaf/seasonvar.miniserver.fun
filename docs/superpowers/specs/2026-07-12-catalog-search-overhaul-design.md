@@ -297,3 +297,34 @@ Viewports: `320x720`, `390x844`, `768x1024` и `1440x1200`.
 - изменение публичной команды импорта Seasonvar;
 - morph relations для каталога;
 - постоянный cache результатов до подтвержденной необходимости по профилю.
+
+## Task 02: аудит и единая portal-search граница — 16.07.2026
+
+Task 02 не вводит второй индекс или внешнюю поисковую службу. Аудит подтвердил, что канонический поиск тайтлов уже принадлежит `CatalogSearchNormalizer` → `CatalogSearchQueryParser` → `CatalogTitleSearch` → `CatalogTitleQuery`, использует SQLite FTS5 с безопасным legacy fallback и синхронизируется существующими importer/admin/merge путями. Общий autocomplete и `/search` должны переиспользовать эту цепочку, а `/titles` остаётся полной Livewire-выдачей с фильтрами, relevance sorting, точным count и стабильной пагинацией.
+
+### Подтвержденная архитектура и ограничения
+
+- Поддерживаются `ru` и `en`; `ru` — default и fallback. Route locale, session locale и сохранённая настройка account разрешаются существующими middleware. Search-cache всегда включает активный locale, public audience и нормализованный hash запроса.
+- Метаданные тайтла не имеют отдельной locale relation: `title` — импортированное основное отображаемое имя, `original_title` — оригинальное имя, а `catalog_title_aliases` хранит альтернативные/provider-варианты. FTS ищет все эти значения и детерминированную транслитерацию независимо от interface locale. Audio/subtitle/translation-studio taxonomies остаются отдельным доменом.
+- `Actor` хранит только стабильные `id/name/slug/source_url`; aliases, биография, фото и локализованные имена отсутствуют. Поэтому каноническая публичная страница актёра — существующая фильтрованная `/titles/actor/{slug}`, а `/actors/{slug}` сохраняется как совместимый redirect. Неподтверждённые биографические поля не создаются.
+- Public `Tag` имеет translations, aliases, moderation/publication scopes и стабильный slug. Общий autocomplete должен учитывать base name, активный/fallback translation и approved aliases, возвращая один tag identity. Каноническая страница остаётся `/titles/tag/{slug}` с существующими presenter/SEO/cache правилами.
+- Title visibility централизована в `CatalogEntitlementService`/`CatalogTitleQuery`: publication, audience, availability windows и soft deletion. Отдельных title-level полей region, premium или age entitlement в текущей схеме нет; Task 02 не имитирует отсутствующие ограничения.
+- Внешний search engine, Scout и search analytics/history отсутствуют. SQLite FTS5 достаточен для текущего каталога; Redis/Memcached используются только существующим tiered cache и не являются обязательным поисковым backend.
+- `/search?q=…` — shareable noindex/follow discovery page; `/titles?q=…` — каноническая полная выдача. Search query/filter combinations не входят в sitemap. Стабильные actor/tag pages сохраняют текущую indexing policy; alternate URLs не выдумываются, потому что эти routes сейчас не locale-prefixed.
+- Header autocomplete сохраняет progressive `GET` fallback без JavaScript. Два bounded API scope (`header_titles`, `header_portal`) имеют 160 ms debounce, request abort и sequence guard. API ограничен existing named limiter, stale response не может перезаписать новый ввод.
+
+### Task 02 решения
+
+1. Оставить одну title-search semantics boundary и одну portal-suggestion boundary; header, mobile compatibility API и `/search` получают данные через них.
+2. Расширить portal suggestion tag lookup на текущую locale/fallback/alias модель без загрузки всех переводов и без duplicate joins.
+3. Возвращать из API полностью локализованную готовую metadata строку title suggestion. JavaScript не строит plural phrases и не форматирует числа самостоятельно.
+4. Убрать presentation mapping из Blade `@php`; query/view data передают уже упорядоченные группы с переведёнными заголовками.
+5. Показать на `/search` точный локализованный count тайтлов и отдельный combined preview count; полная pagination/filter/sort остаётся по канонической ссылке `/titles?q=…`, не дублируя `CatalogSeries`.
+6. Добавить safe error boundary для общей страницы без раскрытия database/cache/exception деталей; обычный GET и no-JS fallback остаются работоспособными.
+7. Инвалидировать `SearchSuggestions` после изменений public collections, public content requests и public profiles через существующие versioned invalidators. Персональные карточные overlays не помещаются в shared suggestion cache.
+8. Перевести новые validation/count/error/a11y строки во все поддерживаемые locale и сохранить одинаковые placeholders/plural structure.
+9. Миграции и production dependencies не добавлять: текущие FTS, taxonomy и pivot indexes соответствуют реальным query paths. Search history/popular-query storage не вводить без privacy/retention owner.
+
+### Rollback
+
+Изменения additive и не меняют route names, public model identity, FTS schema или API envelope. Откат Task 02 возвращает прежний presenter/cache-invalidation слой; title search продолжает работать через тот же FTS/legacy механизм, а header form — через обычный `GET /search`. Отдельная операция rebuild, queue worker или database backfill для отката не требуется.

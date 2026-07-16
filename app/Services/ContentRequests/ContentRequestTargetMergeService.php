@@ -53,7 +53,7 @@ final readonly class ContentRequestTargetMergeService
         }
 
         $this->moveCompletion('completed_episode_id', $source->id, $canonical->id);
-        $canonical->loadMissing('season');
+        $canonical->loadMissing('season:id,catalog_title_id,number,kind');
         $this->retarget(fn (Builder $query): Builder => $query->where('episode_id', $source->id), [
             'catalog_title_id' => $canonical->season->catalog_title_id,
             'season_id' => $canonical->season_id,
@@ -70,7 +70,12 @@ final readonly class ContentRequestTargetMergeService
     private function retarget(callable $scope, array $target): void
     {
         $requests = $scope(ContentRequest::query())
-            ->with(['externalIdentifiers', 'votes', 'followers', 'sourceLinks', 'clarifications'])
+            ->with([
+                'externalIdentifiers:id,content_request_id,provider,identifier,normalized_identifier',
+                'votes:id,content_request_id,user_id',
+                'followers:id,content_request_id,user_id',
+                'sourceLinks:id,content_request_id,added_by_id,verified_by_id,url,url_hash,provider,is_public,verified_at',
+            ])
             ->orderBy('id')->lockForUpdate()->get();
 
         foreach ($requests as $request) {

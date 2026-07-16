@@ -172,7 +172,7 @@
                         "description": "Поиск только по основному, оригинальному и альтернативным названиям",
                         "schema": {
                             "type": "string",
-                            "minLength": 2,
+                            "minLength": 1,
                             "maxLength": 80
                         }
                     },
@@ -800,11 +800,24 @@
                             "minLength": 2,
                             "maxLength": 80
                         }
+                    },
+                    {
+                        "name": "scope",
+                        "in": "query",
+                        "required": false,
+                        "description": "Без scope возвращается совместимый мобильный набор. header_titles возвращает богатые карточки тайтлов, header_portal — публичные справочники и разделы портала.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "header_titles",
+                                "header_portal"
+                            ]
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "До пяти тайтлов, актёров и режиссёров каждого типа",
+                        "description": "Совместимые мобильные подсказки либо один из двух ограниченных контуров поиска в шапке",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -816,13 +829,33 @@
                                     "properties": {
                                         "data": {
                                             "type": "array",
-                                            "maxItems": 15,
+                                            "maxItems": 30,
                                             "items": {
                                                 "$ref": "#/components/schemas/SearchSuggestion"
                                             }
                                         },
                                         "meta": {
-                                            "type": "object"
+                                            "type": "object",
+                                            "required": [
+                                                "query",
+                                                "scope"
+                                            ],
+                                            "properties": {
+                                                "query": {
+                                                    "type": "string"
+                                                },
+                                                "scope": {
+                                                    "type": [
+                                                        "string",
+                                                        "null"
+                                                    ],
+                                                    "enum": [
+                                                        "header_titles",
+                                                        "header_portal",
+                                                        null
+                                                    ]
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -3606,6 +3639,12 @@
                     "label": {
                         "type": "string"
                     },
+                    "original_title": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
                     "position_seconds": {
                         "type": "integer",
                         "minimum": 0
@@ -4704,7 +4743,39 @@
                             "title",
                             "actor",
                             "director",
-                            "tag"
+                            "tag",
+                            "genre",
+                            "country",
+                            "age_rating",
+                            "translation",
+                            "status",
+                            "network",
+                            "studio",
+                            "year",
+                            "collection",
+                            "content_request",
+                            "profile",
+                            "section"
+                        ]
+                    },
+                    "id": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "group": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "titles",
+                            "people",
+                            "directories",
+                            "community",
+                            "sections",
+                            null
                         ]
                     },
                     "label": {
@@ -4718,6 +4789,53 @@
                         "type": "string"
                     },
                     "title_slug": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uri"
+                    },
+                    "meta": {
+                        "type": [
+                            "string",
+                            "null"
+                        ]
+                    },
+                    "poster_url": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "uri"
+                    },
+                    "year": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0
+                    },
+                    "seasons_count": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0
+                    },
+                    "episodes_count": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 0
+                    },
+                    "content_type": {
                         "type": [
                             "string",
                             "null"

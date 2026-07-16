@@ -59,6 +59,7 @@ final class PublicTagController extends Controller
             ->with(['aliases' => fn ($query) => $query
                 ->whereIn('locale', ['und', ...$tags->contentLocales()])
                 ->where('moderation_status', TagModerationStatus::Approved->value)
+                ->select(['id', 'tag_id', 'locale', 'name'])
                 ->orderBy('name')])
             ->firstOrFail();
         $related = $tags->related($tag)->map(fn (Tag $related): array => [

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit;
 
+use App\DTOs\PublicCacheWarmBatch;
+use App\Services\Catalog\PublicCatalogWarmStateStore;
 use App\Services\Operations\InfrastructureHealthCheck;
 use Tests\TestCase;
 
@@ -59,5 +61,31 @@ final class InfrastructureHealthCheckTest extends TestCase
         $this->assertSame('failed', $result['components']['queue_workers']['status']);
         $this->assertSame('degraded', $result['status']);
         $this->assertTrue($result['ready']);
+    }
+
+    public function test_full_public_cache_warming_has_an_independent_non_blocking_health_state(): void
+    {
+        $health = app(InfrastructureHealthCheck::class);
+        $states = app(PublicCatalogWarmStateStore::class);
+
+        $this->assertSame('idle', $health->run()['components']['full_cache_warming']['status']);
+
+        $state = $states->start(refresh: false, estimated: 12);
+        $running = $health->run()['components']['full_cache_warming'];
+
+        $this->assertSame('running', $running['status']);
+        $this->assertSame(12, $running['estimated']);
+        $this->assertSame(0, $running['attempted']);
+
+        $states->advance(
+            $state['generation'],
+            new PublicCacheWarmBatch([], null, true),
+            ['attempted' => 1, 'succeeded' => 0, 'failed' => 1, 'errors' => []],
+        );
+        $completed = $health->run()['components']['full_cache_warming'];
+
+        $this->assertSame('degraded', $completed['status']);
+        $this->assertSame(1, $completed['failed']);
+        $this->assertTrue($health->run()['ready']);
     }
 }

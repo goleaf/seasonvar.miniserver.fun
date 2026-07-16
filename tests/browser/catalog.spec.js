@@ -1,12 +1,18 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { installPlayerMediaFixtures } from './support/player-media-fixtures.js';
 
-const isExternalRequest = (requestUrl, baseURL) => {
+const isLocalHttpRequest = (requestUrl, baseURL) => {
     const target = new URL(requestUrl);
     const local = new URL(baseURL);
 
-    return target.origin !== local.origin;
+    return ['http:', 'https:'].includes(target.protocol)
+        && target.origin === local.origin;
 };
+
+const isExpectedBrowserNavigationAbort = (request) => (
+    request.failure()?.errorText === 'net::ERR_ABORTED'
+);
 
 const installNetworkGuard = async (page, baseURL) => {
     const localAssetFailures = [];
@@ -14,7 +20,7 @@ const installNetworkGuard = async (page, baseURL) => {
     const pageErrors = [];
 
     await page.route('**/*', async (route) => {
-        if (isExternalRequest(route.request().url(), baseURL)) {
+        if (!isLocalHttpRequest(route.request().url(), baseURL)) {
             await route.abort('blockedbyclient');
 
             return;
@@ -22,13 +28,14 @@ const installNetworkGuard = async (page, baseURL) => {
 
         await route.continue();
     });
+    await installPlayerMediaFixtures(page);
 
     page.on('response', (response) => {
         const request = response.request();
         const resourceType = request.resourceType();
 
         if (
-            new URL(response.url()).origin === new URL(baseURL).origin
+            isLocalHttpRequest(response.url(), baseURL)
             && ['stylesheet', 'script', 'image', 'font'].includes(resourceType)
             && response.status() >= 400
         ) {
@@ -36,7 +43,10 @@ const installNetworkGuard = async (page, baseURL) => {
         }
     });
     page.on('requestfailed', (request) => {
-        if (new URL(request.url()).origin === new URL(baseURL).origin) {
+        if (
+            isLocalHttpRequest(request.url(), baseURL)
+            && !isExpectedBrowserNavigationAbort(request)
+        ) {
             localAssetFailures.push(`${request.failure()?.errorText || 'request failed'} ${request.url()}`);
         }
     });
@@ -160,6 +170,145 @@ test('catalog keeps URL state, unified filters and responsive geometry', async (
     await assertPageGeometry(page);
     await assertTouchTargets(page);
     await assertAccessibility(page);
+    expect(browserErrors.localAssetFailures).toEqual([]);
+    expect(browserErrors.consoleErrors).toEqual([]);
+    expect(browserErrors.pageErrors).toEqual([]);
+});
+
+test('header search input keeps its neutral frame while focused and edited', async ({ page, baseURL }) => {
+    const browserErrors = await installNetworkGuard(page, baseURL);
+
+    await page.goto('/');
+
+    const search = page.locator('#site-search');
+    const searchFrame = page.locator('[data-header-search-input-frame]');
+    const searchFrameStyle = () => searchFrame.evaluate((frame) => {
+        const style = window.getComputedStyle(frame);
+        const input = frame.querySelector('[data-header-search-input]');
+        const inputStyle = input ? window.getComputedStyle(input) : null;
+
+        return {
+            borderColor: style.borderTopColor,
+            boxShadow: style.boxShadow,
+            inputBoxShadow: inputStyle?.boxShadow ?? '',
+            inputOutlineStyle: inputStyle?.outlineStyle ?? '',
+            inputOutlineWidth: inputStyle?.outlineWidth ?? '',
+        };
+    });
+    for (const width of [375, 768, 1280, 1920]) {
+        await page.setViewportSize({ width, height: width < 800 ? 1024 : 1200 });
+        await assertPageGeometry(page);
+        await search.evaluate((input) => input.blur());
+        const idleSearchFrameStyle = await searchFrameStyle();
+        await search.focus();
+        expect(await searchFrameStyle()).toEqual(idleSearchFrameStyle);
+        await search.fill('Б');
+        expect(await searchFrameStyle()).toEqual(idleSearchFrameStyle);
+        await search.fill('Browser Smoke');
+        await expect(page.getByRole('listbox', { name: 'Подсказки поиска' })).toBeVisible();
+        expect(await searchFrameStyle()).toEqual(idleSearchFrameStyle);
+
+        const frameClasses = await searchFrame.getAttribute('class');
+
+        expect(frameClasses).toContain('border-slate-300');
+        expect(frameClasses).not.toContain('focus-within:border-');
+        expect(frameClasses).not.toContain('focus-within:ring-');
+    }
+
+    expect(browserErrors.localAssetFailures).toEqual([]);
+    expect(browserErrors.consoleErrors).toEqual([]);
+    expect(browserErrors.pageErrors).toEqual([]);
+});
+
+test('header autocomplete works by keyboard and keeps two responsive rows', async ({ page, baseURL }) => {
+    test.setTimeout(90_000);
+
+    const browserErrors = await installNetworkGuard(page, baseURL);
+    let releasePortal;
+    const portalGate = new Promise((resolve) => {
+        releasePortal = resolve;
+    });
+
+    await page.route('**/api/v1/search/suggestions?*', async (route) => {
+        const requestUrl = new URL(route.request().url());
+
+        if (requestUrl.searchParams.get('scope') === 'header_portal') {
+            await portalGate;
+        }
+
+        await route.continue();
+    });
+
+    await page.goto('/');
+
+    const search = page.locator('#site-search');
+    const listbox = page.getByRole('listbox', { name: 'Подсказки поиска' });
+    const titleOption = page.locator('[data-header-search-title-results] [role="option"]').first();
+
+    await search.fill('Browser Smoke');
+    await expect(listbox).toBeVisible();
+    await expect(titleOption).toBeVisible();
+    await expect(titleOption).toContainText('Browser Smoke');
+    await expect(titleOption).toContainText('2025');
+    await expect(titleOption).toContainText('1 сезон');
+    await expect(titleOption).toContainText('1 серия');
+    await expect(titleOption.locator('img')).toBeVisible();
+    await expect.poll(() => titleOption.locator('img').evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
+    await expect(page.getByRole('option', { name: /Browser Smoke category/ })).toHaveCount(0);
+
+    releasePortal();
+    await expect(page.getByRole('option', { name: /Browser Smoke category/ })).toBeVisible();
+    await assertAccessibility(page);
+
+    for (const width of [375, 768, 1280, 1920]) {
+        await page.setViewportSize({ width, height: width < 800 ? 1024 : 1200 });
+        await assertPageGeometry(page);
+
+        const dropdownGeometry = await listbox.evaluate((dropdown) => {
+            const box = dropdown.getBoundingClientRect();
+            const style = window.getComputedStyle(dropdown);
+            const primary = document.querySelector('[data-site-header-primary]')?.getBoundingClientRect();
+            const navigation = document.querySelector('[data-site-header-navigation]')?.getBoundingClientRect();
+            const input = document.querySelector('#site-search')?.getBoundingClientRect();
+            const submit = document.querySelector('[data-header-search-autocomplete] button[type="submit"]')?.getBoundingClientRect();
+
+            return {
+                left: box.left,
+                right: box.right,
+                viewportWidth: window.innerWidth,
+                overflowY: style.overflowY,
+                inputHeight: input?.height ?? 0,
+                submitHeight: submit?.height ?? 0,
+                submitWidth: submit?.width ?? 0,
+                primaryBottom: primary?.bottom ?? 0,
+                navigationTop: navigation?.top ?? 0,
+            };
+        });
+
+        expect(dropdownGeometry.left).toBeGreaterThanOrEqual(0);
+        expect(dropdownGeometry.right).toBeLessThanOrEqual(dropdownGeometry.viewportWidth + 1);
+        expect(['auto', 'scroll']).not.toContain(dropdownGeometry.overflowY);
+        expect(dropdownGeometry.inputHeight).toBeGreaterThanOrEqual(44);
+        expect(dropdownGeometry.submitHeight).toBeGreaterThanOrEqual(44);
+        expect(dropdownGeometry.submitWidth).toBeGreaterThanOrEqual(44);
+        expect(dropdownGeometry.navigationTop).toBeGreaterThanOrEqual(dropdownGeometry.primaryBottom - 1);
+    }
+
+    await search.press('End');
+    await expect(search).not.toHaveAttribute('aria-activedescendant', 'site-search-option-0');
+    await search.press('Home');
+    await expect(search).toHaveAttribute('aria-activedescendant', 'site-search-option-0');
+    await search.press('Escape');
+    await expect(listbox).toBeHidden();
+    await search.evaluate((input) => input.blur());
+    await search.focus();
+    await expect(listbox).toBeVisible();
+    await search.press('Home');
+    await search.press('Enter');
+    await expect(page).toHaveURL(/\/titles\/browser-smoke$/);
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('#site-search')).toHaveCSS('min-height', '44px');
+
     expect(browserErrors.localAssetFailures).toEqual([]);
     expect(browserErrors.consoleErrors).toEqual([]);
     expect(browserErrors.pageErrors).toEqual([]);

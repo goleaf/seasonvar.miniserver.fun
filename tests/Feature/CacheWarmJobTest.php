@@ -9,6 +9,7 @@ use App\Models\CatalogTitle;
 use App\Services\Catalog\CacheWarmingState;
 use App\Services\Catalog\CatalogCacheWarmer;
 use App\Services\Catalog\CatalogCacheWarmRequestStore;
+use App\Services\Catalog\PublicPageCacheWarmer;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheVersionRegistry;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -136,9 +137,12 @@ final class CacheWarmJobTest extends TestCase
             'app.url' => 'https://seasonvar.test',
             'cache-architecture.page_cache.warming_enabled' => true,
             'cache-architecture.page_cache.warm_base_url' => 'https://seasonvar.test',
-            'cache-architecture.page_cache.warm_url_limit' => 15,
+            'cache-architecture.page_cache.warm_url_limit' => 1_000,
+            'cache-architecture.page_cache.warm_title_limit' => 1_000,
             'cache-architecture.warming.request_batch_title_limit' => 250,
         ]);
+        $criticalUrlCount = 1_000 - app(PublicPageCacheWarmer::class)->titleCapacity();
+        config(['cache-architecture.page_cache.warm_url_limit' => $criticalUrlCount + 1]);
         Http::preventStrayRequests();
         Http::fake(fn () => Http::response('<html></html>'));
         Queue::fake();

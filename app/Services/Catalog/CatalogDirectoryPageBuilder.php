@@ -6,6 +6,7 @@ use App\DTOs\CatalogDirectoryDefinition;
 use App\Support\CatalogAlphabet;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Number;
 use stdClass;
 
 class CatalogDirectoryPageBuilder
@@ -40,6 +41,19 @@ class CatalogDirectoryPageBuilder
             'decades' => $decades,
             'totalValues' => $summary['values'],
             'totalTitles' => $summary['titles'],
+            'totalValuesLabel' => trans_choice('catalog.directories.counts.values', $summary['values'], [
+                'count' => Number::format($summary['values']),
+            ]),
+            'totalTitlesLabel' => trans_choice('catalog.counts.results', $summary['titles'], [
+                'count' => Number::format($summary['titles']),
+            ]),
+            'foundValuesLabel' => trans_choice('catalog.directories.counts.found', $items->total(), [
+                'count' => Number::format($items->total()),
+            ]),
+            'pageLabel' => __('catalog.directories.page', [
+                'current' => Number::format($items->currentPage()),
+                'last' => Number::format($items->lastPage()),
+            ]),
             'seo' => $this->seo->directory(
                 directory: $directory,
                 totalValues: $summary['values'],

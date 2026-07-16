@@ -10,93 +10,133 @@ final class CatalogRecommendationThemeExtractor
 {
     private const MAX_THEMES = 8;
 
-    /**
-     * @var array<string, array{label: string, pattern: string}>
-     */
+    /** @var array<string, array{label: string, terms: list<string>, prefixes: list<string>, phrases: list<string>}> */
     private const THEMES = [
         'romance' => [
             'label' => 'Романтика',
-            'pattern' => '/(?:любов\p{L}*|влюб\p{L}*|романтическ\p{L}*|чувств\p{L}*|свидан\p{L}*)/u',
+            'terms' => ['любовь', 'любви', 'любовью'],
+            'prefixes' => ['влюб', 'романтическ', 'свидан'],
+            'phrases' => ['любовная история'],
         ],
         'relationships' => [
             'label' => 'Отношения',
-            'pattern' => '/(?:отношен\p{L}*|супруг\p{L}*|жених\p{L}*|невест\p{L}*|семейной пары|молодая пара|между ними)/u',
+            'terms' => [],
+            'prefixes' => ['отношен', 'супруг', 'жених', 'невест'],
+            'phrases' => ['семейная пара', 'семейной пары', 'молодая пара', 'между ними появляются чувства'],
         ],
         'friendship' => [
             'label' => 'Дружба',
-            'pattern' => '/(?:дружб\p{L}*|друзья|друзей|друг с другом|близкими друзьями)/u',
+            'terms' => ['друг', 'друга', 'другом', 'друзья', 'друзей', 'друзьями'],
+            'prefixes' => ['друж'],
+            'phrases' => ['друг с другом', 'близкими друзьями'],
         ],
         'youth' => [
             'label' => 'Молодые герои',
-            'pattern' => '/(?:молод\p{L}*|подрост\p{L}*|юнош\p{L}*|юных лет)/u',
+            'terms' => [],
+            'prefixes' => ['молод', 'подрост', 'юнош'],
+            'phrases' => ['юных лет'],
         ],
         'family' => [
             'label' => 'Семья',
-            'pattern' => '/(?:семь\p{L}*|родител\p{L}*|ребен\p{L}*|детей|сынов\p{L}*|дочер\p{L}*)/u',
+            'terms' => ['семья', 'семьи', 'семье', 'семью', 'семьей', 'дети', 'детей', 'детьми', 'сын', 'сына', 'сыновья', 'дочь', 'дочери'],
+            'prefixes' => ['семейн', 'родител', 'ребен', 'детск', 'сынов', 'дочер'],
+            'phrases' => [],
         ],
         'workplace' => [
             'label' => 'Работа',
-            'pattern' => '/(?:работ\p{L}*|офис\p{L}*|карьер\p{L}*|бизнес\p{L}*)/u',
+            'terms' => [],
+            'prefixes' => ['работ', 'офис', 'карьер', 'бизнес'],
+            'phrases' => [],
         ],
         'school' => [
             'label' => 'Учёба',
-            'pattern' => '/(?:школ\p{L}*|лице\p{L}*|университет\p{L}*|студент\p{L}*)/u',
+            'terms' => ['лицей', 'лицея', 'лицее', 'лицеем', 'лицеи'],
+            'prefixes' => ['школ', 'университет', 'студент'],
+            'phrases' => [],
         ],
         'medical' => [
             'label' => 'Медицина',
-            'pattern' => '/(?:врач\p{L}*|больниц\p{L}*|медицин\p{L}*|пациент\p{L}*)/u',
+            'terms' => [],
+            'prefixes' => ['врач', 'больниц', 'медицин', 'пациент'],
+            'phrases' => [],
         ],
         'legal' => [
             'label' => 'Право',
-            'pattern' => '/(?:адвокат\p{L}*|юрист\p{L}*|судебн\p{L}*|прокурор\p{L}*)/u',
+            'terms' => [],
+            'prefixes' => ['адвокат', 'юрист', 'судебн', 'прокурор'],
+            'phrases' => [],
         ],
         'crime' => [
             'label' => 'Преступление',
-            'pattern' => '/(?:преступ\p{L}*|убий\p{L}*|расслед\p{L}*|детектив\p{L}*|криминал\p{L}*)/u',
+            'terms' => [],
+            'prefixes' => ['преступ', 'убий', 'расслед', 'детектив', 'криминал'],
+            'phrases' => [],
         ],
         'mystery' => [
             'label' => 'Тайна',
-            'pattern' => '/(?:тайн\p{L}*|загад\p{L}*|мистическ\p{L}*)/u',
+            'terms' => [],
+            'prefixes' => ['тайн', 'загад', 'мистическ'],
+            'phrases' => [],
         ],
         'fantasy' => [
             'label' => 'Фэнтези',
-            'pattern' => '/(?:маг\p{L}*|волшеб\p{L}*|фэнтези|сказочн\p{L}*)/u',
+            'terms' => ['маг', 'маги', 'магия', 'магии', 'магию', 'фэнтези'],
+            'prefixes' => ['магическ', 'волшеб', 'сказочн'],
+            'phrases' => ['мир фэнтези'],
         ],
         'supernatural' => [
             'label' => 'Сверхъестественное',
-            'pattern' => '/(?:вампир\p{L}*|оборот\p{L}*|призрак\p{L}*|сверхъестествен\p{L}*)/u',
+            'terms' => [],
+            'prefixes' => ['вампир', 'оборот', 'призрак', 'сверхъестествен'],
+            'phrases' => [],
         ],
         'science_fiction' => [
             'label' => 'Фантастика',
-            'pattern' => '/(?:космическ\p{L}*|инопланет\p{L}*|робот\p{L}*|будущ\p{L}*|научн\p{L}* фантаст)/u',
+            'terms' => ['робот', 'роботы', 'роботов'],
+            'prefixes' => ['космическ', 'инопланет', 'робот'],
+            'phrases' => ['научная фантастика', 'научной фантастики'],
         ],
         'historical' => [
             'label' => 'История',
-            'pattern' => '/(?:историческ\p{L}*|император\p{L}*|королев\p{L}*|древн\p{L}*|средневек\p{L}*)/u',
+            'terms' => [],
+            'prefixes' => ['историческ', 'император', 'королев', 'древн', 'средневек'],
+            'phrases' => [],
         ],
         'military' => [
             'label' => 'Военная тема',
-            'pattern' => '/(?:военн\p{L}*|войн\p{L}*|солдат\p{L}*|армия|армии|армией)/u',
+            'terms' => ['война', 'войны', 'войне', 'войну', 'войной', 'армия', 'армии', 'армией'],
+            'prefixes' => ['военн', 'солдат'],
+            'phrases' => [],
         ],
         'adventure' => [
             'label' => 'Приключения',
-            'pattern' => '/(?:приключ\p{L}*|путешеств\p{L}*|экспедиц\p{L}*)/u',
+            'terms' => [],
+            'prefixes' => ['приключ', 'путешеств', 'экспедиц'],
+            'phrases' => [],
         ],
         'sports' => [
             'label' => 'Спорт',
-            'pattern' => '/(?:спорт\p{L}*|футбол\p{L}*|баскетбол\p{L}*|соревнован\p{L}*)/u',
+            'terms' => ['спорт', 'спорта', 'спорте', 'спортом'],
+            'prefixes' => ['спортивн', 'футбол', 'баскетбол', 'соревнован'],
+            'phrases' => [],
         ],
         'music' => [
             'label' => 'Музыка',
-            'pattern' => '/(?:музык\p{L}*|певец|певица|песн\p{L}*|оркестр\p{L}*)/u',
+            'terms' => ['певец', 'певица'],
+            'prefixes' => ['музык', 'песн', 'оркестр'],
+            'phrases' => [],
         ],
         'show_business' => [
             'label' => 'Шоу-бизнес',
-            'pattern' => '/(?:актер\p{L}*|актрис\p{L}*|съем\p{L}*|телевиден\p{L}*|шоу-бизнес)/u',
+            'terms' => ['актер', 'актеры', 'актера', 'актеров', 'актриса', 'актрисы'],
+            'prefixes' => ['актерск', 'актрис', 'съемочн', 'телевиден'],
+            'phrases' => ['шоу бизнес'],
         ],
         'everyday_life' => [
             'label' => 'Повседневная жизнь',
-            'pattern' => '/(?:повседнев\p{L}*|обычной жизн\p{L}*|бытов\p{L}*|житейск\p{L}*)/u',
+            'terms' => [],
+            'prefixes' => ['повседнев', 'бытов', 'житейск'],
+            'phrases' => ['обычная жизнь', 'обычной жизни'],
         ],
     ];
 
@@ -119,10 +159,15 @@ final class CatalogRecommendationThemeExtractor
             return [];
         }
 
+        $lexicalText = preg_replace('/[^\p{L}\p{N}]+/u', ' ', $text) ?? $text;
+        $lexicalText = Str::squish($lexicalText);
+        preg_match_all('/[\p{L}\p{N}]+/u', $lexicalText, $matches);
+        $tokens = array_values(array_unique($matches[0] ?? []));
+        $tokenLookup = array_fill_keys($tokens, true);
         $themes = [];
 
         foreach (self::THEMES as $key => $definition) {
-            if (preg_match($definition['pattern'], $text) === 1) {
+            if ($this->matches($definition, $lexicalText, $tokens, $tokenLookup)) {
                 $themes[$key] = $definition['label'];
             }
         }
@@ -133,5 +178,37 @@ final class CatalogRecommendationThemeExtractor
     public function label(string $theme): ?string
     {
         return self::THEMES[$theme]['label'] ?? null;
+    }
+
+    /**
+     * @param  array{label: string, terms: list<string>, prefixes: list<string>, phrases: list<string>}  $definition
+     * @param  list<string>  $tokens
+     * @param  array<string, true>  $tokenLookup
+     */
+    private function matches(array $definition, string $text, array $tokens, array $tokenLookup): bool
+    {
+        foreach ($definition['terms'] as $term) {
+            if (isset($tokenLookup[$term])) {
+                return true;
+            }
+        }
+
+        foreach ($definition['prefixes'] as $prefix) {
+            foreach ($tokens as $token) {
+                if (str_starts_with($token, $prefix)) {
+                    return true;
+                }
+            }
+        }
+
+        $paddedText = ' '.$text.' ';
+
+        foreach ($definition['phrases'] as $phrase) {
+            if (str_contains($paddedText, ' '.$phrase.' ')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

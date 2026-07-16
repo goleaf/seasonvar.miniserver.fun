@@ -42,18 +42,6 @@
                             @error('description') <p id="personal-tag-description-error" role="alert" class="mt-1 text-sm font-bold text-rose-700">{{ $message }}</p> @enderror
                         </div>
 
-                        <div>
-                            <label for="personal-tag-language" class="block text-sm font-bold text-slate-700">{{ __('tags.fields.language') }}</label>
-                            <select id="personal-tag-language" wire:model="contentLocale" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-base text-slate-800 outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100" @error('contentLocale') aria-invalid="true" aria-describedby="personal-tag-language-error" @enderror>
-                                <option value="">{{ __('tags.fields.language_unspecified') }}</option>
-                                @foreach ($supportedLocales as $locale)
-                                    <option value="{{ $locale }}">{{ __('tags.locales.'.$locale) }}</option>
-                                @endforeach
-                            </select>
-                            @error('contentLocale') <p id="personal-tag-language-error" role="alert" class="mt-1 text-sm font-bold text-rose-700">{{ $message }}</p> @enderror
-                            <p class="mt-2 text-xs leading-5 text-slate-500">{{ __('tags.personal_page.original_language') }}</p>
-                        </div>
-
                         <div class="flex flex-wrap gap-2">
                             <button type="submit" wire:loading.attr="disabled" wire:target="save" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60">
                                 <x-ui.icon name="fa-solid fa-check" />

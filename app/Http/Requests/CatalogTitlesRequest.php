@@ -31,7 +31,7 @@ class CatalogTitlesRequest extends FormRequest
     public function rules(): array
     {
         $rules = [
-            'q' => ['nullable', 'string', 'min:2', 'max:80'],
+            'q' => ['nullable', 'string', 'min:1', 'max:80'],
             'year' => ['nullable', 'array', 'max:'.self::MAX_SELECTIONS],
             'year.*' => ['integer', 'distinct', 'between:1900,'.((int) now()->format('Y') + 1)],
             'title' => $this->slugRules(),
@@ -77,21 +77,21 @@ class CatalogTitlesRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'q.string' => 'Поисковый запрос должен быть строкой.',
-            'q.min' => 'Введите не менее 2 символов для поиска.',
-            'q.max' => 'Поисковый запрос слишком длинный.',
-            'year.array' => 'Годы должны быть переданы списком.',
-            'year.max' => 'Выбрано слишком много значений фильтра.',
-            'year.*.integer' => 'Год должен быть целым числом.',
-            'year.*.between' => 'Выбран недопустимый год.',
-            'sort.enum' => 'Выбрана неподдерживаемая сортировка.',
-            'type.enum' => 'Выбран неподдерживаемый тип фильтра.',
-            '*.array' => 'Значения фильтра должны быть переданы списком.',
-            '*.max' => 'Выбрано слишком много значений фильтра.',
-            'letter.regex' => 'Выбрана неподдерживаемая буква.',
-            'quality.*.in' => 'Выбрано неподдерживаемое качество видео.',
-            'subtitles.*.in' => 'Выбрано неподдерживаемое состояние субтитров.',
-            'publication_type.*.enum' => 'Выбран неподдерживаемый тип публикации.',
+            'q.string' => __('catalog.search.validation.query_string'),
+            'q.min' => __('catalog.search.validation.query_minimum'),
+            'q.max' => __('catalog.search.validation.query_maximum'),
+            'year.array' => __('catalog.search.validation.years_array'),
+            'year.max' => __('catalog.search.validation.filter_limit'),
+            'year.*.integer' => __('catalog.search.validation.year_integer'),
+            'year.*.between' => __('catalog.search.validation.year_supported'),
+            'sort.enum' => __('catalog.search.validation.sort_supported'),
+            'type.enum' => __('catalog.search.validation.type_supported'),
+            '*.array' => __('catalog.search.validation.filter_array'),
+            '*.max' => __('catalog.search.validation.filter_limit'),
+            'letter.regex' => __('catalog.search.validation.letter_supported'),
+            'quality.*.in' => __('catalog.search.validation.quality_supported'),
+            'subtitles.*.in' => __('catalog.search.validation.subtitles_supported'),
+            'publication_type.*.enum' => __('catalog.search.validation.publication_type_supported'),
         ];
     }
 
@@ -101,14 +101,14 @@ class CatalogTitlesRequest extends FormRequest
     public function attributes(): array
     {
         $attributes = [
-            'q' => 'поиск',
-            'year' => 'год',
-            'title' => 'страница сериала',
-            'sort' => 'сортировка',
-            'type' => 'тип фильтра',
-            'taxonomy' => 'значение фильтра',
-            'publication_type' => 'тип публикации',
-            'subtitles' => 'субтитры',
+            'q' => __('catalog.search.attributes.query'),
+            'year' => __('catalog.search.attributes.year'),
+            'title' => __('catalog.search.attributes.title'),
+            'sort' => __('catalog.search.attributes.sort'),
+            'type' => __('catalog.search.attributes.type'),
+            'taxonomy' => __('catalog.search.attributes.taxonomy'),
+            'publication_type' => __('catalog.search.attributes.publication_type'),
+            'subtitles' => __('catalog.search.attributes.subtitles'),
         ];
 
         foreach (CatalogFilterType::cases() as $filterType) {
@@ -334,13 +334,13 @@ class CatalogTitlesRequest extends FormRequest
                     $maximum = $this->nullableInt($to);
 
                     if ($minimum !== null && $maximum !== null && $minimum > $maximum) {
-                        $validator->errors()->add($from, 'Начало диапазона не может быть больше конца.');
+                        $validator->errors()->add($from, __('catalog.search.validation.range_order'));
                     }
                 }
 
                 foreach (['country', 'genre'] as $type) {
                     if (array_intersect($this->filterSlugs()[$type], $this->excludedFilterSlugs()[$type]) !== []) {
-                        $validator->errors()->add($type, 'Одно значение нельзя одновременно включить и исключить.');
+                        $validator->errors()->add($type, __('catalog.search.validation.include_exclude_conflict'));
                     }
                 }
             },

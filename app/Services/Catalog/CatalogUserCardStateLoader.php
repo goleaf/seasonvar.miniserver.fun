@@ -84,19 +84,15 @@ final class CatalogUserCardStateLoader
 
     /**
      * @param  Collection<int, int>  $episodeSeasonIds
-     * @return array{type: string, label: string, url: string}
+     * @return array{type: string, label: string, url: string}|null
      */
     private function primaryAction(
         CatalogTitle $title,
         ?object $progress,
         Collection $episodeSeasonIds,
-    ): array {
+    ): ?array {
         if ($progress === null) {
-            return [
-                'type' => 'open',
-                'label' => 'Открыть тайтл',
-                'url' => route('titles.show', $title),
-            ];
+            return null;
         }
 
         $episodeId = (int) $progress->episode_id;

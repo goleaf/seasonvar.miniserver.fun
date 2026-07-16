@@ -39,13 +39,13 @@
         </div>
     </header>
 
-    <nav aria-label="{{ __('recommendations.navigation.all') }}" class="flex snap-x gap-2 overflow-x-auto rounded-panel bg-white p-3 shadow-sm shadow-slate-200/70 sm:flex-wrap sm:overflow-visible">
+    <nav aria-label="{{ __('recommendations.navigation.all') }}" class="flex flex-wrap gap-2 rounded-panel bg-white p-3 shadow-sm shadow-slate-200/70">
         @foreach ($typeLinks as $typeLink)
             <a
                 href="{{ $typeLink['url'] }}"
                 wire:navigate
                 @class([
-                    'inline-flex min-h-11 shrink-0 snap-start items-center rounded-control px-4 py-2 text-sm font-bold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200',
+                    'inline-flex min-h-11 items-center rounded-control px-4 py-2 text-sm font-bold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200',
                     'bg-emerald-700 text-white' => $typeLink['active'],
                     'bg-slate-50 text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' => ! $typeLink['active'],
                 ])

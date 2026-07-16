@@ -236,7 +236,7 @@
                 @forelse ($recommendationRelations as $relation)
                     <div wire:key="recommendation-relation-{{ $relation->id }}" class="flex flex-col gap-3 rounded-control border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
                         <div class="min-w-0">
-                            <p class="truncate text-sm font-black text-slate-800">{{ $relation->targetTitle->title }}</p>
+                            <p class="break-words text-sm font-black text-slate-800">{{ $relation->targetTitle->title }}</p>
                             <p class="mt-1 text-xs font-semibold text-slate-500">
                                 {{ __('recommendations.relations.'.$relation->relation_type->value) }}
                                 · {{ __('recommendations.admin.source_'.$relation->source->value) }}

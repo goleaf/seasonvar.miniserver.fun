@@ -10,24 +10,14 @@ use App\Support\CatalogAlphabet;
 use App\Support\PlainText;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Number;
 
 class CatalogTitlesViewModel
 {
     /**
      * @var array<string, string>
      */
-    public array $typeLabels = [
-        'genre' => 'Жанры',
-        'country' => 'Страны',
-        'actor' => 'Актеры',
-        'director' => 'Режиссеры',
-        'age_rating' => 'Возрастной рейтинг',
-        'translation' => 'Озвучка / перевод',
-        'status' => 'Статус',
-        'network' => 'Каналы',
-        'studio' => 'Студии',
-        'tag' => 'Теги',
-    ];
+    public array $typeLabels;
 
     /**
      * @var array<string, string>
@@ -116,6 +106,12 @@ class CatalogTitlesViewModel
         array $catalogQueryState = [],
         ?Collection $excludedTaxonomies = null,
     ) {
+        $this->typeLabels = collect([
+            'genre', 'country', 'actor', 'director', 'age_rating',
+            'translation', 'status', 'network', 'studio', 'tag',
+        ])->mapWithKeys(fn (string $type): array => [
+            $type => (string) __("catalog.catalog.filter_labels.{$type}"),
+        ])->all();
         $sorts = collect(CatalogSort::cases())->mapWithKeys(fn (CatalogSort $option): array => [$option->value => $option]);
         $this->sortLabels = $sorts->mapWithKeys(fn (CatalogSort $option): array => [$option->value => $option->label()])->all();
         $this->sortIcons = $sorts->mapWithKeys(fn (CatalogSort $option): array => [$option->value => $option->icon()])->all();
@@ -145,10 +141,10 @@ class CatalogTitlesViewModel
     public function label(string $filterType): string
     {
         if ($filterType === 'title') {
-            return 'Сериал';
+            return (string) __('catalog.catalog.filter_labels.title');
         }
 
-        return $this->typeLabels[$filterType] ?? $filterType;
+        return $this->typeLabels[$filterType] ?? (string) __('catalog.taxonomy.filter');
     }
 
     public function taxonomyContextLabel(string $filterType, Model $taxonomy): string
@@ -156,22 +152,12 @@ class CatalogTitlesViewModel
         $name = $this->taxonomyName($taxonomy);
 
         if ($name === '') {
-            return 'по выбранному параметру';
+            return (string) __('catalog.catalog.filter_context.selected');
         }
 
-        return match ($filterType) {
-            'genre' => 'в жанре '.$name,
-            'country' => 'по стране производства '.$name,
-            'actor' => 'с актёром '.$name,
-            'director' => 'режиссёра '.$name,
-            'age_rating' => 'с возрастным рейтингом '.$name,
-            'translation' => 'с озвучкой '.$name,
-            'status' => 'со статусом '.$name,
-            'network' => 'телеканала '.$name,
-            'studio' => 'студии '.$name,
-            'tag' => 'по теме '.$name,
-            default => 'по параметру '.$name,
-        };
+        $key = array_key_exists($filterType, $this->typeLabels) ? $filterType : 'default';
+
+        return (string) __("catalog.catalog.filter_context.{$key}", ['name' => $name]);
     }
 
     public function excludedTaxonomyLabel(string $filterType, Model $taxonomy): string
@@ -179,14 +165,12 @@ class CatalogTitlesViewModel
         $name = $this->taxonomyName($taxonomy);
 
         if ($name === '') {
-            return 'без выбранного параметра';
+            return (string) __('catalog.catalog.excluded_filter_context.selected');
         }
 
-        return match ($filterType) {
-            'genre' => 'без жанра '.$name,
-            'country' => 'без страны производства '.$name,
-            default => 'без параметра '.$name,
-        };
+        $key = in_array($filterType, ['genre', 'country'], true) ? $filterType : 'default';
+
+        return (string) __("catalog.catalog.excluded_filter_context.{$key}", ['name' => $name]);
     }
 
     public function sortIcon(string $sort): string
@@ -420,21 +404,12 @@ class CatalogTitlesViewModel
     /** @return list<array{key: string, label: string, value: string}> */
     public function advancedFilterChips(): array
     {
-        $labels = [
-            'year' => 'Годы',
-            'year_from' => 'Год от',
-            'year_to' => 'Год до',
-            'seasons_min' => 'Сезонов от',
-            'seasons_max' => 'Сезонов до',
-            'episodes_min' => 'Серий от',
-            'episodes_max' => 'Серий до',
-            'rating_source' => 'Источник рейтинга',
-            'rating_min' => 'Рейтинг от',
-            'votes_min' => 'Голосов от',
-            'video' => 'Видео',
-            'updated' => 'Обновлено',
-            'letter' => 'Буква',
-        ];
+        $labels = collect([
+            'year', 'year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min',
+            'episodes_max', 'rating_source', 'rating_min', 'votes_min', 'video', 'updated', 'letter',
+        ])->mapWithKeys(fn (string $key): array => [
+            $key => (string) __("catalog.catalog.advanced_filter_labels.{$key}"),
+        ])->all();
 
         return collect($labels)
             ->filter(fn (string $label, string $key): bool => array_key_exists($key, $this->catalogQueryState)
@@ -458,15 +433,14 @@ class CatalogTitlesViewModel
 
         return match ($key) {
             'updated' => match ($value) {
-                'day' => 'за день',
-                'week' => 'за неделю',
-                'month' => 'за месяц',
-                'year' => 'за год',
+                'day', 'week', 'month', 'year' => (string) __("catalog.catalog.advanced_filter_values.updated_{$value}"),
                 default => (string) $value,
             },
-            'video', 'subtitles' => $value === 'available' ? 'есть' : 'нет',
-            'rating_source' => $value === 'kinopoisk' ? 'КиноПоиск' : 'IMDb',
-            'letter' => mb_strtolower((string) $value) === 'latin' ? 'Латиница A–Z' : (string) $value,
+            'video', 'subtitles' => (string) __("catalog.catalog.advanced_filter_values.{$value}"),
+            'rating_source' => (string) __("catalog.catalog.advanced_filter_values.rating_{$value}"),
+            'letter' => mb_strtolower((string) $value) === 'latin'
+                ? (string) __('catalog.catalog.advanced_filter_values.latin')
+                : (string) $value,
             default => (string) $value,
         };
     }
@@ -502,7 +476,23 @@ class CatalogTitlesViewModel
 
     public function subtitleLabel(string $value): string
     {
-        return $value === 'available' ? 'Есть' : 'Нет';
+        return (string) __("catalog.catalog.advanced_filter_values.{$value}");
+    }
+
+    public function resultCountLabel(int $count): string
+    {
+        return trans_choice('catalog.counts.results', $count, [
+            'count' => Number::format($count, locale: app()->currentLocale()),
+        ]);
+    }
+
+    public function activeFilterCountLabel(): string
+    {
+        $count = $this->activeFilterCount();
+
+        return trans_choice('catalog.catalog.active_filter_count', $count, [
+            'count' => Number::format($count, locale: app()->currentLocale()),
+        ]);
     }
 
     private function taxonomyName(Model $taxonomy): string

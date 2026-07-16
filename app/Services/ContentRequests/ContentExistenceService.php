@@ -132,7 +132,10 @@ final readonly class ContentExistenceService
     /** @return array{kind: string, label: string, url: string} */
     private function episodeMatch(Episode $episode): array
     {
-        $episode->loadMissing('season.catalogTitle');
+        $episode->loadMissing([
+            'season:id,catalog_title_id,number',
+            'season.catalogTitle:id,slug,title,original_title',
+        ]);
         $title = $episode->season->catalogTitle;
 
         return ['kind' => 'episode', 'label' => $title->display_title.' · '.__('requests.fields.episode_number_value', ['number' => $episode->number]), 'url' => route('titles.show', [$title, 'season' => $episode->season->number, 'episode' => $episode->number])];

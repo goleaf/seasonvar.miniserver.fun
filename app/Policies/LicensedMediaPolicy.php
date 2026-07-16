@@ -17,8 +17,7 @@ final class LicensedMediaPolicy
 
     public function download(User $user, LicensedMedia $media): bool
     {
-        $media->loadMissing('catalogTitle');
-        $title = $media->catalogTitle;
+        $title = $this->downloads->catalogTitle($media);
 
         return $title instanceof CatalogTitle
             && $this->downloads->authorizes($user, $title, $media);

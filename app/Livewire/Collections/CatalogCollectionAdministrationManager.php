@@ -88,6 +88,23 @@ final class CatalogCollectionAdministrationManager extends Component
     public function render(CatalogCollectionQuery $collections): View
     {
         $paginator = $collections->moderationQueue($this->search);
+        $sourceSyncSummary = $collections->latestSourceSyncSummary();
+
+        if ($sourceSyncSummary !== null) {
+            $sourceSyncSummary['status_label'] = __('collections.sync.status.'.$sourceSyncSummary['status']);
+            $sourceSyncSummary['status_variant'] = match ($sourceSyncSummary['status']) {
+                'completed' => 'success',
+                'partial' => 'warning',
+                default => 'muted',
+            };
+            $sourceSyncSummary['metrics'] = collect($sourceSyncSummary['counters'])
+                ->map(fn (int $value, string $key): array => [
+                    'label' => __('collections.sync.metrics.'.$key),
+                    'value' => $value,
+                ])
+                ->values()
+                ->all();
+        }
 
         foreach ($paginator->getCollection() as $collection) {
             $totalItems = (int) ($collection->total_items_count ?? 0);
@@ -125,6 +142,7 @@ final class CatalogCollectionAdministrationManager extends Component
 
         return view('livewire.collections.catalog-collection-administration-manager', [
             'collections' => $paginator,
+            'sourceSyncSummary' => $sourceSyncSummary,
         ])->extends('layouts.app', [
             'title' => __('collections.admin.title'),
             'seo' => [

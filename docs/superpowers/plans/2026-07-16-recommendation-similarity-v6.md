@@ -35,10 +35,10 @@
 
 **Interfaces:**
 - Produces: `CatalogRecommendationQualityEvaluator::evaluate(iterable $rows, array $grades, int $limit = 12): CatalogRecommendationQualityReport`.
-- Produces: report fields `precisionAtLimit`, `ndcgAtLimit`, `sourceCount`, `emptySourceCount`, `watchableRate`, `candidateCoverage`, `maximumIncoming`, `incomingAtLeast100`, `reasonFaithfulnessFailures`.
+- Produces: report fields `precisionAtLimit`, `ndcgAtLimit`, `sourceCount`, `emptySourceCount`, `watchableRate`, `candidateCoverage`, `maximumIncoming`, `incomingAtLeast100`, `reasonFaithfulnessFailures`, `judgedRowCount`, `judgmentCoverage`.
 - Golden JSON identifies titles by stable `slug`, never local numeric ID.
 
-- [ ] **Step 1: Добавить failing metric tests**
+- [x] **Step 1: Добавить failing metric tests**
 
 Use a three-source fixture with graded candidates:
 
@@ -58,22 +58,24 @@ public function test_it_calculates_precision_ndcg_coverage_and_concentration(): 
 
     $report = app(CatalogRecommendationQualityEvaluator::class)->evaluate($rows, $grades, 2);
 
-    $this->assertSame(0.3333, $report->precisionAtLimit);
+    $this->assertSame(0.75, $report->precisionAtLimit);
     $this->assertGreaterThan(0.7, $report->ndcgAtLimit);
     $this->assertSame(3, $report->sourceCount);
     $this->assertSame(1, $report->emptySourceCount);
     $this->assertSame(2, $report->maximumIncoming);
     $this->assertSame(1, $report->reasonFaithfulnessFailures);
+    $this->assertSame(3, $report->judgedRowCount);
+    $this->assertSame(1.0, $report->judgmentCoverage);
 }
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `php artisan test tests/Unit/CatalogRecommendationQualityEvaluatorTest.php --compact`
 
 Expected: FAIL because DTO/evaluator do not exist.
 
-- [ ] **Step 3: Реализовать immutable report и pure evaluator**
+- [x] **Step 3: Реализовать immutable report и pure evaluator**
 
 Create the DTO with exact scalar fields and `toArray(): array<string, int|float>`. Evaluator must:
 
@@ -82,9 +84,9 @@ $gain = static fn (int $grade): float => (2 ** max(0, min(2, $grade))) - 1;
 $discount = static fn (int $rank): float => 1 / log($rank + 1, 2);
 ```
 
-Group rows by source, truncate to `$limit`, count grade `> 0` for precision, compute DCG/ideal DCG per graded source, then average sources. A row is reason-faithful only when `reasons !== []`. `watchableRate` is watchable rows divided by all rows. Round ratios to four decimals in the DTO factory.
+Group rows by source and truncate to `$limit`. Для Precision/nDCG учитывать только candidates, которые явно присутствуют в grade map; неразмеченные строки исключать, а не считать нулём. Отдельно считать `judgedRowCount` и его долю среди ранжированных строк. Compute DCG/ideal DCG per graded source, then average sources. A row is reason-faithful only when `reasons !== []`. `watchableRate` is watchable rows divided by all rows. Round ratios to four decimals in the DTO factory.
 
-- [ ] **Step 4: Добавить stratified golden JSON**
+- [x] **Step 4: Добавить stratified golden JSON**
 
 JSON schema:
 
@@ -106,7 +108,7 @@ JSON schema:
 
 Add at least 30 sources across `popular`, `sparse`, `anime`, `documentary`, `show`, `long_cast`, `empty_baseline`, and `lexical_collision`. Only rows manually inspected in the local catalogue receive grades; omitted candidates are unjudged and excluded from nDCG rather than assumed bad.
 
-- [ ] **Step 5: Verify GREEN and commit**
+- [x] **Step 5: Verify GREEN and commit**
 
 Run:
 
@@ -132,7 +134,7 @@ Commit only Task 1 files with `README.md` roadmap wording if product state is de
 - Preserves: `extract(?string $title, ?string $originalTitle, ?string $description): array<string, string>`.
 - Adds no I/O and returns at most eight stable theme codes.
 
-- [ ] **Step 1: Добавить collision corpus и failing test**
+- [x] **Step 1: Добавить collision corpus и failing test**
 
 Fixture must include these exact negatives:
 
@@ -150,13 +152,13 @@ return [
 
 Data-provider test calls `extract(null, null, $case['text'])` and asserts every `present`/`missing` key.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `php artisan test tests/Unit/CatalogRecommendationThemeExtractorTest.php --compact`
 
 Expected: FAIL on all documented substring collisions.
 
-- [ ] **Step 3: Заменить regex по всему тексту на token-prefix/phrase matcher**
+- [x] **Step 3: Заменить regex по всему тексту на token-prefix/phrase matcher**
 
 Represent each theme as `terms`, safe `prefixes`, and `phrases`. Tokenize with:
 
@@ -202,7 +204,7 @@ Rules for collision-prone themes are exact:
 
 Convert the remaining existing theme patterns with prefixes that must start at token offset zero. `matches()` returns true for an exact term, `str_starts_with($token, $prefix)`, or normalized phrase contained between padded spaces. Never search a prefix at a nonzero token offset.
 
-- [ ] **Step 4: Verify GREEN, corpus and format**
+- [x] **Step 4: Verify GREEN, corpus and format**
 
 Run:
 
@@ -228,7 +230,7 @@ Expected: all positive themes remain and all collision cases PASS.
 - Profile shape contains `id`, `type`, `year`, feature ID lists, `themes`, `signals`, and quality counters.
 - DTO exposes `total()`, `matchedFeaturesCount`, `metadataScore`, `sourceScore`, `qualityScore`, `reasons`.
 
-- [ ] **Step 1: Write failing scorer tests**
+- [x] **Step 1: Write failing scorer tests**
 
 Cover exact behaviors:
 
@@ -242,13 +244,13 @@ public function test_verified_provider_relation_has_a_source_score_and_reason():
 
 Use profiles as literal arrays; assert `null` for weak pairs and exact bucket/reason keys for strong pairs.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `php artisan test tests/Unit/CatalogRecommendationPairScorerTest.php --compact`
 
 Expected: FAIL because scorer/DTO do not exist.
 
-- [ ] **Step 3: Implement bounded scoring math**
+- [x] **Step 3: Implement bounded scoring math**
 
 Use these helpers:
 
@@ -279,7 +281,7 @@ Apply configured `min_relevance_score` to `metadata + source`; only then add bou
 ]
 ```
 
-- [ ] **Step 4: Add versioned config**
+- [x] **Step 4: Add versioned config**
 
 Under `similarity_v6`, define exact values:
 
@@ -290,6 +292,7 @@ Under `similarity_v6`, define exact values:
     'min_relevance_score' => 600,
     'max_per_title' => 12,
     'candidate_limit' => 240,
+    'build_history_limit' => 5,
     'weights' => [
         'genre' => 160, 'tag' => 240, 'director' => 300, 'actor' => 160,
         'network' => 220, 'studio' => 220, 'translation' => 40,
@@ -299,7 +302,7 @@ Under `similarity_v6`, define exact values:
 ];
 ```
 
-- [ ] **Step 5: Verify GREEN and format**
+- [x] **Step 5: Verify GREEN and format**
 
 Run focused tests and Pint. Expected: all five cases PASS with exact bucket totals and no negative score.
 
@@ -316,23 +319,23 @@ Run focused tests and Pint. Expected: all five cases PASS with exact bucket tota
 - Produces: `add(array $profile): void`, `idsFor(array $source, int $limit): array<int>`, `reset(): void`.
 - Candidate keys: feature ID, theme, `theme|genre`, `theme|country`, and directed provider target IDs.
 
-- [ ] **Step 1: Add failing deterministic-pool tests**
+- [x] **Step 1: Add failing deterministic-pool tests**
 
 Assert that rare composite candidates precede broad genre candidates, provider target is reachable without shared metadata, current title is excluded, result is unique/stable and never exceeds limit.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `php artisan test tests/Unit/CatalogRecommendationCandidateGeneratorTest.php --compact`.
 
-- [ ] **Step 3: Implement packed indexes**
+- [x] **Step 3: Implement packed indexes**
 
 Use associative maps `key => list<int>` and seed score `1000 / max(1, bucketSize)`; provider target receives priority `10_000`. Sort by seed descending, then title ID ascending, and slice to limit. `reset()` sets every mutable map to `[]` and is called from builder `finally`.
 
-- [ ] **Step 4: Integrate builder candidate selection**
+- [x] **Step 4: Integrate builder candidate selection**
 
 Inject generator and pair scorer. Keep existing compact profile query/eager-load boundaries, but replace private `candidateIds()` and `score()` calls. Set algorithm version from `config('recommendations.similarity_v6.algorithm_version')`. Do not change persistence yet; tests continue to use active table.
 
-- [ ] **Step 5: Run builder/candidate regression**
+- [x] **Step 5: Run builder/candidate regression**
 
 Run:
 
@@ -361,15 +364,15 @@ Expected: deterministic tests PASS; existing builder visibility/media/max tests 
 - Candidate row gains optional `reasons: list<string>` while retaining primary `reason` for backward compatibility.
 - `CatalogRecommendationItem::$explanations` receives 1–4 explanation DTOs.
 
-- [ ] **Step 1: Add failing reason-preservation tests**
+- [x] **Step 1: Add failing reason-preservation tests**
 
 Store a row with `theme_romance`, `director`, `actor`, `country` and assert title page/API return four matching labels in contribution order, not only `Похожие жанры и темы`. Assert score/breakdown remain absent from public API.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run the two focused feature files; expected failure is the current one-reason reduction.
 
-- [ ] **Step 3: Add stable reason enum mapping**
+- [x] **Step 3: Add stable reason enum mapping**
 
 Add `SimilarTheme` and `ImportedRelation` enum cases. In presenter add:
 
@@ -379,11 +382,11 @@ public function storedSimilarityExplanations(mixed $storedReasons): array
 
 Sort by stored `score`, map `theme_* → SimilarTheme` with translated `theme` parameter, other keys to existing enums, unique by `reason+parameters`, take four.
 
-- [ ] **Step 4: Preserve reasons through rows/cache/result**
+- [x] **Step 4: Preserve reasons through rows/cache/result**
 
 `similarCandidates()` returns `reasons` as enum values/parameters. Cache normalization validates a bounded list of strings and keeps at most four. `result()` constructs all valid explanations and falls back to the primary reason only when list is absent. Personalized/public rows remain backward compatible.
 
-- [ ] **Step 5: Verify GREEN and privacy**
+- [x] **Step 5: Verify GREEN and privacy**
 
 Run focused page/API tests, translation tests if present, and assert JSON contains no `score`, `metadata_score`, `source_score`, `quality_score`, or raw reason breakdown.
 
@@ -401,21 +404,21 @@ Run focused page/API tests, translation tests if present, and assert JSON contai
 - Build statuses: `building`, `evaluated`, `rejected`, `active`, `failed`.
 - Rows belong to one build and mirror active scoring columns.
 
-- [ ] **Step 1: Add failing schema/model test**
+- [x] **Step 1: Add failing schema/model test**
 
 Create a build and two rows; assert unique `(build_id, catalog_title_id, recommended_title_id)`, indexed rank retrieval and cascade delete.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run schema test; expected failure: missing tables/models.
 
-- [ ] **Step 3: Create reversible migration**
+- [x] **Step 3: Create reversible migration**
 
 `catalog_recommendation_builds` columns: id, algorithm_version(32), feature_version(32), status(16), metrics JSON nullable, failure_message nullable text, started_at, completed_at, activated_at, timestamps; index `(status, created_at)`.
 
 `catalog_recommendation_build_rows` columns: id, build_id FK cascade, source/candidate FKs cascade, score/rank, matched_features_count, metadata/source/quality scores, reasons JSON nullable, computed_at, timestamps; unique build/source/candidate; indexes `(build_id, catalog_title_id, rank)` and `(build_id, recommended_title_id, score)`.
 
-- [ ] **Step 4: Implement typed models and Verify GREEN**
+- [x] **Step 4: Implement typed models and Verify GREEN**
 
 Use `#[Fillable]`, integer/array/datetime casts and typed `BelongsTo` relations following `CatalogTitleRecommendation`. Run migration test and Pint.
 
@@ -435,37 +438,39 @@ Use `#[Fillable]`, integer/array/datetime casts and typed `BelongsTo` relations 
 - Activator exposes `activate(CatalogRecommendationBuild $build): void`.
 - Summary adds `build_id`, `activated`, `gate_passed`, `baseline_metrics`, `candidate_metrics`, `row_churn` without removing existing keys.
 
-- [ ] **Step 1: Add failing rejection/activation tests**
+- [x] **Step 1: Add failing rejection/activation tests**
 
 Test A seeds active rows, builds a candidate with unavailable rows/empty regression, and asserts build status `rejected` plus unchanged active IDs.
 
 Test B seeds a passing build, activates it, and asserts active table contains only build rows, all `algorithm_version=v6`, build `active`, previous active build `evaluated`, and cache invalidator called after transaction.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run activation test; expected failure: activator missing and builder writes active rows directly.
 
-- [ ] **Step 3: Persist builder output only to shadow rows**
+- [x] **Step 3: Persist builder output only to shadow rows**
 
 Create build before profile loading. Chunk-insert rows with `build_id`; on exception mark build `failed`, store bounded exception class/message through existing error formatter, leave active table unchanged, then rethrow.
 
-- [ ] **Step 4: Implement gate**
+- [x] **Step 4: Implement gate**
 
 Pass only when:
 
 ```php
-$candidate->watchableRate === 1.0
+$candidateRowCount > 0
+    && $candidate->watchableRate === 1.0
     && $candidate->ndcgAtLimit >= $baseline->ndcgAtLimit
-    && $candidate->emptySourceCount <= $baseline->emptySourceCount;
+    && $candidate->emptySourceCount <= $baseline->emptySourceCount
+    && $candidate->judgmentCoverage >= 0.8;
 ```
 
-If golden slugs are absent locally, nDCG is reported as unavailable and activation requires an explicit config `similarity_v6.allow_activation_without_golden=false`; default false.
+If golden slugs are absent locally, nDCG is reported as unavailable and activation requires an explicit config `similarity_v6.allow_activation_without_golden=false`; default false. Override никогда не разрешает пустой build, недоступный candidate или отсутствие достоверной причины.
 
-- [ ] **Step 5: Implement atomic copy**
+- [x] **Step 5: Implement atomic copy**
 
 Inside one `DB::transaction()` delete active rows, `insertUsing()` all mirrored columns from the selected build, mark previous `active` builds `evaluated`, mark selected build `active/activated_at`. Invalidate recommendation cache only after successful commit. A thrown exception rolls back active rows and leaves build `failed`.
 
-- [ ] **Step 6: Verify GREEN and importer summary compatibility**
+- [x] **Step 6: Verify GREEN and importer summary compatibility**
 
 Run activation, builder and `SeasonvarImportMaintenanceTest`. Assert existing summary keys and progress events remain available.
 
@@ -485,23 +490,23 @@ Run activation, builder and `SeasonvarImportMaintenanceTest`. Assert existing su
 - Parser returns only normalized verified `provider_recommendation`/`related_title` signals when source HTML actually supplies them.
 - Pruner deletes only `source=seasonvar_info` generic types, in bounded `chunkById`, and reports checked/deleted counts.
 
-- [ ] **Step 1: Add failing parser/importer tests**
+- [x] **Step 1: Add failing parser/importer tests**
 
 Assert genre/rating/year/page-quality no longer create signal rows while normalized catalog relations still persist in their canonical pivot/rating tables. Assert a manually seeded `provider_recommendation` from a different managed source survives pruning.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run focused parser/importer tests; expected failure: generic signals are currently returned/upserted.
 
-- [ ] **Step 3: Stop generating duplicated generic rows**
+- [x] **Step 3: Stop generating duplicated generic rows**
 
 Return an empty list from the generic recommendation-signal branch and delete unused taxonomy/rating weighting helpers only after tests prove no caller. Keep DTO field for forward-compatible provider signals.
 
-- [ ] **Step 4: Implement bounded pruner**
+- [x] **Step 4: Implement bounded pruner**
 
 Allowlist deletable types `taxonomy_*`, `rating`, `release_year`, `page_quality` only when `source=seasonvar_info`. Delete IDs in chunks of 1,000; never issue a table-wide unqualified delete. Invoke after successful `v6` activation, not before.
 
-- [ ] **Step 5: Verify GREEN and storage metrics**
+- [x] **Step 5: Verify GREEN and storage metrics**
 
 Run parser/importer/pruner tests. On a database copy, compare row counts and `dbstat`; do not prune the live database during automated tests.
 
@@ -522,27 +527,27 @@ Run parser/importer/pruner tests. On a database copy, compare row counts and `db
 - Tracker exposes `mark(int $titleId, string $reason): void`, `ids(int $limit): array`, `forget(array $ids): void`.
 - Builder exposes internal `rebuildDirty(?callable $progress = null): array`; no new Artisan command.
 
-- [ ] **Step 1: Add failing dirty/scoped tests**
+- [x] **Step 1: Add failing dirty/scoped tests**
 
 Assert targeted URL import marks returned catalog title; affected neighbours are discovered from shared indexed features; unchanged titles retain row timestamps/hash; dirty set above configured 2,000 falls back to full shadow build.
 
-- [ ] **Step 2: Create additive queue table**
+- [x] **Step 2: Create additive queue table**
 
 Columns: unique `catalog_title_id` FK cascade, bounded `reason`, `marked_at`, timestamps; index `marked_at`. `mark()` uses upsert and never creates duplicates.
 
-- [ ] **Step 3: Return target title ID from URL cycle**
+- [x] **Step 3: Return target title ID from URL cycle**
 
 Extend the private `runUrlCycle()` result with `catalog_title_id: int|null`. After successful parse/import, call tracker `mark($id, 'targeted-import')`; preserve `targeted_maintenance_skipped=true` for unrelated heavy maintenance.
 
-- [ ] **Step 4: Implement affected-neighbour expansion**
+- [x] **Step 4: Implement affected-neighbour expansion**
 
 For each dirty title collect IDs from the same bounded candidate-generator buckets, cap per source and total. If count exceeds threshold or active feature/algorithm version differs, call full `rebuild()`; otherwise recalculate dirty sources and sources whose active rows target a dirty candidate.
 
-- [ ] **Step 5: Avoid unchanged writes**
+- [x] **Step 5: Avoid unchanged writes**
 
 Hash ordered payload `[candidate_id, rank, score, bucket scores, reasons]`. Within transaction replace only sources whose hash changed. Clear dirty rows only after commit; failure preserves them for retry.
 
-- [ ] **Step 6: Verify targeted/full paths**
+- [x] **Step 6: Verify targeted/full paths**
 
 Run focused import tests with `Http::fake()` and `Http::preventStrayRequests()`. Assert no new public command and bounded query count.
 
@@ -559,11 +564,11 @@ Run focused import tests with `Http::fake()` and `Http::preventStrayRequests()`.
 **Interfaces:**
 - Documents active version separately from roadmap/planned personalization.
 
-- [ ] **Step 1: Update documentation only after behavior exists**
+- [x] **Step 1: Update documentation only after behavior exists**
 
 Document shadow gate, active algorithm version, scoped rebuild, reason contract and operational metrics in the mapped recommendation/importer document. Update Russian README roadmap/history without editing the managed `project-docs` block manually.
 
-- [ ] **Step 2: Run formatting and focused suite**
+- [x] **Step 2: Run formatting and focused suite**
 
 Run:
 
@@ -576,11 +581,13 @@ npm run build
 
 Expected: all commands exit `0`.
 
-- [ ] **Step 3: Run full suite**
+- [x] **Step 3: Run full suite**
 
 Run: `php artisan test --compact`
 
 Expected: `0` failures. If unrelated concurrent work fails, preserve complete output and demonstrate the recommendation-focused suite remains green; do not hide the broad failure.
+
+Фактическая проверка 16 июля 2026 года: полный прогон выполнен — 1162 tests passed, 11 skipped и 13 failures в параллельно изменяемых контрактах поиска/шапки. После дополнительных fail-closed regressions изолированный recommendation/UI/importer набор прошёл: 141 tests, 719 assertions; отдельный API-контракт рекомендаций — 1 test, 14 assertions. Падения полного набора не скрыты и не исправлялись в рамках этой задачи.
 
 - [ ] **Step 4: Wait for existing import and run shadow build**
 
@@ -590,7 +597,7 @@ Confirm no active `php artisan seasonvar:import` process. Run the existing impor
 
 Verify one active algorithm version, no self-pairs, no unavailable candidates, ranks 1..N without gaps, and no source above configured max rows. Compare the audited sample titles before/after.
 
-- [ ] **Step 6: Browser QA**
+- [x] **Step 6: Browser QA**
 
 Use Playwright on desktop/mobile for one title with `v6` rows and one fallback title. Assert 2–4 faithful reasons, no duplicate/current title, no console/network errors and no horizontal overflow.
 

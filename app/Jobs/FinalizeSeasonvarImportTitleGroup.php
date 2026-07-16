@@ -283,7 +283,9 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
     {
         $error = app(SeasonvarImportErrorSanitizer::class)->fromException($exception);
         $reason = SeasonvarImportTitleGroupTerminalReason::FinalizerDeadlineExceeded;
-        $group = SeasonvarImportTitleGroup::query()->with('run')->find($this->groupId);
+        $group = SeasonvarImportTitleGroup::query()
+            ->with('run:id,mode,execution_mode,status,summary')
+            ->find($this->groupId);
 
         if ($group === null || $group->status->isTerminal()) {
             return;
@@ -321,7 +323,12 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
     private function group(): ?SeasonvarImportTitleGroup
     {
         return SeasonvarImportTitleGroup::query()
-            ->with(['run', 'catalogTitle', 'preparedPages.sourcePage.source'])
+            ->with([
+                'run:id,mode,execution_mode,status,summary',
+                'catalogTitle:id,source_id,source_page_id,external_id,title,original_title,type,year,description,poster_url,source_url,source_url_hash,content_hash,provider_field_values,slug',
+                'preparedPages:id,seasonvar_import_run_id,seasonvar_import_title_group_id,source_page_id,status,content_hash,parser_version,payload,warnings,updated_at',
+                'preparedPages.sourcePage:id,source_id,url,url_hash,import_claim_token,import_claim_expires_at,provider_availability_status',
+            ])
             ->find($this->groupId);
     }
 
