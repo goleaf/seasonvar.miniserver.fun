@@ -33,7 +33,7 @@ final readonly class ContentRequestInputFactory
         $externalIdentifiers = collect((array) ($data['external_identifiers'] ?? []))
             ->filter(fn (mixed $item): bool => is_array($item) && trim((string) ($item['identifier'] ?? '')) !== '')
             ->map(fn (array $item): array => [
-                'provider' => trim((string) ($item['provider'] ?? '')),
+                'provider' => Str::lower(trim((string) ($item['provider'] ?? ''))),
                 'identifier' => trim((string) ($item['identifier'] ?? '')),
             ])->values()->all();
 

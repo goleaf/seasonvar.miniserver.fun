@@ -97,6 +97,7 @@ final class CatalogRecommendationExclusionService
             || in_array($context->type, [
                 CatalogRecommendationType::Personalized,
                 CatalogRecommendationType::Editorial,
+                CatalogRecommendationType::Upcoming,
                 CatalogRecommendationType::Related,
                 CatalogRecommendationType::Similar,
             ], true)) {

@@ -18,9 +18,11 @@ use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRating;
 use App\Models\CatalogTitleUserState;
 use App\Models\Episode;
+use App\Models\EpisodeViewProgress;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 final class CatalogPublicDiscoveryQuery
 {
@@ -231,7 +233,27 @@ final class CatalogPublicDiscoveryQuery
                         ->whereNull('episodes.deleted_at')
                         ->whereNull('seasons.deleted_at')
                         ->where('episodes.released_at', '>', now()));
-            })
+            });
+
+        if ($context->user !== null) {
+            $query->selectSub(EpisodeViewProgress::query()
+                ->selectRaw('COUNT(*)')
+                ->where('user_id', $context->user->id)
+                ->whereColumn('catalog_title_id', 'catalog_titles.id'), 'viewer_release_relevance');
+
+            if (Schema::hasColumn('catalog_title_user_states', 'watch_status')) {
+                $query->selectSub(CatalogTitleUserState::query()
+                    ->selectRaw('COUNT(*) * 2')
+                    ->where('user_id', $context->user->id)
+                    ->whereColumn('catalog_title_id', 'catalog_titles.id')
+                    ->whereIn('watch_status', ['watching', 'completed']), 'status_release_relevance')
+                    ->orderByDesc('status_release_relevance');
+            }
+
+            $query->orderByDesc('viewer_release_relevance');
+        }
+
+        $query
             ->orderByRaw('CASE WHEN next_release_at IS NULL THEN 1 ELSE 0 END')
             ->orderBy('next_release_at')
             ->orderBy('catalog_titles.year')

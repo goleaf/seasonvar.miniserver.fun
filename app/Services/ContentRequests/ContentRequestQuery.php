@@ -16,6 +16,7 @@ use App\Services\Catalog\Search\CatalogSearchQueryParser;
 use App\Services\Catalog\Search\CatalogTitleSearch;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Gate;
 
 final readonly class ContentRequestQuery
 {
@@ -66,6 +67,7 @@ final readonly class ContentRequestQuery
 
     public function detail(ContentRequest $request, ?User $viewer, bool $includeClarifications): ContentRequestDetailData
     {
+        $canModerate = $viewer !== null && Gate::forUser($viewer)->allows('moderate', $request);
         $request->loadMissing([
             'catalogTitle:id,slug,title,original_title',
             'completedCatalogTitle:id,slug,title,original_title',
@@ -76,7 +78,9 @@ final readonly class ContentRequestQuery
             'completedEpisode.season.catalogTitle:id,slug,title,original_title',
             'completedMedia:id,catalog_title_id,season_id,episode_id',
             'statusHistory' => fn ($query) => $query->select(['id', 'content_request_id', 'to_status', 'public_reason', 'created_at']),
-            'sourceLinks' => fn ($query) => $query->where('is_public', true)->select(['id', 'content_request_id', 'url', 'provider']),
+            'sourceLinks' => fn ($query) => $query
+                ->when(! $canModerate, fn ($query) => $query->where('is_public', true))
+                ->select(['id', 'content_request_id', 'url', 'provider']),
             'externalIdentifiers:id,content_request_id,provider,identifier',
         ])->loadCount(['votes', 'followers']);
         $this->viewerOverlay($request, $viewer);

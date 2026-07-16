@@ -81,7 +81,11 @@ final readonly class CreateContentRequest
 
         if ($duplicate->confidence === ContentRequestDuplicateConfidence::Probable
             && mb_strlen((string) $input->differentExplanation) < 20) {
-            throw new ContentRequestActionException('requests.errors.probable_duplicate');
+            throw new ContentRequestActionException(
+                'requests.errors.probable_duplicate',
+                canonicalPublicId: $duplicate->candidates[0]['public_id'] ?? null,
+                canonicalUrl: $duplicate->candidates[0]['url'] ?? null,
+            );
         }
 
         $exactHash = $duplicate->exactIdentityHash ?? $this->identity->exactHash($input, $externalIds);

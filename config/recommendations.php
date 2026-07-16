@@ -24,6 +24,11 @@ return [
         'completed' => 100,
         'dropped' => 120,
     ],
+    'availability_boosts' => [
+        'quality' => 12,
+        'variant' => 12,
+        'subtitles' => 6,
+    ],
     'top_rated' => [
         'default_source' => 'kinopoisk',
         'minimum_votes' => [

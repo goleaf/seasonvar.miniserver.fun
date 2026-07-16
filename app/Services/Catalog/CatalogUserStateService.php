@@ -29,6 +29,7 @@ class CatalogUserStateService
         private readonly ApiSyncReadiness $syncReadiness,
         private readonly UserSyncChangePublisher $syncChanges,
         private readonly ReviewCacheInvalidator $reviewCache,
+        private readonly CatalogRecommendationCacheInvalidator $recommendationCache,
     ) {}
 
     public function state(User $user, CatalogTitle $catalogTitle): ?CatalogTitleUserState
@@ -265,6 +266,8 @@ class CatalogUserStateService
                 ->whereBelongsTo($episode)
                 ->lockForUpdate()
                 ->firstOrFail();
+            $wasMeaningful = $this->isMeaningfulProgress($progress);
+            $wasCompleted = $progress->completed_at !== null;
             $storedSessionId = $progress->playback_session_id;
 
             if (is_string($storedSessionId) && strcmp($session->id, $storedSessionId) < 0) {
@@ -298,6 +301,11 @@ class CatalogUserStateService
                 'last_watched_at' => $now,
             ])->save();
             $this->syncChanges->publishProgress($user, $catalogTitle, $episode->id);
+
+            if ((! $wasMeaningful && $this->isMeaningfulProgress($progress))
+                || (! $wasCompleted && $progress->completed_at !== null)) {
+                $this->recommendationCache->publicSignalsChanged('meaningful-progress');
+            }
 
             return $progress;
         }, attempts: 3);
@@ -384,7 +392,9 @@ class CatalogUserStateService
             $this->syncChanges->publishTitleState($user, $catalogTitle);
 
             if ($column === 'rating') {
-                $this->reviewCache->titleChanged((int) $catalogTitle->id);
+                $this->reviewCache->titleChanged((int) $catalogTitle->id, recommendations: true, api: true);
+            } elseif ($column === 'in_watchlist') {
+                $this->recommendationCache->publicSignalsChanged('watchlist-change');
             }
 
             return ['applied' => true, 'state' => $state, 'version' => $version];
@@ -398,6 +408,13 @@ class CatalogUserStateService
         if ($rating !== null && ($rating < $range['minimum'] || $rating > $range['maximum'])) {
             throw ValidationException::withMessages(['rating' => $this->ratingValidationMessage()]);
         }
+    }
+
+    private function isMeaningfulProgress(EpisodeViewProgress $progress): bool
+    {
+        return $progress->completed_at !== null
+            || (int) $progress->position_seconds >= max(1, (int) config('recommendations.meaningful_progress_seconds', 180))
+            || (int) $progress->progress_percent >= max(1, (int) config('recommendations.meaningful_progress_percent', 10));
     }
 
     /** @param array<string, mixed> $timestamps */

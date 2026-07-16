@@ -7,6 +7,7 @@ namespace App\Services\Comments;
 use App\Enums\CommentTargetType;
 use App\Models\Comment;
 use App\Models\User;
+use App\Services\Catalog\CatalogRecommendationCacheInvalidator;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheTelemetry;
 use App\Support\Cache\CacheVersionRegistry;
@@ -19,11 +20,18 @@ final class CommentCacheInvalidator
     public function __construct(
         private readonly CacheVersionRegistry $versions,
         private readonly CacheTelemetry $telemetry,
+        private readonly CatalogRecommendationCacheInvalidator $recommendations,
     ) {}
 
     public function targetChanged(CommentTarget $target): void
     {
-        $invalidate = fn () => $this->invalidate($target->type, $target->catalogTitleId);
+        $invalidate = function () use ($target): void {
+            $this->invalidate($target->type, $target->catalogTitleId);
+
+            if ($target->type === CommentTargetType::Title && $target->catalogTitleId !== null) {
+                $this->recommendations->publicSignalsChanged('comment-change');
+            }
+        };
 
         if (DB::transactionLevel() > 0) {
             DB::afterCommit($invalidate);
@@ -87,6 +95,10 @@ final class CommentCacheInvalidator
 
             if ($collections) {
                 $this->invalidate(CommentTargetType::Collection, null);
+            }
+
+            if ($invalidateAllTitles || $scopedTitleIds !== []) {
+                $this->recommendations->publicSignalsChanged('comment-change');
             }
         };
 

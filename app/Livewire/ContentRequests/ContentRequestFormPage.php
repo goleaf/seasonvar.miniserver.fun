@@ -9,6 +9,7 @@ use App\Enums\ContentRequestExternalProvider;
 use App\Enums\ContentRequestType;
 use App\Exceptions\ContentRequests\ContentRequestActionException;
 use App\Models\CatalogTitle;
+use App\Models\Episode;
 use App\Models\Season;
 use App\Models\User;
 use App\Services\ContentRequests\ContentRequestInputFactory;
@@ -85,6 +86,11 @@ final class ContentRequestFormPage extends Component
     public function updatedSearch(): void
     {
         $this->search = Str::limit(Str::squish($this->search), 120, '');
+    }
+
+    public function updatedSeasonId(): void
+    {
+        $this->episodeId = '';
     }
 
     public function selectCatalogTitle(int $id): void
@@ -178,12 +184,16 @@ final class ContentRequestFormPage extends Component
         $seasons = $this->catalogTitleId !== ''
             ? Season::query()->availableTo(auth()->user())->where('catalog_title_id', (int) $this->catalogTitleId)->orderBy('kind')->orderBy('number')->get(['id', 'number', 'kind', 'title'])
             : collect();
+        $episodes = $this->seasonId !== ''
+            ? Episode::query()->availableTo(auth()->user())->where('season_id', (int) $this->seasonId)->orderBy('kind')->orderBy('number')->get(['id', 'number', 'kind', 'title'])
+            : collect();
 
         return view('livewire.content-requests.form-page', [
             'schemaReady' => $schema->ready(),
             'suggestions' => $suggestions,
             'searchPerformed' => mb_strlen($this->search) >= 2 || $this->catalogTitleId !== '',
             'seasons' => $seasons,
+            'episodes' => $episodes,
             'typeOptions' => collect(ContentRequestType::cases())->map(fn (ContentRequestType $type): array => ['value' => $type->value, 'label' => $type->label(), 'description' => $type->description()])->all(),
             'providerOptions' => collect(ContentRequestExternalProvider::cases())->map(fn (ContentRequestExternalProvider $provider): array => ['value' => $provider->value, 'label' => $provider->label()])->all(),
             'languageOptions' => collect((array) config('content-requests.language_codes', []))->map(fn (string $code): array => ['value' => $code, 'label' => __('requests.languages.'.$code)])->all(),

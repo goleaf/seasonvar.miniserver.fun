@@ -49,8 +49,9 @@ return [
         'alternative_title' => 'Альтернативное название', 'release_year' => 'Год выхода', 'country' => 'Страна',
         'content_locale' => 'Язык текста заявки', 'original_language' => 'Язык оригинала', 'audio_language' => 'Язык звука',
         'subtitle_language' => 'Язык субтитров', 'translation_type' => 'Тип перевода', 'translation_studio' => 'Студия перевода',
-        'target' => 'Связанный материал', 'season' => 'Сезон', 'season_number' => 'Номер сезона',
+        'target' => 'Связанный материал', 'season' => 'Сезон', 'season_number' => 'Номер сезона', 'season_kind' => 'Тип сезона',
         'season_number_value' => 'Сезон :number', 'episode_number' => 'Номер серии', 'episode_number_value' => 'Серия :number',
+        'episode_release_date' => 'Дата выхода серии', 'target_episode' => 'Связанная серия', 'whole_season' => 'Весь сезон',
         'whole_serial' => 'Весь сериал', 'current_quality' => 'Текущее качество', 'requested_quality' => 'Желаемое качество',
         'correction_field' => 'Что исправить', 'current_value' => 'Текущее значение', 'proposed_value' => 'Предлагаемое значение',
         'source_link' => 'Источник', 'source_link_number' => 'Ссылка :number', 'additional_source' => 'Дополнительная ссылка',
@@ -58,6 +59,7 @@ return [
         'different_explanation' => 'Почему это другая заявка', 'not_specified' => 'Не указано', 'public_update' => 'Публичное обновление',
         'rejection_reason' => 'Причина отклонения', 'priority' => 'Редакционный приоритет',
     ],
+    'season_kinds' => ['regular' => 'Обычный сезон', 'special' => 'Специальный сезон'],
     'directory' => [
         'title' => 'Заявки на материалы', 'description' => 'Найдите существующий материал или поддержите уже созданную заявку. Голоса помогают редакции оценивать интерес, но не гарантируют публикацию.',
         'seo_title' => 'Заявки на сериалы и недостающие материалы', 'seo_description' => 'Публичный список заявок на сериалы, сезоны, серии, переводы, субтитры и исправления.',
@@ -129,7 +131,7 @@ return [
     'mine' => ['title' => 'Мои заявки', 'description' => 'Созданные, поддержанные и отслеживаемые заявки.', 'scope' => 'Показать', 'scopes' => ['created' => 'Созданные мной', 'voted' => 'Поддержанные мной', 'followed' => 'Отслеживаемые'], 'empty' => 'В этом разделе заявок нет.'],
     'detail' => [
         'seo_title' => 'Заявка: :title', 'seo_description' => ':type. Текущий статус: :status.', 'requested_content' => 'Запрошенный материал',
-        'references' => 'Проверенные источники', 'timeline' => 'История статусов', 'edit_title' => 'Дополнить заявку',
+        'references' => 'Ссылки и идентификаторы', 'timeline' => 'История статусов', 'edit_title' => 'Дополнить заявку',
         'withdraw_title' => 'Отозвать участие', 'withdraw_notice' => 'Если заявку поддерживают другие пользователи, она останется открытой без связи с вашим профилем.',
     ],
     'clarifications' => ['title' => 'Уточнения', 'reply_label' => 'Ответ редакции', 'roles' => ['requester' => 'Автор заявки', 'moderator' => 'Редакция']],

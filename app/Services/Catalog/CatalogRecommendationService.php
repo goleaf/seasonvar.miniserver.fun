@@ -24,6 +24,7 @@ final class CatalogRecommendationService
         private readonly CatalogPublicDiscoveryQuery $public,
         private readonly CatalogPersonalizedRecommendationQuery $personalized,
         private readonly CatalogRecommendationExclusionService $exclusions,
+        private readonly CatalogRecommendationAvailabilityReranker $availability,
         private readonly CatalogRecommendationDiversityService $diversity,
         private readonly CatalogRecommendationCache $cache,
         private readonly CatalogRecommendationTitleLoader $loader,
@@ -86,6 +87,7 @@ final class CatalogRecommendationService
         }
 
         $candidates = $this->exclusions->applySoftDemotions($context, $candidates);
+        $candidates = $this->availability->rerank($context, $candidates);
 
         return $this->result(
             context: $context,
