@@ -361,7 +361,7 @@ GET authenticated download route
 - [x] Перевести download-time correction на тот же writer и снимать snapshot до upstream request; metadata repair остаётся best-effort.
 - [x] Обновить architecture/performance/changelog ровно в затронутых owner sections.
 - [x] Выполнить non-test verification: PHP lint, targeted Pint, targeted PHPStan, `git diff --check`, forbidden-pattern и task-only diff review.
-- [ ] Подтвердить `main`, закоммитить только follow-up файлы и отправить commit в `origin/main`, не смешивая параллельные изменения.
+- [x] Подтвердить `main`, закоммитить только follow-up файлы как `561efc7fc6a3c32737dbeba735de5d6ff0a66899` и отправить commit в `origin/main`, не смешивая параллельные изменения.
 
 ### Interfaces и порядок выполнения
 
