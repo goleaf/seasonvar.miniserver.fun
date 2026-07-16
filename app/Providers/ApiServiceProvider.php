@@ -19,10 +19,16 @@ final class ApiServiceProvider extends ServiceProvider
         RateLimiter::for('mobile-register', fn (Request $request): Limit => Limit::perMinute(5)
             ->by('register|'.$this->networkFingerprint($request)));
 
-        RateLimiter::for('mobile-login', function (Request $request): Limit {
+        RateLimiter::for('mobile-login', function (Request $request): array {
             $email = NormalizedEmail::value((string) $request->input('email'));
+            $emailFingerprint = $this->emailFingerprint($email);
+            $networkFingerprint = $this->networkFingerprint($request);
 
-            return Limit::perMinute(5)->by('login|'.$this->emailFingerprint($email).'|'.$this->networkFingerprint($request));
+            return [
+                Limit::perMinute(5)->by('login|'.$emailFingerprint.'|'.$networkFingerprint),
+                Limit::perMinutes(10, 20)->by('login-identifier|'.$emailFingerprint),
+                Limit::perMinute(60)->by('login-network|'.$networkFingerprint),
+            ];
         });
 
         foreach (['mobile-forgot-password', 'mobile-reset-password'] as $limiter) {

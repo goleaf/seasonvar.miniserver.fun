@@ -15,8 +15,6 @@ use Livewire\Component;
 
 final class LoginPage extends Component
 {
-    private const MAX_ATTEMPTS = 5;
-
     public LoginForm $form;
 
     public ?string $status = null;
@@ -40,19 +38,20 @@ final class LoginPage extends Component
 
             throw $exception;
         }
-        $rateKey = $rateLimiter->loginKey($credentials['email'], request()->ip());
+        $ipAddress = request()->ip();
+        $retryAfter = $rateLimiter->loginRetryAfter($credentials['email'], $ipAddress);
 
-        if ($rateLimiter->tooManyAttempts($rateKey, self::MAX_ATTEMPTS)) {
+        if ($retryAfter > 0) {
             $this->form->addError(
                 'email',
-                __('auth.errors.too_many_login_attempts', ['seconds' => $rateLimiter->availableIn($rateKey)]),
+                __('auth.errors.too_many_login_attempts', ['seconds' => $retryAfter]),
             );
             $this->form->reset('password');
 
             return;
         }
 
-        $rateLimiter->hit($rateKey);
+        $rateLimiter->hitLogin($credentials['email'], $ipAddress);
 
         if (! $authentication->attempt(
             $credentials['email'],
@@ -65,7 +64,7 @@ final class LoginPage extends Component
             return;
         }
 
-        $rateLimiter->clear($rateKey);
+        $rateLimiter->clearSuccessfulLogin($credentials['email'], $ipAddress);
         $this->form->reset('password');
 
         $this->redirect($redirects->intended());
