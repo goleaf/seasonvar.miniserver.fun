@@ -2,7 +2,7 @@
 
 Дата: 2026-07-16  
 Ветка: только существующая `main`  
-Статус: выполняется
+Статус: завершено
 
 ## Цель и границы
 
@@ -278,7 +278,7 @@ GET authenticated download route
 - [x] Проверить все locale keys, отсутствие hardcoded public UI text, inline CSS и Volt.
 - [x] Проверить отсутствие binary/video/temp artifacts и secrets.
 - [x] Полностью просмотреть `git diff --stat` и `git diff`; task paths отделены от unrelated working-tree changes.
-- [ ] Подтвердить `main`, выполнить task-only commit и `git push origin main` без PR.
+- [x] Подтвердить `main`, выполнить task-only commit и `git push origin main` без PR.
 
 ## Итоговый список task-файлов
 
