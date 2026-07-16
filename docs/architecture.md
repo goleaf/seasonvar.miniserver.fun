@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 30327)
-Total output lines: 392
-
 # Архитектура приложения
 
 Обновлено: 16.07.2026
@@ -211,7 +208,11 @@ Target boundaries:
 - Multi-selector на title page загружает одной выборкой не более 100 manageable collections и membership `exists`, держит draft UUID set, а Apply транзакционно сверяет его с owner-scoped locked records и bulk insert/delete. Cancel ничего не записывает; create-and-add оборачивает обе операции одной transaction. Ни одна membership operation не меняет watchlist, rating, blacklist, progress или history.
 - Manual order использует `position,id`; up/down — обязательная keyboard/touch альтернатива drag-and-drop. Reorder payload bounded до 500 IDs, принадлежность перепроверяется. Automatic sort modes (`added_desc`, `added_asc`, `title_asc`, `year_desc`, `rating_desc`, `updated_desc`) меняют только query ordering и сохраняют manual positions.
 - Title merge переносит membership до force-delete duplicate: existing canonical row сохраняет минимальную position, самое раннее meaningful `created_at` и attribution, затем positions нормализуются. Удалённый/скрытый title не ломает owner page: public query исключает его, owner получает bounded unavailable placeholder и может удалить membership.
-- Импортное обновление …327 tokens truncated…ограничениями количества подборок, страниц, элементов, размера ответа и задержкой между запросами.
+- Импортное обновление одного title проверяет только его существующие publicly listed collection memberships. При наличии связи оно обновляет collection/home/sitemap/recommendation/API generations и не делает global TitleDetail flush; fan-out до 1 000 collections получает targeted scopes, больший набор безопасно переходит на один global collection generation. Private/unlisted/pending collections не имеют shared public summary и не создают лишний bump; полный import по-прежнему выполняет существующую общую catalog invalidation в finalizer.
+
+### Синхронизация внешних редакционных подборок
+
+- `catalog-collections:sync-hdrezka` — отдельная публичная команда только для редакционных подборок HDRezka; она не входит в `seasonvar:import`, не создаёт второй импортёр тайтлов и не меняет Seasonvar source identity. Функция выключена по умолчанию, а включённое расписание запускает её ежедневно в `03:37` под distributed lock с ограничениями количества подборок, страниц, элементов, размера ответа и задержкой между запросами.
 - `HdRezkaCollectionUrlGuard` принимает только HTTPS-страницы точного host `hdrezka.my` и разрешённые пути индекса, подборки, пагинации, карточки и изображения. Arbitrary redirects, credentials, fragments, обход пути и произвольные URL отклоняются; HTTP-клиент ограничивает timeout, retry и body size. Обход начинает с полного индекса и следует по pagination каждой найденной подборки до настроенного предела.
 - Синхронизация сопоставляет только уже существующие `CatalogTitle`: exact normalized primary/original/approved-alias title является обязательной основой, несовпадение года или типа блокирует связь, а country/detail metadata помогают разрешить конкурирующие exact candidates. Неоднозначные и отсутствующие карточки остаются диагностическими source items; команда не создаёт фиктивные фильмы, жанры, сезоны, серии, media или публичный текст.
 - Каждая remote-подборка получает ownerless `editorial`, `public`, `approved` collection с русской translation row. Синхронизация обновляет только source-owned название, items, cover и provenance; локальные moderation/visibility/description/featured/publication decisions сохраняются. Complete snapshot удаляет только устаревшие source-owned memberships/signals, а partial snapshot никогда не выполняет destructive stale reconciliation.
