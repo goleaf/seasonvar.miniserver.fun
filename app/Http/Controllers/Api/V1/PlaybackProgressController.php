@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\DTOs\PlaybackProgressInput;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\RecordProgressRequest;
 use App\Http\Resources\Api\V1\EpisodeProgressResource;
 use App\Http\Responses\ApiErrorResponse;
 use App\Models\User;
-use App\Services\Catalog\CatalogTitleQuery;
-use App\Services\Catalog\CatalogUserStateService;
+use App\Services\Catalog\Api\V1\PlaybackProgressRecorder;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 
@@ -20,8 +20,7 @@ final class PlaybackProgressController extends Controller
         RecordProgressRequest $request,
         string $titleSlug,
         int $episode,
-        CatalogTitleQuery $titles,
-        CatalogUserStateService $states,
+        PlaybackProgressRecorder $progressRecorder,
         ApiErrorResponse $errors,
     ): JsonResponse {
         $user = $request->user();
@@ -30,16 +29,17 @@ final class PlaybackProgressController extends Controller
             throw new AuthenticationException;
         }
 
-        $title = $titles->visibleTo($user)->where('slug', $titleSlug)->firstOrFail();
-        $progress = $states->recordProgress(
+        $progress = $progressRecorder->record(
             $user,
-            $title,
+            $titleSlug,
             $episode,
-            $request->playbackSessionToken(),
-            $request->eventSequence(),
-            $request->positionSeconds(),
-            $request->reportedDurationSeconds(),
-            $request->ended(),
+            new PlaybackProgressInput(
+                playbackSessionToken: $request->playbackSessionToken(),
+                eventSequence: $request->eventSequence(),
+                positionSeconds: $request->positionSeconds(),
+                reportedDurationSeconds: $request->reportedDurationSeconds(),
+                ended: $request->ended(),
+            ),
         );
 
         if ($progress === null) {
