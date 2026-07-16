@@ -40,3 +40,16 @@ Schedule::job(new WakeSeasonvarImportFinalizers)
     ->name('seasonvar-import-finalization-watchdog')
     ->withoutOverlapping(10)
     ->onOneServer();
+
+$mediaFileSizeBackfillLimit = max(1, min(
+    100_000,
+    (int) config('seasonvar.media_file_size.scheduled_backfill_limit', 20),
+));
+
+Schedule::command('seasonvar:import --refresh-media-sizes --media-size-limit='.$mediaFileSizeBackfillLimit)
+    ->everyTenMinutes()
+    ->name('seasonvar-media-file-size-backfill')
+    ->withoutOverlapping(30)
+    ->onOneServer()
+    ->when(static fn (): bool => (bool) config('seasonvar.media_file_size.enabled', true)
+        && (bool) config('seasonvar.media_file_size.scheduled_backfill_enabled', true));

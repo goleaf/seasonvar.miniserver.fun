@@ -77,6 +77,7 @@ class ImportSeasonvar extends Command
         }
 
         $inventoryOnly = (bool) $this->option('inventory-only');
+        $refreshMediaSizes = (bool) $this->option('refresh-media-sizes');
 
         if (! $inventoryOnly) {
             $this->pipeline = $pipeline;
@@ -147,12 +148,14 @@ class ImportSeasonvar extends Command
                 progress: $this->seasonvarProgress(),
                 pageTypes: $pageTypes,
                 reservedRun: $reservedRun,
-                refreshMediaSizes: (bool) $this->option('refresh-media-sizes'),
+                refreshMediaSizes: $refreshMediaSizes,
                 forceMediaSizes: (bool) $this->option('force-media-sizes'),
                 mediaSizeLimit: $this->mediaSizeLimit(),
             );
 
-            $cacheInvalidator->catalogChanged();
+            if (! $refreshMediaSizes) {
+                $cacheInvalidator->catalogChanged();
+            }
 
             $this->info(sprintf(
                 '%s: запуск #%d, циклов %d, страниц выбрано %d, обновлено %d, ошибок %d, видео добавлено %d, видео обновлено %d, размеров проверено %d, известно %d, неизвестно %d, не поддерживается %d, ошибок размера %d, найдено %s (%d байт).',
@@ -175,7 +178,7 @@ class ImportSeasonvar extends Command
 
             return in_array($run->status, ['completed', 'partial', 'cancelled'], true) ? self::SUCCESS : self::FAILURE;
         } catch (Throwable $exception) {
-            if (! $inventoryOnly) {
+            if (! $inventoryOnly && ! $refreshMediaSizes) {
                 $cacheInvalidator->catalogChanged();
             }
             $this->error($exception->getMessage());

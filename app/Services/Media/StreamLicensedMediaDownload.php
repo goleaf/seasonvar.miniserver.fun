@@ -347,14 +347,27 @@ final class StreamLicensedMediaDownload
         }
 
         try {
-            $media->forceFill([
+            $attributes = [
                 'file_size_bytes' => $bytes,
                 'file_size_checked_at' => now(),
                 'file_size_check_status' => MediaFileSizeCheckStatus::Known,
                 'file_size_source' => $httpStatus === 206 ? 'download-content-range' : 'download-content-length',
                 'file_size_http_status' => $httpStatus,
                 'file_size_check_error' => null,
-            ])->save();
+            ];
+            $updated = LicensedMedia::query()
+                ->whereKey($media->getKey())
+                ->where('catalog_title_id', $media->catalog_title_id)
+                ->where('playback_url', $media->playback_url)
+                ->where('path', $media->path)
+                ->where('format', $media->format)
+                ->update($attributes);
+
+            if ($updated !== 1) {
+                return;
+            }
+
+            $media->forceFill($attributes);
             $this->cache->importedTitleChanged((int) $media->catalog_title_id);
         } catch (Throwable) {
             // Metadata repair is best-effort and must never interrupt an authorized stream.

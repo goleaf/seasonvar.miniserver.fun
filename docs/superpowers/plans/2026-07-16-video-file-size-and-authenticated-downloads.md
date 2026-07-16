@@ -2,7 +2,7 @@
 
 Дата: 2026-07-16  
 Ветка: только существующая `main`  
-Статус: завершено
+Статус: основная реализация завершена; production follow-up выполняется
 
 ## Цель и границы
 
@@ -279,6 +279,59 @@ GET authenticated download route
 - [x] Проверить отсутствие binary/video/temp artifacts и secrets.
 - [x] Полностью просмотреть `git diff --stat` и `git diff`; task paths отделены от unrelated working-tree changes.
 - [x] Подтвердить `main`, выполнить task-only commit и `git push origin main` без PR.
+
+## Production follow-up: автоматический bounded backfill и source-race guard
+
+### Аудит после rollout
+
+- [x] Production migrations применены, SQLite `quick_check` прошёл, guest route не отдал bytes, player показал сохранённый размер.
+- [x] Ручной bounded запуск `seasonvar:import --refresh-media-sizes --media-size-limit=20` завершился 20/20 `known` и сохранил exact bytes.
+- [x] После возобновления обычных workers новые/изменённые media продолжили автоматически получать size metadata; legacy backlog остаётся большим и требует медленного фонового продвижения.
+- [x] Подтверждено, что size-only mode уже использует общие import/global locks, stable `lazyById`, persistent run/events/counters, stop signal и targeted title invalidation.
+- [x] Обнаружен лишний global catalog cache bump после каждого size-only CLI run: scheduled запуск не должен инвалидировать весь каталог поверх уже существующего targeted invalidation.
+- [x] Обнаружено редкое окно гонки: effective URL/format может измениться после начала HEAD/Range и до сохранения результата; старый ответ нельзя записывать в строку с новым source.
+
+### Выбранная архитектура
+
+- [x] Сравнены три подхода: отдельная queue job, backfill только внутри full import и Laravel scheduler поверх существующей команды.
+- [x] Выбран scheduler-вызов `seasonvar:import --refresh-media-sizes --media-size-limit=N`: он не создаёт второй публичной команды или importer boundary и наследует current single-flight/recovery/progress contract.
+- [x] Добавить config-backed enable flag и консервативный scheduled batch limit; env defaults должны работать без обязательной настройки production `.env`.
+- [x] Зарегистрировать запуск каждые 10 минут через существующий `redis-locks`, `withoutOverlapping(30)` и `onOneServer`; не использовать background execution и не запускать в maintenance mode.
+- [x] Оставить hard cap внутри pipeline источником истины даже при ошибочной большой config величине.
+- [x] Для size-only run пропускать global `catalogChanged()`: action должна инвалидировать только реально изменившиеся title/player metadata.
+- [x] Перед inspector snapshot-ить `catalog_title_id`, `playback_url`, `path` и `format`; сохранять результат одним conditional update только если source identity всё ещё совпадает и media не soft-deleted.
+- [x] Применить тот же source/title guard к best-effort download-time size correction, чтобы authorized stream старого URL не обновил metadata уже изменённой записи.
+- [x] При source-race выдавать безопасный skipped progress без URL/credentials, не затирать новый `pending` и не считать старый результат terminal metadata.
+- [x] Удалить недостижимый `Pending` match arm после уже существующего раннего возврата; targeted PHPStan использует тот же control-flow path как non-test regression check.
+- [x] Обновить `.env.example`, importer/performance/deployment/queue docs и dated changelog без дублирования полного feature-контракта.
+
+### Проверка follow-up без тестов
+
+- [x] Не создавать, не изменять и не запускать automated tests согласно прямому запрету задачи.
+- [x] Выполнить `php -l` для изменённых PHP-файлов и targeted `./vendor/bin/pint --format agent ...`; `--dirty` намеренно не форматирует параллельные пользовательские PHP-изменения.
+- [x] Выполнить `php artisan schedule:list` и подтвердить command/10-minute cadence; overlap/single-server contract сверить с route source и Laravel 13 docs.
+- [x] Выполнить безопасную non-network validation через `seasonvar:import --help`; неконтролируемый backfill повторно не запускать после уже успешного production batch 20/20.
+- [ ] Выполнить `git diff --check`, targeted forbidden-pattern search и task-only diff review.
+- [ ] Подтвердить `main`, отделить task paths от параллельных пользовательских изменений, commit и push в `origin/main`.
+
+### Follow-up changed-files list
+
+- [x] `app/Actions/Media/InspectLicensedMediaFileSize.php`
+- [x] `app/Console/Commands/ImportSeasonvar.php`
+- [x] `app/Services/Media/StreamLicensedMediaDownload.php`
+- [x] `routes/console.php`
+- [x] `config/seasonvar.php`
+- [x] `.env.example`
+- [x] `CHANGELOG.md`
+- [x] `docs/importer.md`
+- [x] `docs/performance.md`
+- [x] `docs/queues.md`
+- [x] `docs/deployment.md`
+- [x] `README.md`
+- [x] `docs/architecture.md`
+- [x] `docs/environment.md`
+- [x] `docs/caching.md`
+- [x] этот plan-файл
 
 ## Итоговый список task-файлов
 

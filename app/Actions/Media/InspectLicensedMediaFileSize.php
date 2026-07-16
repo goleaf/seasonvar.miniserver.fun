@@ -51,9 +51,11 @@ final class InspectLicensedMediaFileSize
         }
 
         $this->report($progress, 'seasonvar-media-size-check-started', $this->context($media, $context));
+        $sourceIdentity = $this->sourceIdentity($media);
 
         try {
             $result = $this->inspector->inspect($media);
+            $attributes = $this->attributes($result);
             $before = $media->only([
                 'file_size_bytes',
                 'file_size_check_status',
@@ -62,7 +64,15 @@ final class InspectLicensedMediaFileSize
                 'file_size_check_error',
             ]);
 
-            $media->forceFill($this->attributes($result))->save();
+            if (! $this->persistIfSourceMatches($media, $sourceIdentity, $attributes)) {
+                $this->report($progress, 'seasonvar-media-size-check-skipped', $this->context($media, $context, [
+                    'reason' => 'источник видео изменился во время проверки',
+                ]));
+
+                return false;
+            }
+
+            $media->forceFill($attributes);
             $changed = $before !== $media->only(array_keys($before));
 
             if ($changed && (int) $media->catalog_title_id > 0) {
@@ -100,7 +110,6 @@ final class InspectLicensedMediaFileSize
             MediaFileSizeCheckStatus::Unknown => $this->configuredSeconds('unknown_retry_seconds', 86_400),
             MediaFileSizeCheckStatus::Failed => $this->configuredSeconds('failed_retry_seconds', 21_600),
             MediaFileSizeCheckStatus::Unsupported => PHP_INT_MAX,
-            MediaFileSizeCheckStatus::Pending => 0,
         };
 
         return $retrySeconds !== PHP_INT_MAX
@@ -122,6 +131,37 @@ final class InspectLicensedMediaFileSize
             'file_size_http_status' => $result->httpStatus,
             'file_size_check_error' => $error !== '' ? Str::limit($error, 255, '') : null,
         ];
+    }
+
+    /**
+     * @return array{catalog_title_id: int|null, playback_url: string|null, path: string, format: string|null}
+     */
+    private function sourceIdentity(LicensedMedia $media): array
+    {
+        return [
+            'catalog_title_id' => $media->catalog_title_id,
+            'playback_url' => $media->playback_url,
+            'path' => $media->path,
+            'format' => $media->format,
+        ];
+    }
+
+    /**
+     * @param  array{catalog_title_id: int|null, playback_url: string|null, path: string, format: string|null}  $sourceIdentity
+     * @param  array<string, mixed>  $attributes
+     */
+    private function persistIfSourceMatches(
+        LicensedMedia $media,
+        array $sourceIdentity,
+        array $attributes,
+    ): bool {
+        return LicensedMedia::query()
+            ->whereKey($media->getKey())
+            ->where('catalog_title_id', $sourceIdentity['catalog_title_id'])
+            ->where('playback_url', $sourceIdentity['playback_url'])
+            ->where('path', $sourceIdentity['path'])
+            ->where('format', $sourceIdentity['format'])
+            ->update($attributes) === 1;
     }
 
     /**
