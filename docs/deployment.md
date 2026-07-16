@@ -302,7 +302,7 @@ php artisan app:deployment-check --json
 
 На live SQLite >14 GB instrumented run занял 24.45 s wall time: quick/FK path — 23655 ms, каждый прочий check — 0–303 ms. Внешний `timeout 25s` поэтому дал ложное впечатление зависания. Не снижайте полноту integrity-проверки: запускайте preflight вне активной write-нагрузки с бюджетом >=30 s и отслеживайте рост `duration_ms` вместе с размером базы.
 
-Атомарный порядок maintenance: preflight → дождаться безопасной точки одного `seasonvar:import --forever` и остановить writers → backup SQLite → `migrate:status` и обычный `migrate --force` → при необходимости штатный FTS rebuild/cache warm → `config:cache` → перезапуск PHP-FPM и единственного importer process → повторный preflight, `app:health --json` и гостевой HTTP smoke. `queue:retry`/`queue:forget` остаются отдельным ручным решением после сверки run state и claims; preflight их не вызывает.
+Атомарный порядок maintenance: preflight → послать единственному `seasonvar:import --forever` `SIGTERM` и дождаться terminal `cancelled` после текущей страницы → остановить остальные writers → backup SQLite → `migrate:status` и обычный `migrate --force` → при необходимости штатный FTS rebuild/cache warm → `config:cache` → перезапуск PHP-FPM и единственного importer process → повторный preflight, `app:health --json` и гостевой HTTP smoke. Не продолжайте schema/backup-шаг, пока Linux PID жив или heartbeat/run state остаются active; `SIGKILL`, принудительная смена run state и освобождение claims не являются writer pause. `queue:retry`/`queue:forget` остаются отдельным ручным решением после сверки run state и claims; preflight их не вызывает.
 
 ### Владение retention и failed jobs
 

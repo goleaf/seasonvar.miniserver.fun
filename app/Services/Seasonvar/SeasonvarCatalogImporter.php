@@ -253,7 +253,8 @@ class SeasonvarCatalogImporter
     /**
      * @param  Collection<int, SourcePage>  $pages
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
-     * @return array{parsed: int, failed: int, media_attached: int, media_updated: int, media_skipped: int, media_failed: int, failures: list<string>}
+     * @param  (callable(): bool)|null  $shouldStop
+     * @return array{selected: int, parsed: int, failed: int, media_attached: int, media_updated: int, media_skipped: int, media_failed: int, failures: list<string>, stopped: bool}
      */
     public function parsePages(
         Collection $pages,
@@ -261,7 +262,9 @@ class SeasonvarCatalogImporter
         bool $force = false,
         ?int $importRunId = null,
         bool $retryTransient = false,
+        ?callable $shouldStop = null,
     ): array {
+        $selected = 0;
         $parsed = 0;
         $failed = 0;
         $mediaAttached = 0;
@@ -278,7 +281,12 @@ class SeasonvarCatalogImporter
         $position = 0;
 
         foreach ($pages as $page) {
+            if ($shouldStop !== null && $shouldStop()) {
+                break;
+            }
+
             $position++;
+            $selected++;
 
             $this->report($progress, 'parse-batch-item-started', [
                 'index' => $position,
@@ -328,15 +336,18 @@ class SeasonvarCatalogImporter
 
         $this->report($progress, 'parse-batch-complete', [
             'total' => $total,
+            'selected' => $selected,
             'parsed' => $parsed,
             'failed' => $failed,
             'media_attached' => $mediaAttached,
             'media_updated' => $mediaUpdated,
             'media_skipped' => $mediaSkipped,
             'media_failed' => $mediaFailed,
+            'stopped' => $selected < $total,
         ]);
 
         return [
+            'selected' => $selected,
             'parsed' => $parsed,
             'failed' => $failed,
             'media_attached' => $mediaAttached,
@@ -344,6 +355,7 @@ class SeasonvarCatalogImporter
             'media_skipped' => $mediaSkipped,
             'media_failed' => $mediaFailed,
             'failures' => $failures,
+            'stopped' => $selected < $total,
         ];
     }
 

@@ -3,11 +3,11 @@
 namespace App\Console\Commands\Concerns;
 
 use App\Enums\SeasonvarPageType;
+use App\Support\HumanFileSizeFormatter;
 use BackedEnum;
 use DateTimeInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
-use App\Support\HumanFileSizeFormatter;
 
 /**
  * @mixin Command
@@ -246,8 +246,10 @@ trait OutputsSeasonvarProgress
             'seasonvar-metadata-title-failed' => 'Дополнение связей тайтла завершилось ошибкой',
             'seasonvar-title-merge-complete' => 'Объединение сериалов завершено',
             'seasonvar-title-merged' => 'Страницы сезонов объединены',
+            'seasonvar-import-cancelled' => 'Обновление Seasonvar остановлено',
             'seasonvar-import-complete' => 'Обновление Seasonvar завершено',
             'seasonvar-import-cycle-complete' => 'Цикл обновления завершен',
+            'seasonvar-import-cycle-stopped' => 'Цикл обновления остановлен на безопасной границе',
             'seasonvar-import-cycle-started' => 'Цикл обновления начался',
             'seasonvar-import-failed' => 'Обновление Seasonvar завершилось ошибкой',
             'seasonvar-import-season-url-failed' => 'Страница сезона завершилась ошибкой',

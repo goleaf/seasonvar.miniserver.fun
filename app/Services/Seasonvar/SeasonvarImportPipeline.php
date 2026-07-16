@@ -6,6 +6,7 @@ namespace App\Services\Seasonvar;
 
 use App\Actions\Media\InspectLicensedMediaFileSize;
 use App\Enums\MediaHealthStatus;
+use App\Enums\SeasonvarImportStatus;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
 use App\Models\Season;
@@ -104,6 +105,10 @@ class SeasonvarImportPipeline
 
         try {
             do {
+                if ($this->stopRequested) {
+                    break;
+                }
+
                 $cycle = ((int) $run->cycles) + 1;
                 $this->runCycle(
                     $run,
@@ -126,31 +131,44 @@ class SeasonvarImportPipeline
                 $this->sleepBetweenCycles($sleepSeconds, $loggedProgress);
             } while (! $this->stopRequested);
 
-            $run->refresh()->fill([
-                'status' => $run->completionStatus(),
+            $terminalAttributes = [
+                'status' => $this->stopRequested
+                    ? SeasonvarImportStatus::Cancelled->value
+                    : $run->completionStatus(),
                 'finished_at' => now(),
                 'last_heartbeat_at' => now(),
-            ])->save();
+            ];
+
+            if ($this->stopRequested) {
+                $terminalAttributes['cancel_requested_at'] = now();
+            }
+
+            $run->refresh()->fill($terminalAttributes)->save();
             $this->contentRequests->link($run->refresh());
 
-            $this->recordProgress($run, $progress, 'seasonvar-import-complete', [
-                'cycles' => $run->cycles,
-                'discovered' => $run->discovered,
-                'stored' => $run->stored,
-                'selected' => $run->selected,
-                'parsed' => $run->parsed,
-                'failed' => $run->failed,
-                'media_attached' => $run->media_attached,
-                'media_updated' => $run->media_updated,
-                'media_skipped' => $run->media_skipped,
-                'media_failed' => $run->media_failed,
-                'media_sizes_checked' => $run->media_sizes_checked,
-                'media_sizes_known' => $run->media_sizes_known,
-                'media_sizes_unknown' => $run->media_sizes_unknown,
-                'media_sizes_unsupported' => $run->media_sizes_unsupported,
-                'media_size_checks_failed' => $run->media_size_checks_failed,
-                'media_size_known_bytes' => $run->media_size_known_bytes,
-            ]);
+            $this->recordProgress(
+                $run,
+                $progress,
+                $this->stopRequested ? 'seasonvar-import-cancelled' : 'seasonvar-import-complete',
+                [
+                    'cycles' => $run->cycles,
+                    'discovered' => $run->discovered,
+                    'stored' => $run->stored,
+                    'selected' => $run->selected,
+                    'parsed' => $run->parsed,
+                    'failed' => $run->failed,
+                    'media_attached' => $run->media_attached,
+                    'media_updated' => $run->media_updated,
+                    'media_skipped' => $run->media_skipped,
+                    'media_failed' => $run->media_failed,
+                    'media_sizes_checked' => $run->media_sizes_checked,
+                    'media_sizes_known' => $run->media_sizes_known,
+                    'media_sizes_unknown' => $run->media_sizes_unknown,
+                    'media_sizes_unsupported' => $run->media_sizes_unsupported,
+                    'media_size_checks_failed' => $run->media_size_checks_failed,
+                    'media_size_known_bytes' => $run->media_size_known_bytes,
+                ],
+            );
         } catch (Throwable $exception) {
             $run->fill([
                 'status' => 'failed',
@@ -299,19 +317,78 @@ class SeasonvarImportPipeline
 
         $storageMaintenanceResult = $this->storageMaintenance->prune();
         $progress('seasonvar-import-storage-pruned', $storageMaintenanceResult);
+
+        if ($this->finishStoppedCycle($run, $cycle, $progress, 'storage_maintenance')) {
+            return;
+        }
+
         $sourceAvailabilityBackfillResult = $this->sourceAvailabilityBackfill->run($progress);
+
+        if ($this->finishStoppedCycle($run, $cycle, $progress, 'provider_availability_backfill')) {
+            return;
+        }
+
         $metadataBackfillResult = $this->metadataBackfill->run($progress);
 
+        if ($this->finishStoppedCycle($run, $cycle, $progress, 'metadata_backfill')) {
+            return;
+        }
+
         $earlyRelationCleanupResult = $this->metadataDeduplicator->run($progress);
+
+        if ($this->finishStoppedCycle($run, $cycle, $progress, 'early_relation_cleanup')) {
+            return;
+        }
+
         $sourceStatusBackfillResult = $this->backfillParsedSourcePageStatuses($progress);
+
+        if ($this->finishStoppedCycle($run, $cycle, $progress, 'source_status_backfill')) {
+            return;
+        }
+
         $cycleResult = $this->runSitemapCycle($run, $force, $discover, $progress, $pageTypes);
+
+        if ($this->finishStoppedCycle($run, $cycle, $progress, 'sitemap', $cycleResult)) {
+            return;
+        }
+
         $mediaMetadataResult = $this->refreshMediaMetadataBacklog($progress);
+
+        if ($this->finishStoppedCycle($run, $cycle, $progress, 'media_metadata_backlog')) {
+            return;
+        }
+
         $mediaSourceKeyResult = $this->backfillMediaSourceKeys($progress);
+
+        if ($this->finishStoppedCycle($run, $cycle, $progress, 'media_source_key_backlog')) {
+            return;
+        }
+
         $mediaBacklogResult = $this->refreshMediaBacklog($progress);
+
+        if ($this->finishStoppedCycle($run, $cycle, $progress, 'media_availability_backlog')) {
+            return;
+        }
+
         $mediaSizeBacklogResult = $this->refreshMediaFileSizeBacklog($progress);
+
+        if ($this->finishStoppedCycle($run, $cycle, $progress, 'media_size_backlog')) {
+            return;
+        }
+
         $lateRelationCleanupResult = $this->metadataDeduplicator->run($progress);
         $relationCleanupResult = $this->mergeRelationCleanupResults($earlyRelationCleanupResult, $lateRelationCleanupResult);
+
+        if ($this->finishStoppedCycle($run, $cycle, $progress, 'late_relation_cleanup')) {
+            return;
+        }
+
         $mergeResult = $this->titleMerger->merge($progress);
+
+        if ($this->finishStoppedCycle($run, $cycle, $progress, 'title_merge')) {
+            return;
+        }
+
         $recommendationResult = $this->recommendations->rebuild($progress);
 
         $this->addRunCounters($run, [
@@ -368,6 +445,37 @@ class SeasonvarImportPipeline
             'recommendations_stored' => $recommendationResult['stored'],
             'recommendations_duration_ms' => $recommendationResult['duration_ms'],
         ]);
+    }
+
+    /**
+     * @param  callable(string, array<string, mixed>): void  $progress
+     * @param  array<string, mixed>  $context
+     */
+    private function finishStoppedCycle(
+        SeasonvarImportRun $run,
+        int $cycle,
+        callable $progress,
+        string $phase,
+        array $context = [],
+    ): bool {
+        if (! $this->stopRequested) {
+            return false;
+        }
+
+        $this->addRunCounters($run, ['cycles' => 1], [
+            'last_stop' => [
+                'phase' => $phase,
+                'requested_at' => now()->toIso8601String(),
+            ],
+        ]);
+
+        $progress('seasonvar-import-cycle-stopped', [
+            'cycle' => $cycle,
+            'phase' => $phase,
+            ...$context,
+        ]);
+
+        return true;
     }
 
     /**
@@ -446,7 +554,7 @@ class SeasonvarImportPipeline
     /**
      * @param  callable(string, array<string, mixed>): void  $progress
      * @param  list<string>|null  $pageTypes
-     * @return array{discovered: int, stored: int, selected: int, parsed: int, failed: int, media_attached: int, media_updated: int, media_skipped: int, media_failed: int, cleaned: int}
+     * @return array{discovered: int, stored: int, selected: int, parsed: int, failed: int, media_attached: int, media_updated: int, media_skipped: int, media_failed: int, cleaned: int, stopped: bool}
      */
     private function runSitemapCycle(
         SeasonvarImportRun $run,
@@ -491,10 +599,20 @@ class SeasonvarImportPipeline
         ];
 
         foreach ($this->pageChunksForImportCycle($force, $run->id, $progress, $pageTypes) as $pages) {
-            $selected += $pages->count();
-            $chunkResult = $this->importer->parsePages($pages, $progress, $force, $run->id);
+            if ($this->stopRequested) {
+                break;
+            }
+
+            $chunkResult = $this->importer->parsePages(
+                pages: $pages,
+                progress: $progress,
+                force: $force,
+                importRunId: $run->id,
+                shouldStop: fn (): bool => $this->stopRequested,
+            );
+            $selected += $chunkResult['selected'];
             $chunkCounters = [
-                'selected' => $pages->count(),
+                'selected' => $chunkResult['selected'],
                 'parsed' => $chunkResult['parsed'],
                 'failed' => $chunkResult['failed'],
                 'media_attached' => $chunkResult['media_attached'],
@@ -523,6 +641,10 @@ class SeasonvarImportPipeline
                 'parsed_total' => $parseResult['parsed'],
                 'failed_total' => $parseResult['failed'],
             ]);
+
+            if ($this->stopRequested) {
+                break;
+            }
         }
 
         return [
@@ -536,6 +658,7 @@ class SeasonvarImportPipeline
             'media_skipped' => $parseResult['media_skipped'],
             'media_failed' => $parseResult['media_failed'],
             'cleaned' => $cleaned,
+            'stopped' => $this->stopRequested,
         ];
     }
 

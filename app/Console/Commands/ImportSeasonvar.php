@@ -155,7 +155,8 @@ class ImportSeasonvar extends Command
             $cacheInvalidator->catalogChanged();
 
             $this->info(sprintf(
-                'Готово: запуск #%d, циклов %d, страниц выбрано %d, обновлено %d, ошибок %d, видео добавлено %d, видео обновлено %d, размеров проверено %d, известно %d, неизвестно %d, не поддерживается %d, ошибок размера %d, найдено %s (%d байт).',
+                '%s: запуск #%d, циклов %d, страниц выбрано %d, обновлено %d, ошибок %d, видео добавлено %d, видео обновлено %d, размеров проверено %d, известно %d, неизвестно %d, не поддерживается %d, ошибок размера %d, найдено %s (%d байт).',
+                $run->status === 'cancelled' ? 'Остановлено' : 'Готово',
                 $run->id,
                 $run->cycles,
                 $run->selected,
@@ -172,7 +173,7 @@ class ImportSeasonvar extends Command
                 $run->media_size_known_bytes,
             ));
 
-            return in_array($run->status, ['completed', 'partial'], true) ? self::SUCCESS : self::FAILURE;
+            return in_array($run->status, ['completed', 'partial', 'cancelled'], true) ? self::SUCCESS : self::FAILURE;
         } catch (Throwable $exception) {
             if (! $inventoryOnly) {
                 $cacheInvalidator->catalogChanged();
@@ -570,19 +571,8 @@ class ImportSeasonvar extends Command
 
     private function registerSignalHandlers(): void
     {
-        if (! function_exists('pcntl_async_signals') || ! function_exists('pcntl_signal')) {
-            return;
-        }
-
-        pcntl_async_signals(true);
-
-        foreach ([SIGINT, SIGTERM] as $signal) {
-            pcntl_signal($signal, function () use ($signal): void {
-                $this->writeSeasonvarProgress('seasonvar-import-stop-requested', [
-                    'signal' => $signal,
-                ]);
-                $this->pipeline?->stop();
-            });
-        }
+        $this->trap([SIGINT, SIGTERM], function (int $_signal): void {
+            $this->pipeline?->stop();
+        });
     }
 }
