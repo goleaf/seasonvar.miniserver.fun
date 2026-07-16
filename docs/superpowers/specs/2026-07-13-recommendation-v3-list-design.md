@@ -261,6 +261,14 @@ Homepage renders one light recommendation row: authenticated real personal resul
 
 The Livewire component keeps only stable scalar URL state and locked type/seed/undo ID. It does not serialize models/history. Every loading, empty, anonymous, cold-start, error and feedback state is localized and announced. Results use a responsive grid/list, meaningful headings, 44px controls, visible focus, touch scroll for type navigation and no autoplay/carousel/focus trap/inline CSS/inline business JS. No new JavaScript module was necessary.
 
+### Post-rollout initial public discovery cache eligibility
+
+The repeat-suppression cache audit exposed one adjacent Livewire lifecycle mismatch: `CatalogDiscoveryPage::mount()` generated a non-empty seed for every route, while the canonical cache correctly treats every seeded context as session-specific. As a result, the first anonymous deterministic `trending`, `popular`, `top_rated`, `recently_added`, `recently_updated`, `upcoming` and `editorial` render bypassed the shared public candidate cache even before the viewer requested a refresh. Result identity remained correct, but the documented stable-public cache path was unreachable from the primary discovery page.
+
+Keeping every page seeded would preserve correctness but discard useful cache reuse. Introducing a separate refresh-context DTO or second cache API would duplicate an identity already represented by the nullable server-only seed. The selected design retains the existing DTO and locked scalar property: initial deterministic public types keep an empty component seed and pass `null` into `CatalogRecommendationContext`; `random` and `personalized` mount with an opaque seed because their initial request is intentionally non-shared/repeat-aware. An explicit refresh still remembers the visible batch, rotates the opaque seed and renders the next bounded set with recent exclusions.
+
+The empty-string Livewire transport value is never a recommendation identity or URL field; it is normalized to `null` only at the server-side DTO boundary. Filters, pagination, locale, public type codes, random behavior, authenticated personalization, session bounds, cache resource/version and SEO remain unchanged. This restores cache reuse without globally caching private or recently shown state and requires no migration, JavaScript, translation or new service.
+
 ### Authorization, privacy, analytics and lifecycle
 
 Public discovery is readable without login. Feedback/watch status uses current authenticated user and `CatalogTitlePolicy::interact`; editorial relation create/remove/search requires `manage-catalog`. Client-provided IDs, type, relation type, priority, feedback, filter, provider and limit are enum/allowlist/bounds checked again in services. Editorial text is existing escaped collection metadata; no raw HTML or score mutation reaches mass assignment.

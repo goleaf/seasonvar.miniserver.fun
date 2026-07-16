@@ -870,3 +870,37 @@ return $query
 - [x] Update owner documentation and the English changelog, inspect the exact isolated task patch, commit only Task 18 files on `main`, push and verify the remote SHA without absorbing concurrent profile/technical-issue work. Commit `db1417ba9671c39e1e6a882fadd2401b03a0b35f` was pushed and matched `origin/main` before this closure update.
 
 Verification evidence: an isolated array cache rebuilt one stable public request once, rebuilt two seeded requests twice and held 15 keys both before and after the seeded calls. A separate bounded session check changed recent IDs from `[]` to `[101,102]`; a read-only canonical cold-start sequence returned `[151,11446,22692]` and then `[34144,32264,32177]` with zero overlap. No production cache, user row or catalogue row was mutated.
+
+## Follow-up: initial public discovery cache eligibility, 2026-07-16
+
+> **For agentic workers:** execute inline on the existing `main`; project rules prohibit another branch/worktree or subagent delegation. Task 18 forbids creating or running automated tests, so acceptance uses isolated runtime probes and static inspection.
+
+**Goal:** restore the shared candidate-cache path for the first anonymous deterministic discovery render without weakening random/personalized repeat suppression.
+
+**Architecture:** keep the existing locked Livewire seed and nullable recommendation-context seed. Mount only `random` and `personalized` with an opaque seed; deterministic public types transport an empty scalar and normalize it to `null` at the DTO boundary. Explicit refresh keeps the existing remember-then-rotate sequence.
+
+**Tech stack:** PHP 8.5, Laravel 13.20, Livewire 4.3, existing recommendation DTO/service/cache/session boundaries; no migration, frontend asset, translation or route change.
+
+### Task F13: align Livewire seed lifecycle with cache contract
+
+**Files:**
+
+- Modify: `app/Livewire/CatalogDiscoveryPage.php`
+- Modify: `docs/caching.md`
+- Modify: `docs/performance.md`
+- Modify: `docs/MAINTENANCE_LOG.md`
+- Modify: `CHANGELOG.md`
+- Modify: this plan and the existing Task 18 design spec.
+
+**Interfaces:**
+
+- Preserve every public property name, URL alias, route, action signature and `CatalogRecommendationContext` constructor.
+- Empty Livewire seed means stable initial deterministic discovery and becomes `null` only inside `context()`.
+- Non-empty seed remains the server-only marker for random, personalized and explicit refresh requests.
+
+- [ ] Initialize an opaque seed only for `random` and `personalized`; leave deterministic public types at the existing locked empty transport value.
+- [ ] Normalize the empty transport value to `null` when constructing `CatalogRecommendationContext`; never expose seed in URL state.
+- [ ] Preserve explicit refresh ordering: discover the displayed batch, remember its IDs, rotate seed, reset page, then let Livewire render the next bounded result.
+- [ ] Prove with isolated component-context/cache probes that initial public deterministic requests share one rebuild, while random/personalized/refresh contexts remain uncached and repeat-aware.
+- [ ] Run PHP syntax, task-file Pint, targeted Larastan, route inspection, managed-doc check, debug/placeholder scan and task-scoped `git diff --check`; do not invoke PHPUnit/Pest or create test files.
+- [ ] Update owner documentation and English changelog, inspect the isolated patch, commit only Task 18 files on `main`, push and verify the remote SHA without absorbing concurrent work.
