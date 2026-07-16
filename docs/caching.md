@@ -212,7 +212,7 @@ Public card DTO содержит только public target, status, dates и gr
 
 ## Cache lifecycle рекомендаций
 
-`CatalogRecommendationCache` переиспользует `TieredCache`, `CacheDomain::Recommendations`, существующие TTL/version/telemetry и хранит только bounded scalar candidate arrays. Public dimensions: stable type, interface locale, `audience=public`, trending period, one rating source, normalized filter hash, current/exclusion hash только когда контекст требует, и ranking version `task18-v5`. Page/per-page применяются после общего pool и не размножают keys. Full models, media URLs и translations graph не кэшируются.
+`CatalogRecommendationCache` переиспользует `TieredCache`, `CacheDomain::Recommendations`, существующие TTL/version/telemetry и хранит только bounded scalar candidate arrays. Public dimensions: stable type, interface locale, `audience=public`, trending period, one rating source, normalized filter hash, current/exclusion hash только когда контекст требует, и ranking version `task18-v6`. Версия `v6` намеренно отделяет ужесточённую семантику trending/upcoming от ранее сохранённых `v5` pools без scan, flush или удаления чужих namespace. Page/per-page применяются после общего pool и не размножают keys. Full models, media URLs и translations graph не кэшируются.
 
 Authenticated requests, `personalized` и `random` всегда bypass shared result. Feedback, blacklist, history, progress, watchlist, statuses, private tags/collections, premium/region context и private explanations не являются global value/dimension. Recent-display suppression живёт bounded в current session (`96` IDs, `7` дней) с отдельным guest/user scope; raw IDs не попадают в public key.
 
