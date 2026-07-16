@@ -9,15 +9,22 @@ use App\Enums\CatalogCollectionSort;
 use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogCollection;
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleUserState;
+use App\Models\Episode;
+use App\Models\EpisodeViewProgress;
+use App\Models\LicensedMedia;
+use App\Models\Season;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\UserTag;
 use App\Services\DemoData\DemoTitleSelector;
 use App\Services\DemoData\Stages\DemoAccountStage;
+use App\Services\DemoData\Stages\DemoCatalogActivityStage;
 use App\Services\DemoData\Stages\DemoOrganizationStage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 final class DemoCatalogCorpusStageTest extends TestCase
@@ -134,6 +141,100 @@ final class DemoCatalogCorpusStageTest extends TestCase
 
         $this->assertFalse($duplicatePersonalPivot);
         $this->assertFalse($duplicateCollectionPivot);
+    }
+
+    public function test_catalog_activity_stage_fills_exact_state_feedback_and_real_progress_idempotently(): void
+    {
+        CatalogTitle::factory()->count(100)->create()->each(function (CatalogTitle $title): void {
+            $season = Season::factory()->create(['catalog_title_id' => $title->id, 'number' => 1]);
+            $episode = Episode::factory()->create(['season_id' => $season->id, 'number' => 1]);
+            LicensedMedia::factory()->create([
+                'catalog_title_id' => $title->id,
+                'season_id' => $season->id,
+                'episode_id' => $episode->id,
+                'status' => 'published',
+                'published_at' => now()->subDay(),
+                'duration_seconds' => 2_400,
+            ]);
+        });
+        $options = DemoDataOptions::fromConfig();
+        app(DemoAccountStage::class)->run($options);
+        $stage = app(DemoCatalogActivityStage::class);
+        $first = $stage->run($options);
+        $counts = [
+            CatalogTitleUserState::query()->count(),
+            EpisodeViewProgress::query()->count(),
+        ];
+        $second = $stage->run($options);
+
+        $this->assertSame('catalog_activity', $stage->key());
+        $this->assertSame(200, $first->counters['states']);
+        $this->assertSame(200, $first->counters['progress']);
+        $this->assertSame($first->counters, $second->counters);
+        $this->assertSame($counts, [
+            CatalogTitleUserState::query()->count(),
+            EpisodeViewProgress::query()->count(),
+        ]);
+
+        $users = User::query()->whereIn('email', [
+            'user1@example.com', 'user2@example.com', 'user3@example.com', 'user4@example.com',
+        ])->get();
+
+        foreach ($users as $user) {
+            $states = CatalogTitleUserState::query()->where('user_id', $user->id)->get();
+            $this->assertCount(50, $states);
+            $this->assertEqualsCanonicalizing(
+                ['planned', 'watching', 'completed', 'dropped'],
+                $states->pluck('watch_status')->map->value->unique()->values()->all(),
+            );
+            $this->assertSame(2, $states->where('recommendation_feedback.value', 'not_interested')->count());
+            $this->assertSame(1, $states->where('recommendation_feedback.value', 'blacklisted')->count());
+
+            foreach ($states as $state) {
+                $this->assertGreaterThanOrEqual(1, $state->rating);
+                $this->assertLessThanOrEqual(10, $state->rating);
+                $this->assertGreaterThan(0, $state->watchlist_version);
+                $this->assertGreaterThan(0, $state->rating_version);
+                $this->assertGreaterThan(0, $state->watch_status_version);
+                $this->assertNotNull($state->watchlist_updated_at);
+                $this->assertNotNull($state->rating_updated_at);
+                $this->assertNotNull($state->watch_status_updated_at);
+            }
+        }
+
+        $statesByPair = CatalogTitleUserState::query()->get()->keyBy(
+            fn (CatalogTitleUserState $state): string => $state->user_id.':'.$state->catalog_title_id,
+        );
+
+        EpisodeViewProgress::query()
+            ->with('licensedMedia:id,episode_id')
+            ->each(function (EpisodeViewProgress $progress) use ($statesByPair): void {
+                $state = $statesByPair->get($progress->user_id.':'.$progress->catalog_title_id);
+
+                $this->assertNotNull($state);
+                $this->assertNotNull($progress->licensedMedia);
+                $this->assertSame($progress->episode_id, $progress->licensedMedia->episode_id);
+                $this->assertGreaterThanOrEqual(0, $progress->position_seconds);
+                $this->assertLessThanOrEqual($progress->duration_seconds, $progress->position_seconds);
+                $this->assertGreaterThan(0, $progress->duration_seconds);
+                $this->assertGreaterThanOrEqual(0, $progress->progress_percent);
+                $this->assertLessThanOrEqual(100, $progress->progress_percent);
+                $this->assertTrue(Str::isUlid((string) $progress->playback_session_id));
+                $this->assertSame($state->watch_status->value === 'completed', $progress->completed_at !== null);
+                $this->assertNotNull($progress->first_started_at);
+                $this->assertNotNull($progress->last_watched_at);
+            });
+
+        $this->assertFalse(CatalogTitleUserState::query()
+            ->select(['user_id', 'catalog_title_id'])
+            ->groupBy(['user_id', 'catalog_title_id'])
+            ->havingRaw('count(*) > 1')
+            ->exists());
+        $this->assertFalse(EpisodeViewProgress::query()
+            ->select(['user_id', 'episode_id'])
+            ->groupBy(['user_id', 'episode_id'])
+            ->havingRaw('count(*) > 1')
+            ->exists());
     }
 
     /** @return array<string, int> */

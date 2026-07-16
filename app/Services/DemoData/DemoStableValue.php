@@ -7,6 +7,7 @@ namespace App\Services\DemoData;
 use Carbon\CarbonImmutable;
 use InvalidArgumentException;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Uid\Ulid;
 
 final readonly class DemoStableValue
 {
@@ -55,6 +56,13 @@ final readonly class DemoStableValue
     public function uuid(string $scope): string
     {
         return Uuid::uuid5(Uuid::NAMESPACE_URL, $this->namespace.'|'.$scope)->toString();
+    }
+
+    public function ulid(string $scope): string
+    {
+        $binary = substr(hash('sha256', $this->namespace.'|ulid|'.$scope, true), 0, 16);
+
+        return Ulid::fromString($binary)->toBase32();
     }
 
     public function hash(string $scope): string

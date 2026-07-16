@@ -97,8 +97,9 @@ final class DemoTitleSelector
         $media = LicensedMedia::query()
             ->published()
             ->withPlaybackLocation()
-            ->select(['id', 'catalog_title_id', 'duration_seconds'])
+            ->select(['id', 'catalog_title_id', 'episode_id', 'duration_seconds'])
             ->whereIn('catalog_title_id', $titleIds)
+            ->whereNotNull('episode_id')
             ->orderBy('id')
             ->get()
             ->groupBy('catalog_title_id');
@@ -118,7 +119,7 @@ final class DemoTitleSelector
                 displayTitle: $title->display_title,
                 year: $title->year,
                 firstSeasonId: $firstSeason?->id,
-                firstEpisodeId: $firstEpisode?->id,
+                firstEpisodeId: $firstMedia?->episode_id ?? $firstEpisode?->id,
                 lastEpisodeId: $lastEpisode?->id,
                 licensedMediaId: $firstMedia?->id,
                 durationSeconds: $firstMedia?->duration_seconds,
