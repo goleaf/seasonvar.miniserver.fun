@@ -48,7 +48,7 @@ class CatalogVisualSystemTest extends TestCase
         $this->actingAs($viewer)->get(route('home'))
             ->assertOk()
             ->assertSee('href="'.route('library.index').'"', false)
-            ->assertSee('href="'.route('profile.security').'"', false)
+            ->assertSee('href="'.route('settings.index').'"', false)
             ->assertDontSee('href="'.route('login').'"', false)
             ->assertDontSee('href="'.route('admin.imports').'"', false);
 

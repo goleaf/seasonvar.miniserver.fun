@@ -48,7 +48,9 @@ final class ApplyAccountPreferences
         View::share([
             'accountReducedMotion' => $resolved->reducedMotion,
             'accountSettingsVersion' => $resolved->version,
-            'accountAnonymousStorageKey' => (string) config('account-settings.anonymous_storage_key'),
+            'accountAnonymousStorageKey' => $user instanceof User
+                ? (string) config('account-settings.anonymous_storage_key')
+                : null,
             'accountPreferenceMigrationUrl' => $user instanceof User && Route::has('settings.preferences.migrate')
                 ? route('settings.preferences.migrate')
                 : null,

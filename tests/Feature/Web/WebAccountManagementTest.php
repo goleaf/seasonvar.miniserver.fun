@@ -44,8 +44,7 @@ final class WebAccountManagementTest extends TestCase
             ->assertSeeText('Безопасность')
             ->assertSeeText('Устройства API');
         $this->get(route('home'))
-            ->assertSee(route('profile.show'), false)
-            ->assertSee(route('profile.security'), false);
+            ->assertSee(route('settings.index'), false);
     }
 
     public function test_profile_update_normalizes_fields_and_reverifies_only_after_email_change(): void

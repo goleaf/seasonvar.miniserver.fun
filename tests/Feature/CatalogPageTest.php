@@ -1541,7 +1541,6 @@ class CatalogPageTest extends TestCase
 
     public function test_title_page_server_renders_safe_localized_metadata_without_inferring_content_language(): void
     {
-        app()->setLocale('en');
         $catalogTitle = CatalogTitle::factory()->create([
             'title' => 'Verified <em>Series</em>',
             'slug' => 'verified-series',
@@ -1555,7 +1554,9 @@ class CatalogPageTest extends TestCase
             'votes' => 21,
         ]);
 
-        $response = $this->get(route('titles.show', $catalogTitle));
+        $response = $this
+            ->withSession(['interface_locale_route' => 'en'])
+            ->get(route('titles.show', $catalogTitle));
         $content = $response->assertOk()->getContent();
         $canonical = route('titles.show', $catalogTitle);
 
