@@ -1,6 +1,6 @@
 # Тестирование
 
-Обновлено: 15.07.2026
+Обновлено: 16.07.2026
 
 ## Стек
 
@@ -17,6 +17,16 @@
 - Cache architecture tests фиксируют canonical key hashing/bounds, TTL+jitter, negative lookup, payload limit, version invalidation, stale fallback, bounded lock timeout, warming uniqueness/overlap/after-commit, private shared-cache bypass и public HTTP validators.
 - Blade audit отвергает `@php`, `@endphp`, PHP tags, request/config/container calls, auth/gate/inject/use directives, infrastructure facades, application static construction/calls, cache/database access и Volt. Livewire security tests продолжают фиксировать URL state, locked tamper protection, Form Objects, renderless actions, visible-only polling и отсутствие больших public model collections; намеренно неиспользуемые Livewire features не симулируются искусственными компонентами.
 - Browser regression suite по умолчанию использует отдельный ignored `output/playwright/browser.sqlite`, database sessions, локальный PHP server и Playwright Chromium на `390×844`, `768×1024` и `1440×1200`. `PLAYWRIGHT_RUNTIME_NAME` и `PLAYWRIGHT_PORT` позволяют безопасно изолировать параллельный локальный запуск без разделения SQLite/cache/port. Внешние requests блокируются; axe gate отклоняет critical/serious WCAG 2 A/AA violations, а geometry checks фиксируют horizontal overflow, читаемость authenticated header и 44-pixel control contract. Auth flow дополнительно проверяет Livewire login/profile/library/logout, verified player progress и Continue Watching без failed same-origin requests.
+
+## Канонический quality gate
+
+- `bash scripts/ci-check.sh backend` — dependency validation/audit, Pint, PHP syntax, bounded Larastan, documentation contract, isolated Laravel cache build и PHPUnit.
+- `bash scripts/ci-check.sh frontend` — npm audit и production Vite build.
+- `bash scripts/ci-check.sh browser` — build, managed Chromium, isolated fixtures и Playwright/axe matrix.
+- `bash scripts/ci-check.sh pre-push` — backend и frontend checks после Git guard.
+- `composer ci:check` — полный `full` profile.
+
+Установка Composer/npm dependencies остаётся отдельным setup-шагом и не скрывается внутри quality gate. Неизвестный profile завершается с кодом `2`; profile-команды передают исходный ненулевой код первой неуспешной проверки.
 
 ## Паттерны
 
