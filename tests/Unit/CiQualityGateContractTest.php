@@ -90,7 +90,7 @@ final class CiQualityGateContractTest extends TestCase
     {
         $qualityGate = File::get(base_path('scripts/ci-check.sh'));
 
-        $this->assertStringContainsString('$repo_root/output/playwright/browser.sqlite', $qualityGate);
+        $this->assertStringContainsString('$repo_root/output/playwright/$ci_run_id/browser.sqlite', $qualityGate);
         $this->assertStringContainsString('export DB_DATABASE="$browser_database"', $qualityGate);
         $this->assertStringContainsString('export BROWSER_TEST_DATABASE="$browser_database"', $qualityGate);
     }
@@ -111,6 +111,24 @@ final class CiQualityGateContractTest extends TestCase
         $qualityGate = File::get(base_path('scripts/ci-check.sh'));
 
         $this->assertStringContainsString("run_browser() (\n    trap clear_laravel_cache_artifacts EXIT", $qualityGate);
+    }
+
+    public function test_default_generated_paths_are_scoped_to_one_gate_process(): void
+    {
+        $qualityGate = File::get(base_path('scripts/ci-check.sh'));
+
+        $this->assertStringContainsString('ci_run_id="${SEASONVAR_CI_RUN_ID:-$$}"', $qualityGate);
+        $this->assertStringContainsString('$repo_root/output/ci/$ci_run_id', $qualityGate);
+        $this->assertStringContainsString('$repo_root/output/playwright/$ci_run_id/browser.sqlite', $qualityGate);
+    }
+
+    public function test_browser_profile_exports_process_scoped_runtime_and_port_defaults(): void
+    {
+        $qualityGate = File::get(base_path('scripts/ci-check.sh'));
+
+        $this->assertStringContainsString('export PLAYWRIGHT_PORT="$browser_port"', $qualityGate);
+        $this->assertStringContainsString('export PLAYWRIGHT_RUNTIME_NAME="${PLAYWRIGHT_RUNTIME_NAME:-ci-$ci_run_id}"', $qualityGate);
+        $this->assertStringContainsString('http://127.0.0.1:$browser_port', $qualityGate);
     }
 
     public function test_pre_push_runs_the_same_local_quality_gate_before_upload(): void

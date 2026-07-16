@@ -15,7 +15,8 @@ export MAIL_MAILER="${MAIL_MAILER:-array}"
 export QUEUE_CONNECTION="${QUEUE_CONNECTION:-sync}"
 export SESSION_DRIVER="${SESSION_DRIVER:-array}"
 
-ci_output_root="${SEASONVAR_CI_OUTPUT_ROOT:-$repo_root/output/ci}"
+ci_run_id="${SEASONVAR_CI_RUN_ID:-$$}"
+ci_output_root="${SEASONVAR_CI_OUTPUT_ROOT:-$repo_root/output/ci/$ci_run_id}"
 export APP_CONFIG_CACHE="${APP_CONFIG_CACHE:-$ci_output_root/config.php}"
 export APP_EVENTS_CACHE="${APP_EVENTS_CACHE:-$ci_output_root/events.php}"
 export APP_PACKAGES_CACHE="${APP_PACKAGES_CACHE:-$ci_output_root/packages.php}"
@@ -70,16 +71,19 @@ run_frontend() {
 
 run_browser() (
     trap clear_laravel_cache_artifacts EXIT
-    local browser_database="${BROWSER_TEST_DATABASE:-$repo_root/output/playwright/browser.sqlite}"
+    local browser_database="${BROWSER_TEST_DATABASE:-$repo_root/output/playwright/$ci_run_id/browser.sqlite}"
+    local browser_port="${PLAYWRIGHT_PORT:-$((18000 + ($$ % 20000)))}"
 
     if [[ "$browser_database" != /* ]]; then
         browser_database="$repo_root/$browser_database"
     fi
 
-    export APP_URL="${PLAYWRIGHT_APP_URL:-http://127.0.0.1:8013}"
+    export APP_URL="${PLAYWRIGHT_APP_URL:-http://127.0.0.1:$browser_port}"
     export DB_CONNECTION=sqlite
     export DB_DATABASE="$browser_database"
     export BROWSER_TEST_DATABASE="$browser_database"
+    export PLAYWRIGHT_PORT="$browser_port"
+    export PLAYWRIGHT_RUNTIME_NAME="${PLAYWRIGHT_RUNTIME_NAME:-ci-$ci_run_id}"
     export PLAYBACK_ALLOWED_HOSTS="${PLAYBACK_ALLOWED_HOSTS:-media.example.com}"
     export PLAYBACK_ENFORCE_PUBLIC_DNS="${PLAYBACK_ENFORCE_PUBLIC_DNS:-false}"
 
