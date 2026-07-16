@@ -3,7 +3,7 @@
         <div class="flex min-w-0 flex-wrap items-start justify-between gap-4">
             <div class="min-w-0"><div class="flex flex-wrap gap-2 text-xs font-bold"><span class="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-800">{{ $request->card->typeLabel }}</span><span title="{{ $request->card->statusDescription }}" class="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{{ $request->card->statusLabel }}</span></div><h1 class="mt-3 break-words text-2xl font-black text-slate-800 sm:text-3xl">{{ $request->card->title }}</h1>@if ($request->card->originalTitle)<p class="mt-1 break-words text-sm text-slate-500">{{ $request->card->originalTitle }}</p>@endif</div>
             <div class="flex flex-wrap gap-2">
-                @if (auth()->check())
+                @if ($isAuthenticated)
                     <button type="button" wire:click="setVote({{ $request->card->hasVoted ? 'false' : 'true' }})" wire:loading.attr="disabled" wire:target="setVote" @disabled(! $request->card->canEngage) aria-pressed="{{ $request->card->hasVoted ? 'true' : 'false' }}" class="inline-flex min-h-11 items-center gap-2 rounded-control px-4 py-2 text-sm font-bold {{ $request->card->hasVoted ? 'bg-emerald-700 text-white' : 'bg-slate-100 text-slate-700' }} disabled:opacity-50"><x-ui.icon name="fa-solid fa-arrow-up" />{{ $request->card->hasVoted ? __('requests.actions.remove_vote') : __('requests.actions.vote') }} · {{ $request->card->votes }}</button>
                     <button type="button" wire:click="setFollow({{ $request->card->isFollowing ? 'false' : 'true' }})" wire:loading.attr="disabled" wire:target="setFollow" @disabled(! $request->card->canEngage) aria-pressed="{{ $request->card->isFollowing ? 'true' : 'false' }}" class="inline-flex min-h-11 items-center gap-2 rounded-control px-4 py-2 text-sm font-bold {{ $request->card->isFollowing ? 'bg-sky-700 text-white' : 'bg-slate-100 text-slate-700' }} disabled:opacity-50"><x-ui.icon name="fa-solid fa-bell" />{{ $request->card->isFollowing ? __('requests.actions.unfollow') : __('requests.actions.follow') }}</button>
                 @else
@@ -19,6 +19,7 @@
 
     <x-ui.panel :title="__('requests.detail.requested_content')" icon="fa-solid fa-circle-info">
         <dl class="grid gap-4 sm:grid-cols-2">
+            <div><dt class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('requests.fields.type') }}</dt><dd class="mt-1 text-slate-800">{{ $request->card->typeLabel }}</dd></div>
             @if ($request->card->targetLabel)<div><dt class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('requests.fields.target') }}</dt><dd class="mt-1">@if ($request->card->targetUrl)<a href="{{ $request->card->targetUrl }}" class="font-bold text-emerald-700">{{ $request->card->targetLabel }}</a>@else{{ $request->card->targetLabel }}@endif</dd></div>@endif
             @if ($request->card->year)<div><dt class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('requests.fields.release_year') }}</dt><dd class="mt-1 text-slate-800">{{ $request->card->year }}</dd></div>@endif
             @if ($request->alternativeTitle)<div><dt class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('requests.fields.alternative_title') }}</dt><dd class="mt-1 break-words text-slate-800">{{ $request->alternativeTitle }}</dd></div>@endif

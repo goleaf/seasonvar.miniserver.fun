@@ -9,6 +9,7 @@ use App\DTOs\ContentRequests\ContentRequestDetailData;
 use App\Enums\ContentRequestSort;
 use App\Enums\ContentRequestStatus;
 use App\Enums\ContentRequestType;
+use App\Models\CatalogTitle;
 use App\Models\ContentRequest;
 use App\Models\User;
 use App\Services\Catalog\Search\CatalogSearchNormalizer;
@@ -109,14 +110,14 @@ final readonly class ContentRequestQuery
             ->map(fn (mixed $id): int => (int) $id)
             ->values() ?? collect();
         $titles = $candidateIds->isNotEmpty()
-            ? \App\Models\CatalogTitle::query()->availableTo(null)
+            ? CatalogTitle::query()->availableTo(null)
                 ->whereKey($candidateIds)->get(['id', 'slug', 'title', 'original_title', 'year'])
                 ->sortBy(function ($title) use ($candidateIds): int {
                     $position = $candidateIds->search($title->id, strict: true);
 
                     return $position === false ? PHP_INT_MAX : $position;
                 })->values()
-            : \App\Models\CatalogTitle::query()->availableTo(null)
+            : CatalogTitle::query()->availableTo(null)
                 ->where(function (Builder $query) use ($search): void {
                     $query->where('title', 'like', "%{$search}%")
                         ->orWhere('original_title', 'like', "%{$search}%")

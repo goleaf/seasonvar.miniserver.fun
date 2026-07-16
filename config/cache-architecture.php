@@ -152,6 +152,15 @@ return [
             'wait_milliseconds' => 250,
             'jitter_percent' => 10,
         ],
+        'content-requests' => [
+            'fresh' => 120,
+            'stale' => 900,
+            'hot' => 60,
+            'negative' => 15,
+            'lock' => 60,
+            'wait_milliseconds' => 250,
+            'jitter_percent' => 10,
+        ],
         'sitemap' => [
             'fresh' => 1_800,
             'stale' => 21_600,

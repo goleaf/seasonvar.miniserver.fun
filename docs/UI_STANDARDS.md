@@ -198,6 +198,12 @@ Blade и Livewire Blade являются только presentation layer: зап
 - Save/Cancel/reset/revoke/delete имеют scoped loading, disabled, localized live status/error и confirmation; destructive actions визуально и структурно отделены. Recoverable failure сохраняет draft/focus, successful Livewire morph повторно инициализирует только display/device helpers.
 - Account reduced-motion override и OS `prefers-reduced-motion` отключают transitions/animations/scroll behavior на application level. Manual acceptance покрывает 320px, landscape, tablet, desktop, 200% zoom, long ru/en timezone labels, keyboard navigation, validation/empty/failure/session/destructive states.
 
+## Заявки на материалы
+
+- Directory, request card/detail/create, My Requests и moderation queue переиспользуют светлые panels/forms/badges/buttons/pagination, 44px controls и одну responsive колонку на телефоне. Long original/translated title, explanation, URL, evidence list и timeline используют wrapping без horizontal scroll; destructive withdrawal/merge отделены и подтверждаются текстом.
+- Autocomplete имеет visible label, combobox/listbox roles, 300 ms debounce, stable item keys, loading/no-result/fallback states и keyboard/touch actions. Server-side existing-content/duplicate validation остаётся authoritative; Blade не вычисляет identity, duplicate, priority, transition, permission или importer eligibility.
+- Vote/follow используют `aria-pressed`, status descriptions доступны не только цветом, timeline сохраняет heading/list semantics, Livewire actions имеют scoped disabled/loading и localized live regions. `ru/en`, long labels, 320px/landscape/tablet/desktop/200% zoom, browser back/forward, keyboard focus и reduced motion входят в manual acceptance.
+
 <!-- project-docs:start -->
 ## Документация интерфейса
 

@@ -65,7 +65,7 @@ final readonly class ContentRequestTargetMergeService
     }
 
     /** @param callable(Builder<ContentRequest>): Builder<ContentRequest> $scope
-     * @param array<string, int|string> $target
+     * @param  array<string, int|string>  $target
      */
     private function retarget(callable $scope, array $target): void
     {

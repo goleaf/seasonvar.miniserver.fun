@@ -25,16 +25,25 @@ final class ContentRequestDetailPage extends Component
 {
     #[Locked]
     public int $requestId;
+
     public string $alternativeTitle = '';
+
     public string $explanation = '';
+
     public string $audioLanguage = '';
+
     public string $subtitleLanguage = '';
+
     /** @var list<string> */
     public array $sourceLinks = [''];
+
     public string $clarificationBody = '';
+
     #[Locked]
     public string $clarificationToken = '';
+
     public ?string $statusMessage = null;
+
     public ?string $actionError = null;
 
     public function mount(ContentRequest $contentRequest): mixed
@@ -56,6 +65,8 @@ final class ContentRequestDetailPage extends Component
         $this->audioLanguage = (string) $contentRequest->audio_language;
         $this->subtitleLanguage = (string) $contentRequest->subtitle_language;
         $this->clarificationToken = (string) Str::uuid();
+
+        return null;
     }
 
     public function setVote(bool $desired, SetContentRequestEngagement $action): void
@@ -104,6 +115,7 @@ final class ContentRequestDetailPage extends Component
 
         return view('livewire.content-requests.detail-page', [
             'request' => $detail,
+            'isAuthenticated' => $viewer instanceof User,
             'languageOptions' => collect((array) config('content-requests.language_codes', []))->map(fn (string $code): array => ['value' => $code, 'label' => __('requests.languages.'.$code)])->all(),
             'loginUrl' => route('login'),
         ])->extends('layouts.app', [

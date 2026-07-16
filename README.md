@@ -16,6 +16,12 @@ Laravel-приложение для локального каталога сер
 
 `GET /api` публикует discovery для стабильного `/api/v1`, а project-owned OpenAPI доступен по ссылке из манифеста. Public v1 включает home, полный фильтрованный каталог, schema-driven filters, 11 directories, карточку тайтла, сезоны/серии с безопасными media profiles, подсказки, рекомендации и read-only отзывы. Mobile auth добавляет регистрацию, login, queued email verification/password reset, 90-дневные device tokens с rotation/logout и self-service `/me`. Private v1 также отдаёт owner-scoped watchlist, оценки, состояние тайтла, Continue Watching, историю и компактную сводку `/me/library/summary`; watchlist/ratings поддерживают поиск, тип, год и явную сортировку. Чтение требует `mobile:read`, изменения — `mobile:write` и verified email, все ответы private/no-store. Offline-sync v1 добавляет manifest/checkpoint, public и owner-scoped incremental pull, а также идемпотентный batch push с optimistic версиями и 30/90-дневным retention. Playback v1 создаёт безопасные same-origin sessions, выдаёт provider source только через короткоживущий signed encrypted grant и записывает verified monotonic progress без раскрытия raw media URL; скачивание/offline playback видео не поддерживается. Полный route/query/response/security contract находится в [`docs/api.md`](docs/api.md).
 
+## Заявки на недостающие материалы
+
+Публичный каталог `/requests` объединяет заявки на отсутствующий сериал, сезон, серию, перевод, субтитры, улучшение качества, исправление метаданных/списка серий и восстановление недоступного материала. Создание, голосование, подписка и личный список требуют подтверждённую учётную запись; публичная карточка использует стабильный UUID и не раскрывает email, внутренний user ID, private evidence, moderator notes или техническое состояние импортера.
+
+Форма сначала ищет существующий каталог и открытые заявки, затем сервер повторно проверяет canonical title/season/episode/media, нормализованные названия, внешние ID и exact active identity. Модераторская очередь `/admin/requests` использует существующий admin allowlist и единственный `seasonvar:import`: отдельный ticket/importer не создаётся. Статусы, merge, clarification, partial/full completion, requester/voter/follower notifications, cache/SEO/sitemap и rollout описаны в [`docs/architecture.md`](docs/architecture.md), [`docs/authorization.md`](docs/authorization.md) и общем плане [`docs/plans/laravel-video-portal-modernization.md`](docs/plans/laravel-video-portal-modernization.md).
+
 ## Основные команды
 
 ```bash

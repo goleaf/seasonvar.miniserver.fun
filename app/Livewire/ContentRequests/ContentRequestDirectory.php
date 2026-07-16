@@ -81,7 +81,10 @@ final class ContentRequestDirectory extends Component
             'requests' => $requests,
             'schemaReady' => $schema->ready(),
             'typeOptions' => $this->enumOptions(ContentRequestType::cases()),
-            'statusOptions' => $this->enumOptions(ContentRequestStatus::cases()),
+            'statusOptions' => $this->enumOptions(array_values(array_filter(
+                ContentRequestStatus::cases(),
+                static fn (ContentRequestStatus $status): bool => ! in_array($status, [ContentRequestStatus::Merged, ContentRequestStatus::Duplicate], true),
+            ))),
             'sortOptions' => $this->enumOptions(ContentRequestSort::cases()),
             'createUrl' => Auth::check()
                 ? ($localized !== null ? route('localized.requests.create', ['locale' => $localized]) : route('requests.create'))
@@ -114,6 +117,12 @@ final class ContentRequestDirectory extends Component
     /** @return LengthAwarePaginator<int, mixed> */
     private function emptyPaginator(): LengthAwarePaginator
     {
-        return new Paginator([], 0, max(1, (int) config('content-requests.per_page', 20)), pageName: 'requestsPage');
+        return new Paginator(
+            [],
+            0,
+            max(1, (int) config('content-requests.per_page', 20)),
+            max(1, Paginator::resolveCurrentPage('requestsPage')),
+            ['path' => request()->url(), 'query' => request()->query(), 'pageName' => 'requestsPage'],
+        );
     }
 }

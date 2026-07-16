@@ -11,7 +11,7 @@ use Illuminate\Support\Str;
 final class ContentRequestExternalIdentifierService
 {
     /**
-     * @param list<array{provider: string, identifier: string}> $identifiers
+     * @param  list<array{provider: string, identifier: string}>  $identifiers
      * @return list<array{provider: string, identifier: string, normalized_identifier: string}>
      */
     public function normalize(array $identifiers): array

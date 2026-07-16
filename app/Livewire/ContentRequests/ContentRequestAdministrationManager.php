@@ -261,6 +261,12 @@ final class ContentRequestAdministrationManager extends Component
     /** @return LengthAwarePaginator<int, mixed> */
     private function emptyPaginator(): LengthAwarePaginator
     {
-        return new Paginator([], 0, 25, pageName: 'adminRequestsPage');
+        return new Paginator(
+            [],
+            0,
+            max(1, (int) config('content-requests.admin_per_page', 25)),
+            max(1, Paginator::resolveCurrentPage('adminRequestsPage')),
+            ['path' => request()->url(), 'query' => request()->query(), 'pageName' => 'adminRequestsPage'],
+        );
     }
 }

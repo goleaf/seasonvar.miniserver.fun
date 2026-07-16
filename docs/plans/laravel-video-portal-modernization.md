@@ -1042,6 +1042,8 @@ Rollback drops only `user_account_settings` after exporting any user choices cre
 - Privacy risks: requester email, voter/follower identity, clarification, private evidence and moderator/importer notes are never selected for public presenters. Authenticated/private responses remain no-store.
 - Performance risks: directory/detail queries must use grouped counts/eager target loads and bounded duplicate candidates; exact identity hashes and composite target/status indexes avoid scanning all requests in PHP. Public and viewer queries stay separate.
 - Compatibility risks: no existing request data exists, so migrations are additive with nullable foreign keys and reversible tables. Existing catalog, comments, reviews, reports, notifications, API fields, importer command, route bindings, locales and cache keys remain semantically unchanged.
+- Known limitations: anonymous submissions remain unavailable because the portal had no verified anonymous request workflow; creation, engagement and clarification therefore require an authenticated verified account. The current media schema has title-level translation labels and a subtitle-presence flag, but no canonical per-language audio/subtitle-track aggregate, so language-specific translation/subtitle requests are not rejected from coarse availability alone and require moderator verification before completion.
+- Known limitations: arbitrary provider lookup, user-link scraping, public discussions, attachments, bulk moderation, public import errors, queue position, percentage progress and completion estimates are deliberately absent. Evidence URLs and allowlisted provider IDs are stored for moderator review without fetching; clarification is requester/moderator-only; importer integration records only a real existing source-page/import-run reference; the existing read-only mobile API is unchanged.
 - Rollback drops only the new request tables after exporting post-deployment request data. It cannot reverse notifications already delivered or source pages intentionally handed to the existing importer; those references remain valid importer data.
 
 Expected changes: additive content-request migrations; request enums/models/policy/DTOs/value objects/actions/query/search/duplicate/existence/cache/notification/import/lifecycle services; public/private/admin Livewire pages and views; routes/navigation/title links/settings preferences/account export/delete/title merge; `ru`/`en` catalogs; scoped cache/SEO/sitemap integration; topic-owner documentation and English changelog.
@@ -1051,29 +1053,31 @@ Protected boundaries: existing request-independent tables and identities, all ca
 ### Phased implementation checklist
 
 - [x] Review the complete tracked Markdown inventory and fully audit every request-adjacent route, schema, model, relationship, policy/gate, service/action/query/DTO, Livewire/Blade/JS asset, locale, cache, search, notification, moderation, account lifecycle, importer, API and SEO boundary.
-- [ ] Add reversible schema, enums, typed models/relations, stable identity, exact indexes/uniqueness and rolling-schema guard without touching legacy tables destructively.
-- [ ] Implement type rules, URL/provider/language/quality validation, catalog existence lookup, bounded duplicate search, transactional idempotent creation and anti-spam/rate limits.
-- [ ] Implement policy-enforced edit/withdraw, idempotent voting/following, centralized transitions/history, clarification, rejection, priority, merge and partial/full completion.
-- [ ] Integrate deterministic preference-aware notifications, account export/deletion, title merge and the existing Seasonvar importer handoff without a second importer or mandatory queue.
-- [ ] Implement public directory/detail/create, private My Requests and gated administration with validated URL state, deterministic pagination, prepared presenters, localized accessible responsive UI and truthful states.
-- [ ] Integrate navigation/title entry points, scoped public cache invalidation, canonical/noindex/hreflang/structured-data policy and the existing streamed sitemap responder.
-- [ ] Update all topic-owner Markdown, owner map, maintenance log and English changelog; record known limitations and complete manual acceptance evidence.
-- [ ] Run only allowed Pint/static syntax/routes/schema/query/index/authorization/translation/cache/SEO/Vite/browser/accessibility diagnostics; do not create or run automated tests for Task 19.
-- [ ] Reread Task 19 and changed/directly-related files, inspect final diff/status on `main`, commit only Task 19 changes without absorbing pre-existing work and push the configured remote.
+- [x] Add reversible schema, enums, typed models/relations, stable identity, exact indexes/uniqueness and rolling-schema guard without touching legacy tables destructively.
+- [x] Implement type rules, URL/provider/language/quality validation, catalog existence lookup, bounded duplicate search, transactional idempotent creation and anti-spam/rate limits.
+- [x] Implement policy-enforced edit/withdraw, idempotent voting/following, centralized transitions/history, clarification, rejection, priority, merge and partial/full completion.
+- [x] Integrate deterministic preference-aware notifications, account export/deletion, title merge and the existing Seasonvar importer handoff without a second importer or mandatory queue.
+- [x] Implement public directory/detail/create, private My Requests and gated administration with validated URL state, deterministic pagination, prepared presenters, localized accessible responsive UI and truthful states.
+- [x] Integrate navigation/title entry points, scoped public cache invalidation, canonical/noindex/hreflang/structured-data policy and the existing streamed sitemap responder.
+- [x] Update all topic-owner Markdown, owner map, maintenance log and English changelog; record known limitations and complete manual acceptance evidence.
+- [x] Run only allowed Pint/static syntax/routes/schema/query/index/authorization/translation/cache/SEO/Vite/browser/accessibility diagnostics; do not create or run automated tests for Task 19.
+- [x] Reread Task 19 and changed/directly-related files, inspect final diff/status on `main`, commit only Task 19 changes without absorbing pre-existing work and push the configured remote.
+
+Manual evidence: every Task 19 PHP file passed syntax inspection and focused Pint formatting; the additive migration executed against a disposable SQLite database and passed foreign-key and indexed-query-plan inspection; route, authorization, transition, privacy, cache, SEO/sitemap, translation parity and forbidden-template-pattern inspections passed. Vite production build passed. HTTP-kernel and managed-Chromium smoke covered default/localized directory and detail routes, merged redirect, guest administration denial, private-field absence, desktop/phone/landscape/tablet/200% zoom, long Unicode titles and long evidence URLs without console, asset, focus-label, touch-target or horizontal-overflow failures. No automated test was created or invoked, as required; the production database was not migrated during verification.
 
 ### Final manual acceptance checklist
 
-- [ ] Stable opaque identity, canonical target/type/language/quality dimensions, exact active uniqueness and probable/related bounded matching work without translated labels or fuzzy-only blocking.
-- [ ] Every supported request type validates its real fields; existing serial/season/episode/media matches prevent misleading missing-content creation and provide canonical links.
-- [ ] Source/external IDs are allowlisted and safe; no video upload, arbitrary scraping, internal-network fetch, dangerous scheme, raw HTML or client-assigned status/priority is possible.
-- [ ] Creation/edit/withdraw/vote/follow/clarify and all moderation mutations are authenticated as required, authorized, rate-limited, idempotent, non-GET and leave append-only history.
-- [ ] Status transition, rejection, merge, partial/full completion and importer handoff preserve evidence, links, votes/followers and private notes while emitting one preference-aware notification per real revision.
-- [ ] Public directory/detail/search/filter/sort/count/pagination and My Requests/admin queues are deterministic, scoped, privacy-safe, noindex where required and free of target/requester/count/viewer N+1 queries.
-- [ ] Public cache excludes viewer/private state and invalidates after each mutation; canonical/merged URLs, locale alternates and sitemap eligibility follow the documented SEO policy without guaranteed-availability schemas.
-- [ ] Account export/deletion, user/title merges, catalogue/search/title/player/library/profile/settings/recommendations/comments/reviews/tags/import/API routes and existing cache keys remain compatible.
-- [ ] All `ru`/`en` visible/ARIA/loading/empty/error/confirmation text resolves; phone/landscape/tablet/desktop/zoom, keyboard/focus/touch/reduced-motion and long title/URL layouts pass inspection.
-- [ ] No Volt, new `@php`, Blade query, inline CSS/business JavaScript, fake control/progress, TODO/debug output, unused class/import, duplicate request architecture or automated Task 19 test remains.
-- [ ] Allowed diagnostics and browser smoke pass; owner docs/plan/changelog match implementation; the focused commit is on existing `main` and pushed.
+- [x] Stable opaque identity, canonical target/type/language/quality dimensions, exact active uniqueness and probable/related bounded matching work without translated labels or fuzzy-only blocking.
+- [x] Every supported request type validates its real fields; existing serial/season/episode/media matches prevent misleading missing-content creation and provide canonical links.
+- [x] Source/external IDs are allowlisted and safe; no video upload, arbitrary scraping, internal-network fetch, dangerous scheme, raw HTML or client-assigned status/priority is possible.
+- [x] Creation/edit/withdraw/vote/follow/clarify and all moderation mutations are authenticated as required, authorized, rate-limited, idempotent, non-GET and leave append-only history.
+- [x] Status transition, rejection, merge, partial/full completion and importer handoff preserve evidence, links, votes/followers and private notes while emitting one preference-aware notification per real revision.
+- [x] Public directory/detail/search/filter/sort/count/pagination and My Requests/admin queues are deterministic, scoped, privacy-safe, noindex where required and free of target/requester/count/viewer N+1 queries.
+- [x] Public cache excludes viewer/private state and invalidates after each mutation; canonical/merged URLs, locale alternates and sitemap eligibility follow the documented SEO policy without guaranteed-availability schemas.
+- [x] Account export/deletion, user/title merges, catalogue/search/title/player/library/profile/settings/recommendations/comments/reviews/tags/import/API routes and existing cache keys remain compatible.
+- [x] All `ru`/`en` visible/ARIA/loading/empty/error/confirmation text resolves; phone/landscape/tablet/desktop/zoom, keyboard/focus/touch/reduced-motion and long title/URL layouts pass inspection.
+- [x] No Volt, new `@php`, Blade query, inline CSS/business JavaScript, fake control/progress, TODO/debug output, unused class/import, duplicate request architecture or automated Task 19 test remains.
+- [x] Allowed diagnostics and browser smoke pass; owner docs/plan/changelog match implementation; the focused commit is on existing `main` and pushed.
 
 ## Task 20: canonical private technical issues and support workflow
 

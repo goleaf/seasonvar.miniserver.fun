@@ -365,10 +365,25 @@ final class AppLayoutData
             ->all();
     }
 
-    private function headerLink(string $routeName, string $icon, string $label, bool $active): LayoutNavigationItem
-    {
+    /** @param array<string, mixed> $parameters */
+    private function headerLink(
+        string $routeName,
+        string $icon,
+        string $label,
+        bool $active,
+        array $parameters = [],
+    ): LayoutNavigationItem {
+        return $this->headerLinkUrl($this->route($routeName, $parameters), $icon, $label, $active);
+    }
+
+    private function headerLinkUrl(
+        string $url,
+        string $icon,
+        string $label,
+        bool $active,
+    ): LayoutNavigationItem {
         return new LayoutNavigationItem(
-            url: $this->route($routeName),
+            url: $url,
             icon: $icon,
             label: $label,
             className: self::HEADER_LINK_CLASS.' '.($active

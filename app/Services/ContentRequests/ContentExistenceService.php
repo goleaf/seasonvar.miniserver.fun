@@ -6,8 +6,8 @@ namespace App\Services\ContentRequests;
 
 use App\DTOs\ContentRequests\ContentExistenceResult;
 use App\DTOs\ContentRequests\ContentRequestInput;
-use App\Enums\ContentRequestType;
 use App\Enums\ContentRequestExternalProvider;
+use App\Enums\ContentRequestType;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;

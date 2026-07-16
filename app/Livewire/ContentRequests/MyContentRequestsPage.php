@@ -22,8 +22,10 @@ final class MyContentRequestsPage extends Component
 
     #[Url(history: true, except: 'created')]
     public string $scope = 'created';
+
     #[Url(history: true, except: '')]
     public string $status = '';
+
     #[Url(history: true, except: 'recently_updated')]
     public string $sort = 'recently_updated';
 
@@ -67,6 +69,12 @@ final class MyContentRequestsPage extends Component
     /** @return LengthAwarePaginator<int, mixed> */
     private function emptyPaginator(): LengthAwarePaginator
     {
-        return new Paginator([], 0, 20, pageName: 'myRequestsPage');
+        return new Paginator(
+            [],
+            0,
+            max(1, (int) config('content-requests.per_page', 20)),
+            max(1, Paginator::resolveCurrentPage('myRequestsPage')),
+            ['path' => request()->url(), 'query' => request()->query(), 'pageName' => 'myRequestsPage'],
+        );
     }
 }

@@ -9,8 +9,8 @@ use App\Enums\ContentRequestType;
 final readonly class ContentRequestInput
 {
     /**
-     * @param list<array{provider: string, identifier: string}> $externalIdentifiers
-     * @param list<string> $sourceLinks
+     * @param  list<array{provider: string, identifier: string}>  $externalIdentifiers
+     * @param  list<string>  $sourceLinks
      */
     public function __construct(
         public ContentRequestType $type,
