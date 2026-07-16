@@ -889,18 +889,18 @@ Must remain semantically unchanged: provider review bodies/IDs/source/hash/date 
 
 ### Final manual verification checklist
 
-- [ ] Existing 73,101 provider reviews retain IDs/content and remain importable/API-readable; no provider/user duplicate system exists.
-- [ ] Title-only target allowlist, one-review rule, submission idempotency and merged-title reconciliation preserve stable review/legacy anchor identity.
-- [ ] Plain-text title/body validation accepts Unicode and prevents stored/reflected XSS, dangerous schemes, excessive links/lines/repetition and mass assignment.
-- [ ] Optional 1–10 review score uses the existing portal rating row, missing is not zero, external/provider scores remain separate, and edit/delete behavior is documented and accurate.
-- [ ] Verified watching is server-only and privacy-safe; spoiler title/body are absent from initial HTML, profiles, notifications, search, SEO and structured data until explicit reveal.
-- [ ] Edit/delete/restore, helpful vote/change/remove, report, moderation and restriction actions are authorized, rate-limited, retry-safe and expose no private notes/reporter/block state.
-- [ ] Sorting/filtering/pagination/direct focus are deterministic and URL-safe; query plans use justified indexes and avoid author/rating/vote/verification/block N+1 queries.
-- [ ] Public counts/averages/vote totals update after every mutation/merge/moderation; viewer vote/pending ownership/permissions/restrictions never enter shared cache.
-- [ ] Profile/export/deletion/notifications/blocks/mutes/recommendations/admin integration preserves privacy and unrelated watchlist/progress/bookmark/collection state.
-- [ ] Direct/filter/page URLs canonicalize safely, remain absent from sitemap and emit no invalid/duplicate/spoiler review JSON-LD.
-- [ ] Every visible control has translated `ru`/`en` loading/empty/error/authorization state, keyboard/focus/touch/reduced-motion behavior and works from narrow phone through desktop/zoom.
-- [ ] No Volt, new `@php`, inline CSS, business JavaScript, raw review HTML, Blade query, fake control, TODO/debug output, unused class/import or dead route remains.
+- [x] Existing 73,101 provider reviews retain IDs/content and remain importable/API-readable; no provider/user duplicate system exists.
+- [x] Title-only target allowlist, one-review rule, submission idempotency and merged-title reconciliation preserve stable review/legacy anchor identity.
+- [x] Plain-text title/body validation accepts Unicode and prevents stored/reflected XSS, dangerous schemes, excessive links/lines/repetition and mass assignment.
+- [x] Optional 1–10 review score uses the existing portal rating row, missing is not zero, external/provider scores remain separate, and edit/delete behavior is documented and accurate.
+- [x] Verified watching is server-only and privacy-safe; spoiler title/body are absent from initial HTML, profiles, notifications, search, SEO and structured data until explicit reveal.
+- [x] Edit/delete/restore, helpful vote/change/remove, report, moderation and restriction actions are authorized, rate-limited, retry-safe and expose no private notes/reporter/block state.
+- [x] Sorting/filtering/pagination/direct focus are deterministic and URL-safe; query plans use justified indexes and avoid author/rating/vote/verification/block N+1 queries.
+- [x] Public counts/averages/vote totals update after every mutation/merge/moderation; viewer vote/pending ownership/permissions/restrictions never enter shared cache.
+- [x] Profile/export/deletion/notifications/blocks/mutes/recommendations/admin integration preserves privacy and unrelated watchlist/progress/bookmark/collection state.
+- [x] Direct/filter/page URLs canonicalize safely, remain absent from sitemap and emit no invalid/duplicate/spoiler review JSON-LD.
+- [x] Every visible control has translated `ru`/`en` loading/empty/error/authorization state, keyboard/focus/touch/reduced-motion behavior and works from narrow phone through desktop/zoom.
+- [x] No Volt, new `@php`, inline CSS, business JavaScript, raw review HTML, Blade query, fake control, TODO/debug output, unused class/import or dead route remains.
 - [ ] Allowed diagnostics/build/browser smoke pass without creating/running tests; all relevant docs/changelog are current; final commit is on existing `main` and pushed.
 
 ## Task 14: canonical public profiles, identity and privacy
