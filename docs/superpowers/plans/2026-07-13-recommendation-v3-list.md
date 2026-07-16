@@ -934,4 +934,4 @@ Verification evidence: a real `CatalogDiscoveryPage` instance produced `null` fo
 - [x] Verify read-only that page one plus page two equals one 48-row result for trending, popular, Kinopoisk top-rated, recently added and recently updated; all adjacent windows had zero overlap and page-two ranks began at 25.
 - [x] Reject the proposed full-pool output change because it would not change feature-query scope or result identity and would only remove the existing early loop stop.
 - [x] Run documentation consistency, managed-doc and task-scoped `git diff --check`; do not invoke PHPUnit/Pest or create test files. The managed documentation was current and both Task 18 files passed whitespace inspection.
-- [ ] Correct the audit design on `main`, push and verify the remote SHA without absorbing concurrent work.
+- [x] Correct the audit design on `main`, push and verify the remote SHA without absorbing concurrent work. Commit `d8d746183a48c458b76b8ab7c5287d172ccd5241` matched `origin/main` immediately after push; no application file was changed.
