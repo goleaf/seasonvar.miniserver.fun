@@ -8,6 +8,7 @@ use App\DTOs\Seasonvar\SeasonvarPreparedCatalogPage;
 use App\DTOs\Seasonvar\SeasonvarTitleManifest;
 use App\Enums\SeasonvarImportStatus;
 use App\Enums\SeasonvarImportTitleGroupStatus;
+use App\Enums\SeasonvarImportTitleGroupTerminalReason;
 use App\Enums\SeasonvarPageType;
 use App\Enums\SeasonvarPreparedPageStatus;
 use App\Models\CatalogTitle;
@@ -23,6 +24,7 @@ use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
 use App\Services\Seasonvar\SeasonvarImportFinalizationDispatcher;
 use App\Services\Seasonvar\SeasonvarImportGroupKey;
 use App\Services\Seasonvar\SeasonvarImportRunRecorder;
+use App\Services\Seasonvar\SeasonvarImportTitleGroupReconciler;
 use App\Services\Seasonvar\SeasonvarTitleManifestBuilder;
 use App\Services\Seasonvar\SeasonvarTitleMerger;
 use App\Services\Seasonvar\SeasonvarUrl;
@@ -84,7 +86,21 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
         SeasonvarImportGroupKey $groupKeys,
         SeasonvarUrl $urls,
         SeasonvarImportFinalizationDispatcher $finalizers,
+        SeasonvarImportTitleGroupReconciler $reconciler,
     ): void {
+        $group = $this->group();
+
+        if ($group === null) {
+            return;
+        }
+
+        if ($group->status->isTerminal()) {
+            $finalizers->signalGlobalRun($group->run);
+
+            return;
+        }
+
+        $reconciler->reconcile($group);
         $group = $this->group();
 
         if ($group === null) {
@@ -266,6 +282,7 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
     public function failed(?Throwable $exception): void
     {
         $error = app(SeasonvarImportErrorSanitizer::class)->fromException($exception);
+        $reason = SeasonvarImportTitleGroupTerminalReason::FinalizerDeadlineExceeded;
         $group = SeasonvarImportTitleGroup::query()->with('run')->find($this->groupId);
 
         if ($group === null || $group->status->isTerminal()) {
@@ -274,14 +291,15 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
 
         $group->update([
             'status' => SeasonvarImportTitleGroupStatus::Failed,
-            'last_error' => $error,
+            'terminal_reason_code' => $reason,
+            'last_error' => $reason->message(),
             'finished_at' => now(),
         ]);
 
         if ($this->isVisitorRun($group->run)) {
             $group->run->update([
                 'status' => SeasonvarImportStatus::Failed->value,
-                'last_error' => $error,
+                'last_error' => $reason->message(),
                 'finished_at' => now(),
                 'last_heartbeat_at' => now(),
             ]);
@@ -456,18 +474,19 @@ final class FinalizeSeasonvarImportTitleGroup implements ShouldBeUniqueUntilProc
         int $invalidPages,
         CatalogTitleRefreshStateStore $refreshStates,
     ): void {
-        $message = 'Ни одна страница сезона не подготовлена.';
+        $reason = SeasonvarImportTitleGroupTerminalReason::NoPreparedPages;
         $group->update([
             'status' => SeasonvarImportTitleGroupStatus::Failed,
             'failed_pages' => max($group->failed_pages, $invalidPages),
-            'last_error' => $message,
+            'terminal_reason_code' => $reason,
+            'last_error' => $reason->message(),
             'finished_at' => now(),
         ]);
 
         if ($this->isVisitorRun($group->run)) {
             $group->run->update([
                 'status' => SeasonvarImportStatus::Failed->value,
-                'last_error' => $message,
+                'last_error' => $reason->message(),
                 'finished_at' => now(),
                 'last_heartbeat_at' => now(),
             ]);

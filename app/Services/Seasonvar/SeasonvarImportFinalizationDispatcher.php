@@ -15,6 +15,10 @@ use Throwable;
 
 final class SeasonvarImportFinalizationDispatcher
 {
+    public function __construct(
+        private readonly SeasonvarImportTitleGroupReconciler $groups,
+    ) {}
+
     public function titleGroup(SeasonvarImportTitleGroup $group, int $delaySeconds = 0): void
     {
         $dispatch = FinalizeSeasonvarImportTitleGroup::dispatch((int) $group->id)
@@ -83,14 +87,19 @@ final class SeasonvarImportFinalizationDispatcher
     public function wakeReady(): array
     {
         $batchSize = max(1, (int) config('seasonvar.queue.finalizer_watchdog_batch_size', 250));
+        $staleBefore = $this->groups->staleBefore();
         $groups = SeasonvarImportTitleGroup::query()
             ->whereIn('status', [
                 SeasonvarImportTitleGroupStatus::Discovering->value,
                 SeasonvarImportTitleGroupStatus::Running->value,
                 SeasonvarImportTitleGroupStatus::Finalizing->value,
             ])
-            ->where('expected_pages', '>', 0)
-            ->whereRaw('expected_pages <= prepared_pages + failed_pages')
+            ->where(function ($query) use ($staleBefore): void {
+                $query->where(function ($query): void {
+                    $query->where('expected_pages', '>', 0)
+                        ->whereRaw('expected_pages <= prepared_pages + failed_pages');
+                })->orWhere('updated_at', '<=', $staleBefore);
+            })
             ->whereHas('run', fn ($query) => $query
                 ->where('execution_mode', 'queue')
                 ->where('status', SeasonvarImportStatus::Running->value))

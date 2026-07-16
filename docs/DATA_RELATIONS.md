@@ -9,6 +9,7 @@
 - `SeasonvarImportRun hasMany SeasonvarImportTitleGroup`; одна группа соответствует одному каноническому сезонному семейству внутри конкретного запуска.
 - `SeasonvarImportTitleGroup belongsTo CatalogTitle` через nullable `catalog_title_id`, потому что первый подготовленный payload может создать тайтл только на стадии fan-in.
 - `SeasonvarImportTitleGroup hasMany SeasonvarImportPreparedPage`; unique `(seasonvar_import_title_group_id, source_page_id)` исключает повторную подготовку одной страницы в группе.
+- `SeasonvarImportTitleGroup.terminal_reason_code` nullable и хранит только allowlisted code из `SeasonvarImportTitleGroupTerminalReason`; русское безопасное объяснение вычисляется enum, а не сохраняется как идентификатор. Индекс `(status, updated_at, id)` обслуживает десятиминутный bounded watchdog для counter-ready/stale active групп; сам reason code не индексируется, потому что по нему нет runtime eligibility query.
 - `SeasonvarImportPreparedPage belongsTo SourcePage` и хранит нормализованный parser payload, предупреждения, content hash и статусы `queued/preparing/prepared/applied/failed`, но не становится источником истины каталога.
 
 - `CatalogTitle belongsTo Source`

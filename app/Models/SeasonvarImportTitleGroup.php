@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\SeasonvarImportTitleGroupStatus;
+use App\Enums\SeasonvarImportTitleGroupTerminalReason;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,6 +19,7 @@ use Illuminate\Support\Collection;
  * @property int $prepared_pages
  * @property int $failed_pages
  * @property int $applied_pages
+ * @property SeasonvarImportTitleGroupTerminalReason|null $terminal_reason_code
  * @property Carbon|null $started_at
  * @property Carbon|null $finished_at
  * @property SeasonvarImportRun $run
@@ -34,6 +36,7 @@ use Illuminate\Support\Collection;
     'prepared_pages',
     'failed_pages',
     'applied_pages',
+    'terminal_reason_code',
     'last_error',
     'started_at',
     'finished_at',
@@ -67,6 +70,7 @@ class SeasonvarImportTitleGroup extends Model
             'prepared_pages' => 'integer',
             'failed_pages' => 'integer',
             'applied_pages' => 'integer',
+            'terminal_reason_code' => SeasonvarImportTitleGroupTerminalReason::class,
             'started_at' => 'datetime',
             'finished_at' => 'datetime',
         ];

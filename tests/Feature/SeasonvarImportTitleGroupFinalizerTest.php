@@ -73,6 +73,9 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
             $group->seasonvar_import_run_id,
             3600,
         ));
+        DB::table($group->getTable())
+            ->where('id', $group->id)
+            ->update(['updated_at' => now()->subDays(2)]);
         $job = (new FinalizeSeasonvarImportTitleGroup($group->id))->withFakeQueueInteractions();
 
         $this->app->call([$job, 'handle']);
@@ -80,6 +83,110 @@ class SeasonvarImportTitleGroupFinalizerTest extends TestCase
         $job->assertNotReleased();
         $this->assertSame('running', $group->fresh()->status->value);
         $this->assertSame(0, $group->fresh()->applied_pages);
+    }
+
+    public function test_finalizer_fails_a_stale_group_with_a_structurally_incomplete_page_set(): void
+    {
+        $title = $this->titleWithSeasonUrls([1]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        DB::table($group->getTable())->where('id', $group->id)->update([
+            'expected_pages' => 2,
+            'updated_at' => now()->subDays(2),
+        ]);
+
+        $this->app->call([
+            (new FinalizeSeasonvarImportTitleGroup($group->id))->withFakeQueueInteractions(),
+            'handle',
+        ]);
+
+        $freshGroup = $group->fresh();
+        $this->assertSame('failed', $freshGroup->status->value);
+        $this->assertSame('page_set_mismatch', $freshGroup->terminal_reason_code?->value);
+        $this->assertSame('Набор страниц группы импорта неполон.', $freshGroup->last_error);
+        $this->assertNotNull($freshGroup->finished_at);
+        $this->assertSame('failed', $group->run->fresh()->status);
+        $this->assertSame(1, $group->run->fresh()->failed);
+        $this->assertSame(
+            'failed',
+            app(CatalogTitleRefreshStateStore::class)->read($title->id)->status?->value,
+        );
+    }
+
+    public function test_finalizer_salvages_prepared_siblings_after_a_stale_page_deadline(): void
+    {
+        $title = $this->titleWithSeasonUrls([1, 2]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $rows = $group->preparedPages()->with('sourcePage')->get();
+        $prepared = $rows->first();
+        $expired = $rows->last();
+        $this->prepareRow($prepared, 1, 2);
+        DB::table($expired->getTable())
+            ->where('id', $expired->id)
+            ->update(['updated_at' => now()->subDays(2)]);
+        DB::table($group->getTable())
+            ->where('id', $group->id)
+            ->update(['updated_at' => now()->subDays(2)]);
+
+        $this->app->call([
+            (new FinalizeSeasonvarImportTitleGroup($group->id))->withFakeQueueInteractions(),
+            'handle',
+        ]);
+
+        $freshGroup = $group->fresh();
+        $this->assertSame('partial', $freshGroup->status->value);
+        $this->assertSame('preparation_deadline_exceeded', $freshGroup->terminal_reason_code?->value);
+        $this->assertSame(1, $freshGroup->failed_pages);
+        $this->assertSame(1, $freshGroup->applied_pages);
+        $this->assertSame('failed', $expired->fresh()->status->value);
+        $this->assertSame(
+            'Подготовка страницы не завершилась в допустимое время.',
+            $expired->fresh()->last_error,
+        );
+        $this->assertSame('partial', $group->run->fresh()->status);
+        $this->assertSame(1, $group->run->fresh()->failed);
+        $this->assertSame(
+            'partial',
+            app(CatalogTitleRefreshStateStore::class)->read($title->id)->status?->value,
+        );
+    }
+
+    public function test_finalizer_records_a_stable_reason_when_no_page_can_be_applied(): void
+    {
+        $title = $this->titleWithSeasonUrls([1]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+        $row = $group->preparedPages()->firstOrFail();
+        $row->markFailed('Seasonvar вернул HTTP 404.');
+        $group->update(['failed_pages' => 1]);
+
+        $this->app->call([
+            (new FinalizeSeasonvarImportTitleGroup($group->id))->withFakeQueueInteractions(),
+            'handle',
+        ]);
+
+        $freshGroup = $group->fresh();
+        $this->assertSame('failed', $freshGroup->status->value);
+        $this->assertSame('no_prepared_pages', $freshGroup->terminal_reason_code?->value);
+        $this->assertSame('Ни одна страница сезона не подготовлена.', $freshGroup->last_error);
+    }
+
+    public function test_failed_finalizer_records_a_stable_reason_without_private_exception_text(): void
+    {
+        $title = $this->titleWithSeasonUrls([1]);
+        $group = app(SeasonvarImportTitleGroupDispatcher::class)
+            ->start($title, 'seasonvar-title-refresh');
+
+        (new FinalizeSeasonvarImportTitleGroup($group->id))
+            ->failed(new RuntimeException('private payload https://seasonvar.ru/private?token=secret'));
+
+        $freshGroup = $group->fresh();
+        $this->assertSame('failed', $freshGroup->status->value);
+        $this->assertSame('finalizer_deadline_exceeded', $freshGroup->terminal_reason_code?->value);
+        $this->assertSame('Группа сезонов не финализирована в допустимое время.', $freshGroup->last_error);
+        $this->assertStringNotContainsString('secret', (string) $freshGroup->last_error);
+        $this->assertSame($freshGroup->last_error, $group->run->fresh()->last_error);
     }
 
     public function test_finalizer_applies_shuffled_pages_to_one_title_and_completes_manifest(): void
