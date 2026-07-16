@@ -144,7 +144,11 @@ final class CommentAccountService
             $user->notifications()->where('type', 'comment.activity')->delete();
         }
 
-        $this->cache->identitiesChanged($catalogTitleIds, $hasCollections);
+        $this->cache->identitiesChanged(
+            $catalogTitleIds,
+            $hasCollections,
+            recommendationsChanged: false,
+        );
     }
 
     public function authorIdentityChanged(User $user): void

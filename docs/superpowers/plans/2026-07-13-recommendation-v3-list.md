@@ -1006,9 +1006,9 @@ Implementation evidence before documentation closure: private user and public un
 - Recommendation activity is only a `title` comment changing between published/non-deleted and any other state. Reaction totals, body/spoiler text, private moderation metadata, author identity and season/episode/collection discussion are not ranking inputs.
 - Title merge and unknown callers remain conservative; no private comment/user identifier enters a public key, payload or telemetry label.
 
-- [ ] Add an explicit recommendation-impact flag to the existing invalidator boundary and require a title target before bumping Recommendations.
-- [ ] Make create/update/delete/restore/moderation pass true only when published public visibility appears or disappears; reaction always passes false.
-- [ ] Keep author identity and account anonymization out of recommendation invalidation while preserving their current presentation-domain invalidation; keep title merge conservative.
-- [ ] Prove with an isolated array store that content/reaction and season-target paths produce recommendation deltas `0`, while a counted title-activity transition produces `1`; prove presentation versions still change.
-- [ ] Run PHP syntax, task-file Pint, targeted Larastan, managed-doc check, debug/placeholder scan and task-scoped `git diff --check`; do not invoke PHPUnit/Pest or create test files.
+- [x] Add an explicit recommendation-impact flag to the existing invalidator boundary and require a title target before bumping Recommendations.
+- [x] Make create/update/delete/restore/moderation pass true only when published public visibility appears or disappears; reaction always passes false.
+- [x] Keep author identity and account anonymization out of recommendation invalidation while preserving their current presentation-domain invalidation; keep title merge conservative.
+- [x] Prove with an isolated array store that content/reaction and season-target paths produce recommendation deltas `0`, while a counted title-activity transition produces `1`; prove presentation versions still change. Exact recommendation/presentation deltas were `0/1` for content/reaction, `0/1` for season target, `1/1` for title visibility transition and `0/1` for private identity invalidation; conservative identity activity produced recommendation delta `1`.
+- [x] Run PHP syntax, task-file Pint, targeted Larastan, managed-doc check, debug/placeholder scan and task-scoped `git diff --check`; do not invoke PHPUnit/Pest or create test files. All eight PHP paths passed lint, path Pint and targeted Larastan; managed docs were current, source call sites carried explicit activity state where required, the debug scan was empty and task-scoped whitespace inspection passed.
 - [ ] Update owner documentation and English changelog, inspect the isolated patch, commit only Task 18 files on `main`, push and verify the remote SHA without absorbing concurrent work.

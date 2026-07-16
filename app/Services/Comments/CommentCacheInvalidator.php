@@ -23,12 +23,14 @@ final class CommentCacheInvalidator
         private readonly CatalogRecommendationCacheInvalidator $recommendations,
     ) {}
 
-    public function targetChanged(CommentTarget $target): void
+    public function targetChanged(CommentTarget $target, bool $recommendationsChanged = true): void
     {
-        $invalidate = function () use ($target): void {
+        $invalidate = function () use ($target, $recommendationsChanged): void {
             $this->invalidate($target->type, $target->catalogTitleId);
 
-            if ($target->type === CommentTargetType::Title && $target->catalogTitleId !== null) {
+            if ($recommendationsChanged
+                && $target->type === CommentTargetType::Title
+                && $target->catalogTitleId !== null) {
                 $this->recommendations->publicSignalsChanged('comment-change');
             }
         };
@@ -42,7 +44,7 @@ final class CommentCacheInvalidator
         $invalidate();
     }
 
-    public function commentChanged(Comment $comment): void
+    public function commentChanged(Comment $comment, bool $recommendationsChanged = true): void
     {
         $catalogTitleIds = $comment->catalog_title_id !== null
             ? [(int) $comment->catalog_title_id]
@@ -51,6 +53,8 @@ final class CommentCacheInvalidator
         $this->identitiesChanged(
             $catalogTitleIds,
             $comment->target_type === CommentTargetType::Collection,
+            recommendationsChanged: $recommendationsChanged
+                && $comment->target_type === CommentTargetType::Title,
         );
     }
 
@@ -71,12 +75,15 @@ final class CommentCacheInvalidator
             ->where('target_type', CommentTargetType::Collection->value)
             ->exists();
 
-        $this->identitiesChanged($titleIds, $hasCollections);
+        $this->identitiesChanged($titleIds, $hasCollections, recommendationsChanged: false);
     }
 
     /** @param iterable<int, int|string> $catalogTitleIds */
-    public function identitiesChanged(iterable $catalogTitleIds, bool $collections): void
-    {
+    public function identitiesChanged(
+        iterable $catalogTitleIds,
+        bool $collections,
+        bool $recommendationsChanged = true,
+    ): void {
         $titleIds = collect($catalogTitleIds)
             ->map(fn (mixed $id): int => (int) $id)
             ->filter(fn (int $id): bool => $id > 0)
@@ -84,7 +91,12 @@ final class CommentCacheInvalidator
             ->values();
         $invalidateAllTitles = $titleIds->count() > 1_000;
         $scopedTitleIds = $invalidateAllTitles ? [] : $titleIds->all();
-        $invalidate = function () use ($scopedTitleIds, $invalidateAllTitles, $collections): void {
+        $invalidate = function () use (
+            $scopedTitleIds,
+            $invalidateAllTitles,
+            $collections,
+            $recommendationsChanged,
+        ): void {
             if ($invalidateAllTitles) {
                 $this->invalidateAllTitlePages();
             } else {
@@ -97,7 +109,7 @@ final class CommentCacheInvalidator
                 $this->invalidate(CommentTargetType::Collection, null);
             }
 
-            if ($invalidateAllTitles || $scopedTitleIds !== []) {
+            if ($recommendationsChanged && ($invalidateAllTitles || $scopedTitleIds !== [])) {
                 $this->recommendations->publicSignalsChanged('comment-change');
             }
         };

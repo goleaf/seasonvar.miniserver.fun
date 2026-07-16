@@ -103,7 +103,7 @@ final class SetCommentReaction
             return $reaction?->type;
         }
 
-        $this->cache->targetChanged($target);
+        $this->cache->targetChanged($target, recommendationsChanged: false);
 
         if ($reaction !== null) {
             $this->notifications->reactionSet($reaction, $comment, $user);

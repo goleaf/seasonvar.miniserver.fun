@@ -39,7 +39,7 @@ final class UpdateComment
         $normalizedBody = CommentBody::from($body);
         $this->rateLimiter->hit('edit', $user, $target->key());
 
-        /** @var array{0: Comment, 1: bool} $result */
+        /** @var array{0: Comment, 1: bool, 2: bool} $result */
         $result = DB::transaction(function () use (
             $user,
             $target,
@@ -60,7 +60,7 @@ final class UpdateComment
             if ($locked->body === $normalizedBody->value
                 && $locked->body_hash === $normalizedBody->hash
                 && $locked->is_spoiler === $isSpoiler) {
-                return [$locked, false];
+                return [$locked, false, false];
             }
 
             if ($expectedVersion < 1 || (int) $locked->version !== $expectedVersion) {
@@ -75,6 +75,8 @@ final class UpdateComment
                 $normalizedBody,
                 (int) $locked->id,
             );
+            $wasPublic = $locked->status === CommentStatus::Published
+                && $locked->deleted_at === null;
             $status = $locked->status === CommentStatus::Published
                 && $this->antiSpam->decision($user, $normalizedBody) === CommentAntiSpamDecision::Review
                     ? CommentStatus::Pending
@@ -89,13 +91,16 @@ final class UpdateComment
                 'edited_at' => now(),
             ])->save();
 
-            return [$locked, true];
+            $isPublic = $locked->status === CommentStatus::Published
+                && $locked->deleted_at === null;
+
+            return [$locked, true, $wasPublic !== $isPublic];
         }, attempts: 3);
 
-        [$comment, $changed] = $result;
+        [$comment, $changed, $recommendationsChanged] = $result;
 
         if ($changed) {
-            $this->cache->targetChanged($target);
+            $this->cache->targetChanged($target, $recommendationsChanged);
         }
 
         return $comment;

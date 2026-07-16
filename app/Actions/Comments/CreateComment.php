@@ -155,7 +155,11 @@ final class CreateComment
             return $comment;
         }
 
-        $this->cache->targetChanged($target);
+        $this->cache->targetChanged(
+            $target,
+            recommendationsChanged: $comment->status === CommentStatus::Published
+                && $comment->deleted_at === null,
+        );
 
         if ($comment->isReply() && $comment->status === CommentStatus::Published) {
             $this->notifications->replyCreated($comment, $user);

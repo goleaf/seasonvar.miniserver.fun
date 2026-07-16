@@ -54,7 +54,7 @@ final class ModerateComment
             throw new CommentActionException('comments.errors.moderator_note_too_long', ['maximum' => 2_000]);
         }
 
-        [$comment, $resolvedReports, $visibilityChanged] = DB::transaction(function () use (
+        [$comment, $resolvedReports, $visibilityChanged, $recommendationsChanged] = DB::transaction(function () use (
             $comment,
             $moderator,
             $status,
@@ -90,6 +90,8 @@ final class ModerateComment
             }
 
             $beforeVersion = $this->audit->comment($locked);
+            $wasPublic = $locked->status === CommentStatus::Published
+                && $locked->deleted_at === null;
             $protectedDeletion = $locked->deleted_at !== null
                 && in_array(
                     $locked->deletion_reason,
@@ -196,13 +198,16 @@ final class ModerateComment
                 );
             }
 
-            return [$locked, $reports, $visibilityChanged];
+            $isPublic = $locked->status === CommentStatus::Published
+                && $locked->deleted_at === null;
+
+            return [$locked, $reports, $visibilityChanged, $wasPublic !== $isPublic];
         }, attempts: 3);
 
         $comment->refresh();
 
         if ($visibilityChanged) {
-            $this->cache->commentChanged($comment);
+            $this->cache->commentChanged($comment, $recommendationsChanged);
             $this->notifications->moderationChanged($comment);
 
             if ($comment->status === CommentStatus::Published && $comment->isReply()) {
