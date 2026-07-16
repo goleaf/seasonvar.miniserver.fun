@@ -7,6 +7,7 @@ namespace App\Services\Auth;
 use App\Enums\AuthenticationEvent;
 use App\Models\User;
 use Carbon\CarbonInterface;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
@@ -22,15 +23,28 @@ final class MobileTokenService
     /** @return array{token: string, expires_at: CarbonInterface} */
     public function rotate(User $user, PersonalAccessToken $current): array
     {
-        return DB::transaction(function () use ($user, $current): array {
+        $tokenId = (int) $current->getKey();
+
+        return DB::transaction(function () use ($user, $tokenId): array {
+            $lockedToken = $user->tokens()
+                ->whereKey($tokenId)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $lockedToken instanceof PersonalAccessToken) {
+                throw new AuthenticationException;
+            }
+
+            $name = (string) $lockedToken->name;
+            $abilities = $lockedToken->abilities ?? [];
+            $lockedToken->delete();
+
             $expiresAt = now()->addDays(self::TOKEN_DAYS);
             $token = $user->createToken(
-                (string) $current->name,
-                $current->abilities ?? [],
+                $name,
+                $abilities,
                 $expiresAt,
             );
-
-            $current->delete();
 
             return [
                 'token' => $token->plainTextToken,
