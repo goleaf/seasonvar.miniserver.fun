@@ -60,7 +60,10 @@ final class AuthenticationRedirectService
     {
         $candidate = trim($candidate);
 
-        if ($candidate === '' || str_contains($candidate, '\\') || preg_match('/[\x00-\x1F\x7F]/', $candidate) === 1) {
+        if ($candidate === ''
+            || str_contains($candidate, '\\')
+            || preg_match('/[\x00-\x1F\x7F]/', $candidate) === 1
+            || preg_match('/%(?![0-9A-Fa-f]{2})/', $candidate) === 1) {
             return null;
         }
 
@@ -84,7 +87,7 @@ final class AuthenticationRedirectService
             return null;
         }
 
-        if (isset($parts['scheme']) || isset($parts['host']) || isset($parts['port'])) {
+        if (isset($parts['scheme']) || isset($parts['host'])) {
             $application = parse_url((string) config('app.url'));
 
             if ($application === false
@@ -99,8 +102,16 @@ final class AuthenticationRedirectService
         }
 
         $path = (string) ($parts['path'] ?? '/');
+        $validationPath = $path;
 
-        if (! Str::startsWith($path, '/') || $this->forbiddenPath($path)) {
+        for ($i = 0; $i < 2; $i++) {
+            $validationPath = rawurldecode($validationPath);
+        }
+
+        if (! Str::startsWith($validationPath, '/')
+            || str_contains($validationPath, '//')
+            || $this->hasDotSegment($validationPath)
+            || $this->forbiddenPath($validationPath)) {
             return null;
         }
 
@@ -118,11 +129,22 @@ final class AuthenticationRedirectService
     {
         $segments = explode('/', ltrim($path, '/'), 2);
 
-        if (isset($segments[0], $segments[1]) && $this->supportedLocale($segments[0])) {
+        if (isset($segments[1]) && $this->supportedLocale($segments[0])) {
             $path = '/'.$segments[1];
         }
 
         return Str::startsWith($path, self::FORBIDDEN_PATH_PREFIXES);
+    }
+
+    private function hasDotSegment(string $path): bool
+    {
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '.' || $segment === '..') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function defaultPort(string $scheme): int
