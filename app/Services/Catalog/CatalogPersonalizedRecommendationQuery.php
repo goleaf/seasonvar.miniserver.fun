@@ -138,67 +138,82 @@ final class CatalogPersonalizedRecommendationQuery
             ]);
         }
 
-        $this->orderBySignalActivity(CatalogTitleUserState::query()
+        $watchlistTitleIds = $this->orderBySignalActivity(CatalogTitleUserState::query()
             ->whereBelongsTo($user)
             ->where('in_watchlist', true), 'watchlist_updated_at')
             ->limit(80)
-            ->pluck('catalog_title_id')
-            ->each(fn (mixed $titleId) => $this->rememberSignal($signals, (int) $titleId, [
+            ->pluck('catalog_title_id');
+
+        foreach ($watchlistTitleIds as $titleId) {
+            $this->rememberSignal($signals, (int) $titleId, [
                 'weight' => (int) config('recommendations.personalized.watchlist_weight', 140),
                 'source' => CatalogRecommendationSource::UserWatchlist,
                 'reason' => CatalogRecommendationReason::BecauseWatchlist,
-            ]));
+            ]);
+        }
 
         if (Schema::hasColumn('catalog_title_user_states', 'watch_status')) {
-            $this->orderBySignalActivity(CatalogTitleUserState::query()
+            $statusTitleIds = $this->orderBySignalActivity(CatalogTitleUserState::query()
                 ->whereBelongsTo($user)
                 ->whereIn('watch_status', [CatalogWatchStatus::Planned->value, CatalogWatchStatus::Watching->value]), 'watch_status_updated_at')
                 ->limit(80)
-                ->pluck('catalog_title_id')
-                ->each(fn (mixed $titleId) => $this->rememberSignal($signals, (int) $titleId, [
+                ->pluck('catalog_title_id');
+
+            foreach ($statusTitleIds as $titleId) {
+                $this->rememberSignal($signals, (int) $titleId, [
                     'weight' => (int) config('recommendations.personalized.status_weight', 135),
                     'source' => CatalogRecommendationSource::UserStatuses,
                     'reason' => CatalogRecommendationReason::BecauseStatus,
-                ]));
+                ]);
+            }
         }
 
         $ratingThreshold = max(1, (int) ceil((int) config('catalog.user_rating.maximum', 10) * 0.7));
-        $this->orderBySignalActivity(CatalogTitleUserState::query()
+        $ratedTitleIds = $this->orderBySignalActivity(CatalogTitleUserState::query()
             ->whereBelongsTo($user)
             ->where('rating', '>=', $ratingThreshold), 'rating_updated_at')
             ->limit(80)
-            ->pluck('catalog_title_id')
-            ->each(fn (mixed $titleId) => $this->rememberSignal($signals, (int) $titleId, [
+            ->pluck('catalog_title_id');
+
+        foreach ($ratedTitleIds as $titleId) {
+            $this->rememberSignal($signals, (int) $titleId, [
                 'weight' => (int) config('recommendations.personalized.rating_weight', 130),
                 'source' => CatalogRecommendationSource::UserRatings,
                 'reason' => CatalogRecommendationReason::BecauseRating,
-            ]));
+            ]);
+        }
 
-        DB::table('catalog_collection_items')
+        $collectionTitleIds = DB::table('catalog_collection_items')
             ->join('catalog_collections', 'catalog_collections.id', '=', 'catalog_collection_items.catalog_collection_id')
             ->where('catalog_collections.owner_id', $user->id)
             ->whereNull('catalog_collections.deleted_at')
             ->latest('catalog_collection_items.updated_at')
             ->limit(120)
-            ->pluck('catalog_collection_items.catalog_title_id')
-            ->each(fn (mixed $titleId) => $this->rememberSignal($signals, (int) $titleId, [
+            ->pluck('catalog_collection_items.catalog_title_id');
+
+        foreach ($collectionTitleIds as $titleId) {
+            $this->rememberSignal($signals, (int) $titleId, [
                 'weight' => (int) config('recommendations.personalized.collection_weight', 110),
                 'source' => CatalogRecommendationSource::UserCollections,
                 'reason' => CatalogRecommendationReason::BecauseCollection,
-            ]));
+            ]);
+        }
 
-        DB::table('catalog_title_user_tag')
+        $personalTagTitleIds = DB::table('catalog_title_user_tag')
             ->join('user_tags', 'user_tags.id', '=', 'catalog_title_user_tag.user_tag_id')
             ->where('user_tags.user_id', $user->id)
             ->whereNull('user_tags.deleted_at')
             ->latest('catalog_title_user_tag.updated_at')
             ->limit(120)
-            ->pluck('catalog_title_user_tag.catalog_title_id')
-            ->each(fn (mixed $titleId) => $this->rememberSignal($signals, (int) $titleId, [
+            ->pluck('catalog_title_user_tag.catalog_title_id');
+
+        foreach ($personalTagTitleIds as $titleId) {
+            $this->rememberSignal($signals, (int) $titleId, [
                 'weight' => (int) config('recommendations.personalized.personal_tag_weight', 100),
                 'source' => CatalogRecommendationSource::UserTags,
                 'reason' => CatalogRecommendationReason::BecausePersonalTags,
-            ]));
+            ]);
+        }
 
         return array_slice($signals, 0, $historyLimit, true);
     }
