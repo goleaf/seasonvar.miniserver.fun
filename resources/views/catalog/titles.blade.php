@@ -361,6 +361,10 @@
                                     <x-ui.icon name="fa-solid fa-list-ul" />
                                     <span>Показать весь каталог</span>
                                 </a>
+                                <a href="{{ route('discover.index', ['type' => 'popular']) }}" wire:navigate class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-sky-50 px-4 py-2 text-sm font-bold text-sky-800 hover:bg-sky-100">
+                                    <x-ui.icon name="fa-solid fa-compass" />
+                                    <span>{{ __('recommendations.page.browse_popular') }}</span>
+                                </a>
                             </div>
                         </div>
                     </x-ui.panel>

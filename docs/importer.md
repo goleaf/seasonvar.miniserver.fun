@@ -1,6 +1,6 @@
 # Конвейер импорта Seasonvar
 
-Обновлено: 15.07.2026
+Обновлено: 16.07.2026
 
 ## Граница данных
 
@@ -15,6 +15,8 @@
 7. Import run counters обновляются после URL/chunk. `indexed_at` отмечает SQL-search visibility; Scout или внешний поисковый движок в проекте не установлен. На главной обновление тайтла определяется только добавлением доступной серии (`episodes.created_at`) или опубликованного видеоварианта (`licensed_media.created_at`), поэтому повторный импорт одной метаинформации не поднимает тайтл в свежей выдаче.
 8. Полный sync/queued finalizer пересобирает рекомендации и обновляет stats cache; targeted URL run обновляет stats cache, но намеренно не запускает глобальное обслуживание каталога.
 9. Новый тайтл получает `published/public`, но повторный import не меняет локальные publication status, audience, availability window, soft delete или slug. Публичный интерфейс всё равно повторно применяет `CatalogEntitlementService`.
+
+Полный sitemap import имеет одну lifecycle start-boundary независимо от способа выполнения. `SeasonvarGlobalImportRunCoordinator` под коротким distributed lock ищет active `queued/running` sitemap-run среди `sync` и `queue`; новый sync run резервируется до входа в pipeline, а повторный CLI/admin/cron start безопасно переиспользует существующую строку без второго dispatch. Lock не удерживается во время HTTP, parsing или catalog writes. Targeted URL import, `--inventory-only` и `--status` не являются полным global cycle и сохраняют независимый контракт.
 
 ## Retention и секреты
 
@@ -47,7 +49,7 @@ Serial fetcher и parser распознают точное provider-сообще
 
 ## Режимы длительного запуска
 
-Репозиторий поддерживает два взаимоисключающих production-профиля. `seasonvar-import-forever.service` непрерывно выполняет sitemap discovery и весь sync pipeline одним PHP-процессом. Redis queued-профиль использует cron dispatcher и отдельные import/title-refresh workers для параллельной обработки. Одновременный запуск профилей запрещён: command lock предотвратит часть дублей, но нарушит операционный контракт и оставит непредсказуемый backlog.
+Репозиторий поддерживает два взаимоисключающих production-профиля. `seasonvar-import-forever.service` непрерывно выполняет sitemap discovery и весь sync pipeline одним PHP-процессом. Redis queued-профиль использует cron dispatcher и отдельные import/title-refresh workers для параллельной обработки. Одновременный запуск профилей запрещён: application-level single-flight предотвращает создание нового пересекающегося global run, но не заменяет корректное отключение лишнего systemd/cron profile и не завершает уже существовавший run автоматически.
 
 Удалённый после dispatch `CatalogTitle` считается нормальным устаревшим targeted job: refresh state очищается, import group не создаётся, exception и retry не нужны. Absolute retry deadline preparation и group finalizer jobs равен максимуму configured retry window и page claim lease; поэтому живой 24-часовой claim не переживает job, который должен его дождаться или завершить группу.
 
@@ -55,7 +57,7 @@ Serial fetcher и parser распознают точное provider-сообще
 
 ## Queue coordinator и статусы
 
-`/admin/imports`, cron/CLI `--queued` и retry используют общий `SeasonvarGlobalImportRunCoordinator`. Atomic lock охватывает проверку всего lifecycle: пока существует глобальный `sitemap + queue` run в `queued/running`, повторный вызов возвращает его и не создаёт run, page jobs или title groups. Targeted `mode=url` refresh не владеет этой глобальной границей и не блокируется. Новый `queued` run создаётся короткой transaction; `StartSeasonvarQueuedImport` получает только scalar run ID. Coordinator job имеет 3 attempts, backoff 60/300/900 секунд, timeout 900 секунд и unique lock на run. Transient network/408/425/429/5xx/SQLite-lock ошибки возвращают run в `queued` для retry; permanent validation/provider errors переводят его в `failed` без бесполезного повтора.
+Sync CLI/legacy wrapper, `/admin/imports`, cron/CLI `--queued` и retry используют общий `SeasonvarGlobalImportRunCoordinator`. Atomic start-lock охватывает active lookup и вставку: пока существует глобальный `sitemap` run любого execution mode в `queued/running`, повторный вызов возвращает его и не создаёт run, page jobs или title groups. Sync path заранее создаёт running reservation и передаёт её в pipeline без второй audit-строки. Targeted `mode=url` refresh не владеет этой глобальной границей и не блокируется. Новый `queued` run создаётся короткой transaction; `StartSeasonvarQueuedImport` получает только scalar run ID. Coordinator job имеет 3 attempts, backoff 60/300/900 секунд, timeout 900 секунд и unique lock на run. Transient network/408/425/429/5xx/SQLite-lock ошибки возвращают run в `queued` для retry; permanent validation/provider errors переводят его в `failed` без бесполезного повтора.
 
 После начального SSR открытие видимой карточки в browser вызывает `wire:init` и может поставить один forced targeted refresh, если последнее успешное обновление было более 15 минут назад. SSR, crawler и клиент без JavaScript не создают import job. Browser передаёт только locked ID тайтла: URL читается из базы, нормализуется и повторно проверяется по HTTPS allowlist `seasonvar.ru`. Coordinator немедленно создаёт title group и dispatches по одному preparation job на каноническую и каждую известную прямую страницу сезона — без chunk/max-pages limit. Динамически найденные страницы добавляются в ту же группу до закрытия discovery, а посетители разных тайтлов создают независимые группы. После fan-in один finalizer применяет payload в стабильном порядке и записывает все сезоны и серии внутрь того же `CatalogTitle`. Новое 15-минутное окно начинается только после `completed`; `partial/failed` не считаются свежим обновлением.
 

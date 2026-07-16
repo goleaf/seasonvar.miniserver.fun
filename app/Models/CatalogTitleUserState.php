@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\CatalogRecommendationFeedback;
+use App\Enums\CatalogWatchStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,6 +17,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'rating',
     'watchlist_version',
     'rating_version',
+    'recommendation_feedback',
+    'recommendation_feedback_version',
+    'recommendation_feedback_updated_at',
+    'watch_status',
+    'watch_status_version',
 ])]
 class CatalogTitleUserState extends Model
 {
@@ -22,6 +29,8 @@ class CatalogTitleUserState extends Model
     protected $attributes = [
         'watchlist_version' => 0,
         'rating_version' => 0,
+        'recommendation_feedback_version' => 0,
+        'watch_status_version' => 0,
     ];
 
     /** @return BelongsTo<User, $this> */
@@ -46,6 +55,16 @@ class CatalogTitleUserState extends Model
         return $this->versionAttribute('rating_version');
     }
 
+    public function recommendationFeedbackVersion(): int
+    {
+        return $this->versionAttribute('recommendation_feedback_version');
+    }
+
+    public function watchStatusVersion(): int
+    {
+        return $this->versionAttribute('watch_status_version');
+    }
+
     /** @return array<string, string> */
     protected function casts(): array
     {
@@ -54,6 +73,11 @@ class CatalogTitleUserState extends Model
             'rating' => 'integer',
             'watchlist_version' => 'integer',
             'rating_version' => 'integer',
+            'recommendation_feedback' => CatalogRecommendationFeedback::class,
+            'recommendation_feedback_version' => 'integer',
+            'recommendation_feedback_updated_at' => 'datetime',
+            'watch_status' => CatalogWatchStatus::class,
+            'watch_status_version' => 'integer',
         ];
     }
 

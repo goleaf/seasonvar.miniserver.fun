@@ -94,6 +94,12 @@ class Episode extends Model
             ->where('target_type', CommentTargetType::Episode->value);
     }
 
+    /** @return HasMany<ContentRequest, $this> */
+    public function contentRequests(): HasMany
+    {
+        return $this->hasMany(ContentRequest::class);
+    }
+
     /**
      * @return array<string, string>
      */

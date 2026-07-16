@@ -2,6 +2,10 @@
 
 namespace App\Services\Catalog;
 
+use App\DTOs\CatalogRecommendationContext;
+use App\DTOs\CatalogRecommendationItem;
+use App\DTOs\CatalogRecommendationListItem;
+use App\Enums\CatalogRecommendationType;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
@@ -26,6 +30,8 @@ class CatalogHomePageBuilder
         private readonly CatalogHomeSnapshotCache $snapshot,
         private readonly CatalogUserCardStateLoader $cardStates,
         private readonly CatalogCollectionQuery $collections,
+        private readonly CatalogRecommendationService $recommendations,
+        private readonly CatalogRecommendationPresenter $recommendationPresenter,
     ) {}
 
     /**
@@ -102,6 +108,48 @@ class CatalogHomePageBuilder
         $latestMedia->each(function (LicensedMedia $media): void {
             $media->setAttribute('card_meta', $this->latestMediaCardMeta($media));
         });
+        $excludedRecommendationIds = $latestTitles
+            ->concat($featuredTitles)
+            ->concat($videoTitles)
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $recommendationType = $user !== null
+            ? CatalogRecommendationType::Personalized
+            : CatalogRecommendationType::Trending;
+        $recommendationResult = $this->recommendations->discover(new CatalogRecommendationContext(
+            type: $recommendationType,
+            user: $user,
+            locale: app()->currentLocale(),
+            excludedTitleIds: $excludedRecommendationIds,
+            perPage: 8,
+        ));
+
+        if ($recommendationResult->items->isEmpty() && $recommendationType === CatalogRecommendationType::Trending) {
+            $recommendationResult = $this->recommendations->discover(new CatalogRecommendationContext(
+                type: CatalogRecommendationType::Popular,
+                user: null,
+                locale: app()->currentLocale(),
+                excludedTitleIds: $excludedRecommendationIds,
+                perPage: 8,
+            ));
+        }
+
+        $homeRecommendationItems = $recommendationResult->items->map(
+            fn (CatalogRecommendationItem $item): CatalogRecommendationListItem => new CatalogRecommendationListItem(
+                title: $item->title,
+                rank: $item->rank,
+                reasonLabels: $this->recommendationPresenter->explanations($item->explanations),
+                score: $item->score,
+                type: $item->type,
+                source: $item->source,
+                relationType: $item->relationType,
+                canDismiss: false,
+            ),
+        );
+        $homeRecommendationPresentation = $this->recommendationPresenter->type($recommendationResult->displayType);
         $this->cardStates->load(
             $latestTitles->concat($featuredTitles)->concat($videoTitles),
             $user,
@@ -127,6 +175,9 @@ class CatalogHomePageBuilder
             'countries' => $countries,
             'subtitleTag' => $subtitleTag,
             'featuredCollections' => $this->collections->featured(),
+            'homeRecommendationItems' => $homeRecommendationItems,
+            'homeRecommendationPresentation' => $homeRecommendationPresentation,
+            'discoveryUrl' => route('discover.index', ['type' => $recommendationResult->displayType->value]),
             'noveltiesUrl' => route('titles.year', ['year' => now()->year]),
             'seo' => $this->seo->home($stats, $latestTitles),
         ];

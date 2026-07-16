@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\Api\V1\Sync\ApiSyncReadiness;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Schema;
 
 final readonly class UserLibraryQuery
 {
@@ -47,6 +48,36 @@ final readonly class UserLibraryQuery
             ->withQueryString();
     }
 
+    /** @return LengthAwarePaginator<int, CatalogTitleUserState> */
+    public function recommendationFeedback(User $user, string $pageName = 'page'): LengthAwarePaginator
+    {
+        $query = $this->base($user);
+
+        if (! Schema::hasColumn('catalog_title_user_states', 'recommendation_feedback')) {
+            $query->whereRaw('1 = 0');
+        } else {
+            $query->whereNotNull('recommendation_feedback');
+        }
+
+        return $query
+            ->orderByDesc('recommendation_feedback_updated_at')
+            ->orderByDesc('id')
+            ->paginate(24, pageName: $pageName)
+            ->withQueryString();
+    }
+
+    public function recommendationFeedbackCount(User $user): int
+    {
+        if (! Schema::hasColumn('catalog_title_user_states', 'recommendation_feedback')) {
+            return 0;
+        }
+
+        return CatalogTitleUserState::query()
+            ->whereBelongsTo($user)
+            ->whereNotNull('recommendation_feedback')
+            ->count();
+    }
+
     /** @return Builder<CatalogTitleUserState> */
     private function base(User $user): Builder
     {
@@ -69,6 +100,24 @@ final readonly class UserLibraryQuery
             $query->addSelect(['watchlist_version', 'rating_version']);
         } else {
             $query->selectRaw('0 AS watchlist_version, 0 AS rating_version');
+        }
+
+        if (Schema::hasColumns('catalog_title_user_states', [
+            'recommendation_feedback',
+            'recommendation_feedback_version',
+            'recommendation_feedback_updated_at',
+            'watch_status',
+            'watch_status_version',
+        ])) {
+            $query->addSelect([
+                'recommendation_feedback',
+                'recommendation_feedback_version',
+                'recommendation_feedback_updated_at',
+                'watch_status',
+                'watch_status_version',
+            ]);
+        } else {
+            $query->selectRaw('NULL AS recommendation_feedback, 0 AS recommendation_feedback_version, NULL AS recommendation_feedback_updated_at, NULL AS watch_status, 0 AS watch_status_version');
         }
 
         return $query->with([

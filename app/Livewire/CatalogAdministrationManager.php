@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Enums\CatalogPublicationType;
+use App\Enums\CatalogTitleRelationSource;
+use App\Enums\CatalogTitleRelationType;
 use App\Enums\ContentAudience;
 use App\Enums\PublicationStatus;
 use App\Enums\ReleaseKind;
@@ -16,6 +18,7 @@ use App\Models\User;
 use App\Services\Catalog\CatalogAdministrationQuery;
 use App\Services\Catalog\CatalogAdministrationService;
 use App\Services\Catalog\CatalogTaxonomyRegistry;
+use App\Services\Catalog\CatalogTitleRelationService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -32,6 +35,8 @@ final class CatalogAdministrationManager extends Component
 
     public string $search = '';
 
+    public string $recommendationRelationSearch = '';
+
     /** @var array<string, mixed> */
     public array $titleForm = [];
 
@@ -46,6 +51,13 @@ final class CatalogAdministrationManager extends Component
 
     /** @var array<string, mixed> */
     public array $lookupForm = [];
+
+    /** @var array{type: string, priority: int|string, locked: bool} */
+    public array $recommendationRelationForm = [
+        'type' => 'companion',
+        'priority' => 100,
+        'locked' => true,
+    ];
 
     /** @var array<string, mixed> */
     public array $seasonForm = [];
@@ -97,14 +109,18 @@ final class CatalogAdministrationManager extends Component
 
     protected CatalogTaxonomyRegistry $taxonomies;
 
+    protected CatalogTitleRelationService $titleRelations;
+
     public function boot(
         CatalogAdministrationQuery $query,
         CatalogAdministrationService $administration,
         CatalogTaxonomyRegistry $taxonomies,
+        CatalogTitleRelationService $titleRelations,
     ): void {
         $this->query = $query;
         $this->administration = $administration;
         $this->taxonomies = $taxonomies;
+        $this->titleRelations = $titleRelations;
     }
 
     public function mount(): void
@@ -127,6 +143,58 @@ final class CatalogAdministrationManager extends Component
         $this->relationSearch[$key] = is_string($value)
             ? str($value)->squish()->limit(80, '')->toString()
             : '';
+    }
+
+    public function updatedRecommendationRelationSearch(): void
+    {
+        $this->recommendationRelationSearch = str($this->recommendationRelationSearch)->squish()->limit(80, '')->toString();
+    }
+
+    public function addRecommendationRelation(mixed $targetTitleId): void
+    {
+        $targetTitleId = $this->positiveId($targetTitleId);
+
+        if ($targetTitleId === null) {
+            return;
+        }
+
+        $validated = Validator::make(['relation' => $this->recommendationRelationForm], [
+            'relation.type' => ['required', Rule::enum(CatalogTitleRelationType::class)],
+            'relation.priority' => ['required', 'integer', 'between:0,65535'],
+            'relation.locked' => ['required', 'boolean'],
+        ])->validate()['relation'];
+        $type = CatalogTitleRelationType::from((string) $validated['type']);
+        $source = $this->selectedTitle();
+        $target = $this->query->title($targetTitleId);
+        $this->titleRelations->saveEditorial(
+            $this->user(),
+            $source,
+            $target,
+            $type,
+            (int) $validated['priority'],
+            (bool) $validated['locked'],
+        );
+
+        $this->recommendationRelationSearch = '';
+        $this->notice = __('recommendations.admin.relation_saved');
+        $this->resetErrorBag();
+    }
+
+    public function removeRecommendationRelation(mixed $relationId): void
+    {
+        $relationId = $this->positiveId($relationId);
+
+        if ($relationId === null) {
+            return;
+        }
+
+        $source = $this->selectedTitle();
+        $relation = $this->query->recommendationRelation($source, $relationId);
+        abort_unless($relation->source === CatalogTitleRelationSource::Editorial, 404);
+        $this->titleRelations->removeEditorial($this->user(), $relation);
+
+        $this->notice = __('recommendations.admin.relation_removed');
+        $this->resetErrorBag();
     }
 
     public function selectTitle(mixed $titleId): void
@@ -517,6 +585,11 @@ final class CatalogAdministrationManager extends Component
             'titles' => $this->query->titles($this->search),
             'selectedTitle' => $selectedTitle,
             'relationGroups' => $selectedTitle !== null ? $this->relationGroups($selectedTitle) : [],
+            'recommendationRelations' => $selectedTitle !== null ? $this->query->recommendationRelations($selectedTitle) : collect(),
+            'recommendationRelationCandidates' => $selectedTitle !== null
+                ? $this->query->recommendationRelationCandidates($selectedTitle, $this->recommendationRelationSearch)
+                : collect(),
+            'recommendationRelationTypes' => CatalogTitleRelationType::cases(),
             'seasons' => $seasons,
             'activeSeason' => $activeSeason,
             'episodes' => $episodes,

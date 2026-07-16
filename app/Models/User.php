@@ -126,6 +126,30 @@ class User extends Authenticatable implements MustVerifyEmailContract
         return $this->hasOne(CatalogTitleReviewNotificationPreference::class);
     }
 
+    /** @return HasMany<ContentRequest, $this> */
+    public function contentRequests(): HasMany
+    {
+        return $this->hasMany(ContentRequest::class, 'requester_id');
+    }
+
+    /** @return HasMany<ContentRequestVote, $this> */
+    public function contentRequestVotes(): HasMany
+    {
+        return $this->hasMany(ContentRequestVote::class);
+    }
+
+    /** @return HasMany<ContentRequestFollower, $this> */
+    public function followedContentRequests(): HasMany
+    {
+        return $this->hasMany(ContentRequestFollower::class);
+    }
+
+    /** @return HasOne<ContentRequestNotificationPreference, $this> */
+    public function contentRequestNotificationPreference(): HasOne
+    {
+        return $this->hasOne(ContentRequestNotificationPreference::class);
+    }
+
     /** @return HasOne<UserAccountSetting, $this> */
     public function accountSetting(): HasOne
     {

@@ -115,7 +115,6 @@ class CatalogTitlesPageBuilder
                 CatalogSort::EpisodesDesc => ['episodes'],
                 CatalogSort::SeasonsDesc => ['seasons'],
                 CatalogSort::VideoDesc => ['licensedMedia as published_media_count'],
-                CatalogSort::Popularity => ['episodes', 'licensedMedia as published_media_count'],
                 default => [],
             };
 

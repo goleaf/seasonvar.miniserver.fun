@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\UserTag;
 use App\Services\Collections\CatalogCollectionAccountService;
 use App\Services\Comments\CommentAccountService;
+use App\Services\ContentRequests\ContentRequestAccountService;
 use App\Services\Reviews\ReviewAccountService;
 use Illuminate\Support\Facades\DB;
 
@@ -20,6 +21,7 @@ final class AccountDataExportService
         private readonly CatalogCollectionAccountService $collections,
         private readonly CommentAccountService $comments,
         private readonly ReviewAccountService $reviews,
+        private readonly ContentRequestAccountService $contentRequests,
         private readonly AccountSettingsService $settings,
     ) {}
 
@@ -83,6 +85,7 @@ final class AccountDataExportService
                 ])->all(),
             'discussions' => $this->comments->export($user),
             'reviews' => $this->reviews->export($user),
+            'content_requests' => $this->contentRequests->export($user),
             'library' => CatalogTitleUserState::query()
                 ->whereBelongsTo($user)
                 ->with('catalogTitle:id,slug,title')
@@ -93,6 +96,9 @@ final class AccountDataExportService
                     'title' => $state->catalogTitle?->title,
                     'in_watchlist' => $state->in_watchlist,
                     'rating' => $state->rating,
+                    'watch_status' => $state->watch_status?->value,
+                    'recommendation_feedback' => $state->recommendation_feedback?->value,
+                    'recommendation_feedback_updated_at' => $state->recommendation_feedback_updated_at?->toAtomString(),
                     'updated_at' => $state->updated_at?->toAtomString(),
                 ])->all(),
             'view_progress' => EpisodeViewProgress::query()

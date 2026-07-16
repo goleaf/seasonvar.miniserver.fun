@@ -7,12 +7,16 @@ namespace App\Livewire\Profile;
 use App\Actions\Comments\MarkCommentNotificationRead;
 use App\Actions\Comments\SetUserBlock;
 use App\Actions\Comments\SetUserMute;
+use App\Actions\ContentRequests\MarkContentRequestNotificationRead;
 use App\Actions\Reviews\MarkReviewNotificationRead;
 use App\Exceptions\Comments\CommentActionException;
+use App\Exceptions\ContentRequests\ContentRequestActionException;
 use App\Exceptions\Reviews\ReviewActionException;
 use App\Models\User;
 use App\Services\Comments\CommentProfileQuery;
 use App\Services\Comments\CommentSchema;
+use App\Services\ContentRequests\ContentRequestNotificationQuery;
+use App\Services\ContentRequests\ContentRequestSchema;
 use App\Services\Reviews\ReviewNotificationQuery;
 use App\Services\Reviews\ReviewSchema;
 use Illuminate\Contracts\View\View;
@@ -75,6 +79,28 @@ final class DiscussionPage extends Component
         }
     }
 
+    public function markRequestNotificationRead(string $notificationId, MarkContentRequestNotificationRead $notifications): void
+    {
+        $this->attempt(function () use ($notificationId, $notifications): bool {
+            $notifications->one($this->user(), $notificationId);
+
+            return true;
+        });
+    }
+
+    public function markAllRequestNotificationsRead(MarkContentRequestNotificationRead $notifications): void
+    {
+        $result = $this->attempt(function () use ($notifications): bool {
+            $notifications->all($this->user());
+
+            return true;
+        });
+
+        if ($result === true) {
+            $this->notice = __('requests.notifications.marked_all_read');
+        }
+    }
+
     public function unblock(int $userId, SetUserBlock $blocks): void
     {
         $result = $this->attempt(function () use ($userId, $blocks): bool {
@@ -108,6 +134,8 @@ final class DiscussionPage extends Component
         CommentSchema $schema,
         ReviewNotificationQuery $reviewNotifications,
         ReviewSchema $reviewSchema,
+        ContentRequestNotificationQuery $requestNotifications,
+        ContentRequestSchema $requestSchema,
     ): View {
         $available = $schema->writable();
         $notificationsAvailable = $schema->notificationsAvailable();
@@ -117,6 +145,8 @@ final class DiscussionPage extends Component
         $queryFailed = false;
         $activity = null;
         $notifications = null;
+        $requestNotificationItems = null;
+        $requestNotificationsFailed = false;
         $blocks = null;
         $mutes = null;
 
@@ -142,6 +172,15 @@ final class DiscussionPage extends Component
             $reviewNotificationsFailed = true;
         }
 
+        try {
+            $requestNotificationItems = $requestSchema->ready()
+                ? $requestNotifications->forUser($this->user())
+                : null;
+        } catch (Throwable $exception) {
+            report($exception);
+            $requestNotificationsFailed = true;
+        }
+
         return view('livewire.profile.discussion-page', [
             'available' => $available,
             'queryFailed' => $queryFailed,
@@ -151,6 +190,9 @@ final class DiscussionPage extends Component
             'reviewNotificationsAvailable' => $reviewNotificationsAvailable,
             'reviewNotificationsFailed' => $reviewNotificationsFailed,
             'reviewNotifications' => $reviewNotificationItems,
+            'requestNotificationsAvailable' => $requestSchema->ready(),
+            'requestNotificationsFailed' => $requestNotificationsFailed,
+            'requestNotifications' => $requestNotificationItems,
             'blocks' => $blocks,
             'mutes' => $mutes,
         ])
@@ -186,6 +228,8 @@ final class DiscussionPage extends Component
         } catch (CommentActionException $exception) {
             $this->actionError = $exception->localizedMessage();
         } catch (ReviewActionException $exception) {
+            $this->actionError = __($exception->translationKey, $exception->replace);
+        } catch (ContentRequestActionException $exception) {
             $this->actionError = __($exception->translationKey, $exception->replace);
         } catch (ModelNotFoundException) {
             $this->actionError = __('comments.errors.comment_not_found');

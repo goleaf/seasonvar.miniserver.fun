@@ -378,3 +378,97 @@ Expected: unresolved detector findings `0`; any external media failure is report
 - [ ] **Step 6: Commit only task files**
 
 Check `git status --short --branch`, stage the exact files from this plan, inspect `git diff --cached --name-status` and `git diff --cached --check`, then commit on `main` with `feat: improve catalog title recommendations`. Do not stage parallel security, MCP, catalog-filter or unrelated documentation changes.
+
+---
+
+## Task 18 continuation: canonical recommendation and discovery architecture
+
+This section supersedes only the unfinished execution notes above. It preserves the shipped similarity v4 rows and API contract while extending them through one canonical orchestration boundary. The repository audit was performed on 2026-07-16 before implementation; the installed runtime is Laravel 13.20.0, Livewire 4.3.3, PHP 8.5 and SQLite.
+
+### Audited baseline
+
+- The only recommendation route is `GET /api/v1/titles/{titleSlug}/recommendations` (`api.v1.titles.recommendations`). The title page embeds one similarity row; there is no web discovery route, private recommendation route or legacy/localized recommendation route.
+- `CatalogTitleRecommendationBuilder` v4 is the only stored similarity builder. It uses bounded relation/theme candidate maps, a strong-feature gate, deterministic ranking and MMR-style diversity. The import finalizer performs a full rebuild. The title page has a genre/year fallback.
+- Production-shaped SQLite contains 32,932 visible titles, 385,979 v4 rows for 32,508 sources and 627,095 provider signals. There are no self-relations, duplicate ranks, deleted targets or hidden targets. A total of 424 visible sources have no stored row.
+- The fallback and `CatalogTitleRecommendation::reasonLabels()` contain Russian display text in PHP. Recommendation explanations are therefore not locale-safe.
+- `CatalogSort::Popularity` sorts by published media and episode counts. It is availability ordering, not popularity. There is no trending query, time decay or use of `updated_at` as activity.
+- Portal behavior exists for watchlist, portal rating and meaningful episode progress. The current database has one rating state and no progress/watchlist activity. There is no blacklist, not-interested or dropped-state field.
+- Collections and private personal tags exist. Featured approved editorial collections are the existing editorial-content boundary, but the current database contains no collection rows. There are no favorite-genre/profile models.
+- Per-user region or premium entitlement models do not exist. The canonical access boundary currently covers publication, soft deletion, availability windows and public/authenticated audience. Audio/subtitle language entities and creator/writer relations also do not exist; quality, subtitle availability, translation studio, actor and director filters do.
+- There is no release-calendar entity. Future `episodes.released_at` and future title years are the only truthful upcoming signals; the audited database currently contains neither.
+- The public recommendation API is cacheable. It must remain public/content-contextual; private signals must never be added to this response or its global cache.
+- Existing homepage snapshots cache locale-aware public scalar ID lists. User card state is loaded afterward. Recommendation caches already have a dedicated version domain and fresh/stale windows.
+- Existing routes, title binding, search/filter state, collection editor, personal tags, review/comment policies, importer signals and serial-card components are compatibility dependencies and must not be duplicated.
+
+### Canonical target and stable identities
+
+- `CatalogRecommendationService` is the sole page/API orchestration boundary. The existing v4 builder remains the precomputed `similar` provider, not a competing system.
+- Stable types are limited to implemented behavior: `personalized`, `similar`, `related`, `editorial`, `trending`, `popular`, `top_rated`, `recently_added`, `recently_updated`, `upcoming` and `random`.
+- Stable sources are limited to verified signals: user history, watchlist, collections, personal tag assignments, content similarity, editorial collections, recent portal activity, portal/provider ratings, catalogue publication/content events, release dates, random selection and imported provider similarity.
+- A server-only context owns authenticated identity, locale, current title, access audience, filters, bounded result limit, hard exclusions and recent-display suppression. URLs never contain user IDs, private history, blacklist state or candidate lists.
+- Presentation DTOs carry localized reason keys/parameters and card-ready titles. Scores remain internal and are never presented as percentages or ratings.
+
+### Ranking, visibility and privacy rules
+
+- Every pool starts from `CatalogTitleQuery::visibleTo()`. Watchable sections additionally require a published, healthy and currently available media source. Upcoming rows are explicitly non-playable until that boundary is met.
+- Current title, self-relations and duplicate canonical IDs are hard exclusions. `not_interested` and `blacklisted` are stored additively on the existing one-row-per-user/title state and excluded from all private/contextual recommendations. Feedback is authenticated, authorized, idempotent, POST/Livewire-only and undoable.
+- Meaningful history is bounded to recent title IDs and excludes accidental playback; completed/currently-watching states are derived from canonical episode progress. General discovery excludes current watching and completed titles unless a meaningful later release exists. A future explicit dropped state is not inferred from short playback.
+- Personal ranking uses only real portal signals. No history yields a cold-start mix of actual watchlist/collection/tag signals when present, otherwise public editorial/trending/popular rows with public explanations. Public fallback is never labelled personalized.
+- Similarity continues to use v4 strong metadata and trusted provider signals. Explicit related records distinguish directional sequel/prequel/spin-off/remake from computed similarity and are shown first. Editorial rows never bypass access or user exclusions.
+- Popularity combines bounded lifetime portal interest/meaningful starts and one rating source at a time; it never uses raw page views alone. Trending uses recent 7-day portal events and is distinct from lifetime popularity. Empty recent activity yields an honest empty/fallback public section, not fabricated trending.
+- Top-rated uses one requested stable source and a minimum vote count. IMDb, Kinopoisk and portal ratings are not averaged together.
+- Diversity and repeat suppression operate after relevance: deterministic tie-breaking, bounded candidate pools, configurable per-primary-genre/actor limits and a bounded session history. The catalogue is never scored wholly in PHP and random discovery never uses unbounded `ORDER BY RANDOM()`.
+- Private explanations are broad and truthful. They do not include progress timestamps, episode numbers, personal tag names or private collection names. Private result IDs are not globally cached; public caches contain scalar IDs only and include type, locale, public access class, period, filter/sort/page and recommendation version.
+
+### Compatibility and migration plan
+
+- Keep `catalog_title_recommendations`, its pair uniqueness, algorithm codes, API route/name and existing cache domain. Replace hardcoded label generation with a translator-backed presenter without changing stored reason keys.
+- Add an additive explicit relation table rather than placing locked editorial rows in the builder-owned table. It stores source/target, stable relation type/source, priority, lock/active state and provider provenance; service validation rejects self-relations, invalid inverse/cycles and inaccessible targets.
+- Add additive recommendation feedback/version/timestamp columns to `catalog_title_user_states`, preserving its unique user/title row and all watchlist/rating values. No destructive backfill is needed; null means no feedback.
+- Reuse approved featured editorial collections as editorial sections. Their public UUID is stable independently of localized titles/slugs and item position is already deterministic and unique.
+- Add targeted indexes only for the exact relation lookup, feedback exclusion, recent activity and release-event queries. All migrations must be reversible and SQLite-compatible.
+- Importer v4 rows and provider signals stay idempotent. Explicit locked relations are stored separately, so full imports cannot overwrite them. Title merge/delete services must move/dedupe or hide explicit relations and invalidate the recommendation domain.
+- Rolling-deploy fallback: schema capability checks retain the old similarity API/title block until additive tables/columns exist. Cache failure falls back to bounded database queries; no queue, scheduler or external service becomes mandatory.
+
+### Phased implementation checklist
+
+- [ ] Add stable enums, context/item/explanation DTOs, translated presenter and central configuration.
+- [ ] Add additive feedback and explicit-relation schema/models/policies/services with merge/delete handling.
+- [ ] Add centralized visibility, hard-exclusion, diversity, repeat-suppression and scalar-ID cache services.
+- [ ] Add public queries for popular, trending, top-rated, recently added/updated, upcoming, editorial and efficient filtered random discovery.
+- [ ] Add bounded personalized candidate generation from real progress/watchlist/collection/tag/rating signals with honest cold start.
+- [ ] Route title-page related/similar and the legacy API through the canonical service while preserving response shape.
+- [ ] Add one discovery route/page with validated stable URL state, public/private SEO policy, pagination, refresh and feedback/undo.
+- [ ] Integrate lightweight sections into home, search empty state, library and calendar-compatible release views only where the corresponding feature exists.
+- [ ] Add authorized relation administration within the existing catalogue administration surface; reuse collection administration for editorial sections.
+- [ ] Add complete `ru`/`en` recommendation translations, localized reasons, accessibility/loading/empty/error states and mobile-first reusable cards.
+- [ ] Extend canonical SEO/sitemap generation only with non-empty stable public discovery types; keep personalized/random/filter state noindex and out of sitemap.
+- [ ] Update architecture/data/cache/security/performance/view/SEO/API documentation and the English changelog.
+
+### Files expected to change
+
+- Recommendation/catalog domain classes under `app/Enums`, `app/DTOs`, `app/Services/Catalog`, related models/policies and existing merge/cache/import integration points.
+- Additive migrations, routes/controllers/requests, one Livewire discovery component, existing title/home/library/search views and `lang/en`, `lang/ru` catalogues.
+- Relevant topic-owner Markdown files, this plan and `CHANGELOG.md`.
+
+### Files and contracts that must remain unchanged
+
+- The public import command, v4 stored row identity, current API recommendation route/name/field shape, title slug binding and existing catalogue/search/filter route codes.
+- External media URL-only storage, current collection/tag/history/progress ownership, public cache keys already consumed by unrelated pages and all existing user data.
+- Unrelated staged operational audit changes present before task 18.
+
+### Rollback considerations
+
+- Web integration can be rolled back while additive feedback/relation data remains inert and preserved.
+- Down migration removes only new relation/feedback structures and never touches v4 rows, user watchlist/rating/progress or editorial collections.
+- Versioned public keys make stale discovery lists unreachable without flushing unrelated cache domains. Private results are reconstructed from authoritative rows.
+- If recent-signal queries or cache stores fail, public recently-added/similar lists remain available; authenticated users receive the same honest public fallback.
+
+### Final verification checklist (no new or existing automated tests run for task 18)
+
+- [ ] Inspect every changed file and all directly related routes, bindings, models, relations, policies, import/merge and cache invalidators.
+- [ ] Run Pint for changed PHP, PHP syntax checks, static analysis already configured by the project, route/schema/query-plan inspection, migration dry inspection and `git diff --check`.
+- [ ] Exercise public/private/cold-start/feedback/undo/random/related/similar queries against a disposable SQLite copy without invoking the automated test runner.
+- [ ] Run Vite build and browser smoke checks at phone/tablet/desktop widths, including keyboard/focus, no horizontal overflow, console/network errors and no private HTML/URL/cache leakage.
+- [ ] Verify public versus private cache dimensions, noindex/canonical/hreflang/sitemap policy, translation key parity and accessibility names.
+- [ ] Re-read the full task, record any unavailable portal capability as a verified limitation rather than a fabricated implementation, update all owner docs and changelog, then commit only task 18 changes on `main` and push.

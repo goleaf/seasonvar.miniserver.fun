@@ -1,6 +1,6 @@
 <x-ui.poster-card
     :src="$title->poster_url"
-    alt="Постер {{ $title->display_title }}"
+    :alt="__('catalog.seo.poster_alt', ['title' => $title->display_title])"
     layout="recommendation"
     data-catalog-card
     {{ $attributes }}
@@ -9,7 +9,7 @@
         <div class="min-w-0">
             @if ($rank)
                 <span class="text-xs font-bold uppercase tracking-wide text-emerald-700" data-recommendation-rank="{{ $rank }}">
-                    Совет № {{ $rank }}
+                    {{ __('recommendations.card.rank', ['rank' => $rank]) }}
                 </span>
             @endif
 
@@ -25,7 +25,7 @@
         </div>
 
         <div class="flex shrink-0 items-center gap-2 text-xs font-semibold text-slate-500">
-            <span>{{ $title->type === 'serial' ? __('catalog.title.series_type') : $title->type }}</span>
+            <span>{{ $title->type === 'serial' ? __('catalog.title.series_type') : __('recommendations.card.catalog_title') }}</span>
             @if ($title->year)
                 <span aria-hidden="true">·</span>
                 <span>{{ $title->year }}</span>

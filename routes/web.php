@@ -2,6 +2,7 @@
 
 use App\Enums\AccountSettingsSection;
 use App\Enums\CatalogFilterType;
+use App\Enums\CatalogRecommendationType;
 use App\Http\Controllers\AccountDataExportController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\CatalogCollectionController;
@@ -22,6 +23,7 @@ use App\Livewire\Auth\ResetPasswordPage;
 use App\Livewire\Auth\VerifyEmailPage;
 use App\Livewire\CatalogAdministrationManager;
 use App\Livewire\CatalogDirectoryBrowser;
+use App\Livewire\CatalogDiscoveryPage;
 use App\Livewire\CatalogSeries;
 use App\Livewire\Collections\CatalogCollectionAdministrationManager;
 use App\Livewire\Collections\CatalogCollectionDashboard;
@@ -29,6 +31,11 @@ use App\Livewire\Collections\CatalogCollectionDirectory;
 use App\Livewire\Collections\CatalogCollectionEditor;
 use App\Livewire\Collections\CatalogCollectionProfile;
 use App\Livewire\Comments\CommentAdministrationManager;
+use App\Livewire\ContentRequests\ContentRequestAdministrationManager;
+use App\Livewire\ContentRequests\ContentRequestDetailPage;
+use App\Livewire\ContentRequests\ContentRequestDirectory;
+use App\Livewire\ContentRequests\ContentRequestFormPage;
+use App\Livewire\ContentRequests\MyContentRequestsPage;
 use App\Livewire\Library\UserLibraryPage;
 use App\Livewire\Profile\DiscussionPage;
 use App\Livewire\Profile\ProfilePage;
@@ -47,6 +54,14 @@ use Illuminate\Http\Request;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+
+$discoveryRouteTypes = collect(CatalogRecommendationType::values())
+    ->reject(fn (string $type): bool => in_array($type, [
+        CatalogRecommendationType::Similar->value,
+        CatalogRecommendationType::Related->value,
+    ], true))
+    ->values()
+    ->all();
 
 Route::get('/', [CatalogController::class, 'index'])
     ->middleware('public.page:homepage')
@@ -87,6 +102,16 @@ Route::middleware(['auth', 'auth.session', 'account.private'])->group(function (
         ->middleware(['password.confirm', 'throttle:6,1'])
         ->name('profile.export');
     Route::get('/my/collections', CatalogCollectionDashboard::class)->name('collections.mine');
+    Route::get('/requests/create', ContentRequestFormPage::class)->name('requests.create');
+    Route::get('/requests/mine', MyContentRequestsPage::class)->name('requests.mine');
+    Route::get('/{locale}/requests/create', ContentRequestFormPage::class)
+        ->whereIn('locale', config('content-requests.supported_locales', ['ru']))
+        ->middleware('collection.locale')
+        ->name('localized.requests.create');
+    Route::get('/{locale}/requests/mine', MyContentRequestsPage::class)
+        ->whereIn('locale', config('content-requests.supported_locales', ['ru']))
+        ->middleware('collection.locale')
+        ->name('localized.requests.mine');
     Route::get('/my/collections/{collectionPublicId}/edit', CatalogCollectionEditor::class)
         ->whereUuid('collectionPublicId')
         ->name('collections.edit');
@@ -95,7 +120,7 @@ Route::middleware(['auth', 'auth.session', 'account.private'])->group(function (
         ->defaults('section', 'watchlist')
         ->name('library.index');
     Route::get('/library/{section}', UserLibraryPage::class)
-        ->whereIn('section', ['watchlist', 'ratings', 'continue-watching', 'history'])
+        ->whereIn('section', ['watchlist', 'ratings', 'continue-watching', 'history', 'hidden-recommendations'])
         ->name('library.section');
     Route::get('/library/tags/manage', PersonalTagManager::class)
         ->name('personal-tags.index');
@@ -125,6 +150,9 @@ Route::middleware('public.cache:documents')
         Route::get('/sitemap-videos-{page}.xml', [CatalogSitemapController::class, 'sitemapVideos'])
             ->whereNumber('page')
             ->name('sitemap.videos');
+        Route::get('/sitemap-requests-{page}.xml', [CatalogSitemapController::class, 'sitemapRequests'])
+            ->whereNumber('page')
+            ->name('sitemap.requests');
         Route::get('/feed.xml', [CatalogSitemapController::class, 'feed'])->name('feed');
         Route::get('/opensearch.xml', [CatalogSitemapController::class, 'openSearch'])->name('opensearch');
         Route::get('/llms.txt', [CatalogSitemapController::class, 'llms'])->name('llms');
@@ -146,12 +174,26 @@ Route::get('/playback/{licensedMedia}', PlaybackSourceController::class)
     ->whereNumber('licensedMedia')
     ->name('playback.source');
 
+Route::redirect('/discover', '/discover/popular', 302)->name('discover.default');
+Route::get('/discover/{type}', CatalogDiscoveryPage::class)
+    ->whereIn('type', $discoveryRouteTypes)
+    ->name('discover.index');
+Route::redirect('/recommendations', '/discover/popular', 301)->name('legacy.recommendations.index');
+
 Route::get('/comments/{comment}', CommentRedirectController::class)
     ->whereNumber('comment')
     ->name('comments.show');
 Route::get('/reviews/{review}', ReviewDirectLinkController::class)
     ->whereNumber('review')
     ->name('reviews.show');
+
+Route::get('/requests', ContentRequestDirectory::class)
+    ->middleware('public.page:requests')
+    ->name('requests.index');
+Route::get('/requests/{contentRequest}', ContentRequestDetailPage::class)
+    ->whereUuid('contentRequest')
+    ->middleware('public.page:requests')
+    ->name('requests.show');
 
 Route::get('/collections', CatalogCollectionDirectory::class)
     ->middleware('public.page:collections')
@@ -168,7 +210,36 @@ Route::get('/profiles/{userPublicId}/collections', CatalogCollectionProfile::cla
     ->middleware('public.page:collections')
     ->name('profiles.collections');
 
-Route::middleware('collection.locale')->group(function (): void {
+Route::middleware('collection.locale')->group(function () use ($discoveryRouteTypes): void {
+    Route::get('/{locale}/requests', ContentRequestDirectory::class)
+        ->whereIn('locale', config('content-requests.supported_locales', ['ru']))
+        ->middleware('public.page:requests')
+        ->name('localized.requests.index');
+    Route::get('/{locale}/requests/{contentRequest}', ContentRequestDetailPage::class)
+        ->whereIn('locale', config('content-requests.supported_locales', ['ru']))
+        ->whereUuid('contentRequest')
+        ->middleware('public.page:requests')
+        ->name('localized.requests.show');
+    Route::get('/{locale}/discover', function (string $locale) {
+        return redirect()->route('localized.discover.index', [
+            'locale' => $locale,
+            'type' => CatalogRecommendationType::Popular->value,
+        ], 302);
+    })
+        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->name('localized.discover.default');
+    Route::get('/{locale}/discover/{type}', CatalogDiscoveryPage::class)
+        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->whereIn('type', $discoveryRouteTypes)
+        ->name('localized.discover.index');
+    Route::get('/{locale}/recommendations', function (string $locale) {
+        return redirect()->route('localized.discover.index', [
+            'locale' => $locale,
+            'type' => CatalogRecommendationType::Popular->value,
+        ], 301);
+    })
+        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->name('localized.legacy.recommendations.index');
     Route::get('/{locale}/comments/{comment}', CommentRedirectController::class)
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->whereNumber('comment')
@@ -225,6 +296,9 @@ Route::get('/admin/reviews', ReviewModerationManager::class)
 Route::get('/admin/tags', TagAdministrationManager::class)
     ->middleware('can:manage-catalog')
     ->name('admin.tags');
+Route::get('/admin/requests', ContentRequestAdministrationManager::class)
+    ->middleware('can:manage-content-requests')
+    ->name('admin.requests');
 Route::get('/titles/year/{year}', CatalogSeries::class)
     ->where('year', '(?:19|20)\d{2}')
     ->middleware('public.page:catalog')

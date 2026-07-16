@@ -9,6 +9,7 @@ use App\DTOs\Seasonvar\SeasonvarSourceInventoryResult;
 use App\Enums\SeasonvarPageType;
 use App\Models\SeasonvarImportRun;
 use App\Services\Catalog\CatalogCacheInvalidator;
+use App\Services\Seasonvar\SeasonvarGlobalImportRunCoordinator;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use App\Services\Seasonvar\SeasonvarImportProcessInspector;
 use App\Services\Seasonvar\SeasonvarPageHandlerRegistry;
@@ -44,6 +45,7 @@ class ImportSeasonvar extends Command
     public function handle(
         SeasonvarImportPipeline $pipeline,
         SeasonvarImportProcessInspector $processInspector,
+        SeasonvarGlobalImportRunCoordinator $globalRuns,
         SeasonvarQueuedImportDispatcher $queuedDispatcher,
         SeasonvarQueueStatus $queueStatus,
         SeasonvarSourceInventory $sourceInventory,
@@ -93,6 +95,28 @@ class ImportSeasonvar extends Command
 
         try {
             $lockStore->put(self::LOCK_PROCESS_KEY, $process, $lockSeconds);
+            $reservedRun = null;
+
+            if (! $inventoryOnly && $this->argument('url') === null) {
+                $reservation = $globalRuns->acquireSync(
+                    force: (bool) $this->option('force'),
+                    forever: (bool) $this->option('forever'),
+                    processId: $process['pid'],
+                    processHost: $process['host'],
+                    processCommand: $process['command'],
+                );
+
+                if (! $reservation->created) {
+                    $this->warn(sprintf(
+                        'Активный глобальный запуск #%d уже выполняется. Синхронный запуск не создан.',
+                        $reservation->run->id,
+                    ));
+
+                    return self::SUCCESS;
+                }
+
+                $reservedRun = $reservation->run;
+            }
 
             if ($inventoryOnly) {
                 $result = $sourceInventory->run(
@@ -116,6 +140,7 @@ class ImportSeasonvar extends Command
                 processCommand: $process['command'],
                 progress: $this->seasonvarProgress(),
                 pageTypes: $pageTypes,
+                reservedRun: $reservedRun,
             );
 
             $cacheInvalidator->catalogChanged();

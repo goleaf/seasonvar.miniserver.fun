@@ -28,6 +28,27 @@
                     </section>
                 @endif
 
+                @if ($homeRecommendationItems->isNotEmpty())
+                    <x-ui.panel :title="$homeRecommendationPresentation['title']" icon="fa-solid fa-compass" :pad="false">
+                        <div class="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                            <div class="flex flex-wrap items-center justify-between gap-3">
+                                <p class="text-sm leading-6 text-slate-600">{{ $homeRecommendationPresentation['description'] }}</p>
+                                <a href="{{ $discoveryUrl }}" class="inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 text-sm font-bold text-emerald-700 hover:bg-emerald-50">
+                                    <span>{{ __('recommendations.navigation.all') }}</span>
+                                    <x-ui.icon name="fa-solid fa-arrow-right" />
+                                </a>
+                            </div>
+                        </div>
+                        <ol class="divide-y divide-slate-200" aria-label="{{ $homeRecommendationPresentation['accessibility'] }}" data-home-recommendations>
+                            @foreach ($homeRecommendationItems as $recommendationItem)
+                                <li data-recommendation-row>
+                                    <x-catalog.title-card :title="$recommendationItem->title" layout="recommendation" :rank="$recommendationItem->rank" :reason-labels="$recommendationItem->reasonLabels" />
+                                </li>
+                            @endforeach
+                        </ol>
+                    </x-ui.panel>
+                @endif
+
                 <x-ui.panel title="Последние обновления" icon="fa-solid fa-clock-rotate-left" :pad="false">
                     <div data-home-latest-updates-list class="divide-y divide-slate-200">
                         @forelse ($latestByDate as $date => $titlesForDate)

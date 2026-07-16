@@ -9,17 +9,24 @@
                 <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Сохранённые тайтлы, оценки, продолжение просмотра и личная история.</p>
             </div>
 
-            @if ($lastWatchedAtLabel !== null)
-                <p class="text-xs font-semibold text-slate-500">Последний просмотр {{ $lastWatchedAtLabel }}</p>
-            @endif
+            <div class="flex flex-col items-start gap-2 lg:items-end">
+                @if ($lastWatchedAtLabel !== null)
+                    <p class="text-xs font-semibold text-slate-500">Последний просмотр {{ $lastWatchedAtLabel }}</p>
+                @endif
+                <a href="{{ route('discover.index', ['type' => 'personalized']) }}" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-100">
+                    <x-ui.icon name="fa-solid fa-compass" />
+                    <span>{{ __('recommendations.types.personalized.title') }}</span>
+                </a>
+            </div>
         </div>
 
-        <div class="mt-5 grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <div class="mt-5 grid grid-cols-2 gap-2 lg:grid-cols-5">
             @foreach ([
                 ['section' => 'watchlist', 'label' => 'В списке', 'count' => $summary->watchlistCount, 'icon' => 'fa-solid fa-bookmark'],
                 ['section' => 'ratings', 'label' => 'Оценено', 'count' => $summary->ratingsCount, 'icon' => 'fa-solid fa-star'],
                 ['section' => 'continue-watching', 'label' => 'Продолжить', 'count' => $summary->continueWatchingCount, 'icon' => 'fa-solid fa-circle-play'],
                 ['section' => 'history', 'label' => 'В истории', 'count' => $summary->historyCount, 'icon' => 'fa-solid fa-clock-rotate-left'],
+                ['section' => 'hidden-recommendations', 'label' => __('recommendations.library.hidden'), 'count' => $recommendationFeedbackCount, 'icon' => 'fa-solid fa-eye-slash'],
             ] as $item)
                 <a href="{{ route('library.section', $item['section']) }}" @class([
                     'flex min-h-20 items-center gap-3 rounded-control border p-3 transition',
@@ -129,12 +136,12 @@
         </form>
     @endif
 
-    <div wire:loading.flex wire:target="applyFilters,resetFilters,setWatchlist,setRating,removeHistoryItem,clearHistory,setPage" class="min-h-28 items-center justify-center gap-2 rounded-panel border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-500 shadow-panel">
+    <div wire:loading.flex wire:target="applyFilters,resetFilters,setWatchlist,setRating,removeHistoryItem,clearHistory,undoRecommendationFeedback,setPage" class="min-h-28 items-center justify-center gap-2 rounded-panel border border-slate-200 bg-white p-6 text-sm font-semibold text-slate-500 shadow-panel">
         <x-ui.icon name="fa-solid fa-spinner fa-spin text-emerald-700" />
         <span>Обновляем библиотеку…</span>
     </div>
 
-    <div wire:loading.remove wire:target="applyFilters,resetFilters,setWatchlist,setRating,removeHistoryItem,clearHistory,setPage">
+    <div wire:loading.remove wire:target="applyFilters,resetFilters,setWatchlist,setRating,removeHistoryItem,clearHistory,undoRecommendationFeedback,setPage">
         @if ($section === 'watchlist')
             <x-ui.panel title="Список просмотра" :subtitle="'Сохранено: '.$watchlist->total()" icon="fa-solid fa-bookmark" :pad="false">
                 @if ($watchlist->isEmpty())
@@ -238,6 +245,40 @@
                             </x-ui.poster-card>
                         @endforeach
                     </div>
+                @endif
+            </x-ui.panel>
+        @elseif ($section === 'hidden-recommendations')
+            <x-ui.panel :title="__('recommendations.library.title')" :subtitle="__('recommendations.library.description')" icon="fa-solid fa-eye-slash" :pad="false">
+                @if ($recommendationFeedback->isEmpty())
+                    <div class="px-4 py-10 text-center">
+                        <x-ui.icon name="fa-regular fa-eye text-3xl text-slate-400" />
+                        <p class="mt-3 text-sm font-bold text-slate-700">{{ __('recommendations.library.empty') }}</p>
+                    </div>
+                @else
+                    <div class="divide-y divide-slate-200">
+                        @foreach ($recommendationFeedback as $state)
+                            <article wire:key="recommendation-feedback-{{ $state->id }}" class="min-w-0">
+                                <x-catalog.title-card
+                                    :title="$state->catalogTitle"
+                                    layout="list"
+                                    :show-description="false"
+                                    :user-in-watchlist="(bool) $state->in_watchlist"
+                                    :user-rating="$state->rating"
+                                />
+                                <div class="flex flex-wrap items-center justify-between gap-3 px-3 pb-3 sm:px-4 sm:pb-4">
+                                    <span class="text-sm font-bold text-slate-600">{{ __('recommendations.feedback.'.$state->recommendation_feedback->value) }}</span>
+                                    @if ($canInteract)
+                                        <button type="button" wire:click="undoRecommendationFeedback({{ $state->catalog_title_id }})" wire:loading.attr="disabled" class="relative z-10 min-h-11 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-100 disabled:opacity-60">
+                                            {{ __('recommendations.library.restore') }}
+                                        </button>
+                                    @endif
+                                </div>
+                            </article>
+                        @endforeach
+                    </div>
+                    @if ($recommendationFeedback->hasPages())
+                        <div class="border-t border-slate-200 bg-slate-50 p-4">{{ $recommendationFeedback->links() }}</div>
+                    @endif
                 @endif
             </x-ui.panel>
         @else

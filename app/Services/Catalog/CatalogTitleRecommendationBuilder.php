@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 
 final class CatalogTitleRecommendationBuilder
 {
-    private const ALGORITHM_VERSION = 'v4';
+    private const ALGORITHM_VERSION = 'v5';
 
     private const DEFAULT_MIN_SCORE = 600;
 
@@ -42,7 +42,7 @@ final class CatalogTitleRecommendationBuilder
         'genre' => 180,
         'tag' => 220,
         'director' => 280,
-        'actor' => 230,
+        'actor' => 130,
         'network' => 200,
         'studio' => 200,
         'translation' => 45,
@@ -74,7 +74,6 @@ final class CatalogTitleRecommendationBuilder
     private const STRONG_RELATION_TYPES = [
         'tag',
         'director',
-        'actor',
         'network',
         'studio',
     ];
@@ -667,7 +666,7 @@ final class CatalogTitleRecommendationBuilder
                 $shared,
             );
             rsort($contributions, SORT_NUMERIC);
-            $reasonScore = array_sum(array_slice($contributions, 0, 3));
+            $reasonScore = array_sum(array_slice($contributions, 0, $filterType === 'actor' ? 2 : 3));
             $metadataScore += $reasonScore;
             $reasons[$filterType] = [
                 'count' => $sharedCount,
@@ -680,7 +679,8 @@ final class CatalogTitleRecommendationBuilder
                 }
             }
 
-            if (in_array($filterType, self::STRONG_RELATION_TYPES, true)) {
+            if (in_array($filterType, self::STRONG_RELATION_TYPES, true)
+                || ($filterType === 'actor' && $sharedCount >= 2)) {
                 $hasStrongMatch = true;
             }
         }

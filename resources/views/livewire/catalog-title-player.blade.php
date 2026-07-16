@@ -198,7 +198,7 @@
                 </div>
 
                 @if ($canInteract)
-                    <div class="mt-3 grid gap-3 sm:grid-cols-2 sm:items-end">
+                    <div class="mt-3 grid gap-3 sm:grid-cols-2 sm:items-end lg:grid-cols-3">
                         <button
                             type="button"
                             wire:click="setWatchlist({{ $inWatchlist ? 'false' : 'true' }})"
@@ -221,6 +221,17 @@
                                 @endforeach
                             </select>
                         </label>
+                        @if ($recommendationStateAvailable)
+                            <label class="grid gap-1 text-sm font-semibold text-slate-600">
+                                <span>{{ __('recommendations.watch_status.label') }}</span>
+                                <select wire:change="setWatchStatus($event.target.value)" wire:loading.attr="disabled" wire:target="setWatchStatus" class="min-h-11 rounded-control border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700">
+                                    <option value="">{{ __('recommendations.watch_status.none') }}</option>
+                                    @foreach ($watchStatusOptions as $statusOption)
+                                        <option value="{{ $statusOption->value }}" @selected($watchStatus === $statusOption)>{{ __('recommendations.watch_status.'.$statusOption->value) }}</option>
+                                    @endforeach
+                                </select>
+                            </label>
+                        @endif
                         @error('rating')
                             <p class="text-sm font-semibold text-rose-700">{{ $message }}</p>
                         @enderror

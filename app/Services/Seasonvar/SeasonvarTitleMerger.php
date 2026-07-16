@@ -14,6 +14,7 @@ use App\Services\Catalog\CatalogTitleUserDataMerger;
 use App\Services\Catalog\Search\CatalogSearchIndexer;
 use App\Services\Collections\CatalogCollectionItemService;
 use App\Services\Comments\CommentTargetMergeService;
+use App\Services\ContentRequests\ContentRequestTargetMergeService;
 use App\Services\Reviews\ReviewMergeService;
 use App\Services\Tags\TagCacheInvalidator;
 use App\Services\Tags\TagTitleMergeService;
@@ -45,6 +46,7 @@ class SeasonvarTitleMerger
         private readonly CatalogCollectionItemService $collectionItems,
         private readonly CatalogTitleUserDataMerger $userData,
         private readonly CommentTargetMergeService $comments,
+        private readonly ContentRequestTargetMergeService $contentRequests,
         private readonly ReviewMergeService $reviews,
         private readonly TagTitleMergeService $tagTitles,
         private readonly TagCacheInvalidator $tagCache,
@@ -393,6 +395,7 @@ class SeasonvarTitleMerger
 
         foreach ($titles->slice(1) as $duplicate) {
             $this->comments->moveTitle($duplicate, $canonical);
+            $this->contentRequests->moveTitle($duplicate->id, $canonical->id);
 
             foreach ($this->relationIds($duplicate) as $relation => $ids) {
                 $relationIds[$relation] = array_values(array_unique([
@@ -436,6 +439,7 @@ class SeasonvarTitleMerger
                 $movedEpisodes += $this->mergeEpisodes($season, $targetSeason, $canonical);
                 $this->moveMediaForSeason($season->id, $canonical, $targetSeason);
                 $this->comments->moveSeason($season, $targetSeason);
+                $this->contentRequests->moveSeason($season, $targetSeason);
 
                 $season->forceDelete();
                 $mergedSeasons++;
@@ -526,6 +530,7 @@ class SeasonvarTitleMerger
 
             $targetEpisode->setRelation('season', $targetSeason);
             $this->comments->moveEpisode($episode, $targetEpisode);
+            $this->contentRequests->moveEpisode($episode, $targetEpisode);
             $this->userData->moveEpisode($episode, $targetEpisode, $canonical);
 
             $episode->forceDelete();

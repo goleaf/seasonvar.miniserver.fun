@@ -142,6 +142,19 @@
             @endif
         </section>
 
+        <section aria-labelledby="request-notifications-title" class="rounded-panel border border-slate-200 bg-white shadow-panel">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 p-4 sm:p-5">
+                <h2 id="request-notifications-title" class="flex items-center gap-2 text-lg font-black text-slate-800"><x-ui.icon name="fa-solid fa-list-check text-emerald-700" />{{ __('requests.notifications.title') }}</h2>
+                @if ($requestNotificationsAvailable)<button type="button" wire:click="markAllRequestNotificationsRead" wire:loading.attr="disabled" class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-50 px-3 text-sm font-bold text-slate-700"><x-ui.icon name="fa-solid fa-check-double" />{{ __('requests.notifications.mark_all_read') }}</button>@endif
+            </div>
+            @if (! $requestNotificationsAvailable || $requestNotificationsFailed || $requestNotifications === null || $requestNotifications->isEmpty())
+                <p class="p-6 text-sm font-semibold text-slate-600">{{ $requestNotificationsFailed ? __('requests.errors.query_failed') : __('requests.notifications.empty') }}</p>
+            @else
+                <ul class="divide-y divide-slate-100">@foreach ($requestNotifications as $notification)<li wire:key="request-notification-{{ $notification->id }}" @class(['p-4 sm:p-5', 'bg-emerald-50/60' => ! $notification->isRead])><div class="flex min-w-0 flex-wrap items-start justify-between gap-3"><div class="min-w-0"><div class="flex flex-wrap items-center gap-2">@if (! $notification->isRead)<x-ui.status-pill variant="success">{{ __('requests.notifications.unread') }}</x-ui.status-pill>@endif<time datetime="{{ $notification->createdAtIso }}" class="text-xs text-slate-500">{{ $notification->createdAtLabel }}</time></div><p class="mt-2 break-words text-sm font-bold text-slate-800">{{ $notification->label }}</p>@if ($notification->detail)<p class="mt-1 text-sm text-slate-600">{{ $notification->detail }}</p>@endif</div><div class="flex flex-wrap gap-2">@if ($notification->url)<a href="{{ $notification->url }}" class="inline-flex min-h-11 items-center rounded-control bg-emerald-700 px-3 text-sm font-bold text-white">{{ __('requests.notifications.open') }}</a>@endif @if (! $notification->isRead)<button type="button" wire:click="markRequestNotificationRead('{{ $notification->id }}')" class="min-h-11 rounded-control bg-slate-100 px-3 text-sm font-bold text-slate-700">{{ __('requests.notifications.mark_read') }}</button>@endif</div></div></li>@endforeach</ul>
+                @if ($requestNotifications->hasPages())<nav class="p-4" aria-label="{{ __('requests.notifications.title') }}">{{ $requestNotifications->links() }}</nav>@endif
+            @endif
+        </section>
+
         @if ($notificationsAvailable)
             <section aria-labelledby="discussion-preferences-title" class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
                 <h2 id="discussion-preferences-title" class="flex items-center gap-2 text-lg font-black text-slate-800"><x-ui.icon name="fa-solid fa-sliders text-emerald-700" />{{ __('comments.notifications.preferences') }}</h2>

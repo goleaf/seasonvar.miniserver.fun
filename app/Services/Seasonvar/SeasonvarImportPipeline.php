@@ -18,6 +18,7 @@ use App\Services\Media\MediaSourceHealthManager;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 use Throwable;
 
 class SeasonvarImportPipeline
@@ -57,8 +58,9 @@ class SeasonvarImportPipeline
         ?string $processCommand = null,
         ?callable $progress = null,
         ?array $pageTypes = null,
+        ?SeasonvarImportRun $reservedRun = null,
     ): SeasonvarImportRun {
-        $run = SeasonvarImportRun::query()->create([
+        $run = $reservedRun ?? SeasonvarImportRun::query()->create([
             'mode' => $argument === null ? 'sitemap' : 'url',
             'status' => 'running',
             'argument' => $argument,
@@ -71,6 +73,15 @@ class SeasonvarImportPipeline
             'started_at' => now(),
             'last_heartbeat_at' => now(),
         ]);
+
+        if ($reservedRun !== null && (
+            $argument !== null
+            || $reservedRun->mode !== 'sitemap'
+            || $reservedRun->execution_mode !== 'sync'
+            || $reservedRun->status !== 'running'
+        )) {
+            throw new LogicException('Reserved Seasonvar run is incompatible with a synchronous global import.');
+        }
         $loggedProgress = fn (string $event, array $context = []) => $this->recordProgress($run, $progress, $event, $context);
         $sleepSeconds = max(1, $sleepSeconds ?? (int) config('seasonvar.import.sleep_seconds', 60));
 

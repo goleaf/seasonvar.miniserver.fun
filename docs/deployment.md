@@ -168,6 +168,8 @@ Google-интеграции по умолчанию выключены. Если
 
 Последовательный и Redis queued-профили взаимоисключающие. Перед включением однопоточного профиля дождитесь текущих jobs, затем отключите import/title-refresh worker instances и удалите или закомментируйте cron-строку `seasonvar:import --queued`. Failed jobs и Redis backlog при переключении не очищаются.
 
+Application-level `SeasonvarGlobalImportRunCoordinator` дополнительно не создаёт новый full sitemap run, пока active `queued/running` run существует в `sync` или `queue` execution mode. Это rolling-deploy safety net, а не способ переключения профиля: guard не останавливает уже запущенный процесс, не завершает существующие пересекающиеся runs и не очищает backlog. Перед сменой профиля всё равно требуется описанная выше safe boundary.
+
 ```bash
 sudo systemctl disable --now 'seasonvar-import-worker@*.service'
 sudo systemctl disable --now 'seasonvar-title-refresh-worker@*.service'

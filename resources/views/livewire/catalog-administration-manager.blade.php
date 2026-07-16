@@ -176,6 +176,89 @@
             @endif
         </x-ui.panel>
 
+        <x-ui.panel
+            :title="__('recommendations.admin.section_title')"
+            :subtitle="__('recommendations.admin.section_description')"
+            icon="fa-solid fa-code-branch"
+        >
+            <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_10rem_12rem]">
+                <label class="text-sm font-bold text-slate-700">
+                    {{ __('recommendations.admin.relation_type') }}
+                    <select wire:model="recommendationRelationForm.type" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 font-normal">
+                        @foreach ($recommendationRelationTypes as $relationType)
+                            <option value="{{ $relationType->value }}">{{ __('recommendations.relations.'.$relationType->value) }}</option>
+                        @endforeach
+                    </select>
+                </label>
+                <label class="text-sm font-bold text-slate-700">
+                    {{ __('recommendations.admin.priority') }}
+                    <input type="number" min="0" max="65535" wire:model="recommendationRelationForm.priority" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 font-normal">
+                </label>
+                <label class="mt-7 flex min-h-11 items-center gap-3 rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700">
+                    <input type="checkbox" wire:model="recommendationRelationForm.locked" class="h-4 w-4 rounded border-slate-300 text-emerald-700">
+                    <span>{{ __('recommendations.admin.locked') }}</span>
+                </label>
+            </div>
+
+            <label class="mt-4 block text-sm font-bold text-slate-700" for="recommendation-relation-search">
+                {{ __('recommendations.admin.target_search') }}
+            </label>
+            <input
+                id="recommendation-relation-search"
+                type="search"
+                wire:model.live.debounce.350ms="recommendationRelationSearch"
+                maxlength="80"
+                class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-sm"
+                placeholder="{{ __('recommendations.admin.target_placeholder') }}"
+            >
+
+            @if (mb_strlen($recommendationRelationSearch) >= 2)
+                <div class="mt-2 grid gap-1" aria-live="polite">
+                    @forelse ($recommendationRelationCandidates as $candidate)
+                        <button
+                            type="button"
+                            wire:key="recommendation-relation-candidate-{{ $candidate->id }}"
+                            wire:click="addRecommendationRelation({{ $candidate->id }})"
+                            wire:loading.attr="disabled"
+                            wire:target="addRecommendationRelation({{ $candidate->id }})"
+                            class="flex min-h-11 items-center justify-between gap-3 rounded-control bg-slate-50 px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-60"
+                        >
+                            <span>{{ $candidate->title }} @if ($candidate->year)· {{ $candidate->year }}@endif</span>
+                            <span class="text-xs">{{ __('recommendations.admin.add') }}</span>
+                        </button>
+                    @empty
+                        <p class="rounded-control bg-slate-50 px-3 py-2 text-sm text-slate-500">{{ __('recommendations.admin.no_matches') }}</p>
+                    @endforelse
+                </div>
+            @endif
+
+            <div class="mt-4 grid gap-2">
+                @forelse ($recommendationRelations as $relation)
+                    <div wire:key="recommendation-relation-{{ $relation->id }}" class="flex flex-col gap-3 rounded-control border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-black text-slate-800">{{ $relation->targetTitle->title }}</p>
+                            <p class="mt-1 text-xs font-semibold text-slate-500">
+                                {{ __('recommendations.relations.'.$relation->relation_type->value) }}
+                                · {{ __('recommendations.admin.source_'.$relation->source->value) }}
+                                · {{ __('recommendations.admin.priority') }} {{ $relation->priority }}
+                            </p>
+                        </div>
+                        @if ($relation->source->value === 'editorial')
+                            <button
+                                type="button"
+                                wire:click="removeRecommendationRelation({{ $relation->id }})"
+                                wire:confirm="{{ __('recommendations.admin.remove') }}?"
+                                wire:loading.attr="disabled"
+                                class="min-h-11 rounded-control bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                            >{{ __('recommendations.admin.remove') }}</button>
+                        @endif
+                    </div>
+                @empty
+                    <p class="rounded-control bg-slate-50 px-3 py-3 text-sm text-slate-500">{{ __('recommendations.admin.empty') }}</p>
+                @endforelse
+            </div>
+        </x-ui.panel>
+
         <div class="grid gap-5 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
             <x-ui.panel title="Сезоны" subtitle="Обычные сезоны и спецсезоны имеют независимые номера." icon="fa-solid fa-layer-group" :pad="false">
                 <div class="border-b border-slate-200 p-3">

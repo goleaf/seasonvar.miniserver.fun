@@ -141,6 +141,119 @@ class SeasonvarParallelImportTest extends TestCase
         Queue::assertNotPushed(PrepareSeasonvarImportTitlePage::class);
     }
 
+    public function test_queued_start_reuses_an_active_sync_global_run(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        $syncRun = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'sync',
+            'status' => 'running',
+            'started_at' => now(),
+            'last_heartbeat_at' => now(),
+        ]);
+
+        $result = app(SeasonvarGlobalImportRunCoordinator::class)->acquire(
+            force: false,
+            discover: false,
+        );
+
+        $this->assertFalse($result->created);
+        $this->assertTrue($result->run->is($syncRun));
+        $this->assertSame(1, SeasonvarImportRun::query()
+            ->where('mode', 'sitemap')
+            ->whereIn('status', ['queued', 'running'])
+            ->count());
+    }
+
+    public function test_sync_global_run_reservation_is_idempotent_and_preserves_process_metadata(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        $coordinator = app(SeasonvarGlobalImportRunCoordinator::class);
+
+        $first = $coordinator->acquireSync(
+            force: true,
+            forever: true,
+            processId: 1234,
+            processHost: 'import-host',
+            processCommand: 'php artisan seasonvar:import --forever',
+        );
+        $duplicate = $coordinator->acquireSync(
+            force: false,
+            forever: false,
+        );
+
+        $this->assertTrue($first->created);
+        $this->assertFalse($duplicate->created);
+        $this->assertTrue($duplicate->run->is($first->run));
+        $this->assertSame('sitemap', $first->run->mode);
+        $this->assertSame('sync', $first->run->execution_mode);
+        $this->assertSame('running', $first->run->status);
+        $this->assertTrue((bool) $first->run->force);
+        $this->assertTrue((bool) $first->run->forever);
+        $this->assertSame(1234, $first->run->process_id);
+        $this->assertSame('import-host', $first->run->process_host);
+        $this->assertSame('php artisan seasonvar:import --forever', $first->run->process_command);
+        $this->assertNotNull($first->run->started_at);
+        $this->assertNotNull($first->run->last_heartbeat_at);
+        $this->assertSame(1, SeasonvarImportRun::query()
+            ->where('mode', 'sitemap')
+            ->whereIn('status', ['queued', 'running'])
+            ->count());
+    }
+
+    public function test_targeted_run_does_not_block_a_sync_global_reservation(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        $targeted = SeasonvarImportRun::query()->create([
+            'mode' => 'url',
+            'execution_mode' => 'sync',
+            'status' => 'running',
+            'started_at' => now(),
+            'last_heartbeat_at' => now(),
+        ]);
+
+        $global = app(SeasonvarGlobalImportRunCoordinator::class)->acquireSync(
+            force: false,
+            forever: false,
+        );
+
+        $this->assertTrue($global->created);
+        $this->assertFalse($global->run->is($targeted));
+        $this->assertSame('sitemap', $global->run->mode);
+        $this->assertSame('sync', $global->run->execution_mode);
+    }
+
+    public function test_full_sync_command_reuses_an_active_queued_global_run_before_pipeline(): void
+    {
+        config(['seasonvar.queue.lock_store' => 'array']);
+        $queuedRun = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'running',
+            'started_at' => now(),
+            'last_heartbeat_at' => now(),
+        ]);
+        $pipeline = Mockery::mock(SeasonvarImportPipeline::class);
+        $pipeline->shouldNotReceive('run');
+        $this->app->instance(SeasonvarImportPipeline::class, $pipeline);
+
+        $this->artisan('seasonvar:import', ['--no-discovery' => true])
+            ->expectsOutputToContain(
+                "Активный глобальный запуск #{$queuedRun->id} уже выполняется. Синхронный запуск не создан.",
+            )
+            ->assertExitCode(0);
+
+        $this->assertSame(1, SeasonvarImportRun::query()
+            ->where('mode', 'sitemap')
+            ->whereIn('status', ['queued', 'running'])
+            ->count());
+        $this->assertSame(0, SeasonvarImportRun::query()
+            ->where('mode', 'sitemap')
+            ->where('execution_mode', 'sync')
+            ->whereIn('status', ['queued', 'running'])
+            ->count());
+    }
+
     public function test_admin_start_marks_the_run_failed_when_coordinator_dispatch_is_rejected(): void
     {
         config([

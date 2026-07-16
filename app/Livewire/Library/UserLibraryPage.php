@@ -26,7 +26,7 @@ final class UserLibraryPage extends Component
 {
     use WithPagination;
 
-    private const SECTIONS = ['watchlist', 'ratings', 'continue-watching', 'history'];
+    private const SECTIONS = ['watchlist', 'ratings', 'continue-watching', 'history', 'hidden-recommendations'];
 
     #[Locked]
     public string $section = 'watchlist';
@@ -145,6 +145,13 @@ final class UserLibraryPage extends Component
         $this->status = 'История просмотров очищена.';
     }
 
+    public function undoRecommendationFeedback(int $catalogTitleId): void
+    {
+        $this->userState->undoRecommendationFeedback($this->user(), $this->title($catalogTitleId));
+        $this->resetPage(pageName: 'recommendationFeedbackPage');
+        $this->status = __('recommendations.feedback.undone');
+    }
+
     public function render(
         AccountSettingsService $settings,
         AccountDateTimeFormatter $dateTimes,
@@ -172,6 +179,8 @@ final class UserLibraryPage extends Component
             'ratings' => null,
             'continueWatching' => null,
             'history' => null,
+            'recommendationFeedbackCount' => $this->library->recommendationFeedbackCount($user),
+            'recommendationFeedback' => null,
         ];
 
         match ($this->section) {
@@ -187,6 +196,10 @@ final class UserLibraryPage extends Component
             ),
             'continue-watching' => $data['continueWatching'] = $this->activity->continueWatching($user, 24),
             'history' => $data['history'] = $this->activity->history($user, 12, 'historyPage'),
+            'hidden-recommendations' => $data['recommendationFeedback'] = $this->library->recommendationFeedback(
+                $user,
+                'recommendationFeedbackPage',
+            ),
             default => abort(404),
         };
 

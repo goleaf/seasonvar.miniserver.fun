@@ -47,6 +47,11 @@ class CatalogSitemapController extends Controller
         return $sitemaps->videos($page);
     }
 
+    public function sitemapRequests(CatalogSitemapResponder $sitemaps, int $page): StreamedResponse
+    {
+        return $sitemaps->requests($page);
+    }
+
     public function feed(CatalogSitemapResponder $sitemaps): StreamedResponse
     {
         return $sitemaps->feed();

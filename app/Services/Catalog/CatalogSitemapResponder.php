@@ -2,14 +2,18 @@
 
 namespace App\Services\Catalog;
 
+use App\DTOs\CatalogRecommendationContext;
+use App\Enums\CatalogRecommendationType;
 use App\Models\CatalogCollection;
 use App\Models\CatalogTitle;
+use App\Models\ContentRequest;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\Tag;
 use App\Services\Collections\CatalogCollectionQuery;
 use App\Services\Collections\CatalogCollectionSchema;
+use App\Services\ContentRequests\ContentRequestSchema;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -32,6 +36,8 @@ class CatalogSitemapResponder
         private readonly CatalogDirectoryRegistry $directories,
         private readonly CatalogCollectionQuery $collections,
         private readonly CatalogCollectionSchema $collectionSchema,
+        private readonly ContentRequestSchema $contentRequestSchema,
+        private readonly CatalogRecommendationService $recommendations,
     ) {}
 
     public function index(): StreamedResponse
@@ -41,6 +47,9 @@ class CatalogSitemapResponder
                 ->whereNotNull('slug')
                 ->count() / self::SITEMAP_PAGE_SIZE));
             $videoSitemapPages = max(1, (int) ceil($this->videoSitemapMediaQuery()->count() / self::VIDEO_SITEMAP_PAGE_SIZE));
+            $requestSitemapPages = $this->contentRequestSchema->ready()
+                ? (int) ceil($this->requestSitemapQuery()->count() / self::SITEMAP_PAGE_SIZE)
+                : 0;
 
             echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
             echo '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
@@ -57,6 +66,10 @@ class CatalogSitemapResponder
                 $this->writeSitemapIndexUrl(route('sitemap.videos', ['page' => $page]), now());
             }
 
+            for ($page = 1; $page <= $requestSitemapPages; $page++) {
+                $this->writeSitemapIndexUrl(route('sitemap.requests', ['page' => $page]), now());
+            }
+
             echo '</sitemapindex>'."\n";
         }, 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
     }
@@ -69,6 +82,42 @@ class CatalogSitemapResponder
             $this->writeSitemapUrl(route('home'), now(), 'daily', '1.0');
             $this->writeSitemapUrl(route('titles.index'), now(), 'daily', '0.9');
             $this->writeSitemapUrl(route('collections.index'), now(), 'daily', '0.8');
+
+            if ($this->contentRequestSchema->ready()) {
+                $this->writeSitemapUrl(route('requests.index'), now(), 'daily', '0.6');
+            }
+
+            foreach (CatalogRecommendationType::publicCases() as $type) {
+                if (! $type->isIndexable()) {
+                    continue;
+                }
+
+                try {
+                    $result = $this->recommendations->discover(new CatalogRecommendationContext(
+                        type: $type,
+                        user: null,
+                        locale: (string) config('app.locale', 'ru'),
+                        perPage: 1,
+                    ));
+                } catch (Throwable $exception) {
+                    report($exception);
+
+                    continue;
+                }
+
+                if ($result->items->isEmpty()) {
+                    continue;
+                }
+
+                $this->writeSitemapUrl(route('discover.index', ['type' => $type->value]), now(), 'daily', '0.7');
+
+                foreach (config('catalog-collections.supported_locales', ['ru']) as $locale) {
+                    $this->writeSitemapUrl(route('localized.discover.index', [
+                        'locale' => $locale,
+                        'type' => $type->value,
+                    ]), now(), 'daily', '0.7');
+                }
+            }
 
             foreach ($this->directories->all() as $directory) {
                 $this->writeSitemapUrl(route($directory->indexRouteName), now(), 'weekly', '0.8');
@@ -326,6 +375,41 @@ class CatalogSitemapResponder
 
             echo '</urlset>'."\n";
         }, 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
+    }
+
+    public function requests(int $page): StreamedResponse
+    {
+        $page = max(1, $page);
+
+        return response()->stream(function () use ($page): void {
+            echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
+            echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
+
+            if ($this->contentRequestSchema->ready()) {
+                $this->requestSitemapQuery()
+                    ->orderBy('id')
+                    ->forPage($page, self::SITEMAP_PAGE_SIZE)
+                    ->get(['id', 'public_id', 'updated_at'])
+                    ->each(function (ContentRequest $request): void {
+                        $this->writeSitemapUrl(
+                            route('requests.show', $request),
+                            $request->updated_at,
+                            'weekly',
+                            '0.4',
+                        );
+                    });
+            }
+
+            echo '</urlset>'."\n";
+        }, 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
+    }
+
+    /** @return Builder<ContentRequest> */
+    private function requestSitemapQuery(): Builder
+    {
+        return ContentRequest::query()
+            ->publiclyVisible()
+            ->whereIn('status', ['submitted', 'pending_review', 'approved', 'planned', 'in_progress', 'partially_completed', 'completed']);
     }
 
     public function feed(): StreamedResponse

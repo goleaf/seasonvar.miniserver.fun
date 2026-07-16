@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Resources\Api\V1;
 
-use App\Models\CatalogTitleRecommendation;
+use App\DTOs\CatalogRecommendationItem;
+use App\Services\Catalog\CatalogRecommendationPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/** @mixin CatalogTitleRecommendation */
+/** @mixin CatalogRecommendationItem */
 final class CatalogRecommendationResource extends JsonResource
 {
     /** @return array<string, mixed> */
@@ -16,8 +17,8 @@ final class CatalogRecommendationResource extends JsonResource
     {
         return [
             'rank' => (int) $this->rank,
-            'reasons' => $this->resource->reasonLabels(),
-            'title' => new TitleCardResource($this->recommendedTitle),
+            'reasons' => app(CatalogRecommendationPresenter::class)->explanations($this->explanations),
+            'title' => new TitleCardResource($this->title),
         ];
     }
 }

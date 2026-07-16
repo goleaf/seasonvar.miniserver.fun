@@ -6,6 +6,7 @@ namespace App\Support\Cache;
 
 use App\Livewire\Forms\CatalogSeriesFilters;
 use App\Models\CatalogTitle;
+use App\Models\ContentRequest;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 
@@ -49,6 +50,13 @@ final class PublicPageCachePolicy
         'page',
         'collectionsPage',
         'profileCollectionsPage',
+        'sort',
+    ];
+
+    private const CONTENT_REQUEST_QUERY_KEYS = [
+        'requestsPage',
+        'type',
+        'status',
         'sort',
     ];
 
@@ -96,6 +104,7 @@ final class PublicPageCachePolicy
                 : null,
             'title' => $this->titleContext($request, $dimensions),
             'collections' => new PublicPageCacheContext(CacheDomain::Collections, $dimensions),
+            'requests' => $this->contentRequestContext($request, $dimensions),
             default => null,
         };
     }
@@ -115,6 +124,24 @@ final class PublicPageCachePolicy
             CacheDomain::TitleDetail,
             $dimensions,
             'title:'.$title->getKey(),
+        );
+    }
+
+    /** @param array<string, mixed> $dimensions */
+    private function contentRequestContext(Request $request, array $dimensions): PublicPageCacheContext
+    {
+        $contentRequest = $request->route('contentRequest');
+
+        if (! $contentRequest instanceof ContentRequest) {
+            return new PublicPageCacheContext(CacheDomain::ContentRequests, $dimensions);
+        }
+
+        $dimensions['global_request_version'] = $this->versions->version(CacheDomain::ContentRequests);
+
+        return new PublicPageCacheContext(
+            CacheDomain::ContentRequests,
+            $dimensions,
+            'request:'.$contentRequest->public_id,
         );
     }
 
@@ -139,6 +166,7 @@ final class PublicPageCachePolicy
             ])),
             'title' => self::TITLE_QUERY_KEYS,
             'collections' => self::COLLECTION_QUERY_KEYS,
+            'requests' => self::CONTENT_REQUEST_QUERY_KEYS,
             default => null,
         };
 

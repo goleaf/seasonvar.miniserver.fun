@@ -2,6 +2,9 @@
 
 namespace App\Services\Catalog;
 
+use App\DTOs\CatalogRecommendationItem;
+use App\DTOs\CatalogRecommendationResult;
+use App\Enums\CatalogRecommendationType;
 use App\DTOs\CatalogDirectoryDefinition;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
@@ -17,6 +20,86 @@ use Illuminate\Support\Str;
 
 class CatalogSeoBuilder
 {
+    public function __construct(private readonly CatalogRecommendationPresenter $recommendationPresenter) {}
+
+    /**
+     * @param Collection<int, CatalogRecommendationItem> $items
+     * @return array<string, mixed>
+     */
+    public function discovery(
+        CatalogRecommendationType $type,
+        CatalogRecommendationResult $result,
+        Collection $items,
+        bool $hasFilters,
+    ): array {
+        $presentation = $this->recommendationPresenter->type($result->displayType);
+        $page = $result->page;
+        $localized = request()->routeIs('localized.discover.*');
+        $routeName = $localized ? 'localized.discover.index' : 'discover.index';
+        $routeParameters = [
+            ...($localized ? ['locale' => app()->currentLocale()] : []),
+            'type' => $type->value,
+        ];
+        $baseUrl = route($routeName, $routeParameters);
+        $canonical = $page > 1 && ! $hasFilters
+            ? route($routeName, [...$routeParameters, 'page' => $page])
+            : $baseUrl;
+        $title = __('recommendations.seo.title', ['type' => $presentation['title']]);
+
+        if ($page > 1) {
+            $title .= ' — '.__('recommendations.page.page_number', ['page' => $page]);
+        }
+
+        $description = __('recommendations.seo.description', ['description' => $presentation['description']]);
+        $indexable = $type->isIndexable()
+            && request()->user() === null
+            && ! $hasFilters
+            && $items->isNotEmpty();
+        $alternates = [];
+
+        if ($indexable) {
+            foreach (config('catalog-collections.supported_locales', ['ru']) as $locale) {
+                $alternates[$locale] = route('localized.discover.index', [
+                    'locale' => $locale,
+                    'type' => $type->value,
+                    ...($page > 1 ? ['page' => $page] : []),
+                ]);
+            }
+
+            $alternates['x-default'] = route('discover.index', [
+                'type' => $type->value,
+                ...($page > 1 ? ['page' => $page] : []),
+            ]);
+        }
+
+        $titles = $items->map(fn (CatalogRecommendationItem $item): CatalogTitle => $item->title);
+        $breadcrumbs = [
+            ['name' => __('catalog.navigation.home'), 'url' => route('home')],
+            ['name' => __('recommendations.navigation.discover'), 'url' => $baseUrl],
+            ['name' => $presentation['title'], 'url' => $canonical],
+        ];
+
+        return [
+            'title' => $title,
+            'description' => $this->seoDescription($description),
+            'canonical' => $canonical,
+            'robots' => $indexable ? $this->indexRobots() : 'noindex,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1',
+            'prev' => $page > 1 && ! $hasFilters ? route($routeName, [...$routeParameters, ...($page > 2 ? ['page' => $page - 1] : [])]) : null,
+            'next' => $result->hasMore && ! $hasFilters ? route($routeName, [...$routeParameters, 'page' => $page + 1]) : null,
+            'type' => 'website',
+            'section' => __('recommendations.navigation.discover'),
+            'updated_time' => now()->toAtomString(),
+            'alternates' => $alternates,
+            'breadcrumbs' => $breadcrumbs,
+            'jsonLd' => $indexable ? [
+                $this->webPageJsonLd($title, $description, $canonical, 'CollectionPage', [$presentation['title']]),
+                $this->collectionPageJsonLd($title, $description, $canonical),
+                $this->itemListJsonLd($titles, (($page - 1) * $result->perPage) + 1, $presentation['title']),
+                $this->breadcrumbJsonLd($breadcrumbs),
+            ] : [],
+        ];
+    }
+
     /**
      * @param  array{titles: int, episodes: int, videos: int, genres: int, countries: int}  $stats
      * @param  Collection<int, CatalogTitle>  $latestTitles

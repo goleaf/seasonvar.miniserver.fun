@@ -223,7 +223,7 @@
                         <h2 class="text-xl font-black text-slate-900">{{ __('settings.notifications.title') }}</h2>
                         <p class="mt-1 text-sm leading-6 text-slate-600">{{ __('settings.notifications.description') }}</p>
 
-                        @if (! $commentNotificationsAvailable && ! $reviewNotificationsAvailable)
+                        @if (! $commentNotificationsAvailable && ! $reviewNotificationsAvailable && ! $contentRequestNotificationsAvailable)
                             <div class="mt-5 rounded-control bg-slate-50 p-5 text-sm leading-6 text-slate-600">{{ __('settings.notifications.unavailable') }}</div>
                         @else
                             <div class="mt-5 overflow-hidden rounded-control border border-slate-200">
@@ -246,6 +246,15 @@
                                             'reviewHelpfulNotifications' => 'review_helpful',
                                             'reviewModerationNotifications' => 'review_moderation',
                                             'reviewReportNotifications' => 'review_reports',
+                                        ] as $property => $label)
+                                            <label class="grid min-h-14 grid-cols-[minmax(0,1fr)_6rem] items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700"><span class="break-words">{{ __('settings.notifications.'.$label) }}</span><span class="flex justify-center"><input type="checkbox" wire:model="{{ $property }}" class="h-5 w-5 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600" /></span></label>
+                                        @endforeach
+                                    @endif
+                                    @if ($contentRequestNotificationsAvailable)
+                                        @foreach ([
+                                            'requesterRequestNotifications' => 'request_requester_updates',
+                                            'votedRequestNotifications' => 'request_voted_updates',
+                                            'followedRequestNotifications' => 'request_followed_updates',
                                         ] as $property => $label)
                                             <label class="grid min-h-14 grid-cols-[minmax(0,1fr)_6rem] items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700"><span class="break-words">{{ __('settings.notifications.'.$label) }}</span><span class="flex justify-center"><input type="checkbox" wire:model="{{ $property }}" class="h-5 w-5 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600" /></span></label>
                                         @endforeach

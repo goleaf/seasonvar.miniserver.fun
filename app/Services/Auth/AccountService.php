@@ -7,6 +7,7 @@ namespace App\Services\Auth;
 use App\Models\User;
 use App\Services\Collections\CatalogCollectionAccountService;
 use App\Services\Comments\CommentAccountService;
+use App\Services\ContentRequests\ContentRequestAccountService;
 use App\Services\Reviews\ReviewAccountService;
 use App\Support\UserPlainText;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,7 @@ final class AccountService
         private readonly CatalogCollectionAccountService $collections,
         private readonly CommentAccountService $comments,
         private readonly ReviewAccountService $reviews,
+        private readonly ContentRequestAccountService $contentRequests,
     ) {}
 
     /** @param array{name?: string, email?: string} $data */
@@ -130,6 +132,7 @@ final class AccountService
             $this->collections->purgeOwned($lockedUser);
             $this->comments->prepareForDeletion($lockedUser);
             $this->reviews->prepareForDeletion($lockedUser);
+            $this->contentRequests->prepareForDeletion($lockedUser);
             $lockedUser->tokens()->delete();
             DB::table('password_reset_tokens')
                 ->whereRaw('lower(email) = ?', [Str::lower((string) $lockedUser->email)])

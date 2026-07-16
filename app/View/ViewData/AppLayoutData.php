@@ -48,10 +48,22 @@ final class AppLayoutData
             && $this->gate->forUser($authenticatedUser)->allows('manage-comments');
         $canManageReviews = $authenticatedUser !== null
             && $this->gate->forUser($authenticatedUser)->allows('manage-reviews');
+        $canManageContentRequests = $authenticatedUser !== null
+            && $this->gate->forUser($authenticatedUser)->allows('manage-content-requests');
         $layoutHeaderNavigation = [
             $this->headerLink('home', 'fa-solid fa-house', 'Главная', $this->request->routeIs('home')),
             $this->headerLink('titles.index', 'fa-solid fa-list-ul', 'Каталог', $this->request->routeIs('titles.*')),
         ];
+
+        if ($this->router->has('discover.index')) {
+            $layoutHeaderNavigation[] = $this->headerLink(
+                'discover.index',
+                'fa-solid fa-compass',
+                __('recommendations.navigation.discover'),
+                $this->request->routeIs('discover.*', 'localized.discover.*'),
+                ['type' => 'popular'],
+            );
+        }
 
         if ($this->router->has('collections.index')) {
             $layoutHeaderNavigation[] = $this->headerLink(
@@ -59,6 +71,15 @@ final class AppLayoutData
                 'fa-solid fa-layer-group',
                 __('collections.navigation.collections'),
                 $this->request->routeIs('collections.index', 'collections.show', 'localized.collections.*', 'profiles.collections'),
+            );
+        }
+
+        if ($this->router->has('requests.index')) {
+            $layoutHeaderNavigation[] = $this->headerLink(
+                'requests.index',
+                'fa-solid fa-list-check',
+                __('requests.directory.title'),
+                $this->request->routeIs('requests.*', 'localized.requests.*'),
             );
         }
 
@@ -150,6 +171,14 @@ final class AppLayoutData
                     $this->request->routeIs('admin.tags'),
                 );
             }
+            if ($canManageContentRequests && $this->router->has('admin.requests')) {
+                $layoutHeaderNavigation[] = $this->headerLink(
+                    'admin.requests',
+                    'fa-solid fa-inbox',
+                    __('requests.admin.title'),
+                    $this->request->routeIs('admin.requests'),
+                );
+            }
         } else {
             $layoutHeaderNavigation[] = $this->headerLink(
                 'login',
@@ -170,12 +199,31 @@ final class AppLayoutData
             $this->footerLink('titles.index', 'fa-solid fa-list-ul text-slate-400', 'Каталог', $this->request->routeIs('titles.*')),
         ];
 
+        if ($this->router->has('discover.index')) {
+            $layoutFooterNavigation[] = $this->footerLink(
+                'discover.index',
+                'fa-solid fa-compass text-slate-400',
+                __('recommendations.navigation.discover'),
+                $this->request->routeIs('discover.*', 'localized.discover.*'),
+                ['type' => 'popular'],
+            );
+        }
+
         if ($this->router->has('collections.index')) {
             $layoutFooterNavigation[] = $this->footerLink(
                 'collections.index',
                 'fa-solid fa-layer-group text-slate-400',
                 __('collections.navigation.collections'),
                 $this->request->routeIs('collections.*', 'localized.collections.*'),
+            );
+        }
+
+        if ($this->router->has('requests.index')) {
+            $layoutFooterNavigation[] = $this->footerLink(
+                'requests.index',
+                'fa-solid fa-list-check text-slate-400',
+                __('requests.directory.title'),
+                $this->request->routeIs('requests.*', 'localized.requests.*'),
             );
         }
 

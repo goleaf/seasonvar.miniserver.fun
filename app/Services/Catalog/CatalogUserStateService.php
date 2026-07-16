@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Catalog;
 
 use App\DTOs\CatalogUserStateSummary;
+use App\Enums\CatalogRecommendationFeedback;
+use App\Enums\CatalogWatchStatus;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUserState;
 use App\Models\EpisodeViewProgress;
@@ -14,6 +16,8 @@ use App\Services\Api\V1\Sync\UserSyncChangePublisher;
 use App\Services\Reviews\ReviewCacheInvalidator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class CatalogUserStateService
@@ -89,6 +93,65 @@ class CatalogUserStateService
         $this->validateRating($rating);
 
         return $this->writeState($user, $catalogTitle, ['rating' => $rating], null)['state'];
+    }
+
+    public function setRecommendationFeedback(
+        User $user,
+        CatalogTitle $catalogTitle,
+        CatalogRecommendationFeedback $feedback,
+    ): CatalogTitleUserState {
+        $this->authorizeInteraction($user, $catalogTitle);
+        $this->assertRecommendationStateSchema();
+
+        $this->hitRecommendationFeedbackLimit($user);
+
+        return $this->writeRecommendationState(
+            user: $user,
+            catalogTitle: $catalogTitle,
+            column: 'recommendation_feedback',
+            value: $feedback->value,
+            versionColumn: 'recommendation_feedback_version',
+            timestamps: ['recommendation_feedback_updated_at' => now()],
+        );
+    }
+
+    public function undoRecommendationFeedback(User $user, CatalogTitle $catalogTitle): ?CatalogTitleUserState
+    {
+        $this->authorizeInteraction($user, $catalogTitle);
+        $this->assertRecommendationStateSchema();
+        $this->hitRecommendationFeedbackLimit($user);
+
+        $state = $this->state($user, $catalogTitle);
+
+        if ($state === null || $state->recommendation_feedback === null) {
+            return $state;
+        }
+
+        return $this->writeRecommendationState(
+            user: $user,
+            catalogTitle: $catalogTitle,
+            column: 'recommendation_feedback',
+            value: null,
+            versionColumn: 'recommendation_feedback_version',
+            timestamps: ['recommendation_feedback_updated_at' => now()],
+        );
+    }
+
+    public function setWatchStatus(
+        User $user,
+        CatalogTitle $catalogTitle,
+        ?CatalogWatchStatus $status,
+    ): CatalogTitleUserState {
+        $this->authorizeInteraction($user, $catalogTitle);
+        $this->assertRecommendationStateSchema();
+
+        return $this->writeRecommendationState(
+            user: $user,
+            catalogTitle: $catalogTitle,
+            column: 'watch_status',
+            value: $status?->value,
+            versionColumn: 'watch_status_version',
+        );
     }
 
     /** @return array{applied: bool, state: CatalogTitleUserState|null, version: int} */
@@ -335,6 +398,77 @@ class CatalogUserStateService
         if ($rating !== null && ($rating < $range['minimum'] || $rating > $range['maximum'])) {
             throw ValidationException::withMessages(['rating' => $this->ratingValidationMessage()]);
         }
+    }
+
+    /** @param array<string, mixed> $timestamps */
+    private function writeRecommendationState(
+        User $user,
+        CatalogTitle $catalogTitle,
+        string $column,
+        ?string $value,
+        string $versionColumn,
+        array $timestamps = [],
+    ): CatalogTitleUserState {
+        return DB::transaction(function () use ($catalogTitle, $column, $timestamps, $user, $value, $versionColumn): CatalogTitleUserState {
+            $now = now();
+
+            CatalogTitleUserState::query()->insertOrIgnore([
+                'user_id' => $user->id,
+                'catalog_title_id' => $catalogTitle->id,
+                'in_watchlist' => false,
+                'rating' => null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            $state = CatalogTitleUserState::query()
+                ->whereBelongsTo($user)
+                ->whereBelongsTo($catalogTitle)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $current = $state->getRawOriginal($column);
+
+            if ($current === $value) {
+                return $state;
+            }
+
+            $state->forceFill([
+                $column => $value,
+                $versionColumn => (int) $state->getAttribute($versionColumn) + 1,
+                ...$timestamps,
+                'updated_at' => $now,
+            ])->save();
+            $this->syncChanges->publishTitleState($user, $catalogTitle);
+
+            return $state->refresh();
+        }, attempts: 3);
+    }
+
+    private function assertRecommendationStateSchema(): void
+    {
+        if (! Schema::hasColumns('catalog_title_user_states', [
+            'recommendation_feedback',
+            'recommendation_feedback_version',
+            'watch_status',
+            'watch_status_version',
+        ])) {
+            throw ValidationException::withMessages([
+                'recommendationFeedback' => __('recommendations.feedback.unavailable'),
+            ]);
+        }
+    }
+
+    private function hitRecommendationFeedbackLimit(User $user): void
+    {
+        $key = 'recommendation-feedback:'.$user->id;
+
+        if (RateLimiter::tooManyAttempts($key, 30)) {
+            throw ValidationException::withMessages([
+                'recommendationFeedback' => __('recommendations.feedback.rate_limited'),
+            ]);
+        }
+
+        RateLimiter::hit($key, 60);
     }
 
     private function authorizeInteraction(User $user, CatalogTitle $catalogTitle): void

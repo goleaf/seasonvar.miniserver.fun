@@ -9,6 +9,7 @@ use App\DTOs\CatalogEpisodeNavigation;
 use App\DTOs\CatalogPrimaryAction;
 use App\DTOs\PlaybackPreferencesData;
 use App\Enums\ReleaseKind;
+use App\Enums\CatalogWatchStatus;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
@@ -25,6 +26,7 @@ use App\View\ViewModels\CatalogShowViewModel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Renderless;
@@ -256,6 +258,20 @@ class CatalogTitlePlayer extends Component
         $this->userState->setRating($user, $this->title(), $rating);
     }
 
+    public function setWatchStatus(mixed $status): void
+    {
+        $user = $this->authenticatedUser();
+        $watchStatus = $status === '' || $status === null
+            ? null
+            : (is_string($status) ? CatalogWatchStatus::tryFrom($status) : null);
+
+        if ($watchStatus === null && $status !== '' && $status !== null) {
+            return;
+        }
+
+        $this->userState->setWatchStatus($user, $this->title(), $watchStatus);
+    }
+
     #[Renderless]
     public function recordProgress(
         mixed $episodeId,
@@ -408,6 +424,9 @@ class CatalogTitlePlayer extends Component
             'showView' => $showView,
             'inWatchlist' => (bool) ($state->in_watchlist ?? false),
             'userRating' => $state?->rating,
+            'watchStatus' => $state?->watch_status,
+            'watchStatusOptions' => CatalogWatchStatus::cases(),
+            'recommendationStateAvailable' => Schema::hasColumns('catalog_title_user_states', ['watch_status', 'watch_status_version']),
             'userStateSummary' => $stateSummary,
             'ratingOptions' => $this->userState->ratingOptions(),
             'ratingMaximum' => $ratingRange['maximum'],

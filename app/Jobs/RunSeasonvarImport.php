@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Services\Notifications\SeasonvarImportFailureNotifier;
+use App\Services\Seasonvar\SeasonvarGlobalImportRunCoordinator;
 use App\Services\Seasonvar\SeasonvarImportErrorSanitizer;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use Illuminate\Bus\Queueable;
@@ -46,8 +47,10 @@ class RunSeasonvarImport implements ShouldBeUnique, ShouldQueue
         public readonly bool $discover = true,
     ) {}
 
-    public function handle(SeasonvarImportPipeline $pipeline): void
-    {
+    public function handle(
+        SeasonvarImportPipeline $pipeline,
+        SeasonvarGlobalImportRunCoordinator $globalRuns,
+    ): void {
         $lockSeconds = (int) config('seasonvar.import.lock_seconds', 604800);
         $lock = $this->lockStore()->lock(self::LOCK_KEY, $lockSeconds);
 
@@ -58,6 +61,21 @@ class RunSeasonvarImport implements ShouldBeUnique, ShouldQueue
         }
 
         try {
+            $reservedRun = null;
+
+            if ($this->argument === null) {
+                $reservation = $globalRuns->acquireSync(
+                    force: $this->force,
+                    forever: false,
+                );
+
+                if (! $reservation->created) {
+                    return;
+                }
+
+                $reservedRun = $reservation->run;
+            }
+
             $run = $pipeline->run(
                 argument: $this->argument,
                 force: $this->force,
@@ -65,6 +83,7 @@ class RunSeasonvarImport implements ShouldBeUnique, ShouldQueue
                 sleepSeconds: null,
                 discover: $this->discover,
                 progress: null,
+                reservedRun: $reservedRun,
             );
 
             if (! in_array($run->status, ['completed', 'partial'], true)) {

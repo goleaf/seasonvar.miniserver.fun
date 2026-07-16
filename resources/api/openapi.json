@@ -3225,7 +3225,9 @@
                 "type": "object",
                 "required": [
                     "watchlist",
-                    "rating"
+                    "rating",
+                    "watch_status",
+                    "recommendation_feedback"
                 ],
                 "properties": {
                     "watchlist": {
@@ -3233,6 +3235,14 @@
                         "minimum": 0
                     },
                     "rating": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "watch_status": {
+                        "type": "integer",
+                        "minimum": 0
+                    },
+                    "recommendation_feedback": {
                         "type": "integer",
                         "minimum": 0
                     }
@@ -3243,6 +3253,8 @@
                 "required": [
                     "in_watchlist",
                     "rating",
+                    "watch_status",
+                    "recommendation_feedback",
                     "versions",
                     "aggregate",
                     "rating_range",
@@ -3259,6 +3271,30 @@
                         ],
                         "minimum": 1,
                         "maximum": 10
+                    },
+                    "watch_status": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "planned",
+                            "watching",
+                            "completed",
+                            "dropped",
+                            null
+                        ]
+                    },
+                    "recommendation_feedback": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "enum": [
+                            "not_interested",
+                            "blacklisted",
+                            null
+                        ]
                     },
                     "versions": {
                         "$ref": "#/components/schemas/UserStateVersions"
@@ -3391,6 +3427,8 @@
                         "required": [
                             "in_watchlist",
                             "rating",
+                            "watch_status",
+                            "recommendation_feedback",
                             "versions",
                             "updated_at"
                         ],
@@ -3405,6 +3443,30 @@
                                 ],
                                 "minimum": 1,
                                 "maximum": 10
+                            },
+                            "watch_status": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "enum": [
+                                    "planned",
+                                    "watching",
+                                    "completed",
+                                    "dropped",
+                                    null
+                                ]
+                            },
+                            "recommendation_feedback": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "enum": [
+                                    "not_interested",
+                                    "blacklisted",
+                                    null
+                                ]
                             },
                             "versions": {
                                 "$ref": "#/components/schemas/UserStateVersions"

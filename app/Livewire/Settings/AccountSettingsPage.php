@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Settings;
 
 use App\Actions\Comments\UpdateCommentNotificationPreferences;
+use App\Actions\ContentRequests\UpdateContentRequestNotificationPreferences;
 use App\Actions\Reviews\UpdateReviewNotificationPreferences;
 use App\DTOs\AccountSettingsData;
 use App\DTOs\PlaybackSettingsData;
@@ -12,11 +13,13 @@ use App\Enums\AccountSettingsSection;
 use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogTitleReviewNotificationPreference;
 use App\Models\CommentNotificationPreference;
+use App\Models\ContentRequestNotificationPreference;
 use App\Models\User;
 use App\Services\Auth\AccountDateTimeFormatter;
 use App\Services\Auth\AccountSettingsService;
 use App\Services\Catalog\PlaybackPreferenceOptions;
 use App\Services\Comments\CommentSchema;
+use App\Services\ContentRequests\ContentRequestSchema;
 use App\Services\Reviews\ReviewSchema;
 use App\ValueObjects\AccountTimezone;
 use Illuminate\Contracts\View\View;
@@ -75,6 +78,12 @@ final class AccountSettingsPage extends Component
 
     public bool $reviewReportNotifications = true;
 
+    public bool $requesterRequestNotifications = true;
+
+    public bool $votedRequestNotifications = true;
+
+    public bool $followedRequestNotifications = true;
+
     public ?string $statusMessage = null;
 
     public ?string $actionError = null;
@@ -83,6 +92,7 @@ final class AccountSettingsPage extends Component
         AccountSettingsService $settings,
         CommentSchema $commentSchema,
         ReviewSchema $reviewSchema,
+        ContentRequestSchema $contentRequestSchema,
         ?string $section = null,
         ?string $locale = null,
     ): void {
@@ -106,7 +116,7 @@ final class AccountSettingsPage extends Component
         }
 
         if ($resolvedSection === AccountSettingsSection::Notifications) {
-            $this->loadNotificationPreferences($commentSchema, $reviewSchema);
+            $this->loadNotificationPreferences($commentSchema, $reviewSchema, $contentRequestSchema);
         }
     }
 
@@ -238,8 +248,10 @@ final class AccountSettingsPage extends Component
     public function saveNotifications(
         UpdateCommentNotificationPreferences $comments,
         UpdateReviewNotificationPreferences $reviews,
+        UpdateContentRequestNotificationPreferences $contentRequests,
         CommentSchema $commentSchema,
         ReviewSchema $reviewSchema,
+        ContentRequestSchema $contentRequestSchema,
     ): void {
         $user = $this->user();
         Gate::forUser($user)->authorize('update-account-settings');
@@ -251,10 +263,13 @@ final class AccountSettingsPage extends Component
             'reviewHelpfulNotifications' => ['required', 'boolean'],
             'reviewModerationNotifications' => ['required', 'boolean'],
             'reviewReportNotifications' => ['required', 'boolean'],
+            'requesterRequestNotifications' => ['required', 'boolean'],
+            'votedRequestNotifications' => ['required', 'boolean'],
+            'followedRequestNotifications' => ['required', 'boolean'],
         ]);
 
         try {
-            DB::transaction(function () use ($comments, $reviews, $commentSchema, $reviewSchema, $user, $validated): void {
+            DB::transaction(function () use ($comments, $reviews, $contentRequests, $commentSchema, $reviewSchema, $contentRequestSchema, $user, $validated): void {
                 if ($commentSchema->notificationsAvailable()) {
                     $comments->handle($user, [
                         'reply_notifications' => $validated['replyNotifications'],
@@ -269,6 +284,14 @@ final class AccountSettingsPage extends Component
                         'helpful_notifications' => $validated['reviewHelpfulNotifications'],
                         'moderation_notifications' => $validated['reviewModerationNotifications'],
                         'report_notifications' => $validated['reviewReportNotifications'],
+                    ]);
+                }
+
+                if ($contentRequestSchema->ready()) {
+                    $contentRequests->handle($user, [
+                        'requester_updates' => $validated['requesterRequestNotifications'],
+                        'voted_updates' => $validated['votedRequestNotifications'],
+                        'followed_updates' => $validated['followedRequestNotifications'],
                     ]);
                 }
             }, attempts: 3);
@@ -289,8 +312,10 @@ final class AccountSettingsPage extends Component
     public function resetNotifications(
         UpdateCommentNotificationPreferences $comments,
         UpdateReviewNotificationPreferences $reviews,
+        UpdateContentRequestNotificationPreferences $contentRequests,
         CommentSchema $commentSchema,
         ReviewSchema $reviewSchema,
+        ContentRequestSchema $contentRequestSchema,
     ): void {
         $this->replyNotifications = true;
         $this->reactionNotifications = true;
@@ -299,7 +324,10 @@ final class AccountSettingsPage extends Component
         $this->reviewHelpfulNotifications = true;
         $this->reviewModerationNotifications = true;
         $this->reviewReportNotifications = true;
-        $this->saveNotifications($comments, $reviews, $commentSchema, $reviewSchema);
+        $this->requesterRequestNotifications = true;
+        $this->votedRequestNotifications = true;
+        $this->followedRequestNotifications = true;
+        $this->saveNotifications($comments, $reviews, $contentRequests, $commentSchema, $reviewSchema, $contentRequestSchema);
 
         if ($this->actionError === null) {
             $this->statusMessage = __('settings.status.notifications_reset');
@@ -310,12 +338,13 @@ final class AccountSettingsPage extends Component
         AccountSettingsService $settings,
         CommentSchema $commentSchema,
         ReviewSchema $reviewSchema,
+        ContentRequestSchema $contentRequestSchema,
     ): void {
         $this->resetValidation();
         $this->loadSettings($settings);
 
         if ($this->section === AccountSettingsSection::Notifications->value) {
-            $this->loadNotificationPreferences($commentSchema, $reviewSchema);
+            $this->loadNotificationPreferences($commentSchema, $reviewSchema, $contentRequestSchema);
         }
 
         $this->statusMessage = __('settings.status.changes_discarded');
@@ -328,6 +357,7 @@ final class AccountSettingsPage extends Component
         PlaybackPreferenceOptions $playbackOptions,
         CommentSchema $commentSchema,
         ReviewSchema $reviewSchema,
+        ContentRequestSchema $contentRequestSchema,
     ): View {
         $active = AccountSettingsSection::from($this->section);
         $navigation = collect(AccountSettingsSection::cases())->map(fn (AccountSettingsSection $section): array => [
@@ -364,6 +394,7 @@ final class AccountSettingsPage extends Component
             ], CatalogCollectionVisibility::cases()),
             'commentNotificationsAvailable' => $commentSchema->notificationsAvailable(),
             'reviewNotificationsAvailable' => $reviewSchema->notificationsAvailable(),
+            'contentRequestNotificationsAvailable' => $contentRequestSchema->ready(),
             'databaseSessionsAvailable' => config('session.driver') === 'database',
             'anonymousStorageKey' => (string) config('account-settings.anonymous_storage_key'),
             'profileSummary' => [
@@ -426,7 +457,7 @@ final class AccountSettingsPage extends Component
         }
     }
 
-    private function loadNotificationPreferences(CommentSchema $comments, ReviewSchema $reviews): void
+    private function loadNotificationPreferences(CommentSchema $comments, ReviewSchema $reviews, ContentRequestSchema $contentRequests): void
     {
         try {
             if ($comments->notificationsAvailable()) {
@@ -444,6 +475,14 @@ final class AccountSettingsPage extends Component
                 $this->reviewHelpfulNotifications = $preference->helpful_notifications;
                 $this->reviewModerationNotifications = $preference->moderation_notifications;
                 $this->reviewReportNotifications = $preference->report_notifications;
+            }
+
+            if ($contentRequests->ready()) {
+                $preference = ContentRequestNotificationPreference::query()->find($this->user()->id)
+                    ?? new ContentRequestNotificationPreference(['user_id' => $this->user()->id]);
+                $this->requesterRequestNotifications = $preference->requester_updates;
+                $this->votedRequestNotifications = $preference->voted_updates;
+                $this->followedRequestNotifications = $preference->followed_updates;
             }
         } catch (Throwable $exception) {
             report($exception);

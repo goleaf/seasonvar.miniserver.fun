@@ -120,4 +120,10 @@ class Season extends Model
         return $this->hasMany(Comment::class, 'target_id')
             ->where('target_type', CommentTargetType::Season->value);
     }
+
+    /** @return HasMany<ContentRequest, $this> */
+    public function contentRequests(): HasMany
+    {
+        return $this->hasMany(ContentRequest::class);
+    }
 }

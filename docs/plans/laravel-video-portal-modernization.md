@@ -123,6 +123,8 @@ Rollback: restore pre-update lockfiles and install exactly from them. Laravel an
 - [x] Keep browser-triggered title refresh separate from global-cycle ownership.
 - [x] Update importer/queue runbooks so cron frequency cannot create new overlapping full runs; concurrent process stress remains a later verification layer.
 
+Cross-mode closure increment: read-only production topology and database inspection found one live queued sitemap run and one live sync sitemap run, both with current heartbeat. The original queue-only coordinator and separate sync command lock made that state possible. `SeasonvarGlobalImportRunCoordinator` now serializes active lookup plus reservation across both execution modes; full sync CLI/legacy job execute the reserved row through the existing pipeline, while URL-targeted, inventory and status paths remain independent. No current run, worker, claim, queue row or catalog data was mutated. Focused result: 80 tests / 426 assertions; changed PHP syntax/Pint and bounded Larastan passed. Broad importer verification is pending completion after concurrent Recommendation V3 route work stops changing the shared tree.
+
 Acceptance: repeated dispatch results in one active global run and no duplicate page/title-group work; command output explains reuse/skip in Russian.
 
 ### 2.2 Claims and state machine
@@ -944,6 +946,75 @@ Rollback drops only `user_account_settings` after exporting any user choices cre
 - [x] Russian/English keys are complete; controls are keyboard/touch/screen-reader accessible, responsive at phone/zoom widths and have loading/success/error/confirmation states.
 - [x] No arbitrary mass assignment/key/category/provider/session value, destructive GET, Volt, new `@php`, Blade query, inline CSS/business JavaScript, debug/TODO/dead control or global cache flush remains.
 - [x] Allowed diagnostics and browser smoke pass without automated tests; owner docs, plan and changelog match implementation; final commit is on `main` and pushed.
+
+## Task 19: canonical content requests
+
+### Confirmed audit snapshot and integration decision
+
+- [x] Route, model, migration, service, policy, Livewire, Blade, locale, cache, notification, moderation, importer, API and sitemap inventories contain no dedicated content-request, support-ticket, serial-suggestion or missing-content domain. There are no legacy request routes, tables, votes, followers, histories, merge mappings, comments, imported request rows or cache keys to reconcile.
+- [x] Existing comments, reviews, reports and collections are independent product domains with different targets, privacy and moderation contracts. They must not become surrogate tickets or be deleted/renamed; Task 19 is the first and only content-request aggregate.
+- [x] Public search already has canonical title normalization, FTS/alias matching and bounded suggestions. Catalog titles, seasons, episodes and licensed media provide stable target IDs; translated display names never become request identity.
+- [x] The current portal supports `ru` and `en`, normal and locale-prefixed routes, shared public HTML caching with authenticated/Livewire bypass, database notifications with deterministic UUIDs, owner-only account settings/export/deletion, gated administration and a single Seasonvar importer command.
+- [x] The importer stores allowlisted `https://seasonvar.ru/` source pages and can refresh an existing title. A request handoff may create/update an approved source-page reference or schedule the existing targeted refresh, but normal users may never execute an import or see commands, raw importer failures or fictitious progress.
+- [x] Current request-like abuse controls are domain-local. Content requests therefore need their own bounded creation/edit/vote/follow/clarification limiters and plain-text/link validation without invasive fingerprinting or a mandatory queue.
+- [x] Request pages are absent from the current sitemap/SEO contract. Canonical public request URLs will use an opaque stable UUID; merged UUIDs redirect to the canonical request, private/moderation/filter pages remain noindex, and user prose is never presented as translated content.
+
+### Canonical domain contract
+
+- Identity: database ID is internal and UUID `public_id` is the stable route identity. Mutable title, locale, requester name, type, status, priority, votes and slug do not participate in route identity. Exact active uniqueness is represented by an indexed identity hash built from the stable target/type dimensions; fuzzy title similarity only produces bounded candidates.
+- Types: stable codes are `serial`, `season`, `episode`, `translation`, `subtitles`, `quality_upgrade`, `metadata_correction`, `episode_list_correction`, `broken_content_restoration` and `other_content_request`. A server-side type rules service owns required/optional target, season/episode, language, translation, quality, correction and evidence fields.
+- Targets: season/episode/translation/subtitle/quality/correction/restoration requests use canonical catalog IDs when the target exists. Missing serial identity uses normalized original/alternative title, year and allowlisted external identifiers. Season and episode numbers are canonical numbers, never database IDs or translated labels.
+- Existing-content and duplicates: one service reuses catalog search normalization and bounded database candidates to return exact/probable/related/none. Exact existing content or an exact active request prevents creation and points to the canonical content/request; probable matches are shown and require a distinct explanation, never an automatic merge.
+- Creation: authenticated, verified, unrestricted users submit one typed input to one transactional action. The server assigns requester, `submitted` status and normal priority, stores initial history, creates one idempotent requester vote/follow, validates up to the configured link/provider limits, invalidates scoped caches and emits deterministic notifications after commit.
+- Statuses: stable codes are `submitted`, `pending_review`, `clarification_needed`, `approved`, `planned`, `in_progress`, `partially_completed`, `completed`, `rejected`, `duplicate`, `merged`, `cancelled` and `withdrawn`. One transition service validates the matrix, authorization and optimistic version, appends public-safe history, separates private notes, links verified results and deduplicates notifications.
+- Editing/withdrawal: requester edits are limited to evidence, alternative title, explanation and language preferences in submitted/review/clarification states. Withdrawal keeps immutable history; a community-supported request remains open and becomes anonymized instead of being destroyed.
+- Engagement: one unique user/request vote and follow row supports idempotent POST/Livewire add/remove. Totals are grouped query aggregates, identities remain private, terminal states retain historical totals but reject new engagement, and viewer overlays never enter shared cache.
+- Moderation: `manage-content-requests` gates search/filter/inspect, clarification, approval, rejection reason, merge, priority, planning, processing, partial/full completion, result linking, private notes and importer handoff. Merge upserts votes/follows/evidence/external IDs without duplication, preserves both histories and makes the old route redirect.
+- Clarification: the aggregate has a restricted requester/moderator plain-text thread, not a public discussion system. A moderator question moves to clarification; an authorized requester reply moves back to review and preserves history. Private moderator notes never enter it.
+- Notifications: database-only delivery follows dedicated request preferences for requester, voter and follower updates. Deterministic `(request revision, recipient, category)` UUIDs prevent retries, merge and repeated callbacks from duplicating notices; actor self-notifications and hidden recipients are suppressed.
+- Import handoff: an authorized moderator may pass only validated canonical request data to the existing Seasonvar source-page/targeted-refresh boundaries. The request stores the resulting existing source-page/import-run reference, shows only truthful public statuses and completes only after a moderator verifies visible canonical content.
+- Privacy/lifecycle: public DTOs omit email, internal user ID, private links/notes, raw errors and importer state. Account export includes the owner’s requests/votes/follows/clarifications only; deletion removes private engagement/preferences and anonymizes community-valued requests. Title merge retargets requests and completion links without changing request identity.
+- Cache/SEO: a dedicated cache version scopes public directory/detail/search/count data by locale/filter/sort/page/version. Votes, follows, permissions, drafts, clarification and moderation data are viewer/private overlays. Mutations bump only request/detail/sitemap dependencies. Public eligible canonical pages may be indexed; merged/rejected-thin/withdrawn/private/admin/filter state is noindex and excluded from sitemap.
+- Interface: page-level Livewire components keep only locked IDs and validated URL/form state, use deterministic pagination and debounced bounded autocomplete, and pass prepared DTOs to passive Blade. All visible and ARIA text has `ru`/`en` parity; responsive controls reuse project components, 44px targets, visible focus, live regions and reduced-motion behavior.
+
+### Risks, dependencies and rollback
+
+- Security risks: arbitrary target/provider/status/priority IDs, mass assignment, unsafe schemes, SSRF, stored/reflected XSS, IDOR, duplicate mutations, spam and cache leakage are rejected at policy/value-object/action boundaries. User URLs are stored for review and never fetched automatically; only the existing Seasonvar allowlist may enter the importer.
+- Privacy risks: requester email, voter/follower identity, clarification, private evidence and moderator/importer notes are never selected for public presenters. Authenticated/private responses remain no-store.
+- Performance risks: directory/detail queries must use grouped counts/eager target loads and bounded duplicate candidates; exact identity hashes and composite target/status indexes avoid scanning all requests in PHP. Public and viewer queries stay separate.
+- Compatibility risks: no existing request data exists, so migrations are additive with nullable foreign keys and reversible tables. Existing catalog, comments, reviews, reports, notifications, API fields, importer command, route bindings, locales and cache keys remain semantically unchanged.
+- Rollback drops only the new request tables after exporting post-deployment request data. It cannot reverse notifications already delivered or source pages intentionally handed to the existing importer; those references remain valid importer data.
+
+Expected changes: additive content-request migrations; request enums/models/policy/DTOs/value objects/actions/query/search/duplicate/existence/cache/notification/import/lifecycle services; public/private/admin Livewire pages and views; routes/navigation/title links/settings preferences/account export/delete/title merge; `ru`/`en` catalogs; scoped cache/SEO/sitemap integration; topic-owner documentation and English changelog.
+
+Protected boundaries: existing request-independent tables and identities, all catalog/title/season/episode/media IDs and route binding, public/mobile API contract, comment/review/report/collection/tag domains, personal library/playback/progress, notification preference keys, importer command/parser workflow, locale codes, existing sitemap/feed URLs and cache keys.
+
+### Phased implementation checklist
+
+- [x] Review the complete tracked Markdown inventory and fully audit every request-adjacent route, schema, model, relationship, policy/gate, service/action/query/DTO, Livewire/Blade/JS asset, locale, cache, search, notification, moderation, account lifecycle, importer, API and SEO boundary.
+- [ ] Add reversible schema, enums, typed models/relations, stable identity, exact indexes/uniqueness and rolling-schema guard without touching legacy tables destructively.
+- [ ] Implement type rules, URL/provider/language/quality validation, catalog existence lookup, bounded duplicate search, transactional idempotent creation and anti-spam/rate limits.
+- [ ] Implement policy-enforced edit/withdraw, idempotent voting/following, centralized transitions/history, clarification, rejection, priority, merge and partial/full completion.
+- [ ] Integrate deterministic preference-aware notifications, account export/deletion, title merge and the existing Seasonvar importer handoff without a second importer or mandatory queue.
+- [ ] Implement public directory/detail/create, private My Requests and gated administration with validated URL state, deterministic pagination, prepared presenters, localized accessible responsive UI and truthful states.
+- [ ] Integrate navigation/title entry points, scoped public cache invalidation, canonical/noindex/hreflang/structured-data policy and the existing streamed sitemap responder.
+- [ ] Update all topic-owner Markdown, owner map, maintenance log and English changelog; record known limitations and complete manual acceptance evidence.
+- [ ] Run only allowed Pint/static syntax/routes/schema/query/index/authorization/translation/cache/SEO/Vite/browser/accessibility diagnostics; do not create or run automated tests for Task 19.
+- [ ] Reread Task 19 and changed/directly-related files, inspect final diff/status on `main`, commit only Task 19 changes without absorbing pre-existing work and push the configured remote.
+
+### Final manual acceptance checklist
+
+- [ ] Stable opaque identity, canonical target/type/language/quality dimensions, exact active uniqueness and probable/related bounded matching work without translated labels or fuzzy-only blocking.
+- [ ] Every supported request type validates its real fields; existing serial/season/episode/media matches prevent misleading missing-content creation and provide canonical links.
+- [ ] Source/external IDs are allowlisted and safe; no video upload, arbitrary scraping, internal-network fetch, dangerous scheme, raw HTML or client-assigned status/priority is possible.
+- [ ] Creation/edit/withdraw/vote/follow/clarify and all moderation mutations are authenticated as required, authorized, rate-limited, idempotent, non-GET and leave append-only history.
+- [ ] Status transition, rejection, merge, partial/full completion and importer handoff preserve evidence, links, votes/followers and private notes while emitting one preference-aware notification per real revision.
+- [ ] Public directory/detail/search/filter/sort/count/pagination and My Requests/admin queues are deterministic, scoped, privacy-safe, noindex where required and free of target/requester/count/viewer N+1 queries.
+- [ ] Public cache excludes viewer/private state and invalidates after each mutation; canonical/merged URLs, locale alternates and sitemap eligibility follow the documented SEO policy without guaranteed-availability schemas.
+- [ ] Account export/deletion, user/title merges, catalogue/search/title/player/library/profile/settings/recommendations/comments/reviews/tags/import/API routes and existing cache keys remain compatible.
+- [ ] All `ru`/`en` visible/ARIA/loading/empty/error/confirmation text resolves; phone/landscape/tablet/desktop/zoom, keyboard/focus/touch/reduced-motion and long title/URL layouts pass inspection.
+- [ ] No Volt, new `@php`, Blade query, inline CSS/business JavaScript, fake control/progress, TODO/debug output, unused class/import, duplicate request architecture or automated Task 19 test remains.
+- [ ] Allowed diagnostics and browser smoke pass; owner docs/plan/changelog match implementation; the focused commit is on existing `main` and pushed.
 
 ## Deferred product decisions, not hidden defects
 

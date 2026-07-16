@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\Catalog\CatalogRecommendationPresenter;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -28,54 +29,6 @@ class CatalogTitleRecommendation extends Model
     ];
 
     /**
-     * @var array<string, string>
-     */
-    private const REASON_LABELS = [
-        'genre' => 'Жанр',
-        'tag' => 'Теги',
-        'director' => 'Режиссер',
-        'actor' => 'Актеры',
-        'network' => 'Канал',
-        'studio' => 'Студия',
-        'translation' => 'Перевод',
-        'status' => 'Статус',
-        'country' => 'Страна',
-        'age_rating' => 'Возраст',
-        'year' => 'Год',
-        'rating' => 'Рейтинг',
-        'reviews' => 'Отзывы',
-        'published_media' => 'Видео',
-        'source_signal' => 'Источник',
-    ];
-
-    /**
-     * @var array<string, string>
-     */
-    private const THEME_REASON_LABELS = [
-        'theme_romance' => 'Романтика',
-        'theme_relationships' => 'Отношения',
-        'theme_friendship' => 'Дружба',
-        'theme_youth' => 'Молодые герои',
-        'theme_family' => 'Семья',
-        'theme_workplace' => 'Работа',
-        'theme_school' => 'Учёба',
-        'theme_medical' => 'Медицина',
-        'theme_legal' => 'Право',
-        'theme_crime' => 'Преступление',
-        'theme_mystery' => 'Тайна',
-        'theme_fantasy' => 'Фэнтези',
-        'theme_supernatural' => 'Сверхъестественное',
-        'theme_science_fiction' => 'Фантастика',
-        'theme_historical' => 'История',
-        'theme_military' => 'Военная тема',
-        'theme_adventure' => 'Приключения',
-        'theme_sports' => 'Спорт',
-        'theme_music' => 'Музыка',
-        'theme_show_business' => 'Шоу-бизнес',
-        'theme_everyday_life' => 'Повседневная жизнь',
-    ];
-
-    /**
      * @return BelongsTo<CatalogTitle, $this>
      */
     public function catalogTitle(): BelongsTo
@@ -96,24 +49,9 @@ class CatalogTitleRecommendation extends Model
      */
     public function reasonLabels(): array
     {
-        $storedReasons = $this->getAttribute('reasons');
-        $reasons = is_array($storedReasons) ? $storedReasons : [];
-
-        return collect($reasons)
-            ->map(fn (mixed $details, string $reason): array => [
-                'reason' => $reason,
-                'score' => is_array($details) ? (int) ($details['score'] ?? 0) : 0,
-            ])
-            ->reject(fn (array $item): bool => $item['reason'] === 'type')
-            ->sortByDesc('score')
-            ->map(fn (array $item): ?string => self::THEME_REASON_LABELS[$item['reason']]
-                ?? self::REASON_LABELS[$item['reason']]
-                ?? null)
-            ->filter()
-            ->unique()
-            ->take(4)
-            ->values()
-            ->all();
+        return app(CatalogRecommendationPresenter::class)->storedSimilarityReasons(
+            $this->getAttribute('reasons'),
+        );
     }
 
     /**

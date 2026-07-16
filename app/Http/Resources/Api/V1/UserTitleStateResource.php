@@ -27,9 +27,13 @@ final class UserTitleStateResource extends JsonResource
         return [
             'in_watchlist' => $state instanceof CatalogTitleUserState && $state->in_watchlist,
             'rating' => $state?->rating,
+            'watch_status' => $state?->watch_status?->value,
+            'recommendation_feedback' => $state?->recommendation_feedback?->value,
             'versions' => [
                 'watchlist' => $state?->watchlistVersion() ?? 0,
                 'rating' => $state?->ratingVersion() ?? 0,
+                'watch_status' => $state?->watchStatusVersion() ?? 0,
+                'recommendation_feedback' => $state?->recommendationFeedbackVersion() ?? 0,
             ],
             'aggregate' => [
                 'watchlist_count' => $summary->watchlistCount,

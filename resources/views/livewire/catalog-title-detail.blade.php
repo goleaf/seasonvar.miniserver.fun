@@ -40,6 +40,11 @@
                         </a>
                     </nav>
 
+                    <a href="{{ $contentRequestUrl }}" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900 hover:bg-amber-100">
+                        <x-ui.icon name="fa-solid fa-circle-exclamation" />
+                        <span>{{ __('requests.actions.request_for_title') }}</span>
+                    </a>
+
                     <div class="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
                         <div class="grid min-h-16 content-center gap-1 rounded-lg bg-slate-50 px-3 py-3">
                             <div class="flex items-center justify-between gap-2">
@@ -228,9 +233,43 @@
                 @endif
             </x-ui.panel>
 
-            <x-ui.panel :title="__('catalog.title.recommendations')" icon="fa-solid fa-thumbs-up" :pad="false">
+            @if ($recommendationNotice)
+                <div class="flex flex-wrap items-center justify-between gap-3 rounded-control bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800" role="status" aria-live="polite">
+                    <span>{{ $recommendationNotice }}</span>
+                    @if ($lastRecommendationFeedbackTitleId)
+                        <button type="button" wire:click="undoRecommendationFeedback" class="min-h-11 rounded-control px-3 py-2 font-bold underline hover:bg-emerald-100">{{ __('recommendations.feedback.undo') }}</button>
+                    @endif
+                </div>
+            @endif
+
+            @if ($errors->has('recommendationFeedback'))
+                <div role="alert" aria-live="assertive" class="rounded-control border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">{{ $errors->first('recommendationFeedback') }}</div>
+            @endif
+
+            @if ($relatedRecommendationItems->isNotEmpty())
+                <x-ui.panel :title="__('recommendations.types.related.title')" icon="fa-solid fa-code-branch" :pad="false">
+                    <ol class="divide-y divide-slate-200" aria-label="{{ __('recommendations.types.related.accessibility') }}" data-related-list>
+                        @foreach ($relatedRecommendationItems as $recommendationItem)
+                            <li wire:key="title-related-{{ $title->id }}-{{ $recommendationItem->title->id }}" data-recommendation-row>
+                                <x-catalog.title-card :title="$recommendationItem->title" layout="recommendation" :rank="$recommendationItem->rank" :reason-labels="$recommendationItem->reasonLabels" />
+                                @if ($recommendationItem->canDismiss)
+                                    <details class="relative z-20 border-t border-slate-100 bg-slate-50 px-3 py-2">
+                                        <summary class="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-bold text-slate-600 hover:text-emerald-700"><x-ui.icon name="fa-solid fa-sliders" /><span>{{ __('recommendations.feedback.menu') }}</span></summary>
+                                        <div class="flex flex-wrap gap-2 pb-2">
+                                            <button type="button" wire:click="setRecommendationFeedback({{ $recommendationItem->title->id }}, 'not_interested')" wire:loading.attr="disabled" class="min-h-11 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-800 disabled:opacity-60">{{ __('recommendations.feedback.not_interested') }}</button>
+                                            <button type="button" wire:click="setRecommendationFeedback({{ $recommendationItem->title->id }}, 'blacklisted')" wire:loading.attr="disabled" class="min-h-11 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-rose-50 hover:text-rose-800 disabled:opacity-60">{{ __('recommendations.feedback.blacklist') }}</button>
+                                        </div>
+                                    </details>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ol>
+                </x-ui.panel>
+            @endif
+
+            <x-ui.panel :title="__('recommendations.types.similar.title')" icon="fa-solid fa-thumbs-up" :pad="false">
                 @if ($recommendationItems->isNotEmpty())
-                    <ol class="divide-y divide-slate-200" data-recommendation-list>
+                    <ol class="divide-y divide-slate-200" aria-label="{{ __('recommendations.types.similar.accessibility') }}" data-recommendation-list>
                         @foreach ($recommendationItems as $recommendationItem)
                             <li
                                 wire:key="title-recommendation-{{ $title->id }}-{{ $recommendationItem->title->id }}"
@@ -242,6 +281,15 @@
                                     :rank="$recommendationItem->rank"
                                     :reason-labels="$recommendationItem->reasonLabels"
                                 />
+                                @if ($recommendationItem->canDismiss)
+                                    <details class="relative z-20 border-t border-slate-100 bg-slate-50 px-3 py-2">
+                                        <summary class="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-bold text-slate-600 hover:text-emerald-700"><x-ui.icon name="fa-solid fa-sliders" /><span>{{ __('recommendations.feedback.menu') }}</span></summary>
+                                        <div class="flex flex-wrap gap-2 pb-2">
+                                            <button type="button" wire:click="setRecommendationFeedback({{ $recommendationItem->title->id }}, 'not_interested')" wire:loading.attr="disabled" class="min-h-11 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-800 disabled:opacity-60">{{ __('recommendations.feedback.not_interested') }}</button>
+                                            <button type="button" wire:click="setRecommendationFeedback({{ $recommendationItem->title->id }}, 'blacklisted')" wire:loading.attr="disabled" class="min-h-11 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-rose-50 hover:text-rose-800 disabled:opacity-60">{{ __('recommendations.feedback.blacklist') }}</button>
+                                        </div>
+                                    </details>
+                                @endif
                             </li>
                         @endforeach
                     </ol>
@@ -250,7 +298,7 @@
                         <div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
                             <div class="inline-flex items-center gap-2">
                                 <x-ui.icon name="fa-solid fa-circle-info text-slate-400" />
-                                <span>{{ __('catalog.title.recommendations_missing') }}</span>
+                                <span>{{ __('recommendations.page.empty') }}</span>
                             </div>
                         </div>
                     </div>

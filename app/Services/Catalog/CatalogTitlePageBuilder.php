@@ -5,26 +5,19 @@ declare(strict_types=1);
 namespace App\Services\Catalog;
 
 use App\DTOs\CatalogRecommendationListItem;
+use App\DTOs\CatalogRecommendationItem;
 use App\Models\CatalogTitle;
-use App\Models\CatalogTitleRecommendation;
 use App\Models\Season;
 use App\Models\User;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Support\CatalogTitleDisplayName;
 use App\View\ViewModels\CatalogShowViewModel;
 use Illuminate\Container\Attributes\Scoped;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Schema;
-use LogicException;
 
 #[Scoped]
 final class CatalogTitlePageBuilder
 {
-    private ?bool $recommendationsTableExists = null;
-
     /** @var array<string, array<string, mixed>> */
     private array $preparedPages = [];
 
@@ -35,6 +28,8 @@ final class CatalogTitlePageBuilder
         private readonly CatalogTaxonomyRegistry $taxonomies,
         private readonly ExternalMediaMetadata $mediaMetadata,
         private readonly CatalogUserCardStateLoader $cardStates,
+        private readonly CatalogRecommendationService $recommendations,
+        private readonly CatalogRecommendationPresenter $recommendationPresenter,
     ) {}
 
     /**
@@ -67,9 +62,17 @@ final class CatalogTitlePageBuilder
             ->filter(fn (Season $season): bool => (int) $season->getAttribute('available_episodes_count') > 0)
             ->count();
         $mediaCount = (int) $seasons->sum('available_media_count');
-        $genreIds = $taxonomiesByType->get('genre', collect())->pluck('id')->unique()->values();
-        $recommendationItems = $this->recommendationItems($catalogTitle, $user, $genreIds);
-        $this->cardStates->load($recommendationItems->pluck('title'), $user);
+        $titleRecommendations = $this->recommendations->forTitle(
+            $catalogTitle,
+            $user,
+            max(1, (int) config('seasonvar.recommendations.max_per_title', 12)),
+        );
+        $relatedRecommendationItems = $this->presentRecommendationItems($titleRecommendations['related'], $user !== null);
+        $recommendationItems = $this->presentRecommendationItems($titleRecommendations['similar'], $user !== null);
+        $this->cardStates->load(
+            $relatedRecommendationItems->pluck('title')->concat($recommendationItems->pluck('title')),
+            $user,
+        );
 
         $showView = new CatalogShowViewModel(
             title: $catalogTitle,
@@ -109,6 +112,7 @@ final class CatalogTitlePageBuilder
             'topTaxonomies' => $showView->topTaxonomies,
             'showView' => $showView,
             'recommendationItems' => $recommendationItems,
+            'relatedRecommendationItems' => $relatedRecommendationItems,
             'seo' => $this->seo->title($catalogTitle, $taxonomiesByType, $seasons, $episodeCount, $mediaCount, null, null),
         ];
     }
@@ -135,71 +139,21 @@ final class CatalogTitlePageBuilder
     }
 
     /**
-     * @param  Collection<int, int>  $genreIds
+     * @param Collection<int, CatalogRecommendationItem> $items
      * @return Collection<int, CatalogRecommendationListItem>
      */
-    private function recommendationItems(CatalogTitle $catalogTitle, ?User $user, Collection $genreIds): Collection
+    private function presentRecommendationItems(Collection $items, bool $canDismiss): Collection
     {
-        $precomputed = $this->recommendedTitleRecommendations($catalogTitle, $user);
-
-        if ($precomputed->isNotEmpty()) {
-            return $precomputed
-                ->values()
-                ->map(fn (CatalogTitleRecommendation $recommendation, int $index): CatalogRecommendationListItem => new CatalogRecommendationListItem(
-                    title: $recommendation->recommendedTitle,
-                    rank: $index + 1,
-                    reasonLabels: $recommendation->reasonLabels(),
-                    score: (int) $recommendation->score,
-                ));
-        }
-
-        return $this->fallbackRecommendationItems($catalogTitle, $user, $genreIds);
-    }
-
-    /**
-     * @param  Collection<int, int>  $genreIds
-     * @return Collection<int, CatalogRecommendationListItem>
-     */
-    private function fallbackRecommendationItems(CatalogTitle $catalogTitle, ?User $user, Collection $genreIds): Collection
-    {
-        $genreRecommendations = $this->relatedTitleSummaryQuery($catalogTitle, $user)
-            ->when($genreIds->isNotEmpty(), fn (Builder $query): Builder => $query->whereHas('genres', fn (Builder $query): Builder => $query->whereKey($genreIds)))
-            ->when($genreIds->isEmpty(), fn (Builder $query): Builder => $query->whereRaw('1 = 0'))
-            ->latest('indexed_at')
-            ->limit(8)
-            ->get();
-        $yearRecommendations = $catalogTitle->year
-            ? $this->relatedTitleSummaryQuery($catalogTitle, $user)
-                ->where('year', $catalogTitle->year)
-                ->latest('indexed_at')
-                ->limit(8)
-                ->get()
-            : collect();
-        $titles = [];
-        $labels = [];
-
-        foreach ([
-            'Похожий жанр' => $genreRecommendations,
-            'Тот же год' => $yearRecommendations,
-        ] as $label => $recommendations) {
-            foreach ($recommendations as $recommendedTitle) {
-                $titles[$recommendedTitle->id] ??= $recommendedTitle;
-                $labels[$recommendedTitle->id] ??= [];
-
-                if (! in_array($label, $labels[$recommendedTitle->id], true)) {
-                    $labels[$recommendedTitle->id][] = $label;
-                }
-            }
-        }
-
-        return collect(array_values($titles))
-            ->take($this->recommendationDisplayLimit())
-            ->values()
-            ->map(fn (CatalogTitle $recommendedTitle, int $index): CatalogRecommendationListItem => new CatalogRecommendationListItem(
-                title: $recommendedTitle,
-                rank: $index + 1,
-                reasonLabels: $labels[$recommendedTitle->id],
-            ));
+        return $items->map(fn (CatalogRecommendationItem $item): CatalogRecommendationListItem => new CatalogRecommendationListItem(
+            title: $item->title,
+            rank: $item->rank,
+            reasonLabels: $this->recommendationPresenter->explanations($item->explanations),
+            score: $item->score,
+            type: $item->type,
+            source: $item->source,
+            relationType: $item->relationType,
+            canDismiss: $canDismiss,
+        ));
     }
 
     /** @return array<string, mixed> */
@@ -221,80 +175,4 @@ final class CatalogTitlePageBuilder
         return $catalogTitleId.'|user:'.($userKey !== null ? (string) $userKey : 'object:'.spl_object_id($user));
     }
 
-    /**
-     * @return Builder<CatalogTitle>
-     */
-    private function relatedTitleSummaryQuery(CatalogTitle $catalogTitle, ?User $user): Builder
-    {
-        return $this->titleSummaryQuery(CatalogTitle::query(), $user)
-            ->whereKeyNot($catalogTitle->id);
-    }
-
-    /**
-     * @return Collection<int, CatalogTitleRecommendation>
-     */
-    private function recommendedTitleRecommendations(CatalogTitle $catalogTitle, ?User $user): Collection
-    {
-        if (! $this->hasRecommendationsTable()) {
-            return collect();
-        }
-
-        return $catalogTitle->recommendations()
-            ->whereHas('recommendedTitle', fn (Builder $query): Builder => $query->whereIn(
-                (new CatalogTitle)->qualifyColumn('id'),
-                $this->query->visibleTo($user)->select((new CatalogTitle)->qualifyColumn('id')),
-            ))
-            ->orderBy('rank')
-            ->orderByDesc('score')
-            ->limit($this->recommendationDisplayLimit())
-            ->with([
-                'recommendedTitle' => function ($query) use ($user): void {
-                    $this->titleSummaryQuery($query->getQuery(), $user);
-                },
-            ])
-            ->get()
-            ->filter(fn ($recommendation): bool => $recommendation->recommendedTitle !== null)
-            ->values();
-    }
-
-    private function recommendationDisplayLimit(): int
-    {
-        return max(1, (int) config('seasonvar.recommendations.max_per_title', 12));
-    }
-
-    private function hasRecommendationsTable(): bool
-    {
-        return $this->recommendationsTableExists ??= Schema::hasTable('catalog_title_recommendations');
-    }
-
-    /**
-     * @param  Builder<CatalogTitle>  $query
-     * @return Builder<CatalogTitle>
-     */
-    private function titleSummaryQuery(Builder $query, ?User $user): Builder
-    {
-        return $this->query
-            ->constrainVisible($query, $user)
-            ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url', 'indexed_at'])
-            ->with($this->cardSummaryLoads())
-            ->withCount($this->query->publicCardCounts($user));
-    }
-
-    /** @return array<string, \Closure> */
-    private function cardSummaryLoads(): array
-    {
-        $loads = [];
-
-        foreach ($this->taxonomies->cardSummaryLoads() as $relationName => $constraint) {
-            $loads[$relationName] = static function (Relation $relation) use ($constraint): mixed {
-                if (! $relation instanceof BelongsToMany) {
-                    throw new LogicException('Card taxonomy eager loading requires a belongs-to-many relation.');
-                }
-
-                return $constraint($relation);
-            };
-        }
-
-        return $loads;
-    }
 }

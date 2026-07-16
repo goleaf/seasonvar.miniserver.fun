@@ -226,6 +226,12 @@ class CatalogTitle extends Model
         return $this->hasMany(Comment::class);
     }
 
+    /** @return HasMany<ContentRequest, $this> */
+    public function contentRequests(): HasMany
+    {
+        return $this->hasMany(ContentRequest::class);
+    }
+
     /** @return HasMany<Comment, $this> */
     public function titleComments(): HasMany
     {
@@ -293,6 +299,18 @@ class CatalogTitle extends Model
     public function recommendations(): HasMany
     {
         return $this->hasMany(CatalogTitleRecommendation::class);
+    }
+
+    /** @return HasMany<CatalogTitleRelation, $this> */
+    public function outgoingRelations(): HasMany
+    {
+        return $this->hasMany(CatalogTitleRelation::class, 'source_title_id');
+    }
+
+    /** @return HasMany<CatalogTitleRelation, $this> */
+    public function incomingRelations(): HasMany
+    {
+        return $this->hasMany(CatalogTitleRelation::class, 'target_title_id');
     }
 
     /**

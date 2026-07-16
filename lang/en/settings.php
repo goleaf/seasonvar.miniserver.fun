@@ -125,6 +125,9 @@ return [
         'review_helpful' => 'Helpful votes on my reviews',
         'review_moderation' => 'Review moderation decisions',
         'review_reports' => 'Decisions on my review reports',
+        'request_requester_updates' => 'Updates to my requests',
+        'request_voted_updates' => 'Updates to requests I voted for',
+        'request_followed_updates' => 'Updates to requests I follow',
         'mandatory_security_hint' => 'Critical email verification and password reset messages are mandatory for security and are not controlled here.',
     ],
     'collections' => [

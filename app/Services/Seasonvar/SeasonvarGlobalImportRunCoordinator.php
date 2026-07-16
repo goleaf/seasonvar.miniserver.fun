@@ -62,6 +62,45 @@ final class SeasonvarGlobalImportRunCoordinator
         });
     }
 
+    public function acquireSync(
+        bool $force,
+        bool $forever,
+        ?int $processId = null,
+        ?string $processHost = null,
+        ?string $processCommand = null,
+    ): SeasonvarImportStartResultData {
+        $lock = $this->startLock();
+
+        return $lock->block(5, function () use (
+            $force,
+            $forever,
+            $processId,
+            $processHost,
+            $processCommand,
+        ): SeasonvarImportStartResultData {
+            $active = $this->activeRun();
+
+            if ($active !== null) {
+                return new SeasonvarImportStartResultData($active, false);
+            }
+
+            $run = DB::transaction(fn (): SeasonvarImportRun => SeasonvarImportRun::query()->create([
+                'mode' => 'sitemap',
+                'execution_mode' => 'sync',
+                'status' => SeasonvarImportStatus::Running->value,
+                'force' => $force,
+                'forever' => $forever,
+                'process_id' => $processId,
+                'process_host' => $processHost,
+                'process_command' => $processCommand,
+                'started_at' => now(),
+                'last_heartbeat_at' => now(),
+            ]));
+
+            return new SeasonvarImportStartResultData($run, true);
+        });
+    }
+
     public function activeRun(): ?SeasonvarImportRun
     {
         return $this->activeRuns()->latest('id')->first();
@@ -94,7 +133,6 @@ final class SeasonvarGlobalImportRunCoordinator
     {
         return SeasonvarImportRun::query()
             ->where('mode', 'sitemap')
-            ->where('execution_mode', 'queue')
             ->whereIn('status', [
                 SeasonvarImportStatus::Queued->value,
                 SeasonvarImportStatus::Running->value,

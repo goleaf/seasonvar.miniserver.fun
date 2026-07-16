@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Catalog;
 
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleRelation;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
@@ -12,6 +13,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 final class CatalogAdministrationQuery
 {
@@ -131,6 +133,56 @@ final class CatalogAdministrationQuery
                 ->whereIn('season_id', Season::query()->withTrashed()->whereBelongsTo($title)->select('id'))
                 ->select('id'))
             ->findOrFail($mediaId);
+    }
+
+    /** @return Collection<int, CatalogTitle> */
+    public function recommendationRelationCandidates(CatalogTitle $source, string $search, int $limit = 20): Collection
+    {
+        $search = str($search)->squish()->limit(80, '')->toString();
+
+        if (mb_strlen($search) < 2) {
+            return collect();
+        }
+
+        return CatalogTitle::query()
+            ->select(['id', 'title', 'slug', 'year'])
+            ->whereKeyNot($source->id)
+            ->whereNull('deleted_at')
+            ->where(function (Builder $query) use ($search): void {
+                $query->where('title', 'like', '%'.$search.'%')
+                    ->orWhere('slug', 'like', $search.'%')
+                    ->when(ctype_digit($search), fn (Builder $query): Builder => $query->orWhere('id', (int) $search));
+            })
+            ->orderBy('title')
+            ->orderBy('id')
+            ->limit(max(1, min(20, $limit)))
+            ->get();
+    }
+
+    /** @return Collection<int, CatalogTitleRelation> */
+    public function recommendationRelations(CatalogTitle $source): Collection
+    {
+        if (! Schema::hasTable('catalog_title_relations')) {
+            return collect();
+        }
+
+        return CatalogTitleRelation::query()
+            ->whereBelongsTo($source, 'sourceTitle')
+            ->with('targetTitle:id,title,slug,year')
+            ->orderBy('priority')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (CatalogTitleRelation $relation): bool => $relation->targetTitle !== null)
+            ->values();
+    }
+
+    public function recommendationRelation(CatalogTitle $source, int $relationId): CatalogTitleRelation
+    {
+        abort_unless(Schema::hasTable('catalog_title_relations'), 404);
+
+        return CatalogTitleRelation::query()
+            ->whereBelongsTo($source, 'sourceTitle')
+            ->findOrFail($relationId);
     }
 
     /** @return Collection<int, Model> */

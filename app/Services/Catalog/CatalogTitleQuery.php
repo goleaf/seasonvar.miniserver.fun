@@ -38,6 +38,7 @@ class CatalogTitleQuery
         private readonly CatalogSearchNormalizer $searchNormalizer,
         private readonly CatalogEntitlementService $entitlements,
         private readonly CatalogTitleSearch $titleSearch,
+        private readonly CatalogPopularityQuery $popularity,
     ) {}
 
     /**
@@ -142,7 +143,7 @@ class CatalogTitleQuery
             CatalogSort::VideoDesc => $query->orderByDesc('published_media_count'),
             CatalogSort::KinopoiskRating => $query->orderByDesc('kinopoisk_rating'),
             CatalogSort::ImdbRating => $query->orderByDesc('imdb_rating'),
-            CatalogSort::Popularity => $query->orderByDesc('published_media_count')->orderByDesc('episodes_count'),
+            CatalogSort::Popularity => $this->popularity->apply($query),
             CatalogSort::Relevance, CatalogSort::Updated => $query,
         };
 

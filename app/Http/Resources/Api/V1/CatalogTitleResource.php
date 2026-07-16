@@ -76,6 +76,8 @@ final class CatalogTitleResource extends JsonResource
             'user_state' => $this->when($request->user() !== null, [
                 'in_watchlist' => $userState instanceof CatalogTitleUserState && $userState->in_watchlist,
                 'rating' => $userState?->rating,
+                'watch_status' => $userState?->watch_status?->value,
+                'recommendation_feedback' => $userState?->recommendation_feedback?->value,
             ]),
             'links' => [
                 'self' => url('/api/v1/titles/'.$this->slug),

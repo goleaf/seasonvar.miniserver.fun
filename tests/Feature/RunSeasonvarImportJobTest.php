@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Jobs\RunSeasonvarImport;
 use App\Models\SeasonvarImportRun;
 use App\Notifications\SeasonvarImportFailed;
+use App\Services\Seasonvar\SeasonvarGlobalImportRunCoordinator;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -94,7 +95,7 @@ class RunSeasonvarImportJobTest extends TestCase
             ->andReturn($run);
 
         $job = new RunSeasonvarImport(argument: 'https://seasonvar.ru/serial-1-Test-1-season.html', force: true, discover: false);
-        $job->handle($pipeline);
+        $job->handle($pipeline, app(SeasonvarGlobalImportRunCoordinator::class));
 
         $lock = Cache::store((string) config('seasonvar.queue.lock_store'))->lock('seasonvar-import', 60);
         $this->assertTrue($lock->get());
@@ -111,12 +112,36 @@ class RunSeasonvarImportJobTest extends TestCase
             $pipeline->shouldNotReceive('run');
             $job = (new RunSeasonvarImport)->withFakeQueueInteractions();
 
-            $job->handle($pipeline);
+            $job->handle($pipeline, app(SeasonvarGlobalImportRunCoordinator::class));
 
             $job->assertReleased(delay: 300);
         } finally {
             $lock->release();
         }
+    }
+
+    public function test_full_import_job_reuses_an_active_queued_global_run_before_pipeline(): void
+    {
+        $queuedRun = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'execution_mode' => 'queue',
+            'status' => 'running',
+            'started_at' => now(),
+            'last_heartbeat_at' => now(),
+        ]);
+        $pipeline = Mockery::mock(SeasonvarImportPipeline::class);
+        $pipeline->shouldNotReceive('run');
+
+        (new RunSeasonvarImport)->handle(
+            $pipeline,
+            app(SeasonvarGlobalImportRunCoordinator::class),
+        );
+
+        $this->assertSame(1, SeasonvarImportRun::query()
+            ->where('mode', 'sitemap')
+            ->whereIn('status', ['queued', 'running'])
+            ->count());
+        $this->assertSame('running', $queuedRun->fresh()->status);
     }
 
     public function test_job_logs_failure_context(): void
