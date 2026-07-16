@@ -277,6 +277,8 @@ Verified layout/SEO increment: AppLayoutData/layout shrink from 1,928/783 to 411
 - [ ] Break domain dependency cycles (Models↔Catalog, Catalog↔Seasonvar, Catalog↔API sync) with narrow interfaces/events only at real substitution boundaries.
 - [ ] Convert expected business failures to domain exceptions mapped to safe HTTP/API/Livewire errors.
 
+Verified API sync controller increment 16.07.2026: the clean 193-line `SyncController` audit found duplicated catalog/owner checkpoint, cursor decode, bounded pull and cursor encode orchestration. One immutable `ApiSyncPullResult` and one constructor-injected `ApiSyncPullService` now own that repeated query flow; the controller retains readiness, authenticated owner resolution, safe `422`/`410` mapping, API Resource serialization and `private, no-store`. Routes, middleware, abilities, cursor encryption/retention, JSON fields, schema and push/manifest behavior are unchanged. RED→GREEN service coverage passes 3/7, the existing catalog/user characterization gate passes 14/184 before integration, the combined gate passes 17/191, and focused Pint, PHP syntax and Larastan report clean. This is one demonstrated controller increment, not a claim that the repository-wide controller audit is complete.
+
 ### 5.4 Static typing
 
 - [ ] Group full Larastan diagnostics by identifier/file/domain and fix production-risk types first (casts/resources/nullability/queue locks).
