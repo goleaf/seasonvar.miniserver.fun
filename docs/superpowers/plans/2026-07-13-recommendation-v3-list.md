@@ -907,36 +907,31 @@ Verification evidence: an isolated array cache rebuilt one stable public request
 
 Verification evidence: a real `CatalogDiscoveryPage` instance produced `null` for initial `popular`, 32-character opaque seeds for initial `random` and `personalized`, and a 32-character explicit refresh context. Two initial public cache reads rebuilt once; two refreshed reads rebuilt twice; array-store keys stayed at 15 before and after the refreshed reads. PHP lint, path Pint and targeted Larastan passed before documentation closure. No production cache, session, user row or catalogue row was mutated.
 
-## Follow-up: pagination-prefix stability, 2026-07-16
+## Follow-up: pagination-prefix stability audit, 2026-07-16
 
 > **For agentic workers:** execute inline on the existing `main`; project rules prohibit another branch/worktree or subagent delegation. Task 18 forbids creating or running automated tests, so acceptance uses isolated read-only runtime probes and static inspection.
 
-**Goal:** guarantee that every discovery page is a stable slice of one deterministic diversified candidate order, so opening a later page cannot reorder, duplicate or skip cards from an earlier page.
+**Goal:** verify that every discovery page is already a stable slice of one deterministic diversified candidate order and change production code only if the traced boundary disproves that contract.
 
-**Architecture:** keep candidate generation, cache identity and diversity rules unchanged. Run the existing diversity service over the complete already-bounded candidate list, then apply page slicing and one-row look-ahead to that canonical order.
+**Architecture:** trace the candidate array and diversity limit separately. Confirm feature maps are calculated from the complete bounded pool, then compare adjacent page windows with a wider canonical prefix; reject speculative persistence or ranking changes when the contract holds.
 
 **Tech stack:** PHP 8.5, Laravel 13.20, existing recommendation DTO/service/diversity boundaries and SQLite-compatible grouped pivot queries; no migration, frontend asset, translation, route or cache-key change.
 
-### Task F14: stabilize diversity before pagination
+### Task F14: verify diversity before pagination
 
 **Files:**
 
-- Modify: `app/Services/Catalog/CatalogRecommendationService.php`
-- Modify: `docs/architecture.md`
-- Modify: `docs/performance.md`
-- Modify: `docs/MAINTENANCE_LOG.md`
-- Modify: `CHANGELOG.md`
 - Modify: this plan and the existing Task 18 design spec.
 
 **Interfaces:**
 
 - Preserve `CatalogRecommendationDiversityService::diversify(array $candidates, int $limit): array` and every public service/DTO/Livewire signature.
-- Public and personalized builders continue to provide the existing configured bounded candidate pool; no catalogue-wide PHP ranking is introduced.
-- Page slicing and `hasMore` are derived only after the full-pool diversified order is fixed.
+- Public and personalized builders continue to provide the existing configured bounded candidate pool; no catalogue-wide PHP ranking or new persisted order is introduced.
+- Page slicing and `hasMore` remain derived from the deterministic diversified prefix.
 
-- [ ] Diversify all received bounded candidates once inside `CatalogRecommendationService::result()`, then slice the requested `perPage + 1` window from that canonical order.
-- [ ] Preserve sequential ranks, stable tie-breaking, page bounds, small-catalogue deferred fill and all existing hard/soft exclusions.
-- [ ] Verify read-only that page-one/page-two/full-pool prefixes are identical across deterministic public types and that adjacent page windows have zero overlap while their concatenation matches the full canonical prefix.
-- [ ] Compare query count and elapsed/memory observations for the former page-one prefix and full-pool diversity calls; document the bounded trade-off without claiming an SLA.
-- [ ] Run PHP syntax, task-file Pint, targeted Larastan, route inspection, managed-doc check, debug/placeholder scan and task-scoped `git diff --check`; do not invoke PHPUnit/Pest or create test files.
-- [ ] Update owner documentation and English changelog, inspect the isolated patch, commit only Task 18 files on `main`, push and verify the remote SHA without absorbing concurrent work.
+- [x] Trace `CatalogRecommendationService::result()` into `CatalogRecommendationDiversityService::diversify()` and distinguish the complete candidate-array input from the requested output limit.
+- [x] Confirm genre, actor and explicit-franchise maps are calculated from the complete bounded candidate pool on every page; the selection loop and deferred fill are prefix-deterministic for that pool.
+- [x] Verify read-only that page one plus page two equals one 48-row result for trending, popular, Kinopoisk top-rated, recently added and recently updated; all adjacent windows had zero overlap and page-two ranks began at 25.
+- [x] Reject the proposed full-pool output change because it would not change feature-query scope or result identity and would only remove the existing early loop stop.
+- [x] Run documentation consistency, managed-doc and task-scoped `git diff --check`; do not invoke PHPUnit/Pest or create test files. The managed documentation was current and both Task 18 files passed whitespace inspection.
+- [ ] Correct the audit design on `main`, push and verify the remote SHA without absorbing concurrent work.
