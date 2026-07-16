@@ -75,6 +75,23 @@ final class CatalogCacheInvalidator
         $invalidate();
     }
 
+    public function titlePlaybackMetadataChanged(int $titleId): void
+    {
+        if ($titleId < 1) {
+            return;
+        }
+
+        $invalidate = fn () => $this->invalidateTitlePlaybackMetadataNow($titleId);
+
+        if (DB::transactionLevel() > 0) {
+            DB::afterCommit($invalidate);
+
+            return;
+        }
+
+        $invalidate();
+    }
+
     /** @param list<int> $titleIds */
     private function invalidateNow(array $titleIds): void
     {
@@ -100,6 +117,12 @@ final class CatalogCacheInvalidator
         $this->telemetry->increment(CacheDomain::TitleDetail, 'invalidation');
         $this->collections->titleChanged($titleId);
         $this->dispatchWarm([$titleId], refresh: false);
+    }
+
+    private function invalidateTitlePlaybackMetadataNow(int $titleId): void
+    {
+        $this->versions->bump(CacheDomain::TitleDetail, 'title:'.$titleId);
+        $this->telemetry->increment(CacheDomain::TitleDetail, 'playback-metadata-invalidation');
     }
 
     /** @param list<int> $titleIds */

@@ -31,7 +31,7 @@
 - Consumes: positive catalogue title ID after a successful material file-size conditional update.
 - Produces: `CatalogCacheInvalidator::titlePlaybackMetadataChanged(int $titleId): void`.
 
-- [ ] **Step 1: Add the public focused method**
+- [x] **Step 1: Add the public focused method**
 
 Add beside `importedTitleChanged()`:
 
@@ -54,7 +54,7 @@ public function titlePlaybackMetadataChanged(int $titleId): void
 }
 ```
 
-- [ ] **Step 2: Add the exact private mutation**
+- [x] **Step 2: Add the exact private mutation**
 
 Add beside `invalidateImportedTitleNow()`:
 
@@ -68,7 +68,7 @@ private function invalidateTitlePlaybackMetadataNow(int $titleId): void
 
 Do not call collection invalidation or `dispatchWarm()` from this method.
 
-- [ ] **Step 3: Route material file-size writes through the focused method**
+- [x] **Step 3: Route material file-size writes through the focused method**
 
 Replace only this call in `LicensedMediaFileSizeMetadataWriter`:
 
@@ -84,7 +84,7 @@ $this->cache->titlePlaybackMetadataChanged($source->catalogTitleId);
 
 Preserve the successful conditional update, material comparison, source matching and in-memory model synchronization unchanged.
 
-- [ ] **Step 4: Inspect the dependency boundary**
+- [x] **Step 4: Inspect the dependency boundary**
 
 Run:
 
@@ -108,23 +108,23 @@ Expected: media writer references only `titlePlaybackMetadataChanged`; general i
 - Consumes: the exact cache dependency and read-only production counts.
 - Produces: operator/developer documentation without changing public API or UI terminology.
 
-- [ ] **Step 1: Update README visitor-facing performance wording**
+- [x] **Step 1: Update README visitor-facing performance wording**
 
 Extend the current 16 July visitor-history sentence about background video sizes to state that size refresh now invalidates only the affected series page and no longer refreshes unrelated catalogue sections. Do not add internal class, cache-key or queue names.
 
-- [ ] **Step 2: Add the current-date changelog entry**
+- [x] **Step 2: Add the current-date changelog entry**
 
 Document the focused title/player invalidation, unchanged conditional metadata write, removal of collection lookup/general warming fan-out, and production audit counts `18597 checked media / 426 titles / 0 approved-public collection mappings` without claiming p95 improvement.
 
-- [ ] **Step 3: Update architecture and cache ownership**
+- [x] **Step 3: Update architecture and cache ownership**
 
 In `docs/architecture.md`, state that material size change advances only the affected title detail generation. In `docs/caching.md`, distinguish focused playback metadata invalidation from general importer invalidation and document that it performs no collection query or warming dispatch.
 
-- [ ] **Step 4: Update the performance contract**
+- [x] **Step 4: Update the performance contract**
 
 Record the read-only counts and explain which redundant query/fan-out is removed. State explicitly that this is workload evidence rather than measured latency/SLA.
 
-- [ ] **Step 5: Check documentation ownership and generated blocks**
+- [x] **Step 5: Check documentation ownership and generated blocks**
 
 Confirm no changed line is inside `project-docs:start`/`project-docs:end`, no duplicate changelog exists, and `docs/README.md` topic ownership still points architecture/cache/performance details to the edited documents.
 
@@ -137,7 +137,7 @@ Confirm no changed line is inside `project-docs:start`/`project-docs:end`, no du
 - Consumes: final implementation and documentation.
 - Produces: evidence-backed, task-only main-branch commits.
 
-- [ ] **Step 1: Run PHP syntax, formatting and static analysis**
+- [x] **Step 1: Run PHP syntax, formatting and static analysis**
 
 Run:
 
@@ -150,7 +150,7 @@ php -l app/Services/Media/LicensedMediaFileSizeMetadataWriter.php
 
 Expected: two clean syntax checks, Pint pass and zero Larastan errors.
 
-- [ ] **Step 2: Run application and build verification**
+- [x] **Step 2: Run application and build verification**
 
 Run:
 
@@ -163,7 +163,7 @@ npm run build
 
 Expected: importer status renders, the download route retains authentication/throttling/private middleware, migration inventory renders without mutation, and Vite production build exits zero.
 
-- [ ] **Step 3: Review task scope and forbidden patterns**
+- [x] **Step 3: Review task scope and forbidden patterns**
 
 Run task-only `git diff --check`, inspect exact diff/stat and search for conflict markers, `@php`, `env(`, debug calls, placeholders, remote URL input, body buffering, test/migration/dependency/binary changes. Confirm all task code remains outside Blade and no external request/cache/queue mutation was performed for verification.
 
@@ -192,21 +192,33 @@ Push directly to `origin/main`, then close the checklist in a one-file plan comm
 
 ## Verification evidence
 
-- [ ] Read-only production audit recorded.
-- [ ] Focused method has exact title scope and no collection/warming call.
-- [ ] PHP lint, Pint and Larastan pass.
-- [ ] Runtime status, route, migration inventory and frontend build pass.
-- [ ] Task-only diff/security/scope review passes.
+- [x] Read-only production audit recorded.
+- [x] Focused method has exact title scope and no collection/warming call.
+- [x] PHP lint, Pint and Larastan pass.
+- [x] Runtime status, route, migration inventory and frontend build pass.
+- [x] Task-only diff/security/scope review passes.
 - [ ] Local `main`, tracking ref and remote `main` hashes match.
+
+### Recorded verification
+
+- Read-only production audit: 18,597 checked media rows, 426 distinct catalogue titles and zero mappings to approved public collections at capture time.
+- Dependency inspection: `LicensedMediaFileSizeMetadataWriter` calls only `titlePlaybackMetadataChanged()`; the focused private mutation contains one scoped `TitleDetail` version bump plus telemetry, while collection propagation and `dispatchWarm()` remain only in general importer methods.
+- PHP lint reports no syntax errors for both changed classes; path-targeted Pint passes; focused Larastan passes with zero errors.
+- `seasonvar:import --status` renders active sync run `#887` and its live media-size counters without mutation.
+- `route:list --path=download -vv` retains `auth`, `throttle:media-downloads`, authenticated-session, scoped bindings and private-response middleware.
+- `migrate:status` renders the production inventory. The unrelated `2026_07_16_200100_add_requester_order_index_to_technical_issues` migration remains pending and is outside this task; no migration command was executed.
+- `npm run build` succeeds with Vite 8.1.4; no generated build artifact is task-modified.
+- Task-file `git diff --check` passes and targeted conflict/debug/placeholder/body-buffering search returns no matches.
+- No task test, migration, dependency, configuration, route, translation, Blade or binary file was created or modified. Automated tests were not created or executed per the user constraint.
 
 ## Final changed-file list
 
-- [ ] `README.md`
-- [ ] `CHANGELOG.md`
-- [ ] `app/Services/Catalog/CatalogCacheInvalidator.php`
-- [ ] `app/Services/Media/LicensedMediaFileSizeMetadataWriter.php`
-- [ ] `docs/architecture.md`
-- [ ] `docs/caching.md`
-- [ ] `docs/performance.md`
-- [ ] `docs/superpowers/specs/2026-07-16-targeted-media-size-cache-invalidation-design.md`
-- [ ] `docs/superpowers/plans/2026-07-16-targeted-media-size-cache-invalidation.md`
+- [x] `README.md`
+- [x] `CHANGELOG.md`
+- [x] `app/Services/Catalog/CatalogCacheInvalidator.php`
+- [x] `app/Services/Media/LicensedMediaFileSizeMetadataWriter.php`
+- [x] `docs/architecture.md`
+- [x] `docs/caching.md`
+- [x] `docs/performance.md`
+- [x] `docs/superpowers/specs/2026-07-16-targeted-media-size-cache-invalidation-design.md`
+- [x] `docs/superpowers/plans/2026-07-16-targeted-media-size-cache-invalidation.md`

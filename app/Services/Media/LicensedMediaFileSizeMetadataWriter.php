@@ -66,7 +66,7 @@ final class LicensedMediaFileSizeMetadataWriter
         }
 
         if ($source->catalogTitleId !== null && $source->catalogTitleId > 0) {
-            $this->cache->importedTitleChanged($source->catalogTitleId);
+            $this->cache->titlePlaybackMetadataChanged($source->catalogTitleId);
         }
 
         return MediaFileSizeMetadataWriteStatus::Changed;
