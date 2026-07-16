@@ -71,3 +71,11 @@
 - `UserTag` — независимая owner-scoped private model с SoftDeletes и explicit `catalog_title_user_tag`. Она не наследует `Tag`, не может изменить global classification и не имеет public slug/visibility/moderation relation. `User::personalTags()` и `CatalogTitle::personalTags()` используются только в authenticated query/service boundaries.
 - Model scopes определяют `publiclyEligible` и `globallyAssignable`, но public visible-title requirement, localization, counts/search/related/popular остаются в `TagQuery/TagResolver`; mutation/normalization/merge/cache — в services. Blade/API получают eager-loaded model/resource/DTO и не вызывают lazy relations, resolver или cache.
 - Enum storage: `TagType`, `TagVisibility`, `TagModerationStatus`, `TagSource`, `TagAliasSource`, `TagSynonymRelationship`, `TagProviderMappingStatus`. UI translation keys не являются stored values. Public-user/hierarchy/season/episode tag models отсутствуют намеренно.
+
+## Recommendation models и DTO
+
+- `CatalogTitleRecommendation` remains calculated similarity storage with source/target, score, rank, reasons, breakdown, algorithm version and computed time. It is not user-specific and its score is not a display percentage.
+- `CatalogTitleRelation` owns explicit source/target, `CatalogTitleRelationType`, `CatalogTitleRelationSource`, provider key, priority, lock/active state and inverse belongs-to relations. `CatalogTitle` exposes outgoing/incoming explicit relations; seasons are never recommendation titles.
+- `CatalogTitleUserState` retains one unique owner/title aggregate and adds enum-cast nullable `recommendation_feedback` and `watch_status` plus monotonic versions. Watchlist/rating/progress/history are not duplicated.
+- `CatalogRecommendationContext`, result/item/explanation/list-item DTOs are typed server-side presentation boundaries. Livewire public properties never contain these Eloquent/history graphs.
+- Stable recommendation type/source/reason/relation/watch-status/feedback/popularity-period enums store untranslated codes. Unsupported creator/audio/subtitle-language/premium/region/franchise entities remain absent rather than represented by nullable fake models.

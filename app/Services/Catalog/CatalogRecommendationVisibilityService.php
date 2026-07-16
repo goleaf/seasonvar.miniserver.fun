@@ -25,7 +25,10 @@ final class CatalogRecommendationVisibilityService
 
     public function __construct(private readonly CatalogTitleQuery $titles) {}
 
-    /** @return Builder<CatalogTitle> */
+    /**
+     * @param  list<int>  $excludedIds
+     * @return Builder<CatalogTitle>
+     */
     public function eligible(
         CatalogRecommendationContext $context,
         bool $watchable,
@@ -34,11 +37,7 @@ final class CatalogRecommendationVisibilityService
         $query = $this->titles->visibleTo($context->user);
 
         if ($watchable) {
-            $query->whereHas('licensedMedia', fn (Builder $query): Builder => $query
-                ->published()
-                ->forAvailableReleases($context->user)
-                ->withoutKnownFailures()
-                ->withPlaybackLocation());
+            $query->whereExists($this->mediaQuery($context)->selectRaw('1')->toBase());
         }
 
         if ($excludedIds !== []) {
@@ -53,8 +52,7 @@ final class CatalogRecommendationVisibilityService
                     $query->where('slug', $slug);
 
                     if ($key === 'tag') {
-                        /** @var Builder<Tag> $query */
-                        $query->publiclyEligible();
+                        $query->whereIn('tags.id', Tag::query()->publiclyEligible()->select('tags.id'));
                     }
                 });
             }
@@ -74,19 +72,17 @@ final class CatalogRecommendationVisibilityService
         $quality = $context->filters['quality'] ?? null;
 
         if (is_string($quality) && in_array($quality, config('playback.supported_qualities', []), true)) {
-            $query->whereHas('licensedMedia', fn (Builder $query): Builder => $query
-                ->published()
-                ->forAvailableReleases($context->user)
-                ->withoutKnownFailures()
-                ->where('quality', $quality));
+            $query->whereExists($this->mediaQuery($context)
+                ->where('quality', $quality)
+                ->selectRaw('1')
+                ->toBase());
         }
 
         if (($context->filters['subtitles'] ?? null) === 'available') {
-            $query->whereHas('licensedMedia', fn (Builder $query): Builder => $query
-                ->published()
-                ->forAvailableReleases($context->user)
-                ->withoutKnownFailures()
-                ->where('has_subtitles', true));
+            $query->whereExists($this->mediaQuery($context)
+                ->where('has_subtitles', true)
+                ->selectRaw('1')
+                ->toBase());
         }
 
         $ratingMin = $context->filters['rating_min'] ?? null;
@@ -101,6 +97,17 @@ final class CatalogRecommendationVisibilityService
         }
 
         return $query;
+    }
+
+    /** @return Builder<LicensedMedia> */
+    private function mediaQuery(CatalogRecommendationContext $context): Builder
+    {
+        return LicensedMedia::query()
+            ->whereColumn('licensed_media.catalog_title_id', 'catalog_titles.id')
+            ->published()
+            ->forAvailableReleases($context->user)
+            ->withoutKnownFailures()
+            ->withPlaybackLocation();
     }
 
     private function provider(string $source): string

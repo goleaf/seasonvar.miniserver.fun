@@ -2,10 +2,10 @@
 
 namespace App\Services\Catalog;
 
+use App\DTOs\CatalogDirectoryDefinition;
 use App\DTOs\CatalogRecommendationItem;
 use App\DTOs\CatalogRecommendationResult;
 use App\Enums\CatalogRecommendationType;
-use App\DTOs\CatalogDirectoryDefinition;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
@@ -23,7 +23,7 @@ class CatalogSeoBuilder
     public function __construct(private readonly CatalogRecommendationPresenter $recommendationPresenter) {}
 
     /**
-     * @param Collection<int, CatalogRecommendationItem> $items
+     * @param  Collection<int, CatalogRecommendationItem>  $items
      * @return array<string, mixed>
      */
     public function discovery(

@@ -10,7 +10,7 @@ use Illuminate\Support\Collection;
 final readonly class CatalogRecommendationResult
 {
     /**
-     * @param Collection<int, CatalogRecommendationItem> $items
+     * @param  Collection<int, CatalogRecommendationItem>  $items
      */
     public function __construct(
         public CatalogRecommendationType $requestedType,

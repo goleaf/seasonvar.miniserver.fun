@@ -352,3 +352,18 @@
 - `2026_07_16_190100_add_media_file_size_counters_to_seasonvar_import_runs.php`
 - `2026_07_16_200000_create_technical_issue_domain.php`
 <!-- project-docs:end -->
+
+## 2026-07-16 — recommendation/discovery task 18
+
+- Audited every recommendation route/service/model/view/cache/import/user-signal dependency and all project Markdown. Live baseline: 32,932 titles, 385,555 stored v4 similarity rows for 32,500 sources, zero invalid/self/hidden stored targets; no existing feedback/explicit-relation rows or region/premium/audio-language/creator/calendar/analytics models.
+- Applied additive migration `2026_07_16_120000_add_canonical_recommendation_discovery.php` successfully to configured SQLite; separately rehearsed `up` on `/tmp/seasonvar-task18-schema.sqlite` and inspected all columns/indexes. Project safety policy blocked disposable rollback, so no guard was bypassed and live schema was not rolled back.
+- Read-only ranking smoke returned distinct valid IDs for trending, popular, top-rated, recently-added, recently-updated and seeded random; editorial/upcoming correctly returned empty against empty source data. Cold observations are recorded in `performance.md` and are not SLA claims.
+- Preserved all stored v4 rows and user/catalog data. Builder v5 will replace calculated rows through the existing full import; explicit/editorial relation storage is separate and empty until authorized/editor/provider writes.
+- Final no-test verification: task-scoped Pint, PHP syntax, targeted and configured Larastan, 193-key RU/EN parity, OpenAPI JSON, managed-doc check, route/schema/index/quick-check inspection and Vite build passed. Chromium at 1440/768/390 verified public/private-fallback/localized/random/title/search/home flows without horizontal overflow or browser errors; public SEO/hreflang/ItemList and sitemap exclusions matched policy, and axe found no serious/critical findings in the accepted pages. Smoke exposed an invalid filename-sanitation regex in the concurrently integrated media download path; slash/control normalization was corrected and the title page returned 200 with 12 non-self recommendation rows.
+
+## 2026-07-16 — authentication Task 15
+
+- Audited every project Markdown file plus web/API auth routes, guards/providers/broker, middleware, cookies/CSRF, rate limits, users/reset/session/Sanctum schema, Livewire/forms/controllers/services/notifications, locale/cache/SEO, administration, export and deletion. Read-only data inspection found two verified users, no case-insensitive duplicate email, no password-reset or personal-token row, and no external-identity/social/MFA/magic/merge/anonymous bookmark-progress model.
+- Kept the `web` guard, Eloquent provider, `users` broker, signed verification and Sanctum as the only architecture. No migration or account-data rewrite was introduced. Optional provider/link/merge/MFA/magic functionality remains absent because no canonical storage, dependency or proof-of-control flow exists.
+- Diagnostics: explicit PHP syntax scan and Pint, source-cache route/middleware/config inspection, enabled/disabled registration route comparison, translation parity, read-only schema/data checks, safe-redirect probes, compiled views and `npm run build`. No automated test runner was invoked per Task 15.
+- Read-only managed Chromium verified `/login`, `/en/login`, `/register`, `/en/forgot-password` and a reset shell at `1440×1200` and `390×844`: HTTP 200, expected RU/EN language/headings, `noindex,nofollow`, labelled inputs/autocomplete, 44px submits, no horizontal overflow and no console/page/request errors. Screenshots are stored only in ignored `output/playwright/task15-auth/`.

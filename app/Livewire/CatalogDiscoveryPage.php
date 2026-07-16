@@ -11,7 +11,6 @@ use App\DTOs\CatalogRecommendationResult;
 use App\Enums\CatalogPopularityPeriod;
 use App\Enums\CatalogRecommendationFeedback;
 use App\Enums\CatalogRecommendationType;
-use App\Models\CatalogTitle;
 use App\Models\User;
 use App\Services\Catalog\CatalogFacetQuery;
 use App\Services\Catalog\CatalogRecommendationPresenter;
@@ -343,7 +342,8 @@ final class CatalogDiscoveryPage extends Component
 
     private function normalizeState(): void
     {
-        $this->period = CatalogPopularityPeriod::tryFrom((string) $this->period)?->value ?? CatalogPopularityPeriod::Week->value;
+        $period = CatalogPopularityPeriod::tryFrom((string) $this->period) ?? CatalogPopularityPeriod::Week;
+        $this->period = $period->value;
         $this->ratingSource = in_array($this->ratingSource, ['kinopoisk', 'imdb', 'portal'], true) ? $this->ratingSource : 'kinopoisk';
         $this->genre = $this->slug($this->genre);
         $this->country = $this->slug($this->country);

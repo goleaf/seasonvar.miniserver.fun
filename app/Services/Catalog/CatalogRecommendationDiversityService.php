@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace App\Services\Catalog;
 
 use App\Enums\CatalogTitleRelationType;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use stdClass;
 
 final class CatalogRecommendationDiversityService
 {
     /**
-     * @param list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}> $candidates
+     * @param  list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>  $candidates
      * @return list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>
      */
     public function diversify(array $candidates, int $limit): array
@@ -77,20 +79,20 @@ final class CatalogRecommendationDiversityService
             $selected = [...$selected, ...array_slice($deferred, 0, $limit - count($selected))];
         }
 
-        return array_values(array_slice($selected, 0, $limit));
+        return array_slice($selected, 0, $limit);
     }
 
     /**
-     * @param \Illuminate\Support\Collection<int, object> $rows
+     * @param  Collection<int, stdClass>  $rows
      * @return array<int, int>
      */
-    private function dominantFeatureByTitle(\Illuminate\Support\Collection $rows, string $featureColumn): array
+    private function dominantFeatureByTitle(Collection $rows, string $featureColumn): array
     {
         $frequency = $rows->countBy(fn (object $row): int => (int) $row->{$featureColumn});
 
         return $rows
             ->groupBy(fn (object $row): int => (int) $row->catalog_title_id)
-            ->map(function (\Illuminate\Support\Collection $titleRows) use ($featureColumn, $frequency): int {
+            ->map(function (Collection $titleRows) use ($featureColumn, $frequency): int {
                 return (int) $titleRows
                     ->sort(function (object $left, object $right) use ($featureColumn, $frequency): int {
                         $leftId = (int) $left->{$featureColumn};
@@ -105,7 +107,10 @@ final class CatalogRecommendationDiversityService
             ->all();
     }
 
-    /** @param list<int> $titleIds @return array<int, int> */
+    /**
+     * @param  list<int>  $titleIds
+     * @return array<int, int>
+     */
     private function franchiseByTitle(array $titleIds): array
     {
         if ($titleIds === [] || ! Schema::hasTable('catalog_title_relations')) {

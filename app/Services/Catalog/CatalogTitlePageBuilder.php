@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Catalog;
 
-use App\DTOs\CatalogRecommendationListItem;
 use App\DTOs\CatalogRecommendationItem;
+use App\DTOs\CatalogRecommendationListItem;
 use App\Models\CatalogTitle;
 use App\Models\Season;
 use App\Models\User;
@@ -139,7 +139,7 @@ final class CatalogTitlePageBuilder
     }
 
     /**
-     * @param Collection<int, CatalogRecommendationItem> $items
+     * @param  Collection<int, CatalogRecommendationItem>  $items
      * @return Collection<int, CatalogRecommendationListItem>
      */
     private function presentRecommendationItems(Collection $items, bool $canDismiss): Collection
@@ -174,5 +174,4 @@ final class CatalogTitlePageBuilder
 
         return $catalogTitleId.'|user:'.($userKey !== null ? (string) $userKey : 'object:'.spl_object_id($user));
     }
-
 }

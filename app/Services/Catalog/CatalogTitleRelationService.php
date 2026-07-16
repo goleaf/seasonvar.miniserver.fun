@@ -95,12 +95,12 @@ final class CatalogTitleRelationService
     {
         Gate::forUser($actor)->authorize('manage-catalog');
 
-        abort_unless($relation->source === CatalogTitleRelationSource::Editorial, 404);
+        abort_unless($relation->relationSource() === CatalogTitleRelationSource::Editorial, 404);
 
         DB::transaction(function () use ($relation): void {
             $sourceId = (int) $relation->source_title_id;
             $targetId = (int) $relation->target_title_id;
-            $inverse = $relation->relation_type->inverse();
+            $inverse = $relation->relationType()->inverse();
 
             $relation->delete();
             CatalogTitleRelation::query()
@@ -152,8 +152,8 @@ final class CatalogTitleRelationService
                     ->where('id', '!=', $relation->id)
                     ->where('source_title_id', $sourceId)
                     ->where('target_title_id', $targetId)
-                    ->where('relation_type', $relation->relation_type->value)
-                    ->where('source', $relation->source->value)
+                    ->where('relation_type', $relation->relationType()->value)
+                    ->where('source', $relation->relationSource()->value)
                     ->first();
 
                 if ($existing !== null) {

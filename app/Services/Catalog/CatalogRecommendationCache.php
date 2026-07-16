@@ -20,6 +20,7 @@ final class CatalogRecommendationCache
 
     /**
      * @param  Closure(): list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>  $rebuild
+     * @param  list<int>  $excludedIds
      * @return list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>
      */
     public function rememberPublic(CatalogRecommendationContext $context, Closure $rebuild, array $excludedIds = []): array
@@ -37,7 +38,7 @@ final class CatalogRecommendationCache
             ...$excludedIds,
             ...($context->currentTitleId !== null ? [$context->currentTitleId] : []),
         ])
-            ->filter(fn (mixed $id): bool => is_int($id) && $id > 0)
+            ->filter(fn (int $id): bool => $id > 0)
             ->unique()
             ->sort()
             ->values()

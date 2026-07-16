@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Catalog;
 
 use App\DTOs\CatalogRecommendationExplanation;
-use App\Enums\CatalogRecommendationReason;
 use App\Enums\CatalogRecommendationType;
 use App\Enums\CatalogTitleRelationType;
 
@@ -27,7 +26,7 @@ final class CatalogRecommendationPresenter
     }
 
     /**
-     * @param list<CatalogRecommendationExplanation> $explanations
+     * @param  list<CatalogRecommendationExplanation>  $explanations
      * @return list<string>
      */
     public function explanations(array $explanations): array

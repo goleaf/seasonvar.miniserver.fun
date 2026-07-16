@@ -14,7 +14,10 @@ use Illuminate\Database\Eloquent\Builder;
 
 final class CatalogPopularityQuery
 {
-    /** @param Builder<CatalogTitle> $query */
+    /**
+     * @param  Builder<CatalogTitle>  $query
+     * @return Builder<CatalogTitle>
+     */
     public function apply(Builder $query, string $ratingProvider = 'kinopoisk'): Builder
     {
         $ratingProvider = in_array($ratingProvider, ['imdb', 'kinopoisk'], true)

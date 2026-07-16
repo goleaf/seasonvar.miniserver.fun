@@ -32,6 +32,7 @@ final class CatalogPublicDiscoveryQuery
     ) {}
 
     /**
+     * @param  list<int>  $excludedIds
      * @return list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>
      */
     public function candidates(CatalogRecommendationContext $context, array $excludedIds = []): array
@@ -49,7 +50,10 @@ final class CatalogPublicDiscoveryQuery
         };
     }
 
-    /** @return list<array{id: int, score: int, source: string, reason: string}> */
+    /**
+     * @param  list<int>  $excludedIds
+     * @return list<array{id: int, score: int, source: string, reason: string}>
+     */
     private function trending(CatalogRecommendationContext $context, array $excludedIds): array
     {
         $after = now()->subDays(min(
@@ -109,7 +113,10 @@ final class CatalogPublicDiscoveryQuery
         return $this->rows($query, CatalogRecommendationSource::Trending, CatalogRecommendationReason::Trending);
     }
 
-    /** @return list<array{id: int, score: int, source: string, reason: string}> */
+    /**
+     * @param  list<int>  $excludedIds
+     * @return list<array{id: int, score: int, source: string, reason: string}>
+     */
     private function popular(CatalogRecommendationContext $context, array $excludedIds): array
     {
         $provider = $this->provider($context->ratingSource);
@@ -120,7 +127,10 @@ final class CatalogPublicDiscoveryQuery
         return $this->rows($query, CatalogRecommendationSource::Popularity, CatalogRecommendationReason::Popular);
     }
 
-    /** @return list<array{id: int, score: int, source: string, reason: string}> */
+    /**
+     * @param  list<int>  $excludedIds
+     * @return list<array{id: int, score: int, source: string, reason: string}>
+     */
     private function topRated(CatalogRecommendationContext $context, array $excludedIds): array
     {
         $source = $context->ratingSource;
@@ -173,7 +183,10 @@ final class CatalogPublicDiscoveryQuery
         return $this->rows($query, CatalogRecommendationSource::Rating, CatalogRecommendationReason::TopRated);
     }
 
-    /** @return list<array{id: int, score: int, source: string, reason: string}> */
+    /**
+     * @param  list<int>  $excludedIds
+     * @return list<array{id: int, score: int, source: string, reason: string}>
+     */
     private function recentlyAdded(CatalogRecommendationContext $context, array $excludedIds): array
     {
         $query = $this->eligibleQuery($context, watchable: true, excludedIds: $excludedIds)
@@ -185,7 +198,10 @@ final class CatalogPublicDiscoveryQuery
         return $this->rows($query, CatalogRecommendationSource::CatalogPublication, CatalogRecommendationReason::RecentlyAdded);
     }
 
-    /** @return list<array{id: int, score: int, source: string, reason: string}> */
+    /**
+     * @param  list<int>  $excludedIds
+     * @return list<array{id: int, score: int, source: string, reason: string}>
+     */
     private function recentlyUpdated(CatalogRecommendationContext $context, array $excludedIds): array
     {
         $events = DB::query()
@@ -217,7 +233,10 @@ final class CatalogPublicDiscoveryQuery
         return $this->rows($query, CatalogRecommendationSource::ContentUpdate, CatalogRecommendationReason::RecentlyUpdated);
     }
 
-    /** @return list<array{id: int, score: int, source: string, reason: string}> */
+    /**
+     * @param  list<int>  $excludedIds
+     * @return list<array{id: int, score: int, source: string, reason: string}>
+     */
     private function upcoming(CatalogRecommendationContext $context, array $excludedIds): array
     {
         $query = $this->eligibleQuery($context, watchable: false, excludedIds: $excludedIds)
@@ -268,7 +287,10 @@ final class CatalogPublicDiscoveryQuery
         return $this->rows($query, CatalogRecommendationSource::ReleaseCalendar, CatalogRecommendationReason::Upcoming);
     }
 
-    /** @return list<array{id: int, score: int, source: string, reason: string}> */
+    /**
+     * @param  list<int>  $excludedIds
+     * @return list<array{id: int, score: int, source: string, reason: string}>
+     */
     private function editorial(CatalogRecommendationContext $context, array $excludedIds): array
     {
         $titleIds = DB::table('catalog_collection_items')
@@ -305,7 +327,10 @@ final class CatalogPublicDiscoveryQuery
             ->all();
     }
 
-    /** @return list<array{id: int, score: int, source: string, reason: string}> */
+    /**
+     * @param  list<int>  $excludedIds
+     * @return list<array{id: int, score: int, source: string, reason: string}>
+     */
     private function random(CatalogRecommendationContext $context, array $excludedIds): array
     {
         $query = $this->eligibleQuery($context, watchable: true, excludedIds: $excludedIds)
@@ -331,7 +356,7 @@ final class CatalogPublicDiscoveryQuery
 
         for ($probe = 0; $probe < $maximumProbes && $ids->count() < $limit; $probe++) {
             $hash = hash('sha256', $seed.'|'.$probe);
-            $fraction = hexdec(substr($hash, 0, 8)) / 0xffffffff;
+            $fraction = hexdec(substr($hash, 0, 8)) / 0xFFFFFFFF;
             $pivot = $minimum + (int) floor(($maximum - $minimum) * $fraction);
             $probeIds = (clone $query)
                 ->where('catalog_titles.id', '>=', $pivot)
@@ -360,14 +385,17 @@ final class CatalogPublicDiscoveryQuery
             ->all();
     }
 
-    /** @return Builder<CatalogTitle> */
+    /**
+     * @param  list<int>  $excludedIds
+     * @return Builder<CatalogTitle>
+     */
     private function eligibleQuery(CatalogRecommendationContext $context, bool $watchable, array $excludedIds): Builder
     {
         return $this->visibility->eligible($context, $watchable, $excludedIds);
     }
 
     /**
-     * @param Builder<CatalogTitle> $query
+     * @param  Builder<CatalogTitle>  $query
      * @return list<array{id: int, score: int, source: string, reason: string}>
      */
     private function rows(
@@ -399,5 +427,4 @@ final class CatalogPublicDiscoveryQuery
     {
         return in_array($source, ['imdb', 'kinopoisk'], true) ? $source : 'kinopoisk';
     }
-
 }

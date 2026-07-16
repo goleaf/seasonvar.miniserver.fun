@@ -85,3 +85,9 @@ Section navigation, fieldsets, native checkbox/select/datalist/range, status/err
 `ContentRequestPresenter` — единственная card/detail preparation boundary. Public card не содержит requester identity/email/private evidence/note/import state; detail добавляет только public-safe timeline/results/references, а clarification появляется исключительно в owner/moderator context. Viewer vote/follow/permission flags вычисляются после guest-cache boundary. `x-content-requests.card` переиспользуется directory/My/admin и не выполняет query.
 
 Create view показывает search-before-submit, type descriptions, stable target selection, canonical season/episode sequence, language/translation/subtitle/quality/correction fields, bounded source/external-ID rows и probable-difference explanation. Не существует file/video upload, fake queue position/progress/ETA или public discussion. Empty/error/unavailable/merged/completed/rejected/partial states ведут к реальному действию или безопасной информации; visible copy/ARIA/confirmations имеют exact `ru`/`en` key parity и user prose остаётся untranslated escaped text.
+
+## Представления рекомендаций
+
+`CatalogRecommendationPresenter` — единственная boundary для type metadata, relation labels, stored similarity badges и broad explanation templates. `CatalogRecommendationListItem` содержит уже загруженный card title, rank/reason codes и permission to dismiss; Blade не видит score breakdown, user history или query services.
+
+Homepage показывает не более одной recommendation section; title detail — explicit related перед computed similar; discovery — filtered paginated list с working not-interested/blacklist/undo; library — link на personal discovery и owner-only hidden restore; search no-result — labelled popular link. Все состояния используют `lang/{ru,en}/recommendations.php`, existing cards/buttons/panels and escaped output. No fake percentage/AI label/dead feedback/carousel/hover-only reason exists.

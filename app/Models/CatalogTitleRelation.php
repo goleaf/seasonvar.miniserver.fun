@@ -22,6 +22,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 final class CatalogTitleRelation extends Model
 {
+    public function relationType(): CatalogTitleRelationType
+    {
+        return CatalogTitleRelationType::from((string) $this->getRawOriginal('relation_type'));
+    }
+
+    public function relationSource(): CatalogTitleRelationSource
+    {
+        return CatalogTitleRelationSource::from((string) $this->getRawOriginal('source'));
+    }
+
     /** @return BelongsTo<CatalogTitle, $this> */
     public function sourceTitle(): BelongsTo
     {

@@ -8,13 +8,14 @@ use App\DTOs\CatalogRecommendationContext;
 use App\Enums\CatalogRecommendationType;
 use App\Models\LicensedMedia;
 use App\Services\Auth\AccountSettingsService;
+use Illuminate\Support\Collection;
 
 final class CatalogRecommendationAvailabilityReranker
 {
     public function __construct(private readonly AccountSettingsService $settings) {}
 
     /**
-     * @param list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}> $candidates
+     * @param  list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>  $candidates
      * @return list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>
      */
     public function rerank(CatalogRecommendationContext $context, array $candidates): array
@@ -61,13 +62,16 @@ final class CatalogRecommendationAvailabilityReranker
         return $candidates;
     }
 
-    /** @param list<int> $candidateIds */
+    /**
+     * @param  list<int>  $candidateIds
+     * @return Collection<int, int>
+     */
     private function matchingTitleIds(
         CatalogRecommendationContext $context,
         array $candidateIds,
         string $column,
         string|bool $value,
-    ): \Illuminate\Support\Collection {
+    ): Collection {
         return LicensedMedia::query()
             ->availableTo($context->user)
             ->forAvailableReleases($context->user)
@@ -75,6 +79,8 @@ final class CatalogRecommendationAvailabilityReranker
             ->whereIn('catalog_title_id', $candidateIds)
             ->where($column, $value)
             ->distinct()
-            ->pluck('catalog_title_id');
+            ->pluck('catalog_title_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->values();
     }
 }

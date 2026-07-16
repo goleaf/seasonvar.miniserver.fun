@@ -211,3 +211,18 @@ Blade и Livewire Blade являются только presentation layer: зап
 - Изменения sitemap, robots и hook не меняют светлую тему, Blade-компоненты и русскоязычные правила интерфейса.
 - Если будущая правка меняет видимые блоки, этот файл нужно обновить вручную и затем запустить `php artisan project:docs-refresh`.
 <!-- project-docs:end -->
+
+## Recommendation/discovery UI
+
+- Type navigation remains usable by touch and keyboard; horizontal overflow is contained inside the navigation, never the page. No autoplay carousel is used.
+- Filters use existing responsive form controls, stable labels and one collapsible advanced taxonomy group. Long translated labels/select values wrap or truncate inside their control without overlapping feedback actions.
+- Recommendation list owns heading hierarchy, ordered rank, poster alternative text, broad visible reason and one meaningful title link. Internal score is not a percentage/rating and is never rendered.
+- Feedback menu buttons are at least 44px, server-authorized, disabled during request and followed by accessible localized notice/undo. Loading, cold-start, empty and failure states are live-region safe and do not blank unrelated sections.
+- Phone, landscape phone, tablet, desktop and zoom layouts use existing light-theme tokens/components; no inline CSS, arbitrary colour/shadow/radius, hover-only information or focus trap was introduced.
+
+## Размер и скачивание выбранного видео
+
+- Размер direct-file показывается рядом с existing quality/format через reusable status pill и локальный `fa-hard-drive`. Unknown отображается текстом, HLS manifest size не показывается как размер видео.
+- Primary download action использует local `fa-file-arrow-down`, emerald/slate language, `min-h-11`, visible `focus-visible` ring, полный width на phone и content width начиная с `sm`. Format/size — вторичная строка, не отдельная кликабельная цель.
+- Guest получает компактную login action с lock icon и ясным сообщением о регистрации; HLS/unsupported получает non-interactive stream-only state. Скрытие active link не заменяет endpoint policy.
+- Attachment открывается обычным `<a>` на named route, не `wire:click`; raw provider URL, inline styles, layout shift и binary transfer через Livewire запрещены.

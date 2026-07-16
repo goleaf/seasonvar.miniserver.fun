@@ -20,7 +20,7 @@ final class CatalogRecommendationTitleLoader
     ) {}
 
     /**
-     * @param list<int> $ids
+     * @param  list<int>  $ids
      * @return Collection<int, CatalogTitle>
      */
     public function load(CatalogRecommendationContext $context, array $ids, bool $watchable = true): Collection
@@ -47,7 +47,10 @@ final class CatalogRecommendationTitleLoader
     /** @param Collection<int, CatalogTitle> $titles */
     private function loadCounts(Collection $titles, CatalogRecommendationContext $context): void
     {
-        $titleIds = $titles->modelKeys();
+        $titleIds = $titles
+            ->pluck('id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
 
         if ($titleIds === []) {
             return;

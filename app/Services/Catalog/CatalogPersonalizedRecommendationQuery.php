@@ -12,7 +12,6 @@ use App\Models\CatalogTitleRecommendation;
 use App\Models\CatalogTitleUserState;
 use App\Models\EpisodeViewProgress;
 use App\Models\User;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -21,7 +20,7 @@ final class CatalogPersonalizedRecommendationQuery
     public function __construct(private readonly CatalogRecommendationVisibilityService $visibility) {}
 
     /**
-     * @param list<int> $excludedIds
+     * @param  list<int>  $excludedIds
      * @return list<array{id: int, score: int, source: string, reason: string}>
      */
     public function candidates(CatalogRecommendationContext $context, array $excludedIds): array
@@ -207,8 +206,8 @@ final class CatalogPersonalizedRecommendationQuery
     }
 
     /**
-     * @param array<int, array{weight: int, source: CatalogRecommendationSource, reason: CatalogRecommendationReason}> $signals
-     * @param array{weight: int, source: CatalogRecommendationSource, reason: CatalogRecommendationReason} $candidate
+     * @param  array<int, array{weight: int, source: CatalogRecommendationSource, reason: CatalogRecommendationReason}>  $signals
+     * @param  array{weight: int, source: CatalogRecommendationSource, reason: CatalogRecommendationReason}  $candidate
      */
     private function rememberSignal(array &$signals, int $titleId, array $candidate): void
     {

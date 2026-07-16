@@ -432,18 +432,18 @@ This section supersedes only the unfinished execution notes above. It preserves 
 
 ### Phased implementation checklist
 
-- [ ] Add stable enums, context/item/explanation DTOs, translated presenter and central configuration.
-- [ ] Add additive feedback and explicit-relation schema/models/policies/services with merge/delete handling.
-- [ ] Add centralized visibility, hard-exclusion, diversity, repeat-suppression and scalar-ID cache services.
-- [ ] Add public queries for popular, trending, top-rated, recently added/updated, upcoming, editorial and efficient filtered random discovery.
-- [ ] Add bounded personalized candidate generation from real progress/watchlist/collection/tag/rating signals with honest cold start.
-- [ ] Route title-page related/similar and the legacy API through the canonical service while preserving response shape.
-- [ ] Add one discovery route/page with validated stable URL state, public/private SEO policy, pagination, refresh and feedback/undo.
-- [ ] Integrate lightweight sections into home, search empty state, library and calendar-compatible release views only where the corresponding feature exists.
-- [ ] Add authorized relation administration within the existing catalogue administration surface; reuse collection administration for editorial sections.
-- [ ] Add complete `ru`/`en` recommendation translations, localized reasons, accessibility/loading/empty/error states and mobile-first reusable cards.
-- [ ] Extend canonical SEO/sitemap generation only with non-empty stable public discovery types; keep personalized/random/filter state noindex and out of sitemap.
-- [ ] Update architecture/data/cache/security/performance/view/SEO/API documentation and the English changelog.
+- [x] Add stable enums, context/item/explanation DTOs, translated presenter and central configuration.
+- [x] Add additive feedback and explicit-relation schema/models/policies/services with merge/delete handling.
+- [x] Add centralized visibility, hard-exclusion, diversity, repeat-suppression and scalar-ID cache services.
+- [x] Add public queries for popular, trending, top-rated, recently added/updated, upcoming, editorial and efficient filtered random discovery.
+- [x] Add bounded personalized candidate generation from real progress/watchlist/collection/tag/rating signals with honest cold start.
+- [x] Route title-page related/similar and the legacy API through the canonical service while preserving response shape.
+- [x] Add one discovery route/page with validated stable URL state, public/private SEO policy, pagination, refresh and feedback/undo.
+- [x] Integrate lightweight sections into home, search empty state, library and calendar-compatible release views only where the corresponding feature exists.
+- [x] Add authorized relation administration within the existing catalogue administration surface; reuse collection administration for editorial sections.
+- [x] Add complete `ru`/`en` recommendation translations, localized reasons, accessibility/loading/empty/error states and mobile-first reusable cards.
+- [x] Extend canonical SEO/sitemap generation only with non-empty stable public discovery types; keep personalized/random/filter state noindex and out of sitemap.
+- [x] Update architecture/data/cache/security/performance/view/SEO/API documentation and the English changelog.
 
 ### Files expected to change
 
@@ -466,9 +466,24 @@ This section supersedes only the unfinished execution notes above. It preserves 
 
 ### Final verification checklist (no new or existing automated tests run for task 18)
 
-- [ ] Inspect every changed file and all directly related routes, bindings, models, relations, policies, import/merge and cache invalidators.
-- [ ] Run Pint for changed PHP, PHP syntax checks, static analysis already configured by the project, route/schema/query-plan inspection, migration dry inspection and `git diff --check`.
-- [ ] Exercise public/private/cold-start/feedback/undo/random/related/similar queries against a disposable SQLite copy without invoking the automated test runner.
-- [ ] Run Vite build and browser smoke checks at phone/tablet/desktop widths, including keyboard/focus, no horizontal overflow, console/network errors and no private HTML/URL/cache leakage.
-- [ ] Verify public versus private cache dimensions, noindex/canonical/hreflang/sitemap policy, translation key parity and accessibility names.
+- [x] Inspect every changed file and all directly related routes, bindings, models, relations, policies, import/merge and cache invalidators.
+- [x] Run Pint for changed PHP, PHP syntax checks, static analysis already configured by the project, route/schema/query-plan inspection, migration dry inspection and `git diff --check`.
+- [x] Exercise public/private/cold-start/feedback/undo/random/related/similar queries against the configured and disposable SQLite schemas without invoking the automated test runner; mutations were verified through authorization/validation/idempotent write-path inspection rather than changing a real user's state.
+- [x] Run Vite build and browser smoke checks at phone/tablet/desktop widths, including keyboard/focus, no horizontal overflow, console/network errors and no private HTML/URL/cache leakage.
+- [x] Verify public versus private cache dimensions, noindex/canonical/hreflang/sitemap policy, translation key parity and accessibility names.
 - [ ] Re-read the full task, record any unavailable portal capability as a verified limitation rather than a fabricated implementation, update all owner docs and changelog, then commit only task 18 changes on `main` and push.
+
+### Implementation evidence, 2026-07-16
+
+- [x] Canonical service/query/DTO/enum boundaries, public/private fallback, filters, visibility, feedback, diversity, repeat suppression and truthful explanations were statically inspected.
+- [x] Additive migration applied successfully to configured SQLite and separately to `/tmp/seasonvar-task18-schema.sqlite`; exact table/index list was inspected. Project command policy prohibited even a disposable `migrate:rollback`, so `down()` was inspected rather than bypassing that guard.
+- [x] Uncached route inspection resolves canonical, localized, legacy and existing API names. Public read-only smoke returned distinct IDs for trending, popular, top-rated, recently-added, recently-updated and seeded random. Empty editorial/upcoming results reflect the audited empty source data.
+- [x] Live cold diagnostic observations on 32.9k titles: trending 4.255s, popular 5.686s, top-rated 4.434s, recently-added 4.200s, recently-updated 8.953s and seeded random 7.167s. These include cold title hydration/facet/cache work and are not p95/SLA claims.
+- [x] The current relation table contains zero legacy anomalies after additive creation; existing 385,555 stored similarity rows remain algorithm v4 and readable. Code v5 is used at the next canonical full import rebuild, preserving old data until atomic per-title replacement.
+- [x] Dedicated region/premium, audio/subtitle-language, creator/writer/billing, favorite-genre profile, release-calendar entity and recommendation analytics were confirmed absent and are documented as limitations rather than simulated features.
+- [x] Complete Pint/lint/OpenAPI/translation/build/browser/diff verification.
+- [ ] Re-read the task, finish owner docs/changelog, inspect staged scope, commit task-only work on `main` and push.
+
+Fresh final evidence: explicit task-file Pint returned `passed`; PHP syntax covered 42 PHP files; targeted Larastan and the repository `composer analyse` gate both returned zero errors; recommendation locale parity is 193 keys; OpenAPI JSON and `project:docs-refresh --check` passed; Vite 8.1.4 produced the production bundle. SQLite `PRAGMA quick_check` returned `ok`, relation/feedback queries selected their focused indexes, and route inspection preserved canonical/localized/legacy/API names.
+
+Managed Chromium exercised public trending/popular/top-rated/random, English locale, anonymous personalized cold fallback, homepage, title detail and search no-result flows. Desktop `1440×1000`, tablet `768×1024` and phone `390×844` returned 200 with no page overflow or browser errors. Public pages exposed canonical/hreflang/ItemList metadata, personalized/random were `noindex`, sitemap static included only eligible public discovery URLs, title detail showed 12 recommendation rows without the current title, and axe reported no serious/critical violations after the two shared title controls received stronger contrast. Browser smoke also found and closed an unrelated title-page blocker in download filename sanitation; the safe slash/control-character normalization now renders the same title route successfully.

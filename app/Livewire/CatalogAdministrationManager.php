@@ -190,7 +190,7 @@ final class CatalogAdministrationManager extends Component
 
         $source = $this->selectedTitle();
         $relation = $this->query->recommendationRelation($source, $relationId);
-        abort_unless($relation->source === CatalogTitleRelationSource::Editorial, 404);
+        abort_unless($relation->relationSource() === CatalogTitleRelationSource::Editorial, 404);
         $this->titleRelations->removeEditorial($this->user(), $relation);
 
         $this->notice = __('recommendations.admin.relation_removed');

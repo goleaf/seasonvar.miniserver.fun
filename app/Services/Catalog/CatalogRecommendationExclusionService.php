@@ -87,7 +87,7 @@ final class CatalogRecommendationExclusionService
     }
 
     /**
-     * @param list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}> $candidates
+     * @param  list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>  $candidates
      * @return list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>
      */
     public function applySoftDemotions(CatalogRecommendationContext $context, array $candidates): array
@@ -124,7 +124,7 @@ final class CatalogRecommendationExclusionService
             $demotion = $state->in_watchlist
                 ? (int) config('recommendations.soft_demotions.watchlist', 40)
                 : 0;
-            $status = $state->watch_status;
+            $status = CatalogWatchStatus::tryFrom((string) $state->getRawOriginal('watch_status'));
 
             if ($status instanceof CatalogWatchStatus) {
                 $demotion = max($demotion, (int) config('recommendations.soft_demotions.'.$status->value, 0));
@@ -139,7 +139,10 @@ final class CatalogRecommendationExclusionService
         return $candidates;
     }
 
-    /** @param iterable<int, mixed> $ids @return list<int> */
+    /**
+     * @param  iterable<int, mixed>  $ids
+     * @return list<int>
+     */
     private function normalize(iterable $ids): array
     {
         return collect($ids)

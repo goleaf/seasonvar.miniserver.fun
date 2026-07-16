@@ -11,9 +11,11 @@ use App\DTOs\CatalogRecommendationResult;
 use App\Enums\CatalogRecommendationReason;
 use App\Enums\CatalogRecommendationSource;
 use App\Enums\CatalogRecommendationType;
+use App\Enums\CatalogTitleRelationSource;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
 use App\Models\CatalogTitleRelation;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
@@ -102,7 +104,7 @@ final class CatalogRecommendationService
     /**
      * @return array{related: Collection<int, CatalogRecommendationItem>, similar: Collection<int, CatalogRecommendationItem>}
      */
-    public function forTitle(CatalogTitle $title, ?\App\Models\User $user, int $limit = 12): array
+    public function forTitle(CatalogTitle $title, ?User $user, int $limit = 12): array
     {
         $limit = max(1, min(24, $limit));
         $relatedContext = new CatalogRecommendationContext(
@@ -130,16 +132,16 @@ final class CatalogRecommendationService
                 return new CatalogRecommendationItem(
                     title: $target,
                     type: CatalogRecommendationType::Related,
-                    source: $relation->source === \App\Enums\CatalogTitleRelationSource::Editorial
+                    source: $relation->relationSource() === CatalogTitleRelationSource::Editorial
                         ? CatalogRecommendationSource::Editorial
                         : CatalogRecommendationSource::ImportedProvider,
                     explanations: [new CatalogRecommendationExplanation(
                         CatalogRecommendationReason::RelatedStory,
-                        ['relation' => $this->presenter->relation($relation->relation_type)],
+                        ['relation' => $this->presenter->relation($relation->relationType())],
                     )],
                     rank: $index + 1,
                     score: max(1, 65_535 - (int) $relation->priority),
-                    relationType: $relation->relation_type->value,
+                    relationType: $relation->relationType()->value,
                 );
             });
         $relatedIds = $relatedItems->map(fn (CatalogRecommendationItem $item): int => $item->title->id)->all();
@@ -164,14 +166,17 @@ final class CatalogRecommendationService
         return ['related' => $relatedItems, 'similar' => $similarResult->items];
     }
 
-    public function rememberShown(CatalogRecommendationResult $result, ?\App\Models\User $user): void
+    public function rememberShown(CatalogRecommendationResult $result, ?User $user): void
     {
         $this->repeats->remember($user, $result->items->map(
             fn (CatalogRecommendationItem $item): int => $item->title->id,
         ));
     }
 
-    /** @return list<array{id: int, score: int, source: string, reason: string}> */
+    /**
+     * @param  list<int>  $excludedIds
+     * @return list<array{id: int, score: int, source: string, reason: string}>
+     */
     private function coldStartCandidates(CatalogRecommendationContext $context, array $excludedIds): array
     {
         foreach ([CatalogRecommendationType::Editorial, CatalogRecommendationType::Trending, CatalogRecommendationType::Popular] as $type) {
@@ -197,7 +202,7 @@ final class CatalogRecommendationService
     }
 
     /**
-     * @param list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}> $candidates
+     * @param  list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>  $candidates
      */
     private function result(
         CatalogRecommendationContext $context,
