@@ -588,3 +588,94 @@ The appended URL list is derived from stable enum identity:
 - [x] Run Pint, PHP lint, configured static analysis, `project:docs-refresh --check`, `git diff --check` and route inspection; no frontend assets changed, so Vite was not rerun, and PHPUnit/Pest remained unused.
 - [x] Browser-smoke `/discover/recently_updated` and popular at desktop/mobile widths for 200 status, canonical/index policy, no console error, no overflow and zero axe violations.
 - [x] Inspect every changed file and staged scope, commit only this follow-up on `main`, push, and verify remote SHA while preserving unrelated importer/media worktree changes.
+
+## Follow-up: source-first top-rated ranking, 2026-07-16
+
+> **For agentic workers:** execute inline on the existing `main`; project rules prohibit another branch/worktree and the active session does not delegate to subagents. No new or existing automated test runner is invoked because Task 18 explicitly forbids it.
+
+**Goal:** eliminate per-visible-title rating/vote correlation from the canonical `top_rated` cold path while preserving exact source isolation, ordering, visibility, filters, exclusions, cache identity and output codes.
+
+**Architecture:** portal ratings are aggregated once into a title-keyed derived table; Kinopoisk and IMDb join their existing unique provider row. The existing `CatalogRecommendationVisibilityService` remains the outer query and `rows()` remains the only result-shape boundary.
+
+**Tech stack:** PHP 8.5, Laravel 13.20 Eloquent/query builder, SQLite existing indexes, existing recommendation cache and DTO/enum contracts.
+
+### Task F4: replace correlated top-rated scoring with source-first joins
+
+**Files:**
+
+- Modify: `app/Services/Catalog/CatalogPublicDiscoveryQuery.php`
+
+**Interfaces:**
+
+- `CatalogPublicDiscoveryQuery::candidates()` keeps returning `list<array{id:int,score:int,source:string,reason:string}>` for `top_rated`.
+- `CatalogRecommendationSource::Rating`, `CatalogRecommendationReason::TopRated`, the 180-candidate cap and configured portal/Kinopoisk/IMDb minimum votes remain unchanged.
+- No new public method, route, cache key, table, index, config value or dependency is introduced.
+
+- [ ] Remove the now-unused `CatalogTitleRating` import and import `Illuminate\Database\Query\JoinClause`.
+- [ ] Replace only `topRated()` with the following source-first query while retaining the existing provider fallback:
+
+```php
+private function topRated(CatalogRecommendationContext $context, array $excludedIds): array
+{
+    $source = $context->ratingSource;
+    $minimumVotes = max(1, (int) config("recommendations.top_rated.minimum_votes.{$source}", 1_000));
+    $query = $this->eligibleQuery($context, watchable: true, excludedIds: $excludedIds);
+
+    if ($source === 'portal') {
+        $ratings = DB::table('catalog_title_user_states')
+            ->select('catalog_title_id')
+            ->selectRaw('AVG(rating) AS source_rating')
+            ->selectRaw('COUNT(rating) AS source_votes')
+            ->whereNotNull('rating')
+            ->groupBy('catalog_title_id')
+            ->havingRaw('COUNT(rating) >= ?', [$minimumVotes]);
+
+        $query->joinSub(
+            $ratings,
+            'recommendation_rating',
+            'recommendation_rating.catalog_title_id',
+            '=',
+            'catalog_titles.id',
+        );
+        $ratingColumn = 'recommendation_rating.source_rating';
+        $votesColumn = 'recommendation_rating.source_votes';
+    } else {
+        $provider = $this->provider($source);
+        $query
+            ->join('catalog_title_ratings as recommendation_rating', function (JoinClause $join) use ($provider): void {
+                $join
+                    ->on('recommendation_rating.catalog_title_id', '=', 'catalog_titles.id')
+                    ->where('recommendation_rating.provider', '=', $provider);
+            })
+            ->whereNotNull('recommendation_rating.rating')
+            ->where('recommendation_rating.votes', '>=', $minimumVotes);
+        $ratingColumn = 'recommendation_rating.rating';
+        $votesColumn = 'recommendation_rating.votes';
+    }
+
+    $query
+        ->select('catalog_titles.id')
+        ->orderByDesc($ratingColumn)
+        ->orderByDesc($votesColumn)
+        ->orderByDesc('catalog_titles.id');
+
+    return $this->rows($query, CatalogRecommendationSource::Rating, CatalogRecommendationReason::TopRated);
+}
+```
+
+- [ ] Confirm the provider join uses the existing unique `(catalog_title_id,provider)` constraint and `catalog_ratings_provider_score_votes_title_idx`; do not add a migration.
+
+### Task F5: no-test verification, documentation and delivery
+
+**Files:**
+
+- Modify: `docs/performance.md`
+- Modify: `docs/MAINTENANCE_LOG.md`
+- Modify: `CHANGELOG.md`
+- Modify: this plan and the existing Task 18 design spec only if implementation evidence changes the contract.
+
+- [ ] Run PHP syntax, task-file Pint, configured Larastan, `project:docs-refresh --check`, route inspection and `git diff --check`; do not run PHPUnit/Pest and do not run Vite because no frontend asset changes are authorized.
+- [ ] Re-run portal, Kinopoisk, IMDb, Kinopoisk genre-filter and top-ten-exclusion candidates. Preserve these pre-change public result hashes: portal empty `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`; Kinopoisk `8562907a32509b5489c79db64a918d7147277ead528f26a548a1f3e6c8876405`; IMDb `9f2a1f65723f25f6db01efde888b414ead1d2267c9b795707f86f9ee9c356a5b`; genre filter `e1875f185a11df935b405d282853e9719d547fafd0f73dfad63154df0f0bcf17`; top-ten exclusion `684d1aafa808c10d245d251c9de2ca2b15dc1280d7d138acaa2488cc69d52225` with zero overlap.
+- [ ] Inspect `EXPLAIN QUERY PLAN`: provider ranking must select `catalog_ratings_provider_score_votes_title_idx`; portal must materialize the grouped owner-safe rating source before joining visible titles.
+- [ ] Record actual post-change diagnostics without presenting them as p95/SLA. Browser-smoke `/discover/top_rated?rating_source=kinopoisk` only if the existing local QA server can be started without production cache warming or queue dispatch.
+- [ ] Inspect staged scope, commit only this follow-up on `main`, push fast-forward and verify the remote SHA while preserving unrelated player/auth/route worktree changes.
