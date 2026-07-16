@@ -10,7 +10,12 @@ use Ramsey\Uuid\Uuid;
 
 final readonly class DemoStableValue
 {
-    public function __construct(private string $namespace) {}
+    private string $namespace;
+
+    public function __construct(?string $namespace = null)
+    {
+        $this->namespace = $namespace ?? (string) config('demo-data.version', 'seasonvar-demo-v1');
+    }
 
     public function integer(string $scope, int $minimum, int $maximum): int
     {

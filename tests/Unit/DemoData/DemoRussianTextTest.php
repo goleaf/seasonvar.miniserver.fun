@@ -9,6 +9,7 @@ use App\Services\DemoData\DemoPersonaFactory;
 use App\Services\DemoData\DemoRussianText;
 use App\Services\DemoData\DemoStableValue;
 use App\ValueObjects\CommentBody;
+use App\ValueObjects\ProfileUsername;
 use App\ValueObjects\ReviewBody;
 use Tests\TestCase;
 
@@ -27,7 +28,8 @@ final class DemoRussianTextTest extends TestCase
 
         foreach ($personas as $persona) {
             $this->assertMatchesRegularExpression('/^[А-ЯЁ][а-яё-]+ [А-ЯЁ][а-яё-]+$/u', $persona->displayName);
-            $this->assertMatchesRegularExpression('/^[a-z]+\.[a-z]+$/', $persona->username);
+            $this->assertTrue(ProfileUsername::isValid($persona->username));
+            $this->assertMatchesRegularExpression('/^[a-z]+_[a-z]+$/', $persona->username);
             $this->assertNotSame('', $persona->city);
             $this->assertNotSame('', $persona->occupation);
             $this->assertGreaterThanOrEqual(2, count($persona->favoriteGenres));

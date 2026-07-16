@@ -80,7 +80,7 @@ final readonly class DemoPersonaFactory
         $givenName = ($female ? self::FEMALE_NAMES : self::MALE_NAMES)[$nameIndex];
         $familyName = self::SURNAMES[$nameIndex].($female ? 'а' : '');
         $displayName = $givenName.' '.$familyName;
-        $username = Str::of($givenName.'.'.$familyName)->ascii()->lower()->toString();
+        $username = Str::of($givenName.'_'.$familyName)->ascii()->lower()->toString();
         $city = $this->stable->pick('persona:'.$userIndex.':city', self::CITIES);
         $occupation = $this->stable->pick('persona:'.$userIndex.':occupation', self::OCCUPATIONS);
         $genres = $this->genres($userIndex);
