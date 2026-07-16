@@ -760,6 +760,15 @@ Status: implementation and original non-test acceptance complete on 2026-07-15; 
 - [ ] Normalize the later Task 14 public-profile comments integration through `CommentProfileQuery`/`CommentPresenter`, including the matching public count, without changing schema/routes/UI or exposing spoiler text.
 - [ ] Commit only on existing `main`, preserve unrelated work, verify status/remote and push the completed commit.
 
+### Post-Task-14 reconciliation implementation slice
+
+- [ ] Create `App\DTOs\Comments\PublicCommentActivityData` with the existing public card contract (`id`, nullable `excerpt`, `isSpoiler`, nullable `targetTitle`, nullable `targetUrl`, `directUrl`, `publishedAt`) and remove the profile-owned duplicate DTO after all imports move.
+- [ ] Add `CommentPresenter::publicActivity(Comment $comment): PublicCommentActivityData`; require the caller to eager-load `catalogTitle:id,slug,title,original_title`, use `comments.body.excerpt_length`, omit the excerpt for every spoiler, and generate the existing title/direct routes.
+- [ ] Add `CommentProfileQuery::publicActivity(int $authorId, ?User $viewer, int $perPage): LengthAwarePaginator` and `publicCountForAuthor(int $authorId, ?User $viewer): int` over one shared published, non-deleted, catalog-rooted, viewer-visible target builder. Preserve `commentsPage`, newest deterministic ordering, the current selected columns and one eager-loaded title relation.
+- [ ] Change `PublicUserProfileQuery::comments()` to delegate to `CommentProfileQuery::publicActivity()` and change `PublicUserProfilePresenter::counts()` to delegate to `CommentProfileQuery::publicCountForAuthor()`. Remove direct `Comment`, `CommentStatus` and `Str` projection logic from the profile domain; retain section privacy, pagination configuration and all other profile queries unchanged.
+- [ ] Run PHP syntax, exact-file Pint, focused Larastan, uncached route/schema inspection, comment locale parity, Blade compilation, Vite production build and manual public-profile/comment direct-link browser smoke. Do not create or run PHPUnit/Pest/Playwright automated tests for Task 12.
+- [ ] Update `CHANGELOG.md`, the Task 12 owner sections in architecture/security/caching/views/performance/data-relations/verification documentation, this status/checklist and `README.md` only if the visitor-visible behavior changes. Inspect the complete scoped diff, commit only Task 12 paths on `main`, then push the configured remote when credentials permit.
+
 ### Files expected to change
 
 Expected: additive migrations; comment enums/models/policy/actions/services/DTOs/value objects/notifications/controllers/Livewire components; title/season/episode/user relationships; account/merger/cache/admin/nav/route/request integration; comment Blade/JavaScript; `config/comments.php`; `lang/{ru,en}/comments.php`; architecture/data/authorization/security/validation/forms/views/frontend/caching/performance/notifications/administration/API/SEO/deployment documentation, this plan, maintenance log and `CHANGELOG.md`.
