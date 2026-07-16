@@ -28,27 +28,59 @@ const playerControls = [
     'fullscreen',
 ];
 
-const playerTranslations = {
-    restart: 'Сначала',
-    rewind: 'Назад {seektime} секунд',
-    play: 'Воспроизвести',
-    pause: 'Пауза',
-    fastForward: 'Вперед {seektime} секунд',
-    seek: 'Перемотка',
-    played: 'Просмотрено',
-    buffered: 'Загружено',
-    currentTime: 'Текущее время',
-    duration: 'Длительность',
-    volume: 'Громкость',
-    mute: 'Выключить звук',
-    unmute: 'Включить звук',
-    enableCaptions: 'Включить субтитры',
-    disableCaptions: 'Выключить субтитры',
-    enterFullscreen: 'На весь экран',
-    exitFullscreen: 'Выйти из полноэкранного режима',
-    settings: 'Настройки',
-    pip: 'Картинка в картинке',
+const playerCopyShape = {
+    runtime: [
+        'preparing', 'loading', 'ready', 'playing', 'paused', 'seeking',
+        'buffering', 'retryingNetwork', 'retryingMedia', 'expired',
+        'playbackError', 'fatal', 'ended', 'captionsUnavailable',
+    ],
+    controls: [
+        'restart', 'rewind', 'play', 'pause', 'fastForward', 'seek',
+        'seekLabel', 'played', 'buffered', 'currentTime', 'duration', 'volume',
+        'mute', 'unmute', 'enableCaptions', 'disableCaptions',
+        'download', 'enterFullscreen', 'exitFullscreen', 'frameTitle',
+        'captions', 'settings', 'pip', 'menuBack', 'speed', 'normal',
+        'quality', 'loop', 'start', 'end', 'all', 'reset', 'disabled',
+        'enabled', 'advertisement',
+    ],
 };
+
+const emptyPlayerCopy = () => Object.fromEntries(Object.entries(playerCopyShape).map(
+    ([branch, keys]) => [branch, Object.fromEntries(keys.map((key) => [key, '']))],
+));
+
+const playerCopyFor = (video) => {
+    const copy = emptyPlayerCopy();
+    const raw = video.closest('[data-player-shell]')?.dataset.playerCopy;
+
+    if (!raw) {
+        return copy;
+    }
+
+    try {
+        const parsed = JSON.parse(raw);
+
+        Object.entries(playerCopyShape).forEach(([branch, keys]) => {
+            keys.forEach((key) => {
+                const value = parsed?.[branch]?.[key];
+                copy[branch][key] = typeof value === 'string' && value.trim() !== '' ? value : '';
+            });
+        });
+    } catch {
+        return copy;
+    }
+
+    return copy;
+};
+
+const noInternalRetryPolicy = (maxLoadTimeMs) => ({
+    default: {
+        maxTimeToFirstByteMs: Math.min(10_000, maxLoadTimeMs),
+        maxLoadTimeMs,
+        timeoutRetry: null,
+        errorRetry: null,
+    },
+});
 
 const playerStatusIcons = {
     loading: 'fa-solid fa-circle-notch fa-spin text-emerald-700',
@@ -91,6 +123,7 @@ const clearPlayerMarkers = (video) => {
 };
 
 const showFatalPlayerState = (video) => {
+    const copy = playerCopyFor(video);
     const shell = video.closest('[data-player-shell]');
     const status = shell?.querySelector('[data-player-status]');
     const statusIcon = shell?.querySelector('[data-player-status-icon]');
@@ -107,8 +140,8 @@ const showFatalPlayerState = (video) => {
         status.setAttribute('role', 'alert');
     }
 
-    if (statusText) {
-        statusText.textContent = 'Плеер не удалось запустить.';
+    if (statusText && copy.runtime.fatal) {
+        statusText.textContent = copy.runtime.fatal;
     }
 
     if (statusIcon) {
@@ -133,6 +166,8 @@ class CatalogPlayerSession {
         this.statusIcon = this.shell?.querySelector('[data-player-status-icon]') || null;
         this.statusText = this.shell?.querySelector('[data-player-status-text]') || null;
         this.retryButton = this.shell?.querySelector('[data-player-retry]') || null;
+        this.captionStatus = this.shell?.querySelector('[data-player-caption-status]') || null;
+        this.copy = playerCopyFor(video);
         this.abortController = new AbortController();
         this.hls = null;
         this.plyr = null;
@@ -158,7 +193,7 @@ class CatalogPlayerSession {
 
         this.video.dataset.playerReady = '1';
         delete this.video.dataset.playerReserved;
-        this.setStatus('loading', 'Загружаем видео…');
+        this.setStatus('loading', 'loading');
 
         this.video.addEventListener('play', () => this.handlePlay(), { signal });
         this.video.addEventListener('pause', () => this.handlePause(), { signal });
@@ -167,12 +202,12 @@ class CatalogPlayerSession {
         this.video.addEventListener('timeupdate', () => this.handleTimeUpdate(), { signal });
         this.video.addEventListener('ended', () => this.handleEnded(), { signal });
         this.video.addEventListener('error', () => this.handleNativeError(), { signal });
-        this.video.addEventListener('loadstart', () => this.setStatus('loading', 'Загружаем видео…'), { signal });
+        this.video.addEventListener('loadstart', () => this.setStatus('loading', 'loading'), { signal });
         this.video.addEventListener('loadedmetadata', () => this.handleLoadedMetadata(), { signal });
-        this.video.addEventListener('canplay', () => this.setStatus('ready', 'Видео готово к просмотру.'), { signal });
-        this.video.addEventListener('waiting', () => this.setStatus('buffering', 'Видео загружается…'), { signal });
-        this.video.addEventListener('stalled', () => this.setStatus('buffering', 'Видео загружается…'), { signal });
-        this.video.addEventListener('emptied', () => this.setStatus('loading', 'Загружаем видео…'), { signal });
+        this.video.addEventListener('canplay', () => this.setStatus('ready', 'ready'), { signal });
+        this.video.addEventListener('waiting', () => this.setStatus('buffering', 'buffering'), { signal });
+        this.video.addEventListener('stalled', () => this.setStatus('buffering', 'buffering'), { signal });
+        this.video.addEventListener('emptied', () => this.setStatus('loading', 'loading'), { signal });
         this.video.addEventListener('volumechange', () => this.scheduleDevicePreferenceWrite(), { signal });
         this.video.addEventListener('ratechange', () => this.scheduleDevicePreferenceWrite(), { signal });
         document.addEventListener('visibilitychange', () => this.handleVisibilityChange(), { signal });
@@ -180,12 +215,13 @@ class CatalogPlayerSession {
         this.retryButton?.addEventListener('click', () => this.retry(), { signal });
 
         this.initializeHls();
+        this.initializeCaptionTracks();
         this.video.autoplay = this.preferences.autoplay;
         this.video.volume = this.preferences.volume / 100;
         this.video.muted = this.preferences.muted;
         this.plyr = new this.Plyr(this.video, {
             controls: playerControls,
-            i18n: playerTranslations,
+            i18n: this.copy.controls,
             iconUrl: plyrIconUrl,
             autoplay: this.preferences.autoplay,
             volume: this.preferences.volume / 100,
@@ -216,15 +252,40 @@ class CatalogPlayerSession {
         this.hls = new this.Hls({
             enableWorker: true,
             lowLatencyMode: false,
+            manifestLoadPolicy: noInternalRetryPolicy(20_000),
+            playlistLoadPolicy: noInternalRetryPolicy(20_000),
+            fragLoadPolicy: noInternalRetryPolicy(30_000),
         });
         this.hls.on(this.Hls.Events.ERROR, (_event, data) => this.handleHlsError(data));
         this.hls.loadSource(hlsSource);
         this.hls.attachMedia(this.video);
     }
 
+    initializeCaptionTracks() {
+        const signal = this.abortController.signal;
+        const tracks = this.video.querySelectorAll('track[kind="subtitles"], track[kind="captions"]');
+
+        tracks.forEach((track) => {
+            track.addEventListener('load', () => {
+                if (this.captionStatus) {
+                    this.captionStatus.hidden = true;
+                    this.captionStatus.textContent = '';
+                }
+            }, { signal });
+            track.addEventListener('error', () => {
+                const text = this.copy.runtime.captionsUnavailable || '';
+
+                if (text && this.captionStatus && !this.destroyed) {
+                    this.captionStatus.textContent = text;
+                    this.captionStatus.hidden = false;
+                }
+            }, { signal });
+        });
+    }
+
     handlePlay() {
         this.hasStartedPlayback = true;
-        this.setStatus('playing', 'Видео воспроизводится.');
+        this.setStatus('playing', 'playing');
         this.dispatchProgress(false, true, 'play');
         this.startHeartbeat();
     }
@@ -235,13 +296,13 @@ class CatalogPlayerSession {
 
         if (!this.video.ended) {
             this.flushProgress('pause');
-            this.setStatus('paused', 'Воспроизведение приостановлено.');
+            this.setStatus('paused', 'paused');
         }
     }
 
     handleSeeking() {
         this.clearSeekTimer();
-        this.setStatus('buffering', 'Переходим к выбранному моменту…');
+        this.setStatus('buffering', 'seeking');
     }
 
     handleSeeked() {
@@ -249,9 +310,7 @@ class CatalogPlayerSession {
         this.seekTimer = window.setTimeout(() => {
             this.seekTimer = null;
             this.flushProgress('seeked');
-            this.setStatus(this.video.paused ? 'paused' : 'playing', this.video.paused
-                ? 'Воспроизведение приостановлено.'
-                : 'Видео воспроизводится.');
+            this.setStatus(this.video.paused ? 'paused' : 'playing', this.video.paused ? 'paused' : 'playing');
         }, STABLE_SEEK_DELAY_MS);
     }
 
@@ -271,7 +330,7 @@ class CatalogPlayerSession {
         this.completed = true;
         this.stopHeartbeat();
         this.dispatchProgress(true, true, 'ended');
-        this.setStatus('ended', 'Серия просмотрена.');
+        this.setStatus('ended', 'ended');
     }
 
     handleLoadedMetadata() {
@@ -285,7 +344,7 @@ class CatalogPlayerSession {
             this.video.currentTime = this.resumePosition;
         }
 
-        this.setStatus('ready', 'Видео готово к просмотру.');
+        this.setStatus('ready', 'ready');
     }
 
     handleNativeError() {
@@ -311,7 +370,8 @@ class CatalogPlayerSession {
 
         if (data.type === this.Hls.ErrorTypes.NETWORK_ERROR && this.networkRetries < 1) {
             this.networkRetries += 1;
-            this.setStatus('retrying', 'Повторяем загрузку видео…');
+            this.clearRecoveryTimer();
+            this.setStatus('retrying', 'retryingNetwork');
             this.recoveryTimer = window.setTimeout(() => {
                 this.recoveryTimer = null;
                 this.hls?.startLoad();
@@ -322,7 +382,8 @@ class CatalogPlayerSession {
 
         if (data.type === this.Hls.ErrorTypes.MEDIA_ERROR && this.mediaRecoveries < 1) {
             this.mediaRecoveries += 1;
-            this.setStatus('retrying', 'Восстанавливаем воспроизведение…');
+            this.clearRecoveryTimer();
+            this.setStatus('retrying', 'retryingMedia');
             this.hls?.recoverMediaError();
 
             return;
@@ -372,6 +433,13 @@ class CatalogPlayerSession {
         if (this.seekTimer !== null) {
             window.clearTimeout(this.seekTimer);
             this.seekTimer = null;
+        }
+    }
+
+    clearRecoveryTimer() {
+        if (this.recoveryTimer !== null) {
+            window.clearTimeout(this.recoveryTimer);
+            this.recoveryTimer = null;
         }
     }
 
@@ -505,14 +573,15 @@ class CatalogPlayerSession {
     setFailure(expired) {
         this.expired = expired;
         this.stopHeartbeat();
+        this.clearRecoveryTimer();
         this.setStatus(
             expired ? 'expired' : 'error',
-            expired ? 'Ссылка на просмотр устарела.' : 'Не удалось воспроизвести видео.',
+            expired ? 'expired' : 'playbackError',
             true,
         );
     }
 
-    setStatus(state, text, canRetry = false) {
+    setStatus(state, copyKey, canRetry = false) {
         if (this.destroyed || !this.status) {
             return;
         }
@@ -521,7 +590,9 @@ class CatalogPlayerSession {
         this.shell?.setAttribute('data-player-state', state);
         this.status.hidden = false;
 
-        if (this.statusText) {
+        const text = this.copy.runtime[copyKey] || '';
+
+        if (text && this.statusText) {
             this.statusText.textContent = text;
         }
 
@@ -539,6 +610,8 @@ class CatalogPlayerSession {
             return;
         }
 
+        this.clearRecoveryTimer();
+
         if (this.expired) {
             window.location.reload();
 
@@ -547,7 +620,7 @@ class CatalogPlayerSession {
 
         this.networkRetries = 0;
         this.mediaRecoveries = 0;
-        this.setStatus('retrying', 'Повторяем загрузку видео…');
+        this.setStatus('retrying', 'retryingNetwork');
 
         if (this.hls) {
             this.hls.stopLoad();
@@ -570,15 +643,11 @@ class CatalogPlayerSession {
         this.destroyed = true;
         this.stopHeartbeat();
         this.clearSeekTimer();
+        this.clearRecoveryTimer();
 
         if (this.preferenceTimer !== null) {
             window.clearTimeout(this.preferenceTimer);
             this.preferenceTimer = null;
-        }
-
-        if (this.recoveryTimer !== null) {
-            window.clearTimeout(this.recoveryTimer);
-            this.recoveryTimer = null;
         }
 
         this.abortController.abort();
