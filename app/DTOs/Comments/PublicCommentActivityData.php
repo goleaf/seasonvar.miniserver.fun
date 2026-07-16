@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\DTOs\Profiles;
+namespace App\DTOs\Comments;
 
-final readonly class PublicProfileCommentActivityData
+final readonly class PublicCommentActivityData
 {
     public function __construct(
         public int $id,

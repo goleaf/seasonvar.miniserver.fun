@@ -178,6 +178,7 @@ Cache key dimensions public summary включают domain version, collection 
 - Comment count и reaction totals derived из authoritative DB и обновляются вместе с version bump. Notification read/preference/block/mute/restriction changes не flush-ят public pages: эти состояния туда не входят. Target visibility/collection lifecycle используют собственные existing invalidators; permanent collection delete дополнительно privacy-retires rows.
 - Account deletion до удаления reaction rows собирает union authored и reacted-to target identities. После commit он invalidates bounded title/season/episode roots и collection domain; более 1 000 title identities дают один global `TitleDetail` generation bump, а не неполный fan-out или полный cache flush.
 - Comment URLs с `discussion_scope`, `discussion_sort`, `comments_page`, `thread` или `comment` не входят в allowlisted public-page dimensions и обходят shared full-response cache. Direct redirect имеет `private, no-store` и `X-Robots-Tag: noindex`; cache failure report-ится, но не отменяет committed comment mutation.
+- Public-profile comments не вводят второй cache namespace или cached viewer overlay. `CommentProfileQuery` вычисляет опубликованные catalog-rooted rows и matching count из authoritative SQL с viewer-visible title subquery, а `CommentPresenter` формирует public-safe DTO; section privacy остаётся в profile domain. Spoiler body, current reaction, block/mute state, permissions и moderation data в эту проекцию и shared cache не попадают.
 
 ## Cache lifecycle отзывов
 

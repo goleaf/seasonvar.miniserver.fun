@@ -7,6 +7,7 @@ namespace App\Services\Comments;
 use App\DTOs\Comments\CommentActivityData;
 use App\DTOs\Comments\CommentNotificationData;
 use App\DTOs\Comments\CommentRelationshipData;
+use App\DTOs\Comments\PublicCommentActivityData;
 use App\Enums\CatalogCollectionModerationStatus;
 use App\Enums\CatalogCollectionVisibility;
 use App\Enums\CommentNotificationType;
@@ -28,7 +29,33 @@ use Illuminate\Support\Str;
 
 final class CommentProfileQuery
 {
-    public function __construct(private readonly CatalogTitleQuery $titles) {}
+    public function __construct(
+        private readonly CatalogTitleQuery $titles,
+        private readonly CommentPresenter $presenter,
+    ) {}
+
+    /** @return LengthAwarePaginator<int, PublicCommentActivityData> */
+    public function publicActivity(int $authorId, ?User $viewer, int $perPage): LengthAwarePaginator
+    {
+        $paginator = $this->publicActivityQuery($authorId, $viewer)
+            ->with(['catalogTitle:id,slug,title,original_title'])
+            ->latest('created_at')
+            ->orderByDesc('id')
+            ->paginate(
+                max(1, $perPage),
+                ['id', 'catalog_title_id', 'body', 'is_spoiler', 'created_at'],
+                'commentsPage',
+            );
+
+        return $paginator->through(
+            fn (Comment $comment): PublicCommentActivityData => $this->presenter->publicActivity($comment),
+        );
+    }
+
+    public function publicCountForAuthor(int $authorId, ?User $viewer): int
+    {
+        return $this->publicActivityQuery($authorId, $viewer)->count();
+    }
 
     /** @return LengthAwarePaginator<int, CommentActivityData> */
     public function activity(User $user): LengthAwarePaginator
@@ -161,6 +188,16 @@ final class CommentProfileQuery
             name: $mute->muted->name ?? __('comments.author.unavailable'),
             createdAtLabel: $mute->created_at?->diffForHumans() ?? '',
         ));
+    }
+
+    /** @return Builder<Comment> */
+    private function publicActivityQuery(int $authorId, ?User $viewer): Builder
+    {
+        return Comment::query()
+            ->where('user_id', $authorId)
+            ->published()
+            ->whereNotNull('catalog_title_id')
+            ->whereIn('catalog_title_id', $this->titles->visibleTo($viewer)->select('id'));
     }
 
     private function accessibleTargets(User $user): callable

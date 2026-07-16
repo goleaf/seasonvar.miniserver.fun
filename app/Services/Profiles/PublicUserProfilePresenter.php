@@ -6,15 +6,14 @@ namespace App\Services\Profiles;
 
 use App\DTOs\Profiles\PublicUserProfileData;
 use App\Enums\CatalogWatchStatus;
-use App\Enums\CommentStatus;
 use App\Models\CatalogCollection;
 use App\Models\CatalogTitleUserState;
-use App\Models\Comment;
 use App\Models\User;
 use App\Models\UserBlock;
 use App\Models\UserMute;
 use App\Models\UserProfile;
 use App\Services\Catalog\CatalogTitleQuery;
+use App\Services\Comments\CommentProfileQuery;
 use App\Services\Reviews\CatalogTitleReviewQuery;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -25,6 +24,7 @@ final class PublicUserProfilePresenter
         private readonly UserProfileMediaService $media,
         private readonly CatalogTitleQuery $titles,
         private readonly CatalogTitleReviewQuery $reviews,
+        private readonly CommentProfileQuery $comments,
     ) {}
 
     public function present(UserProfile $profile, ?User $viewer): PublicUserProfileData
@@ -82,12 +82,7 @@ final class PublicUserProfilePresenter
                 ? $this->reviews->publicCountForAuthor((int) $profile->user_id, $viewer)
                 : 0,
             'comments' => $sections['comments']
-                ? Comment::query()
-                    ->where('user_id', $profile->user_id)
-                    ->where('status', CommentStatus::Published->value)
-                    ->whereNotNull('catalog_title_id')
-                    ->whereIn('catalog_title_id', clone $visibleTitleIds)
-                    ->count()
+                ? $this->comments->publicCountForAuthor((int) $profile->user_id, $viewer)
                 : 0,
             'collections' => $sections['collections']
                 ? CatalogCollection::query()->where('owner_id', $profile->user_id)->publiclyListed()->count()

@@ -621,7 +621,7 @@ Rollback is additive-schema rollback only before new Task 11 data is accepted. A
 
 ## Task 12 — canonical serial comments and discussions
 
-Status: implementation and original non-test acceptance complete on 2026-07-15; a post-Task-14 public-profile integration reconciliation is in progress on 2026-07-16, after which the remaining operational handoff is commit/push. This section is the single implementation plan for portal discussions and supersedes Task 10's temporary decision to defer comments until a portal-wide social boundary existed.
+Status: implementation, original non-test acceptance and the post-Task-14 public-profile integration reconciliation are complete on 2026-07-16; the remaining operational handoff is commit/push. This section is the single implementation plan for portal discussions and supersedes Task 10's temporary decision to defer comments until a portal-wide social boundary existed.
 
 ### Audited baseline
 
@@ -757,17 +757,17 @@ Status: implementation and original non-test acceptance complete on 2026-07-15; 
 - [x] Title/player integration, optional collection integration, direct route/canonical/noindex policy, admin moderation queue and title-merge reconciliation.
 - [x] Update topic-owner documentation, manual acceptance matrix, maintenance log and English changelog without adding or running automated tests.
 - [x] Run allowed PHP syntax/Pint/route/schema/query/translation/cache/security/Blade inspection, Vite build and browser smoke; reread the task and inspect all changed/directly-related files. No automated test runner was invoked.
-- [ ] Normalize the later Task 14 public-profile comments integration through `CommentProfileQuery`/`CommentPresenter`, including the matching public count, without changing schema/routes/UI or exposing spoiler text.
+- [x] Normalize the later Task 14 public-profile comments integration through `CommentProfileQuery`/`CommentPresenter`, including the matching public count, without changing schema/routes/UI or exposing spoiler text.
 - [ ] Commit only on existing `main`, preserve unrelated work, verify status/remote and push the completed commit.
 
 ### Post-Task-14 reconciliation implementation slice
 
-- [ ] Create `App\DTOs\Comments\PublicCommentActivityData` with the existing public card contract (`id`, nullable `excerpt`, `isSpoiler`, nullable `targetTitle`, nullable `targetUrl`, `directUrl`, `publishedAt`) and remove the profile-owned duplicate DTO after all imports move.
-- [ ] Add `CommentPresenter::publicActivity(Comment $comment): PublicCommentActivityData`; require the caller to eager-load `catalogTitle:id,slug,title,original_title`, use `comments.body.excerpt_length`, omit the excerpt for every spoiler, and generate the existing title/direct routes.
-- [ ] Add `CommentProfileQuery::publicActivity(int $authorId, ?User $viewer, int $perPage): LengthAwarePaginator` and `publicCountForAuthor(int $authorId, ?User $viewer): int` over one shared published, non-deleted, catalog-rooted, viewer-visible target builder. Preserve `commentsPage`, newest deterministic ordering, the current selected columns and one eager-loaded title relation.
-- [ ] Change `PublicUserProfileQuery::comments()` to delegate to `CommentProfileQuery::publicActivity()` and change `PublicUserProfilePresenter::counts()` to delegate to `CommentProfileQuery::publicCountForAuthor()`. Remove direct `Comment`, `CommentStatus` and `Str` projection logic from the profile domain; retain section privacy, pagination configuration and all other profile queries unchanged.
-- [ ] Run PHP syntax, exact-file Pint, focused Larastan, uncached route/schema inspection, comment locale parity, Blade compilation, Vite production build and manual public-profile/comment direct-link browser smoke. Do not create or run PHPUnit/Pest/Playwright automated tests for Task 12.
-- [ ] Update `CHANGELOG.md`, the Task 12 owner sections in architecture/security/caching/views/performance/data-relations/verification documentation, this status/checklist and `README.md` only if the visitor-visible behavior changes. Inspect the complete scoped diff, commit only Task 12 paths on `main`, then push the configured remote when credentials permit.
+- [x] Create `App\DTOs\Comments\PublicCommentActivityData` with the existing public card contract (`id`, nullable `excerpt`, `isSpoiler`, nullable `targetTitle`, nullable `targetUrl`, `directUrl`, `publishedAt`) and remove the profile-owned duplicate DTO after all imports move.
+- [x] Add `CommentPresenter::publicActivity(Comment $comment): PublicCommentActivityData`; require the caller to eager-load `catalogTitle:id,slug,title,original_title`, use `comments.body.excerpt_length`, omit the excerpt for every spoiler, and generate the existing title/direct routes.
+- [x] Add `CommentProfileQuery::publicActivity(int $authorId, ?User $viewer, int $perPage): LengthAwarePaginator` and `publicCountForAuthor(int $authorId, ?User $viewer): int` over one shared published, non-deleted, catalog-rooted, viewer-visible target builder. Preserve `commentsPage`, newest deterministic ordering, the current selected columns and one eager-loaded title relation.
+- [x] Change `PublicUserProfileQuery::comments()` to delegate to `CommentProfileQuery::publicActivity()` and change `PublicUserProfilePresenter::counts()` to delegate to `CommentProfileQuery::publicCountForAuthor()`. Remove direct `Comment`, `CommentStatus` and `Str` projection logic from the profile domain; retain section privacy, pagination configuration and all other profile queries unchanged.
+- [x] Run PHP syntax, exact-file Pint, focused Larastan, uncached route/schema inspection, comment locale parity, Blade compilation, Vite production build and manual public-profile/comment direct-link browser smoke. Do not create or run PHPUnit/Pest/Playwright automated tests for Task 12.
+- [x] Update `CHANGELOG.md`, the Task 12 owner sections in architecture/security/caching/views/performance/data-relations/verification documentation, this status/checklist and `README.md` only if the visitor-visible behavior changes. Inspect the complete scoped diff, commit only Task 12 paths on `main`, then push the configured remote when credentials permit.
 
 ### Files expected to change
 
@@ -787,7 +787,7 @@ Must remain semantically unchanged: provider `catalog_title_reviews`, imported r
 - [x] Reply/reaction/moderation/report notifications respect preferences, self suppression, blocks/mutes and deduplication; every excerpt is plain, bounded and spoiler/deletion safe.
 - [x] Block/mute/report/restriction/moderation behavior is server-authorized, private state/notes/reporter identities never enter public DTOs, and expiry works without scheduler support.
 - [x] Public counts/caches contain public aggregates only; every meaningful mutation invalidates only the affected title/collection scope after commit.
-- [x] Account deletion anonymizes discussion safely, export omits private evidence, own activity respects visibility and no public profile capability is invented.
+- [x] Account deletion anonymizes discussion safely and export omits private evidence. Private self activity stays owner-only; the later explicit Task 14 public-profile comments section appears only under its section privacy and reuses the canonical Task 12 query/presenter without exposing spoiler text or inventing a general activity feed.
 - [x] Comment pages are absent from sitemap/structured data; direct/sort/page state has target canonical/noindex behavior and no spoiler metadata.
 - [x] Every visible control works with loading/disabled/success/error state; labels and ARIA text have exact Russian/English key parity; no Volt, `@php`, inline CSS, inline business JavaScript, Blade query or dead control is introduced.
 - [x] Responsive inspection covers narrow/landscape phones, tablet, desktop and zoom with long names/text/links/replies/reactions/tombstones; focus, keyboard, touch targets and reduced motion remain usable.

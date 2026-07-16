@@ -8,9 +8,11 @@ use App\DTOs\Comments\CommentAuthorData;
 use App\DTOs\Comments\CommentItemData;
 use App\DTOs\Comments\CommentReactionSummaryData;
 use App\DTOs\Comments\CommentViewerContext;
+use App\DTOs\Comments\PublicCommentActivityData;
 use App\Enums\CommentDeletionReason;
 use App\Enums\CommentReactionType;
 use App\Enums\CommentStatus;
+use App\Models\CatalogTitle;
 use App\Models\Comment;
 use App\Models\User;
 use Illuminate\Support\Facades\Gate;
@@ -19,6 +21,26 @@ use Illuminate\Support\Str;
 
 final class CommentPresenter
 {
+    public function publicActivity(Comment $comment): PublicCommentActivityData
+    {
+        $title = $comment->relationLoaded('catalogTitle') ? $comment->catalogTitle : null;
+
+        return new PublicCommentActivityData(
+            id: (int) $comment->id,
+            excerpt: $comment->is_spoiler
+                ? null
+                : Str::limit(
+                    (string) $comment->body,
+                    max(1, (int) config('comments.body.excerpt_length', 360)),
+                ),
+            isSpoiler: (bool) $comment->is_spoiler,
+            targetTitle: $title instanceof CatalogTitle ? $title->display_title : null,
+            targetUrl: $title instanceof CatalogTitle ? route('titles.show', $title) : null,
+            directUrl: $this->directUrl($comment, null),
+            publishedAt: $comment->created_at?->diffForHumans() ?? '',
+        );
+    }
+
     /**
      * @param  list<int>  $revealedSpoilers
      * @param  list<int>  $expandedBodies

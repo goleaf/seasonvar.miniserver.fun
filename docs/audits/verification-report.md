@@ -115,6 +115,17 @@ Task 12 explicitly prohibited creating or running automated tests. Acceptance th
 | Notifications, privacy and final browser health | Reply, reaction, moderation and report-resolution notification payloads contained stable IDs/status only and zero excerpt/body bytes. The author inbox showed safe activity without spoiler preview. Fresh reader/admin sessions ended with zero console errors and every observed Livewire update returned HTTP 200. Account export/deletion, target retirement/merge, cache separation, hidden direct links and moderator-only evidence were also re-inspected statically. |
 | Final disposable state | The fixture ended with two published comments, one stable root/reply relation, no reaction row, one resolved report and one revoked temporary restriction; comment foreign keys remained valid. The temporary server, browser sessions and disposable database were removed after evidence capture. |
 
+### Task 12 post-profile integration verification (no automated tests)
+
+The 16.07.2026 follow-up re-read the source-owned Markdown corpus and traced the later Task 14 public-profile projection back through profile privacy, title visibility and the canonical comment query/presenter. No PHPUnit, Pest or Playwright test runner was invoked.
+
+| Gate | Fresh evidence |
+| --- | --- |
+| Canonical projection | The duplicate profile-owned DTO/query/count was removed. `PublicUserProfileQuery` and `PublicUserProfilePresenter` now delegate rows and matching counts to `CommentProfileQuery`; `CommentPresenter` alone creates the public activity DTO, omits every spoiler excerpt and emits canonical title/direct URLs. Profile code retains section privacy and paginator configuration only. |
+| Static/runtime boundary | Exact-file PHP syntax and Pint passed; focused Larastan returned 0 diagnostics. Booted-container probes resolved all injected services, confirmed the shared empty-page/count result on the current read-only fixture and verified canonical display title, bounded Unicode excerpt, spoiler omission and route generation without a database write. Uncached route/model inspection retained canonical/localized comment and profile routes and the existing comment policy/schema. |
+| Translation/templates/assets | Russian and English comment catalogs remain at 234 identical leaf keys with no missing paths. All Blade templates compiled and Vite 8.1.4 completed the production build; no Blade, translation, JavaScript, CSS or route change was required. |
+| Browser smoke | Managed Chromium used a production-host-to-loopback resolver because `TrustHosts` correctly rejects raw `127.0.0.1`. The public profile returned 200 at `1440×1200` and `390×844`, rendered one `main`, had no horizontal overflow and produced zero console/page/same-origin request failures. The fixture keeps comments private/empty, so no inactive section was invented; an unavailable direct comment returned a safe 404 without internal details. |
+
 ## Task 13 post-profile integration verification (no automated tests)
 
 Task 13 explicitly prohibited creating or running automated tests. The 16.07.2026 follow-up therefore used the already-completed Task 13 acceptance record plus a full Markdown/code integration re-audit, focused static analysis, read-only production-style schema queries and booted-container probes. No PHPUnit, Pest or Playwright test runner was invoked.
