@@ -8,6 +8,15 @@
 
 **Tech Stack:** PHP 8.5, Laravel 13.19, Livewire 4, PHP translation arrays, Vite 8, Plyr 3.8, hls.js 1.6 light build, PHPUnit 12.5, Playwright 1.61 Chromium, GStreamer 1.26 used only once to generate committed text fixtures.
 
+## Implementation status — 16.07.2026
+
+- Tasks 1–4 are implemented on `main`: paired RU/EN server copy contains all 35 scalar Plyr labels, Blade transports only escaped allowlisted JSON, and `player.js` owns one cleanup-safe session without embedded user-facing language.
+- HLS URLs are isolated in `data-hls-src`. HLS.js/MSE is the managed path when supported; native `video.src` is the fallback. A fatal manifest retry must replace the broken HLS instance—`startLoad()` or same-instance `loadSource()` did not reload it reliably in real Chromium.
+- Playwright intercepts both `/player-fixtures/**` and the first same-origin signed `/playback/**` request. It fetches the signed endpoint without following redirects, validates the allowlisted redirect origin/path, then fulfils the exact local fixture because a page route does not observe the redirect target as a second independently routable request.
+- The corrupt fragment scenario records the actual `corrupt → valid` byte sequence: hls.js performs its own non-fatal fragment retry and reaches ready state, so the regression asserts observable recovery instead of forcing a false fatal state.
+- RU and EN run in Desktop/Mobile/Tablet Chromium. The detailed media matrix runs once on Desktop; the complete suite result is `7 passed`, `2 skipped`. This proves the listed Chromium behaviors only, not universal codec, Safari, fullscreen or PiP support.
+- Task 5 owner documentation and release communication are complete. Fresh final gates: Pint passed; four focused PHPUnit contracts passed with 9 tests / 168 assertions; Larastan reported 0 errors; Vite build, Blade compilation, documentation freshness and 110 paired non-empty RU/EN player translation leaves passed; the complete Playwright suite finished with `7 passed`, `2 skipped` in 2.7 minutes. Only isolated documentation commit/push delivery remains.
+
 ## Global Constraints
 
 - Work only on the existing `main` branch; do not create a branch or worktree.
@@ -628,7 +637,7 @@ rm -rf /tmp/seasonvar-player-fixtures
 mkdir -p /tmp/seasonvar-player-fixtures
 gst-launch-1.0 -q audiotestsrc num-buffers=5 wave=silence ! audio/x-raw,rate=8000,channels=1 ! fdkaacenc ! mp4mux faststart=true ! filesink location=/tmp/seasonvar-player-fixtures/direct.mp4
 gst-launch-1.0 -q audiotestsrc num-buffers=20 wave=silence ! audio/x-raw,rate=8000,channels=1 ! fdkaacenc ! mp4mux fragment-duration=1000 streamable=true ! filesink location=/tmp/seasonvar-player-fixtures/fragmented.mp4
-moof_type_offset=$(grep -abo -m1 moof /tmp/seasonvar-player-fixtures/fragmented.mp4 | cut -d: -f1)
+moof_type_offset=$(LC_ALL=C grep -abo moof /tmp/seasonvar-player-fixtures/fragmented.mp4 | sed -n '1s/:.*//p')
 moof_offset=$((moof_type_offset - 4))
 dd if=/tmp/seasonvar-player-fixtures/fragmented.mp4 of=/tmp/seasonvar-player-fixtures/hls-init.mp4 bs=1 count="$moof_offset" status=none
 dd if=/tmp/seasonvar-player-fixtures/fragmented.mp4 of=/tmp/seasonvar-player-fixtures/hls-segment.m4s bs=1 skip="$moof_offset" status=none

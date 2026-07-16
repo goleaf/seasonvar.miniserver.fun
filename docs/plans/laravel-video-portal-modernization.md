@@ -318,16 +318,18 @@ Verified layout/SEO increment: AppLayoutData/layout shrink from 1,928/783 to 411
 
 ### 7.1 Deterministic media fixtures
 
-- [ ] Add tiny legal/local HLS master/media playlist, MP4 range fixture and subtitle fixture, or deterministic network mocks at the provider boundary.
-- [ ] Cover valid/invalid manifest, timeout, expired/forbidden grant, MIME/CORS/range headers, subtitle failure and offline state.
-- [ ] Keep real-provider checks optional and credential/network gated.
+- [x] Add tiny legal/local HLS media playlist, fragmented MP4/init, direct MP4 Range and WebVTT fixtures at the existing allowlisted provider boundary; payloads remain committed text and in-memory browser responses.
+- [x] Cover valid manifest/init/segment, `503 → success`, `503 → 410`, bounded terminal/manual retry, corrupt-fragment recovery, MP4 `206 Content-Range` and non-fatal subtitle failure without external network access.
+- [x] Keep real-provider checks optional and credential/network gated; deterministic CI first validates the real signed redirect and never installs a production fixture route.
 
 ### 7.2 Player lifecycle
 
-- [ ] Test one initialization/destruction per morph/navigation; no leaked global listeners/timers/media sessions.
-- [ ] Verify native HLS before HLS.js fallback, retry policy and source switching.
-- [ ] Verify progress throttle, pause/leave checkpoint, monotonic completion, restart and next-season resolution.
+- [x] Test one initialization/destruction per morph/navigation, resize preservation, Livewire navigate, back/forward, pagehide/pageshow and HLS→MP4 source replacement without duplicate player sessions.
+- [x] Verify one managed HLS.js instance when supported, native fallback otherwise, fresh-instance fatal retry, stale-timer cancellation and terminal/manual retry bounds.
+- [x] Verify ordered start/pause browser progress events without duplicate positions; completion, replay and next-season resolution remain covered by the existing server/feature suite.
 - [ ] Verify keyboard, touch, captions, speed, volume persistence, fullscreen, PiP, Media Session, orientation and reduced motion where supported.
+
+Verified increment 16.07.2026: localized player PHP/asset/fixture/CI contracts passed; production Vite build passed; the isolated Playwright player suite completed with `7 passed` and `2` deliberate non-desktop detailed-matrix skips across Desktop/Mobile/Tablet Chromium. Keyboard focus, polite status regions, captions failure, responsive overflow and RU/EN copy are automated; fullscreen, PiP, Media Session, orientation and universal codec/browser coverage are not claimed.
 
 ### 7.3 Tailwind/design system
 
