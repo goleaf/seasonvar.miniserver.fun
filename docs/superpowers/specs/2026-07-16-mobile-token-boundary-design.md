@@ -1,6 +1,6 @@
 # Mobile token service boundary design
 
-**Date:** 2026-07-16  
+**Date:** 2026-07-16
 **Status:** approved for implementation through the user's standing instruction to continue with the recommended approach
 
 ## Context
