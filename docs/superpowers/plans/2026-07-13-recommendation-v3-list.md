@@ -822,3 +822,51 @@ return $query
 - [x] Exercise authenticated personalized candidates in a rolled-forward disposable SQLite copy: a real watchlist source produced `user_watchlist/because_watchlist`, while `blacklisted` and `dropped` produced no candidates; semantic timestamps/email were absent from HTML and shared cache.
 - [x] Browser-smoke trending, upcoming, anonymous cold-start and authenticated watchlist discovery at desktop/mobile widths: HTTP 200, expected 24/0/24/1 rows, correct canonical/index/noindex, no overflow, console/page error or failed local request. Playwright CLI lacked system Chrome, so the documented managed-Chromium fallback was used.
 - [x] Update owner documentation and English changelog, inspect exact staged scope, commit only Task 18 follow-ups on `main`, push fast-forward and verify runtime completion through `36cd8be04d50d6f021a45c1f3db483fe7efa90c1` on `origin/main` while preserving unrelated in-progress work and leaving active import state untouched.
+
+## Follow-up: repeat-suppression cache isolation, 2026-07-16
+
+> **For agentic workers:** execute inline on the existing `main`; project rules prohibit another branch/worktree and the active session does not delegate to subagents. No new or existing automated test runner is invoked because Task 18 explicitly forbids it.
+
+**Goal:** prevent session-scoped recently shown title IDs from creating high-cardinality entries in the shared public recommendation cache, while applying bounded repeat suppression to authenticated homepage recommendations.
+
+**Architecture:** `CatalogRecommendationContext::seed` remains the server-only marker for refresh/repeat-aware discovery. Seeded requests always rebuild through the existing bounded query instead of entering shared `TieredCache`; stable unseeded public SSR requests retain their current cache path. The authenticated homepage uses the same session suppressor and records only the eight rendered IDs after the canonical result is prepared.
+
+**Tech stack:** PHP 8.5, Laravel 13.20 cache/session APIs, existing recommendation DTO/service/cache boundaries, no migration or frontend asset change.
+
+### Task F11: isolate repeat-aware requests from shared cache
+
+**Files:**
+
+- Modify: `app/Services/Catalog/CatalogRecommendationCache.php`
+
+**Interfaces:**
+
+- `CatalogRecommendationCache::rememberPublic()` keeps its signature and return shape.
+- Stable unseeded anonymous public requests continue using `CacheDomain::Recommendations` and `discovery-ids-v2`.
+- Authenticated, personalized, random and now seeded refresh/repeat-aware requests execute the supplied bounded rebuild closure without a shared cache write.
+
+- [x] Add `$context->seed !== null` to the existing shared-cache bypass guard; do not add the seed or recently shown IDs to any cache key.
+- [x] Statically exercise an unseeded public context and a seeded guest context with a recording cache store: only the unseeded context may invoke the shared cache boundary.
+- [x] Confirm candidate identity, ordering, limits, explanations and public/private URL state are unchanged.
+
+### Task F12: authenticated homepage suppression, verification and delivery
+
+**Files:**
+
+- Modify: `app/Services/Catalog/CatalogHomePageBuilder.php`
+- Modify: `app/Services/Catalog/CatalogRecommendationService.php`
+- Modify: `docs/caching.md`
+- Modify: `docs/performance.md`
+- Modify: `docs/security.md`
+- Modify: `docs/MAINTENANCE_LOG.md`
+- Modify: `CHANGELOG.md`
+- Modify: this plan and the existing Task 18 design spec.
+
+- [x] Set a server-only non-null seed only for authenticated homepage personalization, so canonical hard exclusions include the bounded user-session recently shown set while anonymous homepage discovery remains on the stable shared public cache path.
+- [x] After the authenticated homepage result is finalized, record its rendered IDs through `CatalogRecommendationService::rememberShown()`; do not serialize IDs to URLs, public HTML metadata or shared cache.
+- [x] Keep watching/completed/dropped demotions as exclusions in personalized cold-start public fallback. Apply recent suppression first and relax only that bounded session set when it would otherwise empty the result.
+- [x] Verify the seeded cache bypass with an isolated array store and verify the session sequence through canonical hard exclusions; stable anonymous contexts must retain their shared public cache path.
+- [x] Run PHP syntax, task-file Pint, targeted Larastan, route/config/cache inspection, `project:docs-refresh --check` and task-scoped `git diff --check`; do not run PHPUnit/Pest or create test files. Pint and targeted Larastan passed, four canonical/localized discovery routes remained present, and task paths had no whitespace/debug violations. The managed-doc check reported only the concurrently staged Task 20 migration `2026_07_16_200100_add_requester_order_index_to_technical_issues.php`; its foreign inventory line was not absorbed into Task 18.
+- [ ] Update owner documentation and the English changelog, inspect the exact isolated task patch, commit only Task 18 files on `main`, push and verify the remote SHA without absorbing concurrent profile/technical-issue work.
+
+Verification evidence: an isolated array cache rebuilt one stable public request once, rebuilt two seeded requests twice and held 15 keys both before and after the seeded calls. A separate bounded session check changed recent IDs from `[]` to `[101,102]`; a read-only canonical cold-start sequence returned `[151,11446,22692]` and then `[34144,32264,32177]` with zero overlap. No production cache, user row or catalogue row was mutated.

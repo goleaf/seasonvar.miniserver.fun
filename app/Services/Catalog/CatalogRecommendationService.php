@@ -47,10 +47,15 @@ final class CatalogRecommendationService
         $displayType = $context->type;
 
         if ($context->type === CatalogRecommendationType::Personalized) {
+            $discoveryDemotions = $this->exclusions->discoveryDemotions($context);
+            $personalizedExclusions = array_values(array_unique([
+                ...$hardExclusions,
+                ...$discoveryDemotions,
+            ]));
             $candidates = $context->user !== null
                 ? $this->personalized->candidates(
                     $context,
-                    [...$hardExclusions, ...$this->exclusions->discoveryDemotions($context)],
+                    $personalizedExclusions,
                 )
                 : [];
             $personalized = $candidates !== [];
@@ -58,14 +63,25 @@ final class CatalogRecommendationService
             if ($candidates === [] && $hardExclusions !== $baseHardExclusions && $context->user !== null) {
                 $candidates = $this->personalized->candidates(
                     $context,
-                    [...$baseHardExclusions, ...$this->exclusions->discoveryDemotions($context)],
+                    array_values(array_unique([
+                        ...$baseHardExclusions,
+                        ...$discoveryDemotions,
+                    ])),
                 );
                 $personalized = $candidates !== [];
             }
 
             if ($candidates === []) {
                 $coldStart = true;
-                $candidates = $this->coldStartCandidates($context, $baseHardExclusions);
+                $candidates = $this->coldStartCandidates($context, $personalizedExclusions);
+
+                if ($candidates === [] && $hardExclusions !== $baseHardExclusions) {
+                    $candidates = $this->coldStartCandidates($context, array_values(array_unique([
+                        ...$baseHardExclusions,
+                        ...$discoveryDemotions,
+                    ])));
+                }
+
                 $displayType = match ($candidates[0]['source'] ?? null) {
                     CatalogRecommendationSource::Editorial->value => CatalogRecommendationType::Editorial,
                     CatalogRecommendationSource::Trending->value => CatalogRecommendationType::Trending,

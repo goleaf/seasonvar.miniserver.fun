@@ -27,7 +27,8 @@ final class CatalogRecommendationCache
     {
         if ($context->user !== null
             || $context->type === CatalogRecommendationType::Personalized
-            || $context->type === CatalogRecommendationType::Random) {
+            || $context->type === CatalogRecommendationType::Random
+            || $context->seed !== null) {
             return $rebuild();
         }
 

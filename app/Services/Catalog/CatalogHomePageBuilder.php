@@ -125,6 +125,7 @@ class CatalogHomePageBuilder
             locale: app()->currentLocale(),
             excludedTitleIds: $excludedRecommendationIds,
             perPage: 8,
+            seed: $user !== null ? 'home' : null,
         ));
 
         if ($recommendationResult->items->isEmpty() && $recommendationType === CatalogRecommendationType::Trending) {
@@ -135,6 +136,10 @@ class CatalogHomePageBuilder
                 excludedTitleIds: $excludedRecommendationIds,
                 perPage: 8,
             ));
+        }
+
+        if ($user !== null) {
+            $this->recommendations->rememberShown($recommendationResult, $user);
         }
 
         $homeRecommendationItems = $recommendationResult->items->map(
