@@ -138,11 +138,13 @@ Acceptance: repeated dispatch results in one active global run and no duplicate 
 
 - [x] Reproduce polling finalizer behavior with delayed/missing siblings and verify no release when work is not terminal.
 - [x] Replace high-frequency self-release loop with deduplicated completion signals plus a bounded ten-minute unique watchdog.
-- [ ] Define tries, retryUntil, timeout, backoff, uniqueness and failed behavior on every importer job.
+- [x] Define tries, retryUntil, timeout, backoff, uniqueness and failed behavior on every importer job.
 - [x] Finalize only after all required pages reach terminal prepared state; unique jobs plus group/global apply locks tolerate duplicate delivery.
 - [ ] Convert permanently impossible groups to explicit failed/abandoned state with user-safe reason code.
 
 Verified increment: 52 importer lifecycle tests / 266 assertions; changed importer/model scope Larastan 0; targeted Pint pass; `schedule:list` exposes `*/10 * * * * seasonvar-import-finalization-watchdog`. Production failed-job aggregation found 4155 group-finalizer, 793 page and 9 preparation `MaxAttemptsExceededException` rows plus 1601 active groups. Historical rows/jobs were not retried, forgotten or cleared; code rollout and explicit reconciliation remain pending.
+
+Queue contract increment: a matrix regression now covers all eight importer jobs, the attempt-bounded versus deadline-bounded split, exact timeout/backoff/deadline/unique identity and the invariant `900s timeout < 1200s retry_after`. RED inspection found only the watchdog without a terminal failure boundary; its new `failed()` emits low-cardinality job/class context and never the exception message. The source-page job remains deliberately non-unique because its claim token is the delivery ownership boundary. Focused result: 2 tests / 66 assertions; no historical queue row was retried, forgotten or cleared.
 
 ### 2.4 Failed-job reconciliation
 

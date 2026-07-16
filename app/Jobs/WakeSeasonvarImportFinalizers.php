@@ -13,6 +13,8 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 final class WakeSeasonvarImportFinalizers implements ShouldBeUnique, ShouldQueue
 {
@@ -52,5 +54,13 @@ final class WakeSeasonvarImportFinalizers implements ShouldBeUnique, ShouldQueue
     public function uniqueVia(): Repository
     {
         return Cache::store((string) config('seasonvar.queue.lock_store', 'redis-locks'));
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        Log::error('Watchdog финализации импорта Seasonvar завершился ошибкой.', [
+            'job' => $this->uniqueId(),
+            'exception' => $exception !== null ? $exception::class : null,
+        ]);
     }
 }
