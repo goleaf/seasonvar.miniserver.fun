@@ -197,11 +197,13 @@
                         @endforeach
                     </div>
 
-                    <div class="mt-3 grid gap-2 text-xs font-semibold text-slate-500 sm:grid-cols-2 xl:grid-cols-4">
+                    <div class="mt-3 grid gap-2 text-xs font-semibold text-slate-500 sm:grid-cols-2 xl:grid-cols-3">
                         <div>{{ __('catalog.importer.pages', ['parsed' => $run['parsed'], 'selected' => $run['selected']]) }}</div>
                         <div>{{ __('catalog.importer.stored_pages', ['count' => $run['stored']]) }}</div>
                         <div>{{ __('catalog.importer.media', ['attached' => $run['media_attached'], 'updated' => $run['media_updated']]) }}</div>
                         <div>{{ __('catalog.importer.media_failed', ['skipped' => $run['media_skipped'], 'failed' => $run['media_failed']]) }}</div>
+                        <div>{{ __('catalog.importer.media_sizes', ['checked' => $run['media_sizes_checked'], 'known' => $run['media_sizes_known'], 'unknown' => $run['media_sizes_unknown'], 'unsupported' => $run['media_sizes_unsupported'], 'failed' => $run['media_size_checks_failed']]) }}</div>
+                        <div>{{ __('catalog.importer.media_size_bytes', ['size' => $run['media_size_known_label'], 'bytes' => $run['media_size_known_bytes']]) }}</div>
                     </div>
 
                     @if ($run['error'])

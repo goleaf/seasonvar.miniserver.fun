@@ -11,6 +11,7 @@ use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogDirectoryRedirectController;
 use App\Http\Controllers\CatalogSitemapController;
 use App\Http\Controllers\CommentRedirectController;
+use App\Http\Controllers\DownloadLicensedMediaController;
 use App\Http\Controllers\InfrastructureHealthController;
 use App\Http\Controllers\MigrateAnonymousPreferencesController;
 use App\Http\Controllers\PlaybackSourceController;
@@ -80,6 +81,11 @@ Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
     ->name('verification.verify');
 
 Route::middleware(['auth', 'auth.session', 'account.private'])->group(function (): void {
+    Route::get('/titles/{catalogTitle:slug}/media/{licensedMedia}/download', DownloadLicensedMediaController::class)
+        ->whereNumber('licensedMedia')
+        ->scopeBindings()
+        ->middleware('throttle:media-downloads')
+        ->name('titles.media.download');
     Route::get('/email/verify', VerifyEmailPage::class)->name('verification.notice');
     Route::get('/confirm-password', ConfirmPasswordPage::class)->name('password.confirm');
     Route::get('/profile', ProfilePage::class)->name('profile.show');

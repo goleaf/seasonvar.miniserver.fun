@@ -21,6 +21,6 @@ final class LicensedMediaPolicy
         $title = $media->catalogTitle;
 
         return $title instanceof CatalogTitle
-            && $this->downloads->resolve($user, $title, $media)->eligible;
+            && $this->downloads->authorizes($user, $title, $media);
     }
 }

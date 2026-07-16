@@ -9,6 +9,36 @@ use Illuminate\Support\Str;
 
 final class ExternalMediaUrlGuard
 {
+    /** @var list<string> */
+    private const BLOCKED_NETWORKS = [
+        '0.0.0.0/8',
+        '10.0.0.0/8',
+        '100.64.0.0/10',
+        '127.0.0.0/8',
+        '169.254.0.0/16',
+        '172.16.0.0/12',
+        '192.0.0.0/24',
+        '192.0.2.0/24',
+        '192.168.0.0/16',
+        '198.18.0.0/15',
+        '198.51.100.0/24',
+        '203.0.113.0/24',
+        '224.0.0.0/4',
+        '240.0.0.0/4',
+        '::/128',
+        '::1/128',
+        '::ffff:0:0/96',
+        '64:ff9b::/96',
+        '100::/64',
+        '2001:2::/48',
+        '2001:10::/28',
+        '2001:db8::/32',
+        '2002::/16',
+        'fc00::/7',
+        'fe80::/10',
+        'ff00::/8',
+    ];
+
     /** @var array<string, list<string>|null> */
     private array $resolvedHosts = [];
 
@@ -20,6 +50,7 @@ final class ExternalMediaUrlGuard
         mixed $url,
         array $allowedSchemes = ['http', 'https'],
         ?array $allowedHosts = null,
+        ?bool $enforcePublicDns = null,
     ): ?VerifiedExternalUrlData {
         if (! is_string($url)) {
             return null;
@@ -51,7 +82,10 @@ final class ExternalMediaUrlGuard
             return null;
         }
 
-        $addresses = $this->publicAddresses($host);
+        $addresses = $this->publicAddresses(
+            $host,
+            $enforcePublicDns ?? (bool) config('security.external_playlist_enforce_public_dns', true),
+        );
 
         if ($addresses === null) {
             return null;
@@ -79,9 +113,9 @@ final class ExternalMediaUrlGuard
     }
 
     /** @return list<string>|null */
-    private function publicAddresses(string $host): ?array
+    private function publicAddresses(string $host, bool $enforcePublicDns): ?array
     {
-        if (! (bool) config('security.external_playlist_enforce_public_dns', true)) {
+        if (! $enforcePublicDns) {
             return [];
         }
 
@@ -113,15 +147,60 @@ final class ExternalMediaUrlGuard
         }
 
         foreach ($addresses as $address) {
-            if (filter_var(
-                $address,
-                FILTER_VALIDATE_IP,
-                FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE,
-            ) === false) {
+            if (! $this->isPublicAddress($address)) {
                 return $this->resolvedHosts[$host] = null;
             }
         }
 
         return $this->resolvedHosts[$host] = $addresses;
+    }
+
+    private function isPublicAddress(string $address): bool
+    {
+        if (filter_var(
+            $address,
+            FILTER_VALIDATE_IP,
+            FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE,
+        ) === false) {
+            return false;
+        }
+
+        foreach (self::BLOCKED_NETWORKS as $network) {
+            if ($this->addressInNetwork($address, $network)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function addressInNetwork(string $address, string $network): bool
+    {
+        [$networkAddress, $prefixLength] = explode('/', $network, 2);
+        $addressBytes = inet_pton($address);
+        $networkBytes = inet_pton($networkAddress);
+
+        if ($addressBytes === false
+            || $networkBytes === false
+            || strlen($addressBytes) !== strlen($networkBytes)) {
+            return false;
+        }
+
+        $prefixLength = (int) $prefixLength;
+        $wholeBytes = intdiv($prefixLength, 8);
+        $remainingBits = $prefixLength % 8;
+
+        if ($wholeBytes > 0
+            && substr($addressBytes, 0, $wholeBytes) !== substr($networkBytes, 0, $wholeBytes)) {
+            return false;
+        }
+
+        if ($remainingBits === 0) {
+            return true;
+        }
+
+        $mask = (0xFF << (8 - $remainingBits)) & 0xFF;
+
+        return (ord($addressBytes[$wholeBytes]) & $mask) === (ord($networkBytes[$wholeBytes]) & $mask);
     }
 }

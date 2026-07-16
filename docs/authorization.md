@@ -136,3 +136,14 @@ Public user tags, unlisted tags, community global assignment, tag reporting и s
 | Internal score/source/cache version | public UI не принимает | public UI не принимает | diagnostics не раскрывает private signals |
 
 Discovery type route ограничен implemented enum cases; similar/related доступны только title context. Public API никогда не повышает доступ из-за authenticated user. Premium/region authorization не имитируется: будущая policy должна войти в existing `CatalogTitleQuery::visibleTo()`/media scopes и автоматически примениться ко всем pools.
+
+## Авторизация скачивания видео
+
+| Проверка | Guest | Authenticated user |
+| --- | --- | --- |
+| `titles.media.download` route | `auth` не допускает request к controller | route продолжает scoped binding/policy |
+| title/media relationship | отсутствуют bytes | numeric media должен принадлежать route-bound title; mismatch = 404 |
+| title/season/episode/media release | отсутствуют bytes | каждый persisted release проходит `CatalogEntitlementService`: publication, audience, window, soft delete |
+| media delivery | отсутствуют bytes | health playable, status published, direct allowlisted format, persisted URL и trusted upstream validation |
+
+`LicensedMediaPolicy::download` обнаруживается model attribute и вызывается в endpoint; UI link не является permission. Policy не требует verified email: скачивание read/delivery доступно любому зарегистрированному authenticated user, а verification остаётся текущим требованием write interactions. Controller маскирует relationship/policy denial как 404, не принимает user/media URL/filename и делегирует всю сеть/Range/headers focused service. `StreamLicensedMediaDownload` повторяет eligibility и full public-DNS/host validation непосредственно перед соединением; cached authorization отсутствует.

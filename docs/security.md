@@ -1,6 +1,6 @@
 # Безопасность
 
-Обновлено: 14.07.2026
+Обновлено: 16.07.2026
 
 ## Правила
 
@@ -121,3 +121,11 @@
 - Public recommendation API намеренно игнорирует authenticated personalization. Private results bypass shared cache; key содержит только hash exclusion set, не raw private IDs/email. Cache/analytics failure не блокирует rendering. Отдельная impression/click tracking система не добавлена, fingerprinting и scroll telemetry отсутствуют.
 - Relation writes reject self/deleted pair and invalid sequel/prequel cycle, write inverse transactionally and keep editorial/imported identity separate. Provider import не перезаписывает locked editorial row; title merge removes collapsed self-relations before FK cascade.
 - Account export includes explicit feedback/status; account deletion removes user-title rows and session suppression through existing lifecycle. Public similarity/editorial/catalog data не удаляется вместе с account.
+
+## Security внешнего размера и authenticated download
+
+- Metadata inspector и download никогда не принимают URL/extension/filename из request. Source берётся только из persisted authorized `LicensedMedia`; extension — stored allowlisted format, затем URL path/content type без query parameter. Credentials, non-HTTP(S), unexpected port, localhost/`.local`, loopback/private/reserved/link-local/CGNAT/metadata IPv4/IPv6 отклоняются.
+- Каждый metadata/download connection повторно resolves все A/AAAA, отклоняет host при любом non-public address и закрепляет validated address через cURL resolve. Download дополнительно требует HTTPS и `PLAYBACK_ALLOWED_HOSTS`. Redirect following отключено, поэтому redirect на новый/unvalidated host никогда не открывается.
+- `HEAD`/one-byte Range требуют `Accept-Encoding: identity`; HTML/HLS/encoded representation, malformed Content-Length/Content-Range и ignored Range не дают trusted size. Streamed response закрывается без чтения полного body. Error/event fields содержат только allowlisted category/status/class и redacted URL marker: signed query, cookie, credentials, exception message, body и stack trace не сохраняются.
+- Download route требует session auth, scoped title/media relation и current policy/entitlements/health. Denial/mismatch скрывается 404, malformed/multiple/unsatisfied range — 416 без full fallback. Named distributed-cache limiter dimensioned user+IP и user+media ограничивает request starts.
+- Upstream headers передаются только allowlisted Content-Length/Range semantics; `Set-Cookie`, Server, CORS/CSP и provider diagnostics не выходят клиенту. Attachment получает sanitized ASCII/RFC 5987 filename, trusted MIME, `nosniff`, `private, no-store`, `noindex`; header/control/path traversal невозможны. Upstream закрывается в `finally`, bytes не персистятся.

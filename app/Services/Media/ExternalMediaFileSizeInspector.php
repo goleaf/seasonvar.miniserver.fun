@@ -43,7 +43,7 @@ final class ExternalMediaFileSizeInspector
         }
 
         $url = $this->fileTypes->effectiveUrl($media);
-        $target = $this->urls->verifiedExternalUrl($url);
+        $target = $this->urls->verifiedExternalUrl($url, ['http', 'https'], enforcePublicDns: true);
 
         if ($target === null) {
             return ExternalMediaFileSizeResultData::failed(
@@ -119,8 +119,16 @@ final class ExternalMediaFileSizeInspector
             return null;
         }
 
-        if ($status < 200 || $status >= 300) {
+        if ($status >= 200 && $status < 300 && $status !== 200) {
+            return null;
+        }
+
+        if ($status !== 200) {
             return $this->httpFailure('head', $status, $checkedAt, $contentType, $acceptRanges, $resolvedUrl);
+        }
+
+        if ($this->hasUnsafeContentEncoding($response)) {
+            return null;
         }
 
         $unsafeContent = $this->unsafeContentResult(
@@ -173,6 +181,19 @@ final class ExternalMediaFileSizeInspector
 
         if ($unsafeContent !== null) {
             return $unsafeContent;
+        }
+
+        if ($this->hasUnsafeContentEncoding($response)) {
+            return ExternalMediaFileSizeResultData::unknown(
+                'range-content-encoding',
+                $status,
+                $checkedAt,
+                'encoded_representation',
+                'upstream_ignored_identity_content_encoding',
+                $contentType,
+                $acceptRanges,
+                $resolvedUrl,
+            );
         }
 
         if ($status === 206) {
@@ -329,6 +350,13 @@ final class ExternalMediaFileSizeInspector
         $value = strtolower(trim($response->header('Accept-Ranges')));
 
         return $value === 'bytes' ? 'bytes' : null;
+    }
+
+    private function hasUnsafeContentEncoding(Response $response): bool
+    {
+        $value = strtolower(trim($response->header('Content-Encoding')));
+
+        return $value !== '' && $value !== 'identity';
     }
 
     private function exceptionCategory(Throwable $exception): string

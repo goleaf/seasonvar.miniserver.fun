@@ -26,7 +26,7 @@ return [
     'downloads' => [
         'allowed_formats' => ['mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi'],
         'chunk_bytes' => 65_536,
-        'timeout_seconds' => 120,
+        'timeout_seconds' => 3600,
         'connect_timeout_seconds' => 10,
         'retry_times' => 1,
         'retry_sleep_milliseconds' => 250,

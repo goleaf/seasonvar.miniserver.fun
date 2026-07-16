@@ -23,6 +23,17 @@ class PlaybackSourceUrlGuard
             $url,
             ['https'],
             array_values(array_map('strval', (array) config('playback.allowed_hosts', []))),
+            (bool) config('playback.enforce_public_dns', true),
+        );
+    }
+
+    public function verifiedDownloadUrl(mixed $url): ?VerifiedExternalUrlData
+    {
+        return $this->urls->verifiedExternalUrl(
+            $url,
+            ['https'],
+            array_values(array_map('strval', (array) config('playback.allowed_hosts', []))),
+            true,
         );
     }
 }

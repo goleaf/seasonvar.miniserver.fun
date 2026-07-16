@@ -23,7 +23,7 @@ final class LicensedMediaDownloadFilename
     {
         $extension = Str::lower(preg_replace('/[^a-z0-9]/i', '', $extension) ?? '');
         $extension = $extension !== '' ? $extension : 'bin';
-        $slug = Str::slug($title->display_title ?: $title->title);
+        $slug = Str::slug($title->title ?: $title->original_title);
         $slug = $this->safeBase($slug);
         $season = $media->season?->number;
         $episode = $media->episode?->number;

@@ -7,7 +7,7 @@ description: Use for Seasonvar import, crawler, parser, media metadata, media av
 
 ## Overview
 
-Keep Seasonvar ingestion reliable, polite, and database-efficient. The importer stores catalog facts and external playback metadata only; it never downloads video files.
+Keep Seasonvar ingestion reliable, polite, and database-efficient. The importer stores catalog facts and external playback metadata only. It may inspect metadata with bounded `HEAD` or one-byte Range requests, but it never reads or stores a complete video body. Authenticated on-demand download is a separate streaming delivery boundary and never persists imported video copies.
 
 ## First Steps
 
@@ -19,7 +19,8 @@ Keep Seasonvar ingestion reliable, polite, and database-efficient. The importer 
 
 - Keep source URLs inside `https://seasonvar.ru/` and normalize/validate them before storage or requests.
 - Store seasons and episodes inside one `CatalogTitle`; never create separate catalog titles for individual seasons.
-- Store external media URL, quality, format, translation/subtitle state, availability status, and stable source keys. Do not download video.
+- Store external media URL, quality, format, translation/subtitle state, availability status, stable source keys, and exact file-size metadata when a trusted bounded response provides it. Never download or persist a complete video during import.
+- On-demand authenticated direct-file delivery may stream bounded chunks from an authorized, revalidated upstream source. It must not write video bodies to application storage/cache/database; HLS manifests and segments are never combined into a downloadable file.
 - Use Laravel HTTP client timeouts, connect timeouts, retry rules, crawl delays, and `Http::fake()` in tests.
 - Treat unchanged source hashes as a safe skip path when existing code supports it.
 

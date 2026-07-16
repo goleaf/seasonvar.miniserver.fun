@@ -151,7 +151,54 @@
                         <x-ui.status-pill icon="fa-solid fa-file-video" variant="success" size="md">
                             {{ $showView->mediaDetailsLabel($selectedMedia) }}
                         </x-ui.status-pill>
+                        @if ($showView->selectedMediaFileSizeLabel)
+                            <x-ui.status-pill icon="fa-solid fa-hard-drive" variant="muted" size="md">
+                                {{ __('catalog.download.file_size') }}: {{ $showView->selectedMediaFileSizeLabel }}
+                            </x-ui.status-pill>
+                        @endif
                     </div>
+
+                    @if ($showView->selectedMediaIsDirectFile)
+                        <div class="mt-3">
+                            @if ($showView->selectedMediaDownloadUrl)
+                                <a
+                                    href="{{ $showView->selectedMediaDownloadUrl }}"
+                                    class="inline-flex min-h-11 w-full items-center justify-center gap-3 rounded-control bg-emerald-700 px-4 py-3 text-left text-sm font-black text-white transition hover:bg-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 sm:w-auto sm:justify-start"
+                                    aria-label="{{ __('catalog.download.download_video') }}"
+                                    title="{{ $showView->selectedMediaDownloadFilename }}"
+                                >
+                                    <x-ui.icon name="fa-solid fa-file-arrow-down text-lg" />
+                                    <span>
+                                        <span class="block">{{ __('catalog.download.download_video') }}</span>
+                                        @if ($showView->selectedMediaDownloadDetail)
+                                            <span class="block text-xs font-bold text-emerald-100">{{ $showView->selectedMediaDownloadDetail }}</span>
+                                        @endif
+                                    </span>
+                                </a>
+                            @elseif ($showView->selectedMediaLoginUrl)
+                                <a
+                                    href="{{ $showView->selectedMediaLoginUrl }}"
+                                    class="inline-flex min-h-11 w-full items-center justify-center gap-3 rounded-control bg-slate-100 px-4 py-3 text-left text-sm font-black text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 sm:w-auto sm:justify-start"
+                                >
+                                    <x-ui.icon name="fa-solid fa-lock" />
+                                    <span>
+                                        <span class="block">{{ __('catalog.download.login_to_download') }}</span>
+                                        <span class="block text-xs font-bold text-slate-600">{{ __('catalog.download.registration_required') }}</span>
+                                    </span>
+                                </a>
+                            @elseif ($showView->selectedMediaDownloadUnavailableReason)
+                                <div class="inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-100 px-4 py-3 text-sm font-bold text-slate-600">
+                                    <x-ui.icon name="fa-solid fa-ban" />
+                                    <span>{{ $showView->selectedMediaDownloadUnavailableReason }}</span>
+                                </div>
+                            @endif
+                        </div>
+                    @elseif ($showView->selectedMediaDownloadUnavailableReason)
+                        <div class="mt-3 inline-flex min-h-11 items-center gap-2 rounded-control bg-slate-100 px-4 py-3 text-sm font-bold text-slate-600">
+                            <x-ui.icon name="fa-solid fa-tower-broadcast" />
+                            <span>{{ $showView->selectedMediaDownloadUnavailableReason }}</span>
+                        </div>
+                    @endif
                 @endif
 
                 @if ($selectedEpisode && ($episodeNavigation->previous || $episodeNavigation->next))

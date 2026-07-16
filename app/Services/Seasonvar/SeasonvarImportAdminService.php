@@ -9,6 +9,7 @@ use App\Enums\SeasonvarImportStatus;
 use App\Jobs\StartSeasonvarQueuedImport;
 use App\Models\SeasonvarImportRun;
 use App\Models\User;
+use App\Support\HumanFileSizeFormatter;
 use Illuminate\Contracts\Bus\Dispatcher as BusDispatcher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -24,6 +25,7 @@ final class SeasonvarImportAdminService
         private readonly SeasonvarImportErrorSanitizer $errors,
         private readonly SeasonvarGlobalImportRunCoordinator $globalRuns,
         private readonly BusDispatcher $bus,
+        private readonly HumanFileSizeFormatter $fileSizes,
     ) {}
 
     public function start(
@@ -149,6 +151,12 @@ final class SeasonvarImportAdminService
                 'media_updated',
                 'media_skipped',
                 'media_failed',
+                'media_sizes_checked',
+                'media_sizes_known',
+                'media_sizes_unknown',
+                'media_sizes_unsupported',
+                'media_size_checks_failed',
+                'media_size_known_bytes',
                 'summary',
                 'last_error',
                 'requested_by_user_id',
@@ -274,6 +282,13 @@ final class SeasonvarImportAdminService
             'media_updated' => (int) $run->media_updated,
             'media_skipped' => (int) $run->media_skipped,
             'media_failed' => (int) $run->media_failed,
+            'media_sizes_checked' => (int) $run->media_sizes_checked,
+            'media_sizes_known' => (int) $run->media_sizes_known,
+            'media_sizes_unknown' => (int) $run->media_sizes_unknown,
+            'media_sizes_unsupported' => (int) $run->media_sizes_unsupported,
+            'media_size_checks_failed' => (int) $run->media_size_checks_failed,
+            'media_size_known_bytes' => (int) $run->media_size_known_bytes,
+            'media_size_known_label' => $this->fileSizes->format((int) $run->media_size_known_bytes) ?? __('catalog.download.size_unknown'),
             'created' => (int) $run->stored + (int) $run->media_attached,
             'updated' => (int) $run->parsed + (int) $run->media_updated,
             'skipped' => max(0, (int) $run->selected - (int) $run->parsed - (int) $run->failed) + (int) $run->media_skipped,

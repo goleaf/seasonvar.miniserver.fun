@@ -1,6 +1,6 @@
 # Frontend
 
-Обновлено: 15.07.2026
+Обновлено: 16.07.2026
 
 ## Стек
 
@@ -148,3 +148,9 @@ Blade получает DTO/options/paginators и не вызывает models/se
 `CatalogDiscoveryPage` хранит только validated scalar URL state; `type`, refresh seed и last undo ID locked, current user/history остаются server-side. Filter changes reset page/errors, pagination deterministic, refresh remembers current IDs before changing seed. Incremental loading keeps the page shell/results visible, disables duplicate actions and announces loading/notice/error/empty state through translated live regions.
 
 Recommendation rows reuse `x-catalog.title-card` recommendation layout. Type navigation is touch-scrollable with standard link fallback; result list is a responsive grid/list, not autoplay carousel. There is no inline CSS, `@php`, business JavaScript, client ranking, exposed candidate graph or polling. Keyboard focus, 44px controls, visible focus, long-label wrapping, missing poster alt, zoom/reduced-motion and phone/tablet/desktop layout follow `UI_STANDARDS.md`. No new Vite module was required.
+
+## File-size и download UI плеера
+
+`CatalogTitlePlayer` использует уже загруженный selected `LicensedMedia`: `CatalogTitlePlaybackQuery` выбирает file-size metadata, общий formatter строит B/KB/MB/GB/TB label, а `CatalogShowViewModel` готовит deterministic direct-file/download/login/reason state. Render не выполняет HEAD/Range/DNS и не принимает remote URL. Binary response не проходит через Livewire: обычная named-route ссылка открывает отдельный controller.
+
+Под player details direct media показывает pill с local `fa-hard-drive`; `null` выводится как переведённый «размер неизвестен», не `0 B`. Authenticated user получает emerald `fa-file-arrow-down` attachment link с форматом/размером, normal navigation, visible focus, 44px touch target и mobile full-width wrapping. Guest видит login CTA с локальным lock icon; HLS/playlist — неактивное stream-only объяснение. Raw/signed upstream query отсутствует в HTML, `wire:click`, duplicate player, Volt, `@php`, inline PHP/CSS/JS и Blade service/query calls не добавлены.

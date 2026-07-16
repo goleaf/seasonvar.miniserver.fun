@@ -27,29 +27,14 @@ final class LicensedMediaDownloadEligibility
             return LicensedMediaDownloadData::unavailable('catalog.download.login_required');
         }
 
-        $media->loadMissing(['catalogTitle', 'season', 'episode.season']);
+        $reason = $this->unavailableReason($user, $title, $media);
 
-        if (! $this->relationshipsMatch($title, $media)) {
-            return LicensedMediaDownloadData::unavailable('catalog.download.unavailable');
-        }
-
-        foreach ($this->releases($title, $media) as $release) {
-            if (! $this->entitlements->decide($user, $release)->isAllowed()) {
-                return LicensedMediaDownloadData::unavailable('catalog.download.unavailable');
-            }
-        }
-
-        if ($media->status === 'unavailable'
-            || ! ($media->health_status ?? MediaHealthStatus::Active)->isPlayable()) {
-            return LicensedMediaDownloadData::unavailable('catalog.download.remote_unavailable');
-        }
-
-        if ($this->fileTypes->isPlaylist($media)) {
-            return LicensedMediaDownloadData::unavailable('catalog.download.stream_only');
+        if ($reason !== null) {
+            return LicensedMediaDownloadData::unavailable($reason);
         }
 
         $extension = $this->fileTypes->trustedExtension($media);
-        $target = $this->urls->verifiedExternalUrl($this->fileTypes->effectiveUrl($media));
+        $target = $this->urls->verifiedDownloadUrl($this->fileTypes->effectiveUrl($media));
 
         if ($extension === null || $target === null) {
             return LicensedMediaDownloadData::unavailable('catalog.download.unsupported_format');
@@ -60,6 +45,41 @@ final class LicensedMediaDownloadEligibility
             $extension,
             $this->fileTypes->contentTypeForExtension($extension),
         );
+    }
+
+    public function authorizes(User $user, CatalogTitle $title, LicensedMedia $media): bool
+    {
+        return $this->unavailableReason($user, $title, $media) === null;
+    }
+
+    private function unavailableReason(User $user, CatalogTitle $title, LicensedMedia $media): ?string
+    {
+        $media->loadMissing(['catalogTitle', 'season', 'episode.season']);
+
+        if (! $this->relationshipsMatch($title, $media)) {
+            return 'catalog.download.unavailable';
+        }
+
+        foreach ($this->releases($title, $media) as $release) {
+            if (! $this->entitlements->decide($user, $release)->isAllowed()) {
+                return 'catalog.download.unavailable';
+            }
+        }
+
+        if ($media->status === 'unavailable'
+            || ! ($media->health_status ?? MediaHealthStatus::Active)->isPlayable()) {
+            return 'catalog.download.remote_unavailable';
+        }
+
+        if ($this->fileTypes->isPlaylist($media)) {
+            return 'catalog.download.stream_only';
+        }
+
+        if (! $this->fileTypes->isDirect($media) || $this->fileTypes->effectiveUrl($media) === null) {
+            return 'catalog.download.unsupported_format';
+        }
+
+        return null;
     }
 
     private function relationshipsMatch(CatalogTitle $title, LicensedMedia $media): bool

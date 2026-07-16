@@ -21,7 +21,10 @@ use App\Services\Catalog\CatalogPlaybackSourceResolver;
 use App\Services\Catalog\CatalogPrimaryActionResolver;
 use App\Services\Catalog\CatalogTitlePlaybackQuery;
 use App\Services\Catalog\CatalogUserStateService;
+use App\Services\Media\ExternalMediaFileType;
 use App\Services\Media\ExternalMediaMetadata;
+use App\Services\Media\LicensedMediaDownloadFilename;
+use App\Support\HumanFileSizeFormatter;
 use App\View\ViewModels\CatalogShowViewModel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -70,6 +73,12 @@ class CatalogTitlePlayer extends Component
 
     protected AccountSettingsService $accountSettings;
 
+    protected LicensedMediaDownloadFilename $downloadFilenames;
+
+    protected ExternalMediaFileType $mediaFileTypes;
+
+    protected HumanFileSizeFormatter $fileSizes;
+
     protected ?AccountSettingsData $resolvedAccountSettings = null;
 
     protected ?CatalogTitle $resolvedTitle = null;
@@ -87,6 +96,9 @@ class CatalogTitlePlayer extends Component
         CatalogUserStateService $userState,
         ExternalMediaMetadata $mediaMetadata,
         AccountSettingsService $accountSettings,
+        LicensedMediaDownloadFilename $downloadFilenames,
+        ExternalMediaFileType $mediaFileTypes,
+        HumanFileSizeFormatter $fileSizes,
     ): void {
         $this->playback = $playback;
         $this->primaryActions = $primaryActions;
@@ -95,6 +107,9 @@ class CatalogTitlePlayer extends Component
         $this->userState = $userState;
         $this->mediaMetadata = $mediaMetadata;
         $this->accountSettings = $accountSettings;
+        $this->downloadFilenames = $downloadFilenames;
+        $this->mediaFileTypes = $mediaFileTypes;
+        $this->fileSizes = $fileSizes;
     }
 
     public function mount(int $catalogTitleId): void
@@ -379,6 +394,19 @@ class CatalogTitlePlayer extends Component
         $selectedMedia = $playbackSource->mediaId !== null
             ? ($mediaItems->firstWhere('id', $playbackSource->mediaId) ?? $selectedMedia)
             : $selectedMedia;
+
+        if ($selectedMedia !== null) {
+            $selectedMedia->setRelation('catalogTitle', $title);
+
+            if ($activeSeason !== null && (int) $selectedMedia->season_id === $activeSeason->id) {
+                $selectedMedia->setRelation('season', $activeSeason);
+            }
+
+            if ($selectedEpisode !== null && (int) $selectedMedia->episode_id === $selectedEpisode->id) {
+                $selectedMedia->setRelation('episode', $selectedEpisode);
+            }
+        }
+
         $playerSessionKey = $selectedMedia !== null && $playbackSource->isPlayable()
             ? implode(':', [$title->id, $selectedEpisode->id ?? 0, $selectedMedia->id])
             : '';
@@ -388,6 +416,21 @@ class CatalogTitlePlayer extends Component
             && $playbackSource->isPlayable()
                 ? $this->progressSessions->issue($user, $title, $selectedEpisode, $selectedMedia)
                 : '';
+        $downloadExtension = $selectedMedia !== null
+            ? $this->mediaFileTypes->trustedExtension($selectedMedia)
+            : null;
+        $isDirectDownload = $selectedMedia !== null
+            && $downloadExtension !== null
+            && $this->mediaFileTypes->effectiveUrl($selectedMedia) !== null;
+        $downloadUrl = $user !== null && $isDirectDownload
+            ? route('titles.media.download', [$title, $selectedMedia])
+            : null;
+        $downloadFilename = $isDirectDownload && $selectedMedia !== null && $downloadExtension !== null
+                ? $this->downloadFilenames->generate($title, $selectedMedia, $downloadExtension)
+                : null;
+        $fileSizeLabel = $isDirectDownload && $selectedMedia !== null
+            ? ($this->fileSizes->format($selectedMedia->file_size_bytes) ?? __('catalog.download.size_unknown'))
+            : null;
 
         $showView = new CatalogShowViewModel(
             title: $title,
@@ -398,6 +441,16 @@ class CatalogTitlePlayer extends Component
             selectedMedia: $selectedMedia,
             mediaMetadata: $this->mediaMetadata,
             playbackSource: $playbackSource,
+            selectedMediaFileSizeLabel: $fileSizeLabel,
+            selectedMediaIsDirectFile: $isDirectDownload,
+            selectedMediaDownloadUrl: $downloadUrl,
+            selectedMediaLoginUrl: $user === null && $isDirectDownload ? route('login') : null,
+            selectedMediaDownloadFilename: $downloadFilename,
+            selectedMediaDownloadUnavailableReason: $selectedMedia === null
+                ? null
+                : ($isDirectDownload
+                    ? null
+                    : __('catalog.download.stream_only')),
             episodeCount: $seasons->sum('available_episodes_count'),
             parsedSeasonCount: $seasons->filter(fn (Season $season): bool => (int) $season->getAttribute('available_episodes_count') > 0)->count(),
             mediaCount: $seasons->sum('available_media_count'),

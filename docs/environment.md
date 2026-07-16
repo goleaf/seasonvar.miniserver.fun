@@ -1,6 +1,6 @@
 # Переменные окружения
 
-Обновлено: 13.07.2026
+Обновлено: 16.07.2026
 
 Полный безопасный шаблон находится в `.env.example`. Реальный `.env` не изменяется deployment-кодом и не коммитится.
 
@@ -46,6 +46,12 @@ Standalone default DBs: cache 1, queues 2, sessions 3, locks 5, broadcasting 6. 
 ## Рекомендации каталога
 
 `SEASONVAR_RECOMMENDATION_CHUNK_SIZE`, `MIN_SCORE`, `MAX_PER_TITLE`, `CANDIDATE_LIMIT` и `CANDIDATE_SCAN_PER_FEATURE` ограничивают локальную catalog-wide пересборку. `SEASONVAR_RECOMMENDATION_DIVERSITY_PENALTY` задаёт bounded MMR-штраф за повтор одинаковых тем и связей; default `120` не может изменить первый, самый релевантный результат. Эти параметры не включают HTTP и не меняют единственную публичную команду импорта.
+
+## Размер внешних видеофайлов
+
+`SEASONVAR_MEDIA_FILE_SIZE_ENABLED` включает bounded metadata inspection. `CONNECT_TIMEOUT`, `TIMEOUT`, `RETRY_TIMES`, `RETRY_SLEEP_MS`, `KNOWN_TTL`, `UNKNOWN_RETRY`, `FAILED_RETRY`, `BACKFILL_CHUNK_SIZE` и `MAX_CHECKS_PER_CYCLE` с тем же префиксом ограничивают сеть, freshness и catalogue backlog; defaults перечислены в `.env.example` и `config/seasonvar.php`. Эти параметры никогда не разрешают чтение полного video body.
+
+`PLAYBACK_ALLOWED_HOSTS` остаётся download allowlist, а production обязан держать `PLAYBACK_ENFORCE_PUBLIC_DNS=true`. Authenticated download принудительно выполняет public-DNS validation даже при compatibility override. Chunk, stream/connect timeout, retry и rate-limit budgets являются versioned `config/playback.php` (`playback.downloads`) и не принимаются из request. После изменения environment/config необходимы `config:cache` и graceful reload PHP-FPM/import workers.
 
 ## Обсуждения
 

@@ -208,3 +208,9 @@ Public card DTO содержит только public target, status, dates и gr
 Authenticated requests, `personalized` и `random` всегда bypass shared result. Feedback, blacklist, history, progress, watchlist, statuses, private tags/collections, premium/region context и private explanations не являются global value/dimension. Recent-display suppression живёт bounded в current session (`96` IDs, `7` дней) с отдельным guest/user scope; raw IDs не попадают в public key.
 
 Public catalog/editorial/rating/comment/review/rebuild/title-merge mutations bump existing recommendation version after commit. Progress bump происходит только при первом meaningful threshold/completion, не на heartbeat; watchlist и rating используют canonical state invalidators. Cache failure не откатывает mutation и выполняет bounded authoritative query. Full-store flush, wildcard key scan, второй cache store или mandatory warming queue не добавлены.
+
+## Cache lifecycle file-size и downloads
+
+Изменение persisted file-size metadata вызывает только существующий `CatalogCacheInvalidator::importedTitleChanged(catalog_title_id)`, чтобы следующий title/player render увидел size label. Sync importer, queued apply, external playlist и download-time trusted size correction используют ту же boundary; full application flush/key scan отсутствуют. Freshness решения инспектора читают timestamp/status из БД, а не shared authorization cache.
+
+Download route всегда возвращает `Cache-Control: private, no-store, max-age=0`, `Pragma: no-cache` и не участвует в public full-response profiles. Video body, PSR-7 chunks, Content-Range и user authorization никогда не записываются в Redis, Memcached, session, DB blob или Laravel cache. Малое size metadata отображается из title query; cached authorization не может пережить publication/audience/health change.

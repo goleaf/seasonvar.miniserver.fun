@@ -413,3 +413,20 @@ Migration `2026_07_16_120000_add_canonical_recommendation_discovery.php` additiv
 - `(in_watchlist,updated_at,catalog_title_id,user_id)` и progress `(last_watched_at,catalog_title_id,user_id)` — recent public semantic activity.
 
 Existing user-title unique and history indexes continue to serve owner state/progress. No feedback/impression/analytics aggregate table, region/premium/language/creator/franchise table or polymorphic recommendation relation was introduced. Complete domain semantics are owned by the [recommendation design](superpowers/specs/2026-07-13-recommendation-v3-list-design.md).
+
+## File-size metadata `licensed_media`
+
+Additive migration `2026_07_16_190000_add_file_size_metadata_to_licensed_media.php` не меняет media IDs, relationships, playback URL или health columns. Она добавляет:
+
+| Поле | Семантика |
+| --- | --- |
+| `file_size_bytes unsigned BIGINT nullable` | точный доверенный byte count; `null` = неизвестно, `0` = явно подтверждённый пустой resource |
+| `file_size_checked_at timestamp nullable` | завершение последней проверки независимо от результата |
+| `file_size_check_status varchar(24) nullable` | `pending|known|unknown|unsupported|failed` |
+| `file_size_source varchar(64) nullable` | bounded источник вроде `head-content-length` или `ranged-content-range` |
+| `file_size_http_status unsigned smallint nullable` | финальный status безопасного metadata response |
+| `file_size_check_error varchar(255) nullable` | category + safe message без URL/query/token/exception message |
+
+Форматированная строка не хранится. Composite `licensed_media_file_size_due_idx (file_size_check_status,file_size_checked_at,id)` соответствует backlog freshness/order; `file_size_bytes` не индексируется, потому что каталог по нему не фильтрует и не сортирует. Изменение effective URL atomically сбрасывает только эти поля в pending, не изменяя publication/availability.
+
+Migration `2026_07_16_190100_add_media_file_size_counters_to_seasonvar_import_runs.php` добавляет safe-default unsigned counters `media_sizes_checked|known|unknown|unsupported`, `media_size_checks_failed` и `media_size_known_bytes`. `SeasonvarImportRunRecorder` увеличивает их атомарно на terminal progress event, поэтому parallel page jobs не выполняют read-modify-write race. `down()` обеих migrations удаляет только введённые columns/index.

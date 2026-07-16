@@ -119,6 +119,20 @@ class CatalogShowViewModel
 
     public string $selectedPlaybackLabel;
 
+    public ?string $selectedMediaFileSizeLabel;
+
+    public bool $selectedMediaIsDirectFile;
+
+    public ?string $selectedMediaDownloadUrl;
+
+    public ?string $selectedMediaLoginUrl;
+
+    public ?string $selectedMediaDownloadFilename;
+
+    public ?string $selectedMediaDownloadUnavailableReason;
+
+    public ?string $selectedMediaDownloadDetail;
+
     /**
      * @var Collection<int, non-empty-string>
      */
@@ -166,6 +180,12 @@ class CatalogShowViewModel
         public readonly ?LicensedMedia $selectedMedia,
         public readonly ExternalMediaMetadata $mediaMetadata,
         public readonly ?PlaybackSourceData $playbackSource = null,
+        ?string $selectedMediaFileSizeLabel = null,
+        bool $selectedMediaIsDirectFile = false,
+        ?string $selectedMediaDownloadUrl = null,
+        ?string $selectedMediaLoginUrl = null,
+        ?string $selectedMediaDownloadFilename = null,
+        ?string $selectedMediaDownloadUnavailableReason = null,
         ?int $episodeCount = null,
         ?int $taxonomyCount = null,
         ?int $parsedSeasonCount = null,
@@ -211,6 +231,16 @@ class CatalogShowViewModel
         $this->selectedQuality = $this->selectedMedia ? $this->mediaQuality($this->selectedMedia) : null;
         $this->selectedFormat = $this->selectedMedia ? $this->mediaFormat($this->selectedMedia) : null;
         $this->selectedPlaybackLabel = $this->selectedMedia ? $this->playbackLabel($this->selectedMedia) : __('catalog.player.variant_not_selected');
+        $this->selectedMediaFileSizeLabel = $selectedMediaFileSizeLabel;
+        $this->selectedMediaIsDirectFile = $selectedMediaIsDirectFile;
+        $this->selectedMediaDownloadUrl = $selectedMediaDownloadUrl;
+        $this->selectedMediaLoginUrl = $selectedMediaLoginUrl;
+        $this->selectedMediaDownloadFilename = $selectedMediaDownloadFilename;
+        $this->selectedMediaDownloadUnavailableReason = $selectedMediaDownloadUnavailableReason;
+        $this->selectedMediaDownloadDetail = collect([
+            $selectedMediaFileSizeLabel,
+            $this->selectedFormat ? Str::upper($this->selectedFormat) : null,
+        ])->filter()->implode(' · ') ?: null;
         $this->selectedMediaBadges = $this->buildSelectedMediaBadges();
         $this->playbackOptionGroups = $this->buildPlaybackOptionGroups();
         $this->selectedSeasonId = $this->selectedEpisode !== null

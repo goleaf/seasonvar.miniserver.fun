@@ -46,10 +46,7 @@ final class ExternalMediaFileType
             return $stored;
         }
 
-        $url = $this->effectiveUrl($media);
-        $extension = $url === null
-            ? null
-            : $this->normalizeFormat(pathinfo((string) parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION));
+        $extension = $this->urlFormat($media);
 
         if ($extension !== null && ($this->isDirectFormat($extension) || $this->isPlaylistFormat($extension))) {
             return $extension;
@@ -60,6 +57,10 @@ final class ExternalMediaFileType
 
     public function trustedExtension(LicensedMedia $media, ?string $contentType = null): ?string
     {
+        if ($this->isPlaylist($media, $contentType)) {
+            return null;
+        }
+
         $format = $this->format($media, $contentType);
 
         return $format !== null && $this->isDirectFormat($format) ? $format : null;
@@ -69,14 +70,17 @@ final class ExternalMediaFileType
     {
         $format = $this->format($media, $contentType);
 
-        return $format !== null && $this->isDirectFormat($format) && ! $this->isPlaylistContentType($contentType);
+        return $format !== null && $this->isDirectFormat($format) && ! $this->isPlaylist($media, $contentType);
     }
 
     public function isPlaylist(LicensedMedia $media, ?string $contentType = null): bool
     {
-        $format = $this->format($media, $contentType);
+        $stored = $this->normalizeFormat($media->format);
+        $urlFormat = $this->urlFormat($media);
 
-        return ($format !== null && $this->isPlaylistFormat($format)) || $this->isPlaylistContentType($contentType);
+        return ($stored !== null && $this->isPlaylistFormat($stored))
+            || ($urlFormat !== null && $this->isPlaylistFormat($urlFormat))
+            || $this->isPlaylistContentType($contentType);
     }
 
     public function isHtmlContentType(?string $contentType): bool
@@ -114,6 +118,15 @@ final class ExternalMediaFileType
     private function isPlaylistContentType(?string $contentType): bool
     {
         return in_array($this->normalizedContentType($contentType), self::PLAYLIST_CONTENT_TYPES, true);
+    }
+
+    private function urlFormat(LicensedMedia $media): ?string
+    {
+        $url = $this->effectiveUrl($media);
+
+        return $url === null
+            ? null
+            : $this->normalizeFormat(pathinfo((string) parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION));
     }
 
     /** @return list<string> */

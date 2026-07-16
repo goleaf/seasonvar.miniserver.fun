@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\LicensedMedia;
 use App\Models\User;
 use App\Policies\AccountSettingsPolicy;
 use App\Services\Auth\AccountSettingsSchema;
@@ -17,11 +18,14 @@ use Illuminate\Cache\Events\CacheHit;
 use Illuminate\Cache\Events\CacheMissed;
 use Illuminate\Cache\Events\KeyForgotten;
 use Illuminate\Cache\Events\KeyWritten;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View as ViewFacade;
 use Illuminate\Support\ServiceProvider;
@@ -50,6 +54,30 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RateLimiter::for('media-downloads', function (Request $request): array {
+            $userId = (string) ($request->user()?->getAuthIdentifier() ?? 'guest');
+            $media = $request->route('licensedMedia');
+            $mediaId = $media instanceof LicensedMedia ? (string) $media->id : (string) $media;
+            $response = static fn (Request $request, array $headers) => response(
+                __('catalog.download.rate_limited'),
+                429,
+                [
+                    ...$headers,
+                    'Cache-Control' => 'private, no-store, max-age=0',
+                    'X-Content-Type-Options' => 'nosniff',
+                ],
+            );
+
+            return [
+                Limit::perMinute(max(1, (int) config('playback.downloads.requests_per_minute', 12)))
+                    ->by($userId.'|'.$request->ip())
+                    ->response($response),
+                Limit::perMinute(max(1, (int) config('playback.downloads.media_requests_per_minute', 4)))
+                    ->by($userId.'|'.$mediaId)
+                    ->response($response),
+            ];
+        });
+
         Event::listen(CacheHit::class, fn (CacheHit $event) => app(CacheEventReporter::class)->record($event, 'hit'));
         Event::listen(CacheMissed::class, fn (CacheMissed $event) => app(CacheEventReporter::class)->record($event, 'miss'));
         Event::listen(KeyWritten::class, fn (KeyWritten $event) => app(CacheEventReporter::class)->record($event, 'write'));

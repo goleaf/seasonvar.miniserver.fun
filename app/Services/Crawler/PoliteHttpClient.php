@@ -85,7 +85,7 @@ final class PoliteHttpClient
             ->map(fn (string $value): string => trim($value))
             ->all();
         $attempts = max(1, min(3, $attempts));
-        $timeoutSeconds = max(1, min(120, $timeoutSeconds));
+        $timeoutSeconds = max(1, min(21_600, $timeoutSeconds));
         $connectTimeoutSeconds = max(1, min($timeoutSeconds, $connectTimeoutSeconds));
 
         return Http::withHeaders([
