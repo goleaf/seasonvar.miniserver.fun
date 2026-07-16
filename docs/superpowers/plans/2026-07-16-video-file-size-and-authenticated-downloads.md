@@ -359,7 +359,7 @@ GET authenticated download route
 - [x] Добавить `seasonvar.media_file_size.status_cache_seconds` с conservative default без обязательной новой env переменной.
 - [x] Обновить owner-документы importer/performance/administration/architecture и единственный dated changelog.
 - [x] Выполнить non-test verification: lint, targeted Pint/PHPStan, cold/warm status, build, locale keys, diff check и forbidden patterns.
-- [ ] Проверить task-only diff, подтвердить `main`, commit и push `origin/main` без смешивания параллельных изменений.
+- [x] Проверить task-only diff, подтвердить `main`, закоммитить implementation как `6590b5597a1d8b32da075572630729b233755409` и отправить его в `origin/main` без смешивания параллельных изменений.
 
 ### Planned changed-files list
 
