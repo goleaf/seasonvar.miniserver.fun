@@ -41,6 +41,11 @@ return [
         'default_period' => 'week',
         'maximum_period_days' => 30,
     ],
+    'content_updates' => [
+        'event_window_multiplier' => 64,
+        'minimum_event_window' => 10_000,
+        'maximum_event_window' => 20_000,
+    ],
     'random' => [
         'maximum_probes' => 12,
         'probe_size' => 8,

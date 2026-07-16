@@ -21,6 +21,7 @@ use App\Models\Episode;
 use App\Models\EpisodeViewProgress;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -204,33 +205,119 @@ final class CatalogPublicDiscoveryQuery
      */
     private function recentlyUpdated(CatalogRecommendationContext $context, array $excludedIds): array
     {
-        $events = DB::query()
-            ->fromSub(
-                DB::table('licensed_media')
-                    ->select(['catalog_title_id', 'published_at as event_at'])
-                    ->where('status', 'published')
-                    ->whereNull('deleted_at')
-                    ->whereNotNull('published_at')
-                    ->unionAll(DB::table('episodes')
-                        ->join('seasons', 'seasons.id', '=', 'episodes.season_id')
-                        ->select(['seasons.catalog_title_id', 'episodes.released_at as event_at'])
-                        ->where('episodes.publication_status', 'published')
-                        ->whereNull('episodes.deleted_at')
-                        ->whereNull('seasons.deleted_at')
-                        ->whereNotNull('episodes.released_at')
-                        ->where('episodes.released_at', '<=', now())),
-                'catalog_content_events',
-            )
-            ->select('catalog_title_id')
-            ->selectRaw('MAX(event_at) AS content_updated_at')
-            ->groupBy('catalog_title_id');
-        $query = $this->eligibleQuery($context, watchable: true, excludedIds: $excludedIds)
-            ->joinSub($events, 'content_updates', 'content_updates.catalog_title_id', '=', 'catalog_titles.id')
-            ->select('catalog_titles.id')
-            ->orderByDesc('content_updates.content_updated_at')
-            ->orderByDesc('catalog_titles.id');
+        $limit = $this->candidateLimit();
+        $eventWindow = min(
+            max(1, (int) config('recommendations.content_updates.maximum_event_window', 20_000)),
+            max(
+                max(1, (int) config('recommendations.content_updates.minimum_event_window', 10_000)),
+                $limit * max(1, (int) config('recommendations.content_updates.event_window_multiplier', 64)),
+            ),
+        );
+        $orderedTitleIds = $this->recentContentEvents($eventWindow)
+            ->pluck('catalog_title_id')
+            ->unique()
+            ->values();
+        $eligibleTitleIds = $this->eligibleOrderedIds($context, $orderedTitleIds, $excludedIds, $limit);
 
-        return $this->rows($query, CatalogRecommendationSource::ContentUpdate, CatalogRecommendationReason::RecentlyUpdated);
+        return $eligibleTitleIds
+            ->map(fn (int $id, int $index): array => [
+                'id' => $id,
+                'score' => $limit - $index,
+                'source' => CatalogRecommendationSource::ContentUpdate->value,
+                'reason' => CatalogRecommendationReason::RecentlyUpdated->value,
+            ])
+            ->all();
+    }
+
+    /**
+     * @return Collection<int, array{catalog_title_id: positive-int, event_at: non-empty-string, event_id: int, event_source: string}>
+     */
+    private function recentContentEvents(int $limit): Collection
+    {
+        $media = DB::table('licensed_media')
+            ->select(['catalog_title_id', 'published_at as event_at', 'id as event_id'])
+            ->where('status', 'published')
+            ->whereNull('deleted_at')
+            ->whereNotNull('published_at')
+            ->orderByDesc('published_at')
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get()
+            ->map(fn (object $event): array => [
+                'catalog_title_id' => (int) $event->catalog_title_id,
+                'event_at' => (string) $event->event_at,
+                'event_id' => (int) $event->event_id,
+                'event_source' => 'media',
+            ]);
+        $episodes = DB::table('episodes')
+            ->join('seasons', 'seasons.id', '=', 'episodes.season_id')
+            ->select(['seasons.catalog_title_id', 'episodes.released_at as event_at', 'episodes.id as event_id'])
+            ->where('episodes.publication_status', 'published')
+            ->whereNull('episodes.deleted_at')
+            ->whereNull('seasons.deleted_at')
+            ->whereNotNull('episodes.released_at')
+            ->where('episodes.released_at', '<=', now())
+            ->orderByDesc('episodes.released_at')
+            ->orderByDesc('episodes.id')
+            ->limit($limit)
+            ->get()
+            ->map(fn (object $event): array => [
+                'catalog_title_id' => (int) $event->catalog_title_id,
+                'event_at' => (string) $event->event_at,
+                'event_id' => (int) $event->event_id,
+                'event_source' => 'episode',
+            ]);
+
+        return $media
+            ->concat($episodes)
+            ->filter(fn (array $event): bool => $event['catalog_title_id'] > 0 && $event['event_at'] !== '')
+            ->sort(function (array $left, array $right): int {
+                $dateOrder = strcmp($right['event_at'], $left['event_at']);
+
+                if ($dateOrder !== 0) {
+                    return $dateOrder;
+                }
+
+                $sourceOrder = strcmp($left['event_source'], $right['event_source']);
+
+                return $sourceOrder !== 0 ? $sourceOrder : $right['event_id'] <=> $left['event_id'];
+            })
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, int>  $orderedTitleIds
+     * @param  list<int>  $excludedIds
+     * @return Collection<int, int>
+     */
+    private function eligibleOrderedIds(
+        CatalogRecommendationContext $context,
+        Collection $orderedTitleIds,
+        array $excludedIds,
+        int $limit,
+    ): Collection {
+        $eligibleTitleIds = collect();
+        $excludedLookup = collect($excludedIds)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->flip();
+
+        foreach ($orderedTitleIds->reject(fn (int $id): bool => $excludedLookup->has($id))->chunk(500) as $chunk) {
+            $eligibleLookup = $this->eligibleQuery($context, watchable: true, excludedIds: [])
+                ->whereKey($chunk->all())
+                ->pluck('catalog_titles.id')
+                ->map(fn (mixed $id): int => (int) $id)
+                ->flip();
+            $eligibleTitleIds = $eligibleTitleIds
+                ->concat($chunk->filter(fn (int $id): bool => $eligibleLookup->has($id)))
+                ->take($limit)
+                ->values();
+
+            if ($eligibleTitleIds->count() >= $limit) {
+                break;
+            }
+        }
+
+        return $eligibleTitleIds;
     }
 
     /**
