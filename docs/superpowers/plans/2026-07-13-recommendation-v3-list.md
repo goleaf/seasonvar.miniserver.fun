@@ -963,9 +963,11 @@ Verification evidence: a real `CatalogDiscoveryPage` instance produced `null` fo
 - Public editorial eligibility remains type `editorial`, visibility `public`, moderation `approved`, featured true, published timestamp present and soft deletion absent.
 - Unknown collection context remains conservative; private model attributes never become cache dimensions or telemetry values.
 
-- [ ] Compute recommendation impact for one/many collection models from current and previous raw attributes, covering both eligibility entry and exit.
-- [ ] Narrow `titleChanged()` to eligible public featured editorial collections before it requests a Recommendations bump.
-- [ ] Pass an explicit boolean into the existing after-commit invalidation closure and conditionally bump only `CacheDomain::Recommendations`; preserve every other domain/scope bump.
-- [ ] Prove with an isolated array store that private user, public unfeatured editorial and eligible featured editorial mutations produce recommendation version deltas `0`, `0` and `1`; prove an eligible-to-ineligible saved transition still produces delta `1`.
-- [ ] Run PHP syntax, task-file Pint, targeted Larastan, managed-doc check, debug/placeholder scan and task-scoped `git diff --check`; do not invoke PHPUnit/Pest or create test files.
+- [x] Compute recommendation impact for one/many collection models from current and previous raw attributes, covering both eligibility entry and exit.
+- [x] Narrow `titleChanged()` to eligible public featured editorial collections before it requests a Recommendations bump.
+- [x] Pass an explicit boolean into the existing after-commit invalidation closure and conditionally bump only `CacheDomain::Recommendations`; preserve every other domain/scope bump.
+- [x] Prove with an isolated array store that private user, public unfeatured editorial and eligible featured editorial mutations produce recommendation version deltas `0`, `0` and `1`; prove an eligible-to-ineligible saved transition still produces delta `1`.
+- [x] Run PHP syntax, task-file Pint, targeted Larastan, managed-doc check, debug/placeholder scan and task-scoped `git diff --check`; do not invoke PHPUnit/Pest or create test files. PHP lint, path Pint, targeted Larastan and managed docs passed; debug/placeholder scan found only the documentation's explicit no-`@php` rules, and task-scoped whitespace inspection passed.
 - [ ] Update owner documentation and English changelog, inspect the isolated patch, commit only Task 18 files on `main`, push and verify the remote SHA without absorbing concurrent work.
+
+Implementation evidence before documentation closure: private user and public unfeatured editorial mutations left the Recommendations version unchanged; eligible editorial and an eligible-to-ineligible saved transition each incremented it once. A separate in-memory SQLite title-membership probe preserved Collections deltas for both ordinary and eligible collections while Recommendations changed only for the eligible editorial membership. No production cache, session, user row, collection row or catalogue row was mutated.

@@ -90,6 +90,7 @@
 - Бюджеты измеряют полное HTTP-тело, включая Livewire snapshot/effects, и запрещают сериализацию `CatalogTitle` collection и provider `source_url`. Это regression ceilings на bounded fixtures, а не production p95/SLA.
 - Независимый facet gate сохраняет 11 запросов полного page-builder при росте actor options с 1 до 20; title gate выполняется на максимальной публичной recommendation collection, поэтому query ceilings не растут на каждый видимый элемент.
 - Full-response regression отдельно доказывает: второй гостевой `GET /` получает `HIT` без SQL к catalog tables, а title HIT выполняет не более одного catalog query, необходимого текущему implicit route binding. Это test fixture contract, не production p95.
+- Collection invalidation не создаёт public recommendation cold miss для private/unlisted/unapproved/unfeatured mutations: Recommendations generation зависит только от текущей или предыдущей public featured editorial eligibility. Title-driven path сохраняет исходный bounded поиск максимум 1 001 approved-public collection ID и выполняет один дополнительный `EXISTS` по этому же набору; overflow консервативно инвалидирует global namespace. Isolated array-cache/in-memory SQLite acceptance зафиксировал version deltas `0`, `0`, `1` для private user, unfeatured editorial и eligible editorial mutations, `1` для eligible→ineligible transition и `0`/`1` для title membership только в обычной/eligible editorial collection. Это проверка identity/invalidation workload, не latency или SLA measurement.
 
 ## Query contract обсуждений
 
