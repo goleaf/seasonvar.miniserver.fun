@@ -347,4 +347,7 @@
 - `2026_07_16_010000_add_terminal_reason_to_seasonvar_import_title_groups.php`
 - `2026_07_16_120000_add_canonical_recommendation_discovery.php`
 - `2026_07_16_180000_create_content_request_domain.php`
+- `2026_07_16_190000_add_file_size_metadata_to_licensed_media.php`
+- `2026_07_16_190100_add_media_file_size_counters_to_seasonvar_import_runs.php`
+- `2026_07_16_200000_create_technical_issue_domain.php`
 <!-- project-docs:end -->
