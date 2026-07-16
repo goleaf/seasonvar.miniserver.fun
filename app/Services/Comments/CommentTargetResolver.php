@@ -140,8 +140,7 @@ final class CommentTargetResolver
         ?User $viewer,
         ?string $interfaceLocale,
         bool $lock,
-    ): CommentTarget
-    {
+    ): CommentTarget {
         $query = CatalogCollection::query()
             ->select(['id', 'slug', 'name', 'owner_id', 'type', 'visibility', 'moderation_status', 'deleted_at'])
             ->with('translations:id,catalog_collection_id,locale,name');

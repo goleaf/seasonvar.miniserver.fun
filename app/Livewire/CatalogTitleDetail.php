@@ -18,9 +18,9 @@ use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
-use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class CatalogTitleDetail extends Component

@@ -1032,9 +1032,9 @@ final readonly class TagService
                                 ->where('related_tag_id', $relatedId));
 
                             $query->orWhere(fn ($query) => $query
-                                    ->where('tag_id', $relatedId)
-                                    ->where('related_tag_id', $tagId)
-                                    ->when(! $synonym->is_bidirectional, fn ($query) => $query->where('is_bidirectional', true)));
+                                ->where('tag_id', $relatedId)
+                                ->where('related_tag_id', $tagId)
+                                ->when(! $synonym->is_bidirectional, fn ($query) => $query->where('is_bidirectional', true)));
                         })
                         ->whereKeyNot($synonym->id)
                         ->first();

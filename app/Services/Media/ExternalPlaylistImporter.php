@@ -70,8 +70,7 @@ final class ExternalPlaylistImporter
         ?CatalogTitle $forcedTitle = null,
         bool $dryRun = false,
         ?callable $progress = null,
-    ): array
-    {
+    ): array {
         $target = $this->verifiedExternalUrl($playlistUrl);
         $safePlaylistUrl = $target->url;
         $response = $this->httpClient->getVerified($target, delaySeconds: 0);
@@ -125,8 +124,7 @@ final class ExternalPlaylistImporter
         ?CatalogTitle $forcedTitle = null,
         bool $dryRun = false,
         ?callable $progress = null,
-    ): array
-    {
+    ): array {
         $entries = $this->parse($content, $baseUrl);
         $titles = $forcedTitle === null
             ? $this->candidateTitles($entries)

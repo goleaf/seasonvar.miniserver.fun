@@ -72,10 +72,10 @@ final class CatalogCollectionAdministrationManager extends Component
             ->get();
 
         $reports->each(fn (CatalogCollectionReport $report) => $moderation->resolveReport(
-                $actor,
-                $report,
-                CatalogCollectionReportStatus::Resolved,
-            ));
+            $actor,
+            $report,
+            CatalogCollectionReportStatus::Resolved,
+        ));
         $hasMore = CatalogCollectionReport::query()
             ->whereBelongsTo($collection, 'collection')
             ->where('status', CatalogCollectionReportStatus::Open->value)

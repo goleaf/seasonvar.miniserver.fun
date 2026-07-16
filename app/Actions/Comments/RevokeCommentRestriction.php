@@ -22,6 +22,7 @@ final class RevokeCommentRestriction
     public function handle(User $moderator, int $restrictionId): CommentRestriction
     {
         Gate::forUser($moderator)->authorize('manage-comments');
+
         return DB::transaction(function () use ($restrictionId, $moderator): CommentRestriction {
             $locked = CommentRestriction::query()->lockForUpdate()->findOrFail($restrictionId);
 
