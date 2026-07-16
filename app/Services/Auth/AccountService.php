@@ -114,22 +114,24 @@ final class AccountService
 
         RateLimiter::hit($rateKey, 300);
 
-        if (! Hash::check($current, $user->password)) {
-            throw ValidationException::withMessages([
-                'current_password' => [__('settings.security_page.current_password_invalid')],
-            ]);
-        }
+        DB::transaction(function () use ($user, $current, $new, $currentTokenId): void {
+            $lockedUser = User::query()->lockForUpdate()->findOrFail($user->getKey());
 
-        DB::transaction(function () use ($user, $new, $currentTokenId): void {
-            $user->forceFill([
+            if (! Hash::check($current, $lockedUser->getAuthPassword())) {
+                throw ValidationException::withMessages([
+                    'current_password' => [__('settings.security_page.current_password_invalid')],
+                ]);
+            }
+
+            $lockedUser->forceFill([
                 'password' => Hash::make($new),
                 'remember_token' => Str::random(60),
             ])->save();
             DB::table('password_reset_tokens')
-                ->whereRaw('lower(email) = ?', [NormalizedEmail::value((string) $user->email)])
+                ->whereRaw('lower(email) = ?', [NormalizedEmail::value((string) $lockedUser->email)])
                 ->delete();
 
-            $tokens = $user->tokens();
+            $tokens = $lockedUser->tokens();
 
             if ($currentTokenId !== null) {
                 $tokens->where('id', '!=', $currentTokenId);
@@ -138,6 +140,7 @@ final class AccountService
             $tokens->delete();
         }, attempts: 3);
 
+        $user->refresh();
         RateLimiter::clear($rateKey);
         $this->audit->record(AuthenticationEvent::PasswordChanged, $user, $user->email);
     }
