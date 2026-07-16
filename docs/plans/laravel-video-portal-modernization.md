@@ -759,7 +759,7 @@ Status: implementation, original non-test acceptance and the post-Task-14 public
 - [x] Run allowed PHP syntax/Pint/route/schema/query/translation/cache/security/Blade inspection, Vite build and browser smoke; reread the task and inspect all changed/directly-related files. No automated test runner was invoked.
 - [x] Normalize the later Task 14 public-profile comments integration through `CommentProfileQuery`/`CommentPresenter`, including the matching public count, without changing schema/routes/UI or exposing spoiler text.
 - [x] Commit only the Task 12 reconciliation on existing `main`, preserve unrelated work and verify status/remote.
-- [ ] Push the completed Task 12 commits to the configured remote.
+- [x] Push the completed Task 12 commits to the configured remote; `origin/main` and the configured remote both contain `89acaab`, `00c1bca`, `b038399` and `37271c7`.
 
 ### Post-Task-14 reconciliation implementation slice
 
