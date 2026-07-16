@@ -28,6 +28,7 @@ class StaticAnalysisContractTest extends TestCase
             'app/Services/Operations',
             'app/Services/Admin/AdminAuditRecorder.php',
             'app/Console/Commands/CheckDeploymentReadiness.php',
+            'app/Console/Commands/AuditFailedSeasonvarJobs.php',
             'app/Models/AdminAuditEvent.php',
         ] as $path) {
             $this->assertStringContainsString($path, $config);

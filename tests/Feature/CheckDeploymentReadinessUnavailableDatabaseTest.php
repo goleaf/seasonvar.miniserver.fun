@@ -54,4 +54,36 @@ final class CheckDeploymentReadinessUnavailableDatabaseTest extends TestCase
             File::deleteDirectory($unavailableDirectory);
         }
     }
+
+    public function test_failed_job_audit_fails_closed_without_disclosing_the_unavailable_database(): void
+    {
+        $originalDatabase = config('database.connections.sqlite.database');
+        $unavailableDirectory = storage_path('framework/testing/missing-audit-'.Str::uuid());
+        $unavailableDatabase = $unavailableDirectory.'/database.sqlite';
+
+        File::deleteDirectory($unavailableDirectory);
+        config(['database.connections.sqlite.database' => $unavailableDatabase]);
+        DB::purge('sqlite');
+
+        try {
+            try {
+                $exitCode = Artisan::call('app:failed-job-audit', ['--json' => true]);
+            } catch (Throwable) {
+                throw new AssertionFailedError('Failed-job audit must fail closed instead of throwing when SQLite is unavailable.');
+            }
+
+            $output = Artisan::output();
+            $decoded = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+
+            $this->assertSame(1, $exitCode);
+            $this->assertSame('failed', $decoded['status']);
+            $this->assertTrue($decoded['read_only']);
+            $this->assertStringNotContainsString($unavailableDatabase, $output);
+            $this->assertStringNotContainsString('SQLSTATE', $output);
+        } finally {
+            DB::purge('sqlite');
+            config(['database.connections.sqlite.database' => $originalDatabase]);
+            File::deleteDirectory($unavailableDirectory);
+        }
+    }
 }

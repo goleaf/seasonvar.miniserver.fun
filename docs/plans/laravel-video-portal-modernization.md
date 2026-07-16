@@ -1,6 +1,6 @@
 # Laravel / Livewire production modernization — living plan
 
-Обновлено: 15.07.2026. Владелец выполнения: текущая работа на существующей ветке `main`. План не является списком пожеланий: каждый пункт должен закончиться кодом или документированным решением, тестом/измерением, фазовым commit и явным remaining risk. Исторические завершённые решения сохранены в Git и тематических документах.
+Обновлено: 16.07.2026. Владелец выполнения: текущая работа на существующей ветке `main`. План не является списком пожеланий: каждый пункт должен закончиться кодом или документированным решением, тестом/измерением, фазовым commit и явным remaining risk. Исторические завершённые решения сохранены в Git и тематических документах.
 
 ## Цель и definition of done
 
@@ -152,10 +152,26 @@ Impossible-group increment: production read-only aggregation found 43 active gro
 
 ### 2.4 Failed-job reconciliation
 
-- [ ] Aggregate failed jobs by class/reason/time without deserializing untrusted/full payloads in health paths.
-- [ ] Map each failed finalizer to run/group/current live state.
-- [ ] Retry only jobs proven recoverable after code fix; forget only obsolete duplicates after a recorded audit decision.
-- [ ] Never run `queue:clear`; keep a before/after count and sampled reason table.
+- [x] Aggregate failed jobs by class/reason/time without deserializing untrusted/full payloads in health paths. `app:deployment-check` selects only the allowlisted display-name and bounded exception prefix; payload/exception bodies never enter its result.
+- [x] Map each failed finalizer to run/group/current live state through a separate bounded read-only operator command. It inspects only exact allowlisted finalizer envelopes below a fixed byte cap, validates the serialized root and one positive scalar target ID without `unserialize()`, and never exposes payload, exception, URL, token or queue UUID.
+- [x] Classify mapped rows as `forget_candidate`, `retain`, `canonical_signal_candidate` or `manual_review`. These are audit hints, not authority to mutate: active ready targets use the current watchdog/signal path, never replay of a historical serialized envelope.
+- [x] Retry only jobs proven recoverable after code fix; forget only obsolete duplicates after a recorded audit decision. The audit intentionally has no retry/forget/dispatch switch; current evidence proved no historical finalizer should be retried, while forget candidates remain preserved pending an explicit recorded disposition.
+- [x] Never run `queue:clear`; keep a before/after count and sampled reason table. The read-only pass reported 6,714 before and the independent post-count remained 6,714.
+
+Approved design: keep the mandatory deployment preflight fast and low-cardinality, share one allowlisted classifier for job kind and failure reason, and isolate finalizer state mapping in `app:failed-job-audit`. The audit streams `failed_jobs` in 200-row chunks, caps payload/exception reads at SQL selection, resolves current groups/runs/claims through grouped queries, and returns aggregate state/disposition counts plus bounded ID-only samples. Missing/terminal targets are only forget candidates; active work is retained; a current active target already eligible for the canonical watchdog is a signal candidate; malformed, oversized or inconsistent records require manual review. The report always includes zero mutation counters. Database unavailability fails closed with a Russian secret-free message. No migration, queue write, cache write or provider request is required.
+
+Implementation slice:
+
+- [x] RED/GREEN safe summary tests for current importer classes, stable reason buckets, malformed JSON and absence of payload/exception text.
+- [x] RED/GREEN audit tests for exact scalar extraction, oversized/malformed envelopes, missing/terminal/active/inconsistent targets, grouped claim state, bounded samples and zero mutation.
+- [x] Add the read-only command and JSON/table output; preserve `seasonvar:import` as the sole public import command.
+- [x] Run focused tests, importer/operations regression, Pint, changed-scope Larastan, full PHPUnit and documentation checks.
+
+Read-only production evidence: 6,714 total rows split into 4,155 title-group finalizers, 793 source-page jobs, 9 preparation jobs and 1,757 cache-warm jobs; reason buckets were 6,707 `attempts_exhausted` and 7 `provider_connection`. All 4,155 finalizer envelopes passed exact scalar parsing and every referenced group is now terminal, so the audit emitted only `forget_candidate`; no retry is justified and no row was forgotten. One bounded sample represented the same terminal/attempts-exhausted category. Report mutation counters were all zero, and the independent post-count remained 6,714.
+
+Verification: 135 importer/operations tests / 827 assertions passed; full PHPUnit completed 939 tests with 928 passed, 11 skipped and 7,477 assertions. Targeted Pint, managed documentation refresh/link check, diff whitespace check and bounded application Larastan including the new command all passed with zero diagnostics.
+
+Rollback: remove the optional command/classifier/report code and restore the prior summary shape. No data rollback is necessary because this slice introduces no schema or state mutation. Do not use historical failed-job retry/forget as rollback.
 
 ### 2.5 Queue worker topology
 

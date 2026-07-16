@@ -234,6 +234,7 @@ final class DeploymentReadinessChecker
                     'job_kinds' => count($summary['jobs']),
                     'categories' => count($summary['categories']),
                     'age_buckets' => count($summary['ages']),
+                    'reason_buckets' => count($summary['reasons']),
                 ],
             );
         } catch (Throwable) {

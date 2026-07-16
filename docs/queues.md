@@ -45,6 +45,15 @@
 
 ## Безопасная сводка failed jobs
 
-`php artisan app:deployment-check --json` читает `failed_jobs` bounded chunks и выводит только total, allowlisted тип job, категорию очереди и возрастной диапазон. Payload, exception text, URL, аргументы и токены не включаются. Наличие строк помечается warning для обязательной ручной disposition; команда не выполняет retry, forget или очистку.
+`php artisan app:deployment-check --json` читает `failed_jobs` bounded chunks, но получает из SQL только allowlisted display name, первые 256 байт exception для стабильной reason-категории, queue category и failed time. Он выводит total и число job/category/age/reason buckets. Payload, полный exception text, URL, аргументы и токены не materialize в health path и не включаются в результат. Наличие строк помечается warning для обязательной ручной disposition; команда не выполняет retry, forget или очистку.
 
-Перед `queue:retry <id>` оператор отдельно сверяет import run, live claims и причину сбоя. Массовый retry/forget не входит в автоматический deployment flow и никогда не запускается preflight-командой.
+`php artisan app:failed-job-audit --json --samples=1` — отдельный forensic path. Он рассматривает только два exact allowlisted finalizer class, забирает из SQL не более 16 KiB payload и 256 байт exception, проверяет JSON display/command name, serialized root и один direct positive integer `groupId`/`importRunId` собственным bounded parser без создания PHP object. Затем 200-row chunks связываются grouped queries с current group/run status, live claims и active child groups. JSON содержит только counts, stable codes и bounded samples из failed ID/type/target ID/reason/age/state/disposition; queue UUID, command body, exception, URL, token и provider data отсутствуют.
+
+Disposition meanings:
+
+- `forget_candidate` — target отсутствует или уже terminal; удаление возможно только отдельным recorded operator decision по конкретным IDs;
+- `retain` — у target есть текущая active work или live claim;
+- `canonical_signal_candidate` — target уже пригоден для современного watchdog/signal path; старый serialized envelope не retry-ится;
+- `manual_review` — payload не подтверждён или current parent state противоречив.
+
+Audit всегда возвращает нулевые `retried/forgotten/cleared/dispatched` counters и не имеет mutation options. Перед любым отдельным `queue:forget <id>` сохранить JSON evidence, записать решение и повторить count/audit. `queue:retry all`, массовый forget и `queue:clear` не входят в recovery flow.

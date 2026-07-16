@@ -63,4 +63,16 @@ class ProductionOperationsDocumentationTest extends TestCase
         $this->assertStringContainsString('cache-warm-v2', $deployment);
         $this->assertStringContainsString('не очищать', $deployment);
     }
+
+    public function test_failed_job_runbook_requires_read_only_reconciliation_before_specific_disposition(): void
+    {
+        $deployment = File::get(base_path('docs/deployment.md'));
+        $queues = File::get(base_path('docs/queues.md'));
+
+        $this->assertStringContainsString('app:failed-job-audit --json --samples=1', $deployment);
+        $this->assertStringContainsString('forget_candidate', $deployment);
+        $this->assertStringContainsString('canonical_signal_candidate', $queues);
+        $this->assertStringContainsString('без создания PHP object', $queues);
+        $this->assertStringNotContainsString('php artisan queue:retry all', $deployment);
+    }
 }

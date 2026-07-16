@@ -67,6 +67,7 @@ bash -n .githooks/pre-commit .githooks/pre-push .githooks/post-commit .githooks/
 - `php artisan seasonvar:import "https://seasonvar.ru/..." --force` — принудительное обновление одной страницы.
 - `php artisan integrations:doctor` — read-only диагностика MCP, Google, CLI tools и проектных skills без вывода секретов.
 - `php artisan app:health` — operational health по DB, Redis workloads, Memcached, workers и прогреву; `degraded`/`failed` возвращают ненулевой exit, даже если HTTP traffic readiness ещё true.
+- `php artisan app:failed-job-audit` — bounded read-only сопоставление historical finalizer rows с текущими run/group/claim states; `--json` даёт safe evidence, `--samples=0..10` ограничивает ID-only примеры на состояние. Команда не retry-ит, не забывает, не очищает и не dispatch-ит jobs.
 - `php artisan cache:warm-catalog` — синхронный bounded warm; `--queue` ставит unique job в `cache-warm-v2`, а `--refresh` планово пересобирает текущие warmable keys под lock, не удаляя читаемый snapshot до успеха. Историческая `cache-warm` не используется новым worker и не очищается автоматически.
 - `php artisan cache:metrics` — low-cardinality hit/miss/rebuild/failure snapshot без raw keys.
 - `php artisan api:sync-prune` — bounded очистка transport-журнала offline-sync: changes старше 30 дней и idempotency receipts старше 90 дней; до additive migration завершается безопасным no-op.

@@ -60,6 +60,7 @@ final class CheckDeploymentReadinessCommandTest extends TestCase
             'jobs' => [],
             'categories' => [],
             'ages' => [],
+            'reasons' => [],
         ], $empty);
 
         DB::table('failed_jobs')->insert([
@@ -81,9 +82,63 @@ final class CheckDeploymentReadinessCommandTest extends TestCase
         $this->assertSame(['refresh_catalog_title' => 1], $summary['jobs']);
         $this->assertSame(['title_refresh' => 1], $summary['categories']);
         $this->assertSame(['1_to_24_hours' => 1], $summary['ages']);
+        $this->assertSame(['runtime' => 1], $summary['reasons']);
         $this->assertStringNotContainsString('private-token', $serialized);
         $this->assertStringNotContainsString('seasonvar.ru', $serialized);
         $this->assertStringNotContainsString('RuntimeException', $serialized);
+    }
+
+    public function test_failed_job_summary_classifies_current_finalizers_and_stable_failure_reasons(): void
+    {
+        DB::table('failed_jobs')->insert([
+            [
+                'uuid' => fake()->uuid(),
+                'connection' => 'redis',
+                'queue' => 'seasonvar-title-refresh',
+                'payload' => json_encode([
+                    'displayName' => 'App\\Jobs\\FinalizeSeasonvarImportTitleGroup',
+                    'data' => ['command' => 'private-payload'],
+                ], JSON_THROW_ON_ERROR),
+                'exception' => 'Illuminate\\Queue\\MaxAttemptsExceededException: private exception text',
+                'failed_at' => now(),
+            ],
+            [
+                'uuid' => fake()->uuid(),
+                'connection' => 'redis',
+                'queue' => 'seasonvar-import',
+                'payload' => json_encode([
+                    'displayName' => 'App\\Jobs\\FinalizeSeasonvarQueuedImport',
+                    'data' => ['command' => 'private-payload'],
+                ], JSON_THROW_ON_ERROR),
+                'exception' => 'Illuminate\\Queue\\TimeoutExceededException: private exception text',
+                'failed_at' => now(),
+            ],
+            [
+                'uuid' => fake()->uuid(),
+                'connection' => 'redis',
+                'queue' => 'seasonvar-import',
+                'payload' => '{malformed private-token https://seasonvar.ru/private',
+                'exception' => 'Unexpected private exception text',
+                'failed_at' => now(),
+            ],
+        ]);
+
+        $summary = app(FailedJobSummaryBuilder::class)->build();
+        $serialized = json_encode($summary, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+
+        $this->assertSame([
+            'finalize_import' => 1,
+            'finalize_title_group' => 1,
+            'other' => 1,
+        ], $summary['jobs']);
+        $this->assertSame([
+            'attempts_exhausted' => 1,
+            'other' => 1,
+            'timeout' => 1,
+        ], $summary['reasons']);
+        $this->assertStringNotContainsString('private-token', $serialized);
+        $this->assertStringNotContainsString('private exception text', $serialized);
+        $this->assertStringNotContainsString('seasonvar.ru', $serialized);
     }
 
     public function test_failed_job_summary_classifies_the_versioned_cache_warm_queue(): void
@@ -218,6 +273,7 @@ final class CheckDeploymentReadinessCommandTest extends TestCase
         $exitCode = Artisan::call('app:deployment-check', ['--json' => true]);
         $output = Artisan::output();
         $decoded = json_decode($output, true, flags: JSON_THROW_ON_ERROR);
+        $checks = collect($decoded['checks'])->keyBy('name');
 
         $this->assertSame(1, $exitCode);
         $this->assertSame('failed', $decoded['status']);
@@ -229,6 +285,7 @@ final class CheckDeploymentReadinessCommandTest extends TestCase
         $this->assertArrayHasKey('duration_ms', $decoded['checks'][0]);
         $this->assertIsInt($decoded['checks'][0]['duration_ms']);
         $this->assertGreaterThanOrEqual(0, $decoded['checks'][0]['duration_ms']);
+        $this->assertSame(1, $checks->get('failed_jobs')['metadata']['reason_buckets']);
         $this->assertStringNotContainsString('private-token', $output);
         $this->assertStringNotContainsString('private exception text', $output);
     }

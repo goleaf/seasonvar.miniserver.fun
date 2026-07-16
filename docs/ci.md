@@ -53,4 +53,4 @@ Browser job после backend/frontend gates устанавливает managed
 
 ## Static Analysis
 
-`composer analyse` запускает Larastan/PHPStan level 6 без baseline и `ignoreErrors`. Начальная область намеренно ограничена `app/DTOs`, `app/Enums`, operational diagnostics, `AdminAuditRecorder`, `CheckDeploymentReadiness` и `AdminAuditEvent`: это low-noise gate для security/operations boundaries, а не заявление о полном анализе всего legacy application. CI также сохраняет отдельные проверки синтаксиса через `php -l` и форматирования через Pint.
+`composer analyse` запускает Larastan/PHPStan level 6 без baseline и `ignoreErrors`. Начальная область намеренно ограничена `app/DTOs`, `app/Enums`, operational diagnostics, `AdminAuditRecorder`, `CheckDeploymentReadiness`, `AuditFailedSeasonvarJobs` и `AdminAuditEvent`: это low-noise gate для security/operations boundaries, а не заявление о полном анализе всего legacy application. CI также сохраняет отдельные проверки синтаксиса через `php -l` и форматирования через Pint.

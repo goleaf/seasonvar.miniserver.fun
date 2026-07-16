@@ -139,6 +139,7 @@ systemctl --no-pager --type=service 'seasonvar-import-worker@*'
 systemctl --no-pager --type=service 'seasonvar-title-refresh-worker@*'
 php artisan seasonvar:import --status
 php artisan queue:failed
+php artisan app:failed-job-audit --samples=1
 journalctl -u 'seasonvar-import-worker@*' -f
 journalctl -u 'seasonvar-title-refresh-worker@*' -f
 ```

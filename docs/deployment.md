@@ -1,6 +1,6 @@
 # Деплой
 
-Обновлено: 15.07.2026
+Обновлено: 16.07.2026
 
 ## Mobile offline-sync rollout от 14.07.2026
 
@@ -230,7 +230,8 @@ journalctl -u 'seasonvar-import-worker@*' -f
 journalctl -u 'seasonvar-title-refresh-worker@*' -f
 php artisan seasonvar:import --status
 php artisan queue:failed
-php artisan queue:retry all
+php artisan app:failed-job-audit --samples=1
+php artisan app:failed-job-audit --json --samples=1
 ```
 
 В crontab пользователя `www` сохранены dispatcher с десятью запусками в сутки и read-only монитор очереди каждые пять минут; 15.07.2026 к ним добавлен Laravel scheduler каждую минуту:
@@ -241,7 +242,7 @@ php artisan queue:retry all
 */5 * * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan queue:monitor 'redis:seasonvar-title-refresh,redis:seasonvar-import' --max=5000 >> storage/logs/seasonvar-queue-monitor.log 2>&1
 ```
 
-15.07.2026 production evidence опровергло прежнее предположение о полном lifecycle deduplication: baseline содержал 11 queued runs, 8037 pending jobs и 5670 live claims; более поздний snapshot — 12 running sitemap runs и 1601 active groups. Новый общий coordinator переиспользует один active global run, а повторный cron вызов дополнительно dispatches уникальный finalizer watchdog. Установленный `schedule:run` обслуживает полный project schedule, включая десятиминутный резервный cache warm. Existing failed/backlog jobs не retry-ить и не очищать массово: сначала сопоставить их с текущим run/group/claim state.
+15.07.2026 production evidence опровергло прежнее предположение о полном lifecycle deduplication: baseline содержал 11 queued runs, 8037 pending jobs и 5670 live claims; более поздний snapshot — 12 running sitemap runs и 1601 active groups. Новый общий coordinator переиспользует один active global run, а повторный cron вызов дополнительно dispatches уникальный finalizer watchdog. Установленный `schedule:run` обслуживает полный project schedule, включая десятиминутный резервный cache warm. Existing failed/backlog jobs не retry-ить и не очищать массово: сначала сопоставить их с текущим run/group/claim state через `app:failed-job-audit`.
 
 ## Server requirements snapshot 15.07.2026
 
@@ -297,7 +298,8 @@ php artisan app:deployment-check --json
 
 - Владелец технического retention импортёра — production operator, выполняющий runbook Seasonvar. `SeasonvarImportStorageMaintenance` применяет только существующие окна: import events 7 дней, source snapshots 14 дней и terminal prepared groups 7 дней через `SEASONVAR_IMPORT_*_RETENTION_DAYS`; изменение окон требует capacity/privacy review и обновления `docs/importer.md`.
 - Transport retention mobile offline-sync принадлежит API operator: `api:sync-prune` удаляет только sync invalidations старше 30 дней и idempotency receipts старше 90 дней. Эти окна зафиксированы в `config/mobile-api.php`; изменение требует обновления manifest/OpenAPI, capacity/retry review и recovery contract в `docs/api.md`.
-- Владелец disposition `failed_jobs` — тот же production operator. `app:deployment-check` даёт только безопасную агрегатную сводку; retry/forget выполняются вручную после сверки import run и live claims. Автоматического удаления failed jobs нет.
+- Владелец disposition `failed_jobs` — тот же production operator. `app:deployment-check` получает из БД только allowlisted job class, bounded exception prefix и время, затем выводит scalar counts/bucket counts. Для детальной сверки используется `app:failed-job-audit --json --samples=1`: он читает exact allowlisted finalizer envelope не более 16 KiB, без `unserialize()`, сопоставляет только положительный scalar target ID с grouped run/group/claim queries и возвращает `forget_candidate`, `retain`, `canonical_signal_candidate` или `manual_review`.
+- Disposition codes являются подсказкой, а не mutation authority. `canonical_signal_candidate` обслуживается текущим watchdog, historical serialized envelope через `queue:retry` не воспроизводится. `forget_candidate` можно удалить только конкретным ID после сохранения JSON-отчёта, повторного before/after count и записи решения в maintenance log; `retain` и `manual_review` не трогают. `queue:retry all`, массовый `queue:forget` и `queue:clear` запрещены. Автоматического удаления failed jobs нет.
 - User history/progress/watchlist/rating, admin audit и потенциально юридически значимые строки не имеют автоматического retention/delete job. Их нельзя включать в общий technical prune без утверждённой продуктовой/legal policy, отдельного owner и тестируемой процедуры удаления/экспорта.
 
 ### Production runtime и журналы

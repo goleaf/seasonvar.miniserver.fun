@@ -69,6 +69,8 @@ Stale reconciliation выполняет сам finalizer в короткой tra
 
 Все восемь importer jobs имеют явные `tries` или абсолютный `retryUntil`, timeout, backoff, uniqueness strategy и `failed()` boundary. Три coordinator/watchdog jobs ограничены числом attempts, пять page/preparation/finalizer/refresh jobs — временем; максимальный timeout 900 секунд остаётся ниже queue `retry_after=1200`. Page delivery намеренно не получает дополнительный unique lock: её idempotent ownership задаёт claim token. Watchdog при окончательном сбое логирует только стабильный job code и класс исключения без exception message, queue payload, URL или token.
 
+Historical failed finalizers не являются частью live state machine. Read-only `app:failed-job-audit` bounded-порциями проверяет exact scalar target ID без `unserialize()`, сопоставляет его с current group/run/claim state и выдаёт только безопасные disposition codes. `canonical_signal_candidate` обрабатывает существующий watchdog; команда не retry-ит старый envelope, не dispatch-ит новый job, не забывает и не очищает строки.
+
 Счётчики admin UI — операционные: `created` объединяет новые source pages и media rows, `updated` — успешно обработанные source pages и обновлённые media, `skipped` — необработанные выбранные pages и пропущенные media, `failed` — page/media failures. Это не точное число созданных Eloquent entities: текущая pipeline не хранит entity-level deltas, а выдавать их приближённо было бы некорректно.
 
 ## Здоровье видеоисточников

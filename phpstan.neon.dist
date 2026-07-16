@@ -9,5 +9,6 @@ parameters:
         - app/Services/Operations
         - app/Services/Admin/AdminAuditRecorder.php
         - app/Console/Commands/CheckDeploymentReadiness.php
+        - app/Console/Commands/AuditFailedSeasonvarJobs.php
         - app/Models/AdminAuditEvent.php
     tmpDir: storage/framework/cache/phpstan
