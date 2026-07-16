@@ -21,6 +21,16 @@ return [
     'empty_title' => 'No ranking yet',
     'empty_description' => 'There are currently no rated, available titles in this category.',
     'empty_action' => 'Open the full catalog',
+    'validation' => [
+        'year' => 'Enter a supported year from 1900 through the next calendar year.',
+        'country' => 'Select a country from the available list.',
+        'range' => 'The first year cannot be later than the last year.',
+    ],
+    'attributes' => [
+        'year_from' => 'first year',
+        'year_to' => 'last year',
+        'country' => 'country',
+    ],
     'categories' => [
         'movies' => [
             'label' => 'Movies',

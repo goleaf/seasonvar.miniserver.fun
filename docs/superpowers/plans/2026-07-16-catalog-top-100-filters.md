@@ -38,7 +38,7 @@
 - Produces: `CatalogTopListFilters::active(): bool`.
 - Produces: `CatalogTopListRequest::filters(): CatalogTopListFilters`.
 
-- [ ] **Step 1: Написать unit-тест DTO и request validation**
+- [x] **Step 1: Написать unit-тест DTO и request validation**
 
 ```php
 <?php
@@ -116,13 +116,13 @@ final class CatalogTopListFiltersTest extends TestCase
 }
 ```
 
-- [ ] **Step 2: Запустить тест и подтвердить RED**
+- [x] **Step 2: Запустить тест и подтвердить RED**
 
 Run: `php artisan test tests/Unit/CatalogTopListFiltersTest.php`
 
 Expected: FAIL, потому что DTO и Form Request ещё не существуют.
 
-- [ ] **Step 3: Реализовать immutable DTO**
+- [x] **Step 3: Реализовать immutable DTO**
 
 ```php
 <?php
@@ -167,7 +167,7 @@ final readonly class CatalogTopListFilters
 }
 ```
 
-- [ ] **Step 4: Реализовать Form Request**
+- [x] **Step 4: Реализовать Form Request**
 
 `CatalogTopListRequest` должен использовать `CatalogFilterSlug`, `Rule::exists(Country::class, 'slug')`, диапазон от `1900` до `(int) now()->format('Y') + 1` и `after()` для порядка диапазона. `prepareForValidation()` преобразует не-scalar значения в `null`, trim-ит scalar и оставляет пустые значения `null`. Метод `filters()` строит DTO только из `$this->validated()`.
 
@@ -188,13 +188,13 @@ public function filters(): CatalogTopListFilters
 
 Добавить translation keys `validation.year`, `validation.country`, `validation.range` и `attributes.year_from|year_to|country` в оба locale-файла.
 
-- [ ] **Step 5: Запустить unit-тест и подтвердить GREEN**
+- [x] **Step 5: Запустить unit-тест и подтвердить GREEN**
 
 Run: `php artisan test tests/Unit/CatalogTopListFiltersTest.php`
 
 Expected: PASS; unknown country и inverted range дают ожидаемые validation keys.
 
-- [ ] **Step 6: Зафиксировать task commit**
+- [x] **Step 6: Зафиксировать task commit**
 
 ```bash
 git add app/DTOs/CatalogTopListFilters.php app/Http/Requests/CatalogTopListRequest.php tests/Unit/CatalogTopListFiltersTest.php lang/ru/top_lists.php lang/en/top_lists.php
