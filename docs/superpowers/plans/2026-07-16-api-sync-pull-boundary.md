@@ -265,13 +265,26 @@ php artisan test \
   tests/Feature/Api/V1/OfflineSyncPullServiceTest.php \
   tests/Feature/Api/V1/OfflineCatalogSyncTest.php \
   tests/Feature/Api/V1/OfflineUserSyncTest.php
-./vendor/bin/pint --dirty --format agent
+./vendor/bin/pint \
+  app/DTOs/ApiSyncPullResult.php \
+  app/Services/Api/V1/Sync/ApiSyncPullService.php \
+  app/Http/Controllers/Api/V1/SyncController.php \
+  tests/Feature/Api/V1/OfflineSyncPullServiceTest.php \
+  --format agent
 vendor/bin/phpstan analyse \
   app/DTOs/ApiSyncPullResult.php \
   app/Services/Api/V1/Sync/ApiSyncPullService.php \
   app/Http/Controllers/Api/V1/SyncController.php \
   --no-progress
-git diff --check
+git diff --check -- \
+  app/DTOs/ApiSyncPullResult.php \
+  app/Services/Api/V1/Sync/ApiSyncPullService.php \
+  app/Http/Controllers/Api/V1/SyncController.php \
+  tests/Feature/Api/V1/OfflineSyncPullServiceTest.php \
+  docs/plans/laravel-video-portal-modernization.md \
+  docs/api.md \
+  CHANGELOG.md \
+  docs/superpowers/plans/2026-07-16-api-sync-pull-boundary.md
 ```
 
 Expected: both route families retain their names/middleware, focused tests pass, formatter/static analysis report no errors, and the scoped diff has no whitespace errors.
