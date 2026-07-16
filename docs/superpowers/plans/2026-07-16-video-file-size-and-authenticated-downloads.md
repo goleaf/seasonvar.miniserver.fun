@@ -2,7 +2,7 @@
 
 Дата: 2026-07-16  
 Ветка: только существующая `main`  
-Статус: основная реализация завершена; production follow-up выполняется
+Статус: основная реализация и production follow-up проверены; ожидается push
 
 ## Цель и границы
 
@@ -311,7 +311,7 @@ GET authenticated download route
 - [x] Выполнить `php -l` для изменённых PHP-файлов и targeted `./vendor/bin/pint --format agent ...`; `--dirty` намеренно не форматирует параллельные пользовательские PHP-изменения.
 - [x] Выполнить `php artisan schedule:list` и подтвердить command/10-minute cadence; overlap/single-server contract сверить с route source и Laravel 13 docs.
 - [x] Выполнить безопасную non-network validation через `seasonvar:import --help`; неконтролируемый backfill повторно не запускать после уже успешного production batch 20/20.
-- [ ] Выполнить `git diff --check`, targeted forbidden-pattern search и task-only diff review.
+- [x] Выполнить `git diff --check`, targeted forbidden-pattern search и task-only diff review.
 - [ ] Подтвердить `main`, отделить task paths от параллельных пользовательских изменений, commit и push в `origin/main`.
 
 ### Follow-up changed-files list
