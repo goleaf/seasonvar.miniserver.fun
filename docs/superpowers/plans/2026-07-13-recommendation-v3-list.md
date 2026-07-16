@@ -789,6 +789,8 @@ return $query
 - [x] Preserve trustworthy semantic timestamps during title merge, keep versions monotonic and reconcile all state with conservative precedence (`blacklisted > not_interested`, `dropped > completed > watching > planned`).
 - [x] Build the trending watchlist UNION only when `watchlist_updated_at` exists and never fall back to `updated_at`; without the column, trending safely degrades to meaningful progress/reviews/comments.
 - [x] Order bounded personalized watchlist/rating/status signals by their semantic timestamp, with stable ID ordering as the rolling-schema fallback.
+- [x] Accumulate every bounded watchlist/status/rating/collection/personal-tag ID set explicitly; do not rely on a value-captured arrow closure for mutation of the shared signal map.
+- [x] Remove `not_interested`, `blacklisted` and `dropped` source titles from the bounded signal map before candidate lookup while retaining meaningful completed/watching sources.
 
 ### Task F9: upcoming and media-preference truthfulness
 
