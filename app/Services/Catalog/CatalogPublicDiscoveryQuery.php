@@ -15,12 +15,12 @@ use App\Enums\CommentStatus;
 use App\Enums\CommentTargetType;
 use App\Enums\ReviewStatus;
 use App\Models\CatalogTitle;
-use App\Models\CatalogTitleRating;
 use App\Models\CatalogTitleUserState;
 use App\Models\Episode;
 use App\Models\EpisodeViewProgress;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -136,49 +136,44 @@ final class CatalogPublicDiscoveryQuery
     {
         $source = $context->ratingSource;
         $minimumVotes = max(1, (int) config("recommendations.top_rated.minimum_votes.{$source}", 1_000));
-        $query = $this->eligibleQuery($context, watchable: true, excludedIds: $excludedIds)
-            ->select('catalog_titles.id');
+        $query = $this->eligibleQuery($context, watchable: true, excludedIds: $excludedIds);
 
         if ($source === 'portal') {
-            $query
-                ->selectSub(CatalogTitleUserState::query()
-                    ->selectRaw('AVG(rating)')
-                    ->whereColumn('catalog_title_id', 'catalog_titles.id')
-                    ->whereNotNull('rating'), 'source_rating')
-                ->selectSub(CatalogTitleUserState::query()
-                    ->selectRaw('COUNT(rating)')
-                    ->whereColumn('catalog_title_id', 'catalog_titles.id')
-                    ->whereNotNull('rating'), 'source_votes');
+            $ratings = DB::table('catalog_title_user_states')
+                ->select('catalog_title_id')
+                ->selectRaw('AVG(rating) AS source_rating')
+                ->selectRaw('COUNT(rating) AS source_votes')
+                ->whereNotNull('rating')
+                ->groupBy('catalog_title_id')
+                ->havingRaw('COUNT(rating) >= ?', [$minimumVotes]);
+
+            $query->joinSub(
+                $ratings,
+                'recommendation_rating',
+                'recommendation_rating.catalog_title_id',
+                '=',
+                'catalog_titles.id',
+            );
+            $ratingColumn = 'recommendation_rating.source_rating';
+            $votesColumn = 'recommendation_rating.source_votes';
         } else {
             $provider = $this->provider($source);
             $query
-                ->selectSub(CatalogTitleRating::query()
-                    ->select('rating')
-                    ->whereColumn('catalog_title_id', 'catalog_titles.id')
-                    ->where('provider', $provider)
-                    ->limit(1), 'source_rating')
-                ->selectSub(CatalogTitleRating::query()
-                    ->select('votes')
-                    ->whereColumn('catalog_title_id', 'catalog_titles.id')
-                    ->where('provider', $provider)
-                    ->limit(1), 'source_votes');
+                ->join('catalog_title_ratings as recommendation_rating', function (JoinClause $join) use ($provider): void {
+                    $join
+                        ->on('recommendation_rating.catalog_title_id', '=', 'catalog_titles.id')
+                        ->where('recommendation_rating.provider', '=', $provider);
+                })
+                ->whereNotNull('recommendation_rating.rating')
+                ->where('recommendation_rating.votes', '>=', $minimumVotes);
+            $ratingColumn = 'recommendation_rating.rating';
+            $votesColumn = 'recommendation_rating.votes';
         }
 
         $query
-            ->where(function (Builder $query) use ($minimumVotes, $source): void {
-                if ($source === 'portal') {
-                    $query->whereRaw('(SELECT COUNT(rating) FROM catalog_title_user_states WHERE catalog_title_id = catalog_titles.id AND rating IS NOT NULL) >= ?', [$minimumVotes]);
-
-                    return;
-                }
-
-                $query->whereHas('ratings', fn (Builder $query): Builder => $query
-                    ->where('provider', $this->provider($source))
-                    ->whereNotNull('rating')
-                    ->where('votes', '>=', $minimumVotes));
-            })
-            ->orderByDesc('source_rating')
-            ->orderByDesc('source_votes')
+            ->select('catalog_titles.id')
+            ->orderByDesc($ratingColumn)
+            ->orderByDesc($votesColumn)
             ->orderByDesc('catalog_titles.id');
 
         return $this->rows($query, CatalogRecommendationSource::Rating, CatalogRecommendationReason::TopRated);
