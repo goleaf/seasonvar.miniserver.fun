@@ -13,14 +13,18 @@ use App\Enums\ContentRequestNotificationType;
 use App\Enums\ReviewNotificationType;
 use App\Enums\ReviewOrigin;
 use App\Enums\TechnicalIssueNotificationType;
+use App\Models\ApiSyncMutation;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleReview;
 use App\Models\CatalogTitleUserState;
 use App\Models\Comment;
 use App\Models\ContentRequest;
+use App\Models\Episode;
+use App\Models\LicensedMedia;
 use App\Models\TechnicalIssue;
 use App\Models\User;
 use App\Services\Api\V1\Sync\ApiSyncMutationService;
+use App\Services\Catalog\CatalogPlaybackProgressSession;
 use App\Services\DemoData\DemoBulkWriter;
 use App\Services\DemoData\DemoStableValue;
 use App\Services\DemoData\DemoTitleSelector;
@@ -34,6 +38,7 @@ final readonly class DemoNotificationSyncStage implements DemoDataStage
     public function __construct(
         private DemoStableValue $stable,
         private ApiSyncMutationService $mutations,
+        private CatalogPlaybackProgressSession $progressSessions,
     ) {}
 
     public function key(): string
@@ -131,7 +136,10 @@ final readonly class DemoNotificationSyncStage implements DemoDataStage
         };
     }
 
-    /** @param Collection<int, Comment> $comments @return array{string, array<string, mixed>} */
+    /**
+     * @param  Collection<int, Comment>  $comments
+     * @return array{string, array<string, mixed>}
+     */
     private function commentNotification(Collection $comments, int $ordinal): array
     {
         $comment = $comments->get($ordinal % $comments->count());
@@ -146,7 +154,10 @@ final readonly class DemoNotificationSyncStage implements DemoDataStage
         ]];
     }
 
-    /** @param Collection<int, CatalogTitleReview> $reviews @return array{string, array<string, mixed>} */
+    /**
+     * @param  Collection<int, CatalogTitleReview>  $reviews
+     * @return array{string, array<string, mixed>}
+     */
     private function reviewNotification(Collection $reviews, int $ordinal): array
     {
         $review = $reviews->get($ordinal % $reviews->count());
@@ -161,7 +172,10 @@ final readonly class DemoNotificationSyncStage implements DemoDataStage
         ]];
     }
 
-    /** @param Collection<int, ContentRequest> $requests @return array{string, array<string, mixed>} */
+    /**
+     * @param  Collection<int, ContentRequest>  $requests
+     * @return array{string, array<string, mixed>}
+     */
     private function requestNotification(Collection $requests, int $ordinal): array
     {
         $request = $requests->get($ordinal % $requests->count());
@@ -170,12 +184,15 @@ final readonly class DemoNotificationSyncStage implements DemoDataStage
         return ['content-request.activity', [
             'kind' => $kind->value,
             'request_public_id' => $request?->public_id,
-            'status' => $request?->status?->value,
+            'status' => $request?->getRawOriginal('status'),
             'canonical_public_id' => null,
         ]];
     }
 
-    /** @param Collection<int, TechnicalIssue> $issues @return array{string, array<string, mixed>} */
+    /**
+     * @param  Collection<int, TechnicalIssue>  $issues
+     * @return array{string, array<string, mixed>}
+     */
     private function issueNotification(Collection $issues, int $ordinal): array
     {
         $issue = $issues->get($ordinal % $issues->count());
@@ -187,7 +204,7 @@ final readonly class DemoNotificationSyncStage implements DemoDataStage
             'public_number' => $issue?->public_number,
             'issue_type' => $issue?->type?->value,
             'status' => $issue?->status?->value,
-            'revision' => $issue?->version ?? 1,
+            'revision' => $issue->version,
             'canonical_public_id' => null,
         ]];
     }
@@ -203,7 +220,7 @@ final readonly class DemoNotificationSyncStage implements DemoDataStage
             ->first(['rating']) : null;
 
         if (! $context instanceof DemoTitleContext || ! $title instanceof CatalogTitle || ! $state instanceof CatalogTitleUserState
-            || $context->firstEpisodeId === null) {
+            || $context->firstEpisodeId === null || $context->licensedMediaId === null) {
             throw new LogicException('Catalog activity demo stage must run before API sync scenarios.');
         }
 
@@ -221,17 +238,7 @@ final readonly class DemoNotificationSyncStage implements DemoDataStage
             'value' => ((int) $state->rating % 10) + 1,
             'expected_version' => 1,
         ];
-        $progress = [
-            'mutation_id' => $this->stable->uuid("sync:user:{$userIndex}:progress"),
-            'type' => 'progress.set',
-            'title_slug' => $title->slug,
-            'episode_id' => $context->firstEpisodeId,
-            'playback_session' => $this->stable->ulid("sync:user:{$userIndex}:playback-session"),
-            'event_sequence' => 100_000 + $userIndex,
-            'position_seconds' => 900 + $userIndex,
-            'duration_seconds' => $context->durationSeconds ?? 2_400,
-            'ended' => false,
-        ];
+        $progressMutationId = $this->stable->uuid("sync:user:{$userIndex}:progress");
         $unsupported = [
             'mutation_id' => $this->stable->uuid("sync:user:{$userIndex}:rejected"),
             'type' => 'demo.unsupported',
@@ -246,11 +253,43 @@ final readonly class DemoNotificationSyncStage implements DemoDataStage
 
         $this->mutations->apply($user, $watchlist);
         $this->mutations->apply($user, $rating);
-        $this->mutations->apply($user, $progress);
+
+        if (! $this->hasMutationReceipt($user, $progressMutationId)) {
+            $episode = Episode::query()->find($context->firstEpisodeId, ['id']);
+            $media = LicensedMedia::query()->find(
+                $context->licensedMediaId,
+                ['id', 'catalog_title_id', 'episode_id'],
+            );
+
+            if (! $episode instanceof Episode || ! $media instanceof LicensedMedia) {
+                throw new LogicException('Licensed playback demo data is missing for API sync scenarios.');
+            }
+
+            $this->mutations->apply($user, [
+                'mutation_id' => $progressMutationId,
+                'type' => 'progress.set',
+                'title_slug' => $title->slug,
+                'episode_id' => $context->firstEpisodeId,
+                'playback_session' => $this->progressSessions->issue($user, $title, $episode, $media),
+                'event_sequence' => 100_000 + $userIndex,
+                'position_seconds' => 900 + $userIndex,
+                'duration_seconds' => $context->durationSeconds ?? 2_400,
+                'ended' => false,
+            ]);
+        }
+
         $this->mutations->apply($user, $watchlist);
         $this->mutations->apply($user, [...$watchlist, 'value' => false]);
         $this->mutations->apply($user, $unsupported);
         $this->mutations->apply($user, $missing);
+    }
+
+    private function hasMutationReceipt(User $user, string $mutationId): bool
+    {
+        return ApiSyncMutation::query()
+            ->whereBelongsTo($user)
+            ->where('mutation_id', $mutationId)
+            ->exists();
     }
 
     /** @return Collection<int, User> */
@@ -266,7 +305,12 @@ final readonly class DemoNotificationSyncStage implements DemoDataStage
         });
     }
 
-    /** @template T of \BackedEnum @param non-empty-list<T> $cases @return T */
+    /**
+     * @template T of \BackedEnum
+     *
+     * @param  non-empty-list<T>  $cases
+     * @return T
+     */
     private function enumAt(array $cases, int $ordinal): \BackedEnum
     {
         return $cases[$ordinal % count($cases)];
