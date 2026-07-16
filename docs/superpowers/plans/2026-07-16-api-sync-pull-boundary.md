@@ -30,7 +30,7 @@
 - Consumes: `ApiSyncPullQuery::checkpoint(string, ?User): ApiSyncCursor`, `ApiSyncPullQuery::pull(ApiSyncCursor, int): array`, `ApiSyncCursorCodec::decode(string, string, ?int): ApiSyncCursor`, and `ApiSyncCursorCodec::encode(ApiSyncCursor): string`.
 - Produces: `ApiSyncPullService::pull(string $scope, ?User $owner, ?string $encodedCursor, int $limit): ApiSyncPullResult`.
 
-- [ ] **Step 1: Write the failing service tests**
+- [x] **Step 1: Write the failing service tests**
 
 Create `OfflineSyncPullServiceTest` with `RefreshDatabase` and three focused cases:
 
@@ -106,7 +106,7 @@ public function test_owner_mismatch_exception_is_not_hidden(): void
 
 Use a private `change(string $scope, ?User $user, string $key): ApiSyncChange` helper matching the existing sync test factory shape.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run:
 
@@ -116,7 +116,7 @@ php artisan test tests/Feature/Api/V1/OfflineSyncPullServiceTest.php
 
 Expected: FAIL because `App\Services\Api\V1\Sync\ApiSyncPullService` does not exist.
 
-- [ ] **Step 3: Add the immutable result DTO**
+- [x] **Step 3: Add the immutable result DTO**
 
 Create:
 
@@ -134,11 +134,11 @@ final readonly class ApiSyncPullResult
 
 Use `Illuminate\Database\Eloquent\Collection` and `App\Models\ApiSyncChange` for the generic PHPDoc.
 
-- [ ] **Step 4: Add the service**
+- [x] **Step 4: Add the service**
 
 Create `ApiSyncPullService` with constructor-injected `ApiSyncPullQuery` and `ApiSyncCursorCodec`. For a missing cursor, encode the exact scope checkpoint and return `new Collection()`. For a supplied cursor, decode against `$scope` and `$owner?->id`, delegate to `pull()`, and return the existing selected Eloquent collection, encoded next cursor, and `has_more` boolean. Do not catch `ApiSyncCursorException`.
 
-- [ ] **Step 5: Run GREEN**
+- [x] **Step 5: Run GREEN**
 
 Run:
 
@@ -148,7 +148,7 @@ php artisan test tests/Feature/Api/V1/OfflineSyncPullServiceTest.php
 
 Expected: 3 tests pass.
 
-- [ ] **Step 6: Format and commit the service slice**
+- [x] **Step 6: Format and commit the service slice**
 
 Run:
 
@@ -169,7 +169,7 @@ Commit only these three files with message `refactor: add typed API sync pull se
 - Consumes: `ApiSyncPullService::pull()` and `ApiSyncPullResult` from Task 1.
 - Produces: the unchanged `api.v1.sync.changes` and `api.v1.me.sync.show` HTTP contracts.
 
-- [ ] **Step 1: Run the characterization endpoints before editing**
+- [x] **Step 1: Run the characterization endpoints before editing**
 
 Run:
 
@@ -179,7 +179,7 @@ php artisan test tests/Feature/Api/V1/OfflineCatalogSyncTest.php tests/Feature/A
 
 Expected: all existing tests pass and establish the preserved response contract.
 
-- [ ] **Step 2: Delegate catalog and user pulls**
+- [x] **Step 2: Delegate catalog and user pulls**
 
 Replace the duplicated cursor/checkpoint/pull blocks with:
 
@@ -205,7 +205,7 @@ $result = $sync->pull(
 
 Retain the existing `try/catch` and `cursorError()` mapping. Add one private HTTP-only response helper that serializes `$result->changes` with `SyncChangeResource`, emits `$result->cursor`, `$result->hasMore`, the validated request limit, and `private, no-store`.
 
-- [ ] **Step 3: Run the service and endpoint suites**
+- [x] **Step 3: Run the service and endpoint suites**
 
 Run:
 
@@ -218,7 +218,7 @@ php artisan test \
 
 Expected: all tests pass with unchanged endpoint assertions.
 
-- [ ] **Step 4: Format and statically inspect**
+- [x] **Step 4: Format and statically inspect**
 
 Run:
 
@@ -228,13 +228,13 @@ vendor/bin/phpstan analyse \
   app/DTOs/ApiSyncPullResult.php \
   app/Services/Api/V1/Sync/ApiSyncPullService.php \
   app/Http/Controllers/Api/V1/SyncController.php \
-  --no-progress
+  --no-progress --memory-limit=512M
 php -l app/Http/Controllers/Api/V1/SyncController.php
 ```
 
 Expected: Pint clean, Larastan reports zero errors, and PHP syntax is valid.
 
-- [ ] **Step 5: Commit controller integration**
+- [x] **Step 5: Commit controller integration**
 
 Commit only `SyncController.php` with message `refactor: thin offline sync controller`.
 
@@ -250,11 +250,11 @@ Commit only `SyncController.php` with message `refactor: thin offline sync contr
 - Consumes: verified Task 1 and Task 2 behavior.
 - Produces: an auditable Phase 5.3 completion record with no duplicate API contract documentation.
 
-- [ ] **Step 1: Document the boundary**
+- [x] **Step 1: Document the boundary**
 
 Record in the API owner document that offline cursor/checkpoint/pull orchestration is centralized in `ApiSyncPullService`, while controllers own HTTP readiness/auth/error/resource concerns. Mark the focused Phase 5.3 controller-audit increment in the living plan without claiming every controller has been audited. Add an English changelog bullet under the current unreleased section.
 
-- [ ] **Step 2: Complete final verification**
+- [x] **Step 2: Complete final verification**
 
 Run:
 
@@ -275,7 +275,7 @@ vendor/bin/phpstan analyse \
   app/DTOs/ApiSyncPullResult.php \
   app/Services/Api/V1/Sync/ApiSyncPullService.php \
   app/Http/Controllers/Api/V1/SyncController.php \
-  --no-progress
+  --no-progress --memory-limit=512M
 git diff --check -- \
   app/DTOs/ApiSyncPullResult.php \
   app/Services/Api/V1/Sync/ApiSyncPullService.php \
@@ -289,7 +289,7 @@ git diff --check -- \
 
 Expected: both route families retain their names/middleware, focused tests pass, formatter/static analysis report no errors, and the scoped diff has no whitespace errors.
 
-- [ ] **Step 3: Inspect and commit documentation**
+- [x] **Step 3: Inspect and commit documentation**
 
 Inspect every changed file and directly related sync request/query/codec/resource. Commit only this plan, the living plan's focused status hunk, the API owner-document hunk, and the changelog hunk with message `docs: record API sync controller refactor`.
 
