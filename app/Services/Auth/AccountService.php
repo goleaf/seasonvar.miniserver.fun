@@ -6,6 +6,7 @@ namespace App\Services\Auth;
 
 use App\Enums\AuthenticationEvent;
 use App\Models\User;
+use App\Services\Catalog\CatalogRecommendationCacheInvalidator;
 use App\Services\Collections\CatalogCollectionAccountService;
 use App\Services\Comments\CommentAccountService;
 use App\Services\ContentRequests\ContentRequestAccountService;
@@ -26,6 +27,7 @@ final class AccountService
         private readonly CommentAccountService $comments,
         private readonly ReviewAccountService $reviews,
         private readonly ContentRequestAccountService $contentRequests,
+        private readonly CatalogRecommendationCacheInvalidator $recommendationCache,
         private readonly AuthenticationAuditService $audit,
     ) {}
 
@@ -172,6 +174,7 @@ final class AccountService
             $lockedUser->deleteOrFail();
         }, attempts: 3);
 
+        $this->recommendationCache->publicSignalsChanged('account-deleted');
         $this->audit->record(AuthenticationEvent::AccountDeleted, $user, $user->email);
         RateLimiter::clear($rateKey);
     }

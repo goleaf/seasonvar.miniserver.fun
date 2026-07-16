@@ -76,6 +76,7 @@ final class CatalogRecommendationAvailabilityReranker
             ->availableTo($context->user)
             ->forAvailableReleases($context->user)
             ->withoutKnownFailures()
+            ->withPlaybackLocation()
             ->whereIn('catalog_title_id', $candidateIds)
             ->where($column, $value)
             ->distinct()

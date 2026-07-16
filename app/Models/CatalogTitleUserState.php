@@ -16,12 +16,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'in_watchlist',
     'rating',
     'watchlist_version',
+    'watchlist_updated_at',
     'rating_version',
+    'rating_updated_at',
     'recommendation_feedback',
     'recommendation_feedback_version',
     'recommendation_feedback_updated_at',
     'watch_status',
     'watch_status_version',
+    'watch_status_updated_at',
 ])]
 class CatalogTitleUserState extends Model
 {
@@ -72,12 +75,15 @@ class CatalogTitleUserState extends Model
             'in_watchlist' => 'boolean',
             'rating' => 'integer',
             'watchlist_version' => 'integer',
+            'watchlist_updated_at' => 'datetime',
             'rating_version' => 'integer',
+            'rating_updated_at' => 'datetime',
             'recommendation_feedback' => CatalogRecommendationFeedback::class,
             'recommendation_feedback_version' => 'integer',
             'recommendation_feedback_updated_at' => 'datetime',
             'watch_status' => CatalogWatchStatus::class,
             'watch_status_version' => 'integer',
+            'watch_status_updated_at' => 'datetime',
         ];
     }
 

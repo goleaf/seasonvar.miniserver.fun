@@ -12,6 +12,7 @@ use App\Models\CatalogTitleRecommendation;
 use App\Models\CatalogTitleUserState;
 use App\Models\EpisodeViewProgress;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -137,10 +138,9 @@ final class CatalogPersonalizedRecommendationQuery
             ]);
         }
 
-        CatalogTitleUserState::query()
+        $this->orderBySignalActivity(CatalogTitleUserState::query()
             ->whereBelongsTo($user)
-            ->where('in_watchlist', true)
-            ->latest('updated_at')
+            ->where('in_watchlist', true), 'watchlist_updated_at')
             ->limit(80)
             ->pluck('catalog_title_id')
             ->each(fn (mixed $titleId) => $this->rememberSignal($signals, (int) $titleId, [
@@ -150,10 +150,9 @@ final class CatalogPersonalizedRecommendationQuery
             ]));
 
         if (Schema::hasColumn('catalog_title_user_states', 'watch_status')) {
-            CatalogTitleUserState::query()
+            $this->orderBySignalActivity(CatalogTitleUserState::query()
                 ->whereBelongsTo($user)
-                ->whereIn('watch_status', [CatalogWatchStatus::Planned->value, CatalogWatchStatus::Watching->value])
-                ->latest('updated_at')
+                ->whereIn('watch_status', [CatalogWatchStatus::Planned->value, CatalogWatchStatus::Watching->value]), 'watch_status_updated_at')
                 ->limit(80)
                 ->pluck('catalog_title_id')
                 ->each(fn (mixed $titleId) => $this->rememberSignal($signals, (int) $titleId, [
@@ -164,10 +163,9 @@ final class CatalogPersonalizedRecommendationQuery
         }
 
         $ratingThreshold = max(1, (int) ceil((int) config('catalog.user_rating.maximum', 10) * 0.7));
-        CatalogTitleUserState::query()
+        $this->orderBySignalActivity(CatalogTitleUserState::query()
             ->whereBelongsTo($user)
-            ->where('rating', '>=', $ratingThreshold)
-            ->latest('updated_at')
+            ->where('rating', '>=', $ratingThreshold), 'rating_updated_at')
             ->limit(80)
             ->pluck('catalog_title_id')
             ->each(fn (mixed $titleId) => $this->rememberSignal($signals, (int) $titleId, [
@@ -203,6 +201,20 @@ final class CatalogPersonalizedRecommendationQuery
             ]));
 
         return array_slice($signals, 0, $historyLimit, true);
+    }
+
+    /**
+     * @param  Builder<CatalogTitleUserState>  $query
+     * @return Builder<CatalogTitleUserState>
+     */
+    private function orderBySignalActivity(Builder $query, string $column): Builder
+    {
+        return $query
+            ->when(
+                Schema::hasColumn('catalog_title_user_states', $column),
+                fn (Builder $query): Builder => $query->orderByDesc($column),
+            )
+            ->orderByDesc('id');
     }
 
     /**

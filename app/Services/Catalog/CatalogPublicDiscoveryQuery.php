@@ -18,6 +18,7 @@ use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUserState;
 use App\Models\Episode;
 use App\Models\EpisodeViewProgress;
+use App\Models\Season;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Query\JoinClause;
@@ -72,14 +73,19 @@ final class CatalogPublicDiscoveryQuery
                     ->orWhere('progress_percent', '>=', max(1, (int) config('recommendations.meaningful_progress_percent', 10)))
                     ->orWhereNotNull('completed_at');
             })
-            ->groupBy('catalog_title_id')
-            ->unionAll(DB::table('catalog_title_user_states')
+            ->groupBy('catalog_title_id');
+
+        if (Schema::hasColumn('catalog_title_user_states', 'watchlist_updated_at')) {
+            $events->unionAll(DB::table('catalog_title_user_states')
                 ->select('catalog_title_id')
                 ->selectRaw('COUNT(*) * 25 AS activity_score')
                 ->selectRaw('0 AS watcher_count')
                 ->where('in_watchlist', true)
-                ->where('updated_at', '>=', $after)
-                ->groupBy('catalog_title_id'))
+                ->where('watchlist_updated_at', '>=', $after)
+                ->groupBy('catalog_title_id'));
+        }
+
+        $events
             ->unionAll(DB::table('catalog_title_reviews')
                 ->select('catalog_title_id')
                 ->selectRaw('COUNT(*) * 8 AS activity_score')
@@ -321,26 +327,58 @@ final class CatalogPublicDiscoveryQuery
      */
     private function upcoming(CatalogRecommendationContext $context, array $excludedIds): array
     {
+        $now = now();
+        $limit = $this->candidateLimit();
+        $availableSeasonForEpisode = Season::query()
+            ->availableTo($context->user)
+            ->whereColumn('seasons.id', 'episodes.season_id')
+            ->selectRaw('1')
+            ->toBase();
+        $availableSeasonForTitle = (clone $availableSeasonForEpisode)
+            ->whereColumn('seasons.catalog_title_id', 'catalog_titles.id');
+        $upcomingEpisodesForTitle = Episode::query()
+            ->availableTo($context->user)
+            ->whereExists($availableSeasonForTitle)
+            ->where('episodes.released_at', '>', $now);
+        $eligibleTitleIds = $this->eligibleQuery($context, watchable: false, excludedIds: $excludedIds)
+            ->select('catalog_titles.id');
+        $futureEpisodeTitleIds = Episode::query()
+            ->join('seasons as release_seasons', 'release_seasons.id', '=', 'episodes.season_id')
+            ->availableTo($context->user)
+            ->whereExists($availableSeasonForEpisode)
+            ->where('episodes.released_at', '>', $now)
+            ->whereIn('release_seasons.catalog_title_id', clone $eligibleTitleIds)
+            ->select('release_seasons.catalog_title_id')
+            ->selectRaw('MIN(episodes.released_at) AS next_release_at')
+            ->groupBy('release_seasons.catalog_title_id')
+            ->orderBy('next_release_at')
+            ->orderBy('release_seasons.catalog_title_id')
+            ->limit($limit)
+            ->pluck('release_seasons.catalog_title_id')
+            ->map(fn (mixed $id): int => (int) $id);
+        $futureYearTitleIds = (clone $eligibleTitleIds)
+            ->where('catalog_titles.year', '>', $now->year)
+            ->orderBy('catalog_titles.year')
+            ->orderBy('catalog_titles.id')
+            ->limit($limit)
+            ->pluck('catalog_titles.id')
+            ->map(fn (mixed $id): int => (int) $id);
+        $candidateIds = $futureEpisodeTitleIds
+            ->concat($futureYearTitleIds)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($candidateIds === []) {
+            return [];
+        }
+
         $query = $this->eligibleQuery($context, watchable: false, excludedIds: $excludedIds)
             ->select('catalog_titles.id')
-            ->selectSub(Episode::query()
-                ->join('seasons', 'seasons.id', '=', 'episodes.season_id')
+            ->selectSub((clone $upcomingEpisodesForTitle)
                 ->selectRaw('MIN(episodes.released_at)')
-                ->whereColumn('seasons.catalog_title_id', 'catalog_titles.id')
-                ->where('episodes.released_at', '>', now()), 'next_release_at')
-            ->where(function (Builder $query): void {
-                $query
-                    ->where('catalog_titles.year', '>', now()->year)
-                    ->orWhereExists(fn (QueryBuilder $query): QueryBuilder => $query
-                        ->selectRaw('1')
-                        ->from('episodes')
-                        ->join('seasons', 'seasons.id', '=', 'episodes.season_id')
-                        ->whereColumn('seasons.catalog_title_id', 'catalog_titles.id')
-                        ->where('episodes.publication_status', 'published')
-                        ->whereNull('episodes.deleted_at')
-                        ->whereNull('seasons.deleted_at')
-                        ->where('episodes.released_at', '>', now()));
-            });
+                ->toBase(), 'next_release_at')
+            ->whereKey($candidateIds);
 
         if ($context->user !== null) {
             $query->selectSub(EpisodeViewProgress::query()

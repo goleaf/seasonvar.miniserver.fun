@@ -152,6 +152,7 @@ class CatalogUserStateService
             column: 'watch_status',
             value: $status?->value,
             versionColumn: 'watch_status_version',
+            timestamps: $this->semanticTimestamp('watch_status_updated_at'),
         );
     }
 
@@ -388,6 +389,14 @@ class CatalogUserStateService
                 $updates[$versionColumn] = ++$version;
             }
 
+            $timestampColumn = $column === 'in_watchlist'
+                ? 'watchlist_updated_at'
+                : 'rating_updated_at';
+
+            if (Schema::hasColumn('catalog_title_user_states', $timestampColumn)) {
+                $updates[$timestampColumn] = $now;
+            }
+
             $state->forceFill($updates)->save();
             $this->syncChanges->publishTitleState($user, $catalogTitle);
 
@@ -473,6 +482,14 @@ class CatalogUserStateService
                 'recommendationFeedback' => __('recommendations.feedback.unavailable'),
             ]);
         }
+    }
+
+    /** @return array<string, mixed> */
+    private function semanticTimestamp(string $column): array
+    {
+        return Schema::hasColumn('catalog_title_user_states', $column)
+            ? [$column => now()]
+            : [];
     }
 
     private function hitRecommendationFeedbackLimit(User $user): void
