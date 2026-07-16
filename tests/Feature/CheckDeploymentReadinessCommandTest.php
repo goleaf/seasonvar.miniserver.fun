@@ -11,11 +11,45 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 final class CheckDeploymentReadinessCommandTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_command_reports_ready_for_a_safe_runtime_and_consistent_sqlite_database(): void
+    {
+        config([
+            'app.env' => 'production',
+            'app.debug' => false,
+            'logging.default' => 'daily',
+            'logging.channels.daily.level' => 'warning',
+            'cache.default' => 'redis-domain',
+            'cache.stores.redis-domain.driver' => 'redis',
+            'cache.stores.memcached-hot.driver' => 'memcached',
+            'session.driver' => 'redis',
+            'session.connection' => 'sessions',
+            'queue.default' => 'redis',
+            'queue.connections.redis.connection' => 'queues',
+        ]);
+
+        $exitCode = Artisan::call('app:deployment-check', ['--json' => true]);
+        $decoded = json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertIsArray($decoded);
+        $decodedChecks = $decoded['checks'] ?? null;
+        $this->assertIsArray($decodedChecks);
+        $checks = collect($decodedChecks)->keyBy('name');
+
+        $this->assertSame(0, $exitCode);
+        $this->assertSame('ready', $decoded['status']);
+        $this->assertTrue($decoded['ready']);
+        $this->assertNotContains('fail', $checks->pluck('status')->all());
+        $this->assertSame('pass', $checks->get('migrations')['status']);
+        $this->assertSame(0, $checks->get('migrations')['metadata']['pending_count']);
+        $this->assertSame('pass', $checks->get('sqlite_integrity')['status']);
+        $this->assertSame(0, $checks->get('sqlite_integrity')['metadata']['foreign_key_errors']);
+    }
 
     public function test_failed_job_summary_is_bounded_and_never_exposes_payload_or_exception_text(): void
     {
@@ -69,6 +103,59 @@ final class CheckDeploymentReadinessCommandTest extends TestCase
 
         $this->assertSame(['warm_catalog_cache' => 1], $summary['jobs']);
         $this->assertSame(['cache' => 1], $summary['categories']);
+    }
+
+    public function test_failed_job_summary_remains_complete_across_bounded_chunks(): void
+    {
+        $jobKinds = [
+            'App\\Jobs\\ProcessSeasonvarImportPage',
+            'App\\Jobs\\RefreshSeasonvarCatalogTitle',
+            'App\\Jobs\\WarmCatalogCaches',
+        ];
+        $queues = ['seasonvar-import', 'seasonvar-title-refresh', 'cache-warm-v2'];
+        $failedAt = [now()->subMinutes(10), now()->subHours(2), now()->subDays(9)];
+        $rows = [];
+
+        foreach (range(0, 449) as $index) {
+            $bucket = $index % 3;
+            $rows[] = [
+                'uuid' => (string) Str::uuid(),
+                'connection' => 'redis',
+                'queue' => $queues[$bucket],
+                'payload' => json_encode([
+                    'displayName' => $jobKinds[$bucket],
+                    'data' => ['token' => 'private-token-'.$index],
+                ], JSON_THROW_ON_ERROR),
+                'exception' => 'private exception '.$index,
+                'failed_at' => $failedAt[$bucket],
+            ];
+        }
+
+        collect($rows)->chunk(90)->each(
+            fn ($chunk) => DB::table('failed_jobs')->insert($chunk->all()),
+        );
+
+        $summary = app(FailedJobSummaryBuilder::class)->build();
+        $serialized = json_encode($summary, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+
+        $this->assertSame(450, $summary['total']);
+        $this->assertSame([
+            'import_page' => 150,
+            'refresh_catalog_title' => 150,
+            'warm_catalog_cache' => 150,
+        ], $summary['jobs']);
+        $this->assertSame([
+            'cache' => 150,
+            'import' => 150,
+            'title_refresh' => 150,
+        ], $summary['categories']);
+        $this->assertSame([
+            '1_to_24_hours' => 150,
+            'over_7_days' => 150,
+            'under_1_hour' => 150,
+        ], $summary['ages']);
+        $this->assertStringNotContainsString('private-token', $serialized);
+        $this->assertStringNotContainsString('private exception', $serialized);
     }
 
     public function test_checker_reports_unsafe_runtime_missing_index_and_fts_mismatch(): void

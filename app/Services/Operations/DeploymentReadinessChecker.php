@@ -169,11 +169,11 @@ final class DeploymentReadinessChecker
 
     private function searchIndexCheck(): DeploymentCheck
     {
-        if (! Schema::hasTable('catalog_title_search_documents') || ! Schema::hasTable('catalog_search_index_states')) {
-            return new DeploymentCheck('search_index', 'fail', 'Таблицы поискового индекса отсутствуют.');
-        }
-
         try {
+            if (! Schema::hasTable('catalog_title_search_documents') || ! Schema::hasTable('catalog_search_index_states')) {
+                return new DeploymentCheck('search_index', 'fail', 'Таблицы поискового индекса отсутствуют.');
+            }
+
             $sourceCount = $this->searchIndexer->sourceCount();
             $documentCount = $this->searchIndexer->documentCount();
             $ftsCount = (int) (DB::table('catalog_title_search_fts')->count());

@@ -63,8 +63,10 @@ Verification: repository scans, `artisan about/route:list/event:list/schedule:li
 - [x] Profile every private check independently, then confirm end-to-end: wall 24.45 s; SQLite quick/FK 23655 ms; migrations 13 ms; FTS 303 ms; failed jobs 98 ms; importer 140 ms; remaining checks 0 ms after integer rounding.
 - [x] Correct the initial diagnosis: the external 25 s deadline was too short; no unbounded/materializing preflight path was proven.
 - [x] Add safe integer `duration_ms` per check to JSON and text output without paths, payloads or exception text; RED/GREEN feature contract verified.
-- [ ] Preserve full quick/FK corruption detection and add regression coverage for normal, pending-migration, failed-job-volume and unavailable-backend results.
+- [x] Preserve full quick/FK corruption detection and add regression coverage for normal, pending-migration, failed-job-volume and unavailable-backend results.
 - [x] Measure the complete command: deterministic completion in 24.45 s within the documented >=30 s budget on the current 14+ GB dataset; integrity pass and expected gate failure remained distinct.
+
+Verified increment: 8 focused deployment-readiness tests / 60 assertions cover a fully ready runtime, full SQLite quick/FK execution, pending migration without application, 450 failed jobs across the bounded 200-row iterator and unavailable SQLite. The unavailable-backend RED case exposed `Schema::hasTable()` outside the FTS check's exception boundary; moving the capability probe inside the existing local `try` now returns stable secret-free fail checks and exit 1 instead of aborting the command.
 
 Rollback: revert duration-only instrumentation if it changes the stable JSON contract. Do not replace the integrity check with a weaker sample and do not add an index without target SQL/plan evidence.
 

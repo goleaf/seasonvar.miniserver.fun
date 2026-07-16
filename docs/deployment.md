@@ -287,7 +287,7 @@ php artisan app:deployment-check
 php artisan app:deployment-check --json
 ```
 
-Команда ничего не мигрирует, не очищает и не перезапускает. Она проверяет production/debug/logging, pending migrations, SQLite quick/FK checks и обязательные индексы, состояние FTS, production cache/session/queue profile, безопасную агрегатную сводку failed jobs и профиль процесса импортёра. Ненулевой exit code означает, что traffic или writers возвращать нельзя. JSON содержит только стабильные имена проверок, статусы, русские сообщения, scalar counts и целочисленный `duration_ms` каждого check; failed-job payload, exception text, URL и токены не выводятся.
+Команда ничего не мигрирует, не очищает и не перезапускает. Она проверяет production/debug/logging, pending migrations, SQLite quick/FK checks и обязательные индексы, состояние FTS, production cache/session/queue profile, безопасную агрегатную сводку failed jobs и профиль процесса импортёра. Ненулевой exit code означает, что traffic или writers возвращать нельзя. JSON содержит только стабильные имена проверок, статусы, русские сообщения, scalar counts и целочисленный `duration_ms` каждого check; failed-job payload, exception text, URL и токены не выводятся. Если SQLite недоступна, каждый database-dependent check возвращает безопасный `fail`, а команда завершает JSON и exit 1 без SQL exception/path disclosure.
 
 На live SQLite >14 GB instrumented run занял 24.45 s wall time: quick/FK path — 23655 ms, каждый прочий check — 0–303 ms. Внешний `timeout 25s` поэтому дал ложное впечатление зависания. Не снижайте полноту integrity-проверки: запускайте preflight вне активной write-нагрузки с бюджетом >=30 s и отслеживайте рост `duration_ms` вместе с размером базы.
 
