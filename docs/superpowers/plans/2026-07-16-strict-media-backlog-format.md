@@ -123,7 +123,7 @@ Push `main` to `origin/main`, verify local/remote hashes, mark this checklist co
 - Read-only production audit: stored direct HTTP(S) `873561`; legacy wildcard eligibility `873561`; wildcard-only `0`; stored-direct playlist conflicts `0`; stored-direct non-HTTP rows `0`.
 - Fresh `v4` status snapshot at `2026-07-16 07:58:31`: eligible `873561`, checked `17349`, pending/due `856212`, known `17348`, failed `1`.
 - Generated Eloquent SQL contains stored `format IN (...)`, effective `http://|https://`, due-state and soft-delete predicates; bindings contain no direct-extension wildcard.
-- Forced strict eligible count is `873561`.
+- Forced strict eligible count was `873561` at the audited snapshot. While final verification ran, active import `#887` advanced both strict and reconstructed legacy counts to `873562`; wildcard-only remained `0`, confirming equivalence on the live-grown dataset.
 - PHP lint reports no syntax errors; path-targeted Pint passes; focused Larastan passes with zero errors.
 - Scheduler retains `--media-size-limit=500 --media-size-time-budget=480`; download route retains `auth`, `throttle:media-downloads`, authenticated session, scoped bindings and private-response middleware.
 - `git diff --check` passes for the six task files; targeted conflict/debug/placeholder/body-buffering search returns no matches.
