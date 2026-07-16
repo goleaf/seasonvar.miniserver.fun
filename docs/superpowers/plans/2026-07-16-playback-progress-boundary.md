@@ -307,7 +307,7 @@ git diff -- app/DTOs/PlaybackProgressInput.php app/Services/Catalog/Api/V1/Playb
 
 Expected: docs check succeeds, no whitespace errors, and the diff contains only the described boundary and documentation hunks.
 
-- [ ] **Step 5: Commit and publish with concurrency safety**
+- [x] **Step 5: Commit and publish with concurrency safety**
 
 Before each commit/publish, verify `main`, fetch the current remote, stage only exact owned files or exact documentation hunks through an alternate index, and use compare-and-swap ref updates. If remote `main` advances, reapply only the owned content on top of the new remote tree; never overwrite or include unrelated working-tree changes.
 
@@ -317,6 +317,15 @@ Expected commit subjects:
 refactor: isolate playback progress controller boundary
 docs: complete playback progress boundary plan
 ```
+
+### Execution evidence
+
+- Design was published on `main` as `4afef2b` and this implementation plan as `10afa89`.
+- The three-file application boundary was published as `e208d2d`; the architecture, living-plan evidence and English changelog entry were published as `10dab6a`.
+- Fresh completion verification reported no PHP syntax errors, Pint pass and scoped Larastan 0 errors.
+- Uncached Laravel route inspection returned one named `PUT` route with Sanctum authentication, `mobile:write`, verified-email and `api-playback-progress` middleware; direct container resolution returned `playback-progress-boundary-ok`.
+- `project:docs-refresh --check` reported current documentation, `git diff --check` was clean, and local/remote commit trees matched after each publication.
+- No automated test, fixture write, migration, database mutation, cache clear, dependency update, branch or worktree was created or run for this increment, as required by Task 12 and the project workflow.
 
 ### Self-review
 
