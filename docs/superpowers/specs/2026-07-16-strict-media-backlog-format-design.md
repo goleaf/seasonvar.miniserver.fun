@@ -16,7 +16,7 @@ A read-only production audit found 873,561 HTTP(S) media rows with a stored dire
 
 ## Design
 
-`LicensedMediaFileSizeBacklog::eligibleQuery()` will require `format IN (configured direct formats)` and an HTTP(S) effective URL. It will remove only the `OR effective_url LIKE %.format%` loop. Freshness, soft-delete scope, stable `lazyById`, limits, status aggregate, caching and file-size state transitions remain unchanged.
+`LicensedMediaFileSizeBacklog::eligibleQuery()` will require `format IN (configured direct formats)` and an HTTP(S) effective URL. It will remove only the `OR effective_url LIKE %.format%` loop. Freshness, soft-delete scope, stable `lazyById`, limits, status aggregate, cache store/TTL and file-size state transitions remain unchanged. The operational cache resource advances from `v3` to `v4` so a snapshot computed under the broader predicate cannot survive the deployment's bounded stale window.
 
 The SQL query is a bounded preselection boundary, not final authorization. `InspectLicensedMediaFileSize` continues to delegate to `ExternalMediaFileSizeInspector`, which calls `ExternalMediaFileType::isPlaylist()` before `isDirect()` and performs URL validation before networking. Download eligibility independently repeats the same type and URL checks. A malformed or contradictory stored row therefore remains unable to turn HLS into a direct download.
 

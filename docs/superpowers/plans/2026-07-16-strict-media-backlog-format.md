@@ -29,11 +29,11 @@
 - Consumes: normalized `licensed_media.format`, configured `playback.downloads.allowed_formats`, effective `playback_url|path` and existing due-state fields.
 - Produces: the existing `LicensedMediaFileSizeBacklog::query(bool $force = false): Builder` with a strict stored-format eligibility predicate.
 
-- [ ] **Step 1: Record the read-only production equivalence evidence**
+- [x] **Step 1: Record the read-only production equivalence evidence**
 
 Run aggregate SQL for stored direct HTTP(S), current wildcard eligibility, wildcard-only rows, playlist-marker conflicts and non-HTTP rows. Expected audited values: stored direct `873561`, current eligibility `873561`, wildcard-only `0`, playlist conflicts `0`, non-HTTP `0`.
 
-- [ ] **Step 2: Remove only the URL extension wildcard loop**
+- [x] **Step 2: Remove only the URL extension wildcard loop**
 
 Replace the eligibility format closure with the direct predicate:
 
@@ -46,13 +46,13 @@ return LicensedMedia::query()
     });
 ```
 
-Do not change `applyDueConstraint()`, configured format normalization, cache identity or status aggregation.
+Do not change `applyDueConstraint()`, configured format normalization, cache store/TTL or status aggregation. Advance the operational cache resource from `v3` to `v4` so a pre-deployment snapshot produced by the broader predicate cannot remain visible during the stale window.
 
-- [ ] **Step 3: Inspect generated SQL without executing external work**
+- [x] **Step 3: Inspect generated SQL without executing external work**
 
 Run a read-only application call for `app(LicensedMediaFileSizeBacklog::class)->query()->toSql()`. Expected: `format in (...)`, HTTP(S) predicates and freshness predicates remain; no `%.mp4%`, `%.m4v%`, `%.mov%`, `%.webm%`, `%.mkv%` or `%.avi%` predicate exists.
 
-- [ ] **Step 4: Reconfirm production count equivalence**
+- [x] **Step 4: Reconfirm production count equivalence**
 
 Run the strict stored-format HTTP(S) aggregate again. Expected eligible total remains `873561`; no row is mutated.
 
@@ -69,19 +69,19 @@ Run the strict stored-format HTTP(S) aggregate again. Expected eligible total re
 - Consumes: final query contract and measured equivalence evidence.
 - Produces: concise operator/developer documentation for the trusted format boundary.
 
-- [ ] **Step 1: Document importer eligibility semantics**
+- [x] **Step 1: Document importer eligibility semantics**
 
 State in `docs/importer.md` that SQL backlog selection trusts normalized stored direct format plus HTTP(S), never query-string extension text, while `ExternalMediaFileType` repeats playlist/direct validation before networking.
 
-- [ ] **Step 2: Document performance impact**
+- [x] **Step 2: Document performance impact**
 
 State in `docs/performance.md` that redundant wildcard extension comparisons were removed from the full eligibility scan and record the `873561 / 0 fallback-only` production audit without claiming an unmeasured timing improvement.
 
-- [ ] **Step 3: Add the current-date changelog entry**
+- [x] **Step 3: Add the current-date changelog entry**
 
 Record the stricter backlog classification, unchanged production eligibility and unchanged downstream safety/streaming contracts.
 
-- [ ] **Step 4: Mark the implementation checklist accurately**
+- [x] **Step 4: Mark the implementation checklist accurately**
 
 Mark only completed steps, add exact verification evidence and keep commit/push unchecked until each operation succeeds.
 
@@ -94,15 +94,15 @@ Mark only completed steps, add exact verification evidence and keep commit/push 
 - Consumes: strict query and documentation.
 - Produces: task-only commits pushed to `origin/main`.
 
-- [ ] **Step 1: Run syntax, formatting and static analysis**
+- [x] **Step 1: Run syntax, formatting and static analysis**
 
 Run `php -l app/Services/Media/LicensedMediaFileSizeBacklog.php`, path-targeted `./vendor/bin/pint --format agent` and focused Larastan. Expected: no syntax error, Pint pass and zero static-analysis errors.
 
-- [ ] **Step 2: Run read-only application verification**
+- [x] **Step 2: Run read-only application verification**
 
 Run generated-SQL inspection, production count equivalence, `php artisan seasonvar:import --status`, `php artisan schedule:list` and `php artisan route:list --path=download`. Expected: strict SQL, count `873561`, working status, unchanged `500/480` schedule and protected download route.
 
-- [ ] **Step 3: Review exact scope**
+- [x] **Step 3: Review exact scope**
 
 Run `git diff --check`, conflict/placeholder/debug/secret/source-URL searches and inspect the task patch. Confirm no test, migration, dependency or binary was added or modified.
 
@@ -118,11 +118,22 @@ fix: trust normalized formats for media backlog
 
 Push `main` to `origin/main`, verify local/remote hashes, mark this checklist complete in a one-file closure commit and push again.
 
+## Verification evidence
+
+- Read-only production audit: stored direct HTTP(S) `873561`; legacy wildcard eligibility `873561`; wildcard-only `0`; stored-direct playlist conflicts `0`; stored-direct non-HTTP rows `0`.
+- Fresh `v4` status snapshot at `2026-07-16 07:58:31`: eligible `873561`, checked `17349`, pending/due `856212`, known `17348`, failed `1`.
+- Generated Eloquent SQL contains stored `format IN (...)`, effective `http://|https://`, due-state and soft-delete predicates; bindings contain no direct-extension wildcard.
+- Forced strict eligible count is `873561`.
+- PHP lint reports no syntax errors; path-targeted Pint passes; focused Larastan passes with zero errors.
+- Scheduler retains `--media-size-limit=500 --media-size-time-budget=480`; download route retains `auth`, `throttle:media-downloads`, authenticated session, scoped bindings and private-response middleware.
+- `git diff --check` passes for the six task files; targeted conflict/debug/placeholder/body-buffering search returns no matches.
+- No task test, migration, dependency or binary file was created or modified. Automated tests were not created or executed, per the task constraint.
+
 ## Final changed-file list
 
-- [ ] `app/Services/Media/LicensedMediaFileSizeBacklog.php`
-- [ ] `CHANGELOG.md`
-- [ ] `docs/importer.md`
-- [ ] `docs/performance.md`
-- [ ] `docs/superpowers/specs/2026-07-16-strict-media-backlog-format-design.md`
-- [ ] `docs/superpowers/plans/2026-07-16-strict-media-backlog-format.md`
+- [x] `app/Services/Media/LicensedMediaFileSizeBacklog.php`
+- [x] `CHANGELOG.md`
+- [x] `docs/importer.md`
+- [x] `docs/performance.md`
+- [x] `docs/superpowers/specs/2026-07-16-strict-media-backlog-format-design.md`
+- [x] `docs/superpowers/plans/2026-07-16-strict-media-backlog-format.md`

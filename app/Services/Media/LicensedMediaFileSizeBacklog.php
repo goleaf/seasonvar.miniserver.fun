@@ -17,7 +17,7 @@ use UnexpectedValueException;
 
 final class LicensedMediaFileSizeBacklog
 {
-    private const CACHE_RESOURCE = 'licensed-media-file-size-backlog-v3';
+    private const CACHE_RESOURCE = 'licensed-media-file-size-backlog-v4';
 
     private const EFFECTIVE_URL_SQL = "COALESCE(NULLIF(playback_url, ''), path)";
 
@@ -138,13 +138,7 @@ final class LicensedMediaFileSizeBacklog
         }
 
         return LicensedMedia::query()
-            ->where(function (Builder $query) use ($formats): void {
-                $query->whereIn('format', $formats);
-
-                foreach ($formats as $format) {
-                    $query->orWhereRaw(self::EFFECTIVE_URL_SQL.' LIKE ?', ['%.'.$format.'%']);
-                }
-            })
+            ->whereIn('format', $formats)
             ->where(function (Builder $query): void {
                 $query->whereRaw(self::EFFECTIVE_URL_SQL.' LIKE ?', ['http://%'])
                     ->orWhereRaw(self::EFFECTIVE_URL_SQL.' LIKE ?', ['https://%']);
