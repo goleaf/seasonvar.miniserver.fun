@@ -602,4 +602,44 @@ Before this final plan commit, the shared main publisher had already advanced bo
 - Shared-worktree backend: `968` tests, `957` passed, `11` skipped, `7627` assertions.
 - Process isolation: concurrent port `8013` did not affect the default run on `34152`; run-specific SQLite, runtime artifacts and Laravel caches were separated.
 - Cleanup: zero generated files remained in each owned `output/ci/<run-id>` after success or failure.
-- Known external failures: clean committed Pint debt in six domain files and 9 active catalog/header Playwright failures. They remain intentionally outside this CI-only boundary and are reported rather than silently bypassed.
+- Known external failures at the original close: six committed Pint mismatches and 9 active catalog/header Playwright failures. Task 5 below resolves the formatting debt and records a newer clean-snapshot audit without weakening either gate.
+
+### Task 5: Resolve verified formatting debt and re-audit remaining gates
+
+**Files:**
+- Format only: `app/Actions/Comments/RevokeCommentRestriction.php`
+- Format only: `app/Livewire/CatalogTitleDetail.php`
+- Format only: `app/Livewire/Collections/CatalogCollectionAdministrationManager.php`
+- Format only: `app/Services/Comments/CommentTargetResolver.php`
+- Format only: `app/Services/Media/ExternalPlaylistImporter.php`
+- Format only: `app/Services/Tags/TagService.php`
+- Update evidence only: this plan
+
+- [x] **Step 1: Prove the shared worktree changes are canonical Pint output**
+
+A fresh `git archive HEAD` snapshot was formatted independently with the committed `pint.json`. The SHA-256 hash of every formatted snapshot file matched its existing shared-worktree counterpart exactly. This proves the six changes contain no behavior beyond the Pint fixers already reported by the clean backend gate.
+
+- [x] **Step 2: Commit only the six verified formatting files**
+
+Use a temporary Git index, verify the exact allowlist and `git diff --check`, then commit with `style: align committed PHP files with Pint`. Do not include any other dirty application, documentation, test, lockfile or untracked file.
+
+Observed: commit `1c04c56` contains exactly the six allowlisted PHP files. Pint check mode, PHP syntax and `git diff --check` passed for the isolated change.
+
+- [x] **Step 3: Re-run clean backend and current browser verification**
+
+Materialize the resulting commit with `git archive` and run the canonical backend profile. Re-audit the browser profile against the latest committed main separately from the active header/catalog worktree. Record exact remaining failures without weakening the gate.
+
+Observed on clean tracked snapshot `22a1180`:
+
+- Composer validation/audit, Pint, PHP syntax, PHPStan, documentation refresh validation and Laravel config/route/view cache builds passed.
+- A fresh-run documentation defect was found before PHPUnit: an empty CI database tried to replace the last confirmed `SOURCE_PARITY.md` inventory with an empty snapshot. Commit `22a1180` preserves an existing confirmed snapshot when inventory storage or a successful inventory record is unavailable; the focused regression test passed, and both refresher suites passed `8` tests with `23` assertions.
+- Full PHPUnit completed `965` tests: `913` passed, `11` skipped, `38` failed and `3` errored (`7391` assertions). Remaining failures are in already committed recommendations, cache warming, account/password, queue-status, localization and Blade/UI contracts outside this CI-only boundary.
+- Clean Playwright completed in `5.5m`: `13` passed and `8` failed. Remaining failures are the committed responsive/accessibility auth, catalog, title-player and poster-surface regressions; the gate reported them normally.
+- The materialization harness used a physical `vendor` copy, a private temporary Git root, an isolated SQLite database and run-scoped Laravel/Playwright output. Temporary snapshots were removed after each run, and the source repository retained its standard implicit worktree configuration.
+- Parallel commit `14b91cb` landed after both snapshots started and is intentionally not represented by the `22a1180` evidence above.
+
+- [ ] **Step 4: Commit evidence and publish `main` (externally blocked)**
+
+Update this checklist with exact results, commit only this file, then push the existing `main`. If credentials remain unavailable, preserve the commits and report the exact 401/public-key blocker.
+
+Direct HTTPS publication was attempted from `main` after the audit and failed with GitHub `401` (`Missing or invalid credentials`, `No anonymous write access`). No history was rewritten and no credential was stored. Commit this evidence locally; remote publication remains pending valid repository credentials or the shared publisher.
