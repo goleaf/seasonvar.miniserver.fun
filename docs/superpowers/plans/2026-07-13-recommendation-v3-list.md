@@ -471,7 +471,7 @@ This section supersedes only the unfinished execution notes above. It preserves 
 - [x] Exercise public/private/cold-start/feedback/undo/random/related/similar queries against the configured and disposable SQLite schemas without invoking the automated test runner; mutations were verified through authorization/validation/idempotent write-path inspection rather than changing a real user's state.
 - [x] Run Vite build and browser smoke checks at phone/tablet/desktop widths, including keyboard/focus, no horizontal overflow, console/network errors and no private HTML/URL/cache leakage.
 - [x] Verify public versus private cache dimensions, noindex/canonical/hreflang/sitemap policy, translation key parity and accessibility names.
-- [ ] Re-read the full task, record any unavailable portal capability as a verified limitation rather than a fabricated implementation, update all owner docs and changelog, then commit only task 18 changes on `main` and push.
+- [x] Re-read the full task, record any unavailable portal capability as a verified limitation rather than a fabricated implementation, update all owner docs and changelog, then commit only task 18 changes on `main` and push.
 
 ### Implementation evidence, 2026-07-16
 
@@ -482,7 +482,7 @@ This section supersedes only the unfinished execution notes above. It preserves 
 - [x] The current relation table contains zero legacy anomalies after additive creation; existing 385,555 stored similarity rows remain algorithm v4 and readable. Code v5 is used at the next canonical full import rebuild, preserving old data until atomic per-title replacement.
 - [x] Dedicated region/premium, audio/subtitle-language, creator/writer/billing, favorite-genre profile, release-calendar entity and recommendation analytics were confirmed absent and are documented as limitations rather than simulated features.
 - [x] Complete Pint/lint/OpenAPI/translation/build/browser/diff verification.
-- [ ] Re-read the task, finish owner docs/changelog, inspect staged scope, commit task-only work on `main` and push.
+- [x] Re-read the task, finish owner docs/changelog, inspect staged scope, commit task-only work on `main` and push.
 
 Fresh final evidence: explicit task-file Pint returned `passed`; PHP syntax covered 42 PHP files; targeted Larastan and the repository `composer analyse` gate both returned zero errors; recommendation locale parity is 193 keys; OpenAPI JSON and `project:docs-refresh --check` passed; Vite 8.1.4 produced the production bundle. SQLite `PRAGMA quick_check` returned `ok`, relation/feedback queries selected their focused indexes, and route inspection preserved canonical/localized/legacy/API names.
 
