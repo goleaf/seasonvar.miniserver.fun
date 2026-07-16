@@ -2,6 +2,7 @@
 
 ## 2026-07-16
 
+- Made `CACHE_WARMING_ENABLED=false` a complete automatic-warming kill switch: catalogue mutations and the ten-minute scheduler now both skip dispatch while disabled, while the manual command and enabled behavior remain unchanged. Production verification across the 10:00 and 10:10 scheduler cycles kept `cache-warm-v2` empty and added no failed jobs; no cache flush, queue cleanup, retry, or data mutation was used.
 - Hardened post-authentication redirect validation against percent-encoded authentication-route and browser dot-segment normalization bypasses while preserving valid encoded UTF-8 catalogue paths and same-origin query destinations.
 - Added independent HMAC-scoped login rate limits for normalized identifier and network alongside the existing identifier/network-pair budget, closing distributed account brute-force and single-network credential-spraying bypasses consistently across Livewire and Sanctum authentication without storing raw email or IP values.
 - Added matching HMAC-scoped pair, normalized-identifier, and network budgets to browser and mobile password recovery/reset flows, preventing distributed recovery-email flooding and single-network recipient spraying while retaining generic account-enumeration responses and clearing only successful reset identity buckets.
