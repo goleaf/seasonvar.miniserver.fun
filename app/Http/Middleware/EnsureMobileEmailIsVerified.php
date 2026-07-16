@@ -22,7 +22,7 @@ final readonly class EnsureMobileEmailIsVerified
             return $this->errors->make(
                 $request,
                 'email_not_verified',
-                'Подтвердите email, чтобы изменить данные профиля.',
+                __('auth.errors.email_not_verified'),
                 403,
             );
         }

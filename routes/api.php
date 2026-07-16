@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\V1\SyncController;
 use App\Http\Controllers\Api\V1\UserLibraryController;
 use App\Http\Controllers\Api\V1\UserTitleStateController;
 use App\Http\Controllers\Api\V1\ViewingActivityController;
+use App\Http\Middleware\SetSignedAuthenticationLocale;
 use App\Services\Catalog\CatalogDirectoryRegistry;
 use Illuminate\Support\Facades\Route;
 
@@ -116,15 +117,18 @@ Route::middleware('auth.optional.sanctum')->prefix('v1')->name('api.v1.')->group
 });
 
 Route::prefix('v1')->name('api.v1.')->group(function (): void {
-    Route::post('/auth/register', RegisterController::class)
-        ->middleware('throttle:mobile-register')
-        ->name('auth.register');
+    if (config('authentication.registration.enabled', true)) {
+        Route::post('/auth/register', RegisterController::class)
+            ->middleware('throttle:mobile-register')
+            ->name('auth.register');
+    }
     Route::post('/auth/login', LoginController::class)
         ->middleware('throttle:mobile-login')
         ->name('auth.login');
     Route::get('/auth/email/verify/{id}/{hash}', VerifyEmailController::class)
         ->whereNumber('id')
-        ->middleware('signed')
+        ->where('hash', '[a-f0-9]{40}')
+        ->middleware([SetSignedAuthenticationLocale::class, 'signed'])
         ->name('auth.verify');
     Route::post('/auth/email/verification-notification', ResendVerificationController::class)
         ->middleware(['auth:sanctum', 'throttle:mobile-verification'])

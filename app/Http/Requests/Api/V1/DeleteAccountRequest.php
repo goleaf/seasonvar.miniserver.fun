@@ -20,7 +20,7 @@ final class DeleteAccountRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'password' => ['required', 'string'],
+            'password' => ['required', 'string', 'max:255'],
         ];
     }
 
@@ -28,7 +28,8 @@ final class DeleteAccountRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'password.required' => 'Не удалось подтвердить пароль.',
+            'password.required' => __('auth.validation.delete_password_invalid'),
+            'password.max' => __('auth.validation.password_max'),
         ];
     }
 
@@ -39,7 +40,7 @@ final class DeleteAccountRequest extends FormRequest
             function (Validator $validator): void {
                 if (! $validator->errors()->has('password')
                     && ! Hash::check($this->password(), $this->user()->password)) {
-                    $validator->errors()->add('password', 'Не удалось подтвердить пароль.');
+                    $validator->errors()->add('password', __('auth.validation.delete_password_invalid'));
                 }
             },
         ];

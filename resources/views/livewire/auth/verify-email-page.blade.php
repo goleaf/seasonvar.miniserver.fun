@@ -5,11 +5,11 @@
                 <x-ui.icon name="fa-solid fa-envelope-circle-check" />
             </span>
             <div class="min-w-0">
-                <h1 id="verify-email-title" class="break-words text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">Подтверждение почты</h1>
+                <h1 id="verify-email-title" class="break-words text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">{{ __('auth.pages.verify_email.title') }}</h1>
                 <p class="mt-2 text-sm leading-6 text-slate-600">
-                    Ссылка для подтверждения отправлена на адрес <strong class="break-words text-slate-800">{{ $email }}</strong>.
+                    {{ __('auth.pages.verify_email.sent_to', ['email' => $email]) }}
                 </p>
-                <p class="mt-2 text-sm leading-6 text-slate-500">После перехода по ссылке вернитесь в свою библиотеку.</p>
+                <p class="mt-2 text-sm leading-6 text-slate-500">{{ __('auth.pages.verify_email.after_link') }}</p>
             </div>
         </div>
 
@@ -23,16 +23,17 @@
                     wire:click="resend"
                     wire:loading.attr="disabled"
                     wire:target="resend"
-                    class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+                    aria-live="polite"
+                    class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
                 >
                     <x-ui.icon name="fa-solid fa-paper-plane" />
-                    <span wire:loading.remove wire:target="resend">Отправить письмо ещё раз</span>
-                    <span wire:loading wire:target="resend">Отправка…</span>
+                    <span wire:loading.remove wire:target="resend">{{ __('auth.actions.resend_verification') }}</span>
+                    <span wire:loading wire:target="resend">{{ __('auth.loading.sending') }}</span>
                 </button>
 
                 <a href="{{ route('library.index') }}" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-slate-100 px-4 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-200 sm:w-auto">
                     <x-ui.icon name="fa-solid fa-bookmark" />
-                    <span>Перейти в библиотеку</span>
+                    <span>{{ __('auth.actions.open_library') }}</span>
                 </a>
             </div>
         </div>

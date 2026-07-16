@@ -1,6 +1,6 @@
 # API
 
-Обновлено: 15.07.2026
+Обновлено: 16.07.2026
 
 ## Версии и discovery
 
@@ -42,7 +42,7 @@
 ## Ошибки и request ID
 
 - Каждый API request проходит `AssignApiRequestId`. Разрешённый входящий `X-Request-ID` имеет 8-128 символов из безопасного allowlist; иначе сервер создаёт ULID.
-- Ошибка возвращает `code`, русское `message`, тот же `request_id` и необязательный объект `errors` для validation. Заголовок `X-Request-ID` совпадает с полем ответа.
+- Ошибка возвращает `code`, локализованное `ru|en` `message`, тот же `request_id` и необязательный объект `errors` для validation. `SetApiLocale` принимает только поддерживаемый `Accept-Language`, иначе использует безопасный fallback; заголовок `X-Request-ID` совпадает с полем ответа.
 - Стабильные foundation codes: `validation_failed`, `unauthenticated`, `forbidden`, `not_found`, `rate_limited`, `server_error`. Offline-sync дополнительно использует `sync_cursor_expired`/410 и `sync_unavailable`/503. Ответ `server_error` не содержит exception message или stack trace.
 - API errors всегда получают `private, no-store`; неизвестный `/api/*` обрабатывает named API fallback, а неизвестный web URL продолжает редирект на главную.
 - Для `/api/*` guest redirect отключён независимо от заголовка `Accept`: защищённый endpoint всегда отвечает JSON `unauthenticated`/401 и никогда не пытается построить web route `login`.
@@ -61,14 +61,15 @@
 
 ## Authentication и аккаунт v1
 
-- `POST /api/v1/auth/register` нормализует имя/email/device name, требует подтверждённый сильный пароль от 12 символов, создаёт аккаунт и один device token. `POST /api/v1/auth/login` использует единое сообщение для неизвестного email и неверного пароля, поэтому endpoint не перечисляет пользователей.
+- `POST /api/v1/auth/register` доступен только при `AUTH_REGISTRATION_ENABLED=true`, нормализует имя/email/device name, применяет общий `Password::defaults()`, создаёт обычный unverified аккаунт и один device token. `POST /api/v1/auth/login` использует единое сообщение и dummy hash work для неизвестного email, а после успешной проверки rehash-ит пароль по текущей Laravel config; endpoint не перечисляет пользователей.
 - `GET /api/v1/auth/email/verify/{id}/{hash}` продолжает принимать временную signed URL для API-клиента. Текущее project-owned verification notification открывает signed web route, чтобы один и тот же адрес можно было подтвердить в браузере; `POST /api/v1/auth/email/verification-notification` доступен с Bearer token и повторно ставит письмо в очередь, если email ещё не подтверждён.
 - `POST /api/v1/auth/forgot-password` имеет byte-identical success body для существующего и отсутствующего email. `POST /api/v1/auth/reset-password` проверяет reset token, меняет пароль и отзывает все mobile tokens аккаунта.
 - `GET /api/v1/auth/devices` возвращает только `id`, device name, last-use/expiry timestamps и признак текущего устройства. Hash и abilities не сериализуются. `DELETE /api/v1/auth/devices/{token}` разрешает только owner-scoped ID и маскирует чужой ID как `not_found`.
 - `POST /api/v1/auth/token/refresh` атомарно создаёт новый 90-дневный plaintext token с тем же device name/abilities и затем удаляет старый. `POST /api/v1/auth/logout` отзывает только текущий token, а `POST /api/v1/auth/logout-all` — все tokens пользователя.
-- `GET /api/v1/me` возвращает `UserResource`; `PATCH /api/v1/me` меняет только имя/email. Смена email сбрасывает `email_verified_at`, удаляет старые reset rows обоих адресов и отправляет новое подтверждение. `PATCH /api/v1/me/password` требует текущий пароль, удаляет reset token и отзывает все device tokens, кроме текущего. `DELETE /api/v1/me` требует пароль и удаляет аккаунт, tokens, reset tokens, database sessions, watchlist/rating и episode progress.
+- `GET /api/v1/me` возвращает `UserResource`; `PATCH /api/v1/me` меняет только имя/email, а реальная смена email дополнительно требует `current_password`. Она сбрасывает `email_verified_at`, удаляет reset rows обоих адресов и отправляет новое подтверждение. `PATCH /api/v1/me/password` требует текущий пароль, удаляет reset token и при Bearer-аутентификации отзывает все device tokens, кроме текущего; допустимый first-party session-вызов сохраняет текущую browser session и отзывает все mobile tokens. `DELETE /api/v1/me` требует пароль и удаляет аккаунт, tokens, reset tokens, database sessions, watchlist/rating и episode progress через общий lifecycle.
 - `/me` намеренно доступен unverified пользователю: иначе он не смог бы исправить email или повторить verification. Будущие write/playback endpoints должны отдельно объявлять, требуется ли verified email; token сам по себе не создаёт такую границу.
-- Read endpoints требуют `mobile:read`, изменения и отзыв tokens — дополнительно `mobile:write`. Credential endpoints имеют отдельные named budgets: register/login — 5 в минуту, resend verification — 3 в минуту, forgot/reset — 3 за 10 минут, refresh — 20 в минуту на текущий token. Публичный каталог не получает эти limits.
+- Read endpoints требуют `mobile:read`, изменения и отзыв tokens — дополнительно `mobile:write`. Credential endpoints имеют отдельные named budgets: register/login — 5 в минуту, resend verification — 3 в минуту, forgot/reset — 3 за 10 минут, refresh — 20 в минуту на текущий token. Limiter dimensions содержат HMAC email/network/token scopes вместо raw sensitive values; публичный каталог не получает эти limits.
+- Authentication events записываются secret-free stable codes с HMAC fingerprints. Password/hash, raw email/IP, Bearer/reset/verification token, device plaintext и request body не попадают в audit. Social providers/linking/merge, magic links и MFA отсутствуют в v1 и discovery, а matching email не создаёт identity relation.
 - Project-owned verification/reset notifications ставятся в очередь и ведут на web routes; mobile client открывает эту ссылку в браузере. API verification endpoint сохраняется как совместимый программный contract, а присланный reset token также принимается API reset endpoint. В production mail transport, `QUEUE_CONNECTION` и worker настраиваются вне Git; секреты и значения `.env` в документацию/репозиторий не переносятся.
 
 ## Личное состояние каталога v1

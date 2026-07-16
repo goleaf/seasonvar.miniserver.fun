@@ -19,7 +19,7 @@ final class ResetPasswordController extends Controller
         $passwords->reset($data['email'], $data['token'], $data['password']);
 
         return response()->json(['data' => [
-            'status' => 'Пароль успешно изменён.',
+            'status' => __('auth.status.password_reset'),
         ]], headers: ['Cache-Control' => 'private, no-store']);
     }
 }

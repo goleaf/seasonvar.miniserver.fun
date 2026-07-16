@@ -36,16 +36,16 @@ final class TokenController extends Controller
         ]], headers: ['Cache-Control' => 'private, no-store']);
     }
 
-    public function logout(Request $request): Response
+    public function logout(Request $request, MobileTokenService $tokens): Response
     {
-        $this->currentToken($request)->delete();
+        $tokens->revoke($this->user($request), (int) $this->currentToken($request)->getKey());
 
         return response()->noContent(headers: ['Cache-Control' => 'private, no-store']);
     }
 
-    public function logoutAll(Request $request): Response
+    public function logoutAll(Request $request, MobileTokenService $tokens): Response
     {
-        $this->user($request)->tokens()->delete();
+        $tokens->revokeAll($this->user($request));
 
         return response()->noContent(headers: ['Cache-Control' => 'private, no-store']);
     }

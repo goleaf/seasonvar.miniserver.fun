@@ -351,6 +351,15 @@ Account deletion обнуляет `reviews.user_id` и `reports.reporter_id`, у
 - Public count/popularity использует distinct visible title count. Related сначала сохраняет explicit editorial ordering, затем shared visible-title count; current/private/hidden tags исключены. Recommendations используют только eligible global tags как weighted signal; personal assignments не входят в public similarity или explanation.
 - Full provider-set sync идемпотентен: stable mapping/pivot uniqueness, current provenance timestamps и complete-snapshot stale reconciliation не создают повторов. Explicit editorial provenance/suppression survives import; rejected mapping clears only its current provider observations, а pivot удаляется только без remaining current source. Raw provider spelling не становится canonical public label автоматически.
 
+## Аутентификация и sessions
+
+- `users` — единственная portal identity table: unique `email`, Laravel password hash cast, nullable `email_verified_at`, remember token и timestamps. Username/profile/external-identity/account-status/MFA/magic-link/merge columns отсутствуют. Canonical email normalization применяется до write, case-insensitive scope сохраняет lookup compatibility; Task 15 не переписывает существующие rows и не добавляет schema.
+- `password_reset_tokens` сохраняет Laravel broker-compatible email/token/created timestamp; raw token не возвращается из persistence и lifecycle остаётся broker-owned. Email change/registration/reset/delete удаляют только применимые rows через canonical account services.
+- Browser session storage определяется `SESSION_DRIVER`: production default Redis не предоставляет enumerable records; database driver использует существующую `sessions` table/index by user/last activity. UI выбирает только safe summary fields и превращает raw record identity в HMAC action token. Session payload, cookie, raw user agent/IP и exact identifier наружу не выдаются.
+- `personal_access_tokens` остаётся Sanctum-owned: token hash, abilities, expiry и owner morph. `(tokenable_type, tokenable_id)`, unique token hash и expiry/prune behavior уже поддерживают реальные login/device queries; Task 15 не добавляет redundant index. Plaintext существует только в issuance response.
+- Authentication audit — отдельный bounded daily log, не user-owned relational history и не источник authorization. Stable event enum и HMAC fingerprints не позволяют восстановить email/IP без application secret. Retention задаётся operation config; экспорт normal user его не включает.
+- External identity/provider-token, merge marker, trusted-device, account lock/status, MFA и magic-link tables отсутствуют. Duplicate email/account collision не auto-merge-ится; неоднозначный legacy conflict потребовал бы отдельного read-only report и proof-of-control/admin workflow до любой schema uniqueness change.
+
 ## Настройки аккаунта
 
 - `users` имеет optional `hasOne(UserAccountSetting::class)`. Таблица `user_account_settings` использует `user_id` одновременно как primary/foreign key, поэтому физически допускает ровно одну строку на account без duplicate reconciliation; account deletion удаляет её FK cascade.

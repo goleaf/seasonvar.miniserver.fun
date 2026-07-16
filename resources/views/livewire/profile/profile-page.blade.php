@@ -116,12 +116,19 @@
                 autocomplete="email"
                 required
             />
+            <x-form.password-field
+                :label="__('settings.profile_page.current_password')"
+                for="profile-current-password"
+                wire:model="currentPassword"
+                autocomplete="current-password"
+                :hint="__('settings.profile_page.current_password_hint')"
+            />
 
             <button
                 type="submit"
                 wire:loading.attr="disabled"
                 wire:target="saveProfile"
-                class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+                class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
             >
                 <x-ui.icon name="fa-solid fa-floppy-disk" />
                 <span wire:loading.remove wire:target="saveProfile">{{ __('settings.profile_page.save') }}</span>

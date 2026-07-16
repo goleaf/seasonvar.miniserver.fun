@@ -19,7 +19,7 @@ final class VerifyEmailController extends Controller
 
         return response()->json(['data' => [
             'email_verified' => true,
-            'status' => 'Адрес электронной почты подтверждён.',
+            'status' => __('auth.status.email_verified'),
         ]], headers: ['Cache-Control' => 'private, no-store']);
     }
 }

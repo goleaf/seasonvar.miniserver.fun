@@ -2,6 +2,14 @@
 
 Обновлено: 16.07.2026
 
+## Authentication Task 15 rollout от 16.07.2026
+
+Task 15 не добавляет migration и не переписывает users, hashes, verified timestamps, reset rows, remember tokens, sessions или Sanctum tokens. Перед rollout read-only проверить case-insensitive duplicate emails и route/config state; неоднозначные duplicate accounts не merge-ить автоматически. Развернуть code/assets, выполнить `php artisan config:cache` и `php artisan route:cache` вместе, затем graceful reload PHP-FPM/workers. Глобальный data-cache flush не требуется и запрещён как способ обновить route/config.
+
+Проверить `AUTH_REGISTRATION_ENABLED` и `AUTH_AUDIT_DAYS`, HTTPS `APP_URL`, `SESSION_SECURE_COOKIE=true`, HttpOnly, `SameSite=lax`, узкие cookie domain/path, mail/queue transport и writable `storage/logs`. Disabled registration должна убрать `/register` и `/api/v1/auth/register`, но оставить login/recovery/verification. После rollout проверить RU/EN login/register/recovery/reset, temporary signed verification, generic recovery, session regeneration/logout CSRF, current-password email/password/device/session actions, auth log redaction и noindex/no-store behavior.
+
+Rollback возвращает только code/config/routes/assets. Если после rollout были реальные credential/account mutations, нельзя откатывать database rows, password hashes или sessions из backup: они остаются authoritative. Social/OAuth, external identity, merge, MFA и magic-link infrastructure не развёртываются этим изменением.
+
 ## Mobile offline-sync rollout от 14.07.2026
 
 Миграция `2026_07_14_164423_create_api_sync_tables_and_add_state_versions` additive и обратима: она создаёт append-only `api_sync_changes`, idempotency receipts `api_sync_mutations` и добавляет независимые `watchlist_version`/`rating_version` с default `0`. Backfill не требуется. Код безопасен между deploy и migrate: sync publishers/prune пропускают работу без таблиц, а три sync routes возвращают очищенный `sync_unavailable`/503; остальные маршруты `/api/v1` продолжают работать.

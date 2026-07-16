@@ -16,6 +16,7 @@ use App\Http\Controllers\InfrastructureHealthController;
 use App\Http\Controllers\MigrateAnonymousPreferencesController;
 use App\Http\Controllers\PlaybackSourceController;
 use App\Http\Controllers\ReviewDirectLinkController;
+use App\Http\Middleware\SetSignedAuthenticationLocale;
 use App\Livewire\Auth\ConfirmPasswordPage;
 use App\Livewire\Auth\ForgotPasswordPage;
 use App\Livewire\Auth\LoginPage;
@@ -70,14 +71,34 @@ Route::get('/', [CatalogController::class, 'index'])
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', LoginPage::class)->name('login');
-    Route::get('/register', RegisterPage::class)->name('register');
+    if (config('authentication.registration.enabled', true)) {
+        Route::get('/register', RegisterPage::class)->name('register');
+    }
     Route::get('/forgot-password', ForgotPasswordPage::class)->name('password.request');
-    Route::get('/reset-password/{token}', ResetPasswordPage::class)->name('password.reset');
+    Route::get('/reset-password/{token}', ResetPasswordPage::class)
+        ->where('token', '[A-Za-z0-9]{1,255}')
+        ->name('password.reset');
 });
+
+Route::prefix('{locale}')
+    ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+    ->middleware(['guest', 'collection.locale'])
+    ->name('localized.')
+    ->group(function (): void {
+        Route::get('/login', LoginPage::class)->name('login');
+        if (config('authentication.registration.enabled', true)) {
+            Route::get('/register', RegisterPage::class)->name('register');
+        }
+        Route::get('/forgot-password', ForgotPasswordPage::class)->name('password.request');
+        Route::get('/reset-password/{token}', ResetPasswordPage::class)
+            ->where('token', '[A-Za-z0-9]{1,255}')
+            ->name('password.reset');
+    });
 
 Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
     ->whereNumber('id')
-    ->middleware('signed')
+    ->where('hash', '[a-f0-9]{40}')
+    ->middleware([SetSignedAuthenticationLocale::class, 'signed'])
     ->name('verification.verify');
 
 Route::middleware(['auth', 'auth.session', 'account.private'])->group(function (): void {

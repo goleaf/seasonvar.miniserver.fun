@@ -919,11 +919,12 @@ Must remain semantically unchanged: provider review bodies/IDs/source/hash/date 
 
 - [x] Inventory all project Markdown plus auth routes, guards/providers/broker, middleware, cookies, CSRF, rate limits, models/schema/indexes, Livewire/API/services, notifications, localization, cache, export/deletion and absent optional capabilities.
 - [x] Record the canonical/unsupported capability decisions, compatibility risks, protected files, rollback notes and manual acceptance matrix in this existing plan before code changes.
-- [ ] Centralize email normalization, password defaults, private rate-limit fingerprints, security event recording and internal redirect resolution; reuse them from browser and Sanctum flows.
-- [ ] Localize web auth pages/forms/emails and supported API auth messages in every existing locale; retain accessible loading/error/empty/unavailable states and Russian default behavior.
-- [ ] Harden registration availability/defaults, password rehash/rotation, email-change confirmation, device/session revocation and sensitive Livewire state without renaming routes or changing user/data identity.
-- [ ] Run only static/Pint/route/middleware/config/schema/translation/security/cache/accessibility/Vite/browser diagnostics; do not create or invoke automated tests for Task 15.
-- [ ] Update owner docs, maintenance record and English changelog; reread Task 15, inspect every changed/directly related file, commit only Task 15 paths on `main` and push the configured remote.
+- [x] Centralize email normalization, password defaults, private rate-limit fingerprints, security event recording and internal redirect resolution; reuse them from browser and Sanctum flows.
+- [x] Localize web auth pages/forms/emails and supported API auth messages in every existing locale; retain accessible loading/error/empty/unavailable states and Russian default behavior.
+- [x] Harden registration availability/defaults, password rehash/rotation, email-change confirmation, device/session revocation and sensitive Livewire state without renaming routes or changing user/data identity.
+- [x] Final race/failure review maps concurrent duplicate account/email writes to localized validation, makes audit transport best-effort, rejects control/bidi device names and clears registration secrets after every recoverable refusal.
+- [x] Run only static/Pint/route/middleware/config/schema/translation/security/cache/accessibility/Vite/browser diagnostics; do not create or invoke automated tests for Task 15.
+- [x] Update owner docs, maintenance record and English changelog; reread Task 15, inspect every changed/directly related file, commit only Task 15 paths on `main` and push the configured remote.
 
 ### Rollback and protected boundaries
 
@@ -931,18 +932,18 @@ No database migration or destructive reconciliation is planned. Rollback is a co
 
 ### Final manual verification checklist
 
-- [ ] One web/Sanctum architecture remains; routes, guard, broker, signed verification, CSRF and noindex/sitemap boundaries are unchanged and inspectable.
-- [ ] Registration enabled/disabled states, canonical email/name validation, case-insensitive duplicate prevention and unprivileged unverified defaults work without mass assignment.
-- [ ] One password policy, Laravel hashing/rehash, remember behavior, session regeneration, generic failures and privacy-safe layered rate limits cover browser and API authentication.
-- [ ] Verification/recovery/reset are localized, signed/broker-owned, expiring, replay-safe and token-free in logs/cache/metadata; password reset/change rotates credentials and invalidates other access according to the documented driver limits.
-- [ ] Logout, database sessions and Sanctum device actions are CSRF/owner/password protected where applicable, preserve unrelated user data and expose no raw ID/payload/cookie/IP/user-agent/token.
-- [ ] Internal redirect resolver rejects external, protocol-relative, malformed and auth-loop destinations while preserving a safe intended portal path and locale fallback.
-- [ ] Provider/link/unlink/merge/magic/MFA controls are absent because their canonical domains are absent; matching email cannot cause takeover or automatic merge.
-- [ ] Anonymous preference migration remains allowlisted/idempotent/non-blocking; no nonexistent anonymous bookmarks/progress capability is advertised.
-- [ ] Russian/English keys have exact parity; web/API notifications and forms expose accessible labels, autocomplete, errors, loading states, mobile layout and password-manager-friendly semantics.
-- [ ] Export/deletion/admin/cache boundaries expose no hash/token/session secret and preserve all existing profile, library, progress, collection, discussion, premium-independent and moderation data.
-- [ ] No Volt, new `@php`, Blade query, inline CSS/business JavaScript, unsafe GET mutation, fake control, debug/TODO, unused class/import or unrelated behavior remains.
-- [ ] Allowed diagnostics and browser smoke pass without automated tests; relevant docs/changelog match the implementation; only Task 15 files are committed on existing `main` and pushed.
+- [x] One web/Sanctum architecture remains; routes, guard, broker, signed verification, CSRF and noindex/sitemap boundaries are unchanged and inspectable.
+- [x] Registration enabled/disabled states, canonical email/name validation, case-insensitive duplicate prevention and unprivileged unverified defaults work without mass assignment.
+- [x] One password policy, Laravel hashing/rehash, remember behavior, session regeneration, generic failures and privacy-safe layered rate limits cover browser and API authentication.
+- [x] Verification/recovery/reset are localized, signed/broker-owned, expiring, replay-safe and token-free in logs/cache/metadata; password reset/change rotates credentials and invalidates other access according to the documented driver limits.
+- [x] Logout, database sessions and Sanctum device actions are CSRF/owner/password protected where applicable, preserve unrelated user data and expose no raw ID/payload/cookie/IP/user-agent/token.
+- [x] Internal redirect resolver rejects external, protocol-relative, malformed and auth-loop destinations while preserving a safe intended portal path and locale fallback.
+- [x] Provider/link/unlink/merge/magic/MFA controls are absent because their canonical domains are absent; matching email cannot cause takeover or automatic merge.
+- [x] Anonymous preference migration remains allowlisted/idempotent/non-blocking; no nonexistent anonymous bookmarks/progress capability is advertised.
+- [x] Russian/English keys have exact parity; web/API notifications and forms expose accessible labels, autocomplete, errors, loading states, mobile layout and password-manager-friendly semantics.
+- [x] Export/deletion/admin/cache boundaries expose no hash/token/session secret and preserve all existing profile, library, progress, collection, discussion, premium-independent and moderation data.
+- [x] No Volt, new `@php`, Blade query, inline CSS/business JavaScript, unsafe GET mutation, fake control, debug/TODO, unused class/import or unrelated behavior remains.
+- [x] Allowed diagnostics and browser smoke pass without automated tests; relevant docs/changelog match the implementation; only Task 15 files are committed on existing `main` and pushed.
 
 ## Task 16: canonical account settings and preferences
 

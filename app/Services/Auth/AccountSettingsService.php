@@ -51,6 +51,32 @@ final class AccountSettingsService
         ]);
     }
 
+    public function adoptLocaleIfUnset(User $user, string $locale): void
+    {
+        $this->ensureLocale($locale);
+
+        if (! $this->schema->available()) {
+            return;
+        }
+
+        Gate::forUser($user)->authorize('update-account-settings');
+
+        DB::transaction(function () use ($user, $locale): void {
+            User::query()->lockForUpdate()->findOrFail($user->id);
+            $setting = UserAccountSetting::query()->lockForUpdate()->find($user->id)
+                ?? new UserAccountSetting(['user_id' => $user->id]);
+
+            if ($setting->locale !== null) {
+                return;
+            }
+
+            $setting->locale = $locale;
+            $setting->settings_version = max(1, (int) $setting->settings_version) + 1;
+            $setting->save();
+            $user->setRelation('accountSetting', $setting);
+        }, attempts: 3);
+    }
+
     public function updatePlayback(User $user, PlaybackSettingsData $data): AccountSettingsData
     {
         $this->ensurePlayback($user, $data);

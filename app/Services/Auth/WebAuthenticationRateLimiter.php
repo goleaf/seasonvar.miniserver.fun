@@ -5,20 +5,21 @@ declare(strict_types=1);
 namespace App\Services\Auth;
 
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Str;
 
 final class WebAuthenticationRateLimiter
 {
     private const DECAY_SECONDS = 60;
 
+    public function __construct(private readonly AuthenticationFingerprint $fingerprints) {}
+
     public function loginKey(string $email, ?string $ipAddress): string
     {
-        return 'web-auth:login:'.Str::lower(Str::squish($email)).'|'.($ipAddress ?? 'unknown');
+        return 'web-auth:login:'.$this->fingerprints->email($email).'|'.$this->fingerprints->network($ipAddress);
     }
 
     public function registrationKey(?string $ipAddress): string
     {
-        return 'web-auth:register:'.($ipAddress ?? 'unknown');
+        return 'web-auth:register:'.$this->fingerprints->network($ipAddress);
     }
 
     public function tooManyAttempts(string $key, int $maximumAttempts): bool
@@ -33,12 +34,12 @@ final class WebAuthenticationRateLimiter
 
     public function forgotPasswordKey(string $email, ?string $ipAddress): string
     {
-        return 'web-auth:forgot-password:'.Str::lower(Str::squish($email)).'|'.($ipAddress ?? 'unknown');
+        return 'web-auth:forgot-password:'.$this->fingerprints->email($email).'|'.$this->fingerprints->network($ipAddress);
     }
 
     public function resetPasswordKey(string $email, ?string $ipAddress): string
     {
-        return 'web-auth:reset-password:'.Str::lower(Str::squish($email)).'|'.($ipAddress ?? 'unknown');
+        return 'web-auth:reset-password:'.$this->fingerprints->email($email).'|'.$this->fingerprints->network($ipAddress);
     }
 
     public function hit(string $key, int $decaySeconds = self::DECAY_SECONDS): void

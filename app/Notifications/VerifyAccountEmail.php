@@ -17,18 +17,24 @@ final class VerifyAccountEmail extends VerifyEmail implements ShouldQueue
     /** @param mixed $notifiable */
     protected function verificationUrl($notifiable): string
     {
+        $locale = method_exists($notifiable, 'preferredLocale')
+            ? $notifiable->preferredLocale()
+            : (string) config('account-settings.default_locale', 'ru');
+
         return URL::temporarySignedRoute('verification.verify', now()->addMinutes(60), [
             'id' => $notifiable->getKey(),
             'hash' => sha1($notifiable->getEmailForVerification()),
+            'locale' => $locale,
         ]);
     }
 
     protected function buildMailMessage($url): MailMessage
     {
         return (new MailMessage)
-            ->subject('Подтверждение адреса электронной почты')
-            ->line('Подтвердите адрес электронной почты для доступа ко всем функциям Seasonvar.')
-            ->action('Подтвердить адрес', $url)
-            ->line('Если вы не создавали аккаунт, письмо можно проигнорировать.');
+            ->subject(__('auth.mail.verify.subject'))
+            ->line(__('auth.mail.verify.line'))
+            ->action(__('auth.mail.verify.action'), $url)
+            ->line(__('auth.mail.verify.expires'))
+            ->line(__('auth.mail.verify.ignore'));
     }
 }

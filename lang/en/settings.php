@@ -43,6 +43,8 @@ return [
         'account_data_hint' => 'Changing the email address requires verification again.',
         'name' => 'Name',
         'email' => 'Email',
+        'current_password' => 'Current password',
+        'current_password_hint' => 'Required only when changing the email address. You can save a name change without a password.',
         'save' => 'Save profile',
         'verify_email' => 'Verify your email',
         'verify_email_hint' => 'Profile reading and account settings remain available before verification.',

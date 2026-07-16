@@ -29,7 +29,8 @@ final class ConfirmPasswordForm extends Form
     protected function messages(): array
     {
         return [
-            'password.required' => 'Введите текущий пароль.',
+            'password.required' => __('auth.validation.current_password_required'),
+            'password.max' => __('auth.validation.password_max'),
         ];
     }
 }

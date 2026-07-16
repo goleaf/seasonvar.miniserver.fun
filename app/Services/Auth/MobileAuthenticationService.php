@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Auth;
 
+use App\Enums\AuthenticationEvent;
 use App\Models\User;
+use App\ValueObjects\NormalizedEmail;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 final class MobileAuthenticationService
@@ -18,6 +19,7 @@ final class MobileAuthenticationService
 
     public function __construct(
         private readonly AccountRegistrationService $accounts,
+        private readonly AuthenticationAuditService $audit,
     ) {}
 
     /**
@@ -30,7 +32,7 @@ final class MobileAuthenticationService
             'name' => $attributes['name'],
             'email' => $attributes['email'],
             'password' => $attributes['password'],
-        ]);
+        ], app()->getLocale());
 
         return $this->issueToken($user, $attributes['device_name']);
     }
@@ -38,14 +40,31 @@ final class MobileAuthenticationService
     /** @return array{user: User, token: string, expires_at: CarbonInterface} */
     public function login(string $email, string $password, string $deviceName): array
     {
-        $normalizedEmail = Str::lower(Str::squish($email));
-        $user = User::query()->whereRaw('lower(email) = ?', [$normalizedEmail])->first();
+        $normalizedEmail = NormalizedEmail::value($email);
+        $user = User::query()->whereEmailIdentity($normalizedEmail)->first();
 
-        if ($user === null || ! Hash::check($password, $user->password)) {
+        if ($user === null) {
+            Hash::make($password);
+            $this->audit->record(AuthenticationEvent::LoginFailed, email: $normalizedEmail);
+
             throw ValidationException::withMessages([
-                'email' => ['Указаны неверные данные для входа.'],
+                'email' => [__('auth.errors.invalid_credentials')],
             ]);
         }
+
+        if (! Hash::check($password, $user->password)) {
+            $this->audit->record(AuthenticationEvent::LoginFailed, email: $normalizedEmail);
+
+            throw ValidationException::withMessages([
+                'email' => [__('auth.errors.invalid_credentials')],
+            ]);
+        }
+
+        if (Hash::needsRehash($user->password)) {
+            $user->forceFill(['password' => Hash::make($password)])->save();
+        }
+
+        $this->audit->record(AuthenticationEvent::LoginSucceeded, $user, $normalizedEmail);
 
         return $this->issueToken($user, $deviceName);
     }

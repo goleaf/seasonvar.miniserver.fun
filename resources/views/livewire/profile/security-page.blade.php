@@ -23,7 +23,7 @@
         <form wire:submit="updatePassword" class="space-y-5" novalidate>
             <x-form.password-field :label="__('settings.security_page.new_password')" for="security-new-password" wire:model="password" autocomplete="new-password" :hint="__('settings.security_page.password_hint')" required />
             <x-form.password-field :label="__('settings.security_page.confirm_password')" for="security-new-password-confirmation" wire:model="passwordConfirmation" autocomplete="new-password" required />
-            <button type="submit" wire:loading.attr="disabled" wire:target="updatePassword" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600 disabled:cursor-wait disabled:opacity-60 sm:w-auto">
+            <button type="submit" wire:loading.attr="disabled" wire:target="updatePassword" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60 sm:w-auto">
                 <x-ui.icon name="fa-solid fa-floppy-disk" /><span wire:loading.remove wire:target="updatePassword">{{ __('settings.security_page.change_password_action') }}</span><span wire:loading wire:target="updatePassword">{{ __('settings.security_page.changing_password') }}</span>
             </button>
         </form>

@@ -25,6 +25,12 @@ LOG_DAILY_DAYS=14
 
 Production также обязан включить HTTPS-only session cookie, корректные domain/path/SameSite, секретный `APP_KEY`, warning-or-higher structured log policy и реальные credentials через secret manager/process environment. Эти значения не должны попадать в Git.
 
+## Аутентификация
+
+`AUTH_REGISTRATION_ENABLED=true` регистрирует web/API create-account routes; `false` убирает только регистрацию и links, сохраняя login/recovery/verification существующих accounts. `AUTH_AUDIT_DAYS=30` задаёт bounded retention отдельного `authentication` daily channel. Оба значения несекретные, но изменение требует совместной пересборки `config:cache` и `route:cache`, затем graceful reload web workers.
+
+Production задаёт `SESSION_SECURE_COOKIE=true`, `SESSION_HTTP_ONLY=true`, `SESSION_SAME_SITE=lax`, узкие domain/path и HTTPS `APP_URL`. `SameSite=None` не используется без отдельной cross-site OAuth необходимости и обязательного Secure. `APP_KEY` подписывает/шифрует framework state и HMAC fingerprints, поэтому его не раскрывают и не меняют без отдельного key-rotation/session invalidation плана.
+
 Versioned-профиль `deploy/logrotate/seasonvar` ежедневно ротирует все `storage/logs/*.log`, хранит 14 архивов и сжимает их. Установить его можно командой `sudo install -m 0644 deploy/logrotate/seasonvar /etc/logrotate.d/seasonvar`; проверка без ротации выполняется через `sudo logrotate --debug /etc/logrotate.d/seasonvar`. Профиль использует `copytruncate`, поэтому PHP-FPM и постоянный импортёр продолжают писать без остановки.
 
 ## Redis workloads

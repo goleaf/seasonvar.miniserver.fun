@@ -17,7 +17,18 @@ final class ResetAccountPassword extends ResetPassword implements ShouldQueue
     /** @param mixed $notifiable */
     protected function resetUrl($notifiable): string
     {
-        return route('password.reset', ['token' => $this->token]).'?'.Arr::query([
+        $locale = method_exists($notifiable, 'preferredLocale')
+            ? $notifiable->preferredLocale()
+            : (string) config('account-settings.default_locale', 'ru');
+        $route = $locale !== (string) config('account-settings.default_locale', 'ru')
+            && in_array($locale, (array) config('catalog-collections.supported_locales', []), true)
+            ? 'localized.password.reset'
+            : 'password.reset';
+        $parameters = $route === 'localized.password.reset'
+            ? ['locale' => $locale, 'token' => $this->token]
+            : ['token' => $this->token];
+
+        return route($route, $parameters).'?'.Arr::query([
             'email' => $notifiable->getEmailForPasswordReset(),
         ]);
     }
@@ -25,9 +36,12 @@ final class ResetAccountPassword extends ResetPassword implements ShouldQueue
     protected function buildMailMessage($url): MailMessage
     {
         return (new MailMessage)
-            ->subject('Восстановление пароля')
-            ->line('Получен запрос на изменение пароля аккаунта Seasonvar.')
-            ->action('Изменить пароль', $url)
-            ->line('Если вы не запрашивали восстановление, письмо можно проигнорировать.');
+            ->subject(__('auth.mail.reset.subject'))
+            ->line(__('auth.mail.reset.line'))
+            ->action(__('auth.mail.reset.action'), $url)
+            ->line(__('auth.mail.reset.expires', [
+                'minutes' => (int) config('auth.passwords.'.config('auth.defaults.passwords').'.expire', 60),
+            ]))
+            ->line(__('auth.mail.reset.ignore'));
     }
 }

@@ -68,6 +68,12 @@ php artisan db:seed
 
 Для административного доступа email должен находиться в существующем allowlist: `SEASONVAR_IMPORT_ADMIN_EMAILS=admin@example.com`. Эти данные предназначены только для локальной разработки; не используйте их в production.
 
+## Аутентификация
+
+Портал использует один Laravel `web` session guard для браузера и Sanctum tokens с `mobile:read|mobile:write` для API. Доступны регистрация, email/password login, remember-me, temporary signed email verification, Laravel broker password recovery/reset, CSRF logout, password-confirmed profile/security actions, owner-scoped mobile devices и database-session management при соответствующем session driver. Русские canonical routes имеют английские localized aliases; все auth pages закрыты от индексации.
+
+Регистрация управляется `AUTH_REGISTRATION_ENABLED`, а отдельный secret-free authentication audit — `AUTH_AUDIT_DAYS`. Social providers/linking, automatic account merge, magic links, MFA, trusted devices и username login в текущей доменной модели отсутствуют и не показываются фиктивными controls. Полный контракт, ограничения и ручная проверка находятся в [`docs/authorization.md`](docs/authorization.md), [`docs/security.md`](docs/security.md) и Task 15 [`docs/plans/laravel-video-portal-modernization.md`](docs/plans/laravel-video-portal-modernization.md).
+
 ## Импорт
 
 `seasonvar:import` скачивает карту сайта Seasonvar, сохраняет найденные страницы, обновляет карточки, сезоны, серии, связи, рейтинги, отзывы и видео. Команда продолжает работу после ошибки отдельной страницы, пишет подробные события в базу и может работать постоянно через `--forever`.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Auth;
 
 use App\DTOs\BrowserSessionSummaryData;
+use App\Enums\AuthenticationEvent;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\SessionGuard;
@@ -19,7 +20,10 @@ use LogicException;
 
 final class BrowserSessionService
 {
-    public function __construct(private readonly AccountDateTimeFormatter $dateTimes) {}
+    public function __construct(
+        private readonly AccountDateTimeFormatter $dateTimes,
+        private readonly AuthenticationAuditService $audit,
+    ) {}
 
     public function synchronizeCurrentPasswordHash(User $user): void
     {
@@ -57,6 +61,7 @@ final class BrowserSessionService
         $this->synchronizeCurrentPasswordHash($user);
         $this->deleteOtherDatabaseSessions($user, $currentSessionId);
         RateLimiter::clear($rateKey);
+        $this->audit->record(AuthenticationEvent::OtherBrowserSessionsRevoked, $user, $user->email);
     }
 
     /** @return Collection<int, BrowserSessionSummaryData> */
@@ -162,6 +167,8 @@ final class BrowserSessionService
                 'session' => [__('settings.security_page.session_not_found')],
             ]);
         }
+
+        $this->audit->record(AuthenticationEvent::BrowserSessionRevoked, $user, $user->email);
     }
 
     private function deleteOtherDatabaseSessions(User $user, string $currentSessionId): void

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Forms\Auth;
 
 use App\Models\User;
+use App\ValueObjects\NormalizedEmail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -25,12 +26,12 @@ final class RegistrationForm extends Form
     public function validatedData(): array
     {
         $this->name = Str::squish($this->name);
-        $this->email = Str::lower(Str::squish($this->email));
+        $this->email = NormalizedEmail::value($this->email);
 
         $this->withValidator(function (Validator $validator): void {
             $validator->after(function (Validator $validator): void {
-                if ($this->email !== '' && User::query()->whereRaw('lower(email) = ?', [$this->email])->exists()) {
-                    $validator->errors()->add('email', 'Этот адрес электронной почты уже используется.');
+                if ($this->email !== '' && User::query()->whereEmailIdentity($this->email)->exists()) {
+                    $validator->errors()->add('email', __('auth.validation.email_unique'));
                 }
             });
         });
@@ -48,10 +49,10 @@ final class RegistrationForm extends Form
     protected function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'min:2', 'max:120'],
+            'name' => ['required', 'string', 'min:2', 'max:120', 'not_regex:/[\p{Cc}\p{Cs}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u'],
             'email' => ['required', 'string', 'lowercase', 'email:rfc', 'max:255', Rule::unique(User::class, 'email')],
-            'password' => ['required', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
-            'passwordConfirmation' => ['required', 'same:password'],
+            'password' => ['required', 'string', 'max:255', Password::defaults()],
+            'passwordConfirmation' => ['required', 'string', 'max:255', 'same:password'],
         ];
     }
 
@@ -59,20 +60,24 @@ final class RegistrationForm extends Form
     protected function messages(): array
     {
         return [
-            'name.required' => 'Введите имя.',
-            'name.min' => 'Имя должно содержать не менее 2 символов.',
-            'name.max' => 'Имя не должно быть длиннее 120 символов.',
-            'email.required' => 'Введите адрес электронной почты.',
-            'email.email' => 'Введите корректный адрес электронной почты.',
-            'email.unique' => 'Этот адрес электронной почты уже используется.',
-            'password.required' => 'Введите пароль.',
-            'password.min' => 'Пароль должен содержать не менее 12 символов.',
-            'password.letters' => 'Пароль должен содержать буквы.',
-            'password.mixed' => 'Пароль должен содержать строчные и заглавные буквы.',
-            'password.numbers' => 'Пароль должен содержать цифры.',
-            'password.symbols' => 'Пароль должен содержать специальный символ.',
-            'passwordConfirmation.required' => 'Повторите пароль.',
-            'passwordConfirmation.same' => 'Подтверждение пароля не совпадает.',
+            'name.required' => __('auth.validation.name_required'),
+            'name.min' => __('auth.validation.name_min'),
+            'name.max' => __('auth.validation.name_max'),
+            'name.not_regex' => __('auth.validation.name_controls'),
+            'email.required' => __('auth.validation.email_required'),
+            'email.email' => __('auth.validation.email_format'),
+            'email.max' => __('auth.validation.email_max'),
+            'email.unique' => __('auth.validation.email_unique'),
+            'password.required' => __('auth.validation.password_required'),
+            'password.max' => __('auth.validation.password_max'),
+            'password.min' => __('auth.validation.password_min'),
+            'password.letters' => __('auth.validation.password_letters'),
+            'password.mixed' => __('auth.validation.password_mixed'),
+            'password.numbers' => __('auth.validation.password_numbers'),
+            'password.symbols' => __('auth.validation.password_symbols'),
+            'passwordConfirmation.required' => __('auth.validation.password_confirmation_required'),
+            'passwordConfirmation.max' => __('auth.validation.password_max'),
+            'passwordConfirmation.same' => __('auth.validation.password_confirmation_same'),
         ];
     }
 }

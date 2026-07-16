@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Forms\Auth;
 
-use Illuminate\Support\Str;
+use App\ValueObjects\NormalizedEmail;
 use Livewire\Form;
 
 final class ForgotPasswordForm extends Form
@@ -13,7 +13,7 @@ final class ForgotPasswordForm extends Form
 
     public function validatedEmail(): string
     {
-        $this->email = Str::lower(Str::squish($this->email));
+        $this->email = NormalizedEmail::value($this->email);
         $validated = $this->validate();
 
         return $validated['email'];
@@ -31,8 +31,9 @@ final class ForgotPasswordForm extends Form
     protected function messages(): array
     {
         return [
-            'email.required' => 'Введите адрес электронной почты.',
-            'email.email' => 'Введите корректный адрес электронной почты.',
+            'email.required' => __('auth.validation.email_required'),
+            'email.email' => __('auth.validation.email_format'),
+            'email.max' => __('auth.validation.email_max'),
         ];
     }
 }

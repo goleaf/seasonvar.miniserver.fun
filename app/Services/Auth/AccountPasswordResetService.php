@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Auth;
 
+use App\Enums\AuthenticationEvent;
 use App\Models\User;
+use App\ValueObjects\NormalizedEmail;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -14,21 +16,32 @@ use Illuminate\Validation\ValidationException;
 
 final class AccountPasswordResetService
 {
-    public const REQUEST_STATUS = 'Если аккаунт существует, письмо для восстановления отправлено.';
+    public function __construct(private readonly AuthenticationAuditService $audit) {}
+
+    public function requestStatus(): string
+    {
+        return __('auth.status.recovery_requested');
+    }
 
     public function sendResetLink(string $email): void
     {
-        $email = Str::lower(Str::squish($email));
-        $user = User::query()->whereRaw('lower(email) = ?', [$email])->first();
+        $email = NormalizedEmail::value($email);
+        $user = User::query()->whereEmailIdentity($email)->first();
         $recipient = $user instanceof User ? $user->email : $email;
 
-        Password::sendResetLink(['email' => $recipient]);
+        try {
+            Password::sendResetLink(['email' => $recipient]);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+
+        $this->audit->record(AuthenticationEvent::PasswordResetRequested, $user, $email);
     }
 
     public function reset(string $email, string $token, string $password): void
     {
-        $email = Str::lower(Str::squish($email));
-        $user = User::query()->whereRaw('lower(email) = ?', [$email])->first();
+        $email = NormalizedEmail::value($email);
+        $user = User::query()->whereEmailIdentity($email)->first();
         $recipient = $user instanceof User ? $user->email : $email;
         $status = Password::reset([
             'email' => $recipient,
@@ -44,11 +57,13 @@ final class AccountPasswordResetService
                 $user->tokens()->delete();
                 event(new PasswordReset($user));
             }, attempts: 3);
+
+            $this->audit->record(AuthenticationEvent::PasswordResetCompleted, $user, $user->email);
         });
 
         if ($status !== Password::PASSWORD_RESET) {
             throw ValidationException::withMessages([
-                'email' => ['Не удалось сбросить пароль с указанными данными.'],
+                'email' => [__('auth.errors.password_reset_failed')],
             ]);
         }
     }

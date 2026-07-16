@@ -6,6 +6,7 @@ namespace App\Livewire\Auth;
 
 use App\Livewire\Forms\Auth\ForgotPasswordForm;
 use App\Services\Auth\AccountPasswordResetService;
+use App\Services\Auth\AuthenticationRedirectService;
 use App\Services\Auth\WebAuthenticationRateLimiter;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
@@ -28,26 +29,31 @@ final class ForgotPasswordPage extends Component
         $rateKey = $rateLimiter->forgotPasswordKey($email, request()->ip());
 
         if ($rateLimiter->tooManyAttempts($rateKey, self::MAX_ATTEMPTS)) {
-            $this->form->addError('email', 'Слишком много запросов. Повторите попытку позже.');
+            $this->form->addError('email', __('auth.errors.too_many_requests'));
 
             return;
         }
 
         $rateLimiter->hit($rateKey, self::DECAY_SECONDS);
         $passwords->sendResetLink($email);
-        $this->status = AccountPasswordResetService::REQUEST_STATUS;
+        $this->status = $passwords->requestStatus();
     }
 
-    public function render(): View
+    public function render(AuthenticationRedirectService $redirects): View
     {
-        return view('livewire.auth.forgot-password-page')
+        return view('livewire.auth.forgot-password-page', [
+            'loginUrl' => $redirects->guestUrl('login'),
+        ])
             ->extends('layouts.app', [
-                'title' => 'Восстановление пароля',
+                'title' => __('auth.pages.forgot_password.title'),
                 'seo' => [
-                    'title' => 'Восстановление пароля',
-                    'description' => 'Запрос ссылки для изменения пароля аккаунта.',
+                    'title' => __('auth.pages.forgot_password.title'),
+                    'description' => __('auth.pages.forgot_password.description'),
                     'robots' => 'noindex, nofollow',
-                    'canonical' => route('password.request'),
+                    'canonical' => $redirects->guestUrl('password.request'),
+                    'social' => false,
+                    'alternates' => [],
+                    'jsonLd' => [],
                 ],
             ])
             ->section('content');

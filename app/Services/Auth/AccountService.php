@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services\Auth;
 
+use App\Enums\AuthenticationEvent;
 use App\Models\User;
 use App\Services\Collections\CatalogCollectionAccountService;
 use App\Services\Comments\CommentAccountService;
 use App\Services\ContentRequests\ContentRequestAccountService;
 use App\Services\Reviews\ReviewAccountService;
 use App\Support\UserPlainText;
+use App\ValueObjects\NormalizedEmail;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
@@ -23,10 +26,11 @@ final class AccountService
         private readonly CommentAccountService $comments,
         private readonly ReviewAccountService $reviews,
         private readonly ContentRequestAccountService $contentRequests,
+        private readonly AuthenticationAuditService $audit,
     ) {}
 
     /** @param array{name?: string, email?: string} $data */
-    public function updateProfile(User $user, array $data): User
+    public function updateProfile(User $user, array $data, ?string $currentPassword = null): User
     {
         $data = array_intersect_key($data, array_flip(['name', 'email']));
 
@@ -35,30 +39,56 @@ final class AccountService
         }
 
         if (array_key_exists('email', $data)) {
-            $data['email'] = Str::lower(Str::squish($data['email']));
+            $data['email'] = NormalizedEmail::value($data['email']);
         }
 
-        $oldEmail = Str::lower(Str::squish((string) $user->email));
+        $oldEmail = NormalizedEmail::value((string) $user->email);
         $emailChanged = array_key_exists('email', $data)
             && $oldEmail !== $data['email'];
         $nameChanged = array_key_exists('name', $data)
             && $user->name !== $data['name'];
 
-        DB::transaction(function () use ($user, $data, $oldEmail, $emailChanged): void {
-            $user->fill($data);
-
-            if ($emailChanged) {
-                $user->email_verified_at = null;
-                DB::table('password_reset_tokens')
-                    ->whereRaw('lower(email) in (?, ?)', [$oldEmail, $data['email']])
-                    ->delete();
+        if ($emailChanged) {
+            if (User::query()
+                ->whereKeyNot($user->getKey())
+                ->whereEmailIdentity($data['email'])
+                ->exists()) {
+                throw ValidationException::withMessages([
+                    'email' => [__('auth.validation.email_unique')],
+                ]);
             }
 
-            $user->save();
-        }, attempts: 3);
+            $this->confirmEmailChange($user, $currentPassword);
+        }
+
+        try {
+            DB::transaction(function () use ($user, $data, $oldEmail, $emailChanged): void {
+                $user->fill($data);
+
+                if ($emailChanged) {
+                    $user->email_verified_at = null;
+                    $user->remember_token = Str::random(60);
+                    DB::table('password_reset_tokens')
+                        ->whereRaw('lower(email) in (?, ?)', [$oldEmail, $data['email']])
+                        ->delete();
+                }
+
+                $user->save();
+            }, attempts: 3);
+        } catch (UniqueConstraintViolationException) {
+            throw ValidationException::withMessages([
+                'email' => [__('auth.validation.email_unique')],
+            ]);
+        }
 
         if ($emailChanged) {
-            $user->sendEmailVerificationNotification();
+            try {
+                $user->sendEmailVerificationNotification();
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+
+            $this->audit->record(AuthenticationEvent::EmailChanged, $user, $data['email']);
         }
 
         if ($nameChanged) {
@@ -94,7 +124,7 @@ final class AccountService
                 'remember_token' => Str::random(60),
             ])->save();
             DB::table('password_reset_tokens')
-                ->whereRaw('lower(email) = ?', [Str::lower((string) $user->email)])
+                ->whereRaw('lower(email) = ?', [NormalizedEmail::value((string) $user->email)])
                 ->delete();
 
             $tokens = $user->tokens();
@@ -107,6 +137,7 @@ final class AccountService
         }, attempts: 3);
 
         RateLimiter::clear($rateKey);
+        $this->audit->record(AuthenticationEvent::PasswordChanged, $user, $user->email);
     }
 
     public function delete(User $user, string $password): void
@@ -135,11 +166,33 @@ final class AccountService
             $this->contentRequests->prepareForDeletion($lockedUser);
             $lockedUser->tokens()->delete();
             DB::table('password_reset_tokens')
-                ->whereRaw('lower(email) = ?', [Str::lower((string) $lockedUser->email)])
+                ->whereRaw('lower(email) = ?', [NormalizedEmail::value((string) $lockedUser->email)])
                 ->delete();
             DB::table('sessions')->where('user_id', $lockedUser->getKey())->delete();
             $lockedUser->deleteOrFail();
         }, attempts: 3);
+
+        $this->audit->record(AuthenticationEvent::AccountDeleted, $user, $user->email);
+        RateLimiter::clear($rateKey);
+    }
+
+    private function confirmEmailChange(User $user, ?string $currentPassword): void
+    {
+        $rateKey = 'account-email-change:'.$user->getKey();
+
+        if (RateLimiter::tooManyAttempts($rateKey, 6)) {
+            throw ValidationException::withMessages([
+                'current_password' => [__('settings.security_page.security_rate_limited')],
+            ]);
+        }
+
+        RateLimiter::hit($rateKey, 300);
+
+        if (! is_string($currentPassword) || ! Hash::check($currentPassword, $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => [__('auth.validation.current_password_invalid')],
+            ]);
+        }
 
         RateLimiter::clear($rateKey);
     }

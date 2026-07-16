@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire\Auth;
 
 use App\Livewire\Forms\Auth\LoginForm;
+use App\Services\Auth\AuthenticationRedirectService;
+use App\Services\Auth\RegistrationAvailability;
 use App\Services\Auth\WebAuthenticationRateLimiter;
 use App\Services\Auth\WebAuthenticationService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 final class LoginPage extends Component
@@ -28,15 +31,23 @@ final class LoginPage extends Component
     public function login(
         WebAuthenticationService $authentication,
         WebAuthenticationRateLimiter $rateLimiter,
+        AuthenticationRedirectService $redirects,
     ): void {
-        $credentials = $this->form->validatedData();
+        try {
+            $credentials = $this->form->validatedData();
+        } catch (ValidationException $exception) {
+            $this->form->reset('password');
+
+            throw $exception;
+        }
         $rateKey = $rateLimiter->loginKey($credentials['email'], request()->ip());
 
         if ($rateLimiter->tooManyAttempts($rateKey, self::MAX_ATTEMPTS)) {
             $this->form->addError(
                 'email',
-                'Слишком много попыток входа. Повторите через '.$rateLimiter->availableIn($rateKey).' сек.',
+                __('auth.errors.too_many_login_attempts', ['seconds' => $rateLimiter->availableIn($rateKey)]),
             );
+            $this->form->reset('password');
 
             return;
         }
@@ -48,26 +59,39 @@ final class LoginPage extends Component
             $credentials['password'],
             $credentials['remember'],
         )) {
-            $this->form->addError('email', 'Указаны неверные данные для входа.');
+            $this->form->addError('email', __('auth.errors.invalid_credentials'));
+            $this->form->reset('password');
 
             return;
         }
 
         $rateLimiter->clear($rateKey);
+        $this->form->reset('password');
 
-        $this->redirectIntended(route('library.index'));
+        $this->redirect($redirects->intended());
     }
 
-    public function render(): View
-    {
-        return view('livewire.auth.login-page')
+    public function render(
+        AuthenticationRedirectService $redirects,
+        RegistrationAvailability $registration,
+    ): View {
+        $registrationEnabled = $registration->enabled();
+
+        return view('livewire.auth.login-page', [
+            'forgotPasswordUrl' => $redirects->guestUrl('password.request'),
+            'registerUrl' => $registrationEnabled ? $redirects->guestUrl('register') : null,
+            'registrationEnabled' => $registrationEnabled,
+        ])
             ->extends('layouts.app', [
-                'title' => 'Вход',
+                'title' => __('auth.pages.login.title'),
                 'seo' => [
-                    'title' => 'Вход',
-                    'description' => 'Вход в пользовательский аккаунт.',
+                    'title' => __('auth.pages.login.title'),
+                    'description' => __('auth.pages.login.description'),
                     'robots' => 'noindex, nofollow',
-                    'canonical' => route('login'),
+                    'canonical' => $redirects->guestUrl('login'),
+                    'social' => false,
+                    'alternates' => [],
+                    'jsonLd' => [],
                 ],
             ])
             ->section('content');

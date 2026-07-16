@@ -18,7 +18,7 @@ final class ForgotPasswordController extends Controller
         $passwords->sendResetLink($request->email());
 
         return response()->json(['data' => [
-            'status' => AccountPasswordResetService::REQUEST_STATUS,
+            'status' => $passwords->requestStatus(),
         ]], headers: ['Cache-Control' => 'private, no-store']);
     }
 }

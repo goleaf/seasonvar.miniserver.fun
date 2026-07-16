@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Auth;
 
+use App\Enums\AuthenticationEvent;
 use App\Models\User;
+use App\Services\Auth\AuthenticationAuditService;
 use App\Services\Auth\WebAuthenticationRateLimiter;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
@@ -32,8 +34,10 @@ final class VerifyEmailPage extends Component
         $this->email = $user->email;
     }
 
-    public function resend(WebAuthenticationRateLimiter $rateLimiter): void
-    {
+    public function resend(
+        WebAuthenticationRateLimiter $rateLimiter,
+        AuthenticationAuditService $audit,
+    ): void {
         $user = auth()->user();
 
         abort_unless($user instanceof User, 403);
@@ -47,26 +51,38 @@ final class VerifyEmailPage extends Component
         $rateKey = $rateLimiter->verificationKey($user->getKey());
 
         if ($rateLimiter->tooManyAttempts($rateKey, self::MAX_ATTEMPTS)) {
-            $this->addError('email', 'Слишком много запросов. Повторите попытку позже.');
+            $this->addError('email', __('auth.errors.too_many_requests'));
 
             return;
         }
 
         $rateLimiter->hit($rateKey);
-        $user->sendEmailVerificationNotification();
-        $this->status = 'Новое письмо для подтверждения отправлено.';
+        try {
+            $user->sendEmailVerificationNotification();
+        } catch (\Throwable $exception) {
+            report($exception);
+            $this->addError('email', __('auth.errors.mail_delivery_failed'));
+
+            return;
+        }
+
+        $audit->record(AuthenticationEvent::VerificationRequested, $user, $user->email);
+        $this->status = __('auth.status.verification_sent');
     }
 
     public function render(): View
     {
         return view('livewire.auth.verify-email-page')
             ->extends('layouts.app', [
-                'title' => 'Подтверждение почты',
+                'title' => __('auth.pages.verify_email.title'),
                 'seo' => [
-                    'title' => 'Подтверждение почты',
-                    'description' => 'Подтверждение адреса электронной почты аккаунта.',
+                    'title' => __('auth.pages.verify_email.title'),
+                    'description' => __('auth.pages.verify_email.description'),
                     'robots' => 'noindex, nofollow',
                     'canonical' => route('verification.notice'),
+                    'social' => false,
+                    'alternates' => [],
+                    'jsonLd' => [],
                 ],
             ])
             ->section('content');

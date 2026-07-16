@@ -30,6 +30,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View as ViewFacade;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 use Livewire\Livewire;
 
@@ -54,6 +55,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Password::defaults(static fn (): Password => Password::min(12)
+            ->letters()
+            ->mixedCase()
+            ->numbers()
+            ->symbols());
+
         RateLimiter::for('media-downloads', function (Request $request): array {
             $userId = (string) ($request->user()?->getAuthIdentifier() ?? 'guest');
             $media = $request->route('licensedMedia');

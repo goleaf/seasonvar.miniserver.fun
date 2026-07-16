@@ -18,6 +18,11 @@ final class AuthenticationFingerprint
         return $this->hash('network|'.($ipAddress ?: 'unknown'));
     }
 
+    public function opaque(string $scope, string $value): string
+    {
+        return $this->hash($scope.'|'.$value);
+    }
+
     private function hash(string $value): string
     {
         return hash_hmac('sha256', $value, (string) config('app.key'));

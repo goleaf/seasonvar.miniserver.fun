@@ -78,37 +78,64 @@ final class SecurityPage extends Component
 
     public function revokeDevice(mixed $tokenId, MobileTokenService $tokens): void
     {
+        $this->resetValidation();
         $this->securityError = null;
         $tokenId = filter_var($tokenId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 
         if ($tokenId === false) {
+            $this->resetCurrentPassword();
             abort(404);
         }
 
         try {
-            $tokens->revoke($this->user(), $tokenId);
+            $this->validateCurrentPassword();
+            $tokens->revokeConfirmed($this->user(), $tokenId, $this->currentPassword);
         } catch (ModelNotFoundException) {
+            $this->resetCurrentPassword();
             abort(404);
+        } catch (ValidationException $exception) {
+            $this->resetCurrentPassword();
+            $this->addError(
+                'currentPassword',
+                $exception->errors()['current_password'][0] ?? __('settings.security_page.current_password_invalid'),
+            );
+
+            return;
         } catch (Throwable $exception) {
+            $this->resetCurrentPassword();
             $this->fail($exception);
 
             return;
         }
 
+        $this->resetCurrentPassword();
         $this->deviceStatus = __('settings.security_page.device_revoked');
     }
 
     public function revokeAllDevices(MobileTokenService $tokens): void
     {
+        $this->resetValidation();
         $this->securityError = null;
 
         try {
-            $tokens->revokeAll($this->user());
+            $this->validateCurrentPassword();
+            $tokens->revokeAllConfirmed($this->user(), $this->currentPassword);
+        } catch (ValidationException $exception) {
+            $this->resetCurrentPassword();
+            $this->addError(
+                'currentPassword',
+                $exception->errors()['current_password'][0] ?? __('settings.security_page.current_password_invalid'),
+            );
+
+            return;
         } catch (Throwable $exception) {
+            $this->resetCurrentPassword();
             $this->fail($exception);
 
             return;
         }
+
+        $this->resetCurrentPassword();
         $this->deviceStatus = __('settings.security_page.devices_revoked');
     }
 
@@ -120,7 +147,7 @@ final class SecurityPage extends Component
         try {
             $this->validateCurrentPassword();
         } catch (ValidationException $exception) {
-            $this->resetSensitiveProperties();
+            $this->resetCurrentPassword();
 
             throw $exception;
         }
@@ -132,7 +159,7 @@ final class SecurityPage extends Component
                 Session::getId(),
             );
         } catch (ValidationException $exception) {
-            $this->resetSensitiveProperties();
+            $this->resetCurrentPassword();
             $this->addError(
                 'currentPassword',
                 $exception->errors()['current_password'][0] ?? __('settings.security_page.current_password_invalid'),
@@ -140,13 +167,13 @@ final class SecurityPage extends Component
 
             return;
         } catch (Throwable $exception) {
-            $this->resetSensitiveProperties();
+            $this->resetCurrentPassword();
             $this->fail($exception);
 
             return;
         }
 
-        $this->resetSensitiveProperties();
+        $this->resetCurrentPassword();
         $this->sessionStatus = __('settings.security_page.other_sessions_revoked');
     }
 
@@ -159,7 +186,7 @@ final class SecurityPage extends Component
             $this->validateCurrentPassword();
             $sessions->revoke($this->user(), $this->currentPassword, $sessionToken, Session::getId());
         } catch (ValidationException $exception) {
-            $this->resetSensitiveProperties();
+            $this->resetCurrentPassword();
             $this->addError(
                 isset($exception->errors()['session']) ? 'session' : 'currentPassword',
                 $exception->errors()['session'][0]
@@ -169,13 +196,13 @@ final class SecurityPage extends Component
 
             return;
         } catch (Throwable $exception) {
-            $this->resetSensitiveProperties();
+            $this->resetCurrentPassword();
             $this->fail($exception);
 
             return;
         }
 
-        $this->resetSensitiveProperties();
+        $this->resetCurrentPassword();
         $this->sessionStatus = __('settings.security_page.session_revoked');
     }
 
@@ -187,7 +214,7 @@ final class SecurityPage extends Component
         try {
             $this->validateCurrentPassword();
         } catch (ValidationException $exception) {
-            $this->resetSensitiveProperties();
+            $this->resetCurrentPassword();
 
             throw $exception;
         }
@@ -197,7 +224,7 @@ final class SecurityPage extends Component
         try {
             $accounts->delete($user, $this->currentPassword);
         } catch (ValidationException $exception) {
-            $this->resetSensitiveProperties();
+            $this->resetCurrentPassword();
             $this->addError(
                 'currentPassword',
                 $exception->errors()['password'][0] ?? __('settings.security_page.deletion_password_invalid'),
@@ -205,7 +232,7 @@ final class SecurityPage extends Component
 
             return;
         } catch (Throwable $exception) {
-            $this->resetSensitiveProperties();
+            $this->resetCurrentPassword();
             $this->fail($exception);
 
             return;
@@ -292,17 +319,20 @@ final class SecurityPage extends Component
     {
         $this->validate([
             'currentPassword' => ['required', 'string', 'max:255'],
-            'password' => ['required', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
-            'passwordConfirmation' => ['required', 'same:password'],
+            'password' => ['required', 'string', 'max:255', Password::defaults()],
+            'passwordConfirmation' => ['required', 'string', 'max:255', 'same:password'],
         ], [
             'currentPassword.required' => __('settings.security_page.validation.current_password'),
+            'currentPassword.max' => __('auth.validation.password_max'),
             'password.required' => __('settings.security_page.validation.new_password'),
+            'password.max' => __('auth.validation.password_max'),
             'password.min' => __('settings.security_page.validation.password_min'),
             'password.letters' => __('settings.security_page.validation.password_letters'),
             'password.mixed' => __('settings.security_page.validation.password_mixed'),
             'password.numbers' => __('settings.security_page.validation.password_numbers'),
             'password.symbols' => __('settings.security_page.validation.password_symbols'),
             'passwordConfirmation.required' => __('settings.security_page.validation.password_confirmation'),
+            'passwordConfirmation.max' => __('auth.validation.password_max'),
             'passwordConfirmation.same' => __('settings.security_page.validation.password_confirmation_same'),
         ]);
     }
@@ -313,12 +343,18 @@ final class SecurityPage extends Component
             'currentPassword' => ['required', 'string', 'max:255'],
         ], [
             'currentPassword.required' => __('settings.security_page.validation.current_password'),
+            'currentPassword.max' => __('auth.validation.password_max'),
         ]);
     }
 
     private function resetSensitiveProperties(): void
     {
         $this->reset('currentPassword', 'password', 'passwordConfirmation');
+    }
+
+    private function resetCurrentPassword(): void
+    {
+        $this->reset('currentPassword');
     }
 
     private function fail(Throwable $exception): void

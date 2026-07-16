@@ -32,6 +32,14 @@ Mobile-клиент создаёт playback session через API и испол
 - Личная библиотека читается unverified пользователем, но mutation controls отображаются только при `canInteract`; server-side policies всё равно повторяют verified/entitlement boundary. `/watching` сохраняется только как redirect на `/library/continue-watching`.
 - Главная, каталог и рекомендации получают личные признаки карточек через bounded eager loader до Blade render: watchlist, rating, progress и primary action не выполняют запросы из `x-catalog.title-card` и не попадают в guest shared cache.
 
+## Frontend lifecycle аутентификации
+
+Auth pages остаются обычными SSR/Livewire страницами: component хранит только typed scalar draft, service выполняет credential/domain action, а Blade выводит prepared URLs/flags/translations. `wire:loading` отключает только active submit и объявляет localized status; validation связывает error с полем. Password очищается после каждого validation/credential outcome; reset token живёт только в scoped reset-form до broker action и не попадает в metadata/storage/log. Verification token, session ID, redirect payload и complete user model не сериализуются в public state или JavaScript.
+
+Канонические RU routes и `/en/...` aliases используют те же components; locale переживает login/register/recovery/reset/verification через allowlisted server state, не через arbitrary callback query. Authentication pages задают `noindex,nofollow`, отключают social/JSON-LD/alternates и не помещают token в canonical. Header login/register links готовит `AppLayoutData`; registration link исчезает вместе с disabled route.
+
+Manual read-only Chromium smoke 16.07.2026 проверил login/register/recovery/reset на desktop `1440×1200` и mobile `390×844`: HTTP 200, RU/EN `<html lang>`/headings, noindex, labels/autocomplete, 44px submit target, отсутствие horizontal overflow, console/page/request errors. Снимки находятся в ignored `output/playwright/task15-auth/`; runtime accounts/forms не изменялись.
+
 ## Browser baseline 13.07.2026
 
 Read-only проверка выполнена в Chromium на desktop `1440×1200`, tablet `768×1024` и mobile `390×844`. Для визуальных маршрутов проверялись HTTP status, итоговый URL, `h1`, landmarks, горизонтальное переполнение, изображения, alt-текст, duplicate IDs, доступные имена controls, console/page errors и полноэкранные снимки. Интерактивные сценарии повторно запускались на `https://seasonvar.miniserver.fun`, чтобы production secure-cookie и Livewire middleware совпадали с реальным окружением.

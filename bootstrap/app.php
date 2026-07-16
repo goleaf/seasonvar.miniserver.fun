@@ -9,6 +9,7 @@ use App\Http\Middleware\PrivateAccountResponse;
 use App\Http\Middleware\PublicHttpCacheHeaders;
 use App\Http\Middleware\ResolveCanonicalTagRoute;
 use App\Http\Middleware\ResolveOptionalSanctumUser;
+use App\Http\Middleware\SetApiLocale;
 use App\Http\Middleware\SetInterfaceLocale;
 use App\Http\Responses\ApiErrorResponse;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -35,7 +36,18 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->redirectGuestsTo(
-            fn (Request $request): ?string => $request->is('api/*') ? null : route('login'),
+            function (Request $request): ?string {
+                if ($request->is('api/*')) {
+                    return null;
+                }
+
+                $locale = $request->route('locale');
+
+                return is_string($locale)
+                    && in_array($locale, (array) config('catalog-collections.supported_locales', []), true)
+                    ? route('localized.login', ['locale' => $locale])
+                    : route('login');
+            },
         );
         $middleware->redirectUsersTo(
             fn (): string => route('library.index'),
@@ -64,14 +76,14 @@ return Application::configure(basePath: dirname(__DIR__))
             ApplyAccountPreferences::class,
         ]);
         $middleware->api(
-            append: [AddSecurityHeaders::class],
+            append: [SetApiLocale::class, AddSecurityHeaders::class],
             prepend: [AssignApiRequestId::class],
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $invalidVerificationLink = static fn () => response()->view('errors.403', [
-            'title' => 'Ссылка недействительна',
-            'message' => 'Ссылка недействительна или срок её действия истёк.',
+            'title' => __('auth.errors.invalid_verification_link_title'),
+            'message' => __('auth.errors.invalid_verification_link'),
         ], 403);
 
         $exceptions->shouldRenderJsonWhen(
@@ -85,7 +97,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return app(ApiErrorResponse::class)->make(
                 $request,
                 'validation_failed',
-                'Переданные данные некорректны.',
+                __('auth.errors.validation_failed'),
                 422,
                 $exception->errors(),
             );
@@ -98,7 +110,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return app(ApiErrorResponse::class)->make(
                 $request,
                 'unauthenticated',
-                'Требуется аутентификация.',
+                __('auth.errors.unauthenticated'),
                 401,
             );
         });
@@ -114,7 +126,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return app(ApiErrorResponse::class)->make(
                 $request,
                 'forbidden',
-                'Доступ запрещён.',
+                __('auth.errors.forbidden'),
                 403,
             );
         });
@@ -130,7 +142,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return app(ApiErrorResponse::class)->make(
                 $request,
                 'forbidden',
-                'Доступ запрещён.',
+                __('auth.errors.forbidden'),
                 403,
             );
         });
@@ -146,7 +158,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return app(ApiErrorResponse::class)->make(
                 $request,
                 'forbidden',
-                'Доступ запрещён.',
+                __('auth.errors.forbidden'),
                 403,
             );
         });
@@ -158,7 +170,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return app(ApiErrorResponse::class)->make(
                 $request,
                 'not_found',
-                'Ресурс не найден.',
+                __('auth.errors.not_found'),
                 404,
             );
         });
@@ -170,7 +182,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return app(ApiErrorResponse::class)->make(
                 $request,
                 'not_found',
-                'Ресурс не найден.',
+                __('auth.errors.not_found'),
                 404,
             );
         });
@@ -182,7 +194,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return app(ApiErrorResponse::class)->make(
                 $request,
                 'rate_limited',
-                'Слишком много запросов. Повторите попытку позже.',
+                __('auth.errors.rate_limited'),
                 429,
             );
         });
@@ -194,7 +206,7 @@ return Application::configure(basePath: dirname(__DIR__))
             return app(ApiErrorResponse::class)->make(
                 $request,
                 'server_error',
-                'Внутренняя ошибка сервера.',
+                __('auth.errors.server_error'),
                 500,
             );
         });

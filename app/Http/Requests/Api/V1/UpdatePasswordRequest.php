@@ -19,8 +19,9 @@ final class UpdatePasswordRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'current_password' => ['required', 'string', 'current_password'],
-            'password' => ['required', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
+            'current_password' => ['bail', 'required', 'string', 'max:255', 'current_password'],
+            'password' => ['required', 'string', 'max:255', 'confirmed', Password::defaults()],
+            'password_confirmation' => ['required', 'string', 'max:255'],
         ];
     }
 
@@ -28,10 +29,19 @@ final class UpdatePasswordRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'current_password.required' => 'Введите текущий пароль.',
-            'current_password.current_password' => 'Текущий пароль указан неверно.',
-            'password.required' => 'Введите новый пароль.',
-            'password.confirmed' => 'Подтверждение пароля не совпадает.',
+            'current_password.required' => __('auth.validation.current_password_required'),
+            'current_password.max' => __('auth.validation.password_max'),
+            'current_password.current_password' => __('auth.validation.current_password_invalid'),
+            'password.required' => __('auth.validation.new_password_required'),
+            'password.confirmed' => __('auth.validation.password_confirmation_same'),
+            'password.max' => __('auth.validation.password_max'),
+            'password.min' => __('auth.validation.password_min'),
+            'password.letters' => __('auth.validation.password_letters'),
+            'password.mixed' => __('auth.validation.password_mixed'),
+            'password.numbers' => __('auth.validation.password_numbers'),
+            'password.symbols' => __('auth.validation.password_symbols'),
+            'password_confirmation.required' => __('auth.validation.new_password_confirmation_required'),
+            'password_confirmation.max' => __('auth.validation.password_max'),
         ];
     }
 

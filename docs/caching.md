@@ -185,6 +185,13 @@ Cache key dimensions public summary включают domain version, collection 
 - Visibility/moderation change bump-ит namespace немедленно after commit, поэтому скрытый tag исчезает из metadata/count/search/related/popular/API/sitemap variants. Cache/store failure не откатывает authoritative DB mutation: request использует cold visibility query, telemetry фиксирует failure, а queue warm остаётся best-effort существующей инфраструктурой.
 - Rolling deploy использует `TagSchema`: если `TAG_CANONICAL_SCHEMA` не задан, capability определяется полным набором canonical columns/tables один раз на scoped container lifetime. До миграции legacy `tags/catalog_title_tag` reads продолжают работать; explicit boolean override предназначен только для управляемого rollback/diagnostics, а не для сокрытия незавершённой schema.
 
+## Cache lifecycle аутентификации
+
+- Guard user, session/remember state, verification, password/reset token, intended redirect, limiter secret input, OAuth-ready state, audit payload и anonymous preference merge никогда не попадают в shared response/data cache. Guest auth pages могут быть SSR, но page metadata noindex и forms/CSRF/session responses bypass shared full-page storage.
+- Named authentication limiters use existing RateLimiter store with HMAC email/network/scope fingerprints; raw email, IP, user ID, password, provider token and session ID are absent from keys. Limiter outage does not create an allow decision inside credential/session/domain services.
+- Login/logout/verification/password/email/device/session/deletion actions do not flush the application cache. Existing owner/domain invalidators remain authoritative; auth/session state is read from guard/database on each boundary. Account settings locale adoption changes only an unset owner row through its existing targeted lifecycle.
+- `config/authentication.php` owns registration availability; `config/logging.php` owns the bounded authentication channel. Rolling deployment must rebuild config and route caches together, because disabled registration changes both web/API route registration. PHP-FPM/workers then require graceful reload; stale config is not repaired with global data-cache flush.
+
 ## Cache lifecycle настроек аккаунта
 
 - Settings page HTML, account email, preferences, notification matrix, sessions, export/delete state и authenticated player overlays никогда не входят в shared response/data cache. `PrivateAccountResponse` запрещает browser/CDN reuse, а full-response middleware обходит authenticated traffic.

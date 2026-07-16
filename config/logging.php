@@ -73,6 +73,14 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'authentication' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/authentication.log'),
+            'level' => 'info',
+            'days' => (int) env('AUTH_AUDIT_DAYS', 30),
+            'replace_placeholders' => true,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

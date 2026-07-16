@@ -19,6 +19,7 @@ final class AuthenticationRedirectService
         '/forgot-password',
         '/livewire/',
         '/login',
+        '/logout',
         '/register',
         '/reset-password',
     ];
@@ -35,7 +36,9 @@ final class AuthenticationRedirectService
         $locale ??= app()->getLocale();
         $localizedRoute = 'localized.'.$canonicalRoute;
 
-        if ($this->supportedLocale($locale) && $this->router->has($localizedRoute)) {
+        $default = (string) config('account-settings.default_locale', config('app.locale', 'ru'));
+
+        if ($locale !== $default && $this->supportedLocale($locale) && $this->router->has($localizedRoute)) {
             return $this->urls->route($localizedRoute, ['locale' => $locale, ...$parameters]);
         }
 
@@ -77,7 +80,7 @@ final class AuthenticationRedirectService
 
         $parts = parse_url($candidate);
 
-        if ($parts === false || isset($parts['user'], $parts['pass'], $parts['fragment'])) {
+        if ($parts === false || isset($parts['user']) || isset($parts['pass']) || isset($parts['fragment'])) {
             return null;
         }
 
@@ -97,7 +100,7 @@ final class AuthenticationRedirectService
 
         $path = (string) ($parts['path'] ?? '/');
 
-        if (! Str::startsWith($path, '/') || Str::startsWith($path, self::FORBIDDEN_PATH_PREFIXES)) {
+        if (! Str::startsWith($path, '/') || $this->forbiddenPath($path)) {
             return null;
         }
 
@@ -109,6 +112,17 @@ final class AuthenticationRedirectService
     private function supportedLocale(string $locale): bool
     {
         return in_array($locale, (array) config('catalog-collections.supported_locales', []), true);
+    }
+
+    private function forbiddenPath(string $path): bool
+    {
+        $segments = explode('/', ltrim($path, '/'), 2);
+
+        if (isset($segments[0], $segments[1]) && $this->supportedLocale($segments[0])) {
+            $path = '/'.$segments[1];
+        }
+
+        return Str::startsWith($path, self::FORBIDDEN_PATH_PREFIXES);
     }
 
     private function defaultPort(string $scheme): int

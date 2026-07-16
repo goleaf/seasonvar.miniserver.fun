@@ -4,12 +4,15 @@ namespace App\Models;
 
 use App\Notifications\ResetAccountPassword;
 use App\Notifications\VerifyAccountEmail;
+use App\ValueObjects\NormalizedEmail;
 use Carbon\CarbonInterface;
 use Database\Factories\UserFactory;
 use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailBehavior;
 use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -26,7 +29,7 @@ use Laravel\Sanctum\HasApiTokens;
  */
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable implements MustVerifyEmailContract
+class User extends Authenticatable implements HasLocalePreference, MustVerifyEmailContract
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, MustVerifyEmailBehavior, Notifiable;
@@ -40,6 +43,35 @@ class User extends Authenticatable implements MustVerifyEmailContract
     public function sendPasswordResetNotification($token): void
     {
         $this->notify((new ResetAccountPassword($token))->afterCommit());
+    }
+
+    public function preferredLocale(): string
+    {
+        $supported = (array) config('catalog-collections.supported_locales', []);
+        $locale = null;
+
+        if (Schema::hasTable('user_account_settings')) {
+            $setting = $this->relationLoaded('accountSetting')
+                ? $this->accountSetting
+                : $this->accountSetting()->first();
+            $locale = is_string($setting?->locale) ? $setting->locale : null;
+        }
+
+        if (is_string($locale) && in_array($locale, $supported, true)) {
+            return $locale;
+        }
+
+        $current = app()->getLocale();
+
+        return in_array($current, $supported, true)
+            ? $current
+            : (string) config('account-settings.default_locale', config('app.locale', 'ru'));
+    }
+
+    /** @param Builder<User> $query */
+    public function scopeWhereEmailIdentity(Builder $query, string $email): void
+    {
+        $query->whereRaw('lower(email) = ?', [NormalizedEmail::value($email)]);
     }
 
     /** @return HasMany<CatalogTitleUserState, $this> */

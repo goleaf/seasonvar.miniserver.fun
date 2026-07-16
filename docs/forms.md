@@ -1,6 +1,6 @@
 # Формы
 
-Обновлено: 13.07.2026
+Обновлено: 16.07.2026
 
 ## Публичные формы
 
@@ -18,6 +18,14 @@
 - Ошибки валидации рендерит `x-form.input-error` через стандартный `@error`.
 - Обычные GET-формы используют `old()` после redirect; full-page каталог показывает Livewire error bag на той же странице и не выполняет запрос выдачи по невалидному состоянию.
 - Для selected/checked/error/old-состояний нельзя добавлять `@php`; используйте props, `old()`, `@error`, `@selected`, `@checked` и Form Request/ViewModel-данные.
+
+## Формы аутентификации
+
+- `/login`, `/register`, `/forgot-password`, `/reset-password/{token}`, `/email/verify` и `/confirm-password` — один набор full-page Livewire components и typed form objects; RU/EN aliases не дублируют validation/service logic. Без JavaScript initial page и native form semantics остаются доступны, а provider/modal формы не рендерятся, потому что таких backend capabilities нет.
+- Поля имеют visible labels, associated error output, `email`, `name`, `current-password`/`new-password` autocomplete, keyboard submit, focus-visible styles и touch target не меньше 44px. Password paste не блокируется, show-password JavaScript не добавлен, secret очищается после action outcome, а non-sensitive identifier сохраняется после recoverable failure.
+- Все action/loading/status/error/disabled labels находятся в `lang/{ru,en}/auth.php`. Submit блокирует повторную отправку только своей action; validation остаётся server authoritative. Livewire public state принимает только scalar form values и не сериализует `User`, token, session, redirect или provider payload.
+- Registration применяет shared `Password::defaults()`, 255-char ceiling, name control/bidi rejection и canonical email normalization. `AUTH_REGISTRATION_ENABLED=false` скрывает registration links и route, а не оставляет dead submit. Login поддерживает только email/password/explicit remember-me, потому что username/provider identity отсутствует.
+- Recovery выдаёт одинаковый safe status независимо от existence; reset получает token route parameter, но не помещает его в SEO metadata/storage/log. Profile email change отдельно запрашивает current password; password/session/device/delete actions используют security page и не смешиваются с general profile save.
 
 ## Административные формы
 

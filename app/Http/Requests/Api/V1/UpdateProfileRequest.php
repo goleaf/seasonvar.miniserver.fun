@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Api\V1;
 
 use App\Models\User;
+use App\ValueObjects\NormalizedEmail;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -21,7 +22,7 @@ final class UpdateProfileRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['sometimes', 'required', 'string', 'min:2', 'max:120'],
+            'name' => ['sometimes', 'required', 'string', 'min:2', 'max:120', 'not_regex:/[\p{Cc}\p{Cs}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u'],
             'email' => [
                 'sometimes',
                 'required',
@@ -31,6 +32,7 @@ final class UpdateProfileRequest extends FormRequest
                 'max:255',
                 Rule::unique(User::class, 'email')->ignore($this->user()),
             ],
+            'current_password' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -38,12 +40,15 @@ final class UpdateProfileRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'name.required' => 'Введите имя.',
-            'name.min' => 'Имя должно содержать не менее 2 символов.',
-            'name.max' => 'Имя не должно быть длиннее 120 символов.',
-            'email.required' => 'Введите адрес электронной почты.',
-            'email.email' => 'Введите корректный адрес электронной почты.',
-            'email.unique' => 'Этот адрес электронной почты уже используется.',
+            'name.required' => __('auth.validation.name_required'),
+            'name.min' => __('auth.validation.name_min'),
+            'name.max' => __('auth.validation.name_max'),
+            'name.not_regex' => __('auth.validation.name_controls'),
+            'email.required' => __('auth.validation.email_required'),
+            'email.email' => __('auth.validation.email_format'),
+            'email.max' => __('auth.validation.email_max'),
+            'email.unique' => __('auth.validation.email_unique'),
+            'current_password.max' => __('auth.validation.password_max'),
         ];
     }
 
@@ -53,7 +58,7 @@ final class UpdateProfileRequest extends FormRequest
         return [
             function (Validator $validator): void {
                 if (! $this->hasAny(['name', 'email'])) {
-                    $validator->errors()->add('profile', 'Укажите имя или адрес электронной почты.');
+                    $validator->errors()->add('profile', __('auth.validation.profile_required'));
 
                     return;
                 }
@@ -63,9 +68,9 @@ final class UpdateProfileRequest extends FormRequest
 
                 if ($email !== '' && User::query()
                     ->whereKeyNot($userId)
-                    ->whereRaw('lower(email) = ?', [$email])
+                    ->whereEmailIdentity($email)
                     ->exists()) {
-                    $validator->errors()->add('email', 'Этот адрес электронной почты уже используется.');
+                    $validator->errors()->add('email', __('auth.validation.email_unique'));
                 }
             },
         ];
@@ -87,6 +92,13 @@ final class UpdateProfileRequest extends FormRequest
         return $data;
     }
 
+    public function currentPassword(): ?string
+    {
+        $password = $this->input('current_password');
+
+        return is_string($password) && $password !== '' ? $password : null;
+    }
+
     protected function prepareForValidation(): void
     {
         $normalized = [];
@@ -98,7 +110,7 @@ final class UpdateProfileRequest extends FormRequest
         }
 
         if (is_string($email)) {
-            $normalized['email'] = Str::lower(Str::squish($email));
+            $normalized['email'] = NormalizedEmail::value($email);
         }
 
         $this->merge($normalized);

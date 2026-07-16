@@ -1,6 +1,6 @@
 # Авторизация
 
-Обновлено: 15.07.2026
+Обновлено: 16.07.2026
 
 ## Правила
 
@@ -27,6 +27,23 @@
 - Signed mobile delivery URL авторизует только один media grant на короткое время и не является reusable login credential. Grant привязан к nullable user ID и media ID; endpoint повторно проверяет существование user и полный entitlement непосредственно перед provider redirect, поэтому удаление аккаунта, снятие релиза с публикации или отзыв доступа действует на уже выданный URL.
 - Email verification не ставится route middleware на web `/profile`/`/library/*` или API `/api/v1/me`: unverified пользователь сохраняет доступ к чтению своего профиля и библиотеки, исправлению email, повторной отправке письма, выходу и удалению аккаунта. `CatalogTitlePolicy::interact`, `EpisodeViewProgressPolicy` и `verified.api` явно защищают watchlist/rating/progress/history mutations; token и скрытая UI-кнопка эту границу не заменяют.
 - Password reset отзывает все tokens; обычная смена пароля сохраняет только текущий token; rotation удаляет прежний token после успешного создания замены. Logout current/all и owner-scoped device delete имеют разный, зафиксированный тестами охват.
+
+## Матрица аутентификации
+
+| Операция | Guest | Authenticated owner | Дополнительная граница |
+| --- | --- | --- | --- |
+| Register/login/recovery/reset | да, если route включён | guest middleware исключает повторный вход | named layered limiter, generic failures, normalized email |
+| Verification callback | владелец signed link без auto-login | только тот же user получает owner redirect | temporary signature, ID и email hash |
+| Resend verification | нет | только unverified owner | throttle, locale-aware notification |
+| Изменить name | нет | да | explicit allowlist и plain-text normalizer |
+| Изменить email | нет | да | current password, uniqueness, reset-token deletion, verification reset, remember rotation |
+| Изменить password | нет | да | current password, shared policy, remember rotation, other access revocation |
+| Logout | нет | да | Livewire POST/CSRF, session invalidate, CSRF rotation |
+| Revoke browser/mobile session | нет | только owner | current password в web UI; opaque session identity или owner token relation |
+| Export/delete | нет | только owner | password confirmation; private/no-store; canonical lifecycle service |
+| Social/link/unlink/merge/MFA/magic link | отсутствует | отсутствует | capability не существует и не симулируется control-ом |
+
+`AUTH_REGISTRATION_ENABLED=false` удаляет create routes web/API при route build; login, recovery, verification и существующие accounts продолжают работать. Обычный unverified user может войти и управлять безопасными account actions, но verified domain policies по-прежнему запрещают catalog writes. Suspended/disabled/deleted status model в проекте отсутствует; hard-deleted row не может пройти Eloquent provider или Sanctum ownership resolution.
 
 ## Реализация
 

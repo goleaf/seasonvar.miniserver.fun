@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\View\ViewData;
 
 use App\DTOs\CatalogDirectoryDefinition;
+use App\Services\Auth\AuthenticationRedirectService;
 use App\Services\Catalog\CatalogDirectoryRegistry;
 use App\Support\PlainText;
 use App\View\ViewModels\LayoutNavigationItem;
@@ -24,6 +25,7 @@ final class AppLayoutData
 
     public function __construct(
         private readonly CatalogDirectoryRegistry $directories,
+        private readonly AuthenticationRedirectService $authenticationRoutes,
         private readonly Request $request,
         private readonly Gate $gate,
         private readonly Router $router,
@@ -180,18 +182,21 @@ final class AppLayoutData
                 );
             }
         } else {
-            $layoutHeaderNavigation[] = $this->headerLink(
-                'login',
+            $layoutHeaderNavigation[] = $this->headerLinkUrl(
+                $this->authenticationRoutes->guestUrl('login'),
                 'fa-solid fa-right-to-bracket',
-                'Войти',
-                $this->request->routeIs('login'),
+                __('auth.actions.login'),
+                $this->request->routeIs('login', 'localized.login'),
             );
-            $layoutHeaderNavigation[] = $this->headerLink(
-                'register',
-                'fa-solid fa-user-plus',
-                'Регистрация',
-                $this->request->routeIs('register'),
-            );
+
+            if (config('authentication.registration.enabled', true) && $this->router->has('register')) {
+                $layoutHeaderNavigation[] = $this->headerLinkUrl(
+                    $this->authenticationRoutes->guestUrl('register'),
+                    'fa-solid fa-user-plus',
+                    __('auth.pages.register.title'),
+                    $this->request->routeIs('register', 'localized.register'),
+                );
+            }
         }
 
         $layoutFooterNavigation = [
