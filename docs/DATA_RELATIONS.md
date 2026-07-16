@@ -86,7 +86,7 @@
 - Автоматическая identity тайтла — `(source_id, external_id)`, при отсутствии provider ID — точный canonical URL hash/source page. Все десять справочников используют общий canonical slug; для актёров и режиссёров он строится после транслитерации, поэтому эквивалентные кириллическое/латинское написания разных источников сходятся в одну строку. Stable external ID или канонический HTTPS URL каждого источника дополнительно закрепляется hash-only строкой `CatalogRelationSourceIdentity`; следующий refresh переиспользует сохранённый canonical key даже после неэквивалентного переименования provider label. Fuzzy matching и slug suffix для provider identity не используются.
 - Admin attaches metadata через `syncWithoutDetaching`, а importer relation sync использует ту же idempotent семантику: локально добавленные pivot rows не отсоединяются частичным или повторным provider import. Concurrent admin writes проверяют fingerprints редактируемых полей и relation IDs под row lock.
 - Успешные admin mutations атомарно добавляют append-only `admin_audit_events`; application model запрещает update/delete, а FK actor использует restrict delete, чтобы история не исчезла каскадно. Importer и public user flows audit rows не создают.
-- Публичные медиа проверяют собственный status/window/audience и доступность связанных сезона и серии.
+- Публичные медиа проверяют собственный status/window/audience и доступность связанных сезона и серии. `LicensedMedia::forAvailableReleases()` не строит глобальные списки child IDs: ненулевые `season_id` и `episode_id` проверяются коррелированными `EXISTS` через точные primary keys, а серия дополнительно проверяет собственный сезон. `NULL`-связь сохраняет прежнюю семантику; publication/audience/window/soft-delete predicates по-прежнему принадлежат только `CatalogEntitlementService` и `availableTo($user)`.
 - Playback дополнительно требует непустой `playback_url` или `path`; пустая опубликованная media row не делает серию доступной и не попадает в counts/primary action.
 
 ## Типы фильтров справочников
@@ -423,6 +423,8 @@ Migration `2026_07_16_120000_add_canonical_recommendation_discovery.php` additiv
 - `episodes_recommendation_release_events_idx(publication_status,deleted_at,released_at,id,season_id)` — bounded `recently_updated` episode event stream: equality on publication/deletion state, release range/order, deterministic ID tie-break and season join key. It avoids the former historical aggregate; isolated SQLite `EXPLAIN QUERY PLAN` selected it as a covering index. The extra episode-write cost is limited to this one real discovery query, and `down()` removes only the index.
 
 Existing user-title unique and history indexes continue to serve owner state/progress. No feedback/impression/analytics aggregate table, region/premium/language/creator/franchise table or polymorphic recommendation relation was introduced. Complete domain semantics are owned by the [recommendation design](superpowers/specs/2026-07-13-recommendation-v3-list-design.md).
+
+Release-availability hardening не добавило индекс: correlated season/episode checks выбирают существующие integer primary keys после title-keyed `licensed_media_publication_lookup_idx`. Дополнительный media index не устранил бы прежнюю materialization child lists, а summary-table создала бы второй источник истины для publication, audience, window, health и delete lifecycle.
 
 ## File-size metadata `licensed_media`
 

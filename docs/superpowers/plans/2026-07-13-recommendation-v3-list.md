@@ -702,7 +702,7 @@ private function topRated(CatalogRecommendationContext $context, array $excluded
 - `Season::availableTo()` and `Episode::availableTo()` remain the only child publication/audience/window boundaries.
 - No route, DTO, enum, response field, cache key/version, table, index, config value, dependency or public method changes.
 
-- [ ] Replace the two list subqueries with the exact correlated shape below, retaining the independent media-season and episode-season checks:
+- [x] Replace the two list subqueries with the exact correlated shape below, retaining the independent media-season and episode-season checks:
 
 ```php
 return $query
@@ -734,10 +734,10 @@ return $query
     });
 ```
 
-- [ ] Preserve `published()`, `withoutKnownFailures()` and `withPlaybackLocation()` ownership in each existing caller; this scope must continue to check only the availability of referenced releases.
-- [ ] Confirm Laravel 13 emits correlated SQL with `seasons.id = licensed_media.season_id`, `episodes.id = licensed_media.episode_id` and `seasons.id = episodes.season_id`; do not collapse the two season conditions or trust a client-provided identity.
-- [ ] Inspect `EXPLAIN QUERY PLAN`: the old `LIST SUBQUERY` branches must be absent and the new child lookups must select the `seasons`/`episodes` integer primary keys after the existing title-keyed media publication lookup.
-- [ ] Do not add a migration: all new predicates target existing primary keys, while another media index would not remove the audited global child-list work.
+- [x] Preserve `published()`, `withoutKnownFailures()` and `withPlaybackLocation()` ownership in each existing caller; this scope continues to check only the availability of referenced releases.
+- [x] Confirm Laravel 13 emits correlated SQL with `seasons.id = licensed_media.season_id`, `episodes.id = licensed_media.episode_id` and `seasons.id = episodes.season_id`; the independent season conditions remain intact.
+- [x] Inspect `EXPLAIN QUERY PLAN`: the old `LIST SUBQUERY` branches are absent and the child lookups select the `seasons`/`episodes` integer primary keys after `licensed_media_publication_lookup_idx`.
+- [x] Do not add a migration: all new predicates target existing primary keys, while another media index would not remove the audited global child-list work.
 
 ### Task F7: equivalence, performance, documentation and delivery
 
@@ -749,10 +749,10 @@ return $query
 - Modify: `CHANGELOG.md`
 - Modify: this plan and the existing Task 18 design spec only when final evidence changes the recorded diagnostics.
 
-- [ ] Re-run complete ordered eligible-ID comparisons for guest watchable, `quality=1080p` and subtitles. Preserve pre-change counts/hashes: `32230/a92480b423592bd0e8a292ed9daae8a04f9bacfe021cce52a6ab053363136043`, `7688/e8a01a1bf32e2ae056b1fdfe21237d77389dae80b862973534d06ebfa597dfb1`, `17195/d030fc8c7a31dc2e101ec8981f3eff9cbbdde0d37474e1e3e493588bb834d777`.
-- [ ] Re-run direct public candidates and preserve exact pre-change hashes for trending `c7588281ebb01e74137ab6775a2a1f9e24a349bb5f546cd795d94bf175416bdb`, popular `b7959de083255f07cee025fb5c0c2c50df7fa7503113beb10e978d66135f3b55`, portal `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, Kinopoisk `8562907a32509b5489c79db64a918d7147277ead528f26a548a1f3e6c8876405`, IMDb `9f2a1f65723f25f6db01efde888b414ead1d2267c9b795707f86f9ee9c356a5b`, recently added `d70f1c4e33ff182a7772c89a762a57b40cb030f938cc31d824b0d77375b6cda6`, recently updated `0f10c1ae716c5c5a0eb3edc23da5ddb07addf5c08b334dfd004f9aa2fec364af`, seeded random `9683b390df2953aa83a048a9b6fbe5126ee91ec52e7421a2fa966ee7b1da1d5e`, 1080p recently added `9c4988d7190a5a2f2d5de728d074b4f8c86d5c763bf65b4118d7106d77783ed8` and subtitles recently added `d0bc6bb24a25d8cbc2f9b868f284e8c0728bba4d6eac7e01ec83f99b33762f95`.
-- [ ] Inspect the authenticated SQL boundary and compare a bounded member query; the audience predicate may expand from `public` to `public|authenticated`, but no user ID or private state may enter shared public SQL/cache.
-- [ ] Record alternating cold diagnostics and explain their one-off local nature. Do not claim p95/SLA, do not claim improvement where repeated evidence does not support it, and keep ranking/explanation scores unchanged.
-- [ ] Run PHP syntax, task-file Pint, targeted Larastan, `project:docs-refresh --check`, route inspection and `git diff --check`. Do not run PHPUnit/Pest or create tests; do not run Vite because no frontend asset changes are authorized.
-- [ ] Browser-smoke one default and one media-filtered discovery route only if the backend change survives all query-equivalence gates; verify 200, canonical/noindex policy, no console error and no overflow without changing UI assets.
+- [x] Re-run complete ordered eligible-ID comparisons for guest watchable, `quality=1080p` and subtitles. Counts/hashes remained exact: `32230/a92480b423592bd0e8a292ed9daae8a04f9bacfe021cce52a6ab053363136043`, `7688/e8a01a1bf32e2ae056b1fdfe21237d77389dae80b862973534d06ebfa597dfb1`, `17195/d030fc8c7a31dc2e101ec8981f3eff9cbbdde0d37474e1e3e493588bb834d777`.
+- [x] Re-run direct public candidates. Trending, popular, portal, Kinopoisk, IMDb, recently-updated, seeded-random and subtitle hashes remained exact. Concurrent catalogue `indexed_at` changes moved recently-added and its 1080p set, but a same-snapshot execution of the retained legacy query produced those same new hashes (`9b0410…4303`, `5702ef…7b7`), proving the movement was source data rather than the scope rewrite.
+- [x] Inspect the authenticated SQL boundary and compare a bounded member query: both modes returned the same 180-row hash, audience expanded only to stable `public|authenticated` codes, and the query bindings contained no user ID.
+- [x] Record alternating cold diagnostics and explain their one-off local nature. Same-snapshot 180-row base/1080p/subtitle samples changed from 2.712s/4.220s/4.512s to 8ms/520ms/39ms; popularity remains dominated by its own aggregate, so no universal latency claim is made.
+- [x] Run PHP syntax, task-file Pint, targeted Larastan, `project:docs-refresh --check`, route inspection and `git diff --check`. PHPUnit/Pest/Vite remained unused because Task 18 forbids automated tests and no frontend asset changed.
+- [x] Browser-smoke default and `quality=1080p` discovery at desktop/mobile: isolated managed Chromium returned 200, 24 rows, correct canonical index/noindex policy, zero console/page/local-request errors and zero overflow. Shared maintenance mode was bypassed only inside the QA server process through an in-memory maintenance store; global state was not changed.
 - [ ] Inspect staged scope, commit only this follow-up on `main`, push fast-forward and verify remote SHA while preserving unrelated player/auth/route worktree changes and leaving pending foreign migrations unapplied.
