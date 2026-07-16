@@ -84,9 +84,30 @@ class ProjectDocumentationRefresher
 
     public function refreshContents(string $relativePath, string $contents): string
     {
+        if ($this->shouldPreserveSourceParitySnapshot($relativePath, $contents)) {
+            return $contents;
+        }
+
         $contents = $this->refreshUpdatedDate($relativePath, $contents);
 
         return $this->replaceManagedSection($contents, $this->managedSection($relativePath));
+    }
+
+    private function shouldPreserveSourceParitySnapshot(string $relativePath, string $contents): bool
+    {
+        if ($relativePath !== 'docs/SOURCE_PARITY.md'
+            || ! Str::contains($contents, [self::START_MARKER, self::END_MARKER])) {
+            return false;
+        }
+
+        if (! Schema::hasTable('seasonvar_import_runs')) {
+            return true;
+        }
+
+        return ! SeasonvarImportRun::query()
+            ->where('mode', 'inventory')
+            ->where('status', 'completed')
+            ->exists();
     }
 
     private function path(string $relativePath): string

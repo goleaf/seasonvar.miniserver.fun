@@ -129,4 +129,24 @@ MARKDOWN;
         $this->assertSame(1, substr_count($first, '2026_07_13_210000_first.php'));
         $this->assertSame(1, substr_count($first, '2026_07_13_220000_second.php'));
     }
+
+    public function test_existing_source_parity_snapshot_is_preserved_without_inventory_storage(): void
+    {
+        $contents = <<<'MARKDOWN'
+# Source parity
+
+Обновлено: 01.01.2000
+
+<!-- project-docs:start -->
+Последний подтверждённый production inventory.
+<!-- project-docs:end -->
+MARKDOWN;
+
+        $refreshed = (new ProjectDocumentationRefresher($this->fixtureRoot))->refreshContents(
+            'docs/SOURCE_PARITY.md',
+            $contents,
+        );
+
+        $this->assertSame($contents, $refreshed);
+    }
 }
