@@ -283,6 +283,7 @@ final class CommentDiscussionQuery
             ])
             ->with([
                 'author:id,name',
+                'author.profile:user_id,username,profile_visibility,moderation_status',
                 'parent:id,status,deletion_reason,deleted_at',
                 'replyTo:id,user_id,status,deleted_at',
                 'replyTo.author:id,name',

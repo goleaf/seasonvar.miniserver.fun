@@ -54,6 +54,13 @@
 - Assignment request requires present array, max configured 50, distinct UUIDs; service additionally checks exact UUID syntax, lowercases canonical form, resolves every row within current owner, reauthorizes title and rejects partial/unauthorized set. Global assignments accept only globally assignable tag/title through policies. Sort/filter/route slug use existing catalog allowlists.
 - Errors use exact-parity `lang/{ru,en}/tags.php`, escaped placeholders and safe generic authorization/failure text; no SQL/table/class/internal ID/provider credential/moderation note. Client maxlength/disabled/debounce are UX only; service validation, policies, DB uniqueness/transactions and rate limits remain authoritative.
 
+## Валидация профилей пользователей
+
+- `ProfileUsername` and the owner Livewire rules enforce lowercase route-safe ASCII, length, separator and reserved-code rules; service repeats ownership/current-password/rate/current+history uniqueness under transaction.
+- Display name retains existing account validation. Biography is optional bounded Unicode plain text; server normalizes newlines and removes HTML, controls and bidi overrides. Visibility and moderation/report values use explicit enums/allowlists rather than client keys.
+- Avatar/cover require image + exact JPEG/PNG/WebP MIME/extensions, separate size/dimension limits and private storage. SVG, arbitrary disk/path/kind/version and executable masquerades are rejected before persistence.
+- Report category is an enum and detail is optional bounded plain text. Normal users cannot submit reporter/target/status/moderator/private note fields.
+
 ## Валидация настроек аккаунта
 
 - Locale принимается только из существующего supported registry; timezone — только `DateTimeZone::listIdentifiers()` плюс `UTC`. Interface locale не преобразуется в audio/subtitle language и не принимает translated labels.

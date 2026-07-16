@@ -37,6 +37,11 @@ class CatalogSitemapController extends Controller
         return $sitemaps->collections();
     }
 
+    public function sitemapProfiles(CatalogSitemapResponder $sitemaps): StreamedResponse
+    {
+        return $sitemaps->profiles();
+    }
+
     public function sitemapTitles(CatalogSitemapResponder $sitemaps, int $page): StreamedResponse
     {
         return $sitemaps->titles($page);

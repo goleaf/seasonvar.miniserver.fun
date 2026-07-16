@@ -5,21 +5,29 @@ declare(strict_types=1);
 namespace App\Livewire\Profile;
 
 use App\Models\User;
+use App\Models\UserProfile;
 use App\Services\Auth\AccountDateTimeFormatter;
 use App\Services\Auth\AccountService;
 use App\Services\Auth\AccountSettingsService;
 use App\Services\Catalog\UserLibrarySummaryQuery;
 use App\Services\Collections\CatalogCollectionQuery;
+use App\Services\Profiles\UserProfileMediaService;
+use App\Services\Profiles\UserProfileService;
 use App\ValueObjects\NormalizedEmail;
+use App\ValueObjects\ProfileUsername;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Validator;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Livewire\WithFileUploads;
 
 final class ProfilePage extends Component
 {
+    use WithFileUploads;
+
     public string $name = '';
 
     public string $email = '';
@@ -32,15 +40,35 @@ final class ProfilePage extends Component
 
     public ?string $status = null;
 
-    public function mount(AccountSettingsService $settings, AccountDateTimeFormatter $dateTimes): void
-    {
+    public string $username = '';
+
+    public string $profilePassword = '';
+
+    public string $biography = '';
+
+    public string $profileVisibility = 'private';
+
+    /** @var array<string, string> */
+    public array $sectionVisibility = [];
+
+    public ?TemporaryUploadedFile $avatarUpload = null;
+
+    public ?TemporaryUploadedFile $coverUpload = null;
+
+    public function mount(
+        AccountSettingsService $settings,
+        AccountDateTimeFormatter $dateTimes,
+        UserProfileService $profiles,
+    ): void {
         $this->fillFromUser($this->user(), $settings, $dateTimes);
+        $this->fillFromProfile($profiles->forUser($this->user()));
     }
 
     public function saveProfile(
         AccountService $accounts,
         AccountSettingsService $settings,
         AccountDateTimeFormatter $dateTimes,
+        UserProfileService $profiles,
     ): void {
         $this->resetValidation();
         $this->name = Str::squish($this->name);
@@ -88,6 +116,7 @@ final class ProfilePage extends Component
         }
 
         $emailChanged = NormalizedEmail::value($user->email) !== $validated['email'];
+        $nameChanged = $user->name !== $validated['name'];
 
         try {
             $updated = $accounts->updateProfile($user, [
@@ -111,16 +140,167 @@ final class ProfilePage extends Component
 
         $this->reset('currentPassword');
         $this->fillFromUser($updated, $settings, $dateTimes);
+
+        if ($nameChanged) {
+            $profiles->identityChanged($profiles->forUser($updated));
+        }
         $this->status = $emailChanged
             ? __('settings.profile_page.updated_verify_email')
             : __('settings.profile_page.updated');
     }
 
-    public function render(UserLibrarySummaryQuery $summaries, CatalogCollectionQuery $collections): View
+    public function savePublicDetails(UserProfileService $profiles): void
     {
+        $validated = $this->validate([
+            'biography' => ['nullable', 'string', 'max:'.max(1, (int) config('user-profiles.biography_maximum_length', 1200)), 'not_regex:/[\p{Cs}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u'],
+        ], [
+            'biography.max' => __('profiles.validation.biography_max'),
+            'biography.not_regex' => __('profiles.validation.biography_max'),
+        ]);
+        $profile = $profiles->updateDetails($this->user(), $profiles->forUser($this->user()), [
+            'biography' => $validated['biography'] !== '' ? $validated['biography'] : null,
+        ]);
+        $this->fillFromProfile($profile);
+        $this->status = __('profiles.settings.updated');
+    }
+
+    public function saveUsername(UserProfileService $profiles): void
+    {
+        $this->username = ProfileUsername::normalize($this->username);
+        $validated = $this->validate([
+            'username' => [
+                'required',
+                'string',
+                'min:'.max(1, (int) config('user-profiles.username.minimum_length', 3)),
+                'max:'.max(3, (int) config('user-profiles.username.maximum_length', 32)),
+                'regex:/^[a-z0-9]+(?:_[a-z0-9]+)*$/',
+                Rule::notIn((array) config('user-profiles.username.reserved', [])),
+            ],
+            'profilePassword' => ['required', 'string', 'max:255'],
+        ], [
+            'username.required' => __('profiles.validation.username_required'),
+            'username.min' => __('profiles.validation.username_format'),
+            'username.max' => __('profiles.validation.username_format'),
+            'username.regex' => __('profiles.validation.username_format'),
+            'username.not_in' => __('profiles.validation.username_reserved'),
+            'profilePassword.required' => __('profiles.validation.current_password'),
+        ]);
+
+        try {
+            $profile = $profiles->changeUsername(
+                $this->user(),
+                $profiles->forUser($this->user()),
+                $validated['username'],
+                $validated['profilePassword'],
+            );
+        } catch (ValidationException $exception) {
+            $this->reset('profilePassword');
+
+            foreach ($exception->errors() as $field => $messages) {
+                $this->addError($field, $messages[0]);
+            }
+
+            return;
+        }
+
+        $this->reset('profilePassword');
+        $this->fillFromProfile($profile);
+        $this->status = __('profiles.settings.username_updated');
+    }
+
+    public function saveProfilePrivacy(UserProfileService $profiles): void
+    {
+        $visibilityValues = ['public', 'private'];
+        $rules = ['profileVisibility' => ['required', Rule::in($visibilityValues)]];
+
+        foreach ($this->profileSections() as $section) {
+            $rules['sectionVisibility.'.$section] = ['required', Rule::in($visibilityValues)];
+        }
+
+        $validated = $this->validate($rules, [
+            'profileVisibility.in' => __('profiles.validation.visibility'),
+            'sectionVisibility.*.in' => __('profiles.validation.visibility'),
+        ]);
+        $visibility = ['profile_visibility' => $validated['profileVisibility']];
+
+        foreach ($this->profileSections() as $section) {
+            $visibility[$section.'_visibility'] = $validated['sectionVisibility'][$section];
+        }
+
+        $profile = $profiles->updatePrivacy($this->user(), $profiles->forUser($this->user()), $visibility);
+        $this->fillFromProfile($profile);
+        $this->status = __('profiles.settings.privacy_updated');
+    }
+
+    public function saveAvatar(UserProfileMediaService $media, UserProfileService $profiles): void
+    {
+        $this->validate([
+            'avatarUpload' => [
+                'required', 'image', 'mimes:jpg,jpeg,png,webp',
+                'mimetypes:image/jpeg,image/png,image/webp',
+                'max:'.max(1, (int) config('user-profiles.uploads.avatar_maximum_kilobytes', 3072)),
+                'dimensions:min_width=128,min_height=128,max_width=4096,max_height=4096',
+            ],
+        ], ['avatarUpload.*' => __('profiles.validation.avatar')]);
+        $profile = $media->replace($this->user(), $profiles->forUser($this->user()), 'avatar', $this->avatarUpload);
+        $this->reset('avatarUpload');
+        $this->fillFromProfile($profile);
+        $this->status = __('profiles.settings.media_updated');
+    }
+
+    public function saveCover(UserProfileMediaService $media, UserProfileService $profiles): void
+    {
+        $this->validate([
+            'coverUpload' => [
+                'required', 'image', 'mimes:jpg,jpeg,png,webp',
+                'mimetypes:image/jpeg,image/png,image/webp',
+                'max:'.max(1, (int) config('user-profiles.uploads.cover_maximum_kilobytes', 6144)),
+                'dimensions:min_width=640,min_height=180,max_width=6000,max_height=3000',
+            ],
+        ], ['coverUpload.*' => __('profiles.validation.cover')]);
+        $profile = $media->replace($this->user(), $profiles->forUser($this->user()), 'cover', $this->coverUpload);
+        $this->reset('coverUpload');
+        $this->fillFromProfile($profile);
+        $this->status = __('profiles.settings.media_updated');
+    }
+
+    public function removeAvatar(UserProfileMediaService $media, UserProfileService $profiles): void
+    {
+        $profile = $media->remove($this->user(), $profiles->forUser($this->user()), 'avatar');
+        $this->fillFromProfile($profile);
+        $this->status = __('profiles.settings.media_removed');
+    }
+
+    public function removeCover(UserProfileMediaService $media, UserProfileService $profiles): void
+    {
+        $profile = $media->remove($this->user(), $profiles->forUser($this->user()), 'cover');
+        $this->fillFromProfile($profile);
+        $this->status = __('profiles.settings.media_removed');
+    }
+
+    public function render(
+        UserLibrarySummaryQuery $summaries,
+        CatalogCollectionQuery $collections,
+        UserProfileService $profiles,
+        UserProfileMediaService $media,
+    ): View {
+        $profile = $profiles->forUser($this->user());
+
         return view('livewire.profile.profile-page', [
             'librarySummary' => $summaries->get($this->user()),
             'collectionSummary' => $collections->ownerCounts($this->user()),
+            'publicProfileUrl' => route('users.show', ['username' => $profile->username]),
+            'avatarUrl' => $media->url($profile, 'avatar'),
+            'coverUrl' => $media->url($profile, 'cover'),
+            'biographyMaximumLength' => max(1, (int) config('user-profiles.biography_maximum_length', 1200)),
+            'profileVisibilityOptions' => collect(['public', 'private'])->map(fn (string $value): array => [
+                'value' => $value,
+                'label' => __('profiles.visibility.'.$value),
+            ])->all(),
+            'profileSections' => collect($this->profileSections())->map(fn (string $section): array => [
+                'key' => $section,
+                'label' => __('profiles.settings.sections.'.$section),
+            ])->all(),
         ])
             ->extends('layouts.app', [
                 'title' => __('settings.profile_page.title'),
@@ -149,6 +329,22 @@ final class ProfilePage extends Component
         $this->createdAt = $user->created_at !== null
             ? $dateTimes->value($user->created_at, $accountSettings->locale, $accountSettings->timezone)
             : '';
+    }
+
+    private function fillFromProfile(UserProfile $profile): void
+    {
+        $this->username = $profile->username;
+        $this->biography = $profile->biography ?? '';
+        $this->profileVisibility = $profile->profile_visibility->value;
+        $this->sectionVisibility = collect($this->profileSections())->mapWithKeys(fn (string $section): array => [
+            $section => $profile->getAttribute($section.'_visibility')->value,
+        ])->all();
+    }
+
+    /** @return list<string> */
+    private function profileSections(): array
+    {
+        return ['biography', 'member_since', 'collections', 'reviews', 'comments', 'watching', 'completed'];
     }
 
     private function user(): User

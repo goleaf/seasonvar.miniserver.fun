@@ -33,7 +33,11 @@
         </span>
         <div class="min-w-0 flex-1">
             <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                <span class="break-words text-sm font-black text-slate-800">{{ $comment->author->name }}</span>
+                @if ($comment->author->profileUrl)
+                    <a href="{{ $comment->author->profileUrl }}" class="break-words text-sm font-black text-slate-800 hover:text-emerald-700">{{ $comment->author->name }}</a>
+                @else
+                    <span class="break-words text-sm font-black text-slate-800">{{ $comment->author->name }}</span>
+                @endif
                 @if ($comment->moderationLabel !== null)
                     <x-ui.status-pill variant="warning">{{ $comment->moderationLabel }}</x-ui.status-pill>
                 @endif

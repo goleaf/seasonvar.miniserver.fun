@@ -115,6 +115,19 @@ Private и pending/rejected/hidden/deleted records не дают redirect/canoni
 
 Public user tags, unlisted tags, community global assignment, tag reporting и season/episode assignment отсутствуют как policy surface, потому что продукт их не поддерживает. Administrator не получает отдельную UI-выгрузку private personal labels/counts; account export/delete выполняются только существующим current-user account boundary.
 
+## Матрица доступа профилей пользователей
+
+| Действие | Guest | Active public viewer | Owner | `manage-catalog` |
+| --- | --- | --- | --- | --- |
+| Public active profile/explicit public section | Да | Да, кроме bilateral block | Да | Да |
+| Private/hidden/suspended profile | Нет, safe 404 | Нет, safe 404 | Да | Да |
+| Edit details/privacy/media/username | Нет | Нет | Да; username дополнительно требует password/rate limit | Нет через owner form |
+| Block/mute | Нет | Только canonical Task 12 action, не self | Нет self-action | По тем же user rules |
+| Report profile | Нет | Verified non-owner, public target | Нет | По reporter policy |
+| View/resolve report and moderate profile/media/text | Нет | Нет | Нет | Да, с повторной authorization |
+
+Section visibility никогда не отменяет whole-profile/moderation/block check. Unblock остаётся в существующем relationship account UI, поэтому blocked direct profile URL не становится side channel. Viewer overlay не входит в shared cache/SEO.
+
 ## Матрица доступа настроек аккаунта
 
 | Действие | Гость | Авторизованный пользователь | Чужой account / администратор |

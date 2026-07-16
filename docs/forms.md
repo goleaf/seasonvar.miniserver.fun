@@ -70,6 +70,12 @@ Global admin form принимает только enum-backed type/visibility/mo
 
 Все видимые strings/errors/confirmations/ARIA находятся в exact-parity `lang/{ru,en}/tags.php`. Form state остаётся небольшим scalar/UUID payload: Eloquent graphs, owner IDs, counts, aliases/translations/provider rows и SEO data формируются server-side query/DTO, не public Livewire properties.
 
+## Формы профиля пользователя
+
+- Owner profile forms save username, biography, avatar, cover and privacy independently; all derive user ID from authentication, validate allowlisted fields server-side and reauthorize through policy/service. Username requires current password and rate limit; file inputs accept only validated raster images.
+- Public report form keeps one stable category and bounded optional plain-text detail, requires verified non-owner policy and deduplicates unresolved reports. Block/mute reuse Task 12 actions rather than duplicate forms.
+- Loading disablement is scoped per action, validation retains non-sensitive draft values, password/file state is cleared, destructive media removal uses confirmation and no mutation uses GET.
+
 ## Формы настроек аккаунта
 
 Appearance, playback, notification и new-collection-default groups имеют единый staged Apply/Cancel pattern: recoverable validation сохраняет draft, success сбрасывает dirty state, failure показывает localized error и не имитирует сохранение. Reset playback и notifications — отдельные подтверждаемые non-GET actions; playback reset не меняет progress/history/library/bookmarks/profile/security.

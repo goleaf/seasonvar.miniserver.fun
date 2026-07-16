@@ -261,6 +261,12 @@
 - Добавлены owner-only localized settings shell, additive one-row preference schema, typed resolver/service/DTO/timezone boundary, documented precedence, rolling guard, anonymous/device merge, task 07 player integration, private-history explanation, non-retroactive collection defaults, canonical notification matrix, safe session summaries/revocation, export/profile/security integration, ru/en a11y UI and no-store/noindex middleware.
 - Task 16 прямо запретил создание и запуск automated tests. Допустимая acceptance ограничена PHP/Blade/translation/routes/config/schema/security/cache/static inspection, Pint, Vite build, disposable non-production migration rehearsal and controlled browser smoke; production database не мигрируется этой задачей.
 
+## 2026-07-16 — canonical user profiles Task 14
+
+- Added additive `user_profiles`, username-history and profile-report schema plus an idempotent existing-account backfill. A schema diagnostic used cached application configuration and applied both pending Task 14 migrations to the configured SQLite instead of the intended disposable path; the operations were additive, completed successfully, created two profiles, found zero duplicate normalized usernames and performed no rollback or destructive repair.
+- Rebuilt the canonical route cache after production HTTPS smoke exposed a stale snapshot that knew `/profile` but not the new `users.show` route. The same authenticated desktop/mobile scenario then returned 200 with no browser errors or overflow; no application cache flush, queue action or user-data rewrite was used.
+- Task 14 forbids automated tests. Allowed acceptance consists of focused syntax/Pint/route/schema/index/translation/public-payload/privacy/cache/SEO/Blade inspection, Vite build and managed Chromium guest/owner checks. Full architecture, rollback and unsupported feature decisions are in Task 14 of the shared modernization plan.
+
 ## 2026-07-16 — canonical technical issues and support Task 20
 
 - Полный Markdown/routes/schema/model/policy/player/progress/account/notification/moderation/Task 19/import/source-health/storage/cache/SEO audit подтвердил отсутствие legacy technical/support/playback ticket data и competing route/table architecture. Добавлен первый private canonical aggregate без изменения Task 19 и moderation reports.
@@ -356,6 +362,8 @@
 - `2026_07_15_235200_add_discussion_relationship_pagination_indexes.php`
 - `2026_07_16_000000_create_user_account_settings_table.php`
 - `2026_07_16_010000_add_terminal_reason_to_seasonvar_import_title_groups.php`
+- `2026_07_16_071908_create_user_profile_domain.php`
+- `2026_07_16_071909_backfill_existing_user_profiles.php`
 - `2026_07_16_120000_add_canonical_recommendation_discovery.php`
 - `2026_07_16_180000_create_content_request_domain.php`
 - `2026_07_16_190000_add_file_size_metadata_to_licensed_media.php`

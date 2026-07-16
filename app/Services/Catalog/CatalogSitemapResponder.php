@@ -11,6 +11,7 @@ use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\Tag;
+use App\Models\UserProfile;
 use App\Services\Collections\CatalogCollectionQuery;
 use App\Services\Collections\CatalogCollectionSchema;
 use App\Services\ContentRequests\ContentRequestSchema;
@@ -57,6 +58,7 @@ class CatalogSitemapResponder
             $this->writeSitemapIndexUrl(route('sitemap.taxonomies'), now());
             $this->writeSitemapIndexUrl(route('sitemap.landings'), now());
             $this->writeSitemapIndexUrl(route('sitemap.collections'), now());
+            $this->writeSitemapIndexUrl(route('sitemap.profiles'), now());
 
             for ($page = 1; $page <= $titleSitemapPages; $page++) {
                 $this->writeSitemapIndexUrl(route('sitemap.titles', ['page' => $page]), now());
@@ -329,6 +331,48 @@ class CatalogSitemapResponder
                         );
                     });
             }
+
+            echo '</urlset>'."\n";
+        }, 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
+    }
+
+    public function profiles(): StreamedResponse
+    {
+        return response()->stream(function (): void {
+            echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
+            echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
+
+            UserProfile::query()
+                ->publiclyVisible()
+                ->whereHas('user', fn (Builder $query): Builder => $query->whereNotNull('email_verified_at'))
+                ->where(function (Builder $query): void {
+                    $query
+                        ->whereNotNull('avatar_path')
+                        ->orWhere(function (Builder $query): void {
+                            $query->where('biography_visibility', 'public')->whereNotNull('biography');
+                        })
+                        ->orWhere(function (Builder $query): void {
+                            $query->where('collections_visibility', 'public')->whereHas('user.catalogCollections', fn (Builder $collections): Builder => $collections->publiclyListed());
+                        })
+                        ->orWhere(function (Builder $query): void {
+                            $query->where('reviews_visibility', 'public')->whereHas('user.catalogTitleReviews', fn (Builder $reviews): Builder => $reviews->publiclyVisible());
+                        })
+                        ->orWhere(function (Builder $query): void {
+                            $query->where('comments_visibility', 'public')->whereHas('user.comments', fn (Builder $comments): Builder => $comments->published());
+                        });
+                })
+                ->select(['user_id', 'username', 'updated_at'])
+                ->orderBy('user_id')
+                ->chunkById(1000, function (Collection $profiles): void {
+                    foreach ($profiles as $profile) {
+                        $this->writeSitemapUrl(
+                            route('users.show', ['username' => $profile->username]),
+                            $profile->updated_at,
+                            'weekly',
+                            '0.4',
+                        );
+                    }
+                }, column: 'user_id');
 
             echo '</urlset>'."\n";
         }, 200, ['Content-Type' => 'application/xml; charset=UTF-8']);

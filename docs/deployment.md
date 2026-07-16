@@ -356,6 +356,14 @@ php artisan test --filter=ConfigurationEnvironmentTest
 php artisan project:docs-refresh --check
 ```
 
+## Rollout профилей пользователей
+
+1. Take and verify the normal database/private-upload backup and confirm the current branch/worker state.
+2. Apply `2026_07_16_071908_create_user_profile_domain.php` followed by the idempotent `071909` backfill. Inspect three tables, foreign keys, username uniqueness, public-list/report indexes and duplicate count before enabling writes. In the current configured SQLite both migrations are already recorded as applied after the disclosed cached-config diagnostic; do not rerun or roll them back destructively.
+3. Build assets and refresh config/routes/views; route cache must contain `users.show`, `localized.users.show`, `profiles.media`, `admin.profiles` and `sitemap.profiles`. Reload PHP-FPM normally.
+4. Smoke one guest public profile, owner `/profile`, private/blocked response, versioned avatar response, profile sitemap and admin denial/allow path. Confirm no email/progress/private fields, noindex owner/private variants and private/no-store media/account headers.
+5. Rollback before accepting profile writes may revert code and drop the additive schema. After usernames/privacy/media/report data exists, export/restore and deploy a forward repair; never drop the live tables as routine rollback.
+
 ## Rollout настроек аккаунта
 
 1. Выполните verified DB backup и deploy code/assets на обычном writer-pause boundary. Примените единственную additive reversible migration `2026_07_16_000000_create_user_account_settings_table.php`; она создаёт one-row-per-user preference table и не backfill-ит/не переписывает users, profile, player, progress/history, library, collections, notification preferences, sessions или account lifecycle data.

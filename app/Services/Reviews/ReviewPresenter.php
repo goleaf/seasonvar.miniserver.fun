@@ -91,6 +91,12 @@ final class ReviewPresenter
             scopeLabel: ReviewTargetType::Title->label(),
             authorName: $authorName,
             authorInitial: Str::upper(Str::substr($authorName, 0, 1)),
+            authorProfileUrl: $author instanceof User
+                && ! $context->hides($review->user_id)
+                && $author->relationLoaded('profile')
+                && $author->profile?->isPublic()
+                    ? route('users.show', ['username' => $author->profile->username])
+                    : null,
             title: ! $bodyHidden && filled($review->review_title)
                 ? (string) $review->review_title
                 : null,

@@ -75,6 +75,10 @@ Public tag page data готовят `TagPagePresenter`, `TagSeoPresenter` и exi
 
 Admin view receives bounded query results, enum options and merge impact from `TagAdministrationQuery`; it does not resolve aliases, normalize names, authorize, count usage or query provider mappings in Blade. Loading/empty/error/confirmation state maps to real Livewire action. No tag template introduces Volt, `@php`, raw HTML, inline CSS, inline business JavaScript, DB/facade/service call or complete Eloquent graph public serialization.
 
+## Представление профилей пользователей
+
+`resources/views/livewire/profile/public-profile-page.blade.php` renders only prepared `PublicUserProfileData` and selected paginator rows. Privacy/count/authorization/SEO are computed in typed PHP, spoiler bodies are absent until their canonical discussion/review page handles reveal, and watch cards contain only safe title-level data. `profile-page.blade.php` remains owner-only and receives prepared options/URLs/limits; it does not resolve models/services/config or arbitrary privacy fields. Author links in comment/review/collection components are optional prepared URLs and never cause Blade queries.
+
 ## Представление настроек аккаунта
 
 `resources/views/livewire/settings/account-settings-page.blade.php` отображает один active section из подготовленных DTO/options. Blade не читает модели/services/config/database, не вычисляет precedence/privacy/entitlement и не сериализует User, session payload или provider secret. Профиль/security/export/delete остаются canonical отдельными Livewire/routes и открываются из единой navigation.

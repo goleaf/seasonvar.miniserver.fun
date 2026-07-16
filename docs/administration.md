@@ -85,6 +85,10 @@ Merge требует source/target preview с counts/translations/aliases/provid
 
 Permanent global delete отсутствует: active tag archive-ится или merge-ится. Archive сохраняет pre-visibility/pre-moderation и прекращает public discovery/new assignment; restore возвращает recorded state и не публикует internal/rejected row. Все validation/result/loading/error labels локализованы; raw SQL, source credentials, moderation internals и private personal labels не выводятся.
 
+## Модерация профилей пользователей
+
+`/admin/profiles` requires the existing `manage-catalog` gate at route, Livewire hydration and service action. The deterministic bounded queue shows safe target identity/category/status/date without reporter email, account credentials, raw media path or unrelated private activity. Moderator may set stable profile moderation status, hide biography, remove avatar/cover and resolve/dismiss a report with a private note; it cannot edit password/email/role/premium or restore deleted account data. Every public-presentation transition increments the profile version so policy/SEO/sitemap reads change immediately.
+
 ## Модерация заявок на материалы
 
 `/admin/requests` требует `manage-content-requests` на route, Livewire hydration и каждой action. Queue имеет deterministic pagination, search/type/status/sort, public card counts, private note, rejection reason, stable priority, clarification question, canonical merge UUID, verified completion title/season/episode/media IDs, importer handoff и связанный real import-run ID. Normal user не получает controls или underlying private fields.

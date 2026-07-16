@@ -12,6 +12,7 @@ final readonly class ReviewItemData
         public string $scopeLabel,
         public string $authorName,
         public string $authorInitial,
+        public ?string $authorProfileUrl,
         public ?string $title,
         public ?string $body,
         public bool $bodyHidden,

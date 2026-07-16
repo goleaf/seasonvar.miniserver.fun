@@ -6,6 +6,7 @@ namespace App\Services\Auth;
 
 use App\Enums\AuthenticationEvent;
 use App\Models\User;
+use App\Services\Profiles\UserProfileService;
 use App\Support\UserPlainText;
 use App\ValueObjects\NormalizedEmail;
 use Illuminate\Auth\Events\Registered;
@@ -18,6 +19,7 @@ final class AccountRegistrationService
     public function __construct(
         private readonly AccountSettingsService $settings,
         private readonly AuthenticationAuditService $audit,
+        private readonly UserProfileService $profiles,
     ) {}
 
     /** @param array{name: string, email: string, password: string} $attributes */
@@ -46,6 +48,7 @@ final class AccountRegistrationService
                 ]);
 
                 $this->settings->adoptLocaleIfUnset($user, $locale);
+                $this->profiles->forUser($user);
 
                 return $user;
             }, attempts: 3);

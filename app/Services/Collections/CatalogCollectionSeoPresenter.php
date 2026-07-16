@@ -157,13 +157,16 @@ final class CatalogCollectionSeoPresenter
     /** @return array<string, mixed> */
     public function profile(User $owner, bool $localizedAlias = false, bool $statefulVariant = false): array
     {
-        $canonical = route('profiles.collections', ['userPublicId' => $owner->public_id]);
+        $canonical = $owner->relationLoaded('profile') && $owner->profile?->isPublic()
+            ? route('users.show', ['username' => $owner->profile->username])
+            : route('profiles.collections', ['userPublicId' => $owner->public_id]);
+        $legacyAlias = $owner->relationLoaded('profile') && $owner->profile !== null;
 
         return [
             'title' => __('collections.profile.title', ['name' => $owner->name]),
             'description' => __('collections.profile.description', ['name' => $owner->name]),
             'canonical' => $canonical,
-            'robots' => $localizedAlias || $statefulVariant ? 'noindex,follow' : 'index,follow',
+            'robots' => $localizedAlias || $statefulVariant || $legacyAlias ? 'noindex,follow' : 'index,follow',
             'breadcrumbs' => [
                 ['name' => __('catalog.navigation.home'), 'url' => route('home')],
                 ['name' => __('collections.navigation.collections'), 'url' => route('collections.index')],

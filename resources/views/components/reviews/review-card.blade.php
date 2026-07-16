@@ -10,7 +10,11 @@
         <div class="flex min-w-0 items-start gap-3">
             <span aria-hidden="true" class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-slate-100 text-sm font-black text-slate-700">{{ $review->authorInitial }}</span>
             <div class="min-w-0">
-                <p class="break-words font-black text-slate-900">{{ $review->authorName }}</p>
+                @if ($review->authorProfileUrl)
+                    <a href="{{ $review->authorProfileUrl }}" class="break-words font-black text-slate-900 hover:text-emerald-700">{{ $review->authorName }}</a>
+                @else
+                    <p class="break-words font-black text-slate-900">{{ $review->authorName }}</p>
+                @endif
                 <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-slate-500">
                     <span>{{ $review->publishedLabel }}</span>
                     <span>{{ $review->scopeLabel }}</span>

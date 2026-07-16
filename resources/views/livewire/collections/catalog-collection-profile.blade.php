@@ -3,7 +3,11 @@
         <div class="flex items-start gap-4">
             <span class="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-emerald-50 text-xl font-black text-emerald-700" aria-hidden="true">{{ mb_strtoupper(mb_substr($owner->name, 0, 1)) }}</span>
             <div class="min-w-0">
-                <h1 class="break-words text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">{{ __('collections.profile.title', ['name' => $owner->name]) }}</h1>
+                @if ($publicProfileUrl)
+                    <a href="{{ $publicProfileUrl }}" class="hover:text-emerald-700"><h1 class="break-words text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">{{ __('collections.profile.title', ['name' => $owner->name]) }}</h1></a>
+                @else
+                    <h1 class="break-words text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">{{ __('collections.profile.title', ['name' => $owner->name]) }}</h1>
+                @endif
                 <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('collections.profile.description', ['name' => $owner->name]) }}</p>
                 <nav aria-label="{{ __('collections.locale.switch') }}" class="mt-3 flex w-fit rounded-control bg-slate-100 p-1">
                     @foreach ($localeUrls as $locale => $localeUrl)

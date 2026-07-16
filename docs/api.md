@@ -152,6 +152,10 @@ API отдает только публичные данные каталога: 
 - comment body hash/submission key, moderation notes, reporter identity, restrictions, blocks/mutes, notification payload/state и author-only pending comments;
 - пароли, токены, stack traces, секреты и приватные диагностические поля.
 
+## Профили пользователей и API
+
+Task 14 adds web/Livewire public profiles only. Existing v1 user/account/library/comment/review/collection resources and routes are unchanged; no Eloquent `UserProfile`, email, privacy matrix, raw media path, report/moderation state, block/mute overlay or detailed watch progress is exposed through a new JSON endpoint. A future mobile profile API must reuse `PublicUserProfileData`, policy and canonical queries through API Resources rather than serialize models directly.
+
 ## Recommendation API compatibility
 
 `GET /api/v1/titles/{titleSlug}/recommendations` и route name `api.v1.titles.recommendations` сохранены. Controller использует canonical `CatalogRecommendationService::forTitle()`, но response shape остаётся совместимым: public recommended title resource, rank и localized public reasons. Explicit related web rows не добавляют новый private API contract и не меняют существующий endpoint без версии.

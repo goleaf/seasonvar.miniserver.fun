@@ -440,6 +440,7 @@ final class CatalogTitleReviewQuery
         $query
             ->with([
                 'authorAccount:id,name',
+                'authorAccount.profile:user_id,username,profile_visibility,moderation_status',
                 'catalogTitle' => fn ($query) => $query
                     ->withTrashed()
                     ->select(['id', 'slug', 'title', 'original_title']),

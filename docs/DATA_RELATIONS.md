@@ -351,6 +351,14 @@ Account deletion обнуляет `reviews.user_id` и `reports.reporter_id`, у
 - Public count/popularity использует distinct visible title count. Related сначала сохраняет explicit editorial ordering, затем shared visible-title count; current/private/hidden tags исключены. Recommendations используют только eligible global tags как weighted signal; personal assignments не входят в public similarity или explanation.
 - Full provider-set sync идемпотентен: stable mapping/pivot uniqueness, current provenance timestamps и complete-snapshot stale reconciliation не создают повторов. Explicit editorial provenance/suppression survives import; rejected mapping clears only its current provider observations, а pivot удаляется только без remaining current source. Raw provider spelling не становится canonical public label автоматически.
 
+## Профили пользователей
+
+- `user_profiles.user_id` одновременно PK и cascade FK к `users`: ровно один профиль на стабильного пользователя. `normalized_username` unique и используется для lookup; display name/email никогда не являются route identity. Visibility/moderation — стабильные codes, media columns содержат только private disk/path metadata и monotonically increasing versions.
+- `user_profile_username_histories` хранит unique former normalized alias и user/time index. Change transaction сначала резервирует историю, затем меняет current alias той же строки; duplicate current/history alias отклоняется, а не объединяет accounts.
+- `user_profile_reports` хранит random public UUID, target stable UUID, nullable lifecycle FKs, stable category/status, private evidence/note и unique unresolved deduplication key. Composite indexes соответствуют target/status, moderation queue и reporter history queries.
+- Existing-user backfill идемпотентно создаёт collision-safe usernames. Он не меняет users, collections, comments, reviews, library/progress/history или privacy choices; new registration получает private model defaults. Account deletion cascade-removes profile/aliases and nulls report lifecycle FKs after private media purge.
+- Public counts derive only from canonical public collection/review/comment/title predicates. Watching/completed are explicit title-level states; detailed episode history/progress has no profile relation or public query.
+
 ## Аутентификация и sessions
 
 - `users` — единственная portal identity table: unique `email`, Laravel password hash cast, nullable `email_verified_at`, remember token и timestamps. Username/profile/external-identity/account-status/MFA/magic-link/merge columns отсутствуют. Canonical email normalization применяется до write, case-insensitive scope сохраняет lookup compatibility; Task 15 не переписывает существующие rows и не добавляет schema.

@@ -24,6 +24,106 @@
         @endif
     </header>
 
+    <x-ui.panel :title="__('profiles.settings.title')" :subtitle="__('profiles.settings.description')" icon="fa-solid fa-id-card">
+        @if ($status)
+            <div class="mb-5">
+                <x-form.status-message :message="$status" />
+            </div>
+        @endif
+
+        <div class="space-y-6">
+            <div class="rounded-control border border-slate-200 bg-slate-50 p-4">
+                <p class="text-xs font-bold uppercase tracking-wide text-slate-500">{{ __('profiles.settings.public_url') }}</p>
+                <a href="{{ $publicProfileUrl }}" class="mt-2 inline-flex min-h-10 max-w-full items-center gap-2 break-all text-sm font-bold text-emerald-700 hover:text-emerald-600"><x-ui.icon name="fa-solid fa-arrow-up-right-from-square" />{{ $publicProfileUrl }}</a>
+            </div>
+
+            <div class="grid gap-5 lg:grid-cols-2">
+                <form wire:submit="saveUsername" class="space-y-4 rounded-panel border border-slate-200 p-4">
+                    <h3 class="font-black text-slate-900">{{ __('profiles.settings.username') }}</h3>
+                    <p class="text-sm leading-6 text-slate-600">{{ __('profiles.settings.username_hint') }}</p>
+                    <x-form.field
+                        :label="__('profiles.settings.username')"
+                        for="public-profile-username"
+                        wire:model="username"
+                        autocomplete="username"
+                        required
+                    />
+                    <x-form.password-field
+                        :label="__('profiles.settings.username_password')"
+                        for="public-profile-password"
+                        wire:model="profilePassword"
+                        autocomplete="current-password"
+                        required
+                    />
+                    <button type="submit" wire:loading.attr="disabled" wire:target="saveUsername" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-60 sm:w-auto"><x-ui.icon name="fa-solid fa-at" />{{ __('profiles.settings.save_username') }}</button>
+                </form>
+
+                <form wire:submit="savePublicDetails" class="space-y-4 rounded-panel border border-slate-200 p-4">
+                    <h3 class="font-black text-slate-900">{{ __('profiles.settings.biography') }}</h3>
+                    <label for="public-profile-biography" class="block text-sm font-bold text-slate-700">{{ __('profiles.settings.biography') }}</label>
+                    <textarea id="public-profile-biography" wire:model="biography" rows="7" maxlength="{{ $biographyMaximumLength }}" aria-describedby="public-profile-biography-hint" class="w-full rounded-control border border-slate-300 bg-white px-3 py-2.5 text-base leading-6 text-slate-800 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"></textarea>
+                    <p id="public-profile-biography-hint" class="text-xs font-semibold leading-5 text-slate-500">{{ __('profiles.settings.biography_hint') }}</p>
+                    @error('biography')<p class="text-sm font-semibold text-rose-700">{{ $message }}</p>@enderror
+                    <button type="submit" wire:loading.attr="disabled" wire:target="savePublicDetails" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-60 sm:w-auto"><x-ui.icon name="fa-solid fa-floppy-disk" />{{ __('profiles.settings.save_details') }}</button>
+                </form>
+            </div>
+
+            <div class="grid gap-5 lg:grid-cols-2">
+                <form wire:submit="saveAvatar" class="space-y-4 rounded-panel border border-slate-200 p-4">
+                    <h3 class="font-black text-slate-900">{{ __('profiles.settings.avatar') }}</h3>
+                    <div class="flex items-center gap-4">
+                        @if ($avatarUrl)<img src="{{ $avatarUrl }}" alt="{{ __('profiles.accessibility.avatar', ['name' => $name]) }}" class="h-20 w-20 rounded-full object-cover">@endif
+                        <label for="public-profile-avatar" class="min-w-0 flex-1 text-sm font-bold text-slate-700">{{ __('profiles.settings.avatar') }}
+                            <input id="public-profile-avatar" type="file" wire:model="avatarUpload" accept="image/jpeg,image/png,image/webp" class="mt-2 block min-h-11 w-full min-w-0 text-sm font-normal text-slate-700 file:mr-3 file:min-h-11 file:rounded-control file:border-0 file:bg-slate-100 file:px-4 file:font-bold file:text-slate-700">
+                        </label>
+                    </div>
+                    @error('avatarUpload')<p class="text-sm font-semibold text-rose-700">{{ $message }}</p>@enderror
+                    <div class="flex flex-wrap gap-2">
+                        <button type="submit" wire:loading.attr="disabled" wire:target="saveAvatar,avatarUpload" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-60"><x-ui.icon name="fa-solid fa-upload" />{{ __('profiles.settings.upload') }}</button>
+                        @if ($avatarUrl)<button type="button" wire:click="removeAvatar" wire:confirm="{{ __('profiles.settings.remove') }}?" wire:loading.attr="disabled" wire:target="removeAvatar" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-100"><x-ui.icon name="fa-solid fa-trash" />{{ __('profiles.settings.remove') }}</button>@endif
+                    </div>
+                </form>
+
+                <form wire:submit="saveCover" class="space-y-4 rounded-panel border border-slate-200 p-4">
+                    <h3 class="font-black text-slate-900">{{ __('profiles.settings.cover') }}</h3>
+                    @if ($coverUrl)<img src="{{ $coverUrl }}" alt="" class="h-24 w-full rounded-control object-cover">@endif
+                    <label for="public-profile-cover" class="block text-sm font-bold text-slate-700">{{ __('profiles.settings.cover') }}
+                        <input id="public-profile-cover" type="file" wire:model="coverUpload" accept="image/jpeg,image/png,image/webp" class="mt-2 block min-h-11 w-full text-sm font-normal text-slate-700 file:mr-3 file:min-h-11 file:rounded-control file:border-0 file:bg-slate-100 file:px-4 file:font-bold file:text-slate-700">
+                    </label>
+                    @error('coverUpload')<p class="text-sm font-semibold text-rose-700">{{ $message }}</p>@enderror
+                    <div class="flex flex-wrap gap-2">
+                        <button type="submit" wire:loading.attr="disabled" wire:target="saveCover,coverUpload" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-60"><x-ui.icon name="fa-solid fa-upload" />{{ __('profiles.settings.upload') }}</button>
+                        @if ($coverUrl)<button type="button" wire:click="removeCover" wire:confirm="{{ __('profiles.settings.remove') }}?" wire:loading.attr="disabled" wire:target="removeCover" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-700 hover:bg-rose-100"><x-ui.icon name="fa-solid fa-trash" />{{ __('profiles.settings.remove') }}</button>@endif
+                    </div>
+                </form>
+            </div>
+
+            <form wire:submit="saveProfilePrivacy" class="space-y-4 rounded-panel border border-slate-200 p-4">
+                <div>
+                    <h3 class="font-black text-slate-900">{{ __('profiles.settings.privacy_title') }}</h3>
+                    <p class="mt-1 text-sm leading-6 text-slate-600">{{ __('profiles.settings.privacy_hint') }}</p>
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <label class="block text-sm font-bold text-slate-700">{{ __('profiles.settings.profile_visibility') }}
+                        <select wire:model="profileVisibility" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 text-sm text-slate-800">
+                            @foreach ($profileVisibilityOptions as $option)<option value="{{ $option['value'] }}">{{ $option['label'] }}</option>@endforeach
+                        </select>
+                    </label>
+                    @foreach ($profileSections as $section)
+                        <label class="block text-sm font-bold text-slate-700">{{ $section['label'] }}
+                            <select wire:model="sectionVisibility.{{ $section['key'] }}" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 text-sm text-slate-800">
+                                @foreach ($profileVisibilityOptions as $option)<option value="{{ $option['value'] }}">{{ $option['label'] }}</option>@endforeach
+                            </select>
+                        </label>
+                    @endforeach
+                </div>
+                @error('profileVisibility')<p class="text-sm font-semibold text-rose-700">{{ $message }}</p>@enderror
+                @error('sectionVisibility.*')<p class="text-sm font-semibold text-rose-700">{{ $message }}</p>@enderror
+                <button type="submit" wire:loading.attr="disabled" wire:target="saveProfilePrivacy" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-800 disabled:opacity-60 sm:w-auto"><x-ui.icon name="fa-solid fa-shield-halved" />{{ __('profiles.settings.save_privacy') }}</button>
+            </form>
+        </div>
+    </x-ui.panel>
+
     <section aria-labelledby="library-summary-title" class="space-y-3">
         <div class="flex items-end justify-between gap-3">
             <div>
@@ -94,12 +194,6 @@
     </section>
 
     <x-ui.panel :title="__('settings.profile_page.account_data')" :subtitle="__('settings.profile_page.account_data_hint')" icon="fa-solid fa-address-card">
-        @if ($status)
-            <div class="mb-5">
-                <x-form.status-message :message="$status" />
-            </div>
-        @endif
-
         <form wire:submit="saveProfile" class="space-y-5" novalidate>
             <x-form.field
                 :label="__('settings.profile_page.name')"

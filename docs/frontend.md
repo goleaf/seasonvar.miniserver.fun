@@ -137,6 +137,13 @@ Replies загружаются одним chronological batch только дл�
 
 Review business state remains in Livewire/actions/DTO: viewer vote, permission, restriction, rating, verified snapshot and spoiler reveal are never decided in JavaScript. Stable `wire:key` prevents row identity loss; URL-backed sort/filter/page works with browser navigation. Vite imports the module from `resources/js/app.js`; no inline application script/CSS, external package, polling or full Eloquent serialization is added.
 
+## Frontend lifecycle профилей пользователей
+
+- `PublicProfilePage` is one class-based Livewire page with locked canonical username, allowlisted URL-backed tab and one selected paginator. Public sections are not all loaded initially; browser history, pagination names and server-normalized invalid tabs remain stable.
+- Owner editing extends the existing `/profile` page with independent username, biography, avatar, cover and privacy forms. Complex privacy is staged until its Apply submit; upload/username actions disable only relevant controls, clear password/file state after outcome and use native accessible inputs/confirmations.
+- Public/owner layouts reuse current panels, cards, typography, buttons, focus and responsive rules. Navigation wraps instead of introducing an internal horizontal scrollbar; long username/biography/URL text wraps, 390px desktop/mobile browser smoke has no document overflow.
+- User text remains original language and escaped. Russian/English labels, errors, loading, empty/private/moderated states and ARIA descriptions live only in the existing PHP translation catalogs. No inline CSS, business JavaScript, Volt or Blade query was added.
+
 ## Frontend lifecycle настроек аккаунта
 
 `resources/js/settings.js` обслуживает только безопасную browser boundary: versioned local preferences, backward-compatible read существующего `plyr` state, volume preview, explicit browser-timezone suggestion, dirty-form warning и one-shot authenticated merge. Он не решает authorization, entitlement, privacy, notification delivery, profile write или source access и не содержит console logging.

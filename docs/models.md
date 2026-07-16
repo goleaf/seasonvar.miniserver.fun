@@ -72,6 +72,12 @@
 - Model scopes определяют `publiclyEligible` и `globallyAssignable`, но public visible-title requirement, localization, counts/search/related/popular остаются в `TagQuery/TagResolver`; mutation/normalization/merge/cache — в services. Blade/API получают eager-loaded model/resource/DTO и не вызывают lazy relations, resolver или cache.
 - Enum storage: `TagType`, `TagVisibility`, `TagModerationStatus`, `TagSource`, `TagAliasSource`, `TagSynonymRelationship`, `TagProviderMappingStatus`. UI translation keys не являются stored values. Public-user/hierarchy/season/episode tag models отсутствуют намеренно.
 
+## Profile models и DTO
+
+- `UserProfile` is the one-to-one presentation/privacy record for `User`; it casts stable visibility/moderation enums and never replaces the authentication model.
+- `UserProfileUsernameHistory` preserves old route aliases; `UserProfileReport` stores private moderation evidence. Neither is exposed directly to Blade/API.
+- `PublicUserProfileData` is the explicit public-safe payload. `ResolvedUserProfile` separates current/history resolution. Full Eloquent graphs, user email/security columns, private activity and report notes are excluded from Livewire public state.
+
 ## Recommendation models и DTO
 
 - `CatalogTitleRecommendation` remains calculated similarity storage with source/target, score, rank, reasons, breakdown, algorithm version and computed time. It is not user-specific and its score is not a display percentage.

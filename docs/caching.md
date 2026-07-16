@@ -194,6 +194,13 @@ Cache key dimensions public summary включают domain version, collection 
 - Login/logout/verification/password/email/device/session/deletion actions do not flush the application cache. Existing owner/domain invalidators remain authoritative; auth/session state is read from guard/database on each boundary. Account settings locale adoption changes only an unset owner row through its existing targeted lifecycle.
 - `config/authentication.php` owns registration availability; `config/logging.php` owns the bounded authentication channel. Rolling deployment must rebuild config and route caches together, because disabled registration changes both web/API route registration. PHP-FPM/workers then require graceful reload; stale config is not repaired with global data-cache flush.
 
+## Cache lifecycle профилей пользователей
+
+- Public profile page/DTO и viewer-specific block/mute/owner controls намеренно не имеют второго shared cache: это исключает stale privacy и cross-user overlay leakage. Reads используют bounded indexed queries and eager relations.
+- `content_version`, avatar/cover version и `UserProfileCacheInvalidator` дают exact user/version/locale key shape для будущих public summaries. Profile/detail/privacy/identity/media/moderation/delete changes bump only affected profile versions; application-wide flush запрещён.
+- Private media URLs contain stable public user UUID, allowlisted kind and non-secret version, но response остаётся `private, no-store`. Email, private values, session IDs, report details/notes, raw disk paths and block/mute state никогда не входят в key/value.
+- Public→private/moderated transition immediately changes policy/query/sitemap output; direct queries are the source of truth, so stale cached HTML cannot survive. Sitemap profile response remains streamed and privacy-filtered.
+
 ## Cache lifecycle настроек аккаунта
 
 - Settings page HTML, account email, preferences, notification matrix, sessions, export/delete state и authenticated player overlays никогда не входят в shared response/data cache. `PrivateAccountResponse` запрещает browser/CDN reuse, а full-response middleware обходит authenticated traffic.

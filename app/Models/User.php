@@ -128,6 +128,24 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
         return $this->hasMany(UserMute::class, 'muter_id');
     }
 
+    /** @return HasOne<UserProfile, $this> */
+    public function profile(): HasOne
+    {
+        return $this->hasOne(UserProfile::class);
+    }
+
+    /** @return HasMany<UserProfileUsernameHistory, $this> */
+    public function profileUsernameHistory(): HasMany
+    {
+        return $this->hasMany(UserProfileUsernameHistory::class);
+    }
+
+    /** @return HasMany<UserProfileReport, $this> */
+    public function profileReports(): HasMany
+    {
+        return $this->hasMany(UserProfileReport::class, 'target_user_id');
+    }
+
     /** @return HasOne<CommentNotificationPreference, $this> */
     public function commentNotificationPreference(): HasOne
     {

@@ -16,6 +16,7 @@ use App\Http\Controllers\InfrastructureHealthController;
 use App\Http\Controllers\MigrateAnonymousPreferencesController;
 use App\Http\Controllers\PlaybackSourceController;
 use App\Http\Controllers\ReviewDirectLinkController;
+use App\Http\Controllers\UserProfileMediaController;
 use App\Http\Middleware\SetSignedAuthenticationLocale;
 use App\Livewire\Auth\ConfirmPasswordPage;
 use App\Livewire\Auth\ForgotPasswordPage;
@@ -41,8 +42,10 @@ use App\Livewire\ContentRequests\MyContentRequestsPage;
 use App\Livewire\Library\UserLibraryPage;
 use App\Livewire\Profile\DiscussionPage;
 use App\Livewire\Profile\ProfilePage;
+use App\Livewire\Profile\PublicProfilePage;
 use App\Livewire\Profile\ReviewHistoryPage;
 use App\Livewire\Profile\SecurityPage;
+use App\Livewire\Profile\UserProfileAdministrationManager;
 use App\Livewire\Reviews\ReviewModerationManager;
 use App\Livewire\SeasonvarImportManager;
 use App\Livewire\Settings\AccountSettingsPage;
@@ -188,6 +191,9 @@ Route::get('/sitemap-collections.xml', [CatalogSitemapController::class, 'sitema
     ->middleware('public.cache:collection_documents')
     ->withoutMiddleware($publicDocumentMiddleware)
     ->name('sitemap.collections');
+Route::get('/sitemap-profiles.xml', [CatalogSitemapController::class, 'sitemapProfiles'])
+    ->withoutMiddleware($publicDocumentMiddleware)
+    ->name('sitemap.profiles');
 Route::get('/health/ready', InfrastructureHealthController::class)
     ->withoutMiddleware($publicDocumentMiddleware)
     ->name('health.ready');
@@ -232,6 +238,14 @@ Route::get('/collections/covers/{publicId}/{version}', CatalogCollectionCoverCon
 Route::get('/collections/{collectionSlug}', [CatalogCollectionController::class, 'show'])
     ->where('collectionSlug', '[^/]+')
     ->name('collections.show');
+Route::get('/profiles/media/{userPublicId}/{kind}/{version}', UserProfileMediaController::class)
+    ->whereUuid('userPublicId')
+    ->whereIn('kind', ['avatar', 'cover'])
+    ->whereNumber('version')
+    ->name('profiles.media');
+Route::get('/users/{username}', PublicProfilePage::class)
+    ->where('username', '[A-Za-z0-9_]{3,32}')
+    ->name('users.show');
 Route::get('/profiles/{userPublicId}/collections', CatalogCollectionProfile::class)
     ->whereUuid('userPublicId')
     ->middleware('public.page:collections')
@@ -282,6 +296,10 @@ Route::middleware('collection.locale')->group(function () use ($discoveryRouteTy
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->whereUuid('userPublicId')
         ->name('localized.profiles.collections');
+    Route::get('/{locale}/users/{username}', PublicProfilePage::class)
+        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->where('username', '[A-Za-z0-9_]{3,32}')
+        ->name('localized.users.show');
 });
 
 Route::redirect('/lists', '/collections', 301)->name('legacy.collections.index');
@@ -320,6 +338,9 @@ Route::get('/admin/comments', CommentAdministrationManager::class)
 Route::get('/admin/reviews', ReviewModerationManager::class)
     ->middleware('can:manage-reviews')
     ->name('admin.reviews');
+Route::get('/admin/profiles', UserProfileAdministrationManager::class)
+    ->middleware('can:manage-catalog')
+    ->name('admin.profiles');
 Route::get('/admin/tags', TagAdministrationManager::class)
     ->middleware('can:manage-catalog')
     ->name('admin.tags');

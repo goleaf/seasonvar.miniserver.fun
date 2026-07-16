@@ -63,6 +63,11 @@ final class CommentPresenter
                 ? __('comments.author.unavailable')
                 : (string) $comment->author->name,
             isUnavailable: $authorUnavailable,
+            profileUrl: ! $authorUnavailable
+                && $comment->author->relationLoaded('profile')
+                && $comment->author->profile?->isPublic()
+                    ? route('users.show', ['username' => $comment->author->profile->username])
+                    : null,
         );
         $replyToAuthor = $this->replyToAuthor($comment, $context);
         $unavailableMessage = match (true) {

@@ -110,6 +110,14 @@
 - Abuse/concurrency: personal create has account-scoped RateLimiter, per-user and batch limits, owner-local uniqueness and optimistic edit version. API store additionally throttles; idempotent create returns existing exact active tag, assignment reconcile/removal/delete/restore tolerate retries. Global merge/assignment/provider changes use transactions, unique pivots, impact preview/audit and after-commit invalidation.
 - Destructive lifecycle: normal global permanent delete is absent; archive/merge preserve URL/mapping/assignment evidence. Personal soft delete has explicit localized action and 30-day restore/conflict rule; expiry purge/account cascade deletes only private tag pivots, never title/watchlist/progress/history/collection/review/comment records.
 
+## Security boundary профилей пользователей
+
+- Public profile lookup accepts only canonical username syntax and resolves to stable user ID; email/display name/client user ID never authorize access. `UserProfilePolicy` fails private/moderated/bilaterally blocked profiles as 404 and every mutation reauthorizes the authenticated actor after locking when necessary.
+- Public DTO/SEO/sitemap allowlist excludes email, auth providers, sessions, preferences, permissions, private collections, blacklist, history, progress, playback choices, report evidence and moderator notes. Owner/profile-media responses are private/no-store; media delivery validates stable owner UUID, allowlisted kind/version and emits `nosniff`.
+- Username change requires current password, rate limits, reserved/format/current+history uniqueness and a transaction. Biography is bounded escaped plain text with control/bidi/HTML removed. Client-supplied arbitrary fields/privacy keys/status/role/badge are never mass-assigned.
+- Avatar/cover accept bounded JPEG/PNG/WebP image MIME/extension/dimensions only; SVG/executables are rejected, storage names are server-generated, raw paths stay private and cleanup is scoped to the configured owned upload disk. The current product has no derivative/EXIF pipeline and does not claim one.
+- Reports require verified non-owner access, stable allowlisted category, bounded detail, rate limiting and unresolved deduplication. Moderator actions require `manage-catalog`; private notes/reporter identity never cross the admin boundary. Profile search/follows/badges/ranks are absent rather than insecure partial implementations.
+
 ## Security boundary настроек аккаунта
 
 - Все settings/profile/security/export routes требуют `auth` и `auth.session`, проходят `PrivateAccountResponse` и возвращают `private, no-store`, `Pragma: no-cache`, `X-Robots-Tag: noindex,nofollow`. URL не содержит user ID, email, private values, session identifiers или OAuth state; sitemap/structured data/social metadata settings не включают.
@@ -117,7 +125,7 @@
 - CSRF защищает Livewire и anonymous merge POST. Merge throttled, idempotent, заполняет только nullable account choices и не блокирует login при nonessential failure. Browser storage не содержит password/email/token/history/progress; account scope — HMAC, local values нормализуются, foreign-account values ограничиваются device-safe volume state.
 - Session UI выбирает только bounded safe summaries, не payload/raw user-agent/IP/cookie/session ID. Revoke получает HMAC action token, повторно проверяет password, ownership и current-session exclusion, rate limits attempts; logout-other сохраняет текущую session и использует canonical remember-token behavior.
 - Profile update использует explicit `name|email` allowlist и plain-text normalization. Password/delete/export inputs не входят в generic settings payload, очищаются component-ом и не логируются. Account export исключает password/tokens/session IDs; deletion вызывает единственный transactional lifecycle service.
-- Public profile, exact viewing history/progress, library/private tags, settings и notification rows никогда не попадают в shared HTML/cache. OAuth/external identity, premium/billing, MFA, avatar/cover и public-profile data models отсутствуют, поэтому интерфейс не показывает фиктивные controls или entitlement state.
+- Exact viewing history/progress, private library/tags, settings и notification rows никогда не попадают в shared HTML/cache. Task 14 public profile использует отдельный allowlisted DTO и private versioned media delivery; OAuth/external identity, premium/billing и MFA по-прежнему отсутствуют, поэтому интерфейс не показывает фиктивные provider/entitlement controls.
 
 ## Security и privacy заявок на материалы
 

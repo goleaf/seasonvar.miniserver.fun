@@ -148,6 +148,12 @@ Static acceptance must inspect generated SQL and SQLite `EXPLAIN QUERY PLAN` aga
 - Public compact popular/related snapshots remove repeat aggregate cost, dimensioned by locale/fallback/limit/version. No user-specific result enters shared cache. Mutation invalidation is version bump, not key scan; no expensive request-time page-view popularity or bot-sensitive counter was added.
 - Index rationale and uniqueness are owned by `DATA_RELATIONS.md`. Static acceptance uses disposable SQLite schema/index inspection and `EXPLAIN QUERY PLAN`; Task 11 does not create or run automated tests by explicit requirement and therefore does not claim invented production latency.
 
+## Query contract профилей пользователей
+
+- Public overview selects one profile plus safe user columns and grouped/independent counts only for explicitly public sections. Each tab loads one deterministic paginator; reviews/comments eager-load visible target summaries, collections reuse their canonical owner query and watch lists eager-load only title card fields.
+- Current/history username lookup uses unique indexes. Sitemap uses `(profile_visibility, moderation_status, updated_at, user_id)` eligibility and streams results. Report moderation uses the exact status/time/id composite; no page loads full report evidence, session/provider data or all sections.
+- Author profile links in comment/review lists use eager `author.profile`; collection owner profile loads the same one-to-one relation. Blade never adds per-card profile/count queries. Viewer block/mute checks are bounded existence queries and are never mixed into a shared cache.
+
 ## Query contract заявок на материалы
 
 - Directory/My/admin hydrate one paginated request query with selected public columns, eager title and `withCount(votes,followers)`; authenticated viewer state uses two correlated `withExists`, not per-card queries. Admin private fields load one grouped page query. Detail eager-loads target/result/history/public evidence/external IDs once; private source/clarification is authorized before selection.

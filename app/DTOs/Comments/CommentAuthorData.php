@@ -10,5 +10,6 @@ final readonly class CommentAuthorData
         public ?int $id,
         public string $name,
         public bool $isUnavailable,
+        public ?string $profileUrl,
     ) {}
 }
