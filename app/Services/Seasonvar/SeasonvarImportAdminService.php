@@ -10,6 +10,7 @@ use App\Enums\SeasonvarImportStatus;
 use App\Jobs\StartSeasonvarQueuedImport;
 use App\Models\SeasonvarImportRun;
 use App\Models\User;
+use App\Services\Media\LicensedMediaFileSizeBackfillSchedule;
 use App\Services\Media\LicensedMediaFileSizeBacklog;
 use App\Support\HumanFileSizeFormatter;
 use Illuminate\Contracts\Bus\Dispatcher as BusDispatcher;
@@ -215,6 +216,7 @@ final class SeasonvarImportAdminService
     private function presentFileSizeBacklog(LicensedMediaFileSizeBacklogStatusData $backlog): array
     {
         $locale = app()->currentLocale();
+        $backfillSchedule = LicensedMediaFileSizeBackfillSchedule::fromConfig();
         $number = fn (int|float $value, ?int $maxPrecision = null): string => Number::format(
             $value,
             maxPrecision: $maxPrecision,
@@ -269,7 +271,8 @@ final class SeasonvarImportAdminService
                 'value' => $backlog->capturedAt->format('d.m.Y H:i:s'),
             ]),
             'scheduled_batch' => __('catalog.importer.file_size_backlog_scheduled_batch', [
-                'count' => $number(max(1, (int) config('seasonvar.media_file_size.scheduled_backfill_limit', 20))),
+                'count' => $number($backfillSchedule->limit),
+                'seconds' => $number($backfillSchedule->timeBudgetSeconds),
             ]),
         ];
     }

@@ -291,7 +291,7 @@ return [
         'file_size_backlog_states' => 'Checked: :checked · unknown: :unknown · unsupported: :unsupported · failed: :failed',
         'file_size_backlog_bytes' => 'Known volume: :size (:bytes bytes)',
         'file_size_backlog_captured_at' => 'Snapshot captured: :value',
-        'file_size_backlog_scheduled_batch' => 'Scheduled batch: :count files',
+        'file_size_backlog_scheduled_batch' => 'Scheduled batch: :count files · time limit: :seconds sec.',
         'empty' => 'No import runs have been created yet.',
         'queued' => 'Run #:id was queued.',
         'already_active' => 'Active run #:id already exists.',

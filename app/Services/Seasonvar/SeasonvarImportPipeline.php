@@ -17,6 +17,7 @@ use App\Services\Catalog\CatalogMetadataDeduplicator;
 use App\Services\Catalog\CatalogTitleRecommendationBuilder;
 use App\Services\ContentRequests\ContentRequestImportRunLinker;
 use App\Services\Media\ExternalMediaMetadata;
+use App\Services\Media\LicensedMediaFileSizeBackfillBudget;
 use App\Services\Media\LicensedMediaFileSizeBacklog;
 use App\Services\Media\MediaSourceHealthManager;
 use Illuminate\Support\Carbon;
@@ -70,6 +71,7 @@ class SeasonvarImportPipeline
         bool $refreshMediaSizes = false,
         bool $forceMediaSizes = false,
         ?int $mediaSizeLimit = null,
+        ?int $mediaSizeTimeBudgetSeconds = null,
     ): SeasonvarImportRun {
         $run = $reservedRun ?? SeasonvarImportRun::query()->create([
             'mode' => $argument === null ? 'sitemap' : 'url',
@@ -103,6 +105,9 @@ class SeasonvarImportPipeline
             'forever' => $forever,
             'sleep_seconds' => $sleepSeconds,
             'page_types' => $pageTypes,
+            ...($refreshMediaSizes ? [
+                'media_size_time_budget_seconds' => $mediaSizeTimeBudgetSeconds,
+            ] : []),
         ]);
 
         try {
@@ -123,6 +128,7 @@ class SeasonvarImportPipeline
                     $refreshMediaSizes,
                     $forceMediaSizes,
                     $mediaSizeLimit,
+                    $mediaSizeTimeBudgetSeconds,
                 );
                 $run->refresh();
 
@@ -275,6 +281,7 @@ class SeasonvarImportPipeline
         bool $refreshMediaSizes,
         bool $forceMediaSizes,
         ?int $mediaSizeLimit,
+        ?int $mediaSizeTimeBudgetSeconds,
     ): void {
         $progress('seasonvar-import-cycle-started', [
             'cycle' => $cycle,
@@ -285,6 +292,7 @@ class SeasonvarImportPipeline
                 $progress,
                 $forceMediaSizes,
                 $mediaSizeLimit,
+                $mediaSizeTimeBudgetSeconds,
             );
             $this->addRunCounters($run, ['cycles' => 1], [
                 'media_size_only' => true,
@@ -892,15 +900,26 @@ class SeasonvarImportPipeline
 
     /**
      * @param  callable(string, array<string, mixed>): void  $progress
-     * @return array{selected: int, processed: int, changed: int, stopped: bool}
+     * @return array{selected: int, processed: int, changed: int, stopped: bool, time_budget_seconds: int|null, time_budget_exhausted: bool, elapsed_milliseconds: int}
      */
     private function refreshMediaFileSizeBacklog(
         callable $progress,
         bool $force = false,
         ?int $requestedLimit = null,
+        ?int $requestedTimeBudgetSeconds = null,
     ): array {
+        $budget = LicensedMediaFileSizeBackfillBudget::start($requestedTimeBudgetSeconds);
+
         if (! (bool) config('seasonvar.media_file_size.enabled', true)) {
-            return ['selected' => 0, 'processed' => 0, 'changed' => 0, 'stopped' => false];
+            return [
+                'selected' => 0,
+                'processed' => 0,
+                'changed' => 0,
+                'stopped' => false,
+                'time_budget_seconds' => $budget->seconds,
+                'time_budget_exhausted' => false,
+                'elapsed_milliseconds' => $budget->elapsedMilliseconds(),
+            ];
         }
 
         $chunkSize = max(1, min(
@@ -937,13 +956,36 @@ class SeasonvarImportPipeline
             'chunk_size' => $chunkSize,
             'max_per_cycle' => $limit,
             'force' => $force,
+            ...($budget->seconds === null ? [] : [
+                'time_budget_seconds' => $budget->seconds,
+            ]),
         ]);
 
-        $result = ['selected' => 0, 'processed' => 0, 'changed' => 0, 'stopped' => false];
+        $result = [
+            'selected' => 0,
+            'processed' => 0,
+            'changed' => 0,
+            'stopped' => false,
+            'time_budget_seconds' => $budget->seconds,
+            'time_budget_exhausted' => false,
+            'elapsed_milliseconds' => 0,
+        ];
 
         foreach ($query->lazyById($chunkSize)->take($limit) as $media) {
             if ($this->stopRequested) {
                 $result['stopped'] = true;
+
+                break;
+            }
+
+            if ($budget->exhausted()) {
+                $result['time_budget_exhausted'] = true;
+                $result['elapsed_milliseconds'] = $budget->elapsedMilliseconds();
+
+                $progress('seasonvar-media-size-backlog-time-budget-exhausted', [
+                    ...$result,
+                    'remaining_seconds' => $budget->remainingSeconds(),
+                ]);
 
                 break;
             }
@@ -963,7 +1005,14 @@ class SeasonvarImportPipeline
             $result['changed'] += $changed ? 1 : 0;
         }
 
-        $progress('seasonvar-media-size-backlog-complete', $result);
+        $result['elapsed_milliseconds'] = $budget->elapsedMilliseconds();
+        $progressResult = $result;
+
+        if ($progressResult['time_budget_seconds'] === null) {
+            unset($progressResult['time_budget_seconds']);
+        }
+
+        $progress('seasonvar-media-size-backlog-complete', $progressResult);
 
         return $result;
     }

@@ -9,6 +9,8 @@ use App\DTOs\Seasonvar\SeasonvarSourceInventoryResult;
 use App\Enums\SeasonvarPageType;
 use App\Models\SeasonvarImportRun;
 use App\Services\Catalog\CatalogCacheInvalidator;
+use App\Services\Media\LicensedMediaFileSizeBackfillBudget;
+use App\Services\Media\LicensedMediaFileSizeBackfillSchedule;
 use App\Services\Media\LicensedMediaFileSizeBacklog;
 use App\Services\Seasonvar\SeasonvarGlobalImportRunCoordinator;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
@@ -29,7 +31,7 @@ use Illuminate\Support\Facades\Cache;
 use LogicException;
 use Throwable;
 
-#[Signature('seasonvar:import {url? : Ссылка страницы seasonvar.ru для обновления одной страницы} {--force : Обновить данные даже если страница не изменилась} {--forever : Работать циклами без остановки} {--sleep= : Пауза между циклами в секундах} {--no-discovery : Не обновлять карту сайта в этом запуске} {--queued : Поставить подходящие страницы в Redis-очередь для параллельной обработки} {--status : Показать состояние Redis-очереди и последнего запуска без импорта} {--inventory-only : Инвентаризировать типы URL из карты сайта без разбора и изменения каталога} {--page-type=* : Обрабатывать только явно включённые типы страниц, например serial или rss} {--refresh-media-sizes : Проверить размеры подходящих существующих прямых видеофайлов} {--force-media-sizes : Повторно проверить размеры независимо от срока свежести} {--media-size-limit= : Ограничить число проверок размера в этом запуске}')]
+#[Signature('seasonvar:import {url? : Ссылка страницы seasonvar.ru для обновления одной страницы} {--force : Обновить данные даже если страница не изменилась} {--forever : Работать циклами без остановки} {--sleep= : Пауза между циклами в секундах} {--no-discovery : Не обновлять карту сайта в этом запуске} {--queued : Поставить подходящие страницы в Redis-очередь для параллельной обработки} {--status : Показать состояние Redis-очереди и последнего запуска без импорта} {--inventory-only : Инвентаризировать типы URL из карты сайта без разбора и изменения каталога} {--page-type=* : Обрабатывать только явно включённые типы страниц, например serial или rss} {--refresh-media-sizes : Проверить размеры подходящих существующих прямых видеофайлов} {--force-media-sizes : Повторно проверить размеры независимо от срока свежести} {--media-size-limit= : Ограничить число проверок размера в этом запуске} {--media-size-time-budget= : Остановить size-only цикл перед следующим файлом после заданного числа секунд}')]
 #[Description('Инвентаризирует страницы seasonvar.ru или обновляет каталог, сезоны, серии и видео одной командой')]
 class ImportSeasonvar extends Command
 {
@@ -153,6 +155,7 @@ class ImportSeasonvar extends Command
                 refreshMediaSizes: $refreshMediaSizes,
                 forceMediaSizes: (bool) $this->option('force-media-sizes'),
                 mediaSizeLimit: $this->mediaSizeLimit(),
+                mediaSizeTimeBudgetSeconds: $this->mediaSizeTimeBudgetSeconds(),
             );
 
             if (! $refreshMediaSizes) {
@@ -402,6 +405,7 @@ class ImportSeasonvar extends Command
         ]);
 
         $backlog = $fileSizeBacklog->status();
+        $backfillSchedule = LicensedMediaFileSizeBackfillSchedule::fromConfig();
 
         $this->components->info('Размеры прямых видеофайлов');
         $this->table(['Показатель', 'Значение'], [
@@ -420,7 +424,8 @@ class ImportSeasonvar extends Command
                 $backlog->knownBytes,
             )],
             ['Снимок построен', $backlog->capturedAt->format('d.m.Y H:i:s')],
-            ['Плановая пачка', max(1, (int) config('seasonvar.media_file_size.scheduled_backfill_limit', 20))],
+            ['Плановая пачка', $backfillSchedule->limit],
+            ['Плановый бюджет времени', $backfillSchedule->timeBudgetSeconds.' сек.'],
         ]);
 
         return self::SUCCESS;
@@ -462,6 +467,8 @@ class ImportSeasonvar extends Command
         $refresh = (bool) $this->option('refresh-media-sizes');
         $force = (bool) $this->option('force-media-sizes');
         $limit = $this->option('media-size-limit');
+        $timeBudget = $this->option('media-size-time-budget');
+        $timeBudgetProvided = $this->input->hasParameterOption('--media-size-time-budget');
 
         if ($force && ! $refresh) {
             $this->error('Опция --force-media-sizes требует --refresh-media-sizes.');
@@ -477,6 +484,27 @@ class ImportSeasonvar extends Command
 
         if ($limit !== null && $limit !== '' && ! $refresh) {
             $this->error('Опция --media-size-limit требует --refresh-media-sizes.');
+
+            return false;
+        }
+
+        if ($timeBudgetProvided && (
+            $timeBudget === null
+            || $timeBudget === ''
+            || ! ctype_digit((string) $timeBudget)
+            || (int) $timeBudget < 1
+            || (int) $timeBudget > LicensedMediaFileSizeBackfillBudget::MAX_SECONDS
+        )) {
+            $this->error(sprintf(
+                'Опция --media-size-time-budget должна быть целым числом от 1 до %d секунд.',
+                LicensedMediaFileSizeBackfillBudget::MAX_SECONDS,
+            ));
+
+            return false;
+        }
+
+        if ($timeBudgetProvided && ! $refresh) {
+            $this->error('Опция --media-size-time-budget требует --refresh-media-sizes.');
 
             return false;
         }
@@ -517,6 +545,13 @@ class ImportSeasonvar extends Command
     private function mediaSizeLimit(): ?int
     {
         $value = $this->option('media-size-limit');
+
+        return $value === null || $value === '' ? null : (int) $value;
+    }
+
+    private function mediaSizeTimeBudgetSeconds(): ?int
+    {
+        $value = $this->option('media-size-time-budget');
 
         return $value === null || $value === '' ? null : (int) $value;
     }

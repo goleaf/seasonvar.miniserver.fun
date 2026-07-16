@@ -121,7 +121,8 @@ return [
         'backfill_chunk_size' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_BACKFILL_CHUNK_SIZE', 25),
         'max_checks_per_import_cycle' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_MAX_CHECKS_PER_CYCLE', 20),
         'scheduled_backfill_enabled' => filter_var(env('SEASONVAR_MEDIA_FILE_SIZE_SCHEDULED_BACKFILL_ENABLED', true), FILTER_VALIDATE_BOOL),
-        'scheduled_backfill_limit' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_SCHEDULED_BACKFILL_LIMIT', 20),
+        'scheduled_backfill_limit' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_SCHEDULED_BACKFILL_LIMIT', 500),
+        'scheduled_backfill_time_budget_seconds' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_SCHEDULED_BACKFILL_TIME_BUDGET_SECONDS', 480),
         'status_cache_seconds' => 900,
     ],
     'media_metadata' => [

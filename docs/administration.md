@@ -19,7 +19,7 @@
 
 ## Наблюдаемость импортёра
 
-- Size-backlog panel показывает eligible, known, pending и due totals, terminal breakdown, metadata coverage, сумму известных exact bytes, плановый размер scheduled batch и время capture.
+- Size-backlog panel показывает eligible, known, pending и due totals, terminal breakdown, metadata coverage, сумму известных exact bytes, плановые hard count/time ограничения scheduled batch и время capture.
 - Данные подготавливает `SeasonvarImportAdminService`; Blade получает только локализованные strings/icons. Полный aggregate по большой SQLite-таблице хранится в operational tiered cache пятнадцать минут и допускает bounded stale fallback, поэтому 5-секундный poll активного запуска не повторяет scan; время capture показывается рядом с totals.
 - Это read-only observability: панель не увеличивает throughput, не принимает URL от browser, не выполняет HEAD/Range и не меняет media metadata. Backfill продолжает только существующая `seasonvar:import --refresh-media-sizes` и её консервативный scheduled запуск.
 

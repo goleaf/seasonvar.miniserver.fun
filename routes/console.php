@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\WakeSeasonvarImportFinalizers;
+use App\Services\Media\LicensedMediaFileSizeBackfillSchedule;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -42,12 +43,13 @@ Schedule::job(new WakeSeasonvarImportFinalizers)
     ->withoutOverlapping(10)
     ->onOneServer();
 
-$mediaFileSizeBackfillLimit = max(1, min(
-    100_000,
-    (int) config('seasonvar.media_file_size.scheduled_backfill_limit', 20),
-));
+$mediaFileSizeBackfillSchedule = LicensedMediaFileSizeBackfillSchedule::fromConfig();
 
-Schedule::command('seasonvar:import --refresh-media-sizes --media-size-limit='.$mediaFileSizeBackfillLimit)
+Schedule::command(sprintf(
+    'seasonvar:import --refresh-media-sizes --media-size-limit=%d --media-size-time-budget=%d',
+    $mediaFileSizeBackfillSchedule->limit,
+    $mediaFileSizeBackfillSchedule->timeBudgetSeconds,
+))
     ->everyTenMinutes()
     ->name('seasonvar-media-file-size-backfill')
     ->withoutOverlapping(30)

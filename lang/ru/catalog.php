@@ -291,7 +291,7 @@ return [
         'file_size_backlog_states' => 'Проверено: :checked · неизвестно: :unknown · не поддерживается: :unsupported · ошибок: :failed',
         'file_size_backlog_bytes' => 'Известный объём: :size (:bytes байт)',
         'file_size_backlog_captured_at' => 'Снимок построен: :value',
-        'file_size_backlog_scheduled_batch' => 'Плановая пачка: :count файлов',
+        'file_size_backlog_scheduled_batch' => 'Плановая пачка: :count файлов · лимит времени: :seconds сек.',
         'empty' => 'Запуски импорта пока не создавались.',
         'queued' => 'Запуск #:id поставлен в очередь.',
         'already_active' => 'Активный запуск #:id уже существует.',
