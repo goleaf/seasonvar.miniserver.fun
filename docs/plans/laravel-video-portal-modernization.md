@@ -621,7 +621,7 @@ Rollback is additive-schema rollback only before new Task 11 data is accepted. A
 
 ## Task 12 — canonical serial comments and discussions
 
-Status: implementation and final non-test acceptance complete on 2026-07-15; repository commit/push is the remaining operational handoff. This section is the single implementation plan for portal discussions and supersedes Task 10's temporary decision to defer comments until a portal-wide social boundary existed.
+Status: implementation and original non-test acceptance complete on 2026-07-15; a post-Task-14 public-profile integration reconciliation is in progress on 2026-07-16, after which the remaining operational handoff is commit/push. This section is the single implementation plan for portal discussions and supersedes Task 10's temporary decision to defer comments until a portal-wide social boundary existed.
 
 ### Audited baseline
 
@@ -708,6 +708,7 @@ Status: implementation and final non-test acceptance complete on 2026-07-15; rep
 - [x] Privacy linkage inspection found that the no-longer-useful idempotency `submission_key` retained a one-way derivation from the deleted user identity and random form token. Account anonymization now nulls it alongside the author and unresolved report deduplication key while preserving comment ID/body hash/thread/moderation evidence.
 - [x] Disposable SQLite inspection now confirms a clean full-repository migration, a direct down/up cycle of all four discussion migrations plus the focused relationship-pagination index migration, all eight discussion tables, required composite indexes and an empty `foreign_key_check`. Representative target/block/mute query plans select the intended covering indexes. The earlier shared-worktree Task 11 migration blocker was resolved before final Task 12 verification.
 - [x] Managed Chromium acceptance exercised a verified author, a second verified reader and an authorized moderator against an isolated database: stable create/edit/delete/restore, server-hidden spoiler and long-body reveal, desired-state reactions, reply context, report, mute/block, notifications, reversible hidden moderation and temporary restriction/revocation all worked. A hidden direct link returned 404, private evidence remained moderator-only, mobile 390×844 had no horizontal overflow, fresh reader/admin sessions had zero console errors and observed Livewire requests returned 200.
+- [x] Task 14 later introduced an explicit public-profile comments section, but its first integration rebuilt published-author filtering, target visibility, spoiler excerpts and matching counts inside the profile domain. That is a competing read/presentation boundary and can drift from Task 12. Public-profile comment rows and counts must delegate to `CommentProfileQuery` and `CommentPresenter`; profile services retain only section-privacy orchestration, and the existing schema, paginator name, route, target scope and visible output remain compatible.
 
 ### Canonical domain contract
 
@@ -732,7 +733,7 @@ Status: implementation and final non-test acceptance complete on 2026-07-15; rep
 - Counts: the public discussion count is all non-deleted `published` comments including replies. Per-thread reply count is non-deleted published replies. Viewer-specific hidden state does not alter these public aggregates; moderator totals are labelled separately.
 - Pagination: deterministic top-level pagination is URL-backed and offers stable `newest`, `oldest` and `popular` codes. Replies stay chronological and only one bounded thread is progressively expanded at a time; no initial query loads every reply.
 - Caching: comment pages are queried directly rather than placed in a second data cache. Guest SSR contains public DTOs only. Mutations bump the existing scoped title/collection page-cache version after commit; notification reads and viewer overlays never invalidate or enter shared caches.
-- Privacy: self-profile activity is private and paginated, includes the owner's eligible public and moderated states with safe labels, excludes deleted/removed rows and spoiler excerpts, and has stable target links. Account deletion anonymizes author linkage while preserving discussion integrity; export includes only the user's comments/reactions and public-safe target references.
+- Privacy: self-profile activity is private and paginated, includes the owner's eligible public and moderated states with safe labels, excludes deleted/removed rows and spoiler excerpts, and has stable target links. Task 14 may additionally expose published catalog-rooted activity only when the owner explicitly makes the comments section public; rows and counts reuse the canonical comment query/presenter rather than a profile-owned projection. Account deletion anonymizes author linkage while preserving discussion integrity; export includes only the user's comments/reactions and public-safe target references.
 - API: existing v1 contracts remain unchanged in this task. Web/Livewire discussions neither serialize Eloquent graphs nor expose raw target URLs/moderation state. A future mobile discussion API must reuse the same actions/policy/query/Resources rather than duplicate behavior.
 
 ### Database and compatibility plan
@@ -756,6 +757,7 @@ Status: implementation and final non-test acceptance complete on 2026-07-15; rep
 - [x] Title/player integration, optional collection integration, direct route/canonical/noindex policy, admin moderation queue and title-merge reconciliation.
 - [x] Update topic-owner documentation, manual acceptance matrix, maintenance log and English changelog without adding or running automated tests.
 - [x] Run allowed PHP syntax/Pint/route/schema/query/translation/cache/security/Blade inspection, Vite build and browser smoke; reread the task and inspect all changed/directly-related files. No automated test runner was invoked.
+- [ ] Normalize the later Task 14 public-profile comments integration through `CommentProfileQuery`/`CommentPresenter`, including the matching public count, without changing schema/routes/UI or exposing spoiler text.
 - [ ] Commit only on existing `main`, preserve unrelated work, verify status/remote and push the completed commit.
 
 ### Files expected to change
