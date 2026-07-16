@@ -215,7 +215,48 @@ final class CatalogPersonalizedRecommendationQuery
             ]);
         }
 
-        return array_slice($signals, 0, $historyLimit, true);
+        return array_slice($this->withoutNegativeSignals($signals, $user), 0, $historyLimit, true);
+    }
+
+    /**
+     * @param  array<int, array{weight: int, source: CatalogRecommendationSource, reason: CatalogRecommendationReason}>  $signals
+     * @return array<int, array{weight: int, source: CatalogRecommendationSource, reason: CatalogRecommendationReason}>
+     */
+    private function withoutNegativeSignals(array $signals, User $user): array
+    {
+        if ($signals === []) {
+            return [];
+        }
+
+        $feedbackAvailable = Schema::hasColumn('catalog_title_user_states', 'recommendation_feedback');
+        $statusAvailable = Schema::hasColumn('catalog_title_user_states', 'watch_status');
+
+        if (! $feedbackAvailable && ! $statusAvailable) {
+            return $signals;
+        }
+
+        $negativeStates = CatalogTitleUserState::query()
+            ->whereBelongsTo($user)
+            ->whereIn('catalog_title_id', array_keys($signals));
+
+        if ($feedbackAvailable && $statusAvailable) {
+            $negativeStates->where(function (Builder $query): void {
+                $query
+                    ->whereNotNull('recommendation_feedback')
+                    ->orWhere('watch_status', CatalogWatchStatus::Dropped->value);
+            });
+        } elseif ($feedbackAvailable) {
+            $negativeStates->whereNotNull('recommendation_feedback');
+        } else {
+            $negativeStates->where('watch_status', CatalogWatchStatus::Dropped->value);
+        }
+
+        $negativeIds = $negativeStates
+            ->pluck('catalog_title_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->all();
+
+        return array_diff_key($signals, array_fill_keys($negativeIds, true));
     }
 
     /**
