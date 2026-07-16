@@ -53,6 +53,8 @@ run_laravel_cache_validation() (
 
 run_backend() (
     trap clear_laravel_cache_artifacts EXIT
+    export DB_CONNECTION=sqlite
+    export DB_DATABASE=:memory:
     composer validate --strict
     composer audit
     bash scripts/check-changelog-policy.sh CHANGELOG.md

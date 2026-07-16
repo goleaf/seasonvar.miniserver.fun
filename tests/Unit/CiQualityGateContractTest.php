@@ -86,6 +86,23 @@ final class CiQualityGateContractTest extends TestCase
         $this->assertContains('output', $pint['exclude']);
     }
 
+    public function test_backend_profile_uses_in_memory_sqlite_before_booting_artisan(): void
+    {
+        $qualityGate = File::get(base_path('scripts/ci-check.sh'));
+        $backendPosition = strpos($qualityGate, 'run_backend() (');
+        $connectionPosition = strpos($qualityGate, 'export DB_CONNECTION=sqlite', $backendPosition);
+        $databasePosition = strpos($qualityGate, 'export DB_DATABASE=:memory:', $backendPosition);
+        $documentationPosition = strpos($qualityGate, 'php artisan project:docs-refresh --check --no-interaction', $backendPosition);
+
+        $this->assertIsInt($backendPosition);
+        $this->assertIsInt($connectionPosition);
+        $this->assertIsInt($databasePosition);
+        $this->assertIsInt($documentationPosition);
+        $this->assertTrue($backendPosition < $connectionPosition);
+        $this->assertTrue($connectionPosition < $databasePosition);
+        $this->assertTrue($databasePosition < $documentationPosition);
+    }
+
     public function test_backend_profile_runs_required_rector_after_pint_and_before_php_analysis(): void
     {
         $qualityGate = File::get(base_path('scripts/ci-check.sh'));
