@@ -13,6 +13,7 @@ use App\Services\Collections\CatalogCollectionAccountService;
 use App\Services\Comments\CommentAccountService;
 use App\Services\ContentRequests\ContentRequestAccountService;
 use App\Services\Reviews\ReviewAccountService;
+use App\Services\TechnicalIssues\TechnicalIssueAccountService;
 use Illuminate\Support\Facades\DB;
 
 final class AccountDataExportService
@@ -22,6 +23,7 @@ final class AccountDataExportService
         private readonly CommentAccountService $comments,
         private readonly ReviewAccountService $reviews,
         private readonly ContentRequestAccountService $contentRequests,
+        private readonly TechnicalIssueAccountService $technicalIssues,
         private readonly AccountSettingsService $settings,
     ) {}
 
@@ -86,6 +88,7 @@ final class AccountDataExportService
             'discussions' => $this->comments->export($user),
             'reviews' => $this->reviews->export($user),
             'content_requests' => $this->contentRequests->export($user),
+            'technical_issues' => $this->technicalIssues->export($user),
             'library' => CatalogTitleUserState::query()
                 ->whereBelongsTo($user)
                 ->with('catalogTitle:id,slug,title')

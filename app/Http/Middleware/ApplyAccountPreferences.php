@@ -32,10 +32,6 @@ final class ApplyAccountPreferences
                 ? $sessionLocale
                 : null;
 
-        if ($request->hasSession() && $routeLocale === null && ! $request->routeIs('livewire.update')) {
-            $request->session()->forget('interface_locale_route');
-        }
-
         $locale = is_string($routeLocale) && in_array($routeLocale, $supportedLocales, true)
             ? $routeLocale
             : ($livewireLocale ?? ($user instanceof User
@@ -57,6 +53,7 @@ final class ApplyAccountPreferences
             'accountPreferenceMigrationScope' => $user instanceof User
                 ? hash_hmac('sha256', (string) $user->getKey(), (string) config('app.key'))
                 : null,
+            'accountTimezone' => $resolved->timezone,
         ]);
 
         return $next($request);

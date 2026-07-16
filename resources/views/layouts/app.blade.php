@@ -18,7 +18,7 @@
         <link rel="sitemap" type="application/xml" href="{{ $layoutHeadUrls['landing_sitemap'] }}">
         <link rel="alternate" type="application/rss+xml" title="{{ $siteName }}" href="{{ $layoutHeadUrls['feed'] }}">
         <link rel="search" type="application/opensearchdescription+xml" title="{{ $siteName }}" href="{{ $layoutHeadUrls['opensearch'] }}">
-        <link rel="alternate" type="text/plain" title="LLMs" href="{{ $layoutHeadUrls['llms'] }}">
+        <link rel="alternate" type="text/plain" title="{{ __('catalog.layout.llms_document') }}" href="{{ $layoutHeadUrls['llms'] }}">
         <meta name="referrer" content="strict-origin-when-cross-origin">
         @if ($previousPageUrl !== null)
             <link rel="prev" href="{{ $previousPageUrl }}">
@@ -75,14 +75,14 @@
         'account-reduced-motion' => $accountReducedMotion ?? false,
     ]) data-account-settings-version="{{ $accountSettingsVersion ?? 1 }}" data-account-storage-key="{{ $accountAnonymousStorageKey ?? '' }}" @if (($accountPreferenceMigrationUrl ?? null) !== null) data-account-migration-url="{{ $accountPreferenceMigrationUrl }}" data-account-migration-scope="{{ $accountPreferenceMigrationScope }}" @endif>
         <a href="#main-content" class="fixed left-3 top-3 z-[100] -translate-y-24 rounded-control bg-emerald-700 px-4 py-3 font-bold text-white shadow-lg transition focus:translate-y-0">
-            Перейти к содержанию
+            {{ __('catalog.layout.skip_to_content') }}
         </a>
 
         <x-layout.site-header :site-name="$siteName" :search-query="$layoutSearchQuery" :header="$layoutHeader" />
 
         <main id="main-content" class="mx-auto max-w-[1760px] px-3 py-4 sm:px-6 sm:py-6 lg:px-8" itemscope itemtype="https://schema.org/WebPageElement" itemid="{{ $canonicalUrl }}#main-content">
             @if ($showBreadcrumbs)
-                <nav aria-label="Хлебные крошки" class="mb-4 rounded-panel border border-slate-200 bg-white px-3 py-2 text-sm shadow-panel">
+                <nav aria-label="{{ __('catalog.layout.breadcrumbs') }}" class="mb-4 rounded-panel border border-slate-200 bg-white px-3 py-2 text-sm shadow-panel">
                     <ol class="flex flex-wrap items-center gap-2 text-slate-500">
                         @foreach ($breadcrumbs as $breadcrumb)
                             <li class="inline-flex min-w-0 items-center gap-2">

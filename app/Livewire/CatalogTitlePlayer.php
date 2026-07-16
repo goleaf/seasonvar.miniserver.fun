@@ -8,8 +8,8 @@ use App\DTOs\AccountSettingsData;
 use App\DTOs\CatalogEpisodeNavigation;
 use App\DTOs\CatalogPrimaryAction;
 use App\DTOs\PlaybackPreferencesData;
-use App\Enums\ReleaseKind;
 use App\Enums\CatalogWatchStatus;
+use App\Enums\ReleaseKind;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
@@ -24,6 +24,7 @@ use App\Services\Catalog\CatalogUserStateService;
 use App\Services\Media\ExternalMediaFileType;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\LicensedMediaDownloadFilename;
+use App\Services\TechnicalIssues\TechnicalIssueContext;
 use App\Support\HumanFileSizeFormatter;
 use App\View\ViewModels\CatalogShowViewModel;
 use Illuminate\Contracts\View\View;
@@ -79,6 +80,8 @@ class CatalogTitlePlayer extends Component
 
     protected HumanFileSizeFormatter $fileSizes;
 
+    protected TechnicalIssueContext $technicalIssueContext;
+
     protected ?AccountSettingsData $resolvedAccountSettings = null;
 
     protected ?CatalogTitle $resolvedTitle = null;
@@ -99,6 +102,7 @@ class CatalogTitlePlayer extends Component
         LicensedMediaDownloadFilename $downloadFilenames,
         ExternalMediaFileType $mediaFileTypes,
         HumanFileSizeFormatter $fileSizes,
+        TechnicalIssueContext $technicalIssueContext,
     ): void {
         $this->playback = $playback;
         $this->primaryActions = $primaryActions;
@@ -110,6 +114,7 @@ class CatalogTitlePlayer extends Component
         $this->downloadFilenames = $downloadFilenames;
         $this->mediaFileTypes = $mediaFileTypes;
         $this->fileSizes = $fileSizes;
+        $this->technicalIssueContext = $technicalIssueContext;
     }
 
     public function mount(int $catalogTitleId): void
@@ -458,6 +463,9 @@ class CatalogTitlePlayer extends Component
         $state = $user !== null ? $this->userState->state($user, $title) : null;
         $stateSummary = $this->userState->summary($title);
         $ratingRange = $this->userState->ratingRange();
+        $technicalIssueUrl = (bool) config('technical-issues.enabled', true) && $user !== null
+            ? $this->technicalIssueContext->playerUrl($title, $activeSeason, $selectedEpisode, $selectedMedia)
+            : null;
 
         return view('livewire.catalog-title-player', [
             'title' => $title,
@@ -485,6 +493,7 @@ class CatalogTitlePlayer extends Component
             'ratingMaximum' => $ratingRange['maximum'],
             'isAuthenticated' => $user !== null,
             'canInteract' => $user?->hasVerifiedEmail() === true,
+            'technicalIssueUrl' => $technicalIssueUrl,
             'accountPlaybackPreferences' => [
                 'autoplay' => $this->accountPreferences()->autoplay,
                 'rememberVolume' => $this->accountPreferences()->rememberVolume,

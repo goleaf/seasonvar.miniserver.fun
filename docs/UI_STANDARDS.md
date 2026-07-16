@@ -227,3 +227,10 @@ Blade и Livewire Blade являются только presentation layer: зап
 - Primary download action использует local `fa-file-arrow-down`, emerald/slate language, `min-h-11`, visible `focus-visible` ring, полный width на phone и content width начиная с `sm`. Format/size — вторичная строка, не отдельная кликабельная цель.
 - Guest получает компактную login action с lock icon и ясным сообщением о регистрации; HLS/unsupported получает non-interactive stream-only state. Скрытие active link не заменяет endpoint policy.
 - Attachment открывается обычным `<a>` на named route, не `wire:click`; raw provider URL, inline styles, layout shift и binary transfer через Livewire запрещены.
+
+## Технические обращения
+
+- Create/My Tickets/detail/support queue переиспользуют existing light panels, labels, textareas, badges, alerts, buttons и pagination; отдельная визуальная система не создаётся.
+- Form/type help, duplicate candidates, upload preview, timeline, messages, verification/reopen и filters имеют visible labels, focus ring, `min-h-11`, live-region feedback и disabled loading state. Цвет не является единственным status signal.
+- Layout должен выдерживать 390 px, landscape/tablet/desktop, browser zoom, длинные переводы/prose/codes и несколько screenshots без horizontal overflow; actions не hover-only, destructive controls отделены.
+- Internal notes/raw diagnostics/чужие attachments не скрываются CSS — они отсутствуют в normal-user DTO. Полный UI/privacy contract: [`technical-issues.md`](technical-issues.md).

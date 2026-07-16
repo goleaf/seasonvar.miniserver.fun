@@ -1,6 +1,6 @@
 <x-ui.poster-card
     :src="$title->poster_url"
-    :alt="__('catalog.seo.poster_alt', ['title' => $title->display_title])"
+    :alt="__('catalog.seo.poster_alt', ['title' => $displayTitle])"
     layout="recommendation"
     data-catalog-card
     {{ $attributes }}
@@ -15,7 +15,7 @@
 
             <h3 class="mt-1 text-base font-bold leading-5 sm:text-lg sm:leading-6">
                 <a href="{{ route('titles.show', $title) }}" class="break-words text-slate-800 after:absolute after:inset-0 hover:text-emerald-700">
-                    {{ $title->display_title }}
+                    {{ $displayTitle }}
                 </a>
             </h3>
 
@@ -51,16 +51,16 @@
     <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-semibold text-slate-500">
         <span class="inline-flex items-center gap-1">
             <x-ui.icon name="fa-solid fa-layer-group text-[0.85em] text-slate-400" />
-            <span>{{ trans_choice('catalog.counts.seasons', $seasonsCount) }}</span>
+            <span>{{ $seasonsLabel }}</span>
         </span>
         <span class="inline-flex items-center gap-1">
             <x-ui.icon name="fa-solid fa-circle-play text-[0.85em] text-slate-400" />
-            <span>{{ trans_choice('catalog.counts.episodes', $episodesCount) }}</span>
+            <span>{{ $episodesLabel }}</span>
         </span>
         @if ($mediaCount > 0)
             <span class="inline-flex items-center gap-1">
                 <x-ui.icon name="fa-solid fa-file-video text-[0.85em] text-slate-400" />
-                <span>{{ trans_choice('catalog.counts.videos', $mediaCount) }}</span>
+                <span>{{ $mediaLabel }}</span>
             </span>
         @endif
     </div>

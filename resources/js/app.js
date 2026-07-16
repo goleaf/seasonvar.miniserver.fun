@@ -6,6 +6,7 @@ import { initializeCollectionInterfaces } from './collections.js';
 import { initializeCommentInterfaces } from './comments.js';
 import { initializeAccountPreferenceMigration, initializeAccountSettings } from './settings.js';
 import './reviews.js';
+import './issues.js';
 
 let catalogPlayerModule = null;
 let catalogPlayerModulePromise = null;

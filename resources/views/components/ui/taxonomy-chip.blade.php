@@ -5,7 +5,7 @@
         @endif
         <span class="min-w-0 break-words">{{ $label($slot) }}</span>
         @if ($count !== null)
-            <span class="shrink-0 tabular-nums text-slate-500">{{ $count }}</span>
+            <span class="shrink-0 tabular-nums text-slate-500">{{ $formattedCount() }}</span>
         @endif
     </a>
 @else
@@ -15,7 +15,7 @@
         @endif
         <span class="min-w-0 break-words">{{ $label($slot) }}</span>
         @if ($count !== null)
-            <span class="shrink-0 tabular-nums text-slate-500">{{ $count }}</span>
+            <span class="shrink-0 tabular-nums text-slate-500">{{ $formattedCount() }}</span>
         @endif
     </span>
 @endif

@@ -85,3 +85,5 @@
 - `CatalogTitleUserState` retains one unique owner/title aggregate and adds enum-cast nullable `recommendation_feedback` and `watch_status` plus monotonic versions. Watchlist/rating/progress/history are not duplicated.
 - `CatalogRecommendationContext`, result/item/explanation/list-item DTOs are typed server-side presentation boundaries. Livewire public properties never contain these Eloquent/history graphs.
 - Stable recommendation type/source/reason/relation/watch-status/feedback/popularity-period enums store untranslated codes. Unsupported creator/audio/subtitle-language/premium/region/franchise entities remain absent rather than represented by nullable fake models.
+
+- `TechnicalIssue` — private Task 20 aggregate с explicit title/season/episode/media/translation belongs-to и child diagnostics/messages/attachments/status/assignment/confirmation/follower/occurrence/merge/redaction/source-action relations. Stable enum casts хранят untranslated codes; `public_id` — route key, но policy остаётся обязательной. Отдельных fake audio/subtitle/premium/region/calendar models не создано; точный контракт принадлежит [`technical-issues.md`](technical-issues.md).

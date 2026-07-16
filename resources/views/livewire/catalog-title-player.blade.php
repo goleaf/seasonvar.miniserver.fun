@@ -146,6 +146,17 @@
                     @endif
                 </div>
 
+                @if ($technicalIssueUrl)
+                    <a
+                        href="{{ $technicalIssueUrl }}"
+                        data-player-issue-link
+                        class="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 sm:w-auto"
+                    >
+                        <x-ui.icon name="fa-solid fa-triangle-exclamation" />
+                        <span>{{ __('issues.report_problem') }}</span>
+                    </a>
+                @endif
+
                 @if ($selectedMedia)
                     <div class="mt-3 flex flex-wrap gap-2">
                         <x-ui.status-pill icon="fa-solid fa-file-video" variant="success" size="md">

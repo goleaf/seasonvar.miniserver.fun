@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services\Catalog;
 
 use App\DTOs\CatalogRecommendationContext;
@@ -12,6 +14,9 @@ use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\Tag;
 use App\Models\User;
+use App\Services\Auth\AccountDateTimeFormatter;
+use App\Services\Auth\AccountSettingsService;
+use App\Services\Auth\AuthenticationRedirectService;
 use App\Services\Collections\CatalogCollectionQuery;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -32,6 +37,9 @@ class CatalogHomePageBuilder
         private readonly CatalogCollectionQuery $collections,
         private readonly CatalogRecommendationService $recommendations,
         private readonly CatalogRecommendationPresenter $recommendationPresenter,
+        private readonly AccountSettingsService $accountSettings,
+        private readonly AccountDateTimeFormatter $dates,
+        private readonly AuthenticationRedirectService $authenticationRoutes,
     ) {}
 
     /**
@@ -39,6 +47,8 @@ class CatalogHomePageBuilder
      */
     public function data(?User $user = null): array
     {
+        $accountSettings = $this->accountSettings->resolve($user);
+        $locale = app()->currentLocale();
         $genres = $this->facets->taxonomies('genre');
         $countries = $this->facets->taxonomies('country');
         $countries->each(function (Model $country): void {
@@ -105,9 +115,6 @@ class CatalogHomePageBuilder
                 'season:id,catalog_title_id,number,kind,sort_order,title',
                 'episode:id,season_id,number,kind,sort_order,title,released_at',
             ]), $snapshot['latest_media_ids']);
-        $latestMedia->each(function (LicensedMedia $media): void {
-            $media->setAttribute('card_meta', $this->latestMediaCardMeta($media));
-        });
         $excludedRecommendationIds = $latestTitles
             ->concat($featuredTitles)
             ->concat($videoTitles)
@@ -170,7 +177,11 @@ class CatalogHomePageBuilder
         return [
             'stats' => $stats,
             'latestTitles' => $latestTitles,
-            'latestByDate' => $latestTitles->groupBy(fn (CatalogTitle $catalogTitle): string => $catalogTitle->content_added_at->format('d.m.Y')),
+            'latestByDate' => $latestTitles->groupBy(fn (CatalogTitle $catalogTitle): string => $this->dates->dateGroup(
+                $catalogTitle->content_added_at,
+                $locale,
+                $accountSettings->timezone,
+            )),
             'featuredTitles' => $featuredTitles,
             'videoTitles' => $videoTitles,
             'latestMedia' => $latestMedia,
@@ -182,7 +193,15 @@ class CatalogHomePageBuilder
             'featuredCollections' => $this->collections->featured(),
             'homeRecommendationItems' => $homeRecommendationItems,
             'homeRecommendationPresentation' => $homeRecommendationPresentation,
-            'discoveryUrl' => route('discover.index', ['type' => $recommendationResult->displayType->value]),
+            'collectionsUrl' => $this->localeRoute('collections.index'),
+            'discoveryUrl' => $this->discoveryUrl($recommendationResult->displayType),
+            'topRatedUrl' => $this->discoveryUrl(CatalogRecommendationType::TopRated),
+            'recentlyAddedUrl' => $this->discoveryUrl(CatalogRecommendationType::RecentlyAdded),
+            'upcomingUrl' => $this->discoveryUrl(CatalogRecommendationType::Upcoming),
+            'randomUrl' => $this->discoveryUrl(CatalogRecommendationType::Random),
+            'continueWatchingUrl' => $user !== null
+                ? route('library.section', ['section' => 'continue-watching'])
+                : $this->authenticationRoutes->guestUrl('login', locale: $locale),
             'noveltiesUrl' => route('titles.year', ['year' => now()->year]),
             'seo' => $this->seo->home($stats, $latestTitles),
         ];
@@ -198,13 +217,24 @@ class CatalogHomePageBuilder
             ->withCount($this->titles->publicCardCounts($user));
     }
 
-    private function latestMediaCardMeta(LicensedMedia $media): string
+    private function discoveryUrl(CatalogRecommendationType $type): string
     {
-        return collect([
-            $media->translation_name,
-            $media->format ? strtoupper($media->format) : null,
-            $media->published_at?->format('d.m.Y'),
-        ])->filter()->implode(' / ') ?: 'Видео сериала';
+        return $this->localeRoute('discover.index', [
+            'type' => $type->value,
+        ]);
+    }
+
+    /** @param array<string, scalar> $parameters */
+    private function localeRoute(string $name, array $parameters = []): string
+    {
+        $locale = app()->currentLocale();
+        $localizedName = 'localized.'.$name;
+        $shouldLocalize = request()->routeIs('localized.*')
+            || $locale !== (string) config('catalog-collections.default_locale', 'ru');
+
+        return $shouldLocalize
+            ? route($localizedName, ['locale' => $locale, ...$parameters])
+            : route($name, $parameters);
     }
 
     /**

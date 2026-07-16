@@ -96,3 +96,9 @@ Create view показывает search-before-submit, type descriptions, stable
 `CatalogRecommendationPresenter` — единственная boundary для type metadata, relation labels, stored similarity badges и broad explanation templates. `CatalogRecommendationListItem` содержит уже загруженный card title, rank/reason codes и permission to dismiss; Blade не видит score breakdown, user history или query services.
 
 Homepage показывает не более одной recommendation section; title detail — explicit related перед computed similar; discovery — filtered paginated list с working not-interested/blacklist/undo; library — link на personal discovery и owner-only hidden restore; search no-result — labelled popular link. Все состояния используют `lang/{ru,en}/recommendations.php`, existing cards/buttons/panels and escaped output. No fake percentage/AI label/dead feedback/carousel/hover-only reason exists.
+
+## Представления технических обращений
+
+`livewire/technical-issues/*` и `components/technical-issues/*` получают prepared DTO/options из Livewire/query/presenter. Create, My Tickets, detail, notifications и staff queue используют existing light Tailwind panels/forms/badges, stable `wire:key`, responsive wrapping, visible focus, minimum touch targets, labelled upload/status/timeline controls и ARIA live regions. Follower view не получает requester evidence; internal notes/raw diagnostics никогда не передаются в normal-user view.
+
+`resources/js/issues.js` — единственный Vite boundary для optional client summary, attachment preview cleanup, player position и focus/live announcements. Blade не содержит model/service/database calls, `@php`, inline CSS или ticket business JavaScript. Полный responsive/accessibility contract: [`technical-issues.md`](technical-issues.md).

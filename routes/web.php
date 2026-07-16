@@ -16,6 +16,8 @@ use App\Http\Controllers\InfrastructureHealthController;
 use App\Http\Controllers\MigrateAnonymousPreferencesController;
 use App\Http\Controllers\PlaybackSourceController;
 use App\Http\Controllers\ReviewDirectLinkController;
+use App\Http\Controllers\SwitchInterfaceLocaleController;
+use App\Http\Controllers\TechnicalIssueAttachmentController;
 use App\Http\Controllers\UserProfileMediaController;
 use App\Http\Middleware\SetSignedAuthenticationLocale;
 use App\Livewire\Auth\ConfirmPasswordPage;
@@ -51,6 +53,10 @@ use App\Livewire\SeasonvarImportManager;
 use App\Livewire\Settings\AccountSettingsPage;
 use App\Livewire\Tags\PersonalTagManager;
 use App\Livewire\Tags\TagAdministrationManager;
+use App\Livewire\TechnicalIssues\MyTechnicalIssuesPage;
+use App\Livewire\TechnicalIssues\TechnicalIssueAdministrationManager;
+use App\Livewire\TechnicalIssues\TechnicalIssueDetailPage;
+use App\Livewire\TechnicalIssues\TechnicalIssueFormPage;
 use App\Services\Catalog\CatalogDirectoryRegistry;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -71,6 +77,13 @@ $discoveryRouteTypes = collect(CatalogRecommendationType::values())
 Route::get('/', [CatalogController::class, 'index'])
     ->middleware('public.page:homepage')
     ->name('home');
+Route::get('/{locale}', [CatalogController::class, 'index'])
+    ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+    ->middleware(['collection.locale', 'public.page:homepage'])
+    ->name('localized.home');
+Route::post('/interface-locale', SwitchInterfaceLocaleController::class)
+    ->middleware('throttle:20,1')
+    ->name('locale.switch');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', LoginPage::class)->name('login');
@@ -134,6 +147,16 @@ Route::middleware(['auth', 'auth.session', 'account.private'])->group(function (
     Route::get('/my/collections', CatalogCollectionDashboard::class)->name('collections.mine');
     Route::get('/requests/create', ContentRequestFormPage::class)->name('requests.create');
     Route::get('/requests/mine', MyContentRequestsPage::class)->name('requests.mine');
+    Route::get('/issues/new', TechnicalIssueFormPage::class)->name('issues.create');
+    Route::get('/issues', MyTechnicalIssuesPage::class)->name('issues.mine');
+    Route::get('/issues/{technicalIssue}', TechnicalIssueDetailPage::class)
+        ->whereUuid('technicalIssue')
+        ->name('issues.show');
+    Route::get('/issues/{technicalIssue}/attachments/{attachment}', TechnicalIssueAttachmentController::class)
+        ->whereUuid('technicalIssue')
+        ->whereUuid('attachment')
+        ->scopeBindings()
+        ->name('issues.attachments.show');
     Route::get('/{locale}/requests/create', ContentRequestFormPage::class)
         ->whereIn('locale', config('content-requests.supported_locales', ['ru']))
         ->middleware('collection.locale')
@@ -142,6 +165,19 @@ Route::middleware(['auth', 'auth.session', 'account.private'])->group(function (
         ->whereIn('locale', config('content-requests.supported_locales', ['ru']))
         ->middleware('collection.locale')
         ->name('localized.requests.mine');
+    Route::get('/{locale}/issues/new', TechnicalIssueFormPage::class)
+        ->whereIn('locale', config('technical-issues.supported_locales', ['ru']))
+        ->middleware('collection.locale')
+        ->name('localized.issues.create');
+    Route::get('/{locale}/issues', MyTechnicalIssuesPage::class)
+        ->whereIn('locale', config('technical-issues.supported_locales', ['ru']))
+        ->middleware('collection.locale')
+        ->name('localized.issues.mine');
+    Route::get('/{locale}/issues/{technicalIssue}', TechnicalIssueDetailPage::class)
+        ->whereIn('locale', config('technical-issues.supported_locales', ['ru']))
+        ->whereUuid('technicalIssue')
+        ->middleware('collection.locale')
+        ->name('localized.issues.show');
     Route::get('/my/collections/{collectionPublicId}/edit', CatalogCollectionEditor::class)
         ->whereUuid('collectionPublicId')
         ->name('collections.edit');
@@ -347,6 +383,9 @@ Route::get('/admin/tags', TagAdministrationManager::class)
 Route::get('/admin/requests', ContentRequestAdministrationManager::class)
     ->middleware('can:manage-content-requests')
     ->name('admin.requests');
+Route::get('/admin/issues', TechnicalIssueAdministrationManager::class)
+    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-technical-issues'])
+    ->name('admin.issues');
 Route::get('/titles/year/{year}', CatalogSeries::class)
     ->where('year', '(?:19|20)\d{2}')
     ->middleware('public.page:catalog')

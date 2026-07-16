@@ -10,13 +10,21 @@
 - Livewire 4 используется для интерактивного каталога `/titles`, одиннадцати directory hubs, полной динамической оболочки и playback-island карточки `/titles/{slug}`, регистрации/входа, профиля, безопасности, личной библиотеки `/library/*` и live-страницы `/stats`; styles/scripts подключаются layout один раз на всех routes и не дублируются в компонентах.
 - Volt не установлен и не используется. Все Livewire-компоненты conventional class-based, а Blade остаётся presentation-only без PHP tags, database/cache/service calls.
 
+## Locale lifecycle и главная страница
+
+- Общий header содержит единственный language switcher: текстовые `RU`/`EN`, локализованные accessible names, `aria-current`, native keyboard POST forms и без flags. Page-specific collection switchers удалены, чтобы preference/session не расходились. Safe return сохраняет текущий localized equivalent или stable path и allowlisted query, но отбрасывает CSRF/Livewire transport fields.
+- Главная SSR использует `home.*` для statistics, latest updates, new episodes/media, watchable titles, discovery navigation, countries/genres/years, empty/loading/error/end copy и accessibility labels. Recommendation/update/filter decisions остаются стабильными enum/code values; Blade переводит только labels.
+- `CatalogTitle` не имеет translation relation, поэтому карточка показывает существующий `display_title`, optional original title и provider metadata без автоматического перевода. Featured collection summary загружает только active/fallback translation rows. Audio translation/studio name остаётся брендом/данными источника; quality/format и их accessible context разделены от interface language.
+- Counts используют locale-aware `Number::format` и Laravel plural rules. Dates используют `AccountDateTimeFormatter`, active locale и account/default timezone; hardcoded `d.m.Y` на главной отсутствует. Layout допускает длинные labels через wrap/min-width rules; текущие `ru`/`en` LTR, полная RTL-поддержка не заявляется.
+- Homepage sections не являются отдельными Livewire components. Если layout или дочерний component выполняет Livewire update, `ApplyAccountPreferences` повторно устанавливает validated session locale до hydration; locale не дублируется mutable public property в каждой секции.
+
 Датированные доказательства и незакрытые gaps находятся в [`audits/frontend-report.md`](audits/frontend-report.md), [`audits/livewire-report.md`](audits/livewire-report.md) и [`audits/video-playback-report.md`](audits/video-playback-report.md). Текущий переходный gap: Blade не содержит PHP/query/service calls, но header/footer/layout всё ещё используют route-aware `request()` и один template читает `config()`; living plan переносит эти решения в prepared view state.
 
 ## Video delivery contract
 
 `Page/API → entitlement → episode/media resolver → short-lived signed viewer grant → delivery reauthorization → allowlisted HTTPS redirect → provider/CDN → native video/Plyr/HLS.js → throttled progress service`.
 
-Laravel не проксирует video bytes и не является range server. `206`, `Accept-Ranges`, MIME, CORS и media cache принадлежат authorized provider/CDN; application tests фиксируют signed/expired/forbidden delivery and no raw upstream URL exposure. Normal CI должна использовать deterministic local/mocked media fixtures, а real-provider checks остаются optional operational checks.
+Обычный playback не проксирует video bytes: `206`, `Accept-Ranges`, MIME, CORS и media cache принадлежат authorized provider/CDN. Отдельный authenticated attachment route является узким исключением для direct-file download и end-to-end single-range resume; он не меняет player redirect architecture, не раскрывает raw upstream URL и не сохраняет video body. Normal CI использует deterministic local/mocked media fixtures, а real-provider checks остаются optional operational checks.
 
 ## Граница текущего продукта
 
@@ -169,3 +177,5 @@ Recommendation rows reuse `x-catalog.title-card` recommendation layout. Type nav
 `CatalogTitlePlayer` использует уже загруженный selected `LicensedMedia`: `CatalogTitlePlaybackQuery` выбирает file-size metadata, общий formatter строит B/KB/MB/GB/TB label, а `CatalogShowViewModel` готовит deterministic direct-file/download/login/reason state. Render не выполняет HEAD/Range/DNS и не принимает remote URL. Binary response не проходит через Livewire: обычная named-route ссылка открывает отдельный controller.
 
 Под player details direct media показывает pill с local `fa-hard-drive`; `null` выводится как переведённый «размер неизвестен», не `0 B`. Authenticated user получает emerald `fa-file-arrow-down` attachment link с форматом/размером, normal navigation, visible focus, 44px touch target и mobile full-width wrapping. Guest видит login CTA с локальным lock icon; HLS/playlist — неактивное stream-only объяснение. Raw/signed upstream query отсутствует в HTML, `wire:click`, duplicate player, Volt, `@php`, inline PHP/CSS/JS и Blade service/query calls не добавлены.
+
+Technical issue UI использует те же light Tailwind/Blade/Livewire conventions. Player передаёт report form только encrypted expiring context и numeric approximate position; `resources/js/issues.js` собирает optional allowlisted diagnostics и не читает source URL, cookies/storage или progress. Create/detail/list/admin layouts mobile-first, long-text safe, keyboard/touch accessible и имеют scoped loading/live-region states. Полный frontend/privacy contract: [`technical-issues.md`](technical-issues.md).

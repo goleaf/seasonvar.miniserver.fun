@@ -80,6 +80,10 @@ final class PublicPageCacheWarmer
     {
         return [
             route('home', [], false),
+            ...collect((array) config('catalog-collections.supported_locales', []))
+                ->filter(fn (mixed $locale): bool => is_string($locale) && $locale !== '')
+                ->map(fn (string $locale): string => route('localized.home', ['locale' => $locale], false))
+                ->all(),
             route('stats', [], false),
             route('titles.index', [], false),
             ...collect(CatalogDirectoryRegistry::routeMap())
@@ -93,6 +97,16 @@ final class PublicPageCacheWarmer
                     ['type' => $type->value],
                     false,
                 ))
+                ->all(),
+            ...collect((array) config('catalog-collections.supported_locales', []))
+                ->filter(fn (mixed $locale): bool => is_string($locale) && $locale !== '')
+                ->flatMap(fn (string $locale): array => collect(CatalogRecommendationType::publicCases())
+                    ->filter(fn (CatalogRecommendationType $type): bool => $type->isIndexable())
+                    ->map(fn (CatalogRecommendationType $type): string => route('localized.discover.index', [
+                        'locale' => $locale,
+                        'type' => $type->value,
+                    ], false))
+                    ->all())
                 ->all(),
         ];
     }

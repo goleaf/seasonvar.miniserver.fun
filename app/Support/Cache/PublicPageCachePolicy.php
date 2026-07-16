@@ -7,6 +7,7 @@ namespace App\Support\Cache;
 use App\Livewire\Forms\CatalogSeriesFilters;
 use App\Models\CatalogTitle;
 use App\Models\ContentRequest;
+use Illuminate\Contracts\Translation\Translator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 
@@ -60,7 +61,20 @@ final class PublicPageCachePolicy
         'sort',
     ];
 
-    public function __construct(private readonly CacheVersionRegistry $versions) {}
+    private const HOMEPAGE_TRANSLATION_GROUPS = [
+        'auth',
+        'catalog',
+        'collections',
+        'home',
+        'recommendations',
+        'requests',
+        'tags',
+    ];
+
+    public function __construct(
+        private readonly CacheVersionRegistry $versions,
+        private readonly Translator $translator,
+    ) {}
 
     public function context(Request $request, string $profile): ?PublicPageCacheContext
     {
@@ -94,8 +108,12 @@ final class PublicPageCachePolicy
             'query' => hash('sha256', json_encode($query, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)),
         ];
 
+        if ($profile === 'homepage') {
+            $dimensions['translations'] = $this->homepageTranslationFingerprint();
+        }
+
         return match ($profile) {
-            'homepage' => $parameters === [] && $query === []
+            'homepage' => $this->homepageParametersAreValid($parameters) && $query === []
                 ? new PublicPageCacheContext(CacheDomain::Homepage, $dimensions)
                 : null,
             'catalog' => new PublicPageCacheContext(CacheDomain::CatalogPages, $dimensions),
@@ -107,6 +125,18 @@ final class PublicPageCachePolicy
             'requests' => $this->contentRequestContext($request, $dimensions),
             default => null,
         };
+    }
+
+    /** @param array<string, scalar|null> $parameters */
+    private function homepageParametersAreValid(array $parameters): bool
+    {
+        if ($parameters === []) {
+            return true;
+        }
+
+        return array_keys($parameters) === ['locale']
+            && is_string($parameters['locale'])
+            && in_array($parameters['locale'], (array) config('catalog-collections.supported_locales', []), true);
     }
 
     /** @param array<string, mixed> $dimensions */
@@ -256,5 +286,24 @@ final class PublicPageCachePolicy
             || $session->has('errors')
             || $session->has('status')
             || (is_array($flash) && collect($flash)->flatten()->filter()->isNotEmpty());
+    }
+
+    private function homepageTranslationFingerprint(): string
+    {
+        $locales = collect([
+            app()->getLocale(),
+            (string) config('app.fallback_locale', 'ru'),
+        ])->filter(fn (string $locale): bool => $locale !== '')
+            ->unique()
+            ->values();
+        $catalogs = [];
+
+        foreach ($locales as $locale) {
+            foreach (self::HOMEPAGE_TRANSLATION_GROUPS as $group) {
+                $catalogs[$locale][$group] = $this->translator->get($group, [], $locale);
+            }
+        }
+
+        return hash('sha256', json_encode($catalogs, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
     }
 }

@@ -12,12 +12,12 @@
                 </a>
 
                 <p class="mt-4 max-w-md text-sm leading-6 text-slate-600">
-                    Каталог сериалов, сезонов и серий.
+                    {{ __('catalog.layout.footer_description') }}
                 </p>
 
                 <a href="{{ $footer['catalog_url'] }}" class="mt-5 inline-flex min-h-11 items-center gap-2 rounded-control bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 transition hover:bg-emerald-100">
                     <x-ui.icon name="fa-solid fa-list-ul" />
-                    <span>Открыть каталог</span>
+                    <span>{{ __('catalog.layout.open_catalog') }}</span>
                     <x-ui.icon name="fa-solid fa-arrow-right text-xs" />
                 </a>
             </div>
@@ -25,7 +25,7 @@
             <nav aria-labelledby="footer-catalog-navigation" class="min-w-0">
                 <h2 id="footer-catalog-navigation" class="flex items-center gap-2 text-sm font-bold text-slate-800">
                     <x-ui.icon name="fa-solid fa-compass" class="text-emerald-700" />
-                    <span>Навигация</span>
+                    <span>{{ __('catalog.layout.navigation') }}</span>
                 </h2>
                 <ul class="mt-3 space-y-1">
                     @foreach ($footer['navigation'] as $item)
@@ -59,7 +59,7 @@
             <nav aria-labelledby="footer-service-navigation" class="min-w-0">
                 <h2 id="footer-service-navigation" class="flex items-center gap-2 text-sm font-bold text-slate-800">
                     <x-ui.icon name="fa-solid fa-screwdriver-wrench" class="text-emerald-700" />
-                    <span>Служебные страницы</span>
+                    <span>{{ __('catalog.layout.service_pages') }}</span>
                 </h2>
                 <ul class="mt-3 space-y-1">
                     @foreach ($footer['service_links'] as $item)
@@ -78,7 +78,7 @@
             <p class="min-w-0 break-words">© {{ $footer['current_year'] }} {{ $siteName }}</p>
             <a href="#main-content" class="inline-flex min-h-11 items-center gap-2 self-start rounded-control px-3 py-2 font-semibold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700 sm:self-auto">
                 <x-ui.icon name="fa-solid fa-arrow-up" />
-                <span>К началу страницы</span>
+                <span>{{ __('catalog.layout.back_to_top') }}</span>
             </a>
         </div>
     </div>

@@ -165,6 +165,15 @@ Target boundaries:
 - Переводы каталога хранятся в `lang/{locale}/catalog.php`; русская локаль — основная/fallback, а plural counts формируются `trans_choice()` вместо ручных окончаний.
 - `catalog_title_slugs` хранит прежние публичные slug. Route binding применяет ту же publication/access boundary, а controller отвечает `301` на текущий canonical slug без переноса query string. Import slug allocation резервирует историю, а merge переносит её к каноническому тайтлу.
 
+### Локализация интерфейса и главной страницы
+
+- Поддерживаются только allowlisted `ru` и `en`; application default и fallback — `ru`. Web precedence: валидный route locale → session locale для Livewire hydration → сохранённая user setting → guest session → default. API отдельно выбирает allowlisted locale из `Accept-Language`. Cookie/domain/subdomain detection и отдельные language databases отсутствуют.
+- Интерфейс хранится в semantic PHP catalogs `lang/{ru,en}/*.php`; JSON language files и translation package не используются. Task 01 использует `home.*`, общая оболочка — `catalog.layout.*`/`catalog.locale.*`. Named placeholders совпадают между locale, предложения не собираются из переведённых фрагментов, plural nouns проходят через `trans_choice`, числа — через `Number::format`.
+- `/{locale}` является локализованным alias главной; `/` остаётся x-default. Остальной портал сохраняет существующую частичную `localized.*` strategy: если equivalent route существует, switcher использует его, иначе сохраняет stable unprefixed path/query и session locale. Slug вручную не префиксуется и не переводится.
+- Один CSRF-защищённый header switcher вызывает validated POST, сохраняет session и, при доступной account schema, `user_account_settings.locale`. Mutable arbitrary locale не попадает в file paths, route decisions или cache keys. `ApplyAccountPreferences` выполняется в `web` group до обычного и Livewire render, поэтому update/pagination/modal hydration не возвращается к default locale.
+- Editorial collection и global tag content продолжает использовать существующие translation tables и active → configured fallback → base behavior. Core title/season/episode, studio/audio/subtitle и UGC не машинно переводятся: `display_title` сохраняет различие provider/original/alternative values, а interface locale не считается audio/subtitle language.
+- `AccountDateTimeFormatter` форматирует homepage date groups и card dates через `IntlDateFormatter` с active locale и account/default timezone; `today`/`yesterday` — переводимые keys. Localized home SEO задаёт translated title/description/JSON-LD, self canonical, reciprocal `ru`/`en` alternates и x-default; sitemap содержит только реально существующие locale routes.
+
 ## Канонический домен коллекций
 
 Именованные пользовательские списки, редакционные подборки и защищённые system records представлены только `CatalogCollection`; отдельной модели «lists», «playlists», «favorites groups» или smart collection нет. Watchlist в `catalog_title_user_states.in_watchlist`, ratings, progress и history остаются независимыми. Коллекции поддерживают только `CatalogTitle`: сезоны, серии, users и external links не являются item types.
@@ -342,6 +351,12 @@ Schema/index/rollback и aggregate definitions принадлежат [`DATA_REL
 - Handoff не создаёт второй importer и не исполняет команды из браузера. Moderator передаёт allowlisted Seasonvar source page либо existing-title refresh в текущий importer, а `ContentRequestImportRunLinker` сохраняет реальный run reference. Completion остаётся ручной проверяемой transition: текущая media schema не позволяет честно auto-complete language-specific subtitles/translations.
 
 Полный аудит, rollback, known limitations и acceptance принадлежат Task 19 общего плана. Tables/indexes — в [`DATA_RELATIONS.md`](DATA_RELATIONS.md), permissions — в [`authorization.md`](authorization.md), privacy/link controls — в [`security.md`](security.md), notification/cache/import/UI details — в соответствующих owner-документах.
+
+## Канонический домен технических обращений
+
+`TechnicalIssue` — единственный aggregate для дефектов существующего контента и функций. Он не заменяет Task 19 `ContentRequest` и moderation reports. Один create/workflow boundary владеет random UUID/`ISS-…` identity, allowlisted type/target rules, encrypted player context, sanitized diagnostics, private raster attachments, bounded duplicate matching, participant engagement, messages/history, assignment, resolution/reopen/merge и staff-only source-health linkage. Read side разделён на viewer-scoped DTO/query для requester, limited participant и support; Blade не вычисляет policy/identity/duplicate/status/severity/priority.
+
+Полный контракт, ограничения и acceptance находятся только в [`technical-issues.md`](technical-issues.md); schema — в [`DATA_RELATIONS.md`](DATA_RELATIONS.md), access matrix — в [`authorization.md`](authorization.md), security — в [`security.md`](security.md).
 
 ## Каноническая recommendation/discovery boundary
 

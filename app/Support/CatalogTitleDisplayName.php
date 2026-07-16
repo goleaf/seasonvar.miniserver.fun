@@ -18,6 +18,10 @@ final readonly class CatalogTitleDisplayName
         $primary = PlainText::clean($title);
         $original = PlainText::clean($originalTitle);
 
+        if ($primary === '' && $original !== '') {
+            return new self($original, null);
+        }
+
         if ($original === '') {
             return new self($primary, null);
         }

@@ -12,6 +12,7 @@ use App\Services\Comments\CommentAccountService;
 use App\Services\ContentRequests\ContentRequestAccountService;
 use App\Services\Profiles\UserProfileMediaService;
 use App\Services\Reviews\ReviewAccountService;
+use App\Services\TechnicalIssues\TechnicalIssueAccountService;
 use App\Support\UserPlainText;
 use App\ValueObjects\NormalizedEmail;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -28,6 +29,7 @@ final class AccountService
         private readonly CommentAccountService $comments,
         private readonly ReviewAccountService $reviews,
         private readonly ContentRequestAccountService $contentRequests,
+        private readonly TechnicalIssueAccountService $technicalIssues,
         private readonly UserProfileMediaService $profileMedia,
         private readonly CatalogRecommendationCacheInvalidator $recommendationCache,
         private readonly AuthenticationAuditService $audit,
@@ -180,6 +182,7 @@ final class AccountService
             $this->comments->prepareForDeletion($lockedUser);
             $this->reviews->prepareForDeletion($lockedUser);
             $this->contentRequests->prepareForDeletion($lockedUser);
+            $this->technicalIssues->prepareForDeletion($lockedUser);
             $profile = $lockedUser->profile()->first();
 
             if ($profile !== null) {

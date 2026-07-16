@@ -23,6 +23,13 @@
 - Данные подготавливает `SeasonvarImportAdminService`; Blade получает только локализованные strings/icons. Полный aggregate по большой SQLite-таблице хранится в operational tiered cache пятнадцать минут и допускает bounded stale fallback, поэтому 5-секундный poll активного запуска не повторяет scan; время capture показывается рядом с totals.
 - Это read-only observability: панель не увеличивает throughput, не принимает URL от browser, не выполняет HEAD/Range и не меняет media metadata. Backfill продолжает только существующая `seasonvar:import --refresh-media-sizes` и её консервативный scheduled запуск.
 
+## Управление переводами
+
+- Interface copy главной и общей оболочки не является editable editorial content: она хранится в парных PHP catalogs `lang/ru/home.php`, `lang/en/home.php` и `catalog.php`, проходит code review и static parity/placeholder validation.
+- Редакционные коллекции и global tags остаются в существующих `catalog_collection_translations`/`tag_translations` и редактируются текущими admin flows для `ru`/`en`; missing locale применяет documented model/query fallback. Не создаётся DB copy для source-code labels.
+- Core serial/season/episode translations не добавлены: authoritative translated fields и admin workflow отсутствуют. Provider/original titles, studio brands, audio/subtitle language/type и user comments/reviews сохраняются как отдельные доменные значения и не машинно переводятся.
+- При добавлении locale сначала расширяется единый config allowlist, затем все PHP catalogs, route/SEO/sitemap/cache dimensions, account validation и admin translation forms. Частичное включение locale запрещено.
+
 ## Целостность и конкурентные изменения
 
 - Формы нормализуют и валидируют explicit allowlist полей. Уникальность slug, `(source_id, external_id)`, `(catalog_title_id, kind, number)`, `(season_id, kind, number)`, metadata pivots и `(catalog_title_id, source_media_key)` дополнительно обеспечивается существующими database constraints.
@@ -94,3 +101,9 @@ Permanent global delete отсутствует: active tag archive-ится ил
 `/admin/requests` требует `manage-content-requests` на route, Livewire hydration и каждой action. Queue имеет deterministic pagination, search/type/status/sort, public card counts, private note, rejection reason, stable priority, clarification question, canonical merge UUID, verified completion title/season/episode/media IDs, importer handoff и связанный real import-run ID. Normal user не получает controls или underlying private fields.
 
 Transition matrix запрещает произвольный jump и direct terminal duplicate без canonical mapping. Rejection требует stable public-safe reason; optional public explanation и private note разделены. Partial/full completion требует published result нужного canonical target. Merge требует exact semantic compatibility, idempotently переносит votes/follows/evidence/external IDs/clarifications, сохраняет source history и redirect. Bulk moderation намеренно не добавлена: без подтверждённого большого объёма per-item preview/authorization безопаснее текущих bounded single-item actions.
+
+## Очередь технической поддержки
+
+`/admin/issues` требует `manage-technical-issues` на route, hydration и каждой action. Queue имеет deterministic pagination, search/status/type/severity/priority/team/target/assignment/source-health filters, grouped counts и safe affected-user/attachment/message indicators без list diagnostic payload. Staff detail поддерживает classification, validated administrator assignment, clarification/public reply/internal note, transition, resolution, requester verification review, reopen, reject/reroute, redact, exact merge и linked source under-review/disable/restore.
+
+Bulk ограничен 10 explicit selected tickets и только priority/assignment; каждый ticket повторно authorizes, partial failures показываются. Merge/resolve/reject/source action не bulk. Private note, requester evidence, provider/source URL и unrelated account data не выходят normal users. Полный support contract: [`technical-issues.md`](technical-issues.md).

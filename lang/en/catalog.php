@@ -21,6 +21,39 @@ return [
     'locale' => [
         'language_name' => 'English',
         'open_graph' => 'en_US',
+        'names' => [
+            'ru' => 'Русский',
+            'en' => 'English',
+        ],
+        'switcher' => 'Interface language',
+        'active' => 'Selected language: :language',
+        'switch_to' => 'Switch the interface to :language',
+        'validation' => [
+            'required' => 'Select an interface language.',
+            'supported' => 'This interface language is not supported.',
+            'return_to' => 'A safe return page could not be determined.',
+        ],
+    ],
+
+    'layout' => [
+        'site_name' => 'TV-series catalog',
+        'search_label' => 'Search by title',
+        'search_placeholder' => 'Series title',
+        'search_action' => 'Search',
+        'primary_navigation' => 'Primary navigation',
+        'my_library' => 'My library',
+        'import' => 'Import',
+        'catalog_statistics' => 'Catalog statistics',
+        'sitemap' => 'Sitemap',
+        'rss_feed' => 'RSS feed',
+        'footer_description' => 'A catalog of series, seasons, and episodes.',
+        'open_catalog' => 'Open catalog',
+        'navigation' => 'Navigation',
+        'service_pages' => 'Service pages',
+        'back_to_top' => 'Back to top',
+        'skip_to_content' => 'Skip to content',
+        'breadcrumbs' => 'Breadcrumbs',
+        'llms_document' => 'Document for language models',
     ],
 
     'navigation' => [
@@ -152,6 +185,7 @@ return [
     ],
 
     'title' => [
+        'untitled' => 'Title unavailable',
         'quick_access' => 'Quick access',
         'quick_navigation' => 'Series quick navigation',
         'watch' => 'Watch',

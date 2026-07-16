@@ -176,4 +176,18 @@ Discovery type route ограничен implemented enum cases; similar/related 
 | title/season/episode/media release | отсутствуют bytes | каждый persisted release проходит `CatalogEntitlementService`: publication, audience, window, soft delete |
 | media delivery | отсутствуют bytes | health playable, status published, direct allowlisted format, persisted URL и trusted upstream validation |
 
-`LicensedMediaPolicy::download` обнаруживается model attribute и вызывается в endpoint; UI link не является permission. Policy не требует verified email: скачивание read/delivery доступно любому зарегистрированному authenticated user, а verification остаётся текущим требованием write interactions. Controller маскирует relationship/policy denial как 404, не принимает user/media URL/filename и делегирует всю сеть/Range/headers focused service. `StreamLicensedMediaDownload` повторяет eligibility и full public-DNS/host validation непосредственно перед соединением; cached authorization отсутствует.
+`LicensedMediaPolicy::download` обнаруживается model attribute и вызывается в endpoint; UI link не является permission. Policy не требует verified email: скачивание read/delivery доступно любому зарегистрированному authenticated user, а verification сохраняется только на тех write interactions, где она явно задана domain policy. Controller маскирует relationship/policy denial как 404, не принимает user/media URL/filename и делегирует всю сеть/Range/headers focused service. `StreamLicensedMediaDownload` повторяет eligibility и full public-DNS/host validation непосредственно перед соединением; cached authorization отсутствует.
+
+## Матрица технических обращений
+
+| Действие | Guest | Authenticated requester/participant | `manage-technical-issues` |
+| --- | --- | --- | --- |
+| Create / My Tickets | нет | create без email-verification barrier и owner-scoped directory | support queue вместо чужого My Tickets |
+| Detail | нет | requester либо уже подтверждённый/following participant; данные viewer-scoped | да, с sanitized diagnostics/internal controls |
+| Edit / withdraw / reply | нет | requester и только разрешённый status; participant не получает owner evidence | public reply/internal note через отдельные actions |
+| Confirm / follow | нет | ручное действие verified-only; exact-duplicate create использует отдельный limiter/occurrence join; requester не self-confirms | те же domain constraints |
+| Attachment | нет | собственный upload или requester-visible support attachment своего ticket | да, только после policy и ticket/attachment binding |
+| Verify / reopen | нет | requester/confirmer в eligible state; reopen rate-limited | да, через тот же transition boundary |
+| Status / classify / assign / merge / redact / source health | нет | нет | route gate плюс policy/action reauthorization |
+
+`TechnicalIssuePolicy` и every action не доверяют UUID/number, requester/target/source/track/status/severity/priority/assignee/resolution/attachment/merge IDs из Livewire. Знание `ISS-…` или UUID не даёт доступ. Полный contract: [`technical-issues.md`](technical-issues.md).

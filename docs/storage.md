@@ -41,3 +41,7 @@ Collection cover хранится только через `PrivateUploadStorage`
 ## Avatar и cover профиля
 
 `UserProfileMediaService` reuses `PrivateUploadStorage` and stores JPEG/PNG/WebP only below `user-profiles/{public_id}/{avatar|cover}` with server-generated names. Database keeps private disk/path/MIME/size/version metadata; public HTML receives only the same-origin versioned controller URL. Replacement/removal deletes only a path on the configured owned disk, account deletion schedules both paths after commit, and public delivery is policy-checked, `private, no-store` and `nosniff`. SVG, executable files, arbitrary paths and public-disk URLs are unsupported. Responsive derivatives/EXIF stripping are not claimed because the repository has no approved processor.
+
+## Screenshots технических обращений
+
+Task 20 переиспользует `PrivateUploadStorage`, но добавляет более узкий screenshot boundary: максимум три PNG/JPEG/WebP, decoded MIME/dimensions/pixels/bytes validation, GD re-encode, generated filename и ticket-owned prefix. DB хранит только private disk/path, safe display name, trusted MIME/extension/size/dimensions/hash. Выдача разрешает exact ticket/attachment и policy, а не storage URL; merge сохраняет uploader privacy. Retention и scanner limitations описаны в [`technical-issues.md`](technical-issues.md).

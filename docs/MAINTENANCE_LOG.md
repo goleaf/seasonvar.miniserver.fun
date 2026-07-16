@@ -270,7 +270,7 @@
 ## 2026-07-16 — canonical technical issues and support Task 20
 
 - Полный Markdown/routes/schema/model/policy/player/progress/account/notification/moderation/Task 19/import/source-health/storage/cache/SEO audit подтвердил отсутствие legacy technical/support/playback ticket data и competing route/table architecture. Добавлен первый private canonical aggregate без изменения Task 19 и moderation reports.
-- Additive migration `2026_07_16_200000_create_technical_issue_domain.php` отрепетирована up/down/up на disposable SQLite: 13 таблиц, 38 явных indexes, пустой `foreign_key_check`, `integrity_check=ok`; production schema/data не изменялись. Exact identity/requester pagination query plans используют intended indexes.
+- Additive migration `2026_07_16_200000_create_technical_issue_domain.php` сначала прошла up/down/up на disposable SQLite, а затем из-за cached application configuration была применена к текущей SQLite в batch 21: созданы 13 пустых таблиц и 38 indexes без DML или destructive repair. Отдельная reversible migration `2026_07_16_200100_add_requester_order_index_to_technical_issues.php` остаётся pending для обычного writer-free deploy; её isolated rehearsal довела inventory до 39 indexes, `foreign_key_check=0`, `integrity_check=ok`, а default и status-filtered requester query plans выбрали свои covering indexes.
 - Manual transactional smoke создал двух verified requesters и одного administrator, подтвердил exact canonical join, unique confirmation/follows/occurrences и lifecycle submitted → triage → confirmed → assigned → in progress → resolved → verified → closed с append-only history и deterministic notifications. Automated tests не создавались и не запускались по прямому ограничению Task 20.
 - Task-scoped Pint/PHP syntax/source/privacy/translation/route/middleware/SEO/cache inspections и Vite production build выполнены. Isolated private-storage smoke подтвердил PNG re-encode/generated path/cleanup и rejection SVG/script masquerade; managed Chromium подтвердил requester/staff policy, RU/EN, noindex и 390px layout без overflow/errors. Полный contract, retention/rollback и known product limitations находятся в [`technical-issues.md`](technical-issues.md).
 
@@ -369,6 +369,7 @@
 - `2026_07_16_190000_add_file_size_metadata_to_licensed_media.php`
 - `2026_07_16_190100_add_media_file_size_counters_to_seasonvar_import_runs.php`
 - `2026_07_16_200000_create_technical_issue_domain.php`
+- `2026_07_16_200100_add_requester_order_index_to_technical_issues.php`
 - `2026_07_16_220000_add_recommendation_release_event_index.php`
 - `2026_07_16_230000_add_recommendation_signal_timestamps.php`
 - `2026_07_16_230100_add_recommendation_signal_owner_indexes.php`

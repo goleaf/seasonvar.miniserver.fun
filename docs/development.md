@@ -92,3 +92,11 @@ php artisan project:docs-refresh --check
 ```
 
 Pest, Rector и `npm run lint` сейчас не установлены. Larastan/PHPStan применяется как ограниченный high-value gate; расширять paths нужно постепенно и только с нулём ignored errors.
+
+### Добавление interface translations
+
+1. Используйте существующий semantic domain (`home.*`, `catalog.*` и т. п.); не добавляйте JSON catalog, package или DB row для source-code UI text.
+2. Добавляйте key во все locale из `config/catalog-collections.php`. Named placeholders и plural structure должны совпадать; dynamic/provider/user text никогда не передаётся как translation key.
+3. Для homepage dates используйте `AccountDateTimeFormatter`, для чисел `Number::format(..., locale: app()->currentLocale())`, для nouns `trans_choice` с уже форматированным named `:count`.
+4. Статически выполните `php -l` для изменённых catalogs, рекурсивную key/placeholder parity сверку, scan изменённых Blade/PHP/JS на hardcoded user copy, route inspection с актуальным route source, Pint, Vite build и `project:docs-refresh --check`. Missing runtime key безопасно падает в configured `ru`, но новая parity-проверка не должна оставлять такой долг.
+5. Изменение PHP translation, используемого public home/layout, автоматически меняет translation fingerprint в full-response key; DB content translation инвалидируется через существующий Homepage/domain version path. После translation deploy выполняется обычный bounded catalog warm, который строит обе locale variants; store-wide flush не нужен.

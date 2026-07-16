@@ -10,19 +10,19 @@
             @if ($userInWatchlist)
                 <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
                     <x-ui.icon name="fa-solid fa-bookmark" />
-                    <span>В списке</span>
+                    <span>{{ __('catalog.player.in_watchlist') }}</span>
                 </span>
             @endif
             @if ($userRating !== null)
                 <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700">
                     <x-ui.icon name="fa-solid fa-star" />
-                    <span>Оценка: {{ $userRating }}</span>
+                    <span>{{ __('catalog.player.your_rating_value', ['rating' => $userRating, 'maximum' => 10]) }}</span>
                 </span>
             @endif
             @if ($userProgressPercent !== null)
                 <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700">
                     <x-ui.icon name="fa-solid fa-circle-play" />
-                    <span>Просмотрено {{ $userProgressPercent }}%</span>
+                    <span>{{ __('catalog.viewing.watched_percent_label', ['percent' => $userProgressPercent]) }}</span>
                 </span>
             @endif
         </div>

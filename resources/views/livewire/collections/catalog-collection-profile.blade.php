@@ -9,11 +9,6 @@
                     <h1 class="break-words text-2xl font-black tracking-tight text-slate-800 sm:text-3xl">{{ __('collections.profile.title', ['name' => $owner->name]) }}</h1>
                 @endif
                 <p class="mt-2 text-sm leading-6 text-slate-600">{{ __('collections.profile.description', ['name' => $owner->name]) }}</p>
-                <nav aria-label="{{ __('collections.locale.switch') }}" class="mt-3 flex w-fit rounded-control bg-slate-100 p-1">
-                    @foreach ($localeUrls as $locale => $localeUrl)
-                        <a href="{{ $localeUrl }}" hreflang="{{ $locale }}" @class(['inline-flex min-h-9 items-center rounded-lg px-3 text-xs font-black', 'bg-white text-emerald-700 shadow-sm' => $interfaceLocale === $locale, 'text-slate-600 hover:text-emerald-700' => $interfaceLocale !== $locale])>{{ __('collections.locale.'.$locale) }}</a>
-                    @endforeach
-                </nav>
             </div>
         </div>
     </header>

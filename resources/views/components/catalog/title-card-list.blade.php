@@ -1,6 +1,6 @@
 <x-ui.poster-card
     :src="$title->poster_url"
-    alt="Постер {{ $title->display_title }}"
+    :alt="__('catalog.seo.poster_alt', ['title' => $displayTitle])"
     :layout="$layout"
     data-catalog-card
     {{ $attributes }}
@@ -8,7 +8,7 @@
     <div class="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
         <div class="min-w-0">
             <a href="{{ route('titles.show', $title) }}" class="block break-words text-base font-bold leading-6 text-slate-700 after:absolute after:inset-0 hover:text-emerald-700">
-                {{ $title->display_title }}
+                {{ $displayTitle }}
             </a>
             @if ($title->display_original_title)
                 <span class="mt-1 block break-words text-sm leading-5 text-slate-500">{{ $title->display_original_title }}</span>
@@ -42,17 +42,17 @@
             @elseif ($layout !== 'compact')
                 <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">
                     <x-ui.icon name="fa-solid fa-layer-group text-[0.85em]" />
-                    <span>{{ trans_choice('catalog.counts.seasons', $seasonsCount) }}</span>
+                    <span>{{ $seasonsLabel }}</span>
                 </span>
             @endif
             <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-1 text-sky-700">
                 <x-ui.icon name="fa-solid fa-circle-play text-[0.85em]" />
-                <span>{{ trans_choice('catalog.counts.episodes', $episodesCount) }}</span>
+                <span>{{ $episodesLabel }}</span>
             </span>
             @if ($mediaCount > 0)
                 <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-amber-700">
                     <x-ui.icon name="fa-solid fa-file-video text-[0.85em]" />
-                    <span>{{ trans_choice('catalog.counts.videos', $mediaCount) }}</span>
+                    <span>{{ $mediaLabel }}</span>
                 </span>
             @endif
         </div>

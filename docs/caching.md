@@ -1,6 +1,6 @@
 # Кеширование и Redis/Memcached
 
-Обновлено: 15.07.2026
+Обновлено: 16.07.2026
 
 Production rollout 15.07.2026 подтвердил, что исторические `cache-warm` envelopes имеют истёкший `retryUntil`: Laravel отклоняет их до application `handle()`, поэтому no-op compatibility не может безопасно drain-ить эту очередь. Pending/failed legacy payload не удаляются и не retry-ятся автоматически. Новый coalesced intent, heartbeat и единственный worker используют `cache-warm-v2`; job не публикует absolute retry deadline и ограничивает реальные ошибки тремя attempts. Redis/Memcached transports остаются раздельными, а отсутствие evictions не является доказательством корректной инвалидации.
 
@@ -77,7 +77,7 @@ HTTP API policy: browser `max-age=60`, shared `s-maxage=300`, SWR 60 s, stale-if
 
 | Данные | Реализация | Invalidation/failure | Security |
 | --- | --- | --- | --- |
-| Homepage HTML и content index | Tiered sanitized HTML плюс ID/scalar cold snapshot | homepage version; stale + Redis lock; queued HTTP warm | guest public+locale only |
+| Homepage HTML и content index | Tiered sanitized HTML плюс ID/scalar cold snapshot | homepage version + public translation fingerprint; stale + Redis lock; queued HTTP warm | guest public+locale only |
 | Homepage metrics | Tiered compact counts | homepage version; warm | public aggregate |
 | Catalog/directory HTML | Tiered sanitized HTML | catalog-pages version; recent bounded manifest | guest only; `q`/`title` bypass |
 | Genre/country and default catalog facets | Tiered compact rows | catalog-facets version; warm top facets | bypass for authenticated, searches and non-default criteria |
@@ -101,6 +101,9 @@ HTTP API policy: browser `max-age=60`, shared `s-maxage=300`, SWR 60 s, stale-if
 `CatalogCacheInvalidator` остаётся единственной catalog cache mutation boundary. После commit он нормализует не более 1000 title IDs, bump-ит homepage, catalog-pages, facets, stats, API, sitemap и recommendations. Известные IDs bump-ят scopes `title:{id}`; неизвестный набор bump-ит global title generation. Затем invalidator атомарно объединяет bounded warm intent и dispatch-ит одну job. Queue outage фиксируется low-card metric/log и не превращает уже committed authoritative write в ложный rollback/500. Bulk importer paths вызывают invalidator явно, потому что query-builder upserts не создают Eloquent events.
 
 File-size metadata использует focused метод той же boundary: после material conditional write `titlePlaybackMetadataChanged()` bump-ит только `TitleDetail` scope `title:{id}` и пишет low-cardinality telemetry. Размер не входит в collection/home/sitemap/recommendation/API presentation, поэтому этот путь не выполняет collection membership query, не меняет их generations и не создаёт general warming intent. Guest title variants уже включают scoped version, а authenticated page bypass-ит shared response cache; следующий запрос затронутой карточки читает актуальный размер без global flush.
+
+
+Homepage snapshot/facets/full-response keys включают validated interface locale вместе с public audience, route, parameters/query и domain version; payload `ru` никогда не обслуживает `en`. Full-response dimension дополнительно содержит SHA-256 fingerprint active/fallback PHP groups, которые реально формируют guest home/layout (`auth`, `catalog`, `collections`, `home`, `recommendations`, `requests`, `tags`). Поэтому code translation edit автоматически выбирает новый exact namespace без store flush; изменение одного locale не требует user ID или arbitrary key. Raw catalogue totals имеют одинаковую семантику, но presentation formatting выполняется после чтения. `CatalogCacheWarmer` последовательно прогревает `ru` и `en` snapshot/facets/metrics, восстанавливает исходный application locale и включает `/ru`/`/en` плюс indexable localized discovery URLs в bounded self-HTTP set. Catalog/domain mutation bump-ит общую Homepage generation и тем самым инвалидирует все locale variants; изменение DB translation проходит тот же domain invalidator. User-specific Continue Watching и account preference никогда не входят в shared homepage payload.
 
 `CACHE_WARMING_ENABLED=false` является общей границей автоматического прогрева: `CatalogCacheInvalidator` не dispatch-ит job после mutations, а десятиминутное scheduler event не становится исполняемым. Ручной `cache:warm-catalog` намеренно остаётся доступен оператору для controlled recovery. Переключение флага не удаляет snapshots, queue rows, failed jobs или cache keys; после изменения environment production config cache и long-lived процессы обновляются штатным deployment workflow.
 
@@ -234,3 +237,7 @@ Existing optional `PublicPageCacheWarmer` additionally resolves exactly the five
 Изменение persisted file-size metadata вызывает только существующий `CatalogCacheInvalidator::importedTitleChanged(catalog_title_id)`, чтобы следующий title/player render увидел size label. Sync importer, queued apply, external playlist, scheduled/manual size-only backfill и download-time trusted size correction используют ту же boundary; size-only command не добавляет global catalog bump, full application flush/key scan отсутствуют. Conditional source guard отбрасывает запоздалый ответ до invalidation, а freshness решения инспектора читают timestamp/status из БД, а не shared authorization cache.
 
 Download route всегда возвращает `Cache-Control: private, no-store, max-age=0`, `Pragma: no-cache` и не участвует в public full-response profiles. Video body, PSR-7 chunks, Content-Range и user authorization никогда не записываются в Redis, Memcached, session, DB blob или Laravel cache. Малое size metadata отображается из title query; cached authorization не может пережить publication/audience/health change.
+
+## Cache lifecycle технических обращений
+
+Private ticket/list/detail/messages/attachments/diagnostics/internal notes/assignment/viewer confirmation/follow state никогда не попадают в global response/data cache. Current state и counts читаются viewer-scoped из DB; framework translation/config cache может хранить только static registry labels/rules. Ticket mutations не вызывают global flush. Реальный authorized source-health action использует существующий `CatalogCacheInvalidator` только для affected title/player; создание, confirm/follow/message/status сами не меняют public catalog cache. Rolling deploy до миграции защищён `TechnicalIssueSchema`. Полный contract: [`technical-issues.md`](technical-issues.md).

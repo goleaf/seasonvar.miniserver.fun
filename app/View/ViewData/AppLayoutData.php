@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\View\ViewData;
 
 use App\DTOs\CatalogDirectoryDefinition;
+use App\Models\CatalogTitle;
 use App\Services\Auth\AuthenticationRedirectService;
 use App\Services\Catalog\CatalogDirectoryRegistry;
+use App\Services\Localization\LocalizedRouteResolver;
+use App\Services\TechnicalIssues\TechnicalIssueContext;
 use App\Support\PlainText;
 use App\View\ViewModels\LayoutNavigationItem;
 use Illuminate\Contracts\Auth\Access\Gate;
@@ -31,6 +34,8 @@ final class AppLayoutData
         private readonly Router $router,
         private readonly UrlGenerator $urls,
         private readonly Translator $translator,
+        private readonly TechnicalIssueContext $technicalIssues,
+        private readonly LocalizedRouteResolver $localizedRoutes,
     ) {}
 
     /**
@@ -39,7 +44,12 @@ final class AppLayoutData
      */
     public function from(array $viewData): array
     {
-        $siteName = config('app.name', 'Каталог сериалов');
+        $siteName = config('app.name', __('catalog.layout.site_name'));
+        $interfaceLocale = $this->translator->getLocale();
+        $defaultLocale = (string) config('catalog-collections.default_locale', 'ru');
+        $layoutHomeUrl = $this->request->routeIs('localized.*') || $interfaceLocale !== $defaultLocale
+            ? $this->localizedRoutes->homeFor($interfaceLocale)
+            : $this->route('home');
         $authenticatedUser = $this->request->user();
         $isAuthenticated = $authenticatedUser !== null;
         $canManageImports = $authenticatedUser !== null
@@ -52,9 +62,13 @@ final class AppLayoutData
             && $this->gate->forUser($authenticatedUser)->allows('manage-reviews');
         $canManageContentRequests = $authenticatedUser !== null
             && $this->gate->forUser($authenticatedUser)->allows('manage-content-requests');
+        $canManageTechnicalIssues = $authenticatedUser !== null
+            && $this->gate->forUser($authenticatedUser)->allows('manage-technical-issues');
+        $canCreateTechnicalIssue = (bool) config('technical-issues.enabled', true)
+            && $authenticatedUser !== null;
         $layoutHeaderNavigation = [
-            $this->headerLink('home', 'fa-solid fa-house', 'Главная', $this->request->routeIs('home')),
-            $this->headerLink('titles.index', 'fa-solid fa-list-ul', 'Каталог', $this->request->routeIs('titles.*')),
+            $this->headerLinkUrl($layoutHomeUrl, 'fa-solid fa-house', __('catalog.navigation.home'), $this->request->routeIs('home', 'localized.home')),
+            $this->headerLink('titles.index', 'fa-solid fa-list-ul', __('catalog.navigation.all_titles'), $this->request->routeIs('titles.*')),
         ];
 
         if ($this->router->has('discover.index')) {
@@ -89,7 +103,7 @@ final class AppLayoutData
             $layoutHeaderNavigation[] = $this->headerLink(
                 'library.index',
                 'fa-solid fa-bookmark',
-                'Моя библиотека',
+                __('catalog.layout.my_library'),
                 $this->request->routeIs('library.*', 'viewing-activity'),
             );
             if ($this->router->has('personal-tags.index')) {
@@ -132,11 +146,19 @@ final class AppLayoutData
                     $this->request->routeIs('profile.reviews'),
                 );
             }
+            if ($this->router->has('issues.mine')) {
+                $layoutHeaderNavigation[] = $this->headerLink(
+                    'issues.mine',
+                    'fa-solid fa-screwdriver-wrench',
+                    __('issues.my_tickets'),
+                    $this->request->routeIs('issues.*', 'localized.issues.*'),
+                );
+            }
             if ($canManageImports) {
                 $layoutHeaderNavigation[] = $this->headerLink(
                     'admin.imports',
                     'fa-solid fa-cloud-arrow-down',
-                    'Импорт',
+                    __('catalog.layout.import'),
                     $this->request->routeIs('admin.imports'),
                 );
             }
@@ -181,6 +203,14 @@ final class AppLayoutData
                     $this->request->routeIs('admin.requests'),
                 );
             }
+            if ($canManageTechnicalIssues && $this->router->has('admin.issues')) {
+                $layoutHeaderNavigation[] = $this->headerLink(
+                    'admin.issues',
+                    'fa-solid fa-headset',
+                    __('issues.support_queue'),
+                    $this->request->routeIs('admin.issues'),
+                );
+            }
         } else {
             $layoutHeaderNavigation[] = $this->headerLinkUrl(
                 $this->authenticationRoutes->guestUrl('login'),
@@ -200,8 +230,8 @@ final class AppLayoutData
         }
 
         $layoutFooterNavigation = [
-            $this->footerLink('home', 'fa-solid fa-house text-slate-400', 'Главная', $this->request->routeIs('home')),
-            $this->footerLink('titles.index', 'fa-solid fa-list-ul text-slate-400', 'Каталог', $this->request->routeIs('titles.*')),
+            $this->footerLinkUrl($layoutHomeUrl, 'fa-solid fa-house text-slate-400', __('catalog.navigation.home'), $this->request->routeIs('home', 'localized.home')),
+            $this->footerLink('titles.index', 'fa-solid fa-list-ul text-slate-400', __('catalog.navigation.all_titles'), $this->request->routeIs('titles.*')),
         ];
 
         if ($this->router->has('discover.index')) {
@@ -236,28 +266,56 @@ final class AppLayoutData
             $layoutFooterNavigation[] = $this->footerLink(
                 'library.section',
                 'fa-solid fa-clock-rotate-left text-slate-400',
-                'Моя библиотека',
+                __('catalog.layout.my_library'),
                 $this->request->routeIs('library.*'),
                 ['section' => 'continue-watching'],
             );
+            if ($this->router->has('issues.mine')) {
+                $layoutFooterNavigation[] = $this->footerLink(
+                    'issues.mine',
+                    'fa-solid fa-screwdriver-wrench text-slate-400',
+                    __('issues.my_tickets'),
+                    $this->request->routeIs('issues.*', 'localized.issues.*'),
+                );
+            }
         }
 
         $catalogDirectoryLinks = $this->directories->all()
             ->map(fn (CatalogDirectoryDefinition $directory): LayoutNavigationItem => $this->directoryLink($directory))
             ->values();
         $layoutFooterServiceLinks = [
-            $this->footerLink('stats', 'fa-solid fa-chart-simple text-slate-400', 'Статистика каталога', $this->request->routeIs('stats')),
-            $this->footerLink('sitemap', 'fa-solid fa-sitemap text-slate-400', 'Карта сайта', false),
-            $this->footerLink('feed', 'fa-solid fa-rss text-slate-400', 'RSS-лента', false),
+            $this->footerLink('stats', 'fa-solid fa-chart-simple text-slate-400', __('catalog.layout.catalog_statistics'), $this->request->routeIs('stats')),
+            $this->footerLink('sitemap', 'fa-solid fa-sitemap text-slate-400', __('catalog.layout.sitemap'), false),
+            $this->footerLink('feed', 'fa-solid fa-rss text-slate-400', __('catalog.layout.rss_feed'), false),
         ];
+
+        if ($canCreateTechnicalIssue && $this->router->has('issues.create')) {
+            $layoutFooterServiceLinks[] = $this->footerLinkUrl(
+                $this->technicalIssueUrl(),
+                'fa-solid fa-triangle-exclamation text-slate-400',
+                __('issues.report_problem'),
+                $this->request->routeIs('issues.create', 'localized.issues.create'),
+            );
+        }
         $layoutHeader = [
-            'home_url' => $this->route('home'),
+            'home_url' => $layoutHomeUrl,
             'search_url' => $this->route('titles.index'),
             'navigation' => $layoutHeaderNavigation,
             'show_logout' => $isAuthenticated,
+            'locale_switch_url' => $this->route('locale.switch'),
+            'locales' => collect((array) config('catalog-collections.supported_locales', []))
+                ->filter(fn (mixed $locale): bool => is_string($locale) && $locale !== '')
+                ->map(fn (string $locale): array => [
+                    'code' => $locale,
+                    'label' => $this->localeLabel($locale),
+                    'active' => $locale === $interfaceLocale,
+                    'return_to' => $this->localizedRoutes->targetFor($this->request, $locale),
+                ])
+                ->values()
+                ->all(),
         ];
         $layoutFooter = [
-            'home_url' => $this->route('home'),
+            'home_url' => $layoutHomeUrl,
             'catalog_url' => $this->route('titles.index'),
             'navigation' => $layoutFooterNavigation,
             'directories' => $catalogDirectoryLinks,
@@ -297,7 +355,7 @@ final class AppLayoutData
         $showSocialMetadata = ($seo['social'] ?? true) !== false;
         $seoImage = $this->nullableString($seo['image'] ?? null);
         $seoVideo = $this->nullableString($seo['video'] ?? null);
-        $interfaceLocale = str_replace('_', '-', $this->translator->getLocale());
+        $interfaceLocale = str_replace('_', '-', $interfaceLocale);
         $htmlLang = $this->nullableString($seo['htmlLang'] ?? null) ?? $interfaceLocale;
         $seoLocale = $this->nullableString($seo['locale'] ?? null) ?? __('catalog.locale.open_graph');
         $seoSection = $this->nullableString($seo['section'] ?? null);
@@ -378,7 +436,7 @@ final class AppLayoutData
         bool $active,
         array $parameters = [],
     ): LayoutNavigationItem {
-        return $this->headerLinkUrl($this->route($routeName, $parameters), $icon, $label, $active);
+        return $this->headerLinkUrl($this->navigationRoute($routeName, $parameters), $icon, $label, $active);
     }
 
     private function headerLinkUrl(
@@ -406,8 +464,13 @@ final class AppLayoutData
         bool $active,
         array $parameters = [],
     ): LayoutNavigationItem {
+        return $this->footerLinkUrl($this->navigationRoute($routeName, $parameters), $icon, $label, $active);
+    }
+
+    private function footerLinkUrl(string $url, string $icon, string $label, bool $active): LayoutNavigationItem
+    {
         return new LayoutNavigationItem(
-            url: $this->route($routeName, $parameters),
+            url: $url,
             icon: $icon,
             label: $label,
             className: self::FOOTER_LINK_CLASS.' '.($active
@@ -415,6 +478,36 @@ final class AppLayoutData
                 : 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700'),
             ariaCurrent: $active ? 'page' : null,
         );
+    }
+
+    private function technicalIssueFeature(): string
+    {
+        if ($this->request->routeIs('settings.*', 'localized.settings.*', 'profile.show', 'profile.security')) {
+            return 'account';
+        }
+
+        if ($this->request->routeIs('notifications.index', 'profile.discussions')) {
+            return 'notifications';
+        }
+
+        if ($this->request->routeIs('library.*', 'viewing-activity')) {
+            return 'library';
+        }
+
+        if ($this->request->routeIs('titles.index', 'titles.year', 'titles.taxonomy', '*.index')) {
+            return $this->request->filled('q') ? 'search' : ($this->request->query() !== [] ? 'filters' : 'catalog');
+        }
+
+        return 'general';
+    }
+
+    private function technicalIssueUrl(): string
+    {
+        $title = $this->request->route('catalogTitle');
+
+        return $title instanceof CatalogTitle
+            ? $this->technicalIssues->titleUrl($title)
+            : $this->technicalIssues->featureUrl($this->technicalIssueFeature());
     }
 
     private function directoryLink(CatalogDirectoryDefinition $directory): LayoutNavigationItem
@@ -438,6 +531,23 @@ final class AppLayoutData
         return $this->urls->route($name, $parameters);
     }
 
+    /** @param array<string, mixed> $parameters */
+    private function navigationRoute(string $name, array $parameters = []): string
+    {
+        $locale = $this->translator->getLocale();
+        $localizedName = 'localized.'.$name;
+        $shouldLocalize = $this->request->routeIs('localized.*')
+            || $locale !== (string) config('catalog-collections.default_locale', 'ru');
+
+        if ($shouldLocalize
+            && in_array($locale, (array) config('catalog-collections.supported_locales', []), true)
+            && $this->router->has($localizedName)) {
+            return $this->urls->route($localizedName, ['locale' => $locale, ...$parameters]);
+        }
+
+        return $this->route($name, $parameters);
+    }
+
     private function nullableString(mixed $value): ?string
     {
         if (! is_scalar($value)) {
@@ -447,6 +557,16 @@ final class AppLayoutData
         $value = trim((string) $value);
 
         return $value !== '' ? $value : null;
+    }
+
+    private function localeLabel(string $locale): string
+    {
+        $key = 'catalog.locale.names.'.$locale;
+        $label = $this->translator->get($key);
+
+        return is_string($label) && $label !== '' && $label !== $key
+            ? $label
+            : Str::upper($locale);
     }
 
     /** @return list<array{name: string, url: string}> */

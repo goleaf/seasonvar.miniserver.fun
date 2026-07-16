@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 
 class CatalogSeoBuilder
@@ -107,62 +109,62 @@ class CatalogSeoBuilder
      */
     public function home(array $stats, Collection $latestTitles): array
     {
-        $title = 'Сериалы онлайн - '.$this->siteName();
-        $description = 'Каталог сериалов онлайн: '.$stats['titles'].' сериалов, '.$stats['episodes'].' серий, фильтры по жанрам, странам, актерам, годам и переводам.';
+        $locale = app()->currentLocale();
+        $titleCount = trans_choice('catalog.counts.results', $stats['titles'], [
+            'count' => Number::format($stats['titles'], locale: $locale),
+        ]);
+        $episodeCount = trans_choice('catalog.counts.episodes', $stats['episodes'], [
+            'count' => Number::format($stats['episodes'], locale: $locale),
+        ]);
+        $title = __('home.seo.title', ['site' => $this->siteName()]);
+        $description = __('home.seo.description', [
+            'titles' => $titleCount,
+            'episodes' => $episodeCount,
+        ]);
+        $localized = request()->routeIs('localized.home')
+            || $locale !== (string) config('catalog-collections.default_locale', 'ru');
+        $canonical = $localized
+            ? route('localized.home', ['locale' => $locale])
+            : route('home');
+        $alternates = collect((array) config('catalog-collections.supported_locales', []))
+            ->filter(fn (mixed $supportedLocale): bool => is_string($supportedLocale) && $supportedLocale !== '')
+            ->mapWithKeys(fn (string $supportedLocale): array => [
+                $supportedLocale => route('localized.home', ['locale' => $supportedLocale]),
+            ])
+            ->put('x-default', route('home'))
+            ->all();
+        $breadcrumbs = [
+            ['name' => __('catalog.navigation.home'), 'url' => $canonical],
+        ];
 
         return [
             'title' => $title,
             'description' => $description,
-            'keywords' => 'сериалы онлайн, смотреть сериалы, каталог сериалов, новые серии, сезоны сериалов',
-            'news_keywords' => 'сериалы онлайн, смотреть сериалы онлайн, новые серии сериалов, каталог сериалов',
-            'canonical' => route('home'),
+            'keywords' => __('home.seo.keywords'),
+            'news_keywords' => __('home.seo.news_keywords'),
+            'canonical' => $canonical,
             'type' => 'website',
             'updated_time' => now()->toAtomString(),
-            'section' => 'Каталог сериалов',
-            'tags' => ['сериалы онлайн', 'каталог сериалов', 'новые серии', 'сезоны сериалов'],
-            'seo_text' => [
-                'Каталог автоматически собирает сериалы, сезоны, серии, постеры, жанры, страны, актеров, режиссеров и доступные видео для просмотра во встроенном плеере.',
-                'На главной странице появляются последние обновления, поэтому поисковые страницы получают актуальную информацию после каждого обновления каталога.',
-            ],
-            'search_phrases' => [
-                'смотреть сериалы онлайн',
-                'новые серии сериалов',
-                'каталог сериалов по жанрам',
-                'сериалы по странам',
-                'сериалы по актерам',
-                'сериалы с сезонами и сериями',
-                'сериалы во встроенном плеере',
-                'обновления сериалов онлайн',
-            ],
-            'keyword_clusters' => [
-                [
-                    'title' => 'Смотреть онлайн',
-                    'items' => ['смотреть сериалы онлайн', 'сериалы онлайн бесплатно', 'сериалы в плеере', 'новые серии онлайн'],
-                ],
-                [
-                    'title' => 'Каталог и фильтры',
-                    'items' => ['сериалы по жанрам', 'сериалы по странам', 'сериалы по актерам', 'сериалы по годам'],
-                ],
-                [
-                    'title' => 'Сезоны и серии',
-                    'items' => ['все сезоны сериалов', 'все серии сериалов', 'обновления сезонов', 'новые эпизоды'],
-                ],
-            ],
+            'section' => __('home.seo.section'),
+            'tags' => __('home.seo.tags'),
+            'seo_text' => __('home.seo.text'),
+            'search_phrases' => __('home.seo.phrases'),
+            'keyword_clusters' => __('home.seo.clusters'),
             'related_links' => [
-                ['name' => 'Все сериалы онлайн', 'url' => route('titles.index')],
-                ['name' => 'Сериалы '.now()->year.' года', 'url' => route('titles.year', ['year' => now()->year])],
-                ['name' => 'RSS обновлений', 'url' => route('feed')],
+                ['name' => __('home.seo.links.all_titles'), 'url' => route('titles.index')],
+                ['name' => __('home.seo.links.year_titles', ['year' => now()->year]), 'url' => route('titles.year', ['year' => now()->year])],
+                ['name' => __('home.seo.links.rss'), 'url' => route('feed')],
             ],
-            'breadcrumbs' => [
-                ['name' => 'Главная', 'url' => route('home')],
-            ],
+            'alternates' => $alternates,
+            'breadcrumbs' => $breadcrumbs,
             'jsonLd' => [
                 $this->organizationJsonLd(),
                 $this->websiteJsonLd(),
                 $this->siteNavigationJsonLd(),
-                $this->webPageJsonLd($title, $description, route('home'), 'WebPage', ['сериалы онлайн', 'каталог сериалов']),
-                $this->collectionPageJsonLd($title, $description, route('home')),
-                $this->itemListJsonLd($latestTitles, 1, 'Новые сериалы каталога'),
+                $this->webPageJsonLd($title, $description, $canonical, 'WebPage', __('home.seo.about')),
+                $this->collectionPageJsonLd($title, $description, $canonical),
+                $this->itemListJsonLd($latestTitles, 1, __('home.seo.new_titles_list')),
+                $this->breadcrumbJsonLd($breadcrumbs),
             ],
         ];
     }
@@ -483,7 +485,20 @@ class CatalogSeoBuilder
 
     private function siteName(): string
     {
-        return (string) config('app.name', 'Каталог сериалов');
+        return (string) config('app.name', __('catalog.layout.site_name'));
+    }
+
+    private function currentHomeUrl(): string
+    {
+        $locale = app()->currentLocale();
+        $localized = request()->routeIs('localized.*')
+            || $locale !== (string) config('catalog-collections.default_locale', 'ru');
+
+        if ($localized && Route::has('localized.home')) {
+            return route('localized.home', ['locale' => $locale]);
+        }
+
+        return route('home');
     }
 
     private function indexRobots(): string
@@ -676,7 +691,8 @@ class CatalogSeoBuilder
             '@context' => 'https://schema.org',
             '@type' => 'WebSite',
             'name' => $this->siteName(),
-            'url' => route('home'),
+            'url' => $this->currentHomeUrl(),
+            'inLanguage' => str_replace('_', '-', app()->currentLocale()),
             'potentialAction' => [
                 '@type' => 'SearchAction',
                 'target' => route('titles.index').'?q={search_term_string}',
@@ -704,7 +720,7 @@ class CatalogSeoBuilder
                     '@type' => 'SiteNavigationElement',
                     'position' => 1,
                     'name' => __('catalog.navigation.home'),
-                    'url' => route('home'),
+                    'url' => $this->currentHomeUrl(),
                 ],
                 [
                     '@type' => 'SiteNavigationElement',
@@ -721,7 +737,7 @@ class CatalogSeoBuilder
                 [
                     '@type' => 'SiteNavigationElement',
                     'position' => 4,
-                    'name' => 'RSS',
+                    'name' => __('catalog.layout.rss_feed'),
                     'url' => route('feed'),
                 ],
             ],
@@ -737,7 +753,7 @@ class CatalogSeoBuilder
             '@context' => $withContext ? 'https://schema.org' : null,
             '@type' => 'Organization',
             'name' => $this->siteName(),
-            'url' => route('home'),
+            'url' => $this->currentHomeUrl(),
             'logo' => null,
         ]);
     }
@@ -758,7 +774,7 @@ class CatalogSeoBuilder
             'isPartOf' => [
                 '@type' => 'WebSite',
                 'name' => $this->siteName(),
-                'url' => route('home'),
+                'url' => $this->currentHomeUrl(),
             ],
             'publisher' => $this->organizationJsonLd(false),
             'mainEntity' => $url,
@@ -791,7 +807,7 @@ class CatalogSeoBuilder
             'isPartOf' => [
                 '@type' => 'WebSite',
                 'name' => $this->siteName(),
-                'url' => route('home'),
+                'url' => $this->currentHomeUrl(),
             ],
         ];
     }
@@ -813,7 +829,9 @@ class CatalogSeoBuilder
                     '@type' => 'ListItem',
                     'position' => $startPosition + $index,
                     'url' => route('titles.show', $title),
-                    'name' => $title->display_title,
+                    'name' => filled($title->display_title)
+                        ? (string) $title->display_title
+                        : __('catalog.title.untitled'),
                     'image' => $title->poster_url,
                 ]))
                 ->all(),

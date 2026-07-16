@@ -443,6 +443,14 @@ Existing user-title unique and history indexes continue to serve owner state/pro
 
 Release-availability hardening не добавило индекс: correlated season/episode checks выбирают существующие integer primary keys после title-keyed `licensed_media_publication_lookup_idx`. Дополнительный media index не устранил бы прежнюю materialization child lists, а summary-table создала бы второй источник истины для publication, audience, window, health и delete lifecycle.
 
+## Технические обращения
+
+Additive migration `2026_07_16_200000_create_technical_issue_domain.php` создаёт 13 новых таблиц и не меняет Task 19, moderation, catalog/media identity или legacy routes. `technical_issues` хранит random UUID/`ISS-…`, typed workflow fields, явные nullable title/season/episode/media/translation FKs, sanitized user text, approximate position, stable language/quality codes, nullable trusted server error code, exact/active identity hashes и lifecycle timestamps. Связанные таблицы разделяют diagnostics, messages, private attachments, append-only status/assignment histories, unique confirmations/follows/occurrences, merge mapping, redaction audit, source actions и user notification preferences.
+
+Uniqueness обеспечивает public UUID/number, idempotent submission, один active exact identity, один confirmation/follow/occurrence на user/ticket и один mapping на merged duplicate. 39 явных indexes обслуживают requester/support pagination, type/target/source/error candidate narrowing, assignment queue, ordered message/attachment/status/occurrence/redaction timelines и participant lookups; отдельный `(requester_id, updated_at, id)` покрывает основной requester sort, а status-prefixed index — фильтр статуса. Attachment bytes и message bodies в list queries не загружаются. Foreign keys используют cascade только для owned child evidence, `nullOnDelete` для retained actor/catalog links и не удаляют catalog/media records.
+
+Полная семантика identity, merge/account lifecycle, retention, rollback и query-plan evidence принадлежит [`technical-issues.md`](technical-issues.md).
+
 ## File-size metadata `licensed_media`
 
 Additive migration `2026_07_16_190000_add_file_size_metadata_to_licensed_media.php` не меняет media IDs, relationships, playback URL или health columns. Она добавляет:

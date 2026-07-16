@@ -6,6 +6,7 @@ namespace App\View\Components\Ui;
 
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Number;
 use Illuminate\View\Component;
 use Illuminate\View\ComponentSlot;
 
@@ -86,10 +87,17 @@ final class TaxonomyChip extends Component
 
         if (is_numeric($this->count)) {
             $count = (int) $this->count;
-            $label .= ' · '.trans_choice('tags.page.count', $count, ['count' => $count]);
+            $label .= ' · '.trans_choice('tags.page.count', $count, ['count' => $this->formattedCount()]);
         }
 
         return $label;
+    }
+
+    public function formattedCount(): ?string
+    {
+        return is_numeric($this->count)
+            ? Number::format((float) $this->count, locale: app()->currentLocale())
+            : $this->count;
     }
 
     public function render(): View

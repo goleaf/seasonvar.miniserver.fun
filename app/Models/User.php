@@ -200,6 +200,42 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
         return $this->hasOne(ContentRequestNotificationPreference::class);
     }
 
+    /** @return HasMany<TechnicalIssue, $this> */
+    public function technicalIssues(): HasMany
+    {
+        return $this->hasMany(TechnicalIssue::class, 'requester_id');
+    }
+
+    /** @return HasMany<TechnicalIssueConfirmation, $this> */
+    public function technicalIssueConfirmations(): HasMany
+    {
+        return $this->hasMany(TechnicalIssueConfirmation::class);
+    }
+
+    /** @return HasMany<TechnicalIssueFollower, $this> */
+    public function followedTechnicalIssues(): HasMany
+    {
+        return $this->hasMany(TechnicalIssueFollower::class);
+    }
+
+    /** @return HasMany<TechnicalIssueOccurrence, $this> */
+    public function technicalIssueOccurrences(): HasMany
+    {
+        return $this->hasMany(TechnicalIssueOccurrence::class);
+    }
+
+    /** @return HasMany<TechnicalIssue, $this> */
+    public function assignedTechnicalIssues(): HasMany
+    {
+        return $this->hasMany(TechnicalIssue::class, 'assigned_to_id');
+    }
+
+    /** @return HasOne<TechnicalIssueNotificationPreference, $this> */
+    public function technicalIssueNotificationPreference(): HasOne
+    {
+        return $this->hasOne(TechnicalIssueNotificationPreference::class);
+    }
+
     /** @return HasOne<UserAccountSetting, $this> */
     public function accountSetting(): HasOne
     {

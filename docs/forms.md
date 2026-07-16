@@ -81,3 +81,9 @@ Global admin form принимает только enum-backed type/visibility/mo
 Appearance, playback, notification и new-collection-default groups имеют единый staged Apply/Cancel pattern: recoverable validation сохраняет draft, success сбрасывает dirty state, failure показывает localized error и не имитирует сохранение. Reset playback и notifications — отдельные подтверждаемые non-GET actions; playback reset не меняет progress/history/library/bookmarks/profile/security.
 
 Простые toggles сохраняются вместе с разделом, а не смешивают optimistic immediate saves с staged forms. Volume preview обновляется локально без request storm. Browser timezone только подставляет предложение в draft; server save обязателен. Profile/password/email/session/export/delete controls вызывают существующие специализированные actions и не входят в generic settings payload.
+
+## Формы технических обращений
+
+Один class-based Livewire form принимает encrypted target context и по `TechnicalIssueTypeRegistry` показывает только relevant actual/steps/timestamp/audio/subtitle/quality fields. Context/locale/submission token locked; recoverable draft живёт в authenticated session, screenshots остаются в Livewire temporary upload boundary. Browser diagnostics checkbox по умолчанию выключен. Similar search и submit используют одинаковые server type/target validation; exact duplicate возвращает canonical ticket, probable не блокирует новую независимую запись.
+
+Detail form разделяет requester edit, requester-visible reply, staff internal note, classification, assignment, status, resolution, verification/reopen, merge, redaction и source action. Loading/disabled/error/live-region states существуют для каждой mutation, а client не передаёт canonical role/status/severity/priority. Полный field matrix: [`technical-issues.md`](technical-issues.md).

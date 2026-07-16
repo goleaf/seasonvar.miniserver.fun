@@ -82,6 +82,11 @@ class CatalogSitemapResponder
             echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
             echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
             $this->writeSitemapUrl(route('home'), now(), 'daily', '1.0');
+
+            foreach (config('catalog-collections.supported_locales', ['ru']) as $locale) {
+                $this->writeSitemapUrl(route('localized.home', ['locale' => $locale]), now(), 'daily', '1.0');
+            }
+
             $this->writeSitemapUrl(route('titles.index'), now(), 'daily', '0.9');
             $this->writeSitemapUrl(route('collections.index'), now(), 'daily', '0.8');
 

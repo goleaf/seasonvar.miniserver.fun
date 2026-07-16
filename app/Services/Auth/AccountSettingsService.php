@@ -51,6 +51,17 @@ final class AccountSettingsService
         ]);
     }
 
+    public function updateLocaleIfAvailable(User $user, string $locale): void
+    {
+        $this->ensureLocale($locale);
+
+        if (! $this->schema->available()) {
+            return;
+        }
+
+        $this->mutate($user, ['locale' => $locale]);
+    }
+
     public function adoptLocaleIfUnset(User $user, string $locale): void
     {
         $this->ensureLocale($locale);

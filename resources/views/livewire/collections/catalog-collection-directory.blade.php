@@ -13,11 +13,6 @@
                 </div>
             </div>
             <div class="flex flex-wrap gap-2">
-                <nav aria-label="{{ __('collections.locale.switch') }}" class="flex rounded-control bg-slate-100 p-1">
-                    @foreach ($localeUrls as $locale => $localeUrl)
-                        <a href="{{ $localeUrl }}" hreflang="{{ $locale }}" @class(['inline-flex min-h-9 items-center rounded-lg px-3 text-xs font-black', 'bg-white text-emerald-700 shadow-sm' => $interfaceLocale === $locale, 'text-slate-600 hover:text-emerald-700' => $interfaceLocale !== $locale])>{{ __('collections.locale.'.$locale) }}</a>
-                    @endforeach
-                </nav>
                 <a href="{{ $collectionAction['url'] }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600">
                     <x-ui.icon :name="$collectionAction['icon']" />
                     <span>{{ $collectionAction['label'] }}</span>

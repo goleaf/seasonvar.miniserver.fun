@@ -20,6 +20,7 @@ use App\Services\ContentRequests\ContentRequestTargetMergeService;
 use App\Services\Reviews\ReviewMergeService;
 use App\Services\Tags\TagCacheInvalidator;
 use App\Services\Tags\TagTitleMergeService;
+use App\Services\TechnicalIssues\TechnicalIssueTargetMergeService;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -49,6 +50,7 @@ class SeasonvarTitleMerger
         private readonly CatalogTitleUserDataMerger $userData,
         private readonly CommentTargetMergeService $comments,
         private readonly ContentRequestTargetMergeService $contentRequests,
+        private readonly TechnicalIssueTargetMergeService $technicalIssues,
         private readonly ReviewMergeService $reviews,
         private readonly TagTitleMergeService $tagTitles,
         private readonly TagCacheInvalidator $tagCache,
@@ -402,6 +404,7 @@ class SeasonvarTitleMerger
         foreach ($titles->slice(1) as $duplicate) {
             $this->comments->moveTitle($duplicate, $canonical);
             $this->contentRequests->moveTitle($duplicate->id, $canonical->id);
+            $this->technicalIssues->moveTitle($duplicate->id, $canonical->id);
 
             foreach ($this->relationIds($duplicate) as $relation => $ids) {
                 $relationIds[$relation] = array_values(array_unique([
@@ -446,6 +449,7 @@ class SeasonvarTitleMerger
                 $this->moveMediaForSeason($season->id, $canonical, $targetSeason);
                 $this->comments->moveSeason($season, $targetSeason);
                 $this->contentRequests->moveSeason($season, $targetSeason);
+                $this->technicalIssues->moveSeason($season->id, $targetSeason->id);
 
                 $season->forceDelete();
                 $mergedSeasons++;
@@ -538,6 +542,7 @@ class SeasonvarTitleMerger
             $targetEpisode->setRelation('season', $targetSeason);
             $this->comments->moveEpisode($episode, $targetEpisode);
             $this->contentRequests->moveEpisode($episode, $targetEpisode);
+            $this->technicalIssues->moveEpisode($episode->id, $targetEpisode->id);
             $this->userData->moveEpisode($episode, $targetEpisode, $canonical);
 
             $episode->forceDelete();
@@ -577,6 +582,7 @@ class SeasonvarTitleMerger
         $existing = $this->matchingCanonicalMedia($media, $canonical);
 
         if ($existing !== null && $existing->isNot($media)) {
+            $this->technicalIssues->moveMedia($media->id, $existing->id);
             $effectiveUrl = $media->playback_url ?: ($existing->playback_url ?: ($media->path ?: $existing->path));
             $effectiveUrlChanged = $existing->effectivePlaybackUrl() !== $effectiveUrl;
 

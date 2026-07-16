@@ -21,6 +21,39 @@ return [
     'locale' => [
         'language_name' => 'Russian',
         'open_graph' => 'ru_RU',
+        'names' => [
+            'ru' => 'Русский',
+            'en' => 'English',
+        ],
+        'switcher' => 'Язык интерфейса',
+        'active' => 'Выбран язык: :language',
+        'switch_to' => 'Переключить интерфейс на :language',
+        'validation' => [
+            'required' => 'Выберите язык интерфейса.',
+            'supported' => 'Этот язык интерфейса не поддерживается.',
+            'return_to' => 'Не удалось определить безопасную страницу для возврата.',
+        ],
+    ],
+
+    'layout' => [
+        'site_name' => 'Каталог сериалов',
+        'search_label' => 'Поиск по названию',
+        'search_placeholder' => 'Название сериала',
+        'search_action' => 'Найти',
+        'primary_navigation' => 'Основная навигация',
+        'my_library' => 'Моя библиотека',
+        'import' => 'Импорт',
+        'catalog_statistics' => 'Статистика каталога',
+        'sitemap' => 'Карта сайта',
+        'rss_feed' => 'RSS-лента',
+        'footer_description' => 'Каталог сериалов, сезонов и серий.',
+        'open_catalog' => 'Открыть каталог',
+        'navigation' => 'Навигация',
+        'service_pages' => 'Служебные страницы',
+        'back_to_top' => 'К началу страницы',
+        'skip_to_content' => 'Перейти к содержанию',
+        'breadcrumbs' => 'Хлебные крошки',
+        'llms_document' => 'Документ для языковых моделей',
     ],
 
     'navigation' => [
@@ -152,6 +185,7 @@ return [
     ],
 
     'title' => [
+        'untitled' => 'Название не указано',
         'quick_access' => 'Быстрый доступ',
         'quick_navigation' => 'Быстрые переходы по сериалу',
         'watch' => 'Смотреть',

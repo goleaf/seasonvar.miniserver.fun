@@ -1,0 +1,1 @@
+<span {{ $attributes }}>{{ $formattedValue }}</span>

@@ -6,6 +6,7 @@ namespace App\Services\Catalog;
 
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheTelemetry;
+use Illuminate\Support\Facades\App;
 
 final class CatalogCacheWarmer
 {
@@ -28,14 +29,15 @@ final class CatalogCacheWarmer
         $startedAt = now();
         $started = hrtime(true);
         $targets = [];
+        $originalLocale = App::currentLocale();
         $this->state->started();
 
         try {
             $targets['catalog_stats'] = $this->measure(fn () => $refresh ? $this->stats->refresh() : $this->stats->snapshot());
-            $targets['home_metrics'] = $this->measure(fn () => $refresh ? $this->homeMetrics->refresh() : $this->homeMetrics->metrics());
-            $targets['home_snapshot'] = $this->measure(fn () => $refresh ? $this->homeSnapshot->refresh() : $this->homeSnapshot->snapshot());
-            $targets['home_genres'] = $this->measure(fn () => $this->facets->taxonomies('genre', refresh: $refresh));
-            $targets['home_countries'] = $this->measure(fn () => $this->facets->taxonomies('country', refresh: $refresh));
+            $targets['home_metrics'] = $this->measureLocales(fn () => $refresh ? $this->homeMetrics->refresh() : $this->homeMetrics->metrics());
+            $targets['home_snapshot'] = $this->measureLocales(fn () => $refresh ? $this->homeSnapshot->refresh() : $this->homeSnapshot->snapshot());
+            $targets['home_genres'] = $this->measureLocales(fn () => $this->facets->taxonomies('genre', refresh: $refresh));
+            $targets['home_countries'] = $this->measureLocales(fn () => $this->facets->taxonomies('country', refresh: $refresh));
 
             if ((bool) config('cache-architecture.page_cache.warming_enabled', true)) {
                 $targets['public_pages'] = $this->measure(fn () => $this->pages->warm($titleIds));
@@ -54,6 +56,8 @@ final class CatalogCacheWarmer
             $this->state->failed($exception);
             $this->telemetry->increment(CacheDomain::Operational, 'warming-failure');
             throw $exception;
+        } finally {
+            App::setLocale($originalLocale);
         }
     }
 
@@ -70,6 +74,22 @@ final class CatalogCacheWarmer
     {
         $started = hrtime(true);
         $callback();
+
+        return (int) ((hrtime(true) - $started) / 1_000_000);
+    }
+
+    private function measureLocales(callable $callback): int
+    {
+        $started = hrtime(true);
+
+        foreach ((array) config('catalog-collections.supported_locales', []) as $locale) {
+            if (! is_string($locale) || $locale === '') {
+                continue;
+            }
+
+            App::setLocale($locale);
+            $callback();
+        }
 
         return (int) ((hrtime(true) - $started) / 1_000_000);
     }

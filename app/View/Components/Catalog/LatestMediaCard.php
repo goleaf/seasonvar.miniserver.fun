@@ -1,11 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\View\Components\Catalog;
 
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
+use App\Services\Auth\AccountDateTimeFormatter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\View\Component;
@@ -17,9 +20,11 @@ class LatestMediaCard extends Component
      *     key: string,
      *     season_label: string|null,
      *     episode_label: string|null,
+     *     update_type: string,
+     *     update_type_label: string,
      *     title: string|null,
      *     added_at: int,
-     *     media: list<array{key: int, url: string, title: string, quality: string|null, meta: string}>
+     *     media: list<array{key: int, url: string, title: string, quality: string|null, translation: string|null, format: string|null, published_date: string|null, accessibility_label: string}>
      * }>
      */
     public array $items;
@@ -27,6 +32,8 @@ class LatestMediaCard extends Component
     public string $titleUrl;
 
     public string $posterAlt;
+
+    public string $displayTitle;
 
     /**
      * @param  Collection<int, Episode>  $episodes
@@ -36,9 +43,14 @@ class LatestMediaCard extends Component
         public CatalogTitle $title,
         public Collection $episodes,
         public Collection $media,
+        private readonly AccountDateTimeFormatter $dates,
+        public ?string $timezone = null,
     ) {
         $this->titleUrl = route('titles.show', $title);
-        $this->posterAlt = 'Постер '.$title->display_title;
+        $this->displayTitle = filled($title->display_title)
+            ? (string) $title->display_title
+            : __('catalog.title.untitled');
+        $this->posterAlt = __('catalog.seo.poster_alt', ['title' => $this->displayTitle]);
         $this->items = $this->releaseItems();
     }
 
@@ -47,9 +59,11 @@ class LatestMediaCard extends Component
      *     key: string,
      *     season_label: string|null,
      *     episode_label: string|null,
+     *     update_type: string,
+     *     update_type_label: string,
      *     title: string|null,
      *     added_at: int,
-     *     media: list<array{key: int, url: string, title: string, quality: string|null, meta: string}>
+     *     media: list<array{key: int, url: string, title: string, quality: string|null, translation: string|null, format: string|null, published_date: string|null, accessibility_label: string}>
      * }>
      */
     private function releaseItems(): array
@@ -90,17 +104,25 @@ class LatestMediaCard extends Component
      *     key: string,
      *     season_label: string|null,
      *     episode_label: string|null,
+     *     update_type: string,
+     *     update_type_label: string,
      *     title: string|null,
      *     added_at: int,
-     *     media: list<array{key: int, url: string, title: string, quality: string|null, meta: string}>
+     *     media: list<array{key: int, url: string, title: string, quality: string|null, translation: string|null, format: string|null, published_date: string|null, accessibility_label: string}>
      * }
      */
     private function episodeItem(Episode $episode, ?Season $season): array
     {
         return [
             'key' => 'episode-'.$episode->id,
-            'season_label' => $season?->number !== null ? 'Сезон '.$season->number : null,
-            'episode_label' => $episode->number.' серия',
+            'season_label' => $season?->number !== null
+                ? __('catalog.release.season', ['number' => $season->number])
+                : null,
+            'episode_label' => $episode->number !== null
+                ? __('catalog.release.episode', ['number' => $episode->number])
+                : __('catalog.release.episode_without_number'),
+            'update_type' => 'new_episode',
+            'update_type_label' => __('home.update_types.new_episode'),
             'title' => filled($episode->title) ? (string) $episode->title : null,
             'added_at' => $episode->created_at?->getTimestamp() ?? 0,
             'media' => [],
@@ -112,26 +134,34 @@ class LatestMediaCard extends Component
      *     key: string,
      *     season_label: string|null,
      *     episode_label: null,
+     *     update_type: string,
+     *     update_type_label: string,
      *     title: string|null,
      *     added_at: int,
-     *     media: list<array{key: int, url: string, title: string, quality: string|null, meta: string}>
+     *     media: list<array{key: int, url: string, title: string, quality: string|null, translation: string|null, format: string|null, published_date: string|null, accessibility_label: string}>
      * }
      */
     private function standaloneMediaItem(LicensedMedia $media, ?Season $season): array
     {
         return [
             'key' => 'media-'.$media->id,
-            'season_label' => $season?->number !== null ? 'Сезон '.$season->number : null,
+            'season_label' => $season?->number !== null
+                ? __('catalog.release.season', ['number' => $season->number])
+                : null,
             'episode_label' => null,
+            'update_type' => 'video_added',
+            'update_type_label' => __('home.update_types.video_added'),
             'title' => filled($media->title) ? (string) $media->title : null,
             'added_at' => $media->created_at?->getTimestamp() ?? 0,
             'media' => [],
         ];
     }
 
-    /** @return array{key: int, url: string, title: string, quality: string|null, meta: string} */
+    /** @return array{key: int, url: string, title: string, quality: string|null, translation: string|null, format: string|null, published_date: string|null, accessibility_label: string} */
     private function mediaItem(LicensedMedia $media): array
     {
+        $title = filled($media->title) ? (string) $media->title : __('home.updates.video');
+
         return [
             'key' => (int) $media->id,
             'url' => route('titles.show', [
@@ -139,13 +169,18 @@ class LatestMediaCard extends Component
                 'episode' => $media->episode_id,
                 'media' => $media->id,
             ]).'#player',
-            'title' => (string) $media->title,
+            'title' => $title,
             'quality' => filled($media->quality) ? mb_strtoupper((string) $media->quality) : null,
-            'meta' => collect([
-                $media->translation_name,
-                $media->format ? mb_strtoupper((string) $media->format) : null,
-                $media->published_at?->format('d.m.Y'),
-            ])->filter()->implode(' / ') ?: 'Видео сериала',
+            'translation' => filled($media->translation_name) ? (string) $media->translation_name : null,
+            'format' => filled($media->format) ? mb_strtoupper((string) $media->format) : null,
+            'published_date' => $media->published_at === null
+                ? null
+                : $this->dates->date(
+                    $media->published_at,
+                    app()->currentLocale(),
+                    $this->timezone ?? (string) config('account-settings.default_timezone', 'UTC'),
+                ),
+            'accessibility_label' => __('home.updates.open_media', ['title' => $title]),
         ];
     }
 

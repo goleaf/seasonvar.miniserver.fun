@@ -63,11 +63,6 @@
                         </button>
                     @endif
                 </div>
-                <nav aria-label="{{ __('collections.locale.switch') }}" class="mt-4 flex w-fit rounded-control bg-slate-100 p-1">
-                    @foreach ($localeUrls as $locale => $localeUrl)
-                        <a href="{{ $localeUrl }}" hreflang="{{ $locale }}" data-preserve-discussion-state @class(['inline-flex min-h-9 items-center rounded-lg px-3 text-xs font-black', 'bg-white text-emerald-700 shadow-sm' => $interfaceLocale === $locale, 'text-slate-600 hover:text-emerald-700' => $interfaceLocale !== $locale])>{{ __('collections.locale.'.$locale) }}</a>
-                    @endforeach
-                </nav>
                 <div data-collection-share-status class="mt-3 text-sm font-bold text-emerald-700" role="status" aria-live="polite"></div>
             </div>
         </div>

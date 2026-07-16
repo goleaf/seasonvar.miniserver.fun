@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\View\Components\Catalog;
 
 use App\Models\CatalogTitle;
@@ -7,6 +9,7 @@ use App\Models\Season;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Number;
 use Illuminate\View\Component;
 
 class TitleCard extends Component
@@ -18,6 +21,14 @@ class TitleCard extends Component
     public int $episodesCount;
 
     public int $mediaCount;
+
+    public string $displayTitle;
+
+    public string $seasonsLabel;
+
+    public string $episodesLabel;
+
+    public string $mediaLabel;
 
     public ?Season $latestSeason;
 
@@ -56,9 +67,15 @@ class TitleCard extends Component
         ?array $userPrimaryAction = null,
     ) {
         $this->layout = in_array($layout, self::LAYOUTS, true) ? $layout : 'list';
+        $this->displayTitle = filled($title->display_title)
+            ? (string) $title->display_title
+            : __('catalog.title.untitled');
         $this->seasonsCount = (int) ($title->seasons_count ?? ($title->relationLoaded('seasons') ? $title->seasons->count() : 0));
         $this->episodesCount = (int) ($title->episodes_count ?? 0);
         $this->mediaCount = (int) ($title->published_media_count ?? $title->licensed_media_count ?? 0);
+        $this->seasonsLabel = $this->countLabel('catalog.counts.seasons', $this->seasonsCount);
+        $this->episodesLabel = $this->countLabel('catalog.counts.episodes', $this->episodesCount);
+        $this->mediaLabel = $this->countLabel('catalog.counts.videos', $this->mediaCount);
         $this->latestSeason = $title->relationLoaded('latestSeason') ? $title->latestSeason : null;
         $this->hasPersonalState = $userInWatchlist !== null || $title->hasAttribute('user_in_watchlist');
         $this->userInWatchlist = $userInWatchlist
@@ -81,6 +98,13 @@ class TitleCard extends Component
             'recommendation' => 'components.catalog.title-card-recommendation',
             default => 'components.catalog.title-card-list',
         });
+    }
+
+    private function countLabel(string $key, int $count): string
+    {
+        return trans_choice($key, $count, [
+            'count' => Number::format($count, locale: app()->currentLocale()),
+        ]);
     }
 
     private function integerAttribute(CatalogTitle $title, string $key): ?int

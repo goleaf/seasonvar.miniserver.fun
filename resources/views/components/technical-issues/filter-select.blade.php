@@ -1,0 +1,2 @@
+@props(['id', 'property', 'label', 'options', 'includeAll' => true])
+<div><label for="{{ $id }}" class="block text-sm font-bold">{{ $label }}</label><select id="{{ $id }}" wire:model.live="{{ $property }}" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3">@if ($includeAll)<option value="">{{ __('issues.admin.all') }}</option>@endif @foreach ($options as $option)<option value="{{ $option['value'] }}">{{ $option['label'] }}</option>@endforeach</select></div>

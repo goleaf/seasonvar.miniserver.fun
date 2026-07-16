@@ -3,14 +3,17 @@
 namespace App\Providers;
 
 use App\Models\LicensedMedia;
+use App\Models\TechnicalIssue;
 use App\Models\User;
 use App\Policies\AccountSettingsPolicy;
+use App\Policies\TechnicalIssuePolicy;
 use App\Services\Auth\AccountSettingsSchema;
 use App\Services\Collections\CatalogCollectionSchema;
 use App\Services\Comments\CommentSchema;
 use App\Services\ContentRequests\ContentRequestSchema;
 use App\Services\Reviews\ReviewSchema;
 use App\Services\Tags\TagSchema;
+use App\Services\TechnicalIssues\TechnicalIssueSchema;
 use App\Support\Cache\CacheEventReporter;
 use App\View\ViewData\AppLayoutData;
 use Illuminate\Cache\Events\CacheFailedOver;
@@ -41,13 +44,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        config()->set('livewire.temporary_file_upload.middleware', 'web');
         $this->app->scopedIf(CatalogCollectionSchema::class);
         $this->app->scopedIf(AccountSettingsSchema::class);
         $this->app->scopedIf(CommentSchema::class);
         $this->app->scopedIf(ContentRequestSchema::class);
         $this->app->scopedIf(ReviewSchema::class);
         $this->app->scopedIf(TagSchema::class);
+        $this->app->scopedIf(TechnicalIssueSchema::class);
     }
 
     /**
@@ -85,6 +88,21 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        RateLimiter::for('livewire-uploads', function (Request $request): Limit {
+            $identity = $request->user()?->getAuthIdentifier();
+            $key = $identity !== null
+                ? 'user:'.$identity
+                : 'guest:'.hash('sha256', (string) $request->ip());
+
+            return Limit::perMinute(max(1, (int) config('technical-issues.rate_limits.upload_per_minute', 30)))
+                ->by($key)
+                ->response(static fn (Request $request, array $headers) => response(
+                    __('issues.errors.rate_limited'),
+                    429,
+                    [...$headers, 'Cache-Control' => 'private, no-store, max-age=0'],
+                ));
+        });
+
         Event::listen(CacheHit::class, fn (CacheHit $event) => app(CacheEventReporter::class)->record($event, 'hit'));
         Event::listen(CacheMissed::class, fn (CacheMissed $event) => app(CacheEventReporter::class)->record($event, 'miss'));
         Event::listen(KeyWritten::class, fn (KeyWritten $event) => app(CacheEventReporter::class)->record($event, 'write'));
@@ -104,6 +122,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-comments', $catalogAdministrator);
         Gate::define('manage-reviews', $catalogAdministrator);
         Gate::define('manage-content-requests', $catalogAdministrator);
+        Gate::define('manage-technical-issues', $catalogAdministrator);
+        Gate::policy(TechnicalIssue::class, TechnicalIssuePolicy::class);
         Gate::define('view-account-settings', [AccountSettingsPolicy::class, 'view']);
         Gate::define('update-account-settings', [AccountSettingsPolicy::class, 'update']);
 
