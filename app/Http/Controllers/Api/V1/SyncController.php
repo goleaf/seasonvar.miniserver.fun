@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\DTOs\ApiSyncPullResult;
 use App\Exceptions\ApiSyncCursorException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\SyncPullRequest;
@@ -15,6 +16,7 @@ use App\Models\User;
 use App\Services\Api\V1\Sync\ApiSyncCursorCodec;
 use App\Services\Api\V1\Sync\ApiSyncMutationService;
 use App\Services\Api\V1\Sync\ApiSyncPullQuery;
+use App\Services\Api\V1\Sync\ApiSyncPullService;
 use App\Services\Api\V1\Sync\ApiSyncReadiness;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
@@ -53,46 +55,31 @@ final class SyncController extends Controller
     public function catalog(
         SyncPullRequest $request,
         ApiSyncReadiness $readiness,
-        ApiSyncPullQuery $pull,
-        ApiSyncCursorCodec $cursors,
+        ApiSyncPullService $sync,
         ApiErrorResponse $errors,
     ): JsonResponse {
         if (! $readiness->available()) {
             return $this->unavailable($request, $errors);
         }
 
-        $encodedCursor = $request->cursor();
-
-        if ($encodedCursor === null) {
-            $result = [
-                'changes' => collect(),
-                'cursor' => $pull->checkpoint(ApiSyncChange::SCOPE_CATALOG, null),
-                'has_more' => false,
-            ];
-        } else {
-            try {
-                $cursor = $cursors->decode($encodedCursor, ApiSyncChange::SCOPE_CATALOG, null);
-                $result = $pull->pull($cursor, $request->limit());
-            } catch (ApiSyncCursorException $exception) {
-                return $this->cursorError($request, $errors, $exception);
-            }
+        try {
+            $result = $sync->pull(
+                ApiSyncChange::SCOPE_CATALOG,
+                null,
+                $request->cursor(),
+                $request->limit(),
+            );
+        } catch (ApiSyncCursorException $exception) {
+            return $this->cursorError($request, $errors, $exception);
         }
 
-        return SyncChangeResource::collection($result['changes'])
-            ->additional(['meta' => [
-                'cursor' => $cursors->encode($result['cursor']),
-                'has_more' => $result['has_more'],
-                'limit' => $request->limit(),
-            ]])
-            ->response()
-            ->header('Cache-Control', 'private, no-store');
+        return $this->pullResponse($request, $result);
     }
 
     public function user(
         SyncPullRequest $request,
         ApiSyncReadiness $readiness,
-        ApiSyncPullQuery $pull,
-        ApiSyncCursorCodec $cursors,
+        ApiSyncPullService $sync,
         ApiErrorResponse $errors,
     ): JsonResponse {
         if (! $readiness->available()) {
@@ -105,27 +92,26 @@ final class SyncController extends Controller
             throw new AuthenticationException;
         }
 
-        $encodedCursor = $request->cursor();
-
-        if ($encodedCursor === null) {
-            $result = [
-                'changes' => collect(),
-                'cursor' => $pull->checkpoint(ApiSyncChange::SCOPE_USER, $user),
-                'has_more' => false,
-            ];
-        } else {
-            try {
-                $cursor = $cursors->decode($encodedCursor, ApiSyncChange::SCOPE_USER, $user->id);
-                $result = $pull->pull($cursor, $request->limit());
-            } catch (ApiSyncCursorException $exception) {
-                return $this->cursorError($request, $errors, $exception);
-            }
+        try {
+            $result = $sync->pull(
+                ApiSyncChange::SCOPE_USER,
+                $user,
+                $request->cursor(),
+                $request->limit(),
+            );
+        } catch (ApiSyncCursorException $exception) {
+            return $this->cursorError($request, $errors, $exception);
         }
 
-        return SyncChangeResource::collection($result['changes'])
+        return $this->pullResponse($request, $result);
+    }
+
+    private function pullResponse(SyncPullRequest $request, ApiSyncPullResult $result): JsonResponse
+    {
+        return SyncChangeResource::collection($result->changes)
             ->additional(['meta' => [
-                'cursor' => $cursors->encode($result['cursor']),
-                'has_more' => $result['has_more'],
+                'cursor' => $result->cursor,
+                'has_more' => $result->hasMore,
                 'limit' => $request->limit(),
             ]])
             ->response()
