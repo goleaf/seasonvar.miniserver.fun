@@ -68,10 +68,10 @@ enum TechnicalIssueStatus: string
 
         return in_array($next, match ($this) {
             self::Submitted => [self::TriagePending, self::ClarificationNeeded, self::Confirmed, self::Rejected, self::Withdrawn, self::Merged],
-            self::TriagePending => [self::ClarificationNeeded, self::Confirmed, self::Rejected, self::Withdrawn, self::Merged],
+            self::TriagePending => [self::ClarificationNeeded, self::Confirmed, self::Assigned, self::Rejected, self::Withdrawn, self::Merged],
             self::ClarificationNeeded => [self::TriagePending, self::Confirmed, self::Rejected, self::Withdrawn, self::Merged],
             self::Confirmed => [self::Assigned, self::InProgress, self::WaitingForExternalSource, self::Resolved, self::Rejected, self::Merged],
-            self::Assigned => [self::InProgress, self::WaitingForRequester, self::WaitingForExternalSource, self::Resolved, self::Merged],
+            self::Assigned => [self::Confirmed, self::InProgress, self::WaitingForRequester, self::WaitingForExternalSource, self::Resolved, self::Merged],
             self::InProgress => [self::WaitingForRequester, self::WaitingForExternalSource, self::Resolved, self::Merged],
             self::WaitingForExternalSource => [self::InProgress, self::Resolved, self::Merged],
             self::WaitingForRequester => [self::TriagePending, self::InProgress, self::Resolved, self::Rejected, self::Merged],

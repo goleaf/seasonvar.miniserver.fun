@@ -322,25 +322,32 @@ final readonly class TechnicalIssueWorkflow
                 throw new TechnicalIssueActionException('issues.errors.invalid_assignment');
             }
 
-            if ($locked->assigned_to_id === $assignee?->id && $locked->support_team === $supportTeam) {
+            $previous = $locked->status;
+            $assignmentChanged = $locked->assigned_to_id !== $assignee?->id || $locked->support_team !== $supportTeam;
+            $next = match (true) {
+                $assignee instanceof User && $previous->canTransitionTo(TechnicalIssueStatus::Assigned) => TechnicalIssueStatus::Assigned,
+                $assignee === null && $previous === TechnicalIssueStatus::Assigned
+                    && $previous->canTransitionTo(TechnicalIssueStatus::Confirmed) => TechnicalIssueStatus::Confirmed,
+                default => $previous,
+            };
+
+            if (! $assignmentChanged && $next === $previous) {
                 return $locked;
             }
 
-            TechnicalIssueAssignment::query()->where('technical_issue_id', $locked->id)->whereNull('ended_at')->update(['ended_at' => now(), 'updated_at' => now()]);
-            TechnicalIssueAssignment::query()->create([
-                'technical_issue_id' => $locked->id,
-                'assigned_by_id' => $actor->id,
-                'assignee_id' => $assignee?->id,
-                'support_team' => $supportTeam,
-            ]);
-            $locked->assigned_to_id = $assignee?->id;
-            $locked->support_team = $supportTeam;
-            $previous = $locked->status;
-
-            if ($assignee instanceof User && in_array($previous, [TechnicalIssueStatus::Confirmed, TechnicalIssueStatus::TriagePending], true)) {
-                $locked->status = TechnicalIssueStatus::Assigned;
+            if ($assignmentChanged) {
+                TechnicalIssueAssignment::query()->where('technical_issue_id', $locked->id)->whereNull('ended_at')->update(['ended_at' => now(), 'updated_at' => now()]);
+                TechnicalIssueAssignment::query()->create([
+                    'technical_issue_id' => $locked->id,
+                    'assigned_by_id' => $actor->id,
+                    'assignee_id' => $assignee?->id,
+                    'support_team' => $supportTeam,
+                ]);
+                $locked->assigned_to_id = $assignee?->id;
+                $locked->support_team = $supportTeam;
             }
 
+            $locked->status = $next;
             $locked->version++;
             $locked->save();
 
@@ -350,7 +357,7 @@ final readonly class TechnicalIssueWorkflow
                     'actor_id' => $actor->id,
                     'from_status' => $previous,
                     'to_status' => $locked->status,
-                    'public_reason_code' => 'assigned',
+                    'public_reason_code' => $assignee instanceof User ? 'assigned' : 'unassigned',
                     'idempotency_key' => hash('sha256', 'assignment:'.$locked->id.':'.$locked->version),
                 ]);
             }

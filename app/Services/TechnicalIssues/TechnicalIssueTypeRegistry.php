@@ -20,7 +20,14 @@ final class TechnicalIssueTypeRegistry
     public function rule(TechnicalIssueType $type): array
     {
         $playbackTargets = [TechnicalIssueTargetType::Media, TechnicalIssueTargetType::Episode];
-        $pageTargets = [TechnicalIssueTargetType::Page, TechnicalIssueTargetType::General];
+        $pageTargets = [
+            TechnicalIssueTargetType::Page,
+            TechnicalIssueTargetType::General,
+            TechnicalIssueTargetType::Account,
+            TechnicalIssueTargetType::Notification,
+            TechnicalIssueTargetType::Calendar,
+            TechnicalIssueTargetType::Search,
+        ];
         $defaultResolutions = [
             TechnicalIssueResolutionType::Fixed,
             TechnicalIssueResolutionType::ConfigurationCorrected,
@@ -176,22 +183,58 @@ final class TechnicalIssueTypeRegistry
         if ($type === TechnicalIssueType::AccessibilityProblem) {
             $rule = [
                 ...$rule,
-                'targets' => [...$pageTargets, TechnicalIssueTargetType::Media, TechnicalIssueTargetType::Episode],
+                'targets' => [
+                    ...$pageTargets,
+                    TechnicalIssueTargetType::Title,
+                    TechnicalIssueTargetType::Season,
+                    TechnicalIssueTargetType::Episode,
+                    TechnicalIssueTargetType::Media,
+                ],
                 'team' => 'accessibility',
                 'severity' => TechnicalIssueSeverity::Medium,
             ];
         }
 
         if (in_array($type, [TechnicalIssueType::PerformanceProblem, TechnicalIssueType::PageRenderingProblem, TechnicalIssueType::LivewireInteractionProblem], true)) {
-            $rule = [...$rule, 'targets' => $pageTargets, 'team' => 'infrastructure'];
+            $rule = [
+                ...$rule,
+                'targets' => [
+                    ...$pageTargets,
+                    TechnicalIssueTargetType::Title,
+                    TechnicalIssueTargetType::Season,
+                    TechnicalIssueTargetType::Episode,
+                    TechnicalIssueTargetType::Media,
+                ],
+                'team' => 'infrastructure',
+            ];
         }
 
         if (in_array($type, [TechnicalIssueType::BrowserCompatibility, TechnicalIssueType::MobileDeviceProblem], true)) {
-            $rule = [...$rule, 'targets' => [...$pageTargets, TechnicalIssueTargetType::Media], 'team' => 'support'];
+            $rule = [
+                ...$rule,
+                'targets' => [
+                    ...$pageTargets,
+                    TechnicalIssueTargetType::Title,
+                    TechnicalIssueTargetType::Season,
+                    TechnicalIssueTargetType::Episode,
+                    TechnicalIssueTargetType::Media,
+                ],
+                'team' => 'support',
+            ];
         }
 
         if (in_array($type, [TechnicalIssueType::BrokenInternalLink, TechnicalIssueType::BrokenExternalReference], true)) {
-            $rule = [...$rule, 'targets' => $pageTargets, 'severity' => TechnicalIssueSeverity::Low, 'requires_steps' => false];
+            $rule = [
+                ...$rule,
+                'targets' => [
+                    ...$pageTargets,
+                    TechnicalIssueTargetType::Title,
+                    TechnicalIssueTargetType::Season,
+                    TechnicalIssueTargetType::Episode,
+                ],
+                'severity' => TechnicalIssueSeverity::Low,
+                'requires_steps' => false,
+            ];
         }
 
         if ($type === TechnicalIssueType::OtherTechnicalIssue) {
