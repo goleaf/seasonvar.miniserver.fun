@@ -216,6 +216,8 @@ Authenticated requests, `personalized` и `random` всегда bypass shared re
 
 Public catalog/editorial/rating/comment/review/rebuild/title-merge mutations bump existing recommendation version after commit. Progress bump происходит только при первом meaningful threshold/completion, не на heartbeat; watchlist и rating используют canonical state invalidators. Cache failure не откатывает mutation и выполняет bounded authoritative query. Full-store flush, wildcard key scan, второй cache store или mandatory warming queue не добавлены.
 
+Existing optional `PublicPageCacheWarmer` additionally resolves exactly the five stable default indexable discovery URLs from `CatalogRecommendationType`: `trending`, `popular`, `top_rated`, `recently_added`, `recently_updated`. They reuse the same same-origin HTTP timeout/retry, bounded URL manifest, sanitized guest page cache and scalar recommendation snapshots. Personalized/authenticated, random, editorial, upcoming, localized, filtered, paginated and private-feedback state is not proactively warmed. Queue/cache outage still falls back to the bounded authoritative discovery query; no second cache domain, queue or scheduler was added.
+
 ## Cache lifecycle file-size и downloads
 
 Изменение persisted file-size metadata вызывает только существующий `CatalogCacheInvalidator::importedTitleChanged(catalog_title_id)`, чтобы следующий title/player render увидел size label. Sync importer, queued apply, external playlist и download-time trusted size correction используют ту же boundary; full application flush/key scan отсутствуют. Freshness решения инспектора читают timestamp/status из БД, а не shared authorization cache.

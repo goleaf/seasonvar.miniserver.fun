@@ -420,6 +420,7 @@ Migration `2026_07_16_120000_add_canonical_recommendation_discovery.php` additiv
 - `(user_id,recommendation_feedback,catalog_title_id)` — owner hard exclusions/library restore;
 - `(user_id,watch_status,updated_at,catalog_title_id)` — bounded personal status source/demotion;
 - `(in_watchlist,updated_at,catalog_title_id,user_id)` и progress `(last_watched_at,catalog_title_id,user_id)` — recent public semantic activity.
+- `episodes_recommendation_release_events_idx(publication_status,deleted_at,released_at,id,season_id)` — bounded `recently_updated` episode event stream: equality on publication/deletion state, release range/order, deterministic ID tie-break and season join key. It avoids the former historical aggregate; isolated SQLite `EXPLAIN QUERY PLAN` selected it as a covering index. The extra episode-write cost is limited to this one real discovery query, and `down()` removes only the index.
 
 Existing user-title unique and history indexes continue to serve owner state/progress. No feedback/impression/analytics aggregate table, region/premium/language/creator/franchise table or polymorphic recommendation relation was introduced. Complete domain semantics are owned by the [recommendation design](superpowers/specs/2026-07-13-recommendation-v3-list-design.md).
 

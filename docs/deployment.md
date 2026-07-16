@@ -278,6 +278,12 @@ php artisan app:failed-job-audit --json --samples=1
 
 Rollback: stop dispatch/writers, restore previous code and lock-built assets/config cache. If migrations/data changed and compatible code rollback is impossible, restore the verified SQLite backup before starting the previous workers. Never combine old code with a partially migrated/derived schema, never use force push, and never delete failed/backlog jobs as a rollback shortcut.
 
+### Recommendation cold-path rollout 16.07.2026
+
+`2026_07_16_220000_add_recommendation_release_event_index.php` is an additive, no-backfill migration. Apply it only inside the normal stopped-writer/verified-backup deployment sequence above, together with every earlier pending migration; do not mark the release ready from a single migration command. After `php artisan migrate --force`, confirm `episodes_recommendation_release_events_idx` exists and that the ordered published episode-event query selects it under `EXPLAIN QUERY PLAN`. The existing media stream continues to use `licensed_media_home_feed_idx`.
+
+After config/route/view cache rebuild and worker restart, the normal optional `php artisan cache:warm-catalog --queue --refresh` may prewarm the five stable public discovery defaults in addition to existing critical pages. This is not a correctness prerequisite and must not be replaced by a new worker or scheduler. Smoke `/discover/recently_updated` and `/discover/popular` as anonymous users, then verify cache-warm health without printing keys or private state. Code rollback may leave the extra index in place safely; schema rollback drops only that index after writers are stopped.
+
 Sitemap-тесты используют отдельный каталог `storage/app/seasonvar/tests/*` и не очищают рабочее зеркало `storage/app/seasonvar/sitemaps`. Это устраняет файловую гонку между безопасными inventory-запусками и PHPUnit; полный тестовый набор всё равно не следует запускать на production во время ресурсоёмкого импорта.
 
 ## Правила конфигурации

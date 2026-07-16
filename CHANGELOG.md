@@ -8,6 +8,7 @@
 
 ### Recommendation and discovery architecture
 
+- Hardened the cold `recently_updated` discovery path without changing recommendation identity or adding mandatory infrastructure: bounded publication-event windows replace the full historical aggregate, one focused episode release index supports deterministic ordering, and canonical visibility is applied in bulk. On the current SQLite catalogue the isolated candidate query fell from 9.623s to 1.748s while still returning 180 unique eligible titles; the existing optional warmer now also covers only the five stable indexable public discovery defaults, never personal, random, filtered, or private state.
 - Added one canonical recommendation service for personalized, similar, related, editorial, trending, popular, top-rated, recently added/updated, upcoming, and indexed random discovery.
 - Added real personalization from meaningful viewing progress, watchlist/status, ratings, owned collections, and private personal-tag assignments, with honest anonymous and cold-start public fallbacks.
 - Added centralized visibility, watchability, blacklist/not-interested exclusions, undo and library restore, completed/watching/dropped handling, availability reranking, bounded repeat suppression, and genre/actor/franchise diversity.

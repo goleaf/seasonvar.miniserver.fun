@@ -535,12 +535,12 @@ Schema::table('episodes', function (Blueprint $table): void {
 });
 ```
 
-- [ ] Add the bounded window settings without environment variables or a second configuration file.
-- [ ] Add the exact episode index `['publication_status', 'deleted_at', 'released_at', 'id', 'season_id']` with the stable name `episodes_recommendation_release_events_idx`; `down()` removes only this index.
-- [ ] Replace the full historical UNION/GROUP aggregate with two ordered `limit($eventWindow)` source queries selecting only `catalog_title_id`, `event_at`, `event_id` and `event_source`.
-- [ ] Merge by `event_at DESC`, then `event_source`, then `event_id DESC`; deduplicate positive title IDs before visibility, request up to the configured candidate limit, and preserve that ordering after one bulk eligible-ID query.
-- [ ] Keep `CatalogRecommendationSource::ContentUpdate`, `CatalogRecommendationReason::RecentlyUpdated`, the 180-candidate cap and `catalog_titles.updated_at` prohibition unchanged.
-- [ ] Run PHP syntax, Pint, migration pretend/static up/down inspection and SQLite `EXPLAIN QUERY PLAN`; expected media stream uses `licensed_media_home_feed_idx`, episode stream uses `episodes_recommendation_release_events_idx` after isolated migration rehearsal.
+- [x] Add the bounded window settings without environment variables or a second configuration file.
+- [x] Add the exact episode index `['publication_status', 'deleted_at', 'released_at', 'id', 'season_id']` with the stable name `episodes_recommendation_release_events_idx`; `down()` removes only this index.
+- [x] Replace the full historical UNION/GROUP aggregate with two ordered `limit($eventWindow)` source queries selecting only `catalog_title_id`, `event_at`, `event_id` and `event_source`.
+- [x] Merge by `event_at DESC`, then `event_source`, then `event_id DESC`; deduplicate positive title IDs before visibility, request up to the configured candidate limit, and preserve that ordering after bounded bulk eligible-ID queries.
+- [x] Keep `CatalogRecommendationSource::ContentUpdate`, `CatalogRecommendationReason::RecentlyUpdated`, the 180-candidate cap and `catalog_titles.updated_at` prohibition unchanged.
+- [x] Run PHP syntax, Pint, static up/down inspection and SQLite `EXPLAIN QUERY PLAN`; media uses `licensed_media_home_feed_idx`, and the isolated migrated episode stream uses `episodes_recommendation_release_events_idx`.
 
 ### Task F2: existing public cache warmer integration
 
@@ -566,10 +566,10 @@ The appended URL list is derived from stable enum identity:
     ->all(),
 ```
 
-- [ ] Import `CatalogRecommendationType` and append exactly `trending`, `popular`, `top_rated`, `recently_added`, `recently_updated` default URLs through `route('discover.index', ['type' => $type->value], false)`.
-- [ ] Keep personalized, similar, related, random, editorial, upcoming, localized/filter/query state and user IDs outside proactive targets.
-- [ ] Preserve URL de-duplication, configured URL cap, same-origin validation, bounded HTTP timeout/retry and failure semantics.
-- [ ] Inspect the resolved target list and run a controlled local warm smoke only when the self-origin server is available; do not dispatch production queue work or flush cache.
+- [x] Import `CatalogRecommendationType` and append exactly `trending`, `popular`, `top_rated`, `recently_added`, `recently_updated` default URLs through `route('discover.index', ['type' => $type->value], false)`.
+- [x] Keep personalized, similar, related, random, editorial, upcoming, localized/filter/query state and user IDs outside proactive targets.
+- [x] Preserve URL de-duplication, configured URL cap, same-origin validation, bounded HTTP timeout/retry and failure semantics.
+- [x] Inspect the resolved target list and run a controlled local warm smoke against all five default URLs without dispatching production queue work or flushing cache.
 
 ### Task F3: verification, documentation and delivery
 
@@ -583,8 +583,8 @@ The appended URL list is derived from stable enum identity:
 - Modify: `CHANGELOG.md`
 - Modify: this plan and the existing Task 18 design spec only if implementation evidence changes the contract.
 
-- [ ] Re-run uncached read-only candidate diagnostics for all five indexable types and record actual before/after observations without calling them p95/SLA.
-- [ ] Verify 180 ordered unique eligible `recently_updated` IDs, stable explanations, no private state, bounded peak memory and unchanged public cache key dimensions.
-- [ ] Run Pint, PHP lint, configured static analysis, `project:docs-refresh --check`, `git diff --check`, route inspection and Vite only if frontend assets changed; do not run PHPUnit/Pest.
-- [ ] Browser-smoke `/discover/recently_updated` and one warmed public type for 200 status, canonical/noindex policy, no console error and no layout regression.
-- [ ] Inspect every changed file and staged scope, commit only this follow-up on `main`, push, and verify remote SHA while preserving unrelated importer/media worktree changes.
+- [x] Re-run uncached read-only candidate diagnostics for all five indexable types and record actual before/after observations without calling them p95/SLA.
+- [x] Verify 180 ordered unique eligible `recently_updated` IDs, stable explanations, no private state, bounded peak memory and unchanged public cache key dimensions.
+- [x] Run Pint, PHP lint, configured static analysis, `project:docs-refresh --check`, `git diff --check` and route inspection; no frontend assets changed, so Vite was not rerun, and PHPUnit/Pest remained unused.
+- [x] Browser-smoke `/discover/recently_updated` and popular at desktop/mobile widths for 200 status, canonical/index policy, no console error, no overflow and zero axe violations.
+- [x] Inspect every changed file and staged scope, commit only this follow-up on `main`, push, and verify remote SHA while preserving unrelated importer/media worktree changes.

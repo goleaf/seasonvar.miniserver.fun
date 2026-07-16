@@ -352,10 +352,12 @@
 - `2026_07_16_190000_add_file_size_metadata_to_licensed_media.php`
 - `2026_07_16_190100_add_media_file_size_counters_to_seasonvar_import_runs.php`
 - `2026_07_16_200000_create_technical_issue_domain.php`
+- `2026_07_16_220000_add_recommendation_release_event_index.php`
 <!-- project-docs:end -->
 
 ## 2026-07-16 — recommendation/discovery task 18
 
+- Follow-up isolated the cold `recently_updated` candidate path from card/facet hydration: the former full-history aggregate over 873,565 published media events measured 9.623s, while bounded deterministic publication-event windows plus bulk canonical visibility returned 180 unique eligible IDs in 1.748s at 42 MiB peak memory. An additive episode release-event index was rehearsed up/down on disposable SQLite and selected as covering by `EXPLAIN`; the existing optional warmer now resolves only the five indexable public discovery defaults. No production migration, queue dispatch, cache flush, automated test runner, private cache state or new infrastructure was used during verification.
 - Audited every recommendation route/service/model/view/cache/import/user-signal dependency and all project Markdown. Live baseline: 32,932 titles, 385,555 stored v4 similarity rows for 32,500 sources, zero invalid/self/hidden stored targets; no existing feedback/explicit-relation rows or region/premium/audio-language/creator/calendar/analytics models.
 - Applied additive migration `2026_07_16_120000_add_canonical_recommendation_discovery.php` successfully to configured SQLite; separately rehearsed `up` on `/tmp/seasonvar-task18-schema.sqlite` and inspected all columns/indexes. Project safety policy blocked disposable rollback, so no guard was bypassed and live schema was not rolled back.
 - Read-only ranking smoke returned distinct valid IDs for trending, popular, top-rated, recently-added, recently-updated and seeded random; editorial/upcoming correctly returned empty against empty source data. Cold observations are recorded in `performance.md` and are not SLA claims.
