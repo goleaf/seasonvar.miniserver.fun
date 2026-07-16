@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Auth;
 
+use App\DTOs\MobileTokenRotationResult;
 use App\Enums\AuthenticationEvent;
 use App\Models\User;
-use Carbon\CarbonInterface;
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
@@ -20,12 +21,19 @@ final class MobileTokenService
 
     public function __construct(private readonly AuthenticationAuditService $audit) {}
 
-    /** @return array{token: string, expires_at: CarbonInterface} */
-    public function rotate(User $user, PersonalAccessToken $current): array
+    /** @return Collection<int, PersonalAccessToken> */
+    public function devices(User $user): Collection
+    {
+        return $user->tokens()
+            ->latest('id')
+            ->get();
+    }
+
+    public function rotate(User $user, PersonalAccessToken $current): MobileTokenRotationResult
     {
         $tokenId = (int) $current->getKey();
 
-        return DB::transaction(function () use ($user, $tokenId): array {
+        return DB::transaction(function () use ($user, $tokenId): MobileTokenRotationResult {
             $lockedToken = $user->tokens()
                 ->whereKey($tokenId)
                 ->lockForUpdate()
@@ -46,10 +54,10 @@ final class MobileTokenService
                 $expiresAt,
             );
 
-            return [
-                'token' => $token->plainTextToken,
-                'expires_at' => $expiresAt,
-            ];
+            return new MobileTokenRotationResult(
+                token: $token->plainTextToken,
+                expiresAt: $expiresAt,
+            );
         }, attempts: 3);
     }
 
