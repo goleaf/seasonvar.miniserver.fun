@@ -118,10 +118,15 @@ final class CatalogDiscoveryPage extends Component
 
     public function mount(string $type): void
     {
-        abort_if(CatalogRecommendationType::tryFrom($type) === null, 404);
+        $recommendationType = CatalogRecommendationType::tryFrom($type);
+
+        abort_if($recommendationType === null, 404);
         abort_if(in_array($type, [CatalogRecommendationType::Similar->value, CatalogRecommendationType::Related->value], true), 404);
         $this->type = $type;
-        $this->seed = bin2hex(random_bytes(16));
+        $this->seed = in_array($recommendationType, [
+            CatalogRecommendationType::Random,
+            CatalogRecommendationType::Personalized,
+        ], true) ? bin2hex(random_bytes(16)) : '';
         $this->normalizeState();
     }
 
@@ -324,7 +329,7 @@ final class CatalogDiscoveryPage extends Component
             ratingSource: (string) $this->ratingSource,
             page: (int) $this->page,
             perPage: max(1, (int) config('recommendations.page_size', 24)),
-            seed: $this->seed,
+            seed: $this->seed !== '' ? $this->seed : null,
         );
     }
 

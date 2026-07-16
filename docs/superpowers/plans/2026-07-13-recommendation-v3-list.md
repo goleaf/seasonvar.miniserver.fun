@@ -898,9 +898,11 @@ Verification evidence: an isolated array cache rebuilt one stable public request
 - Empty Livewire seed means stable initial deterministic discovery and becomes `null` only inside `context()`.
 - Non-empty seed remains the server-only marker for random, personalized and explicit refresh requests.
 
-- [ ] Initialize an opaque seed only for `random` and `personalized`; leave deterministic public types at the existing locked empty transport value.
-- [ ] Normalize the empty transport value to `null` when constructing `CatalogRecommendationContext`; never expose seed in URL state.
-- [ ] Preserve explicit refresh ordering: discover the displayed batch, remember its IDs, rotate seed, reset page, then let Livewire render the next bounded result.
-- [ ] Prove with isolated component-context/cache probes that initial public deterministic requests share one rebuild, while random/personalized/refresh contexts remain uncached and repeat-aware.
-- [ ] Run PHP syntax, task-file Pint, targeted Larastan, route inspection, managed-doc check, debug/placeholder scan and task-scoped `git diff --check`; do not invoke PHPUnit/Pest or create test files.
+- [x] Initialize an opaque seed only for `random` and `personalized`; leave deterministic public types at the existing locked empty transport value.
+- [x] Normalize the empty transport value to `null` when constructing `CatalogRecommendationContext`; never expose seed in URL state.
+- [x] Preserve explicit refresh ordering: discover the displayed batch, remember its IDs, rotate seed, reset page, then let Livewire render the next bounded result.
+- [x] Prove with isolated component-context/cache probes that initial public deterministic requests share one rebuild, while random/personalized/refresh contexts remain uncached and repeat-aware.
+- [x] Run PHP syntax, task-file Pint, targeted Larastan, route inspection, managed-doc check, debug/placeholder scan and task-scoped `git diff --check`; do not invoke PHPUnit/Pest or create test files. All checks passed, managed documentation was current and the four canonical/localized discovery routes remained registered.
 - [ ] Update owner documentation and English changelog, inspect the isolated patch, commit only Task 18 files on `main`, push and verify the remote SHA without absorbing concurrent work.
+
+Verification evidence: a real `CatalogDiscoveryPage` instance produced `null` for initial `popular`, 32-character opaque seeds for initial `random` and `personalized`, and a 32-character explicit refresh context. Two initial public cache reads rebuilt once; two refreshed reads rebuilt twice; array-store keys stayed at 15 before and after the refreshed reads. PHP lint, path Pint and targeted Larastan passed before documentation closure. No production cache, session, user row or catalogue row was mutated.
