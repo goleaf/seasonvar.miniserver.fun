@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Catalog;
 
+use App\Enums\CatalogRecommendationType;
 use App\Models\CatalogTitle;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -84,6 +85,14 @@ final class PublicPageCacheWarmer
             ...collect(CatalogDirectoryRegistry::routeMap())
                 ->keys()
                 ->map(fn (string $directory): string => route($directory.'.index', [], false))
+                ->all(),
+            ...collect(CatalogRecommendationType::publicCases())
+                ->filter(fn (CatalogRecommendationType $type): bool => $type->isIndexable())
+                ->map(fn (CatalogRecommendationType $type): string => route(
+                    'discover.index',
+                    ['type' => $type->value],
+                    false,
+                ))
                 ->all(),
         ];
     }
