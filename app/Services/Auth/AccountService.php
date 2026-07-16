@@ -44,44 +44,52 @@ final class AccountService
             $data['email'] = NormalizedEmail::value($data['email']);
         }
 
-        $oldEmail = NormalizedEmail::value((string) $user->email);
-        $emailChanged = array_key_exists('email', $data)
-            && $oldEmail !== $data['email'];
-        $nameChanged = array_key_exists('name', $data)
-            && $user->name !== $data['name'];
-
-        if ($emailChanged) {
-            if (User::query()
-                ->whereKeyNot($user->getKey())
-                ->whereEmailIdentity($data['email'])
-                ->exists()) {
-                throw ValidationException::withMessages([
-                    'email' => [__('auth.validation.email_unique')],
-                ]);
-            }
-
-            $this->confirmEmailChange($user, $currentPassword);
-        }
+        $emailChanged = false;
+        $nameChanged = false;
 
         try {
-            DB::transaction(function () use ($user, $data, $oldEmail, $emailChanged): void {
-                $user->fill($data);
+            DB::transaction(function () use (
+                $user,
+                $data,
+                $currentPassword,
+                &$emailChanged,
+                &$nameChanged,
+            ): void {
+                $lockedUser = User::query()->lockForUpdate()->findOrFail($user->getKey());
+                $oldEmail = NormalizedEmail::value((string) $lockedUser->email);
+                $emailChanged = array_key_exists('email', $data)
+                    && $oldEmail !== $data['email'];
+                $nameChanged = array_key_exists('name', $data)
+                    && $lockedUser->name !== $data['name'];
 
                 if ($emailChanged) {
-                    $user->email_verified_at = null;
-                    $user->remember_token = Str::random(60);
+                    if (User::query()
+                        ->whereKeyNot($lockedUser->getKey())
+                        ->whereEmailIdentity($data['email'])
+                        ->exists()) {
+                        throw ValidationException::withMessages([
+                            'email' => [__('auth.validation.email_unique')],
+                        ]);
+                    }
+
+                    $this->confirmEmailChange($lockedUser, $currentPassword);
+                    $lockedUser->email_verified_at = null;
+                    $lockedUser->remember_token = Str::random(60);
                     DB::table('password_reset_tokens')
                         ->whereRaw('lower(email) in (?, ?)', [$oldEmail, $data['email']])
                         ->delete();
                 }
 
-                $user->save();
+                $lockedUser->fill($data);
+                $lockedUser->save();
             }, attempts: 3);
         } catch (UniqueConstraintViolationException) {
             throw ValidationException::withMessages([
                 'email' => [__('auth.validation.email_unique')],
             ]);
         }
+
+        $user->refresh();
 
         if ($emailChanged) {
             try {
@@ -157,14 +165,15 @@ final class AccountService
 
         RateLimiter::hit($rateKey, 300);
 
-        if (! Hash::check($password, $user->password)) {
-            throw ValidationException::withMessages([
-                'password' => [__('settings.security_page.deletion_password_invalid')],
-            ]);
-        }
-
-        DB::transaction(function () use ($user): void {
+        DB::transaction(function () use ($user, $password): void {
             $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
+
+            if (! Hash::check($password, $lockedUser->getAuthPassword())) {
+                throw ValidationException::withMessages([
+                    'password' => [__('settings.security_page.deletion_password_invalid')],
+                ]);
+            }
+
             $this->collections->purgeOwned($lockedUser);
             $this->comments->prepareForDeletion($lockedUser);
             $this->reviews->prepareForDeletion($lockedUser);
