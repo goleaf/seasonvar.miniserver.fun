@@ -16,7 +16,7 @@ The global file-size backlog snapshot is intentionally cached and timestamped be
 
 ## Design
 
-`SeasonvarQueueStatus` will continue to calculate Redis queue sizes, live claims and active queued-run count exactly as today. For the primary run projection it will first request the canonical active sitemap lifecycle from `SeasonvarGlobalImportRunCoordinator`. If no global lifecycle is active, it will select the latest sitemap lifecycle regardless of sync/queue execution mode. Targeted URL refreshes remain visible in the admin run history but cannot replace the primary global lifecycle shown by CLI status.
+`SeasonvarQueueStatus` will continue to calculate Redis queue sizes, live claims and active queued-run count exactly as today. For the primary run projection it will first request the canonical active sitemap lifecycle from `SeasonvarGlobalImportRunCoordinator`. If no global lifecycle is active, it will select the latest sitemap lifecycle regardless of sync/queue execution mode. If no sitemap lifecycle exists, the global projection is empty. Targeted URL refreshes remain visible in the admin run history but cannot replace the primary global lifecycle shown by CLI status.
 
 `SeasonvarQueueStatusData` will gain deterministic scalar fields already stored on `seasonvar_import_runs`: execution mode, heartbeat, file-size checked/known/unknown/unsupported/failed counters and known exact bytes. No model queries, cache reads or network calls will occur in the DTO.
 

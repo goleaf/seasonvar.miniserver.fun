@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\DTOs\Seasonvar;
 
+use Carbon\CarbonInterface;
+
 class SeasonvarQueueStatusData
 {
     public function __construct(
@@ -16,10 +18,18 @@ class SeasonvarQueueStatusData
         public readonly int $liveClaims,
         public readonly int $activeRuns,
         public readonly ?int $runId,
+        public readonly ?string $runExecutionMode,
         public readonly ?string $runStatus,
+        public readonly ?CarbonInterface $lastHeartbeatAt,
         public readonly int $selected,
         public readonly int $parsed,
         public readonly int $failed,
+        public readonly int $mediaSizesChecked,
+        public readonly int $mediaSizesKnown,
+        public readonly int $mediaSizesUnknown,
+        public readonly int $mediaSizesUnsupported,
+        public readonly int $mediaSizeChecksFailed,
+        public readonly int $mediaSizeKnownBytes,
     ) {}
 
     public function oldestPendingAgeSeconds(): ?int

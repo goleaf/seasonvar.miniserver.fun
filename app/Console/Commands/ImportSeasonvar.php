@@ -397,11 +397,23 @@ class ImportSeasonvar extends Command
             ['Возраст старейшей job', $oldestAge === null ? 'нет' : $oldestAge.' сек.'],
             ['Живые claims', $status->liveClaims],
             ['Активных queued runs', $status->activeRuns],
-            ['Основной active/last run', $status->runId === null ? 'нет' : '#'.$status->runId],
+            ['Глобальный active/last run', $status->runId === null ? 'нет' : '#'.$status->runId],
+            ['Режим run', $status->runExecutionMode ?? 'нет'],
             ['Статус run', $status->runStatus ?? 'нет'],
+            ['Heartbeat run', $status->lastHeartbeatAt?->format('d.m.Y H:i:s') ?? 'нет'],
             ['Выбрано страниц', $status->selected],
             ['Обработано страниц', $status->parsed],
             ['Ошибок страниц', $status->failed],
+            ['Размеров проверено в run', $status->mediaSizesChecked],
+            ['Размер известен в run', $status->mediaSizesKnown],
+            ['Размер неизвестен в run', $status->mediaSizesUnknown],
+            ['Формат не поддерживается в run', $status->mediaSizesUnsupported],
+            ['Ошибок размера в run', $status->mediaSizeChecksFailed],
+            ['Известный объём в run', sprintf(
+                '%s (%d байт)',
+                $fileSizes->format($status->mediaSizeKnownBytes, 'ru') ?? '0 B',
+                $status->mediaSizeKnownBytes,
+            )],
         ]);
 
         $backlog = $fileSizeBacklog->status();
