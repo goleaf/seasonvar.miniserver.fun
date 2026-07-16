@@ -10,10 +10,16 @@ use App\Models\ContentRequestStatusHistory;
 use App\Models\Episode;
 use App\Models\Season;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 final readonly class ContentRequestTargetMergeService
 {
-    public function __construct(private ContentRequestSchema $schema, private ContentRequestIdentity $identity) {}
+    public function __construct(
+        private ContentRequestSchema $schema,
+        private ContentRequestIdentity $identity,
+        private ContentRequestCacheInvalidator $cache,
+        private ContentRequestNotificationService $notifications,
+    ) {}
 
     public function moveTitle(int $sourceId, int $canonicalId): void
     {
@@ -21,7 +27,7 @@ final readonly class ContentRequestTargetMergeService
             return;
         }
 
-        ContentRequest::query()->where('completed_catalog_title_id', $sourceId)->update(['completed_catalog_title_id' => $canonicalId]);
+        $this->moveCompletion('completed_catalog_title_id', $sourceId, $canonicalId);
         $this->retarget(fn (Builder $query): Builder => $query->where('catalog_title_id', $sourceId), ['catalog_title_id' => $canonicalId]);
     }
 
@@ -31,7 +37,7 @@ final readonly class ContentRequestTargetMergeService
             return;
         }
 
-        ContentRequest::query()->where('completed_season_id', $source->id)->update(['completed_season_id' => $canonical->id]);
+        $this->moveCompletion('completed_season_id', $source->id, $canonical->id);
         $this->retarget(fn (Builder $query): Builder => $query->where('season_id', $source->id), [
             'catalog_title_id' => $canonical->catalog_title_id,
             'season_id' => $canonical->id,
@@ -46,7 +52,7 @@ final readonly class ContentRequestTargetMergeService
             return;
         }
 
-        ContentRequest::query()->where('completed_episode_id', $source->id)->update(['completed_episode_id' => $canonical->id]);
+        $this->moveCompletion('completed_episode_id', $source->id, $canonical->id);
         $canonical->loadMissing('season');
         $this->retarget(fn (Builder $query): Builder => $query->where('episode_id', $source->id), [
             'catalog_title_id' => $canonical->season->catalog_title_id,
@@ -86,16 +92,25 @@ final readonly class ContentRequestTargetMergeService
             $request->active_identity_key = $request->status->isOpen() ? $hash : null;
             $request->version++;
             $request->save();
+            $this->cache->changed($request->public_id, sitemap: true);
         }
     }
 
     private function merge(ContentRequest $source, ContentRequest $canonical): void
     {
+        $recipients = [];
+
+        if ($source->requester_id !== null) {
+            $recipients[$source->requester_id] = 'requester';
+        }
+
         foreach ($source->votes as $vote) {
+            $recipients[$vote->user_id] ??= 'voted';
             $canonical->votes()->firstOrCreate(['user_id' => $vote->user_id]);
         }
 
         foreach ($source->followers as $follow) {
+            $recipients[$follow->user_id] ??= 'followed';
             $canonical->followers()->firstOrCreate(['user_id' => $follow->user_id]);
         }
 
@@ -119,6 +134,13 @@ final readonly class ContentRequestTargetMergeService
         $source->active_identity_key = null;
         $source->version++;
         $source->save();
+
+        if ($canonical->requester_id === null && $source->requester_id !== null) {
+            $canonical->requester_id = $source->requester_id;
+        }
+
+        $canonical->version++;
+        $canonical->save();
         ContentRequestStatusHistory::query()->create([
             'content_request_id' => $source->id,
             'from_status' => $from,
@@ -126,5 +148,19 @@ final readonly class ContentRequestTargetMergeService
             'public_reason' => null,
             'idempotency_key' => hash('sha256', 'target-merge:'.$source->id.':'.$canonical->id),
         ]);
+        $this->cache->changed($source->public_id, sitemap: true);
+        $this->cache->changed($canonical->public_id, sitemap: true);
+        $notify = fn () => $this->notifications->merged($source, $canonical, null, $recipients);
+        DB::transactionLevel() > 0 ? DB::afterCommit($notify) : $notify();
+    }
+
+    private function moveCompletion(string $column, int $sourceId, int $canonicalId): void
+    {
+        $publicIds = ContentRequest::query()->where($column, $sourceId)->pluck('public_id')->all();
+        ContentRequest::query()->where($column, $sourceId)->update([$column => $canonicalId]);
+
+        foreach ($publicIds as $publicId) {
+            $this->cache->changed((string) $publicId, sitemap: true);
+        }
     }
 }

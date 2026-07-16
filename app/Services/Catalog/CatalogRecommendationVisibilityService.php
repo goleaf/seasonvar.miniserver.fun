@@ -34,12 +34,11 @@ final class CatalogRecommendationVisibilityService
         $query = $this->titles->visibleTo($context->user);
 
         if ($watchable) {
-            $query->whereIn('catalog_titles.id', LicensedMedia::query()
+            $query->whereHas('licensedMedia', fn (Builder $query): Builder => $query
                 ->published()
                 ->forAvailableReleases($context->user)
                 ->withoutKnownFailures()
-                ->withPlaybackLocation()
-                ->select('licensed_media.catalog_title_id'));
+                ->withPlaybackLocation());
         }
 
         if ($excludedIds !== []) {

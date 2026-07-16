@@ -101,6 +101,16 @@ final readonly class ChangeContentRequestStatus
                 $request->completed_at = now();
             }
 
+            if (in_array($desired, [
+                ContentRequestStatus::Approved,
+                ContentRequestStatus::Planned,
+                ContentRequestStatus::InProgress,
+                ContentRequestStatus::PartiallyCompleted,
+                ContentRequestStatus::Completed,
+            ], true)) {
+                $request->is_public = true;
+            }
+
             $request->completed_catalog_title_id = $completion['catalog_title_id'] ?? $request->completed_catalog_title_id;
             $request->completed_season_id = $completion['season_id'] ?? $request->completed_season_id;
             $request->completed_episode_id = $completion['episode_id'] ?? $request->completed_episode_id;

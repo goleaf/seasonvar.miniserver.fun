@@ -38,8 +38,7 @@ final class CatalogTitleRelationService
             ->with(['targetTitle' => function ($query) use ($viewer): void {
                 $query
                     ->whereIn('catalog_titles.id', $this->titles->visibleTo($viewer)->select('id'))
-                    ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url', 'indexed_at'])
-                    ->withCount($this->titles->publicCardCounts($viewer));
+                    ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url', 'indexed_at']);
             }])
             ->orderBy('priority')
             ->orderBy('id')

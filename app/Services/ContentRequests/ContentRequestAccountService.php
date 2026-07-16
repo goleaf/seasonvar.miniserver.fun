@@ -11,7 +11,6 @@ use App\Models\ContentRequestNotificationPreference;
 use App\Models\ContentRequestStatusHistory;
 use App\Models\ContentRequestVote;
 use App\Models\User;
-use App\Notifications\ContentRequestActivityNotification;
 use Illuminate\Support\Facades\DB;
 
 final readonly class ContentRequestAccountService
@@ -57,7 +56,7 @@ final readonly class ContentRequestAccountService
         ContentRequestVote::query()->where('user_id', $user->id)->delete();
         ContentRequestFollower::query()->where('user_id', $user->id)->delete();
         ContentRequestNotificationPreference::query()->whereKey($user->id)->delete();
-        $user->notifications()->where('type', ContentRequestActivityNotification::class)->delete();
+        $user->notifications()->where('type', 'content-request.activity')->delete();
 
         foreach ($publicIds as $publicId) {
             $this->cache->changed((string) $publicId);
@@ -69,6 +68,13 @@ final readonly class ContentRequestAccountService
         if (! $this->schema->ready() || $source->is($canonical)) {
             return;
         }
+
+        $publicIds = ContentRequest::query()
+            ->where('requester_id', $source->id)
+            ->orWhereHas('votes', fn ($votes) => $votes->where('user_id', $source->id))
+            ->orWhereHas('followers', fn ($followers) => $followers->where('user_id', $source->id))
+            ->pluck('public_id')
+            ->all();
 
         DB::transaction(function () use ($source, $canonical): void {
             ContentRequest::query()->where('requester_id', $source->id)->update(['requester_id' => $canonical->id]);
@@ -85,6 +91,18 @@ final readonly class ContentRequestAccountService
             ContentRequestFollower::query()->where('user_id', $source->id)->delete();
             ContentRequestStatusHistory::query()->where('actor_id', $source->id)->update(['actor_id' => $canonical->id]);
             ContentRequestClarification::query()->where('author_id', $source->id)->update(['author_id' => $canonical->id]);
+
+            $sourcePreference = ContentRequestNotificationPreference::query()->find($source->id);
+
+            if ($sourcePreference !== null && ContentRequestNotificationPreference::query()->find($canonical->id) === null) {
+                ContentRequestNotificationPreference::query()->whereKey($source->id)->update(['user_id' => $canonical->id]);
+            } else {
+                ContentRequestNotificationPreference::query()->whereKey($source->id)->delete();
+            }
         }, attempts: 3);
+
+        foreach ($publicIds as $publicId) {
+            $this->cache->changed((string) $publicId);
+        }
     }
 }

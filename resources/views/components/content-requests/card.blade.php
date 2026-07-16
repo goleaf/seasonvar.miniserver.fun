@@ -5,7 +5,7 @@
         <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2 text-xs font-bold">
                 <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-800">{{ $request->typeLabel }}</span>
-                <span class="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{{ $request->statusLabel }}</span>
+                <span title="{{ $request->statusDescription }}" class="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700">{{ $request->statusLabel }}</span>
             </div>
             <h2 class="mt-3 break-words text-lg font-black text-slate-800">
                 <a href="{{ $request->url }}" class="rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2">{{ $request->title }}</a>

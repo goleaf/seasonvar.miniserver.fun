@@ -115,28 +115,31 @@ final class CatalogRecommendationService
             ->forTitle($title, $user, $limit)
             ->reject(fn (CatalogTitleRelation $relation): bool => in_array((int) $relation->target_title_id, $hardExclusions, true))
             ->values();
-        $relatedItems = $relatedRows->map(function (CatalogTitleRelation $relation, int $index): CatalogRecommendationItem {
-            $target = $relation->targetTitle;
+        $relatedTitles = $this->loader
+            ->load($relatedContext, $relatedRows->pluck('target_title_id')->map(fn (mixed $id): int => (int) $id)->all())
+            ->keyBy('id');
+        $relatedItems = $relatedRows
+            ->filter(fn (CatalogTitleRelation $relation): bool => $relatedTitles->has((int) $relation->target_title_id))
+            ->values()
+            ->map(function (CatalogTitleRelation $relation, int $index) use ($relatedTitles): CatalogRecommendationItem {
+                /** @var CatalogTitle $target */
+                $target = $relatedTitles->get((int) $relation->target_title_id);
 
-            if (! $target instanceof CatalogTitle) {
-                throw new \LogicException('Catalog title relation target was not loaded.');
-            }
-
-            return new CatalogRecommendationItem(
-                title: $target,
-                type: CatalogRecommendationType::Related,
-                source: $relation->source === \App\Enums\CatalogTitleRelationSource::Editorial
-                    ? CatalogRecommendationSource::Editorial
-                    : CatalogRecommendationSource::ImportedProvider,
-                explanations: [new CatalogRecommendationExplanation(
-                    CatalogRecommendationReason::RelatedStory,
-                    ['relation' => $this->presenter->relation($relation->relation_type)],
-                )],
-                rank: $index + 1,
-                score: max(1, 65_535 - (int) $relation->priority),
-                relationType: $relation->relation_type->value,
-            );
-        });
+                return new CatalogRecommendationItem(
+                    title: $target,
+                    type: CatalogRecommendationType::Related,
+                    source: $relation->source === \App\Enums\CatalogTitleRelationSource::Editorial
+                        ? CatalogRecommendationSource::Editorial
+                        : CatalogRecommendationSource::ImportedProvider,
+                    explanations: [new CatalogRecommendationExplanation(
+                        CatalogRecommendationReason::RelatedStory,
+                        ['relation' => $this->presenter->relation($relation->relation_type)],
+                    )],
+                    rank: $index + 1,
+                    score: max(1, 65_535 - (int) $relation->priority),
+                    relationType: $relation->relation_type->value,
+                );
+            });
         $relatedIds = $relatedItems->map(fn (CatalogRecommendationItem $item): int => $item->title->id)->all();
         $similarContext = new CatalogRecommendationContext(
             type: CatalogRecommendationType::Similar,

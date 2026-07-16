@@ -44,7 +44,7 @@ final class CatalogRecommendationCache
             ->all();
         $result = $this->cache->remember(
             CacheDomain::Recommendations,
-            'discovery-ids-v1',
+            'discovery-ids-v2',
             [
                 'type' => $context->type->value,
                 'locale' => $context->locale,
@@ -56,7 +56,7 @@ final class CatalogRecommendationCache
                 'page' => $context->boundedPage(),
                 'per_page' => $context->boundedPerPage(),
                 'filters' => hash('sha256', json_encode($filters, JSON_THROW_ON_ERROR)),
-                'ranking_version' => (string) config('recommendations.version', 'task18-v1'),
+                'ranking_version' => (string) config('recommendations.version', 'task18-v4'),
             ],
             $this->ttl->for(CacheDomain::Recommendations),
             $rebuild,

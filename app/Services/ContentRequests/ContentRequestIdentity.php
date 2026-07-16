@@ -23,6 +23,7 @@ final readonly class ContentRequestIdentity
             ->map(fn (array $item): string => $item['provider'].':'.$item['normalized_identifier'])
             ->sort()
             ->implode('|');
+        $usesStableTarget = $input->catalogTitleId !== null || $external !== '';
 
         return hash('sha256', implode('|', [
             $input->type->value,
@@ -32,8 +33,8 @@ final readonly class ContentRequestIdentity
             $input->seasonKind ?? '',
             $input->seasonNumber ?? '',
             $input->episodeNumber ?? '',
-            $this->normalizedTitle($input),
-            $input->releaseYear ?? '',
+            $usesStableTarget ? '' : $this->normalizedTitle($input),
+            $usesStableTarget ? '' : ($input->releaseYear ?? ''),
             $input->audioLanguage ?? '',
             $input->subtitleLanguage ?? '',
             $this->normalizer->key($input->translationStudio ?? ''),
@@ -49,11 +50,13 @@ final readonly class ContentRequestIdentity
         $external = $request->externalIdentifiers
             ->map(fn ($item): string => $item->provider->value.':'.$item->normalized_identifier)
             ->sort()->implode('|');
+        $usesStableTarget = $request->catalog_title_id !== null || $external !== '';
 
         return hash('sha256', implode('|', [
             $request->type->value, $request->catalog_title_id ?? '', $request->season_id ?? '',
             $request->episode_id ?? '', $request->season_kind ?? '', $request->season_number ?? '',
-            $request->episode_number ?? '', $request->normalized_title, $request->release_year ?? '',
+            $request->episode_number ?? '', $usesStableTarget ? '' : $request->normalized_title,
+            $usesStableTarget ? '' : ($request->release_year ?? ''),
             $request->audio_language ?? '', $request->subtitle_language ?? '',
             $this->normalizer->key((string) $request->translation_studio), $request->translation_type ?? '',
             $request->requested_quality ?? '', $request->correction_field ?? '', $external,

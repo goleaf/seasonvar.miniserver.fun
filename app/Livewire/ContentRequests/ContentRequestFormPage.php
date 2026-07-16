@@ -176,7 +176,7 @@ final class ContentRequestFormPage extends Component
         }
 
         $seasons = $this->catalogTitleId !== ''
-            ? Season::query()->where('catalog_title_id', (int) $this->catalogTitleId)->orderBy('kind')->orderBy('number')->get(['id', 'number', 'kind', 'title'])
+            ? Season::query()->availableTo(auth()->user())->where('catalog_title_id', (int) $this->catalogTitleId)->orderBy('kind')->orderBy('number')->get(['id', 'number', 'kind', 'title'])
             : collect();
 
         return view('livewire.content-requests.form-page', [
@@ -208,7 +208,7 @@ final class ContentRequestFormPage extends Component
             'subtitleLanguage' => ['nullable', 'string', 'max:16'], 'translationType' => ['nullable', 'string', 'max:32'],
             'translationStudio' => ['nullable', 'string', 'max:120'], 'catalogTitleId' => ['nullable', 'integer', 'min:1'],
             'seasonId' => ['nullable', 'integer', 'min:1'], 'episodeId' => ['nullable', 'integer', 'min:1'],
-            'seasonNumber' => ['nullable', 'integer', 'min:0'], 'episodeNumber' => ['nullable', 'integer', 'min:0'],
+            'seasonNumber' => ['nullable', 'integer', 'min:0', 'max:999'], 'episodeNumber' => ['nullable', 'integer', 'min:0', 'max:99999'],
             'episodeReleaseDate' => ['nullable', 'date_format:Y-m-d'], 'currentQuality' => ['nullable', 'string', 'max:16'],
             'requestedQuality' => ['nullable', 'string', 'max:16'], 'correctionField' => ['nullable', 'string', 'max:48'],
             'currentValue' => ['nullable', 'string', 'max:2000'], 'proposedValue' => ['nullable', 'string', 'max:4000'],

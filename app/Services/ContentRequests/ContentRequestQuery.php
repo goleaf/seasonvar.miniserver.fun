@@ -11,12 +11,20 @@ use App\Enums\ContentRequestStatus;
 use App\Enums\ContentRequestType;
 use App\Models\ContentRequest;
 use App\Models\User;
+use App\Services\Catalog\Search\CatalogSearchNormalizer;
+use App\Services\Catalog\Search\CatalogSearchQueryParser;
+use App\Services\Catalog\Search\CatalogTitleSearch;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 
 final readonly class ContentRequestQuery
 {
-    public function __construct(private ContentRequestPresenter $presenter) {}
+    public function __construct(
+        private ContentRequestPresenter $presenter,
+        private CatalogSearchNormalizer $normalizer,
+        private CatalogSearchQueryParser $catalogSearchParser,
+        private CatalogTitleSearch $catalogTitleSearch,
+    ) {}
 
     /** @return LengthAwarePaginator<int, ContentRequestCardData> */
     public function directory(
@@ -90,12 +98,26 @@ final readonly class ContentRequestQuery
         }
 
         $limit = max(1, (int) config('content-requests.autocomplete_limit', 8));
-        $titles = \App\Models\CatalogTitle::query()->availableTo(null)
-            ->where(function (Builder $query) use ($search): void {
-                $query->where('title', 'like', "%{$search}%")
-                    ->orWhere('original_title', 'like', "%{$search}%")
-                    ->orWhereHas('aliases', fn (Builder $aliases): Builder => $aliases->where('name', 'like', "%{$search}%"));
-            })->orderBy('title')->orderBy('id')->limit($limit)->get(['id', 'slug', 'title', 'original_title', 'year']);
+        $catalogSearch = $this->catalogSearchParser->parse($search);
+        $candidateIds = $this->catalogTitleSearch->candidateQuery($catalogSearch)
+            ?->limit($limit)
+            ->pluck('catalog_title_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->values() ?? collect();
+        $titles = $candidateIds->isNotEmpty()
+            ? \App\Models\CatalogTitle::query()->availableTo(null)
+                ->whereKey($candidateIds)->get(['id', 'slug', 'title', 'original_title', 'year'])
+                ->sortBy(function ($title) use ($candidateIds): int {
+                    $position = $candidateIds->search($title->id, strict: true);
+
+                    return $position === false ? PHP_INT_MAX : $position;
+                })->values()
+            : \App\Models\CatalogTitle::query()->availableTo(null)
+                ->where(function (Builder $query) use ($search): void {
+                    $query->where('title', 'like', "%{$search}%")
+                        ->orWhere('original_title', 'like', "%{$search}%")
+                        ->orWhereHas('aliases', fn (Builder $aliases): Builder => $aliases->where('name', 'like', "%{$search}%"));
+                })->orderBy('title')->orderBy('id')->limit($limit)->get(['id', 'slug', 'title', 'original_title', 'year']);
 
         $requests = ContentRequest::query()->publiclyVisible()
             ->where(function (Builder $query) use ($search): void {
@@ -141,10 +163,12 @@ final readonly class ContentRequestQuery
     private function applyFilters(Builder $query, string $search, ?ContentRequestType $type, ?ContentRequestStatus $status): void
     {
         $search = str_replace(['%', '_', '\\'], '', trim($search));
-        $query->when($search !== '', fn (Builder $query): Builder => $query->where(function (Builder $searchQuery) use ($search): void {
+        $normalized = $this->normalizer->key($search);
+        $query->when($search !== '', fn (Builder $query): Builder => $query->where(function (Builder $searchQuery) use ($search, $normalized): void {
             $searchQuery->where('title', 'like', "%{$search}%")
                 ->orWhere('original_title', 'like', "%{$search}%")
-                ->orWhere('alternative_title', 'like', "%{$search}%");
+                ->orWhere('alternative_title', 'like', "%{$search}%")
+                ->when($normalized !== '', fn (Builder $query): Builder => $query->orWhere('normalized_title', 'like', "%{$normalized}%"));
         }))->when($type !== null, fn (Builder $query): Builder => $query->where('type', $type->value))
             ->when($status !== null, fn (Builder $query): Builder => $query->where('status', $status->value));
     }

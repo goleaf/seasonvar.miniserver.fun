@@ -16,6 +16,7 @@ final readonly class ContentRequestCardData
         public string $typeLabel,
         public string $status,
         public string $statusLabel,
+        public string $statusDescription,
         public int $votes,
         public int $followers,
         public bool $hasVoted,

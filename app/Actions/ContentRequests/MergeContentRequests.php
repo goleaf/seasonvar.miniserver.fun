@@ -13,6 +13,7 @@ use App\Services\ContentRequests\ContentRequestCacheInvalidator;
 use App\Services\ContentRequests\ContentRequestNotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 
 final readonly class MergeContentRequests
 {
@@ -24,9 +25,9 @@ final readonly class MergeContentRequests
             throw new ContentRequestActionException('requests.errors.invalid_merge');
         }
 
-        $recipientIds = [];
+        $recipients = [];
         $sourcePublicId = null;
-        $canonical = DB::transaction(function () use ($moderator, $sourceId, $canonicalId, &$recipientIds, &$sourcePublicId): ContentRequest {
+        $canonical = DB::transaction(function () use ($moderator, $sourceId, $canonicalId, &$recipients, &$sourcePublicId): ContentRequest {
             $requests = ContentRequest::query()
                 ->whereKey([$sourceId, $canonicalId])
                 ->orderBy('id')
@@ -43,9 +44,17 @@ final readonly class MergeContentRequests
             Gate::forUser($moderator)->authorize('moderate', $source);
             Gate::forUser($moderator)->authorize('moderate', $canonical);
             $this->assertCompatible($source, $canonical);
-            $recipientIds = $source->followers()->pluck('user_id')
-                ->push($source->requester_id)
-                ->filter()->map(fn (mixed $id): int => (int) $id)->unique()->values()->all();
+            if ($source->requester_id !== null) {
+                $recipients[$source->requester_id] = 'requester';
+            }
+
+            foreach ($source->followers()->pluck('user_id') as $userId) {
+                $recipients[(int) $userId] ??= 'followed';
+            }
+
+            foreach ($source->votes()->pluck('user_id') as $userId) {
+                $recipients[(int) $userId] ??= 'voted';
+            }
             $sourcePublicId = $source->public_id;
             $sourceStatus = $source->status;
 
@@ -112,7 +121,7 @@ final readonly class MergeContentRequests
         $this->cache->changed($sourcePublicId, sitemap: true);
         $this->cache->changed($canonical->public_id, sitemap: true);
         $source = ContentRequest::query()->findOrFail($sourceId);
-        $this->notifications->merged($source, $canonical, $moderator, $recipientIds);
+        $this->notifications->merged($source, $canonical, $moderator, $recipients);
 
         return $canonical;
     }
@@ -124,8 +133,15 @@ final readonly class MergeContentRequests
             || $source->catalog_title_id !== $canonical->catalog_title_id
             || $source->season_id !== $canonical->season_id
             || $source->episode_id !== $canonical->episode_id
+            || $source->season_kind !== $canonical->season_kind
+            || $source->season_number !== $canonical->season_number
+            || $source->episode_number !== $canonical->episode_number
             || $source->audio_language !== $canonical->audio_language
-            || $source->subtitle_language !== $canonical->subtitle_language) {
+            || $source->subtitle_language !== $canonical->subtitle_language
+            || $source->translation_type !== $canonical->translation_type
+            || Str::lower((string) $source->translation_studio) !== Str::lower((string) $canonical->translation_studio)
+            || $source->requested_quality !== $canonical->requested_quality
+            || $source->correction_field !== $canonical->correction_field) {
             throw new ContentRequestActionException('requests.errors.incompatible_merge');
         }
     }

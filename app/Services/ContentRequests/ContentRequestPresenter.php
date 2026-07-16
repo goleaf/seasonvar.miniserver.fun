@@ -29,6 +29,7 @@ final class ContentRequestPresenter
             typeLabel: $request->type->label(),
             status: $request->status->value,
             statusLabel: $request->status->label(),
+            statusDescription: $request->status->description(),
             votes: (int) ($request->votes_count ?? 0),
             followers: (int) ($request->followers_count ?? 0),
             hasVoted: (bool) ($request->viewer_has_voted ?? false),

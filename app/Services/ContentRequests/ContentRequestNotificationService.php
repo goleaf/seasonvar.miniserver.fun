@@ -47,12 +47,12 @@ final class ContentRequestNotificationService
         });
     }
 
-    /** @param list<int> $recipientIds */
-    public function merged(ContentRequest $source, ContentRequest $canonical, User $actor, array $recipientIds): void
+    /** @param array<int, string> $recipients */
+    public function merged(ContentRequest $source, ContentRequest $canonical, ?User $actor, array $recipients): void
     {
-        $this->safely(function () use ($source, $canonical, $actor, $recipientIds): void {
-            User::query()->whereKey($recipientIds)->get(['id', 'name'])->each(function (User $recipient) use ($source, $canonical, $actor): void {
-                if ($recipient->is($actor) || ! $this->enabled($recipient, 'followed')) {
+        $this->safely(function () use ($source, $canonical, $actor, $recipients): void {
+            User::query()->whereKey(array_keys($recipients))->get(['id', 'name'])->each(function (User $recipient) use ($source, $canonical, $actor, $recipients): void {
+                if (($actor !== null && $recipient->is($actor)) || ! $this->enabled($recipient, $recipients[$recipient->id] ?? 'voted')) {
                     return;
                 }
 

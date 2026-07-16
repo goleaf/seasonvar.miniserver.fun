@@ -25,6 +25,11 @@ enum ContentRequestStatus: string
         return __('requests.statuses.'.$this->value.'.label');
     }
 
+    public function description(): string
+    {
+        return __('requests.statuses.'.$this->value.'.description');
+    }
+
     public function isTerminal(): bool
     {
         return in_array($this, [self::Completed, self::Rejected, self::Duplicate, self::Merged, self::Cancelled, self::Withdrawn], true);
@@ -49,8 +54,8 @@ enum ContentRequestStatus: string
     public function transitions(): array
     {
         return match ($this) {
-            self::Submitted => [self::PendingReview, self::ClarificationNeeded, self::Approved, self::Rejected, self::Duplicate, self::Merged, self::Withdrawn],
-            self::PendingReview => [self::ClarificationNeeded, self::Approved, self::Rejected, self::Duplicate, self::Merged, self::Withdrawn],
+            self::Submitted => [self::PendingReview, self::ClarificationNeeded, self::Approved, self::Rejected, self::Merged, self::Withdrawn],
+            self::PendingReview => [self::ClarificationNeeded, self::Approved, self::Rejected, self::Merged, self::Withdrawn],
             self::ClarificationNeeded => [self::PendingReview, self::Rejected, self::Merged, self::Withdrawn],
             self::Approved => [self::Planned, self::InProgress, self::Rejected, self::Merged, self::Cancelled],
             self::Planned => [self::InProgress, self::PartiallyCompleted, self::Completed, self::Merged, self::Cancelled],

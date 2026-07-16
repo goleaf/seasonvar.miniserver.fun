@@ -26,6 +26,11 @@ final class ContentRequestRateLimiter
             ['key' => 'content-requests:'.$action.':'.$user->id.':global', 'attempts' => $global],
         ];
 
+        if (in_array($action, ['create', 'clarify'], true)) {
+            $network = hash('sha256', (string) request()->ip());
+            $keys[] = ['key' => 'content-requests:'.$action.':network:'.$network, 'attempts' => $global * 4];
+        }
+
         foreach ($keys as $limit) {
             if (RateLimiter::tooManyAttempts($limit['key'], $limit['attempts'])) {
                 $retry = max(1, RateLimiter::availableIn($limit['key']));

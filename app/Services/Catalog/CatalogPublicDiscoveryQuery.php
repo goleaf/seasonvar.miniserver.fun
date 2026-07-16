@@ -17,10 +17,7 @@ use App\Enums\ReviewStatus;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRating;
 use App\Models\CatalogTitleUserState;
-use App\Models\CatalogTitleReview;
-use App\Models\Comment;
 use App\Models\Episode;
-use App\Models\EpisodeViewProgress;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
@@ -57,62 +54,48 @@ final class CatalogPublicDiscoveryQuery
             max(1, $context->period->days()),
             max(1, (int) config('recommendations.trending.maximum_period_days', 30)),
         ));
-        $query = $this->eligibleQuery($context, watchable: true, excludedIds: $excludedIds)
-            ->select('catalog_titles.id')
-            ->selectSub(EpisodeViewProgress::query()
-                ->selectRaw('COUNT(DISTINCT user_id)')
-                ->whereColumn('catalog_title_id', 'catalog_titles.id')
-                ->where('last_watched_at', '>=', $after), 'recent_watchers')
-            ->selectSub(CatalogTitleUserState::query()
-                ->selectRaw('COUNT(*)')
-                ->whereColumn('catalog_title_id', 'catalog_titles.id')
+        $events = DB::table('episode_view_progress')
+            ->select('catalog_title_id')
+            ->selectRaw('COUNT(DISTINCT user_id) * 40 AS activity_score')
+            ->selectRaw('COUNT(DISTINCT user_id) AS watcher_count')
+            ->where('last_watched_at', '>=', $after)
+            ->groupBy('catalog_title_id')
+            ->unionAll(DB::table('catalog_title_user_states')
+                ->select('catalog_title_id')
+                ->selectRaw('COUNT(*) * 25 AS activity_score')
+                ->selectRaw('0 AS watcher_count')
                 ->where('in_watchlist', true)
-                ->where('updated_at', '>=', $after), 'recent_watchlists')
-            ->selectSub(CatalogTitleReview::query()
-                ->selectRaw('COUNT(*)')
-                ->whereColumn('catalog_title_id', 'catalog_titles.id')
+                ->where('updated_at', '>=', $after)
+                ->groupBy('catalog_title_id'))
+            ->unionAll(DB::table('catalog_title_reviews')
+                ->select('catalog_title_id')
+                ->selectRaw('COUNT(*) * 8 AS activity_score')
+                ->selectRaw('0 AS watcher_count')
                 ->where('status', ReviewStatus::Published->value)
                 ->whereNull('deleted_at')
                 ->whereNull('merged_into_id')
-                ->where('published_at', '>=', $after), 'recent_reviews')
-            ->selectSub(Comment::query()
-                ->selectRaw('COUNT(*)')
-                ->whereColumn('catalog_title_id', 'catalog_titles.id')
+                ->where('published_at', '>=', $after)
+                ->groupBy('catalog_title_id'))
+            ->unionAll(DB::table('comments')
+                ->select('catalog_title_id')
+                ->selectRaw('COUNT(*) * 4 AS activity_score')
+                ->selectRaw('0 AS watcher_count')
                 ->where('target_type', CommentTargetType::Title->value)
                 ->where('status', CommentStatus::Published->value)
                 ->whereNull('deleted_at')
-                ->where('created_at', '>=', $after), 'recent_comments')
-            ->where(function (Builder $query) use ($after): void {
-                $query
-                    ->whereExists(fn (QueryBuilder $query): QueryBuilder => $query
-                        ->selectRaw('1')
-                        ->from('episode_view_progress')
-                        ->whereColumn('episode_view_progress.catalog_title_id', 'catalog_titles.id')
-                        ->where('episode_view_progress.last_watched_at', '>=', $after))
-                    ->orWhereExists(fn (QueryBuilder $query): QueryBuilder => $query
-                        ->selectRaw('1')
-                        ->from('catalog_title_user_states')
-                        ->whereColumn('catalog_title_user_states.catalog_title_id', 'catalog_titles.id')
-                        ->where('catalog_title_user_states.in_watchlist', true)
-                        ->where('catalog_title_user_states.updated_at', '>=', $after))
-                    ->orWhereExists(fn (QueryBuilder $query): QueryBuilder => $query
-                        ->selectRaw('1')
-                        ->from('catalog_title_reviews')
-                        ->whereColumn('catalog_title_reviews.catalog_title_id', 'catalog_titles.id')
-                        ->where('catalog_title_reviews.status', ReviewStatus::Published->value)
-                        ->whereNull('catalog_title_reviews.deleted_at')
-                        ->where('catalog_title_reviews.published_at', '>=', $after))
-                    ->orWhereExists(fn (QueryBuilder $query): QueryBuilder => $query
-                        ->selectRaw('1')
-                        ->from('comments')
-                        ->whereColumn('comments.catalog_title_id', 'catalog_titles.id')
-                        ->where('comments.target_type', CommentTargetType::Title->value)
-                        ->where('comments.status', CommentStatus::Published->value)
-                        ->whereNull('comments.deleted_at')
-                        ->where('comments.created_at', '>=', $after));
-            })
-            ->orderByRaw('(recent_watchers * 40 + recent_watchlists * 25 + recent_reviews * 8 + recent_comments * 4) DESC')
-            ->orderByDesc('recent_watchers')
+                ->where('created_at', '>=', $after)
+                ->groupBy('catalog_title_id'));
+        $activity = DB::query()
+            ->fromSub($events, 'recommendation_recent_events')
+            ->select('catalog_title_id')
+            ->selectRaw('SUM(activity_score) AS activity_score')
+            ->selectRaw('SUM(watcher_count) AS watcher_count')
+            ->groupBy('catalog_title_id');
+        $query = $this->eligibleQuery($context, watchable: true, excludedIds: $excludedIds)
+            ->joinSub($activity, 'recommendation_recent_activity', 'recommendation_recent_activity.catalog_title_id', '=', 'catalog_titles.id')
+            ->select('catalog_titles.id')
+            ->orderByDesc('recommendation_recent_activity.activity_score')
+            ->orderByDesc('recommendation_recent_activity.watcher_count')
             ->orderByDesc('catalog_titles.id');
 
         return $this->rows($query, CatalogRecommendationSource::Trending, CatalogRecommendationReason::Trending);

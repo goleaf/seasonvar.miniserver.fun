@@ -8,12 +8,14 @@ use App\Enums\ContentRequestStatus;
 use App\Exceptions\ContentRequests\ContentRequestActionException;
 use App\Models\CatalogTitle;
 use App\Models\ContentRequest;
+use App\Models\ContentRequestStatusHistory;
 use App\Models\SourcePage;
 use App\Models\User;
 use App\Services\Seasonvar\CatalogTitleRefreshCoordinator;
 use App\Services\Seasonvar\SeasonvarDiscoveredPageStore;
 use App\Services\Seasonvar\SeasonvarUrl;
 use Illuminate\Support\Facades\Gate;
+use InvalidArgumentException;
 
 final readonly class HandoffContentRequestToImporter
 {
@@ -60,7 +62,11 @@ final readonly class HandoffContentRequestToImporter
             throw new ContentRequestActionException('requests.errors.seasonvar_source_required');
         }
 
-        $url = $this->urls->normalize($link->url);
+        try {
+            $url = $this->urls->normalize($link->url);
+        } catch (InvalidArgumentException) {
+            throw new ContentRequestActionException('requests.errors.invalid_source_url');
+        }
 
         if (! $this->urls->isAllowed($url)) {
             throw new ContentRequestActionException('requests.errors.invalid_source_url');
@@ -70,6 +76,16 @@ final readonly class HandoffContentRequestToImporter
         $sourcePage = SourcePage::query()->where('url_hash', $this->urls->hash($url))->firstOrFail();
         $request->source_page_id = $sourcePage->id;
         $request->save();
+        ContentRequestStatusHistory::query()->firstOrCreate(
+            ['idempotency_key' => hash('sha256', 'import-handoff:'.$request->id.':'.$sourcePage->id)],
+            [
+                'content_request_id' => $request->id,
+                'actor_id' => $moderator->id,
+                'from_status' => $request->status,
+                'to_status' => $request->status,
+                'public_reason' => null,
+            ],
+        );
 
         return $request->status === ContentRequestStatus::Approved
             ? $this->statuses->handle(
