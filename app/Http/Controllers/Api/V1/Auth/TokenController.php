@@ -16,11 +16,9 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 final class TokenController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, MobileTokenService $tokens): JsonResponse
     {
-        $tokens = $this->user($request)->tokens()->latest('id')->get();
-
-        return DeviceTokenResource::collection($tokens)
+        return DeviceTokenResource::collection($tokens->devices($this->user($request)))
             ->response()
             ->header('Cache-Control', 'private, no-store');
     }
@@ -30,9 +28,9 @@ final class TokenController extends Controller
         $result = $tokens->rotate($this->user($request), $this->currentToken($request));
 
         return response()->json(['data' => [
-            'token' => $result['token'],
+            'token' => $result->token,
             'token_type' => 'Bearer',
-            'expires_at' => $result['expires_at']->toJSON(),
+            'expires_at' => $result->expiresAt->toJSON(),
         ]], headers: ['Cache-Control' => 'private, no-store']);
     }
 
