@@ -772,6 +772,7 @@ return $query
 **Files:**
 
 - Create: `database/migrations/2026_07_16_230000_add_recommendation_signal_timestamps.php`
+- Create: `database/migrations/2026_07_16_230100_add_recommendation_signal_owner_indexes.php`
 - Modify: `app/Models/CatalogTitleUserState.php`
 - Modify: `app/Services/Catalog/CatalogUserStateService.php`
 - Modify: `app/Services/Catalog/CatalogTitleUserDataMerger.php`
@@ -783,6 +784,7 @@ return $query
 - Add nullable internal columns `watchlist_updated_at`, `rating_updated_at` and `watch_status_updated_at`; do not add API/resource fields.
 - Preserve `CatalogUserStateService` public signatures, optimistic versions, idempotency, authorization, sync publication and cache invalidation.
 - Replace only `catalog_user_state_recent_watchlist_idx` and `catalog_user_state_watch_status_idx` with semantic timestamp equivalents; rollback restores the exact legacy definitions.
+- Add three owner-first covering indexes only for the bounded personalized watchlist/status/rating windows; keep the public semantic indexes and older library indexes for their distinct query contracts.
 
 - [x] Add one reversible migration with no data backfill: legacy values remain intact, while unverifiable shared `updated_at` values are never manufactured into semantic public events.
 - [x] Update only the matching semantic timestamp when watchlist, rating or watch-status actually changes; idempotent writes retain the prior timestamp.
@@ -791,6 +793,7 @@ return $query
 - [x] Order bounded personalized watchlist/rating/status signals by their semantic timestamp, with stable ID ordering as the rolling-schema fallback.
 - [x] Accumulate every bounded watchlist/status/rating/collection/personal-tag ID set explicitly; do not rely on a value-captured arrow closure for mutation of the shared signal map.
 - [x] Remove `not_interested`, `blacklisted` and `dropped` source titles from the bounded signal map before candidate lookup while retaining meaningful completed/watching sources.
+- [x] Verify the exact personalized query plans: without the owner-first indexes SQLite used temporary order B-trees; with them all three windows use covering ordered scans. The reversible follow-up migration adds no column or backfill.
 
 ### Task F9: upcoming and media-preference truthfulness
 
@@ -801,7 +804,7 @@ return $query
 
 - [x] Build bounded future-episode/future-year candidate pools with canonical episode/season availability, then reuse the shared title visibility and deterministic ordering boundary.
 - [x] Require `withPlaybackLocation()` for quality, variant and subtitle preference boosts; retain publication/audience/window, child release and health predicates.
-- [x] Confirm no score, reason, type, route, cache key, DTO, API field or visible label changes.
+- [x] Confirm no score, reason, type, route, DTO, API field or visible label changes. Deliberately advance only the ranking namespace from `task18-v5` to `task18-v6`, so cached public pools produced by the previous trending/upcoming eligibility rules cannot survive rollout.
 
 ### Task F10: verification, documentation and delivery
 
@@ -814,8 +817,8 @@ return $query
 - Modify: `CHANGELOG.md`
 - Modify: this plan and the existing Task 18 design spec only when final evidence changes the contract.
 
-- [ ] Inspect PHP syntax, task-file Pint, configured static analysis, migration up/down/index definitions, query SQL/bindings/plans, translation parity, routes and `git diff --check`; do not invoke PHPUnit/Pest or create tests.
-- [ ] Compare same-snapshot old/new public candidate hashes for every implemented public type; expected differences are forbidden because the current database has no active watchlist or future release row.
-- [ ] Exercise authenticated personalized candidates in a rolled-forward disposable SQLite copy and confirm semantic timestamps remain private and no technical timestamp drives ranking.
-- [ ] Browser-smoke trending, upcoming and authenticated/cold-start discovery at desktop/mobile widths for status, canonical/noindex, loading/empty behavior, no overflow and no browser/local-request error.
+- [x] Inspect PHP syntax, task-file Pint, configured static analysis, migration up/down/index definitions, query SQL/bindings/plans, translation parity, routes and `git diff --check`; no PHPUnit/Pest runner or test file was invoked/created for Task 18.
+- [x] Preserve every public type's identity: only trending/upcoming source boundaries changed; the live snapshot has zero semantically dated watchlist rows and zero eligible future rows, so rendered trending IDs remained `[151,11446,22692,34144,32264,…]`, upcoming remained empty and every other public query path/hash was untouched. A complete catalogue rescore was not repeated under the active importer.
+- [x] Exercise authenticated personalized candidates in a rolled-forward disposable SQLite copy: a real watchlist source produced `user_watchlist/because_watchlist`, while `blacklisted` and `dropped` produced no candidates; semantic timestamps/email were absent from HTML and shared cache.
+- [x] Browser-smoke trending, upcoming, anonymous cold-start and authenticated watchlist discovery at desktop/mobile widths: HTTP 200, expected 24/0/24/1 rows, correct canonical/index/noindex, no overflow, console/page error or failed local request. Playwright CLI lacked system Chrome, so the documented managed-Chromium fallback was used.
 - [ ] Update owner documentation and English changelog, inspect exact staged scope, commit only this follow-up on `main`, push fast-forward and verify remote SHA while preserving unrelated in-progress work and leaving active import state untouched.
