@@ -106,6 +106,12 @@
     }
 }
 
+[data-site-header-navigation] button {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+    justify-content: center;
+}
+
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
     outline: 2px solid var(--color-emerald-700);
     outline-offset: 2px;

@@ -57,6 +57,16 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringNotContainsString('lg:grid-cols-[auto_minmax(280px,1fr)_auto]', $component);
     }
 
+    public function test_site_header_navigation_enforces_large_targets_for_nested_buttons(): void
+    {
+        $stylesheet = File::get(resource_path('css/app.css'));
+
+        $this->assertStringContainsString('[data-site-header-navigation] button', $stylesheet);
+        $this->assertStringContainsString('min-height: 2.75rem;', $stylesheet);
+        $this->assertStringContainsString('min-width: 2.75rem;', $stylesheet);
+        $this->assertStringContainsString('justify-content: center;', $stylesheet);
+    }
+
     public function test_shell_navigation_receives_prepared_audience_and_permission_links(): void
     {
         config(['seasonvar.admin_emails' => ['admin@example.com']]);
