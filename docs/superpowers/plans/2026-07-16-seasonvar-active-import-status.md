@@ -146,7 +146,7 @@ Use an isolated Git index so unrelated shared-tree changes are excluded. Commit 
 fix: report active Seasonvar import progress
 ```
 
-- [ ] **Step 5: Push and record remote evidence**
+- [x] **Step 5: Push and record remote evidence**
 
 Confirm branch `main`, push `origin main`, compare local `HEAD`, `origin/main` and `git ls-remote origin refs/heads/main`, then mark this step complete in a one-file documentation closure commit and push it.
 
@@ -161,6 +161,7 @@ Confirm branch `main`, push `origin main`, compare local `HEAD`, `origin/main` a
 - [x] Download route remained authenticated, throttled and private.
 - [x] `git diff --check`, conflict-marker, placeholder, debug, secret/source-URL and binary-scope review passed.
 - [x] No migration, dependency, test or binary file was created or modified by this task; no test runner was executed.
+- [x] Task-only implementation commit `c043a6676f489a907c75356804edf1aad0f64a79` was pushed directly to `origin/main`.
 
 ## Final changed-file list
 
