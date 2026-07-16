@@ -8,5 +8,5 @@
     aria-live="polite"
 >
     <x-ui.icon name="fa-solid fa-arrow-right-from-bracket" />
-    <span class="sr-only xl:not-sr-only">{{ __('auth.actions.logout') }}</span>
+    <span class="sr-only sm:not-sr-only">{{ __('auth.actions.logout') }}</span>
 </button>

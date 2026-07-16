@@ -1,15 +1,15 @@
 @props(['siteName', 'searchQuery' => '', 'header'])
 
 <header data-site-header {{ $attributes->class(['border-b border-slate-200 bg-white shadow-panel lg:sticky lg:top-0 lg:z-50']) }}>
-    <div class="mx-auto grid max-w-[1760px] grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-3 sm:px-6 lg:grid-cols-[auto_minmax(280px,1fr)_auto] lg:px-8">
-        <a href="{{ $header['home_url'] }}" class="order-1 flex min-w-0 items-center gap-3 rounded-control">
+    <div data-site-header-primary class="mx-auto flex max-w-[1760px] min-w-0 items-center gap-3 px-3 py-3 sm:px-6 lg:px-8">
+        <a href="{{ $header['home_url'] }}" class="flex min-w-11 shrink-0 items-center gap-3 rounded-control sm:min-w-0 sm:max-w-48 lg:max-w-72">
             <span class="grid h-11 w-11 shrink-0 place-items-center rounded-control bg-emerald-50 text-lg text-emerald-700">
                 <x-ui.icon name="fa-solid fa-film" />
             </span>
-            <span class="min-w-0 break-words text-lg font-black tracking-tight text-slate-800">{{ $siteName }}</span>
+            <span class="hidden min-w-0 break-words text-base font-black tracking-tight text-slate-800 sm:block lg:text-lg">{{ $siteName }}</span>
         </a>
 
-        <form action="{{ $header['search_url'] }}" method="GET" role="search" aria-label="Поиск по названию" class="order-3 col-span-2 flex min-w-0 items-start gap-2 lg:order-2 lg:col-span-1 lg:mx-6">
+        <form action="{{ $header['search_url'] }}" method="GET" role="search" aria-label="Поиск по названию" class="flex min-w-0 flex-1 items-start gap-2">
             <x-form.search-field
                 id="site-search"
                 name="q"
@@ -24,12 +24,14 @@
                 <span class="sr-only sm:not-sr-only">Найти</span>
             </button>
         </form>
+    </div>
 
-        <nav aria-label="Основная навигация" class="order-2 col-span-2 flex flex-wrap items-center justify-end gap-1.5 text-sm font-bold sm:col-span-1 lg:order-3">
+    <div class="border-t border-slate-200 bg-slate-50">
+        <nav data-site-header-navigation aria-label="Основная навигация" class="mx-auto flex flex-wrap max-w-[1760px] items-center justify-center gap-1.5 px-3 py-2 text-sm font-bold sm:justify-start sm:px-6 lg:px-8">
             @foreach ($header['navigation'] as $item)
                 <a href="{{ $item->url }}" class="{{ $item->className }}" @if ($item->ariaCurrent !== null) aria-current="{{ $item->ariaCurrent }}" @endif>
                     <x-ui.icon :name="$item->icon" />
-                    <span class="sr-only xl:not-sr-only">{{ $item->label }}</span>
+                    <span class="sr-only sm:not-sr-only">{{ $item->label }}</span>
                 </a>
             @endforeach
             @if ($header['show_logout'])

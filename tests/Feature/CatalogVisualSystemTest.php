@@ -32,6 +32,31 @@ class CatalogVisualSystemTest extends TestCase
             ->assertSee('<main id="main-content"', false);
     }
 
+    public function test_site_header_uses_two_responsive_rows_without_inner_scrolling(): void
+    {
+        $response = $this->get(route('home'));
+        $html = $response->getContent();
+        $component = File::get(resource_path('views/components/layout/site-header.blade.php'));
+
+        $response
+            ->assertOk()
+            ->assertSee('data-site-header-primary', false)
+            ->assertSee('data-site-header-navigation', false);
+
+        $this->assertLessThan(
+            strpos($html, 'data-site-header-navigation'),
+            strpos($html, 'data-site-header-primary'),
+        );
+        $this->assertStringContainsString('flex flex-wrap', $component);
+        $this->assertStringContainsString('<span class="sr-only sm:not-sr-only">{{ $item->label }}</span>', $component);
+        $this->assertStringContainsString(
+            '<span class="sr-only sm:not-sr-only">{{ __(\'auth.actions.logout\') }}</span>',
+            File::get(resource_path('views/livewire/auth/logout-button.blade.php')),
+        );
+        $this->assertDoesNotMatchRegularExpression('/overflow-(?:x|y|auto|scroll)/', $component);
+        $this->assertStringNotContainsString('lg:grid-cols-[auto_minmax(280px,1fr)_auto]', $component);
+    }
+
     public function test_shell_navigation_receives_prepared_audience_and_permission_links(): void
     {
         config(['seasonvar.admin_emails' => ['admin@example.com']]);

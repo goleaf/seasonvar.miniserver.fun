@@ -2,6 +2,7 @@
 
 ## 2026-07-16
 
+- Разделена шапка сайта на две адаптивные полосы: бренд и глобальный поиск находятся сверху, а вся навигация — ниже. На телефоне видимы компактные иконки с доступными именами, с `sm` появляются подписи, длинное меню переносится без внутренней прокрутки; существующие маршруты, GET-поиск, `aria-current` и Livewire-выход сохранены.
 - Made `CACHE_WARMING_ENABLED=false` a complete automatic-warming kill switch: catalogue mutations and the ten-minute scheduler now both skip dispatch while disabled, while the manual command and enabled behavior remain unchanged. Production verification across the 10:00 and 10:10 scheduler cycles kept `cache-warm-v2` empty and added no failed jobs; no cache flush, queue cleanup, retry, or data mutation was used.
 - Hardened post-authentication redirect validation against percent-encoded authentication-route and browser dot-segment normalization bypasses while preserving valid encoded UTF-8 catalogue paths and same-origin query destinations.
 - Added independent HMAC-scoped login rate limits for normalized identifier and network alongside the existing identifier/network-pair budget, closing distributed account brute-force and single-network credential-spraying bypasses consistently across Livewire and Sanctum authentication without storing raw email or IP values.
