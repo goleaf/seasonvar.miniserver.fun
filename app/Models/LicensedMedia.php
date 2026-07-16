@@ -134,15 +134,28 @@ class LicensedMedia extends Model
             ->where(function (Builder $query) use ($user): void {
                 $query
                     ->whereNull('season_id')
-                    ->orWhereIn('season_id', Season::query()->availableTo($user)->select('id'));
+                    ->orWhereExists(Season::query()
+                        ->availableTo($user)
+                        ->whereColumn('seasons.id', 'licensed_media.season_id')
+                        ->selectRaw('1')
+                        ->toBase());
             })
             ->where(function (Builder $query) use ($user): void {
+                $availableSeason = Season::query()
+                    ->availableTo($user)
+                    ->whereColumn('seasons.id', 'episodes.season_id')
+                    ->selectRaw('1')
+                    ->toBase();
+                $availableEpisode = Episode::query()
+                    ->availableTo($user)
+                    ->whereColumn('episodes.id', 'licensed_media.episode_id')
+                    ->whereExists($availableSeason)
+                    ->selectRaw('1')
+                    ->toBase();
+
                 $query
                     ->whereNull('episode_id')
-                    ->orWhereIn('episode_id', Episode::query()
-                        ->availableTo($user)
-                        ->whereIn('season_id', Season::query()->availableTo($user)->select('id'))
-                        ->select('id'));
+                    ->orWhereExists($availableEpisode);
             });
     }
 
