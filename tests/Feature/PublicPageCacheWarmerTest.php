@@ -11,7 +11,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use LogicException;
-use RuntimeException;
 use Tests\TestCase;
 
 final class PublicPageCacheWarmerTest extends TestCase
@@ -129,11 +128,14 @@ final class PublicPageCacheWarmerTest extends TestCase
 
         $result = app(PublicPageCacheWarmer::class)->warm();
 
-        $this->assertSame(['attempted' => 1, 'succeeded' => 1], $result);
+        $this->assertSame(1, $result['attempted']);
+        $this->assertSame(1, $result['succeeded']);
+        $this->assertSame(0, $result['failed']);
+        $this->assertSame([], $result['errors']);
         Http::assertSentCount(2);
     }
 
-    public function test_warmer_fails_the_batch_after_a_final_non_success_response(): void
+    public function test_warmer_records_a_final_non_success_response_without_aborting_the_batch(): void
     {
         config([
             'app.url' => 'https://seasonvar.test',
@@ -145,8 +147,38 @@ final class PublicPageCacheWarmerTest extends TestCase
         Http::preventStrayRequests();
         Http::fake(fn () => Http::response('', 503));
 
-        $this->expectException(RuntimeException::class);
+        $result = app(PublicPageCacheWarmer::class)->warm();
 
-        app(PublicPageCacheWarmer::class)->warm();
+        $this->assertSame(1, $result['attempted']);
+        $this->assertSame(0, $result['succeeded']);
+        $this->assertSame(1, $result['failed']);
+        $this->assertSame(503, $result['errors'][0]['status']);
+    }
+
+    public function test_critical_warmer_stops_before_starting_another_target_after_its_http_budget(): void
+    {
+        config([
+            'app.url' => 'https://seasonvar.test',
+            'cache-architecture.page_cache.warming_enabled' => true,
+            'cache-architecture.page_cache.warm_base_url' => 'https://seasonvar.test',
+            'cache-architecture.page_cache.warm_url_limit' => 2,
+            'cache-architecture.page_cache.warm_budget_seconds' => 1,
+            'cache-architecture.page_cache.warm_retry_times' => 1,
+            'cache-architecture.warming.full_request_delay_milliseconds' => 0,
+        ]);
+        Http::preventStrayRequests();
+        Http::fake(function () {
+            usleep(1_050_000);
+
+            return Http::response('<html></html>');
+        });
+
+        $result = app(PublicPageCacheWarmer::class)->warm();
+
+        $this->assertSame(1, $result['attempted']);
+        $this->assertSame(1, $result['succeeded']);
+        $this->assertSame(1, $result['skipped']);
+        $this->assertTrue($result['limited']);
+        Http::assertSentCount(1);
     }
 }

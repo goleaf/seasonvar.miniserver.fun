@@ -184,6 +184,7 @@ final class InfrastructureHealthCheck
             'status' => (string) ($state['status'] ?? 'unknown'),
             'finished_at' => $state['finished_at'] ?? null,
             'duration_ms' => $state['duration_ms'] ?? null,
+            'failed' => max(0, (int) ($state['failed'] ?? 0)),
         ];
     }
 

@@ -32,12 +32,17 @@ final class PublicPageCacheWarmer
 
     /**
      * @param  iterable<int, int|string>  $titleIds
-     * @return array{attempted: int, succeeded: int}
+     * @return array{
+     *     attempted: int,
+     *     succeeded: int,
+     *     failed: int,
+     *     errors: list<array{fingerprint: string, status: int|null, exception: string|null}>
+     * }
      */
     public function warm(iterable $titleIds = []): array
     {
         if (! (bool) config('cache-architecture.page_cache.warming_enabled', true)) {
-            return ['attempted' => 0, 'succeeded' => 0];
+            return ['attempted' => 0, 'succeeded' => 0, 'failed' => 0, 'errors' => []];
         }
 
         $baseUrl = $this->baseUrl();
@@ -52,11 +57,11 @@ final class PublicPageCacheWarmer
             ->values();
         $result = $this->executeTargets(
             $targets->map(fn (string $relativeUrl): PublicCacheWarmTarget => new PublicCacheWarmTarget($relativeUrl)),
-            failFast: true,
+            failFast: false,
             baseUrl: $baseUrl,
         );
 
-        return ['attempted' => $result['attempted'], 'succeeded' => $result['succeeded']];
+        return $result;
     }
 
     /**

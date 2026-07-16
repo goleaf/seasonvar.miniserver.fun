@@ -15,6 +15,20 @@ final class CatalogRecommendationBuildPruner
             return 0;
         }
 
+        $staleBuildMinutes = max(
+            5,
+            min(1_440, (int) config('recommendations.similarity_v6.stale_build_minutes', 20)),
+        );
+        CatalogRecommendationBuild::query()
+            ->where('status', 'building')
+            ->where('updated_at', '<', now()->subMinutes($staleBuildMinutes))
+            ->update([
+                'status' => 'failed',
+                'failure_message' => 'Shadow build остановлен: heartbeat не обновлялся в допустимом интервале.',
+                'completed_at' => now(),
+                'updated_at' => now(),
+            ]);
+
         $historyLimit = max(
             1,
             min(20, (int) config('recommendations.similarity_v6.build_history_limit', 5)),

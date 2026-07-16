@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Jobs\RebuildCatalogRecommendationsAfterCollectionSync;
 use App\Jobs\WarmCatalogCaches;
+use App\Models\CatalogRecommendationBuild;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
 use App\Models\CatalogTitleRecommendationSignal;
@@ -51,6 +52,14 @@ final class RebuildCatalogRecommendationsAfterCollectionSyncTest extends TestCas
     public function test_job_rebuilds_dirty_editorial_collection_similarity_then_dispatches_cache_warm(): void
     {
         Queue::fake();
+        CatalogRecommendationBuild::query()->create([
+            'algorithm_version' => 'v6',
+            'feature_version' => 'tokens-v2',
+            'status' => 'active',
+            'started_at' => now()->subMinutes(5),
+            'completed_at' => now()->subMinutes(4),
+            'activated_at' => now()->subMinutes(4),
+        ]);
         $source = CatalogTitle::factory()->create(['year' => 2018]);
         $candidate = CatalogTitle::factory()->create(['year' => 2024]);
         LicensedMedia::factory()->create([
@@ -89,5 +98,27 @@ final class RebuildCatalogRecommendationsAfterCollectionSyncTest extends TestCas
         $this->assertDatabaseCount('catalog_recommendation_dirty_titles', 0);
         $this->assertTrue(app(CatalogCacheWarmRequestStore::class)->claim(10)?->refresh);
         Queue::assertPushed(WarmCatalogCaches::class, 1);
+    }
+
+    public function test_job_defers_a_full_fallback_until_the_import_pipeline_without_warming_cache(): void
+    {
+        Queue::fake();
+        $title = CatalogTitle::factory()->create();
+        app(CatalogRecommendationDirtyTitleTracker::class)->mark(
+            $title->id,
+            'editorial-collection-sync',
+        );
+
+        (new RebuildCatalogRecommendationsAfterCollectionSync)->handle(
+            app(CatalogTitleRecommendationBuilder::class),
+            app(CatalogCacheWarmRequestStore::class),
+        );
+
+        $this->assertDatabaseHas('catalog_recommendation_dirty_titles', [
+            'catalog_title_id' => $title->id,
+        ]);
+        $this->assertDatabaseCount('catalog_recommendation_builds', 0);
+        $this->assertNull(app(CatalogCacheWarmRequestStore::class)->claim(10));
+        Queue::assertNotPushed(WarmCatalogCaches::class);
     }
 }

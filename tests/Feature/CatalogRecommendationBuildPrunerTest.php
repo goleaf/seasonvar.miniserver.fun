@@ -50,6 +50,27 @@ final class CatalogRecommendationBuildPrunerTest extends TestCase
         ]);
     }
 
+    public function test_it_marks_a_build_without_a_recent_heartbeat_as_failed(): void
+    {
+        config([
+            'recommendations.similarity_v6.build_history_limit' => 5,
+            'recommendations.similarity_v6.stale_build_minutes' => 20,
+        ]);
+        $stale = $this->build('building');
+        $recent = $this->build('building');
+        CatalogRecommendationBuild::query()->whereKey($stale->id)->update([
+            'updated_at' => now()->subMinutes(21),
+        ]);
+
+        $deleted = app(CatalogRecommendationBuildPruner::class)->prune();
+
+        $this->assertSame(0, $deleted);
+        $this->assertSame('failed', $stale->fresh()->status);
+        $this->assertNotNull($stale->fresh()->completed_at);
+        $this->assertStringContainsString('heartbeat', (string) $stale->fresh()->failure_message);
+        $this->assertSame('building', $recent->fresh()->status);
+    }
+
     private function build(string $status): CatalogRecommendationBuild
     {
         return CatalogRecommendationBuild::query()->create([

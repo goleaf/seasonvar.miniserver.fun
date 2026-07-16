@@ -434,6 +434,33 @@ class CatalogTitleRecommendationBuilderTest extends TestCase
         $this->assertSame(0, CatalogRecommendationDirtyTitle::query()->count());
     }
 
+    public function test_bounded_dirty_rebuild_defers_full_fallback_without_losing_dirty_titles(): void
+    {
+        config([
+            'recommendations.similarity_v6.dirty_title_limit' => 2,
+            'seasonvar.recommendations.min_score' => 1,
+        ]);
+        $titles = CatalogTitle::factory()->count(3)->create();
+        $tracker = app(CatalogRecommendationDirtyTitleTracker::class);
+
+        foreach ($titles as $title) {
+            $tracker->mark($title->id, 'editorial-collection-sync');
+        }
+
+        $result = app(CatalogTitleRecommendationBuilder::class)->rebuildDirty(
+            allowFullRebuild: false,
+        );
+
+        $this->assertSame('deferred', $result['mode']);
+        $this->assertTrue($result['deferred']);
+        $this->assertFalse($result['activated']);
+        $this->assertFalse($result['gate_passed']);
+        $this->assertSame('dirty-limit-exceeded', $result['scope_fallback_reason']);
+        $this->assertSame(3, $result['dirty_titles']);
+        $this->assertDatabaseCount('catalog_recommendation_dirty_titles', 3);
+        $this->assertDatabaseCount('catalog_recommendation_builds', 0);
+    }
+
     public function test_relationship_comedy_is_selected_while_unrelated_shared_actor_title_is_filtered(): void
     {
         config([

@@ -87,6 +87,7 @@ return [
         'scoped_source_limit' => 2_000,
         'scoped_neighbours_per_title' => 240,
         'build_history_limit' => 5,
+        'stale_build_minutes' => 20,
         'minimum_judgment_coverage' => 0.8,
         'provider_relation_score' => 650,
         'editorial_collection_signal_weight' => 280,

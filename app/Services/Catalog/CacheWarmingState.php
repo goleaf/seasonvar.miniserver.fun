@@ -25,7 +25,10 @@ final class CacheWarmingState
     /** @param array<string, mixed> $result */
     public function succeeded(array $result): void
     {
-        $this->write(['status' => 'ok', ...$result]);
+        $this->write([
+            'status' => ((int) ($result['failed'] ?? 0)) > 0 ? 'degraded' : 'ok',
+            ...$result,
+        ]);
     }
 
     public function failed(Throwable $exception): void

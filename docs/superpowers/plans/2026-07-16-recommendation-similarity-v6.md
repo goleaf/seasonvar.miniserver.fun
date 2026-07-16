@@ -525,7 +525,7 @@ Run parser/importer/pruner tests. On a database copy, compare row counts and `db
 
 **Interfaces:**
 - Tracker exposes `mark(int $titleId, string $reason): void`, `ids(int $limit): array`, `forget(array $ids): void`.
-- Builder exposes internal `rebuildDirty(?callable $progress = null): array`; no new Artisan command.
+- Builder exposes internal `rebuildDirty(?callable $progress = null, bool $allowFullRebuild = true): array`; no new Artisan command. Collection-sync passes `false`, while the full import keeps the default full fallback.
 
 - [x] **Step 1: Add failing dirty/scoped tests**
 
@@ -550,6 +550,10 @@ Hash ordered payload `[candidate_id, rank, score, bucket scores, reasons]`. With
 - [x] **Step 6: Verify targeted/full paths**
 
 Run focused import tests with `Http::fake()` and `Http::preventStrayRequests()`. Assert no new public command and bounded query count.
+
+- [x] **Step 7: Bound background fallback and recover abandoned builds**
+
+Collection-sync never starts a full build when active version or affected-source limits require fallback: it returns `deferred`, retains dirty rows and skips cache warm until the full import boundary. Full shadow builds heartbeat `updated_at` during profile and scoring chunks; pruning marks a `building` row failed after 20 minutes without heartbeat, preserving active rows and bounded terminal history.
 
 ---
 
@@ -587,7 +591,7 @@ Run: `php artisan test --compact`
 
 Expected: `0` failures. If unrelated concurrent work fails, preserve complete output and demonstrate the recommendation-focused suite remains green; do not hide the broad failure.
 
-Фактическая проверка 16 июля 2026 года: полный прогон выполнен — 1162 tests passed, 11 skipped и 13 failures в параллельно изменяемых контрактах поиска/шапки. После дополнительных fail-closed regressions изолированный recommendation/UI/importer набор прошёл: 141 tests, 719 assertions; отдельный API-контракт рекомендаций — 1 test, 14 assertions. Падения полного набора не скрыты и не исправлялись в рамках этой задачи.
+Фактическая проверка 16 июля 2026 года: повторный полный прогон на текущей общей ветке выполнен — 1193 tests passed, 11 skipped и 6 несвязанных failures/errors в параллельно изменяемых demo-data и cache-warmer контрактах. После дополнительных fail-closed regressions изолированный recommendation/UI/importer набор прошёл: 146 tests, 747 assertions; отдельный API-контракт рекомендаций — 1 test, 14 assertions; Playwright — 3/3 на desktop/mobile/tablet. Падения полного набора не скрыты и не исправлялись в рамках этой задачи.
 
 - [ ] **Step 4: Wait for existing import and run shadow build**
 

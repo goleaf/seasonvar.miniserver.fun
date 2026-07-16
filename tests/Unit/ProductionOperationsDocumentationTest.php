@@ -59,6 +59,7 @@ class ProductionOperationsDocumentationTest extends TestCase
         $this->assertSame('cache-warm-v2', $cacheConfig['warming']['queue']);
         $this->assertStringContainsString('CACHE_WARM_QUEUE=cache-warm-v2', $envExample);
         $this->assertStringContainsString('--queue=cache-warm-v2', $unit);
+        $this->assertStringContainsString('--timeout=600', $unit);
         $this->assertStringContainsString('retryUntil', $deployment);
         $this->assertStringContainsString('cache-warm-v2', $deployment);
         $this->assertStringContainsString('не очищать', $deployment);

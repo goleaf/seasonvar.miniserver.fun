@@ -60,6 +60,7 @@ final class CatalogTitleRecommendationBuilder
      */
     public function rebuild(?callable $progress = null): array
     {
+        $this->pruneShadowBuilds($progress, null);
         $build = $this->startShadowBuild();
 
         try {
@@ -78,15 +79,24 @@ final class CatalogTitleRecommendationBuilder
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @return array<string, mixed>
      */
-    public function rebuildDirty(?callable $progress = null): array
-    {
+    public function rebuildDirty(
+        ?callable $progress = null,
+        bool $allowFullRebuild = true,
+    ): array {
         $startedAt = microtime(true);
+        $this->pruneShadowBuilds($progress, null);
         $dirtyLimit = max(1, (int) config('recommendations.similarity_v6.dirty_title_limit', 2_000));
         $dirtyIds = $this->dirtyTitles->ids($dirtyLimit + 1);
         $fallbackReason = $this->scopedFallbackReason($dirtyIds, $dirtyLimit);
 
         if ($fallbackReason !== null) {
-            return $this->fallbackToFullRebuild($dirtyIds, $fallbackReason, $progress);
+            return $this->fallbackOrDeferFullRebuild(
+                $dirtyIds,
+                $fallbackReason,
+                $progress,
+                $allowFullRebuild,
+                $startedAt,
+            );
         }
 
         if ($dirtyIds === []) {
@@ -105,10 +115,12 @@ final class CatalogTitleRecommendationBuilder
             if (count($affectedIds) > $sourceLimit) {
                 $this->resetWorkingSet();
 
-                return $this->fallbackToFullRebuild(
+                return $this->fallbackOrDeferFullRebuild(
                     $dirtyIds,
                     'affected-source-limit-exceeded',
                     $progress,
+                    $allowFullRebuild,
+                    $startedAt,
                 );
             }
 
@@ -138,7 +150,7 @@ final class CatalogTitleRecommendationBuilder
         $minScore = max(1, (int) config('seasonvar.recommendations.min_score', self::DEFAULT_MIN_SCORE));
         $maxPerTitle = max(1, (int) config('seasonvar.recommendations.max_per_title', 12));
         $computedAt = now();
-        $profiles = $this->compactProfileIndex($chunkSize);
+        $profiles = $this->compactProfileIndex($chunkSize, $build);
         $stored = 0;
         $activeRowsBefore = $build !== null ? CatalogTitleRecommendation::query()->count() : 0;
         $deleted = $build === null ? $this->deleteOutOfScopeRecommendations() : 0;
@@ -170,6 +182,7 @@ final class CatalogTitleRecommendationBuilder
             }
 
             if ($processedInChunk === $chunkSize) {
+                $this->heartbeatShadowBuild($build);
                 $this->progress($progress, 'catalog-title-recommendations-chunk-complete', [
                     'processed' => $processedInChunk,
                     'stored' => $stored,
@@ -180,6 +193,7 @@ final class CatalogTitleRecommendationBuilder
         }
 
         if ($processedInChunk > 0) {
+            $this->heartbeatShadowBuild($build);
             $this->progress($progress, 'catalog-title-recommendations-chunk-complete', [
                 'processed' => $processedInChunk,
                 'stored' => $stored,
@@ -488,6 +502,54 @@ final class CatalogTitleRecommendationBuilder
         ];
     }
 
+    /**
+     * @param  list<int>  $dirtyIds
+     * @param  (callable(string, array<string, mixed>): void)|null  $progress
+     * @return array<string, mixed>
+     */
+    private function fallbackOrDeferFullRebuild(
+        array $dirtyIds,
+        string $reason,
+        ?callable $progress,
+        bool $allowFullRebuild,
+        float $startedAt,
+    ): array {
+        if ($allowFullRebuild) {
+            return $this->fallbackToFullRebuild($dirtyIds, $reason, $progress);
+        }
+
+        $this->progress($progress, 'catalog-title-recommendations-full-rebuild-deferred', [
+            'dirty_titles' => count($dirtyIds),
+            'scope_fallback_reason' => $reason,
+        ]);
+
+        return [
+            'mode' => 'deferred',
+            'algorithm_version' => $this->algorithmVersion(),
+            'titles' => 0,
+            'titles_with_recommendations' => 0,
+            'titles_without_recommendations' => 0,
+            'stored' => 0,
+            'deleted' => 0,
+            'average_recommendations' => 0.0,
+            'min_score' => max(1, (int) config('seasonvar.recommendations.min_score', self::DEFAULT_MIN_SCORE)),
+            'max_per_title' => max(1, (int) config('seasonvar.recommendations.max_per_title', 12)),
+            'build_id' => null,
+            'activated' => false,
+            'gate_passed' => false,
+            'deferred' => true,
+            'baseline_metrics' => null,
+            'candidate_metrics' => null,
+            'row_churn' => null,
+            'dirty_titles' => count($dirtyIds),
+            'affected_titles' => 0,
+            'changed_titles' => 0,
+            'unchanged_titles' => 0,
+            'scope_fallback_reason' => $reason,
+            'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        ];
+    }
+
     /** @param list<int> $dirtyIds */
     private function scopedFallbackReason(array $dirtyIds, int $dirtyLimit): ?string
     {
@@ -558,9 +620,12 @@ final class CatalogTitleRecommendationBuilder
     }
 
     /** @return array<int, string> */
-    private function compactProfileIndex(int $chunkSize): array
-    {
+    private function compactProfileIndex(
+        int $chunkSize,
+        ?CatalogRecommendationBuild $build = null,
+    ): array {
         $profiles = [];
+        $loaded = 0;
         $publicCounts = $this->titles->publicCardCounts(null);
         $reviewCount = $this->reviewSchema->communityAvailable()
             ? ['reviews' => fn (Builder $query): Builder => $query
@@ -587,7 +652,7 @@ final class CatalogTitleRecommendationBuilder
                 'licensedMedia as published_media_count' => $publicCounts['licensedMedia as published_media_count'],
             ])
             ->lazyById($chunkSize)
-            ->each(function (CatalogTitle $title) use (&$profiles): void {
+            ->each(function (CatalogTitle $title) use (&$loaded, &$profiles, $build, $chunkSize): void {
                 $relations = $this->profileRelations($title);
                 $themes = array_keys($this->themes->extract(
                     $title->title,
@@ -627,8 +692,15 @@ final class CatalogTitleRecommendationBuilder
                     $this->featureDocumentCounts['editorial_collection'][$signalKey]
                         = ($this->featureDocumentCounts['editorial_collection'][$signalKey] ?? 0) + 1;
                 }
+
+                $loaded++;
+
+                if ($loaded % $chunkSize === 0) {
+                    $this->heartbeatShadowBuild($build);
+                }
             });
 
+        $this->heartbeatShadowBuild($build);
         $this->profileCount = count($profiles);
 
         return $profiles;
@@ -1097,20 +1169,28 @@ final class CatalogTitleRecommendationBuilder
     /** @param (callable(string, array<string, mixed>): void)|null $progress */
     private function pruneShadowBuilds(?callable $progress, ?CatalogRecommendationBuild $build): int
     {
-        if ($build === null) {
-            return 0;
-        }
-
         try {
             return $this->buildPruner->prune();
         } catch (Throwable $exception) {
             report($exception);
             $this->progress($progress, 'catalog-title-recommendation-build-prune-failed', [
-                'build_id' => $build->id,
+                'build_id' => $build?->id,
             ]);
 
             return 0;
         }
+    }
+
+    private function heartbeatShadowBuild(?CatalogRecommendationBuild $build): void
+    {
+        if ($build === null) {
+            return;
+        }
+
+        CatalogRecommendationBuild::query()
+            ->whereKey($build->id)
+            ->where('status', 'building')
+            ->update(['updated_at' => now()]);
     }
 
     private function resetWorkingSet(): void

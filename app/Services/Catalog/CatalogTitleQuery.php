@@ -74,7 +74,7 @@ class CatalogTitleQuery
         }
 
         if (! isset($this->rankedSearchAliases[spl_object_id($query)])) {
-            $this->applySearchFilter($query, $search, null, $user, null);
+            $this->applySearchFilter($query, $search, null, $user, null, exactMatchOnly: false);
         }
 
         return $query;
@@ -335,6 +335,7 @@ class CatalogTitleQuery
         ?int $titleContextId,
         ?User $user,
         ?CatalogSearchMatchSet $searchMatches,
+        bool $exactMatchOnly = true,
     ): void {
         if ($search->state === CatalogSearchState::Empty) {
             return;
@@ -359,7 +360,7 @@ class CatalogTitleQuery
         }
 
         if (mb_strlen($search->normalized) < 2) {
-            $query->whereIn('catalog_titles.id', $this->searchCandidateIdsQuery($search, $user));
+            $query->whereIn('catalog_titles.id', $this->searchCandidateIdsQuery($search, $user, $exactMatchOnly));
 
             return;
         }
@@ -370,14 +371,18 @@ class CatalogTitleQuery
             return;
         }
 
-        $query->whereIn('catalog_titles.id', $this->searchCandidateIdsQuery($search, $user));
+        $query->whereIn('catalog_titles.id', $this->searchCandidateIdsQuery($search, $user, $exactMatchOnly));
     }
 
     /** @return Builder<CatalogTitle> */
-    private function searchCandidateIdsQuery(CatalogSearchQuery $search, ?User $user): Builder
-    {
+    private function searchCandidateIdsQuery(
+        CatalogSearchQuery $search,
+        ?User $user,
+        bool $exactMatchOnly = true,
+    ): Builder {
         $exactMatches = $this->exactTitleSearchQuery($search, $user);
-        if (mb_strlen($search->normalized) < 2 || $this->exactMatchExists($search, $user, $exactMatches)) {
+        if (mb_strlen($search->normalized) < 2
+            || ($exactMatchOnly && $this->exactMatchExists($search, $user, $exactMatches))) {
             return $exactMatches;
         }
 

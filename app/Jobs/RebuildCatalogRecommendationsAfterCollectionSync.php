@@ -57,7 +57,16 @@ final class RebuildCatalogRecommendationsAfterCollectionSync implements ShouldBe
         CatalogTitleRecommendationBuilder $recommendations,
         CatalogCacheWarmRequestStore $warmRequests,
     ): void {
-        $result = $recommendations->rebuildDirty();
+        $result = $recommendations->rebuildDirty(allowFullRebuild: false);
+
+        if (($result['deferred'] ?? false) === true) {
+            Log::info('Полное перестроение рекомендаций отложено до завершения импорта.', [
+                'dirty_titles' => (int) ($result['dirty_titles'] ?? 0),
+                'scope_fallback_reason' => $result['scope_fallback_reason'] ?? null,
+            ]);
+
+            return;
+        }
 
         if (($result['activated'] ?? true) !== true || ($result['gate_passed'] ?? true) !== true) {
             throw new RuntimeException('Перестроение рекомендаций не прошло проверку активации.');

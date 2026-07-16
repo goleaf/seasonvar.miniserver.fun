@@ -11,13 +11,17 @@ use App\Services\Catalog\CatalogCacheWarmer;
 use App\Services\Catalog\CatalogCacheWarmRequestStore;
 use App\Services\Catalog\PublicPageCacheWarmer;
 use App\Support\Cache\CacheDomain;
+use App\Support\Cache\CacheKeyFactory;
 use App\Support\Cache\CacheVersionRegistry;
+use Illuminate\Cache\Repository;
+use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SyncQueue;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
@@ -35,6 +39,7 @@ final class CacheWarmJobTest extends TestCase
         $this->assertInstanceOf(ShouldBeUniqueUntilProcessing::class, $job);
         $this->assertTrue($job->afterCommit);
         $this->assertSame(604_800, $job->uniqueFor);
+        $this->assertSame(600, $job->timeout);
         $this->assertSame('catalog-critical-cache-warm-v2', $job->uniqueId());
         $this->assertContainsOnlyInstancesOf(WithoutOverlapping::class, $job->middleware());
     }
@@ -156,5 +161,55 @@ final class CacheWarmJobTest extends TestCase
         $this->assertNotNull($remaining);
         $this->assertCount(1, $remaining->titleIds);
         Queue::assertPushed(WarmCatalogCaches::class, 1);
+    }
+
+    public function test_job_acknowledges_intent_after_a_degraded_public_page_warm_without_retry_storm(): void
+    {
+        config([
+            'app.url' => 'https://seasonvar.test',
+            'cache-architecture.page_cache.warming_enabled' => true,
+            'cache-architecture.page_cache.warm_base_url' => 'https://seasonvar.test',
+            'cache-architecture.page_cache.warm_url_limit' => 1,
+            'cache-architecture.page_cache.warm_retry_times' => 1,
+        ]);
+        Http::preventStrayRequests();
+        Http::fake(fn () => Http::response('', 503));
+        Queue::fake();
+        $store = app(CatalogCacheWarmRequestStore::class);
+        $store->request(refresh: true);
+
+        (new WarmCatalogCaches)->handle(app(CatalogCacheWarmer::class), $store);
+
+        $this->assertNull($store->claim(10));
+        $this->assertSame('degraded', app(CacheWarmingState::class)->read()['status'] ?? null);
+        Queue::assertNotPushed(WarmCatalogCaches::class);
+    }
+
+    public function test_refresh_skips_a_contended_cache_target_and_keeps_warming_the_neighbors(): void
+    {
+        $locale = (string) collect(config('catalog-collections.supported_locales'))->first();
+        $keys = app(CacheKeyFactory::class);
+        $dataKey = $keys->data(
+            CacheDomain::Homepage,
+            'metrics',
+            ['audience' => 'public', 'locale' => $locale],
+            app(CacheVersionRegistry::class)->version(CacheDomain::Homepage),
+        );
+        $repository = Cache::store((string) config('cache-architecture.stores.locks'));
+        $this->assertInstanceOf(Repository::class, $repository);
+        $this->assertInstanceOf(LockProvider::class, $repository->getStore());
+        $lock = $repository->getStore()->lock($keys->lock($dataKey), 30);
+        $this->assertTrue($lock->get());
+
+        try {
+            $result = app(CatalogCacheWarmer::class)->warmCritical(refresh: true);
+        } finally {
+            $lock->release();
+        }
+
+        $this->assertGreaterThanOrEqual(1, $result['failed']);
+        $this->assertContains("home_metrics:{$locale}", array_column($result['failures'], 'target'));
+        $this->assertSame('degraded', app(CacheWarmingState::class)->read()['status'] ?? null);
+        $this->assertArrayHasKey('home_snapshot', $result['targets']);
     }
 }
