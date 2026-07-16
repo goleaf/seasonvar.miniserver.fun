@@ -4,18 +4,17 @@ declare(strict_types=1);
 
 namespace App\Services\Catalog\Search;
 
+use App\Enums\CatalogSort;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\Season;
 use App\Models\User;
 use App\Services\Catalog\CatalogTitleQuery;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 final readonly class CatalogTitleSuggestionQuery
 {
     public function __construct(
-        private CatalogTitleSearch $search,
         private CatalogTitleQuery $titles,
         private CatalogSearchNormalizer $normalizer,
     ) {}
@@ -28,42 +27,32 @@ final readonly class CatalogTitleSuggestionQuery
         }
 
         $limit = max(1, min(25, $limit));
-        $candidates = $this->search->candidateQuery($query);
-
-        if ($candidates !== null) {
-            $candidateIds = $candidates
-                ->limit($limit)
-                ->pluck('catalog_title_id')
-                ->map(static fn (mixed $id): int => (int) $id)
-                ->values();
-
-            if ($candidateIds->isEmpty()) {
-                return collect();
-            }
-
-            $titlesById = $this->summaryQuery($user)
-                ->whereKey($candidateIds)
-                ->get()
-                ->keyBy('id');
-
-            return $this->loadPublicReleaseCounts($candidateIds
-                ->map(fn (int $id): ?CatalogTitle => $titlesById->get($id))
-                ->filter()
-                ->values(), $user);
-        }
-
-        $titles = $this->matchingNamesQuery($query, $user)
-            ->with('aliases:id,catalog_title_id,name')
-            ->orderByDesc('catalog_titles.indexed_at')
-            ->orderByDesc('catalog_titles.id')
-            ->limit(max(40, $limit * 8))
-            ->get()
-            ->sortBy(fn (CatalogTitle $title): array => [
-                $this->rank($title, $query->normalized),
-                $this->normalizer->key($title->display_title),
-                $title->id,
+        $matches = $this->titles->matchingTitles($query, $user)
+            ->select([
+                'catalog_titles.id',
+                'catalog_titles.slug',
+                'catalog_titles.title',
+                'catalog_titles.original_title',
+                'catalog_titles.type',
+                'catalog_titles.year',
+                'catalog_titles.poster_url',
+                'catalog_titles.indexed_at',
             ])
+            ->with('aliases:id,catalog_title_id,name')
+            ->limit(max(40, $limit * 8));
+
+        $titles = $this->titles
+            ->sorted($matches, CatalogSort::Relevance)
+            ->get()
+            ->values()
+            ->map(fn (CatalogTitle $title, int $position): array => [
+                'title' => $title,
+                'rank' => $this->rank($title, $query->normalized),
+                'position' => $position,
+            ])
+            ->sortBy(fn (array $row): array => [$row['rank'], $row['position']])
             ->take($limit)
+            ->pluck('title')
             ->values();
 
         return $this->loadPublicReleaseCounts($titles, $user);
@@ -75,56 +64,7 @@ final readonly class CatalogTitleSuggestionQuery
             return 0;
         }
 
-        $matchingIds = $this->search->matchingTitleIdsQuery($query);
-
-        if ($matchingIds !== null) {
-            return $this->titles->visibleTo($user)
-                ->whereIn('catalog_titles.id', $matchingIds)
-                ->count();
-        }
-
-        return $this->matchingNamesQuery($query, $user)->count();
-    }
-
-    /** @return Builder<CatalogTitle> */
-    private function summaryQuery(?User $user): Builder
-    {
-        return $this->titles->visibleTo($user)->select([
-            'catalog_titles.id',
-            'catalog_titles.slug',
-            'catalog_titles.title',
-            'catalog_titles.original_title',
-            'catalog_titles.type',
-            'catalog_titles.year',
-            'catalog_titles.poster_url',
-            'catalog_titles.indexed_at',
-        ]);
-    }
-
-    /** @return Builder<CatalogTitle> */
-    private function matchingNamesQuery(CatalogSearchQuery $query, ?User $user): Builder
-    {
-        $variants = collect($this->normalizer->legacyVariants(str_replace(['%', '_'], '', $query->raw)))
-            ->filter(fn (string $variant): bool => $variant !== '')
-            ->take(12)
-            ->values();
-
-        if ($variants->isEmpty()) {
-            return $this->summaryQuery($user)->whereRaw('1 = 0');
-        }
-
-        return $this->summaryQuery($user)->where(function (Builder $builder) use ($variants): void {
-            $variants->each(function (string $variant) use ($builder): void {
-                $builder->orWhere('catalog_titles.title', 'like', "%{$variant}%")
-                    ->orWhere('catalog_titles.original_title', 'like', "%{$variant}%");
-            });
-
-            $builder->orWhereHas('aliases', function (Builder $aliases) use ($variants): void {
-                $variants->each(
-                    fn (string $variant): Builder => $aliases->orWhere('name', 'like', "%{$variant}%"),
-                );
-            });
-        });
+        return $this->titles->matchingTitles($query, $user)->count();
     }
 
     /**

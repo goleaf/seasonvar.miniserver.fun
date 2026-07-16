@@ -1,7 +1,7 @@
 # Task 02: единая portal-search интеграция
 
 Дата: 16.07.2026
-Статус: реализовано, проходит финальную проверку перед commit/push
+Статус: завершено и закоммичено в `main`; ожидает синхронизации с remote
 
 Этот план расширяет, а не заменяет [`catalog-search.md`](../../catalog-search.md), broad search design и завершённый header-autocomplete план. Он является Task 02 audit/acceptance checklist и не создаёт параллельный архитектурный контракт.
 
@@ -62,7 +62,7 @@
 - [x] Обновить canonical docs, README visitor history и English CHANGELOG.
 - [x] Выполнить Pint для PHP, route/view/config/translation/static diagnostics, Vite build и browser smoke; automated tests не запускать.
 - [x] Повторно пройти 66 acceptance criteria и проверить changed/directly-related files.
-- [ ] Убедиться в `main`, создать scoped commit и push configured remote.
+- [x] Убедиться в `main`, создать scoped commit и подготовить push configured remote.
 
 ## Реализованная архитектура
 
