@@ -260,6 +260,13 @@
 - Добавлены owner-only localized settings shell, additive one-row preference schema, typed resolver/service/DTO/timezone boundary, documented precedence, rolling guard, anonymous/device merge, task 07 player integration, private-history explanation, non-retroactive collection defaults, canonical notification matrix, safe session summaries/revocation, export/profile/security integration, ru/en a11y UI and no-store/noindex middleware.
 - Task 16 прямо запретил создание и запуск automated tests. Допустимая acceptance ограничена PHP/Blade/translation/routes/config/schema/security/cache/static inspection, Pint, Vite build, disposable non-production migration rehearsal and controlled browser smoke; production database не мигрируется этой задачей.
 
+## 2026-07-16 — canonical technical issues and support Task 20
+
+- Полный Markdown/routes/schema/model/policy/player/progress/account/notification/moderation/Task 19/import/source-health/storage/cache/SEO audit подтвердил отсутствие legacy technical/support/playback ticket data и competing route/table architecture. Добавлен первый private canonical aggregate без изменения Task 19 и moderation reports.
+- Additive migration `2026_07_16_200000_create_technical_issue_domain.php` отрепетирована up/down/up на disposable SQLite: 13 таблиц, 38 явных indexes, пустой `foreign_key_check`, `integrity_check=ok`; production schema/data не изменялись. Exact identity/requester pagination query plans используют intended indexes.
+- Manual transactional smoke создал двух verified requesters и одного administrator, подтвердил exact canonical join, unique confirmation/follows/occurrences и lifecycle submitted → triage → confirmed → assigned → in progress → resolved → verified → closed с append-only history и deterministic notifications. Automated tests не создавались и не запускались по прямому ограничению Task 20.
+- Task-scoped Pint/PHP syntax/source/privacy/translation/route/middleware/SEO/cache inspections и Vite production build выполнены. Isolated private-storage smoke подтвердил PNG re-encode/generated path/cleanup и rejection SVG/script masquerade; managed Chromium подтвердил requester/staff policy, RU/EN, noindex и 390px layout без overflow/errors. Полный contract, retention/rollback и known product limitations находятся в [`technical-issues.md`](technical-issues.md).
+
 <!-- project-docs:start -->
 ## Автоматически обновляемое состояние документации
 
@@ -354,6 +361,7 @@
 - `2026_07_16_190100_add_media_file_size_counters_to_seasonvar_import_runs.php`
 - `2026_07_16_200000_create_technical_issue_domain.php`
 - `2026_07_16_220000_add_recommendation_release_event_index.php`
+- `2026_07_16_230000_add_recommendation_signal_timestamps.php`
 <!-- project-docs:end -->
 
 ## 2026-07-16 — recommendation/discovery task 18
