@@ -106,6 +106,13 @@ final class CiQualityGateContractTest extends TestCase
         $this->assertLessThan($initialCleanupPosition, $mkdirPosition);
     }
 
+    public function test_browser_profile_cleans_isolated_artifacts_after_browser_exit(): void
+    {
+        $qualityGate = File::get(base_path('scripts/ci-check.sh'));
+
+        $this->assertStringContainsString("run_browser() (\n    trap clear_laravel_cache_artifacts EXIT", $qualityGate);
+    }
+
     public function test_pre_push_runs_the_same_local_quality_gate_before_upload(): void
     {
         $hook = File::get(base_path('.githooks/pre-push'));

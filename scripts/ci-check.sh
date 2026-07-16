@@ -68,7 +68,8 @@ run_frontend() {
     npm run build
 }
 
-run_browser() {
+run_browser() (
+    trap clear_laravel_cache_artifacts EXIT
     local browser_database="${BROWSER_TEST_DATABASE:-$repo_root/output/playwright/browser.sqlite}"
 
     if [[ "$browser_database" != /* ]]; then
@@ -86,7 +87,7 @@ run_browser() {
     npm run test:browser:install
     php tests/browser/prepare-fixtures.php
     npm run test:browser
-}
+)
 
 profile="${1:-full}"
 
