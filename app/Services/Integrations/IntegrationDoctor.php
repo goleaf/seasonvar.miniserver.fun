@@ -139,7 +139,7 @@ final class IntegrationDoctor
             && str_contains($server, 'boost:mcp')
             && str_contains($server, '--env=local')
             && str_contains($server, 'env = { APP_ENV = "local" }')
-            && str_contains($server, 'cwd = "'.base_path().'"');
+            && $this->hasAbsoluteWorkingDirectory($server);
 
         return $this->check(
             'laravel_boost_mcp',
@@ -182,7 +182,7 @@ final class IntegrationDoctor
             && str_contains($server, '--headless')
             && str_contains($server, '--isolated')
             && str_contains($server, 'output/playwright')
-            && str_contains($server, 'cwd = "'.base_path().'"')
+            && $this->hasAbsoluteWorkingDirectory($server)
             && str_contains($server, 'required = false');
 
         return $this->check(
@@ -211,6 +211,22 @@ final class IntegrationDoctor
         }
 
         return $matches['server'];
+    }
+
+    private function hasAbsoluteWorkingDirectory(string $server): bool
+    {
+        if (preg_match('/^cwd\s*=\s*"(?<cwd>[^"\r\n]+)"$/m', $server, $matches) !== 1) {
+            return false;
+        }
+
+        $workingDirectory = $matches['cwd'];
+        $isAbsolute = str_starts_with($workingDirectory, '/')
+            || str_starts_with($workingDirectory, '\\\\')
+            || preg_match('/^[A-Za-z]:[\\\\\/]/', $workingDirectory) === 1;
+
+        return $isAbsolute
+            && ! str_contains($workingDirectory, "\0")
+            && preg_match('~(?:^|[\\\\/])\.\.(?:[\\\\/]|$)~', $workingDirectory) !== 1;
     }
 
     /** @return IntegrationCheck */

@@ -34,6 +34,8 @@ final class CatalogCacheWarmer
      *         attempted: int,
      *         succeeded: int,
      *         failed: int,
+     *         skipped: int,
+     *         limited: bool,
      *         errors: list<array{fingerprint: string, status: int|null, exception: string|null}>
      *     }
      * }
@@ -44,7 +46,14 @@ final class CatalogCacheWarmer
         $started = hrtime(true);
         $targets = [];
         $failures = [];
-        $publicPages = ['attempted' => 0, 'succeeded' => 0, 'failed' => 0, 'errors' => []];
+        $publicPages = [
+            'attempted' => 0,
+            'succeeded' => 0,
+            'failed' => 0,
+            'skipped' => 0,
+            'limited' => false,
+            'errors' => [],
+        ];
         $originalLocale = App::currentLocale();
         $this->state->started();
 
@@ -80,6 +89,11 @@ final class CatalogCacheWarmer
                     'warming-page-failure',
                     $publicPages['failed'],
                 );
+                $this->telemetry->increment(
+                    CacheDomain::Operational,
+                    'warming-page-skipped',
+                    $publicPages['skipped'],
+                );
             }
 
             $result = [
@@ -87,7 +101,7 @@ final class CatalogCacheWarmer
                 'finished_at' => now()->toIso8601String(),
                 'duration_ms' => (int) ((hrtime(true) - $started) / 1_000_000),
                 'targets' => $targets,
-                'failed' => count($failures) + $publicPages['failed'],
+                'failed' => count($failures) + $publicPages['failed'] + $publicPages['skipped'],
                 'failures' => $failures,
                 'public_pages' => $publicPages,
             ];

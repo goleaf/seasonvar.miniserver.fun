@@ -36,13 +36,22 @@ final class PublicPageCacheWarmer
      *     attempted: int,
      *     succeeded: int,
      *     failed: int,
+     *     skipped: int,
+     *     limited: bool,
      *     errors: list<array{fingerprint: string, status: int|null, exception: string|null}>
      * }
      */
     public function warm(iterable $titleIds = []): array
     {
         if (! (bool) config('cache-architecture.page_cache.warming_enabled', true)) {
-            return ['attempted' => 0, 'succeeded' => 0, 'failed' => 0, 'errors' => []];
+            return [
+                'attempted' => 0,
+                'succeeded' => 0,
+                'failed' => 0,
+                'skipped' => 0,
+                'limited' => false,
+                'errors' => [],
+            ];
         }
 
         $baseUrl = $this->baseUrl();
@@ -59,6 +68,10 @@ final class PublicPageCacheWarmer
             $targets->map(fn (string $relativeUrl): PublicCacheWarmTarget => new PublicCacheWarmTarget($relativeUrl)),
             failFast: false,
             baseUrl: $baseUrl,
+            budgetSeconds: max(1, (int) config(
+                'cache-architecture.page_cache.warm_budget_seconds',
+                240,
+            )),
         );
 
         return $result;
@@ -70,13 +83,22 @@ final class PublicPageCacheWarmer
      *     attempted: int,
      *     succeeded: int,
      *     failed: int,
+     *     skipped: int,
+     *     limited: bool,
      *     errors: list<array{fingerprint: string, status: int|null, exception: string|null}>
      * }
      */
     public function warmTargets(iterable $targets): array
     {
         if (! (bool) config('cache-architecture.page_cache.warming_enabled', true)) {
-            return ['attempted' => 0, 'succeeded' => 0, 'failed' => 0, 'errors' => []];
+            return [
+                'attempted' => 0,
+                'succeeded' => 0,
+                'failed' => 0,
+                'skipped' => 0,
+                'limited' => false,
+                'errors' => [],
+            ];
         }
 
         return $this->executeTargets($targets, failFast: false, baseUrl: $this->baseUrl());
@@ -170,24 +192,41 @@ final class PublicPageCacheWarmer
      *     attempted: int,
      *     succeeded: int,
      *     failed: int,
+     *     skipped: int,
+     *     limited: bool,
      *     errors: list<array{fingerprint: string, status: int|null, exception: string|null}>
      * }
      */
-    private function executeTargets(iterable $targets, bool $failFast, string $baseUrl): array
-    {
+    private function executeTargets(
+        iterable $targets,
+        bool $failFast,
+        string $baseUrl,
+        ?int $budgetSeconds = null,
+    ): array {
         $attempted = 0;
         $succeeded = 0;
         $errors = [];
+        $skipped = 0;
+        $targetList = collect($targets)->values();
+        $deadline = $budgetSeconds !== null
+            ? hrtime(true) + (max(1, $budgetSeconds) * 1_000_000_000)
+            : null;
 
-        foreach ($targets as $target) {
-            $attempted++;
-
-            if (! $failFast && $attempted > 1) {
+        foreach ($targetList as $index => $target) {
+            if (! $failFast && $index > 0) {
                 usleep(max(0, (int) config(
                     'cache-architecture.warming.full_request_delay_milliseconds',
                     100,
                 )) * 1_000);
             }
+
+            if ($deadline !== null && hrtime(true) >= $deadline) {
+                $skipped = $targetList->count() - $index;
+
+                break;
+            }
+
+            $attempted++;
 
             if (! $this->validRelativeUrl($target->relativeUrl)) {
                 $exception = new InvalidArgumentException('Цель публичного прогрева должна быть безопасным relative URL.');
@@ -233,6 +272,8 @@ final class PublicPageCacheWarmer
             'attempted' => $attempted,
             'succeeded' => $succeeded,
             'failed' => count($errors),
+            'skipped' => $skipped,
+            'limited' => $skipped > 0,
             'errors' => $errors,
         ];
     }

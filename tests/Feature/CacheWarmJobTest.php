@@ -185,6 +185,34 @@ final class CacheWarmJobTest extends TestCase
         Queue::assertNotPushed(WarmCatalogCaches::class);
     }
 
+    public function test_critical_warmer_marks_budget_limited_http_pass_as_degraded(): void
+    {
+        config([
+            'app.url' => 'https://seasonvar.test',
+            'cache-architecture.page_cache.warming_enabled' => true,
+            'cache-architecture.page_cache.warm_base_url' => 'https://seasonvar.test',
+            'cache-architecture.page_cache.warm_url_limit' => 2,
+            'cache-architecture.page_cache.warm_budget_seconds' => 1,
+            'cache-architecture.page_cache.warm_retry_times' => 1,
+            'cache-architecture.warming.full_request_delay_milliseconds' => 0,
+        ]);
+        Http::preventStrayRequests();
+        Http::fake(function () {
+            usleep(1_050_000);
+
+            return Http::response('<html></html>');
+        });
+
+        $result = app(CatalogCacheWarmer::class)->warmCritical();
+
+        $this->assertSame(1, $result['public_pages']['attempted']);
+        $this->assertSame(1, $result['public_pages']['skipped']);
+        $this->assertTrue($result['public_pages']['limited']);
+        $this->assertSame(1, $result['failed']);
+        $this->assertSame('degraded', app(CacheWarmingState::class)->read()['status'] ?? null);
+        Http::assertSentCount(1);
+    }
+
     public function test_refresh_skips_a_contended_cache_target_and_keeps_warming_the_neighbors(): void
     {
         $locale = (string) collect(config('catalog-collections.supported_locales'))->first();

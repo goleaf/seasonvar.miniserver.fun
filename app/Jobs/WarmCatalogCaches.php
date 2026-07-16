@@ -36,7 +36,7 @@ final class WarmCatalogCaches implements ShouldBeUniqueUntilProcessing, ShouldQu
 
     public function __construct(public readonly bool $refresh = false)
     {
-        $this->timeout = max(30, (int) config('cache-architecture.warming.timeout', 300));
+        $this->timeout = max(30, (int) config('cache-architecture.warming.timeout', 600));
         $this->uniqueFor = max(30, (int) config('cache-architecture.warming.unique_seconds', 604_800));
         $this->onConnection((string) config('cache-architecture.warming.connection', 'redis'));
         $this->onQueue((string) config('cache-architecture.warming.queue', 'cache-warm-v2'));

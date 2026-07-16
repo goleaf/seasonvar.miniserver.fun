@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Services\Integrations\IntegrationDoctor;
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Artisan;
+use Symfony\Component\Process\ExecutableFinder;
 use Tests\TestCase;
 
 class CheckIntegrationsCommandTest extends TestCase
@@ -41,5 +43,40 @@ class CheckIntegrationsCommandTest extends TestCase
         $this->assertIsArray($check);
         $this->assertSame(IntegrationDoctor::STATUS_OK, $check['status']);
         $this->assertStringContainsString('APP_ENV=local', $check['message']);
+    }
+
+    public function test_it_accepts_an_absolute_boost_working_directory_from_another_checkout(): void
+    {
+        $projectConfig = <<<'TOML'
+[mcp_servers.laravel-boost]
+command = "php"
+args = ["artisan", "boost:mcp", "--env=local"]
+env = { APP_ENV = "local" }
+cwd = "/srv/seasonvar"
+required = false
+TOML;
+        $files = new class($projectConfig) extends Filesystem
+        {
+            public function __construct(private readonly string $projectConfig) {}
+
+            public function isFile($file)
+            {
+                return $file === base_path('.codex/config.toml') || parent::isFile($file);
+            }
+
+            public function get($path, $lock = false)
+            {
+                if ($path === base_path('.codex/config.toml')) {
+                    return $this->projectConfig;
+                }
+
+                return parent::get($path, $lock);
+            }
+        };
+        $doctor = new IntegrationDoctor($files, app(ExecutableFinder::class));
+        $check = collect($doctor->checks())->firstWhere('key', 'laravel_boost_mcp');
+
+        $this->assertIsArray($check);
+        $this->assertSame(IntegrationDoctor::STATUS_OK, $check['status']);
     }
 }

@@ -45,6 +45,7 @@ final class FullPublicCacheWarmJobTest extends TestCase
         $this->assertInstanceOf(ShouldQueue::class, $job);
         $this->assertInstanceOf(ShouldBeUniqueUntilProcessing::class, $job);
         $this->assertTrue($job->afterCommit);
+        $this->assertSame(600, $job->timeout);
         $this->assertSame('catalog-all-public-cache-warm:generation-1', $job->uniqueId());
         $this->assertContainsOnlyInstancesOf(WithoutOverlapping::class, $job->middleware());
     }
