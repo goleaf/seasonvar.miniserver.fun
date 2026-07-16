@@ -13,10 +13,6 @@ use Livewire\Component;
 
 final class ForgotPasswordPage extends Component
 {
-    private const MAX_ATTEMPTS = 3;
-
-    private const DECAY_SECONDS = 600;
-
     public ForgotPasswordForm $form;
 
     public ?string $status = null;
@@ -26,15 +22,15 @@ final class ForgotPasswordPage extends Component
         WebAuthenticationRateLimiter $rateLimiter,
     ): void {
         $email = $this->form->validatedEmail();
-        $rateKey = $rateLimiter->forgotPasswordKey($email, request()->ip());
+        $ipAddress = request()->ip();
 
-        if ($rateLimiter->tooManyAttempts($rateKey, self::MAX_ATTEMPTS)) {
+        if ($rateLimiter->forgotPasswordRetryAfter($email, $ipAddress) > 0) {
             $this->form->addError('email', __('auth.errors.too_many_requests'));
 
             return;
         }
 
-        $rateLimiter->hit($rateKey, self::DECAY_SECONDS);
+        $rateLimiter->hitForgotPassword($email, $ipAddress);
         $passwords->sendResetLink($email);
         $this->status = $passwords->requestStatus();
     }

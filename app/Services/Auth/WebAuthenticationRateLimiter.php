@@ -18,6 +18,16 @@ final class WebAuthenticationRateLimiter
 
     private const LOGIN_NETWORK_LIMIT = 60;
 
+    private const PASSWORD_FLOW_DECAY_SECONDS = 600;
+
+    private const PASSWORD_FLOW_PAIR_LIMIT = 3;
+
+    private const PASSWORD_FLOW_NETWORK_LIMIT = 30;
+
+    private const RECOVERY_IDENTIFIER_LIMIT = 3;
+
+    private const RESET_IDENTIFIER_LIMIT = 10;
+
     public function __construct(private readonly AuthenticationFingerprint $fingerprints) {}
 
     public function loginKey(string $email, ?string $ipAddress): string
@@ -74,9 +84,63 @@ final class WebAuthenticationRateLimiter
         return 'web-auth:forgot-password:'.$this->fingerprints->email($email).'|'.$this->fingerprints->network($ipAddress);
     }
 
+    public function forgotPasswordRetryAfter(string $email, ?string $ipAddress): int
+    {
+        return $this->retryAfter($this->passwordFlowBuckets(
+            'forgot-password',
+            $email,
+            $ipAddress,
+            self::RECOVERY_IDENTIFIER_LIMIT,
+        ));
+    }
+
+    public function hitForgotPassword(string $email, ?string $ipAddress): void
+    {
+        $this->hitBuckets($this->passwordFlowBuckets(
+            'forgot-password',
+            $email,
+            $ipAddress,
+            self::RECOVERY_IDENTIFIER_LIMIT,
+        ));
+    }
+
     public function resetPasswordKey(string $email, ?string $ipAddress): string
     {
         return 'web-auth:reset-password:'.$this->fingerprints->email($email).'|'.$this->fingerprints->network($ipAddress);
+    }
+
+    public function resetPasswordRetryAfter(string $email, ?string $ipAddress): int
+    {
+        return $this->retryAfter($this->passwordFlowBuckets(
+            'reset-password',
+            $email,
+            $ipAddress,
+            self::RESET_IDENTIFIER_LIMIT,
+        ));
+    }
+
+    public function hitResetPassword(string $email, ?string $ipAddress): void
+    {
+        $this->hitBuckets($this->passwordFlowBuckets(
+            'reset-password',
+            $email,
+            $ipAddress,
+            self::RESET_IDENTIFIER_LIMIT,
+        ));
+    }
+
+    public function clearSuccessfulPasswordReset(string $email, ?string $ipAddress): void
+    {
+        foreach ($this->passwordFlowBuckets(
+            'reset-password',
+            $email,
+            $ipAddress,
+            self::RESET_IDENTIFIER_LIMIT,
+        ) as $bucket) {
+            if ($bucket['clear_on_success']) {
+                RateLimiter::clear($bucket['key']);
+            }
+        }
     }
 
     public function hit(string $key, int $decaySeconds = self::DECAY_SECONDS): void
@@ -120,5 +184,61 @@ final class WebAuthenticationRateLimiter
                 'clear_on_success' => false,
             ],
         ];
+    }
+
+    /**
+     * @return list<array{key: string, limit: int, decay: int, clear_on_success: bool}>
+     */
+    private function passwordFlowBuckets(
+        string $scope,
+        string $email,
+        ?string $ipAddress,
+        int $identifierLimit,
+    ): array {
+        $emailFingerprint = $this->fingerprints->email($email);
+        $networkFingerprint = $this->fingerprints->network($ipAddress);
+
+        return [
+            [
+                'key' => 'web-auth:'.$scope.':'.$emailFingerprint.'|'.$networkFingerprint,
+                'limit' => self::PASSWORD_FLOW_PAIR_LIMIT,
+                'decay' => self::PASSWORD_FLOW_DECAY_SECONDS,
+                'clear_on_success' => true,
+            ],
+            [
+                'key' => 'web-auth:'.$scope.'-identifier:'.$emailFingerprint,
+                'limit' => $identifierLimit,
+                'decay' => self::PASSWORD_FLOW_DECAY_SECONDS,
+                'clear_on_success' => true,
+            ],
+            [
+                'key' => 'web-auth:'.$scope.'-network:'.$networkFingerprint,
+                'limit' => self::PASSWORD_FLOW_NETWORK_LIMIT,
+                'decay' => self::PASSWORD_FLOW_DECAY_SECONDS,
+                'clear_on_success' => false,
+            ],
+        ];
+    }
+
+    /** @param list<array{key: string, limit: int, decay: int, clear_on_success: bool}> $buckets */
+    private function retryAfter(array $buckets): int
+    {
+        $retryAfter = 0;
+
+        foreach ($buckets as $bucket) {
+            if (RateLimiter::tooManyAttempts($bucket['key'], $bucket['limit'])) {
+                $retryAfter = max($retryAfter, RateLimiter::availableIn($bucket['key']));
+            }
+        }
+
+        return $retryAfter;
+    }
+
+    /** @param list<array{key: string, limit: int, decay: int, clear_on_success: bool}> $buckets */
+    private function hitBuckets(array $buckets): void
+    {
+        foreach ($buckets as $bucket) {
+            RateLimiter::hit($bucket['key'], $bucket['decay']);
+        }
     }
 }

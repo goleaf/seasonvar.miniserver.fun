@@ -31,11 +31,20 @@ final class ApiServiceProvider extends ServiceProvider
             ];
         });
 
-        foreach (['mobile-forgot-password', 'mobile-reset-password'] as $limiter) {
-            RateLimiter::for($limiter, function (Request $request) use ($limiter): Limit {
+        foreach ([
+            'mobile-forgot-password' => 3,
+            'mobile-reset-password' => 10,
+        ] as $limiter => $identifierLimit) {
+            RateLimiter::for($limiter, function (Request $request) use ($identifierLimit, $limiter): array {
                 $email = NormalizedEmail::value((string) $request->input('email'));
+                $emailFingerprint = $this->emailFingerprint($email);
+                $networkFingerprint = $this->networkFingerprint($request);
 
-                return Limit::perMinutes(10, 3)->by($limiter.'|'.$this->emailFingerprint($email).'|'.$this->networkFingerprint($request));
+                return [
+                    Limit::perMinutes(10, 3)->by($limiter.'|'.$emailFingerprint.'|'.$networkFingerprint),
+                    Limit::perMinutes(10, $identifierLimit)->by($limiter.'-identifier|'.$emailFingerprint),
+                    Limit::perMinutes(10, 30)->by($limiter.'-network|'.$networkFingerprint),
+                ];
             });
         }
 

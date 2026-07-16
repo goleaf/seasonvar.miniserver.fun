@@ -15,10 +15,6 @@ use Livewire\Component;
 
 final class ResetPasswordPage extends Component
 {
-    private const MAX_ATTEMPTS = 3;
-
-    private const DECAY_SECONDS = 600;
-
     public ResetPasswordForm $form;
 
     public function mount(string $token): void
@@ -41,16 +37,16 @@ final class ResetPasswordPage extends Component
 
             throw $exception;
         }
-        $rateKey = $rateLimiter->resetPasswordKey($attributes['email'], request()->ip());
+        $ipAddress = request()->ip();
 
-        if ($rateLimiter->tooManyAttempts($rateKey, self::MAX_ATTEMPTS)) {
+        if ($rateLimiter->resetPasswordRetryAfter($attributes['email'], $ipAddress) > 0) {
             $this->form->addError('email', __('auth.errors.too_many_requests'));
             $this->form->reset('password', 'passwordConfirmation');
 
             return;
         }
 
-        $rateLimiter->hit($rateKey, self::DECAY_SECONDS);
+        $rateLimiter->hitResetPassword($attributes['email'], $ipAddress);
 
         try {
             $passwords->reset($attributes['email'], $attributes['token'], $attributes['password']);
@@ -61,7 +57,7 @@ final class ResetPasswordPage extends Component
             return;
         }
 
-        $rateLimiter->clear($rateKey);
+        $rateLimiter->clearSuccessfulPasswordReset($attributes['email'], $ipAddress);
         $this->form->reset('password', 'passwordConfirmation');
         Session::flash('status', __('auth.status.password_reset_login'));
         $this->redirect($redirects->guestUrl('login'));
