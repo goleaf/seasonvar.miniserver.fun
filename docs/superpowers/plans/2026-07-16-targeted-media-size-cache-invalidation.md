@@ -167,7 +167,7 @@ Expected: importer status renders, the download route retains authentication/thr
 
 Run task-only `git diff --check`, inspect exact diff/stat and search for conflict markers, `@php`, `env(`, debug calls, placeholders, remote URL input, body buffering, test/migration/dependency/binary changes. Confirm all task code remains outside Blade and no external request/cache/queue mutation was performed for verification.
 
-- [ ] **Step 4: Commit and push only task-owned changes**
+- [x] **Step 4: Commit and push only task-owned changes**
 
 Use an isolated Git index. The product commit must contain exactly:
 
@@ -197,7 +197,7 @@ Push directly to `origin/main`, then close the checklist in a one-file plan comm
 - [x] PHP lint, Pint and Larastan pass.
 - [x] Runtime status, route, migration inventory and frontend build pass.
 - [x] Task-only diff/security/scope review passes.
-- [ ] Local `main`, tracking ref and remote `main` hashes match.
+- [x] Local `main`, tracking ref and remote `main` hashes match.
 
 ### Recorded verification
 
@@ -210,6 +210,7 @@ Push directly to `origin/main`, then close the checklist in a one-file plan comm
 - `npm run build` succeeds with Vite 8.1.4; no generated build artifact is task-modified.
 - Task-file `git diff --check` passes and targeted conflict/debug/placeholder/body-buffering search returns no matches.
 - No task test, migration, dependency, configuration, route, translation, Blade or binary file was created or modified. Automated tests were not created or executed per the user constraint.
+- Task-only product commit: `2767057e8a5acaca5770281a24dd1479a423cd7f`; pushed fast-forward to `origin/main`, then verified against both the local tracking ref and `ls-remote`.
 
 ## Final changed-file list
 
