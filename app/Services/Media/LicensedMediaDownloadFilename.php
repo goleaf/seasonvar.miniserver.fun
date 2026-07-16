@@ -48,7 +48,8 @@ final class LicensedMediaDownloadFilename
 
     private function safeBase(string $value): string
     {
-        $value = preg_replace('/[\x00-\x1F\x7F\\\/]+/u', '-', $value) ?? '';
+        $value = str_replace(['/', '\\'], '-', $value);
+        $value = preg_replace('/[\x00-\x1F\x7F]+/u', '-', $value) ?? '';
         $value = preg_replace('/[^a-z0-9.-]+/i', '-', $value) ?? '';
         $value = preg_replace('/[-.]{2,}/', '-', $value) ?? '';
 

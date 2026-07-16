@@ -123,3 +123,16 @@ Public user tags, unlisted tags, community global assignment, tag reporting и s
 | Private note/source/import run | нет | нет | только moderation context |
 
 `ContentRequestPolicy` и action boundaries повторно разрешают persisted request/target, не доверяют ID/type/status/priority/provider/language/quality/merge/completion values из Livewire. Public binding возвращает 404 для hidden чужой заявки; email/internal user ID/voter/follower list никогда не являются route или DTO полем. Все mutations идут через CSRF-protected Livewire POST, GET только читает или выполняет canonical merged redirect.
+
+## Матрица рекомендаций
+
+| Действие | Guest | Authenticated user | `manage-catalog` |
+| --- | --- | --- | --- |
+| Public discovery / similar / related | canonical visibility | то же, private exclusions/rerank применяются server-side | без обхода visibility |
+| Personal discovery | honest public fallback | только own implicit context, user ID в URL отсутствует | не может читать контекст другого user |
+| Not interested / blacklist / undo / watch status | login redirect | `CatalogTitlePolicy::interact`, current owner row, rate limit | не может менять чужой state через admin role |
+| Editorial relation create/remove/reorder fields | нет | нет | `manage-catalog`, enum type, eligible source/target, bounded priority |
+| Imported relation | нет | нет | только trusted importer service; locked editorial остаётся |
+| Internal score/source/cache version | public UI не принимает | public UI не принимает | diagnostics не раскрывает private signals |
+
+Discovery type route ограничен implemented enum cases; similar/related доступны только title context. Public API никогда не повышает доступ из-за authenticated user. Premium/region authorization не имитируется: будущая policy должна войти в existing `CatalogTitleQuery::visibleTo()`/media scopes и автоматически примениться ко всем pools.

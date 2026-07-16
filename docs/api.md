@@ -150,3 +150,9 @@ API отдает только публичные данные каталога: 
 - recommendation score/breakdown/signals/algorithm version и review source page/body hash;
 - comment body hash/submission key, moderation notes, reporter identity, restrictions, blocks/mutes, notification payload/state и author-only pending comments;
 - пароли, токены, stack traces, секреты и приватные диагностические поля.
+
+## Recommendation API compatibility
+
+`GET /api/v1/titles/{titleSlug}/recommendations` и route name `api.v1.titles.recommendations` сохранены. Controller использует canonical `CatalogRecommendationService::forTitle()`, но response shape остаётся совместимым: public recommended title resource, rank и localized public reasons. Explicit related web rows не добавляют новый private API contract и не меняют существующий endpoint без версии.
+
+Endpoint всегда public/content-contextual: authorization cookie не включает watch history, progress, watchlist, status, collection, personal tag, feedback/blacklist или private explanation и поэтому не загрязняет public API cache. Internal score breakdown, source/algorithm/provider signal, raw media URL и relation administration fields не выдаются. Additive owner-only user-state/library resources включают stable `recommendation_feedback`, feedback version/time, `watch_status` и version; они остаются authenticated `private, no-store` и описаны в `resources/api/openapi.json`.

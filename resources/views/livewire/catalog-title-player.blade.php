@@ -181,7 +181,7 @@
                                 class="flex min-h-11 items-center justify-end gap-3 rounded-control bg-slate-50 px-3 py-2 text-right text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700 sm:col-start-2"
                             >
                                 <span class="min-w-0">
-                                    <span class="block text-xs uppercase tracking-wide text-slate-400">{{ __('catalog.player.next_short') }}</span>
+                                    <span class="block text-xs uppercase tracking-wide text-slate-600">{{ __('catalog.player.next_short') }}</span>
                                     <span class="block break-words">{{ $this->episodeDisplayLabel($episodeNavigation->next) }}</span>
                                 </span>
                                 <x-ui.icon name="fa-solid fa-arrow-right" />

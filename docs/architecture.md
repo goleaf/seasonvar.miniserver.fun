@@ -316,3 +316,11 @@ Schema/index/rollback и aggregate definitions принадлежат [`DATA_REL
 - Handoff не создаёт второй importer и не исполняет команды из браузера. Moderator передаёт allowlisted Seasonvar source page либо existing-title refresh в текущий importer, а `ContentRequestImportRunLinker` сохраняет реальный run reference. Completion остаётся ручной проверяемой transition: текущая media schema не позволяет честно auto-complete language-specific subtitles/translations.
 
 Полный аудит, rollback, known limitations и acceptance принадлежат Task 19 общего плана. Tables/indexes — в [`DATA_RELATIONS.md`](DATA_RELATIONS.md), permissions — в [`authorization.md`](authorization.md), privacy/link controls — в [`security.md`](security.md), notification/cache/import/UI details — в соответствующих owner-документах.
+
+## Каноническая recommendation/discovery boundary
+
+`CatalogRecommendationService` — единственный orchestration layer для homepage, title related/similar, discovery, library и legacy recommendation API. Он собирает server-only `CatalogRecommendationContext`, выбирает один bounded query provider, применяет canonical visibility/exclusions/availability rerank/diversity/repeat suppression и отдаёт typed result/item/explanation DTO. Controllers и Livewire только нормализуют request state и выбирают response; Blade не запрашивает модели и не рассчитывает ranking.
+
+Calculated similarity остаётся в существующем `catalog_title_recommendations` и builder v5. Explicit directional/editorial/provider relations живут отдельно в `catalog_title_relations`; approved featured collections остаются единственной editorial-section architecture. `CatalogTitleQuery::visibleTo()` и media availability scopes — единая access boundary. Второго recommendation repository, translation/cache/admin/import architecture нет.
+
+Stable types/sources, точные formulas, user-signal/exclusion policy, routes, fallback, SEO, verified feature gaps и manual acceptance описаны только в [recommendation design](superpowers/specs/2026-07-13-recommendation-v3-list-design.md); текущий audit/checklist — в [execution plan](superpowers/plans/2026-07-13-recommendation-v3-list.md).

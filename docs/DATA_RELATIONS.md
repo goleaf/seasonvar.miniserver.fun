@@ -396,3 +396,20 @@ Additive migration `2026_07_16_000000_create_user_account_settings_table.php` н
 Exact active uniqueness обеспечивается nullable unique `active_identity_key`; terminal row очищает его, сохраняя historical `exact_identity_hash`. Composite indexes соответствуют public status pagination, type/status moderation, requester/My Requests, normalized title duplicate narrowing и title/season/episode target lookup. Vote/follow unique keys одновременно являются integrity boundary и count index prefix; history/source/external indexes обслуживают только реальные timeline/visibility/duplicate queries. SQLite `migrate --pretend` подтверждает additive FK/index DDL.
 
 Migration `2026_07_16_180000_create_content_request_domain.php` ничего не backfill-ит: audit не нашёл legacy request/ticket/suggestion data. Rollback безопасно удаляет только новые таблицы до появления production writes; после появления заявок сначала нужен export/backup, а importer source pages и уже доставленные notifications не откатываются.
+
+## Recommendation relations и user state
+
+Migration `2026_07_16_120000_add_canonical_recommendation_discovery.php` additive и не меняет `catalog_title_recommendations`, watchlist, rating или progress. Она добавляет nullable `recommendation_feedback`, feedback version/timestamp, nullable `watch_status` и watch-status version в existing unique `(user_id,catalog_title_id)` row. Stable values: feedback `not_interested|blacklisted`, status `planned|watching|completed|dropped`; translated labels не хранятся.
+
+`catalog_title_relations` хранит `(source_title_id,target_title_id,relation_type,source)` unique, provider key, bounded manual priority, lock/active flags и timestamps. FK cascade удаляет explicit rows при hard title delete. Service пишет inverse pair и не смешивает editorial/imported identity. Seasonvar title merge переносит incoming/outgoing rows до duplicate force-delete, объединяет priority/lock/active/provenance, удаляет self-relations и сохраняет legacy slugs.
+
+Индексы соответствуют реальным запросам:
+
+- `(source_title_id,is_active,priority,id)` — related display;
+- `(target_title_id,relation_type,is_active)` — inverse/merge/cycle lookup;
+- `(source,provider_key)` — idempotent provider provenance;
+- `(user_id,recommendation_feedback,catalog_title_id)` — owner hard exclusions/library restore;
+- `(user_id,watch_status,updated_at,catalog_title_id)` — bounded personal status source/demotion;
+- `(in_watchlist,updated_at,catalog_title_id,user_id)` и progress `(last_watched_at,catalog_title_id,user_id)` — recent public semantic activity.
+
+Existing user-title unique and history indexes continue to serve owner state/progress. No feedback/impression/analytics aggregate table, region/premium/language/creator/franchise table or polymorphic recommendation relation was introduced. Complete domain semantics are owned by the [recommendation design](superpowers/specs/2026-07-13-recommendation-v3-list-design.md).
