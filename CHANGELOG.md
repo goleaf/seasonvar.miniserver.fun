@@ -26,6 +26,7 @@
 
 - Добавлено безопасное определение точного размера прямого внешнего видео через `HEAD` и минимальный `Range: bytes=0-0` без чтения полного body; nullable byte metadata, источник, статус, timestamp, HTTP status и очищенная ошибка сохраняются в `licensed_media`.
 - Новый/изменённый media проверяется единым importer action, неизменённый соблюдает TTL/retry, HLS помечается unsupported. Синхронный и queued importer сохраняют атомарные counters/events; `seasonvar:import --refresh-media-sizes` выполняет ограниченный backfill существующих записей.
+- Legacy size backlog теперь автоматически продвигается каждые 10 минут консервативной config-backed пачкой через ту же публичную команду, общие Redis/import locks и persistent progress. Size-only запуск не сбрасывает весь catalog cache, а результат HEAD/Range сохраняется conditional update только пока title/effective URL/format не изменились, поэтому запоздалый ответ не может привязать старый размер к новому источнику.
 - Зарегистрированным пользователям добавлен scoped policy-protected download прямого файла с SSRF/DNS pinning, private/no-store attachment headers, безопасным стабильным filename, rate limiter и корректным single-range resume. Поток идёт bounded chunks без сохранения видео на сервере; гость и недоступные media получают отказ.
 - Player Livewire показывает сохранённый человекочитаемый размер, локальную download icon/action, login CTA для гостя и stream-only состояние для HLS на русском и английском языках.
 

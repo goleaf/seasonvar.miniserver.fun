@@ -55,7 +55,7 @@ Standalone default DBs: cache 1, queues 2, sessions 3, locks 5, broadcasting 6. 
 
 ## Размер внешних видеофайлов
 
-`SEASONVAR_MEDIA_FILE_SIZE_ENABLED` включает bounded metadata inspection. `CONNECT_TIMEOUT`, `TIMEOUT`, `RETRY_TIMES`, `RETRY_SLEEP_MS`, `KNOWN_TTL`, `UNKNOWN_RETRY`, `FAILED_RETRY`, `BACKFILL_CHUNK_SIZE` и `MAX_CHECKS_PER_CYCLE` с тем же префиксом ограничивают сеть, freshness и catalogue backlog; defaults перечислены в `.env.example` и `config/seasonvar.php`. Эти параметры никогда не разрешают чтение полного video body.
+`SEASONVAR_MEDIA_FILE_SIZE_ENABLED` включает bounded metadata inspection. `CONNECT_TIMEOUT`, `TIMEOUT`, `RETRY_TIMES`, `RETRY_SLEEP_MS`, `KNOWN_TTL`, `UNKNOWN_RETRY`, `FAILED_RETRY`, `BACKFILL_CHUNK_SIZE` и `MAX_CHECKS_PER_CYCLE` с тем же префиксом ограничивают сеть, freshness и catalogue backlog. `SEASONVAR_MEDIA_FILE_SIZE_SCHEDULED_BACKFILL_ENABLED` включает десятиминутное постепенное обслуживание legacy rows, а `SEASONVAR_MEDIA_FILE_SIZE_SCHEDULED_BACKFILL_LIMIT` задаёт размер одной пачки (default 20, дополнительно hard-clamped кодом). Defaults перечислены в `.env.example` и `config/seasonvar.php`; ни один параметр не разрешает чтение полного video body.
 
 `PLAYBACK_ALLOWED_HOSTS` остаётся download allowlist, а production обязан держать `PLAYBACK_ENFORCE_PUBLIC_DNS=true`. Authenticated download принудительно выполняет public-DNS validation даже при compatibility override. Chunk, stream/connect timeout, retry и rate-limit budgets являются versioned `config/playback.php` (`playback.downloads`) и не принимаются из request. После изменения environment/config необходимы `config:cache` и graceful reload PHP-FPM/import workers.
 
