@@ -487,3 +487,104 @@ This section supersedes only the unfinished execution notes above. It preserves 
 Fresh final evidence: explicit task-file Pint returned `passed`; PHP syntax covered 42 PHP files; targeted Larastan and the repository `composer analyse` gate both returned zero errors; recommendation locale parity is 193 keys; OpenAPI JSON and `project:docs-refresh --check` passed; Vite 8.1.4 produced the production bundle. SQLite `PRAGMA quick_check` returned `ok`, relation/feedback queries selected their focused indexes, and route inspection preserved canonical/localized/legacy/API names.
 
 Managed Chromium exercised public trending/popular/top-rated/random, English locale, anonymous personalized cold fallback, homepage, title detail and search no-result flows. Desktop `1440×1000`, tablet `768×1024` and phone `390×844` returned 200 with no page overflow or browser errors. Public pages exposed canonical/hreflang/ItemList metadata, personalized/random were `noindex`, sitemap static included only eligible public discovery URLs, title detail showed 12 recommendation rows without the current title, and axe reported no serious/critical violations after the two shared title controls received stronger contrast. Browser smoke also found and closed an unrelated title-page blocker in download filename sanitation; the safe slash/control-character normalization now renders the same title route successfully.
+
+## Follow-up: cold-path hardening, 2026-07-16
+
+> **For agentic workers:** execute inline on the existing `main`; project rules prohibit another branch/worktree and the active session does not delegate to subagents. No new or existing automated test runner is invoked because Task 18 explicitly forbids it.
+
+**Goal:** reduce the measured cold `recently_updated` cost and proactively warm stable public discovery through the existing optional cache infrastructure without changing recommendation identities, URLs, ranking explanations or private-cache boundaries.
+
+**Architecture:** authoritative media/episode publication events are read through bounded ordered source windows, merged and deduplicated in PHP, then passed through the existing visibility/watchability query. The existing public HTTP warmer gains only the five indexable default discovery routes; request-time bounded queries remain the fallback when cache/queue infrastructure is unavailable.
+
+**Tech stack:** PHP 8.5, Laravel 13.20 query builder/cache/queue APIs, Livewire 4.3 unchanged, SQLite-compatible additive migration, existing `TieredCache`, `WarmCatalogCaches` and `PublicPageCacheWarmer`.
+
+### Task F1: bounded semantic update events
+
+**Files:**
+
+- Modify: `config/recommendations.php`
+- Modify: `app/Services/Catalog/CatalogPublicDiscoveryQuery.php`
+- Create: `database/migrations/2026_07_16_220000_add_recommendation_release_event_index.php`
+
+**Interfaces:**
+
+- `CatalogPublicDiscoveryQuery::recentlyUpdated()` keeps returning the existing list shape `{id, score, source, reason}`.
+- Add private `recentContentEvents(int $limit): Collection` and `eligibleOrderedIds(CatalogRecommendationContext $context, Collection $ids, array $excludedIds): Collection`; neither is public API.
+- Configuration supplies `recommendations.content_updates.event_window_multiplier=64`, `minimum_event_window=10000`, `maximum_event_window=20000`.
+
+The bounded window is calculated exactly as:
+
+```php
+$eventWindow = min(
+    max(1, (int) config('recommendations.content_updates.maximum_event_window', 20_000)),
+    max(
+        max(1, (int) config('recommendations.content_updates.minimum_event_window', 10_000)),
+        $this->candidateLimit() * max(1, (int) config('recommendations.content_updates.event_window_multiplier', 64)),
+    ),
+);
+```
+
+The migration body is limited to:
+
+```php
+Schema::table('episodes', function (Blueprint $table): void {
+    $table->index(
+        ['publication_status', 'deleted_at', 'released_at', 'id', 'season_id'],
+        'episodes_recommendation_release_events_idx',
+    );
+});
+```
+
+- [ ] Add the bounded window settings without environment variables or a second configuration file.
+- [ ] Add the exact episode index `['publication_status', 'deleted_at', 'released_at', 'id', 'season_id']` with the stable name `episodes_recommendation_release_events_idx`; `down()` removes only this index.
+- [ ] Replace the full historical UNION/GROUP aggregate with two ordered `limit($eventWindow)` source queries selecting only `catalog_title_id`, `event_at`, `event_id` and `event_source`.
+- [ ] Merge by `event_at DESC`, then `event_source`, then `event_id DESC`; deduplicate positive title IDs before visibility, request up to the configured candidate limit, and preserve that ordering after one bulk eligible-ID query.
+- [ ] Keep `CatalogRecommendationSource::ContentUpdate`, `CatalogRecommendationReason::RecentlyUpdated`, the 180-candidate cap and `catalog_titles.updated_at` prohibition unchanged.
+- [ ] Run PHP syntax, Pint, migration pretend/static up/down inspection and SQLite `EXPLAIN QUERY PLAN`; expected media stream uses `licensed_media_home_feed_idx`, episode stream uses `episodes_recommendation_release_events_idx` after isolated migration rehearsal.
+
+### Task F2: existing public cache warmer integration
+
+**Files:**
+
+- Modify: `app/Services/Catalog/PublicPageCacheWarmer.php`
+
+**Interfaces:**
+
+- `PublicPageCacheWarmer::warm()` response remains `{attempted, succeeded}`.
+- `criticalUrls()` remains private and adds routes derived from `CatalogRecommendationType::publicCases()` filtered by `isIndexable()`.
+
+The appended URL list is derived from stable enum identity:
+
+```php
+...collect(CatalogRecommendationType::publicCases())
+    ->filter(fn (CatalogRecommendationType $type): bool => $type->isIndexable())
+    ->map(fn (CatalogRecommendationType $type): string => route(
+        'discover.index',
+        ['type' => $type->value],
+        false,
+    ))
+    ->all(),
+```
+
+- [ ] Import `CatalogRecommendationType` and append exactly `trending`, `popular`, `top_rated`, `recently_added`, `recently_updated` default URLs through `route('discover.index', ['type' => $type->value], false)`.
+- [ ] Keep personalized, similar, related, random, editorial, upcoming, localized/filter/query state and user IDs outside proactive targets.
+- [ ] Preserve URL de-duplication, configured URL cap, same-origin validation, bounded HTTP timeout/retry and failure semantics.
+- [ ] Inspect the resolved target list and run a controlled local warm smoke only when the self-origin server is available; do not dispatch production queue work or flush cache.
+
+### Task F3: verification, documentation and delivery
+
+**Files:**
+
+- Modify: `docs/performance.md`
+- Modify: `docs/caching.md`
+- Modify: `docs/DATA_RELATIONS.md`
+- Modify: `docs/MAINTENANCE_LOG.md`
+- Modify: `docs/deployment.md`
+- Modify: `CHANGELOG.md`
+- Modify: this plan and the existing Task 18 design spec only if implementation evidence changes the contract.
+
+- [ ] Re-run uncached read-only candidate diagnostics for all five indexable types and record actual before/after observations without calling them p95/SLA.
+- [ ] Verify 180 ordered unique eligible `recently_updated` IDs, stable explanations, no private state, bounded peak memory and unchanged public cache key dimensions.
+- [ ] Run Pint, PHP lint, configured static analysis, `project:docs-refresh --check`, `git diff --check`, route inspection and Vite only if frontend assets changed; do not run PHPUnit/Pest.
+- [ ] Browser-smoke `/discover/recently_updated` and one warmed public type for 200 status, canonical/noindex policy, no console error and no layout regression.
+- [ ] Inspect every changed file and staged scope, commit only this follow-up on `main`, push, and verify remote SHA while preserving unrelated importer/media worktree changes.
