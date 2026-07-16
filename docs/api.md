@@ -58,6 +58,7 @@
 - Laravel Sanctum является единственной token boundary мобильного API. Personal access tokens хранятся только в hashed виде, имеют abilities `mobile:read`/`mobile:write` и максимум 90 дней действия.
 - Global expiration задаётся `SANCTUM_TOKEN_EXPIRATION_MINUTES=129600`; просроченные строки ежедневно удаляет scheduled `sanctum:prune-expired --hours=24`.
 - Admin/import abilities, raw token hashes и plaintext token после момента выдачи через API не возвращаются.
+- `MobileTokenService` является канонической owner-scoped границей для списка, ротации и отзыва Sanctum device tokens. Ротация возвращает неизменяемый `MobileTokenRotationResult`; контроллеры сохраняют только разрешение аутентифицированного request, сериализацию API Resource/JSON и `private, no-store`. Token hashes, abilities и строки чужих устройств не пересекают публичную resource boundary.
 
 ## Authentication и аккаунт v1
 
