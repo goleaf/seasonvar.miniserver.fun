@@ -15,3 +15,5 @@ seasonvar_git_guard_require_no_conflicts
 seasonvar_git_guard_require_safe_paths staged
 seasonvar_git_guard_require_no_unstaged_changes
 seasonvar_git_guard_require_no_untracked_files
+
+"$repo_root/scripts/check-readme-policy.sh" --staged

@@ -2,13 +2,13 @@
 
 Обновлено: 16.07.2026
 
-Этот файл — единый индекс проектной документации. У каждого контракта есть один основной файл-владелец; остальные документы должны ссылаться на него, а не копировать длинные правила. `README.md` остаётся точкой входа, `AGENTS.md` содержит только обязательные инструкции для агентов, а история изменений ведётся только в `CHANGELOG.md`.
+Этот файл — единый индекс проектной документации. У каждого контракта есть один основной файл-владелец; остальные документы должны ссылаться на него, а не копировать длинные правила. `README.md` остаётся точкой входа и содержит простую историю обновлений для посетителей, `AGENTS.md` — только обязательные инструкции для агентов, а подробный технический журнал ведётся в `CHANGELOG.md`.
 
 ## Источники истины
 
 | Тема | Основной документ | Что в нём поддерживается |
 | --- | --- | --- |
-| Обзор и быстрый старт | [`README.md`](../README.md) | Назначение проекта, стек и основные команды. |
+| Обзор и быстрый старт | [`README.md`](../README.md) | Назначение проекта, возможности, основные команды, дорожная карта и простая история обновлений для посетителей. |
 | Границы Laravel/Livewire | [`architecture.md`](architecture.md) | Тонкие контроллеры, page builders, query/services/actions, locked Livewire state и server-rendered оболочки. |
 | JSON и mobile API | [`api.md`](api.md) | Legacy compatibility, `/api` discovery, версионирование `/api/v1`, OpenAPI, error envelope, pagination и публичные поля. |
 | Каталог, поиск, directory hubs и URL state | [`catalog-search.md`](catalog-search.md) | Формат query-параметров, нормализация, OR/AND filters, public directories, allowlisted sorting, pagination и browser history. |
@@ -37,7 +37,7 @@
 | Dependency/runtime upgrades | [`upgrade.md`](upgrade.md) | Installed/latest compatibility, controlled package groups, gates и rollback. |
 | MCP runbook | [`tooling/mcp-setup.md`](tooling/mcp-setup.md) | Project Boost/Context7/Playwright transport, verification, errors и restart requirement. |
 | Production rollout | [`deployment.md`](deployment.md) | Environment, additive migrations, backup/maintenance order, workers, cache warmup и post-deploy checks. |
-| История изменений | [`CHANGELOG.md`](../CHANGELOG.md) | Пользовательские и архитектурные изменения в установленном формате. |
+| Техническая история изменений | [`CHANGELOG.md`](../CHANGELOG.md) | Подробные архитектурные, эксплуатационные и пользовательские изменения в установленном формате. |
 | Журнал обслуживания | [`MAINTENANCE_LOG.md`](MAINTENANCE_LOG.md) | Датированные эксплуатационные работы, замеры и диагностика; не заменяет release changelog. |
 | Реестр Markdown-аудита | [`markdown-review-2026-07-13.md`](markdown-review-2026-07-13.md) | Реестр просмотренных project-owned Markdown-файлов; завершённые временные implementation plans сохранены в Git history и удалены из текущей документации. |
 
@@ -45,8 +45,8 @@
 
 1. Измените основной документ темы из таблицы выше.
 2. В соседнем документе добавьте ссылку только тогда, когда разработчику действительно нужен переход между контрактами.
-3. Не создавайте второй changelog, второй Git workflow или параллельное описание архитектуры.
+3. Не создавайте второй технический журнал, второй Git workflow или параллельное описание архитектуры; краткая пользовательская история поддерживается только в конце `README.md`.
 4. Не редактируйте вручную содержимое между маркерами `project-docs:start` и `project-docs:end`; его обслуживает `php artisan project:docs-refresh`.
 5. Перед commit выполните `php artisan project:docs-refresh --check` и проверки, перечисленные в [`development.md`](development.md).
 
-Если реализация расходится с документацией, сначала подтвердите фактическое поведение кодом и тестами, затем обновите основной документ темы и `CHANGELOG.md` в том же изменении.
+Если реализация расходится с документацией, сначала подтвердите фактическое поведение кодом и тестами, затем обновите основной документ темы и `CHANGELOG.md` в том же изменении. При заметном посетителю результате также обновите соответствующий раздел и пользовательскую историю в конце `README.md`.
