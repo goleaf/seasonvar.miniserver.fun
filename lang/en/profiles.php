@@ -32,6 +32,7 @@ return [
         'unmute' => 'Show activity',
         'muted' => 'User activity is muted.',
         'unmuted' => 'User activity is visible again.',
+        'report' => 'Report',
         'retry' => 'Try again',
     ],
     'empty' => [
