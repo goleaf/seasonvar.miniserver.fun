@@ -293,6 +293,6 @@ Expected: both route families retain their names/middleware, focused tests pass,
 
 Inspect every changed file and directly related sync request/query/codec/resource. Commit only this plan, the living plan's focused status hunk, the API owner-document hunk, and the changelog hunk with message `docs: record API sync controller refactor`.
 
-- [ ] **Step 4: Push and confirm**
+- [x] **Step 4: Push and confirm**
 
 Confirm `main`, push the scoped commits to `origin/main`, verify the configured remote SHA, and leave all unrelated staged/unstaged/untracked work untouched.
