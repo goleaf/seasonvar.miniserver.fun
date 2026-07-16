@@ -756,3 +756,64 @@ return $query
 - [x] Run PHP syntax, task-file Pint, targeted Larastan, `project:docs-refresh --check`, route inspection and `git diff --check`. PHPUnit/Pest/Vite remained unused because Task 18 forbids automated tests and no frontend asset changed.
 - [x] Browser-smoke default and `quality=1080p` discovery at desktop/mobile: isolated managed Chromium returned 200, 24 rows, correct canonical index/noindex policy, zero console/page/local-request errors and zero overflow. Shared maintenance mode was bypassed only inside the QA server process through an in-memory maintenance store; global state was not changed.
 - [x] Inspect staged scope, commit only this follow-up on `main`, push fast-forward and verify remote SHA while preserving unrelated player/auth/route worktree changes and leaving pending foreign migrations unapplied.
+
+## Follow-up: semantic activity provenance and truthful availability, 2026-07-16
+
+> **For agentic workers:** execute inline on the existing `main`; project rules prohibit another branch/worktree and the active session does not delegate to subagents. No new or existing automated test runner is invoked because Task 18 explicitly forbids it.
+
+**Goal:** remove technical user-state timestamps and non-playable/draft availability rows from recommendation ranking signals while preserving routes, types, public/private result identity, feedback, cache and API contracts.
+
+**Architecture:** keep the existing one-row-per-user/title aggregate and add semantic timestamps for its three explicit preference signals. Canonical state mutations and title merge own those timestamps; trending and personalized windows consume them. Upcoming ordering and personalized media-preference boosts reuse the same publication/playback predicates already required by their eligibility boundaries.
+
+**Tech stack:** PHP 8.5, Laravel 13.20 Eloquent/query builder/schema APIs, Livewire 4.3 unchanged, additive reversible SQLite-compatible migration, existing `CatalogUserStateService`, recommendation context/cache/DTO contracts.
+
+### Task F8: semantic user-state timestamps
+
+**Files:**
+
+- Create: `database/migrations/2026_07_16_230000_add_recommendation_signal_timestamps.php`
+- Modify: `app/Models/CatalogTitleUserState.php`
+- Modify: `app/Services/Catalog/CatalogUserStateService.php`
+- Modify: `app/Services/Catalog/CatalogTitleUserDataMerger.php`
+- Modify: `app/Services/Catalog/CatalogPublicDiscoveryQuery.php`
+- Modify: `app/Services/Catalog/CatalogPersonalizedRecommendationQuery.php`
+
+**Interfaces:**
+
+- Add nullable internal columns `watchlist_updated_at`, `rating_updated_at` and `watch_status_updated_at`; do not add API/resource fields.
+- Preserve `CatalogUserStateService` public signatures, optimistic versions, idempotency, authorization, sync publication and cache invalidation.
+- Replace only `catalog_user_state_recent_watchlist_idx` and `catalog_user_state_watch_status_idx` with semantic timestamp equivalents; rollback restores the exact legacy definitions.
+
+- [ ] Add the reversible migration, backfilling only active/non-null legacy signals from the best available existing timestamp and never fabricating a public event row.
+- [ ] Update only the matching semantic timestamp when watchlist, rating or watch-status actually changes; idempotent writes retain the prior timestamp.
+- [ ] Preserve the newest relevant timestamps during title merge while retaining the existing version/value conflict rules.
+- [ ] Build the trending watchlist UNION only when `watchlist_updated_at` exists and never fall back to `updated_at`; without the column, trending safely degrades to meaningful progress/reviews/comments.
+- [ ] Order bounded personalized watchlist/rating/status signals by their semantic timestamp, with stable ID ordering as the rolling-schema fallback.
+
+### Task F9: upcoming and media-preference truthfulness
+
+**Files:**
+
+- Modify: `app/Services/Catalog/CatalogPublicDiscoveryQuery.php`
+- Modify: `app/Services/Catalog/CatalogRecommendationAvailabilityReranker.php`
+
+- [ ] Apply published episode, episode soft-delete and season soft-delete predicates to the `next_release_at` subquery itself, matching the existing public eligibility branch.
+- [ ] Require `withPlaybackLocation()` for quality, variant and subtitle preference boosts; retain publication/audience/window, child release and health predicates.
+- [ ] Confirm no score, reason, type, route, cache key, DTO, API field or visible label changes.
+
+### Task F10: verification, documentation and delivery
+
+**Files:**
+
+- Modify: `docs/DATA_RELATIONS.md`
+- Modify: `docs/performance.md`
+- Modify: `docs/security.md`
+- Modify: `docs/MAINTENANCE_LOG.md`
+- Modify: `CHANGELOG.md`
+- Modify: this plan and the existing Task 18 design spec only when final evidence changes the contract.
+
+- [ ] Inspect PHP syntax, task-file Pint, configured static analysis, migration up/down/index definitions, query SQL/bindings/plans, translation parity, routes and `git diff --check`; do not invoke PHPUnit/Pest or create tests.
+- [ ] Compare same-snapshot old/new public candidate hashes for every implemented public type; expected differences are forbidden because the current database has no active watchlist or future release row.
+- [ ] Exercise authenticated personalized candidates in a rolled-forward disposable SQLite copy and confirm semantic timestamps remain private and no technical timestamp drives ranking.
+- [ ] Browser-smoke trending, upcoming and authenticated/cold-start discovery at desktop/mobile widths for status, canonical/noindex, loading/empty behavior, no overflow and no browser/local-request error.
+- [ ] Update owner documentation and English changelog, inspect exact staged scope, commit only this follow-up on `main`, push fast-forward and verify remote SHA while preserving unrelated in-progress work and leaving active import state untouched.
