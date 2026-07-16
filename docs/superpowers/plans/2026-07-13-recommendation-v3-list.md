@@ -971,3 +971,44 @@ Verification evidence: a real `CatalogDiscoveryPage` instance produced `null` fo
 - [x] Update owner documentation and English changelog, inspect the isolated patch, commit only Task 18 files on `main`, push and verify the remote SHA without absorbing concurrent work. Product commit `ac5478f1830475c3969cd9432372754b9db6d8b2` matched `origin/main` immediately after push; concurrent Task 20/profile/CI work and its mixed-file hunks were not included.
 
 Implementation evidence before documentation closure: private user and public unfeatured editorial mutations left the Recommendations version unchanged; eligible editorial and an eligible-to-ineligible saved transition each incremented it once. A separate in-memory SQLite title-membership probe preserved Collections deltas for both ordinary and eligible collections while Recommendations changed only for the eligible editorial membership. No production cache, session, user row, collection row or catalogue row was mutated.
+
+## Follow-up: comment recommendation invalidation scope, 2026-07-16
+
+> **For agentic workers:** execute inline on the existing `main`; project rules prohibit another branch/worktree or subagent delegation. Task 18 forbids creating or running automated tests, so acceptance uses isolated array-cache probes and static mutation-path inspection.
+
+**Goal:** prevent reaction, content-only, private-metadata and non-title discussion mutations from invalidating shared public recommendation candidates while retaining immediate freshness whenever a counted public title comment appears or disappears.
+
+**Architecture:** retain `CommentCacheInvalidator` as the only discussion cache boundary. Preserve all title/collection page invalidation, carry an explicit recommendation-activity boolean from each mutation owner and require a title target at the boundary; keep merge/unknown callers conservative.
+
+**Tech stack:** PHP 8.5, Laravel 13.20, existing comment actions/value objects/cache version registry and SQLite-compatible trending query; no migration, route, cache resource/key, ranking code, frontend asset or translation change.
+
+### Task F16: scope comment-driven recommendation invalidation
+
+**Files:**
+
+- Modify: `app/Services/Comments/CommentCacheInvalidator.php`
+- Modify: `app/Actions/Comments/CreateComment.php`
+- Modify: `app/Actions/Comments/UpdateComment.php`
+- Modify: `app/Actions/Comments/DeleteComment.php`
+- Modify: `app/Actions/Comments/RestoreComment.php`
+- Modify: `app/Actions/Comments/SetCommentReaction.php`
+- Modify: `app/Actions/Comments/ModerateComment.php`
+- Modify: `app/Services/Comments/CommentAccountService.php`
+- Modify: `docs/caching.md`
+- Modify: `docs/performance.md`
+- Modify: `docs/MAINTENANCE_LOG.md`
+- Modify: `CHANGELOG.md`
+- Modify: this plan and the existing Task 18 design spec.
+
+**Interfaces:**
+
+- Preserve `targetChanged()`, `commentChanged()` and `identitiesChanged()` compatibility through optional conservative arguments; presentation cache domains/scopes retain existing behavior.
+- Recommendation activity is only a `title` comment changing between published/non-deleted and any other state. Reaction totals, body/spoiler text, private moderation metadata, author identity and season/episode/collection discussion are not ranking inputs.
+- Title merge and unknown callers remain conservative; no private comment/user identifier enters a public key, payload or telemetry label.
+
+- [ ] Add an explicit recommendation-impact flag to the existing invalidator boundary and require a title target before bumping Recommendations.
+- [ ] Make create/update/delete/restore/moderation pass true only when published public visibility appears or disappears; reaction always passes false.
+- [ ] Keep author identity and account anonymization out of recommendation invalidation while preserving their current presentation-domain invalidation; keep title merge conservative.
+- [ ] Prove with an isolated array store that content/reaction and season-target paths produce recommendation deltas `0`, while a counted title-activity transition produces `1`; prove presentation versions still change.
+- [ ] Run PHP syntax, task-file Pint, targeted Larastan, managed-doc check, debug/placeholder scan and task-scoped `git diff --check`; do not invoke PHPUnit/Pest or create test files.
+- [ ] Update owner documentation and English changelog, inspect the isolated patch, commit only Task 18 files on `main`, push and verify the remote SHA without absorbing concurrent work.
