@@ -106,7 +106,7 @@ Run generated-SQL inspection, production count equivalence, `php artisan seasonv
 
 Run `git diff --check`, conflict/placeholder/debug/secret/source-URL searches and inspect the task patch. Confirm no test, migration, dependency or binary was added or modified.
 
-- [ ] **Step 4: Commit task-only changes**
+- [x] **Step 4: Commit task-only changes**
 
 Use an isolated Git index and commit message:
 
@@ -114,7 +114,7 @@ Use an isolated Git index and commit message:
 fix: trust normalized formats for media backlog
 ```
 
-- [ ] **Step 5: Push and close the plan**
+- [x] **Step 5: Push and close the plan**
 
 Push `main` to `origin/main`, verify local/remote hashes, mark this checklist complete in a one-file closure commit and push again.
 
@@ -128,6 +128,7 @@ Push `main` to `origin/main`, verify local/remote hashes, mark this checklist co
 - Scheduler retains `--media-size-limit=500 --media-size-time-budget=480`; download route retains `auth`, `throttle:media-downloads`, authenticated session, scoped bindings and private-response middleware.
 - `git diff --check` passes for the six task files; targeted conflict/debug/placeholder/body-buffering search returns no matches.
 - No task test, migration, dependency or binary file was created or modified. Automated tests were not created or executed, per the task constraint.
+- Task-only feature commit: `958e328f77048e56b4b582784ee7ce7cebf10731`; pushed fast-forward to `origin/main` (`5525bf6..958e328`).
 
 ## Final changed-file list
 
