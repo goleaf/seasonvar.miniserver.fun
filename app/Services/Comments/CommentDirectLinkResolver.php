@@ -20,13 +20,13 @@ final readonly class CommentDirectLinkResolver
     public function resolve(int $commentId, ?User $viewer, ?string $interfaceLocale = null): string
     {
         if ($commentId < 1) {
-            throw $this->notFound($commentId);
+            $this->failNotFound($commentId);
         }
 
         $comment = Comment::query()->withTrashed()->findOrFail($commentId);
 
         if (! Gate::forUser($viewer)->allows('view', $comment)) {
-            throw $this->notFound($commentId);
+            $this->failNotFound($commentId);
         }
 
         $isModerator = $viewer !== null && Gate::forUser($viewer)->allows('manage-comments');
@@ -66,8 +66,8 @@ final readonly class CommentDirectLinkResolver
         return route('admin.comments', ['comment' => $comment->id]);
     }
 
-    private function notFound(int $commentId): ModelNotFoundException
+    private function failNotFound(int $commentId): never
     {
-        return (new ModelNotFoundException)->setModel(Comment::class, [$commentId]);
+        throw (new ModelNotFoundException)->setModel(Comment::class, [$commentId]);
     }
 }
