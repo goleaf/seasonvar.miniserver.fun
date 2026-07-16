@@ -178,7 +178,8 @@ final readonly class TechnicalIssueWorkflow
         }
 
         if (($markVerified && $next !== TechnicalIssueStatus::ResolutionVerified)
-            || ($incrementReopen && $next !== TechnicalIssueStatus::Reopened)) {
+            || ($incrementReopen && $next !== TechnicalIssueStatus::Reopened)
+            || ($next === TechnicalIssueStatus::Reopened && ! $incrementReopen)) {
             throw new TechnicalIssueActionException('issues.errors.invalid_transition');
         }
 

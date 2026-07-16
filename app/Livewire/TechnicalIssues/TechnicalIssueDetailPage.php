@@ -345,6 +345,7 @@ final class TechnicalIssueDetailPage extends Component
                     TechnicalIssueStatus::Assigned,
                     TechnicalIssueStatus::Resolved,
                     TechnicalIssueStatus::ResolutionVerified,
+                    TechnicalIssueStatus::Reopened,
                     TechnicalIssueStatus::Merged,
                     TechnicalIssueStatus::Withdrawn,
                 ], true))
