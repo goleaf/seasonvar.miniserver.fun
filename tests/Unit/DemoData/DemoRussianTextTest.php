@@ -79,4 +79,17 @@ final class DemoRussianTextTest extends TestCase
 
         $this->assertCount(250, array_unique($bodies));
     }
+
+    public function test_public_tag_vocabulary_has_at_least_eight_hundred_unique_natural_names(): void
+    {
+        $text = new DemoRussianText(new DemoStableValue('seasonvar-demo-v1'), new DemoLexicalFingerprint);
+        $tags = array_map($text->publicTag(...), range(0, 799));
+
+        $this->assertCount(800, array_unique($tags));
+
+        foreach ($tags as $tag) {
+            $this->assertMatchesRegularExpression('/^[А-ЯЁ][А-Яа-яЁё -]+$/u', $tag);
+            $this->assertDoesNotMatchRegularExpression('/\d/u', $tag);
+        }
+    }
 }

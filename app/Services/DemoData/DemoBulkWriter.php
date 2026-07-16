@@ -27,7 +27,9 @@ final readonly class DemoBulkWriter
 
         foreach (array_chunk($rows, $this->options->chunkSize) as $chunk) {
             $affected += DB::transaction(
-                fn (): int => DB::table($table)->upsert($chunk, $uniqueBy, $update),
+                fn (): int => $update === []
+                    ? DB::table($table)->insertOrIgnore($chunk)
+                    : DB::table($table)->upsert($chunk, $uniqueBy, $update),
                 attempts: 3,
             );
         }
