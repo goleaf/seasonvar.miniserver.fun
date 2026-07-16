@@ -345,3 +345,42 @@ GET authenticated download route
 - [x] Player/admin presentation: `app/Services/Catalog/CatalogTitlePlaybackQuery.php`, `app/Livewire/CatalogTitlePlayer.php`, `app/View/ViewModels/CatalogShowViewModel.php`, `resources/views/livewire/catalog-title-player.blade.php`, `resources/views/livewire/seasonvar-import-manager.blade.php`, `lang/ru/catalog.php`, `lang/en/catalog.php`.
 - [x] Configuration: `config/seasonvar.php`, `config/playback.php`, `.env.example`.
 - [x] Agent/project docs: `AGENTS.md`, `.agents/skills/seasonvar-importer/SKILL.md`, `README.md`, `CHANGELOG.md`, `docs/README.md`, `docs/architecture.md`, `docs/importer.md`, `docs/performance.md`, `docs/frontend.md`, `docs/UI_STANDARDS.md`, `docs/DATA_RELATIONS.md`, `docs/deployment.md`, `docs/environment.md`, `docs/api.md`, `docs/authorization.md`, `docs/caching.md`, `docs/security.md` и этот plan-файл.
+
+## Maintenance follow-up: единая optimistic metadata write boundary
+
+### Current-state audit и решение
+
+- [x] Подтвердить дублирование source guard, `forceFill` и targeted cache invalidation в `InspectLicensedMediaFileSize` и download-time correction.
+- [x] Проверить соседние immutable DTO/enum/service conventions и текущий `CatalogCacheInvalidator` contract.
+- [x] Сравнить сохранение двух реализаций, общий query helper и focused typed writer; выбрать writer как минимальную полную mutation boundary.
+- [x] Зафиксировать одобренный дизайн в `docs/superpowers/specs/2026-07-16-licensed-media-file-size-metadata-writer-design.md` без placeholders и изменения public behavior.
+- [x] Добавить readonly source snapshot DTO с media/title/URL/path/format identity.
+- [x] Добавить typed write status `Changed`, `Unchanged`, `SourceChanged`.
+- [x] Реализовать `LicensedMediaFileSizeMetadataWriter`: один conditional update, standard SoftDeletes scope, in-memory sync и material-only targeted cache invalidation.
+- [x] Перевести importer action на writer, сохранив started/result/source-race/failure progress и boolean return contract.
+- [x] Перевести download-time correction на тот же writer и снимать snapshot до upstream request; metadata repair остаётся best-effort.
+- [x] Обновить architecture/performance/changelog ровно в затронутых owner sections.
+- [x] Выполнить non-test verification: PHP lint, targeted Pint, targeted PHPStan, `git diff --check`, forbidden-pattern и task-only diff review.
+- [ ] Подтвердить `main`, закоммитить только follow-up файлы и отправить commit в `origin/main`, не смешивая параллельные изменения.
+
+### Interfaces и порядок выполнения
+
+1. `LicensedMediaFileSizeSourceData` — readonly DTO с constructor `(int $mediaId, ?int $catalogTitleId, ?string $playbackUrl, string $path, ?string $format)`; `mediaId` обязан быть положительным.
+2. `MediaFileSizeMetadataWriteStatus` — backed enum `Changed|Unchanged|SourceChanged`, возвращаемый каждой попыткой conditional persistence.
+3. `LicensedMediaFileSizeMetadataWriter::snapshot(LicensedMedia $media): LicensedMediaFileSizeSourceData` снимает identity до HTTP; `writeIfSourceMatches(LicensedMedia $media, LicensedMediaFileSizeSourceData $source, ExternalMediaFileSizeResultData $result): MediaFileSizeMetadataWriteStatus` нормализует ровно шесть size attributes, выполняет один guarded update, синхронизирует model и при material change вызывает targeted invalidator.
+4. `InspectLicensedMediaFileSize::execute()` использует snapshot → inspector → writer и отображает `SourceChanged` существующим skipped event.
+5. `StreamLicensedMediaDownload::response()` снимает snapshot до `openUpstream()`; `synchronizeKnownSize()` строит typed `ExternalMediaFileSizeResultData::known()` и best-effort передаёт его writer.
+6. После документации запускаются только разрешённые non-test проверки; schema/route/UI/API не изменяются.
+
+### Planned changed-files list
+
+- [x] `app/DTOs/LicensedMediaFileSizeSourceData.php`
+- [x] `app/Enums/MediaFileSizeMetadataWriteStatus.php`
+- [x] `app/Services/Media/LicensedMediaFileSizeMetadataWriter.php`
+- [x] `app/Actions/Media/InspectLicensedMediaFileSize.php`
+- [x] `app/Services/Media/StreamLicensedMediaDownload.php`
+- [x] `CHANGELOG.md`
+- [x] `docs/architecture.md`
+- [x] `docs/performance.md`
+- [x] `docs/superpowers/specs/2026-07-16-licensed-media-file-size-metadata-writer-design.md`
+- [x] этот plan-файл

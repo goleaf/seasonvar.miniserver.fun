@@ -6,12 +6,12 @@ namespace App\Actions\Media;
 
 use App\DTOs\ExternalMediaFileSizeResultData;
 use App\Enums\MediaFileSizeCheckStatus;
+use App\Enums\MediaFileSizeMetadataWriteStatus;
 use App\Models\LicensedMedia;
-use App\Services\Catalog\CatalogCacheInvalidator;
 use App\Services\Media\ExternalMediaFileSizeInspector;
 use App\Services\Media\ExternalMediaFileType;
+use App\Services\Media\LicensedMediaFileSizeMetadataWriter;
 use App\Support\HumanFileSizeFormatter;
-use Illuminate\Support\Str;
 use Throwable;
 
 final class InspectLicensedMediaFileSize
@@ -20,7 +20,7 @@ final class InspectLicensedMediaFileSize
         private readonly ExternalMediaFileSizeInspector $inspector,
         private readonly ExternalMediaFileType $fileTypes,
         private readonly HumanFileSizeFormatter $fileSizes,
-        private readonly CatalogCacheInvalidator $cache,
+        private readonly LicensedMediaFileSizeMetadataWriter $metadata,
     ) {}
 
     /**
@@ -51,20 +51,13 @@ final class InspectLicensedMediaFileSize
         }
 
         $this->report($progress, 'seasonvar-media-size-check-started', $this->context($media, $context));
-        $sourceIdentity = $this->sourceIdentity($media);
+        $source = $this->metadata->snapshot($media);
 
         try {
             $result = $this->inspector->inspect($media);
-            $attributes = $this->attributes($result);
-            $before = $media->only([
-                'file_size_bytes',
-                'file_size_check_status',
-                'file_size_source',
-                'file_size_http_status',
-                'file_size_check_error',
-            ]);
+            $writeStatus = $this->metadata->writeIfSourceMatches($media, $source, $result);
 
-            if (! $this->persistIfSourceMatches($media, $sourceIdentity, $attributes)) {
+            if ($writeStatus === MediaFileSizeMetadataWriteStatus::SourceChanged) {
                 $this->report($progress, 'seasonvar-media-size-check-skipped', $this->context($media, $context, [
                     'reason' => 'источник видео изменился во время проверки',
                 ]));
@@ -72,16 +65,9 @@ final class InspectLicensedMediaFileSize
                 return false;
             }
 
-            $media->forceFill($attributes);
-            $changed = $before !== $media->only(array_keys($before));
-
-            if ($changed && (int) $media->catalog_title_id > 0) {
-                $this->cache->importedTitleChanged((int) $media->catalog_title_id);
-            }
-
             $this->reportResult($progress, $media, $result, $context);
 
-            return $changed;
+            return $writeStatus === MediaFileSizeMetadataWriteStatus::Changed;
         } catch (Throwable $exception) {
             $this->report($progress, 'seasonvar-media-size-check-failed', $this->context($media, $context, [
                 'check_status' => MediaFileSizeCheckStatus::Failed->value,
@@ -114,54 +100,6 @@ final class InspectLicensedMediaFileSize
 
         return $retrySeconds !== PHP_INT_MAX
             && $media->file_size_checked_at->addSeconds($retrySeconds)->isPast();
-    }
-
-    /** @return array<string, mixed> */
-    private function attributes(ExternalMediaFileSizeResultData $result): array
-    {
-        $error = collect([$result->errorCategory, $result->safeErrorMessage])
-            ->filter(fn (?string $value): bool => is_string($value) && $value !== '')
-            ->implode(': ');
-
-        return [
-            'file_size_bytes' => $result->bytes,
-            'file_size_checked_at' => $result->checkedAt,
-            'file_size_check_status' => $result->status,
-            'file_size_source' => Str::limit($result->source, 64, ''),
-            'file_size_http_status' => $result->httpStatus,
-            'file_size_check_error' => $error !== '' ? Str::limit($error, 255, '') : null,
-        ];
-    }
-
-    /**
-     * @return array{catalog_title_id: int|null, playback_url: string|null, path: string, format: string|null}
-     */
-    private function sourceIdentity(LicensedMedia $media): array
-    {
-        return [
-            'catalog_title_id' => $media->catalog_title_id,
-            'playback_url' => $media->playback_url,
-            'path' => $media->path,
-            'format' => $media->format,
-        ];
-    }
-
-    /**
-     * @param  array{catalog_title_id: int|null, playback_url: string|null, path: string, format: string|null}  $sourceIdentity
-     * @param  array<string, mixed>  $attributes
-     */
-    private function persistIfSourceMatches(
-        LicensedMedia $media,
-        array $sourceIdentity,
-        array $attributes,
-    ): bool {
-        return LicensedMedia::query()
-            ->whereKey($media->getKey())
-            ->where('catalog_title_id', $sourceIdentity['catalog_title_id'])
-            ->where('playback_url', $sourceIdentity['playback_url'])
-            ->where('path', $sourceIdentity['path'])
-            ->where('format', $sourceIdentity['format'])
-            ->update($attributes) === 1;
     }
 
     /**

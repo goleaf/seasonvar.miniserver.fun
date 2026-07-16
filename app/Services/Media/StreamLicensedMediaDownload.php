@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Services\Media;
 
+use App\DTOs\ExternalMediaFileSizeResultData;
 use App\DTOs\LicensedMediaDownloadData;
+use App\DTOs\LicensedMediaFileSizeSourceData;
 use App\DTOs\SingleByteRangeData;
-use App\Enums\MediaFileSizeCheckStatus;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
 use App\Models\User;
-use App\Services\Catalog\CatalogCacheInvalidator;
 use App\Services\Crawler\PoliteHttpClient;
 use Illuminate\Http\Client\Response as UpstreamResponse;
 use Illuminate\Http\Request;
@@ -27,7 +27,7 @@ final class StreamLicensedMediaDownload
         private readonly SingleByteRange $ranges,
         private readonly PoliteHttpClient $http,
         private readonly ExternalMediaFileType $fileTypes,
-        private readonly CatalogCacheInvalidator $cache,
+        private readonly LicensedMediaFileSizeMetadataWriter $metadata,
     ) {}
 
     public function response(
@@ -51,6 +51,8 @@ final class StreamLicensedMediaDownload
             || $download->contentType === null) {
             return $this->errorResponse(__($download->reasonKey), 404);
         }
+
+        $source = $this->metadata->snapshot($media);
 
         try {
             $range = $this->ranges->parse(
@@ -89,7 +91,7 @@ final class StreamLicensedMediaDownload
             $validated['content_range'],
             $validated['accept_ranges'],
         );
-        $this->synchronizeKnownSize($media, $validated['total_bytes'], $validated['http_status']);
+        $this->synchronizeKnownSize($media, $source, $validated['total_bytes'], $validated['http_status']);
 
         return new StreamedResponse(
             function () use ($upstream): void {
@@ -340,35 +342,24 @@ final class StreamLicensedMediaDownload
         return in_array($upstreamStatus, [401, 403, 404, 410], true) ? 404 : 502;
     }
 
-    private function synchronizeKnownSize(LicensedMedia $media, ?int $bytes, int $httpStatus): void
-    {
+    private function synchronizeKnownSize(
+        LicensedMedia $media,
+        LicensedMediaFileSizeSourceData $source,
+        ?int $bytes,
+        int $httpStatus,
+    ): void {
         if ($bytes === null || ($media->hasKnownFileSize() && $media->file_size_bytes === $bytes)) {
             return;
         }
 
         try {
-            $attributes = [
-                'file_size_bytes' => $bytes,
-                'file_size_checked_at' => now(),
-                'file_size_check_status' => MediaFileSizeCheckStatus::Known,
-                'file_size_source' => $httpStatus === 206 ? 'download-content-range' : 'download-content-length',
-                'file_size_http_status' => $httpStatus,
-                'file_size_check_error' => null,
-            ];
-            $updated = LicensedMedia::query()
-                ->whereKey($media->getKey())
-                ->where('catalog_title_id', $media->catalog_title_id)
-                ->where('playback_url', $media->playback_url)
-                ->where('path', $media->path)
-                ->where('format', $media->format)
-                ->update($attributes);
-
-            if ($updated !== 1) {
-                return;
-            }
-
-            $media->forceFill($attributes);
-            $this->cache->importedTitleChanged((int) $media->catalog_title_id);
+            $result = ExternalMediaFileSizeResultData::known(
+                bytes: $bytes,
+                source: $httpStatus === 206 ? 'download-content-range' : 'download-content-length',
+                httpStatus: $httpStatus,
+                checkedAt: now(),
+            );
+            $this->metadata->writeIfSourceMatches($media, $source, $result);
         } catch (Throwable) {
             // Metadata repair is best-effort and must never interrupt an authorized stream.
         }
