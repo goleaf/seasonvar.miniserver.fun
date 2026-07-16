@@ -71,7 +71,7 @@ Constraint: do not create or run automated tests.
 - [x] Verify RU/EN translation key parity and absence of missing feature strings.
 - [x] Run `git diff --check`, conflict-marker, forbidden-pattern and task-binary searches.
 - [x] Confirm no tests were created, modified by this task or executed.
-- [ ] Confirm branch remains exactly `main`, commit only task files and push directly to `origin/main`.
+- [x] Confirm branch remains exactly `main`, commit only task files and push directly to `origin/main` (`a6dfaa2f83d347a374476f61b80b2180449c9075`).
 
 ## Final changed-files list
 
