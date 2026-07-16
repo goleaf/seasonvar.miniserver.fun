@@ -784,11 +784,11 @@ return $query
 - Preserve `CatalogUserStateService` public signatures, optimistic versions, idempotency, authorization, sync publication and cache invalidation.
 - Replace only `catalog_user_state_recent_watchlist_idx` and `catalog_user_state_watch_status_idx` with semantic timestamp equivalents; rollback restores the exact legacy definitions.
 
-- [ ] Add the reversible migration, backfilling only active/non-null legacy signals from the best available existing timestamp and never fabricating a public event row.
-- [ ] Update only the matching semantic timestamp when watchlist, rating or watch-status actually changes; idempotent writes retain the prior timestamp.
-- [ ] Preserve the newest relevant timestamps during title merge while retaining the existing version/value conflict rules.
-- [ ] Build the trending watchlist UNION only when `watchlist_updated_at` exists and never fall back to `updated_at`; without the column, trending safely degrades to meaningful progress/reviews/comments.
-- [ ] Order bounded personalized watchlist/rating/status signals by their semantic timestamp, with stable ID ordering as the rolling-schema fallback.
+- [x] Add one reversible migration with no data backfill: legacy values remain intact, while unverifiable shared `updated_at` values are never manufactured into semantic public events.
+- [x] Update only the matching semantic timestamp when watchlist, rating or watch-status actually changes; idempotent writes retain the prior timestamp.
+- [x] Preserve trustworthy semantic timestamps during title merge, keep versions monotonic and reconcile all state with conservative precedence (`blacklisted > not_interested`, `dropped > completed > watching > planned`).
+- [x] Build the trending watchlist UNION only when `watchlist_updated_at` exists and never fall back to `updated_at`; without the column, trending safely degrades to meaningful progress/reviews/comments.
+- [x] Order bounded personalized watchlist/rating/status signals by their semantic timestamp, with stable ID ordering as the rolling-schema fallback.
 
 ### Task F9: upcoming and media-preference truthfulness
 
@@ -797,9 +797,9 @@ return $query
 - Modify: `app/Services/Catalog/CatalogPublicDiscoveryQuery.php`
 - Modify: `app/Services/Catalog/CatalogRecommendationAvailabilityReranker.php`
 
-- [ ] Apply published episode, episode soft-delete and season soft-delete predicates to the `next_release_at` subquery itself, matching the existing public eligibility branch.
-- [ ] Require `withPlaybackLocation()` for quality, variant and subtitle preference boosts; retain publication/audience/window, child release and health predicates.
-- [ ] Confirm no score, reason, type, route, cache key, DTO, API field or visible label changes.
+- [x] Build bounded future-episode/future-year candidate pools with canonical episode/season availability, then reuse the shared title visibility and deterministic ordering boundary.
+- [x] Require `withPlaybackLocation()` for quality, variant and subtitle preference boosts; retain publication/audience/window, child release and health predicates.
+- [x] Confirm no score, reason, type, route, cache key, DTO, API field or visible label changes.
 
 ### Task F10: verification, documentation and delivery
 
