@@ -758,7 +758,8 @@ Status: implementation, original non-test acceptance and the post-Task-14 public
 - [x] Update topic-owner documentation, manual acceptance matrix, maintenance log and English changelog without adding or running automated tests.
 - [x] Run allowed PHP syntax/Pint/route/schema/query/translation/cache/security/Blade inspection, Vite build and browser smoke; reread the task and inspect all changed/directly-related files. No automated test runner was invoked.
 - [x] Normalize the later Task 14 public-profile comments integration through `CommentProfileQuery`/`CommentPresenter`, including the matching public count, without changing schema/routes/UI or exposing spoiler text.
-- [ ] Commit only on existing `main`, preserve unrelated work, verify status/remote and push the completed commit.
+- [x] Commit only the Task 12 reconciliation on existing `main`, preserve unrelated work and verify status/remote.
+- [ ] Push the completed Task 12 commits to the configured remote.
 
 ### Post-Task-14 reconciliation implementation slice
 
