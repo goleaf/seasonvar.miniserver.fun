@@ -99,6 +99,7 @@ final class SeasonvarImportManager extends Component
             'staleCount' => $dashboard['stale_count'],
             'mediaHealth' => $dashboard['media_health'],
             'mediaDueCount' => $dashboard['media_due_count'],
+            'mediaSizeBacklog' => $dashboard['media_size_backlog'],
         ])->extends('layouts.app', [
             'title' => __('catalog.importer.title'),
             'seo' => [

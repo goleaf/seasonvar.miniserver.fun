@@ -9,6 +9,7 @@ use App\DTOs\Seasonvar\SeasonvarSourceInventoryResult;
 use App\Enums\SeasonvarPageType;
 use App\Models\SeasonvarImportRun;
 use App\Services\Catalog\CatalogCacheInvalidator;
+use App\Services\Media\LicensedMediaFileSizeBacklog;
 use App\Services\Seasonvar\SeasonvarGlobalImportRunCoordinator;
 use App\Services\Seasonvar\SeasonvarImportPipeline;
 use App\Services\Seasonvar\SeasonvarImportProcessInspector;
@@ -53,6 +54,7 @@ class ImportSeasonvar extends Command
         SeasonvarPageHandlerRegistry $pageHandlers,
         CatalogCacheInvalidator $cacheInvalidator,
         HumanFileSizeFormatter $fileSizes,
+        LicensedMediaFileSizeBacklog $fileSizeBacklog,
     ): int {
         $pageTypes = $this->validatedPageTypes($pageHandlers);
 
@@ -69,7 +71,7 @@ class ImportSeasonvar extends Command
         }
 
         if ((bool) $this->option('status')) {
-            return $this->handleStatus($queueStatus);
+            return $this->handleStatus($queueStatus, $fileSizeBacklog, $fileSizes);
         }
 
         if ((bool) $this->option('queued')) {
@@ -374,8 +376,11 @@ class ImportSeasonvar extends Command
         return $store;
     }
 
-    private function handleStatus(SeasonvarQueueStatus $queueStatus): int
-    {
+    private function handleStatus(
+        SeasonvarQueueStatus $queueStatus,
+        LicensedMediaFileSizeBacklog $fileSizeBacklog,
+        HumanFileSizeFormatter $fileSizes,
+    ): int {
         $status = $queueStatus->read();
         $oldestAge = $status->oldestPendingAgeSeconds();
 
@@ -394,6 +399,28 @@ class ImportSeasonvar extends Command
             ['Выбрано страниц', $status->selected],
             ['Обработано страниц', $status->parsed],
             ['Ошибок страниц', $status->failed],
+        ]);
+
+        $backlog = $fileSizeBacklog->status();
+
+        $this->components->info('Размеры прямых видеофайлов');
+        $this->table(['Показатель', 'Значение'], [
+            ['Подходят для проверки', $backlog->eligible],
+            ['Проверены', $backlog->checked],
+            ['Ожидают первой проверки', $backlog->pending],
+            ['Требуют проверки сейчас', $backlog->due],
+            ['Размер известен', $backlog->known],
+            ['Размер неизвестен', $backlog->unknown],
+            ['Формат не поддерживается', $backlog->unsupported],
+            ['Ошибок проверки', $backlog->failed],
+            ['Покрытие метаданных', number_format($backlog->inspectionCoveragePercentage(), 2, ',', ' ').'%'],
+            ['Сумма известных размеров', sprintf(
+                '%s (%d байт)',
+                $fileSizes->format($backlog->knownBytes, 'ru') ?? '0 B',
+                $backlog->knownBytes,
+            )],
+            ['Снимок построен', $backlog->capturedAt->format('d.m.Y H:i:s')],
+            ['Плановая пачка', max(1, (int) config('seasonvar.media_file_size.scheduled_backfill_limit', 20))],
         ]);
 
         return self::SUCCESS;

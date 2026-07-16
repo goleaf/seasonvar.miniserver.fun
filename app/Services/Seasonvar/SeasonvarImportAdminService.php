@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace App\Services\Seasonvar;
 
+use App\DTOs\LicensedMediaFileSizeBacklogStatusData;
 use App\DTOs\Seasonvar\SeasonvarImportStartResultData;
 use App\Enums\SeasonvarImportStatus;
 use App\Jobs\StartSeasonvarQueuedImport;
 use App\Models\SeasonvarImportRun;
 use App\Models\User;
+use App\Services\Media\LicensedMediaFileSizeBacklog;
 use App\Support\HumanFileSizeFormatter;
 use Illuminate\Contracts\Bus\Dispatcher as BusDispatcher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Number;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -26,6 +29,7 @@ final class SeasonvarImportAdminService
         private readonly SeasonvarGlobalImportRunCoordinator $globalRuns,
         private readonly BusDispatcher $bus,
         private readonly HumanFileSizeFormatter $fileSizes,
+        private readonly LicensedMediaFileSizeBacklog $fileSizeBacklog,
     ) {}
 
     public function start(
@@ -134,7 +138,7 @@ final class SeasonvarImportAdminService
     }
 
     /**
-     * @return array{runs: list<array<string, mixed>>, has_active_run: bool, stale_count: int, media_health: list<array<string, mixed>>, media_due_count: int}
+     * @return array{runs: list<array<string, mixed>>, has_active_run: bool, stale_count: int, media_health: list<array<string, mixed>>, media_due_count: int, media_size_backlog: array<string, mixed>}
      */
     public function dashboard(): array
     {
@@ -203,6 +207,70 @@ final class SeasonvarImportAdminService
                 return $item;
             })->all(),
             'media_due_count' => $mediaDueCount,
+            'media_size_backlog' => $this->presentFileSizeBacklog($this->fileSizeBacklog->status()),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function presentFileSizeBacklog(LicensedMediaFileSizeBacklogStatusData $backlog): array
+    {
+        $locale = app()->currentLocale();
+        $number = fn (int|float $value, ?int $maxPrecision = null): string => Number::format(
+            $value,
+            maxPrecision: $maxPrecision,
+            locale: $locale,
+        );
+
+        return [
+            'metrics' => [
+                [
+                    'key' => 'eligible',
+                    'label' => __('catalog.importer.file_size_backlog_eligible'),
+                    'value' => $number($backlog->eligible),
+                    'icon' => 'fa-solid fa-file-video',
+                    'tone' => 'text-sky-700',
+                ],
+                [
+                    'key' => 'known',
+                    'label' => __('catalog.importer.file_size_backlog_known'),
+                    'value' => $number($backlog->known),
+                    'icon' => 'fa-solid fa-circle-check',
+                    'tone' => 'text-emerald-700',
+                ],
+                [
+                    'key' => 'pending',
+                    'label' => __('catalog.importer.file_size_backlog_pending'),
+                    'value' => $number($backlog->pending),
+                    'icon' => 'fa-solid fa-hourglass-half',
+                    'tone' => 'text-amber-700',
+                ],
+                [
+                    'key' => 'due',
+                    'label' => __('catalog.importer.file_size_backlog_due'),
+                    'value' => $number($backlog->due),
+                    'icon' => 'fa-solid fa-clock-rotate-left',
+                    'tone' => 'text-rose-700',
+                ],
+            ],
+            'coverage' => __('catalog.importer.file_size_backlog_coverage', [
+                'percentage' => $number($backlog->inspectionCoveragePercentage(), 2),
+            ]),
+            'states' => __('catalog.importer.file_size_backlog_states', [
+                'checked' => $number($backlog->checked),
+                'unknown' => $number($backlog->unknown),
+                'unsupported' => $number($backlog->unsupported),
+                'failed' => $number($backlog->failed),
+            ]),
+            'known_bytes' => __('catalog.importer.file_size_backlog_bytes', [
+                'size' => $this->fileSizes->format($backlog->knownBytes, $locale) ?? '0 B',
+                'bytes' => $number($backlog->knownBytes),
+            ]),
+            'captured_at' => __('catalog.importer.file_size_backlog_captured_at', [
+                'value' => $backlog->capturedAt->format('d.m.Y H:i:s'),
+            ]),
+            'scheduled_batch' => __('catalog.importer.file_size_backlog_scheduled_batch', [
+                'count' => $number(max(1, (int) config('seasonvar.media_file_size.scheduled_backfill_limit', 20))),
+            ]),
         ];
     }
 

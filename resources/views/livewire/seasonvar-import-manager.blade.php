@@ -64,6 +64,44 @@
         </div>
     </x-ui.panel>
 
+    <x-ui.panel :title="__('catalog.importer.file_size_backlog')" :subtitle="__('catalog.importer.file_size_backlog_description')" icon="fa-solid fa-hard-drive">
+        <div class="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            @foreach ($mediaSizeBacklog['metrics'] as $metric)
+                <div wire:key="media-size-backlog-{{ $metric['key'] }}" class="rounded-control bg-slate-50 p-3">
+                    <div class="flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
+                        <x-ui.icon name="{{ $metric['icon'] }} {{ $metric['tone'] }}" />
+                        <span>{{ $metric['label'] }}</span>
+                    </div>
+                    <div class="mt-1 text-xl font-black tabular-nums text-slate-800">{{ $metric['value'] }}</div>
+                </div>
+            @endforeach
+        </div>
+
+        <div class="mt-3 grid gap-2 text-sm font-semibold text-slate-600 lg:grid-cols-2">
+            <div class="flex items-start gap-2 rounded-control bg-slate-50 px-3 py-2">
+                <x-ui.icon name="fa-solid fa-chart-pie text-emerald-700" align="start" />
+                <span>{{ $mediaSizeBacklog['coverage'] }}</span>
+            </div>
+            <div class="flex items-start gap-2 rounded-control bg-slate-50 px-3 py-2">
+                <x-ui.icon name="fa-solid fa-list-check text-sky-700" align="start" />
+                <span>{{ $mediaSizeBacklog['states'] }}</span>
+            </div>
+            <div class="flex items-start gap-2 rounded-control bg-slate-50 px-3 py-2">
+                <x-ui.icon name="fa-solid fa-database text-violet-700" align="start" />
+                <span>{{ $mediaSizeBacklog['known_bytes'] }}</span>
+            </div>
+            <div class="flex items-start gap-2 rounded-control bg-slate-50 px-3 py-2">
+                <x-ui.icon name="fa-solid fa-calendar-check text-amber-700" align="start" />
+                <span>{{ $mediaSizeBacklog['scheduled_batch'] }}</span>
+            </div>
+        </div>
+
+        <p class="mt-3 flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <x-ui.icon name="fa-solid fa-camera text-slate-400" />
+            <span>{{ $mediaSizeBacklog['captured_at'] }}</span>
+        </p>
+    </x-ui.panel>
+
     <x-ui.panel :title="__('catalog.importer.new_run')" :subtitle="__('catalog.importer.new_run_description')" icon="fa-solid fa-play">
         <form wire:submit="startImport" class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             <div class="grid gap-3 sm:grid-cols-2">

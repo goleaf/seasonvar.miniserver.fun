@@ -17,6 +17,7 @@ use App\Services\Catalog\CatalogMetadataDeduplicator;
 use App\Services\Catalog\CatalogTitleRecommendationBuilder;
 use App\Services\ContentRequests\ContentRequestImportRunLinker;
 use App\Services\Media\ExternalMediaMetadata;
+use App\Services\Media\LicensedMediaFileSizeBacklog;
 use App\Services\Media\MediaSourceHealthManager;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -45,6 +46,7 @@ class SeasonvarImportPipeline
         private readonly SeasonvarCatalogMetadataBackfill $metadataBackfill,
         private readonly SeasonvarImportErrorSanitizer $errors,
         private readonly InspectLicensedMediaFileSize $inspectFileSize,
+        private readonly LicensedMediaFileSizeBacklog $fileSizeBacklog,
         private readonly SeasonvarImportRunRecorder $runRecorder,
         private readonly ContentRequestImportRunLinker $contentRequests,
     ) {}
@@ -909,11 +911,7 @@ class SeasonvarImportPipeline
             100_000,
             $requestedLimit ?? (int) config('seasonvar.media_file_size.max_checks_per_import_cycle', 20),
         ));
-        $directFormats = array_values(array_map(
-            'strval',
-            (array) config('playback.downloads.allowed_formats', ['mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi']),
-        ));
-        $query = LicensedMedia::query()
+        $query = $this->fileSizeBacklog->query($force)
             ->select([
                 'id',
                 'catalog_title_id',
@@ -933,43 +931,7 @@ class SeasonvarImportPipeline
                 'catalogTitle:id,title',
                 'season:id,number',
                 'episode:id,number',
-            ])
-            ->where(function ($query) use ($directFormats): void {
-                $query->whereIn('format', $directFormats);
-
-                foreach ($directFormats as $format) {
-                    $query->orWhere('playback_url', 'like', '%.'.$format.'%')
-                        ->orWhere('path', 'like', '%.'.$format.'%');
-                }
-            })
-            ->where(function ($query): void {
-                $query->where('playback_url', 'like', 'http%')
-                    ->orWhere('path', 'like', 'http%');
-            });
-
-        if (! $force) {
-            $knownCutoff = now()->subSeconds(max(0, (int) config('seasonvar.media_file_size.known_ttl_seconds', 2_592_000)));
-            $unknownCutoff = now()->subSeconds(max(0, (int) config('seasonvar.media_file_size.unknown_retry_seconds', 86_400)));
-            $failedCutoff = now()->subSeconds(max(0, (int) config('seasonvar.media_file_size.failed_retry_seconds', 21_600)));
-
-            $query->where(function ($query) use ($knownCutoff, $unknownCutoff, $failedCutoff): void {
-                $query->whereNull('file_size_check_status')
-                    ->orWhereNull('file_size_checked_at')
-                    ->orWhere('file_size_check_status', 'pending')
-                    ->orWhere(function ($query) use ($knownCutoff): void {
-                        $query->where('file_size_check_status', 'known')
-                            ->where('file_size_checked_at', '<=', $knownCutoff);
-                    })
-                    ->orWhere(function ($query) use ($unknownCutoff): void {
-                        $query->where('file_size_check_status', 'unknown')
-                            ->where('file_size_checked_at', '<=', $unknownCutoff);
-                    })
-                    ->orWhere(function ($query) use ($failedCutoff): void {
-                        $query->where('file_size_check_status', 'failed')
-                            ->where('file_size_checked_at', '<=', $failedCutoff);
-                    });
-            });
-        }
+            ]);
 
         $progress('seasonvar-media-size-backlog-started', [
             'chunk_size' => $chunkSize,

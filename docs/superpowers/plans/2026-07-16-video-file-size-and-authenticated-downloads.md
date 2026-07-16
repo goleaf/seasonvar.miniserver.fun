@@ -333,6 +333,54 @@ GET authenticated download route
 - [x] `docs/caching.md`
 - [x] этот plan-файл
 
+## Operations follow-up: глобальная наблюдаемость backlog размеров
+
+### Current-state audit
+
+- [x] Подтвердить production volume: около 873 тысяч eligible direct-file media и подавляющее большинство legacy rows без terminal status на момент аудита.
+- [x] Подтвердить, что per-run counters не описывают global backlog, а `seasonvar:import --status` показывает только Redis queue/run lifecycle.
+- [x] Подтвердить отсутствие global size backlog в существующей admin Livewire page.
+- [x] Проверить EXPLAIN/runtime: direct-file aggregate выполняет полный scan `licensed_media`; Livewire poll каждые 5 секунд не должен повторять его.
+- [x] Сравнить live aggregate, materialized DB counters и bounded cached snapshot; выбрать один SQL aggregate с 15-минутным tiered cache и stale fallback после production cold/warm measurement.
+- [x] Зафиксировать дизайн в `docs/superpowers/specs/2026-07-16-video-file-size-backlog-observability-design.md`.
+
+### Implementation checklist
+
+- [x] Добавить immutable `LicensedMediaFileSizeBacklogStatusData` с validated non-negative counters, exact known bytes, capture time и coverage calculation.
+- [x] Добавить `LicensedMediaFileSizeBacklog` как единый eligibility/freshness query boundary для direct-file media.
+- [x] После review уточнить boundary: SQL использует effective `playback_url ?: path`, пустой configured allowlist остаётся пустым, а cache dimensions включают status TTL.
+- [x] Собирать global status одним aggregate query без загрузки media rows или N+1.
+- [x] Использовать существующий `TieredCache`/`CacheDomain::Operational` с config-backed 900-second fresh window и bounded stale window.
+- [x] Перевести `SeasonvarImportPipeline::refreshMediaFileSizeBacklog()` на общий query без изменения lazy/chunk/limit/stop/progress contracts.
+- [x] Расширить `seasonvar:import --status` отдельной русской таблицей global backlog, exact bytes, human size, coverage и snapshot time.
+- [x] Расширить `SeasonvarImportAdminService` полностью подготовленным presentation payload без source URLs и runtime network calls.
+- [x] Передать payload через существующий Livewire component и добавить responsive panel из текущих `x-ui`/Tailwind patterns.
+- [x] Добавить стабильные RU/EN translation keys для каждого нового public UI label.
+- [x] Добавить `seasonvar.media_file_size.status_cache_seconds` с conservative default без обязательной новой env переменной.
+- [x] Обновить owner-документы importer/performance/administration/architecture и единственный dated changelog.
+- [x] Выполнить non-test verification: lint, targeted Pint/PHPStan, cold/warm status, build, locale keys, diff check и forbidden patterns.
+- [ ] Проверить task-only diff, подтвердить `main`, commit и push `origin/main` без смешивания параллельных изменений.
+
+### Planned changed-files list
+
+- [x] `app/DTOs/LicensedMediaFileSizeBacklogStatusData.php`
+- [x] `app/Services/Media/LicensedMediaFileSizeBacklog.php`
+- [x] `app/Services/Seasonvar/SeasonvarImportPipeline.php`
+- [x] `app/Console/Commands/ImportSeasonvar.php`
+- [x] `app/Services/Seasonvar/SeasonvarImportAdminService.php`
+- [x] `app/Livewire/SeasonvarImportManager.php`
+- [x] `resources/views/livewire/seasonvar-import-manager.blade.php`
+- [x] `config/seasonvar.php`
+- [x] `lang/ru/catalog.php`
+- [x] `lang/en/catalog.php`
+- [x] `CHANGELOG.md`
+- [x] `docs/architecture.md`
+- [x] `docs/importer.md`
+- [x] `docs/performance.md`
+- [x] `docs/administration.md`
+- [x] `docs/superpowers/specs/2026-07-16-video-file-size-backlog-observability-design.md`
+- [x] этот plan-файл
+
 ## Итоговый список task-файлов
 
 Ниже перечислены только файлы этой функции; посторонние изменения параллельных задач в общем рабочем дереве в feature-индекс не включаются.

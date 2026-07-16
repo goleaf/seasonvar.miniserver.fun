@@ -1,12 +1,12 @@
 # Управление каталогом
 
-Обновлено: 15.07.2026
+Обновлено: 16.07.2026
 
 ## Доступ и границы
 
 - Full-page Livewire 4 компонент `App\Livewire\CatalogAdministrationManager` доступен по `/admin/catalog` только authenticated user из `SEASONVAR_IMPORT_ADMIN_EMAILS`.
 - Route middleware проверяет gate `manage-catalog`, компонент повторяет gate на `mount()` и `render()`, а каждую запись сервис авторизует через `CatalogTitlePolicy`. Browser не передаёт user ID, source ID или родительские IDs для записи.
-- `/admin/imports` остаётся отдельным существующим экраном запусков импортёра. Из каталога на него ведёт служебная ссылка; новый importer workflow не создавался.
+- `/admin/imports` остаётся отдельным существующим экраном запусков импортёра. Из каталога на него ведёт служебная ссылка; новый importer workflow не создавался. Экран показывает per-run counters, здоровье источников и кешируемый глобальный backlog размеров direct-file media; snapshot не содержит source/playback URL и не запускает сетевую проверку при Livewire render.
 - Write actions проходят gate, policy, server-side validation и optimistic version checks без локального request budget.
 
 ## Возможности
@@ -16,6 +16,12 @@
 - Иерархия: обычные и специальные сезоны/серии, детерминированный `sort_order`, publication status, audience и UTC-окна. Все IDs повторно ограничиваются выбранным тайтлом и сезоном.
 - Видео: создание только из HTTPS URL на host из `PLAYBACK_ALLOWED_HOSTS`, безопасные allowlist значения формата/качества и публикация. URL существующего источника не возвращается в форму и не редактируется из browser.
 - «Скрыть» переводит запись в reversible `hidden`/`draft`; строки progress, history, watchlist и rating не удаляются каскадно. Каждый такой action имеет `wire:confirm` и повторную server-side авторизацию.
+
+## Наблюдаемость импортёра
+
+- Size-backlog panel показывает eligible, known, pending и due totals, terminal breakdown, metadata coverage, сумму известных exact bytes, плановый размер scheduled batch и время capture.
+- Данные подготавливает `SeasonvarImportAdminService`; Blade получает только локализованные strings/icons. Полный aggregate по большой SQLite-таблице хранится в operational tiered cache пятнадцать минут и допускает bounded stale fallback, поэтому 5-секундный poll активного запуска не повторяет scan; время capture показывается рядом с totals.
+- Это read-only observability: панель не увеличивает throughput, не принимает URL от browser, не выполняет HEAD/Range и не меняет media metadata. Backfill продолжает только существующая `seasonvar:import --refresh-media-sizes` и её консервативный scheduled запуск.
 
 ## Целостность и конкурентные изменения
 

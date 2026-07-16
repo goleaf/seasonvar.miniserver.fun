@@ -122,6 +122,7 @@ return [
         'max_checks_per_import_cycle' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_MAX_CHECKS_PER_CYCLE', 20),
         'scheduled_backfill_enabled' => filter_var(env('SEASONVAR_MEDIA_FILE_SIZE_SCHEDULED_BACKFILL_ENABLED', true), FILTER_VALIDATE_BOOL),
         'scheduled_backfill_limit' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_SCHEDULED_BACKFILL_LIMIT', 20),
+        'status_cache_seconds' => 900,
     ],
     'media_metadata' => [
         'chunk_size' => (int) env('SEASONVAR_MEDIA_METADATA_CHUNK_SIZE', 100),
