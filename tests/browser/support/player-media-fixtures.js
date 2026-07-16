@@ -99,11 +99,16 @@ export const installPlayerMediaFixtures = async (page) => {
     };
     const observations = [];
 
-    await page.route('https://media.example.com/player-fixtures/**', async (route) => {
+    const fulfillFixture = async (route, pathOverride = null) => {
         const request = route.request();
-        const path = new URL(request.url()).pathname;
+        const path = pathOverride ?? new URL(request.url()).pathname;
         const range = request.headers().range || null;
-        const observation = { path, range, status: 0 };
+        const observation = {
+            path,
+            range,
+            status: 0,
+            bodyVariant: path.endsWith('/hls-segment.m4s') ? 'valid' : null,
+        };
 
         observations.push(observation);
 
@@ -128,7 +133,8 @@ export const installPlayerMediaFixtures = async (page) => {
         let body = fixture.body;
 
         if (path.endsWith('/hls-segment.m4s') && scenario.segmentBodies.length > 0) {
-            body = scenario.segmentBodies.shift() === 'corrupt'
+            observation.bodyVariant = scenario.segmentBodies.shift();
+            body = observation.bodyVariant === 'corrupt'
                 ? Buffer.from('invalid-fragment', 'utf8')
                 : body;
         }
@@ -155,6 +161,29 @@ export const installPlayerMediaFixtures = async (page) => {
                 'Content-Length': String(body.length),
             } : undefined,
         });
+    };
+
+    await page.route('**/player-fixtures/**', (route) => fulfillFixture(route));
+    await page.route('**/playback/**', async (route) => {
+        const response = await route.fetch({ maxRedirects: 0 });
+        const location = response.headers().location;
+
+        if (response.status() < 300 || response.status() >= 400 || !location) {
+            await route.fulfill({ response });
+
+            return;
+        }
+
+        const target = new URL(location);
+
+        if (
+            target.origin !== 'https://media.example.com'
+            || !target.pathname.startsWith('/player-fixtures/')
+        ) {
+            throw new Error(`Unexpected signed playback target: ${target.origin}${target.pathname}`);
+        }
+
+        await fulfillFixture(route, target.pathname);
     });
 
     return {

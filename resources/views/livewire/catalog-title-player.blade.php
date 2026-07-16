@@ -130,7 +130,9 @@
                                 data-account-authenticated="{{ $isAuthenticated ? '1' : '0' }}"
                                 @if ($showView->selectedMediaFormat === 'm3u8') data-hls-src="{{ $showView->selectedMediaUrl }}" @endif
                             >
-                                <source src="{{ $showView->selectedMediaUrl }}" @if ($showView->selectedMediaType) type="{{ $showView->selectedMediaType }}" @endif>
+                                @if ($showView->selectedMediaFormat !== 'm3u8')
+                                    <source src="{{ $showView->selectedMediaUrl }}" @if ($showView->selectedMediaType) type="{{ $showView->selectedMediaType }}" @endif>
+                                @endif
                                 {{ __('catalog.player.unsupported_browser') }}
                             </video>
                             <p
@@ -353,6 +355,8 @@
                             wire:loading.attr="aria-disabled"
                             wire:target="selectMedia({{ $episodeMedia->id }})"
                             data-catalog-history
+                            data-player-media-option="{{ $episodeMedia->id }}"
+                            data-player-media-format="{{ $episodeMedia->format }}"
                             @if ($selectedMedia?->id === $episodeMedia->id) aria-current="true" @endif
                             @class([
                                 'grid min-h-12 grid-cols-[minmax(0,1fr)_auto] content-center items-center gap-2 rounded-control px-3 py-2 text-left text-sm font-bold leading-5 transition data-loading:pointer-events-none data-loading:opacity-60',

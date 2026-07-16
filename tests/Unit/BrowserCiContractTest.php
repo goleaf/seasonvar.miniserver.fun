@@ -16,6 +16,13 @@ final class BrowserCiContractTest extends TestCase
         $fixtures = File::get(base_path('tests/browser/prepare-fixtures.php'));
         $suite = File::get(base_path('tests/browser/catalog.spec.js'));
         $authSuite = File::get(base_path('tests/browser/auth-portal.spec.js'));
+        $playerSuitePath = base_path('tests/browser/player-lifecycle.spec.js');
+        $fixtureRouter = File::get(base_path('tests/browser/support/player-media-fixtures.js'));
+        $playerView = File::get(resource_path('views/livewire/catalog-title-player.blade.php'));
+
+        $this->assertFileExists($playerSuitePath);
+
+        $playerSuite = File::get($playerSuitePath);
 
         $this->assertSame('playwright test', $package['scripts']['test:browser']);
         $this->assertSame('playwright install chromium', $package['scripts']['test:browser:install']);
@@ -50,6 +57,13 @@ final class BrowserCiContractTest extends TestCase
         $this->assertStringContainsString('Browser-Strong-Password-42!', $authSuite);
         $this->assertStringContainsString('data-progress-position', $authSuite);
         $this->assertStringContainsString('sameOriginFailures', $authSuite);
+        $this->assertStringContainsString('installPlayerMediaFixtures', $playerSuite);
+        $this->assertStringContainsString("testInfo.project.name !== 'Desktop Chromium'", $playerSuite);
+        $this->assertStringContainsString('PageTransitionEvent', $playerSuite);
+        $this->assertStringContainsString('data-player-session', $playerSuite);
+        $this->assertStringContainsString('Content-Range', $fixtureRouter);
+        $this->assertStringContainsString('data-player-media-option', $playerView);
+        $this->assertStringContainsString('data-player-media-format', $playerView);
     }
 
     public function test_ci_installs_chromium_and_runs_the_browser_suite_against_local_fixtures(): void

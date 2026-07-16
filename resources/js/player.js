@@ -223,6 +223,7 @@ class CatalogPlayerSession {
             controls: playerControls,
             i18n: this.copy.controls,
             iconUrl: plyrIconUrl,
+            blankVideo: 'data:video/mp4;base64,',
             autoplay: this.preferences.autoplay,
             volume: this.preferences.volume / 100,
             muted: this.preferences.muted,
@@ -245,10 +246,25 @@ class CatalogPlayerSession {
     initializeHls() {
         const hlsSource = this.video.dataset.hlsSrc;
 
-        if (!hlsSource || !this.Hls?.isSupported()) {
+        if (!hlsSource) {
             return;
         }
 
+        if (!this.Hls?.isSupported()) {
+            this.video.src = hlsSource;
+
+            return;
+        }
+
+        this.replaceHls(hlsSource);
+    }
+
+    replaceHls(hlsSource = this.video.dataset.hlsSrc) {
+        if (!hlsSource || this.destroyed) {
+            return;
+        }
+
+        this.hls?.destroy();
         this.hls = new this.Hls({
             enableWorker: true,
             lowLatencyMode: false,
@@ -374,7 +390,7 @@ class CatalogPlayerSession {
             this.setStatus('retrying', 'retryingNetwork');
             this.recoveryTimer = window.setTimeout(() => {
                 this.recoveryTimer = null;
-                this.hls?.startLoad();
+                this.replaceHls();
             }, HLS_RETRY_DELAY_MS);
 
             return;
@@ -623,8 +639,7 @@ class CatalogPlayerSession {
         this.setStatus('retrying', 'retryingNetwork');
 
         if (this.hls) {
-            this.hls.stopLoad();
-            this.hls.startLoad(-1);
+            this.replaceHls();
         } else {
             this.video.load();
         }
@@ -693,11 +708,7 @@ export const initializeCatalogPlayers = async (root = document) => {
         video.dataset.playerReserved = String(generation);
     });
 
-    const needsHls = videos.some((video) => (
-        video.dataset.hlsSrc
-        && video.canPlayType('application/vnd.apple.mpegurl') === ''
-        && video.canPlayType('application/x-mpegURL') === ''
-    ));
+    const needsHls = videos.some((video) => Boolean(video.dataset.hlsSrc));
     let Plyr;
     let Hls;
 

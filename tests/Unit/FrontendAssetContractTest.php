@@ -86,6 +86,7 @@ class FrontendAssetContractTest extends TestCase
     {
         $app = File::get(resource_path('js/app.js'));
         $player = File::get(resource_path('js/player.js'));
+        $playerView = File::get(resource_path('views/livewire/catalog-title-player.blade.php'));
 
         $this->assertStringContainsString('class CatalogPlayerSession', $player);
         $this->assertStringContainsString('const playerSessions = new WeakMap()', $player);
@@ -112,6 +113,7 @@ class FrontendAssetContractTest extends TestCase
         $this->assertSame(0, preg_match('/[А-Яа-яЁё]/u', $player));
         $this->assertStringContainsString('const playerCopyFor = (video)', $player);
         $this->assertStringContainsString('i18n: this.copy.controls', $player);
+        $this->assertStringContainsString("blankVideo: 'data:video/mp4;base64,'", $player);
         $this->assertStringContainsString('initializeCaptionTracks()', $player);
         $this->assertStringContainsString('clearRecoveryTimer()', $player);
         $this->assertGreaterThanOrEqual(5, substr_count($player, 'clearRecoveryTimer()'));
@@ -119,6 +121,9 @@ class FrontendAssetContractTest extends TestCase
         $this->assertStringContainsString('manifestLoadPolicy:', $player);
         $this->assertStringContainsString('playlistLoadPolicy:', $player);
         $this->assertStringContainsString('fragLoadPolicy:', $player);
+        $this->assertStringContainsString('replaceHls(hlsSource = this.video.dataset.hlsSrc)', $player);
+        $this->assertStringContainsString('this.video.src = hlsSource', $player);
+        $this->assertStringContainsString("@if (\$showView->selectedMediaFormat !== 'm3u8')", $playerView);
         $this->assertStringNotContainsString("'Ссылка на просмотр устарела.'", $player);
         $this->assertStringNotContainsString("'The playback link has expired.'", $player);
         $this->assertStringNotContainsString('._catalogHls', $app.$player);

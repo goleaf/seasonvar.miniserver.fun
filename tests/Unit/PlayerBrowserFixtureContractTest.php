@@ -23,7 +23,9 @@ final class PlayerBrowserFixtureContractTest extends TestCase
         $router = File::get(base_path('tests/browser/support/player-media-fixtures.js'));
         $fixtures = File::get(base_path('tests/browser/prepare-fixtures.php'));
 
-        $this->assertStringContainsString("page.route('https://media.example.com/player-fixtures/**'", $router);
+        $this->assertStringContainsString("page.route('**/player-fixtures/**'", $router);
+        $this->assertStringContainsString("page.route('**/playback/**'", $router);
+        $this->assertStringContainsString('maxRedirects: 0', $router);
         $this->assertStringContainsString('Content-Range', $router);
         $this->assertStringContainsString('Buffer.from', $router);
         $this->assertStringContainsString('player-fixtures/valid.m3u8', $fixtures);
