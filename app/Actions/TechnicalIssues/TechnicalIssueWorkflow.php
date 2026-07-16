@@ -556,16 +556,13 @@ final readonly class TechnicalIssueWorkflow
 
     private function mergeTargetsAreCompatible(TechnicalIssue $duplicate, TechnicalIssue $canonical): bool
     {
-        if ($duplicate->type !== $canonical->type) {
-            return false;
-        }
-
-        if ($duplicate->catalog_title_id !== null || $canonical->catalog_title_id !== null) {
-            return $duplicate->catalog_title_id !== null
-                && $duplicate->catalog_title_id === $canonical->catalog_title_id;
-        }
-
-        return $duplicate->target_type === $canonical->target_type
+        return $duplicate->type === $canonical->type
+            && $duplicate->target_type === $canonical->target_type
+            && $duplicate->catalog_title_id === $canonical->catalog_title_id
+            && $duplicate->season_id === $canonical->season_id
+            && $duplicate->episode_id === $canonical->episode_id
+            && $duplicate->licensed_media_id === $canonical->licensed_media_id
+            && $duplicate->translation_id === $canonical->translation_id
             && $duplicate->feature_code === $canonical->feature_code
             && $duplicate->route_name === $canonical->route_name;
     }
