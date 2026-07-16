@@ -15,7 +15,8 @@ Schedule::command('cache:warm-catalog --queue --refresh')
     ->everyTenMinutes()
     ->name('catalog-cache-warm')
     ->withoutOverlapping(10)
-    ->onOneServer();
+    ->onOneServer()
+    ->when(static fn (): bool => (bool) config('cache-architecture.warming.enabled', true));
 
 Schedule::command('sanctum:prune-expired --hours=24')
     ->dailyAt('03:41')
