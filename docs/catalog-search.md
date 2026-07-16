@@ -134,6 +134,12 @@ Request form autocomplete переиспользует `CatalogSearchQueryParser
 
 Request directory ищет только public eligible title/original/alternative/normalized request fields, никогда private note, clarification, email, hidden source или importer detail. Query/type/status/sort URL state валидируется enum allowlist, search minimum/length bounded, sorting имеет ID tie-breaker, pagination сохраняет query/history. Exact duplicate сначала использует indexed active identity и overlapping allowlisted external IDs; probable/related search сужается type+target/title hash+year и ограничивается configured candidate limit. Полная таблица не сравнивается fuzzy в PHP.
 
+## Публичные рейтинги Top 100
+
+Канонические страницы `/top/movies`, `/top/series`, `/top/anime` и `/top/cartoons` обслуживает один enum-bound query contract. В рейтинг попадают только опубликованные карточки, доступные гостю и имеющие минимум одну опубликованную воспроизводимую серию со здоровым media source. Фильмы — неанимационные карточки поддерживаемых типов ровно с одной доступной серией, сериалы — такие же карточки с двумя и более сериями, аниме определяет тип `anime`, мультфильмы — жанр `анимационные` без аниме.
+
+Для каждой карточки выбирается рейтинг КиноПоиска, а при его отсутствии — IMDb; строки без оценки или голосов исключаются. Порядок задаёт сглаженная оценка `(rating × votes + 7.0 × 1000) / (votes + 1000)`, затем число голосов, исходная оценка и ID. Query возвращает не более 100 стабильных результатов и не принимает пользовательские filter/sort/page параметры. Авторизация может добавить только личное состояние уже выбранных карточек и не меняет публичные ID, места или общий cache key.
+
 ## Discovery URL state и no-results
 
 Canonical discovery URL — `/discover/{type}` и `/{locale}/discover/{type}`; default redirect выбирает `popular`, legacy `/recommendations` сохраняется 301. `type` — implemented enum strategy, поэтому отдельный arbitrary `sort` column отсутствует. Stable URL fields: `period`, `rating_source`, taxonomy slugs `genre|country|tag|actor|director|translation|studio`, `year_from|year_to`, `quality`, `subtitles=available`, `rating_min`, `votes_min`, `page`. Unknown/out-of-range values normalize to defaults; page max 500, result limit server-configured max 48.

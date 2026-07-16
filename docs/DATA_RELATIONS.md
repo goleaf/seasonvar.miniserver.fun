@@ -381,6 +381,12 @@ Account deletion обнуляет `reviews.user_id` и `reports.reporter_id`, у
 
 Additive migration `2026_07_16_000000_create_user_account_settings_table.php` не backfill-ит и не переписывает существующие user/player/collection/notification data. До её применения schema guard возвращает defaults для reads и fail-closed `503` для writes; rollback удаляет только новую preference table, поэтому после реальных writes требуется export/backup и предпочтителен roll-forward.
 
+## Производный рейтинг Top 100
+
+Top 100 не вводит новую таблицу и не владеет данными каталога. `CatalogTopListQuery` читает `catalog_titles`, provider rows `catalog_title_ratings`, публичные seasons/episodes и опубликованные доступные `licensed_media`, применяя ту же visibility/entitlement boundary, что публичные карточки. КиноПоиск имеет приоритет над IMDb только как источник расчёта; оба provider row остаются исходными импортными данными.
+
+Категория и место — производные значения запроса и не сохраняются в `catalog_titles`. Фильм определяется одной доступной серией, сериал — двумя и более, анимация — canonical genre relation, аниме — типом карточки. Личная библиотека, оценки пользователя, прогресс, история и скрытые рекомендации не входят в score или candidate set; они могут быть загружены только после определения стабильных публичных ID для отображения карточек.
+
 <!-- project-docs:start -->
 ## Публичная индексация
 

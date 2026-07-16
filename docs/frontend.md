@@ -173,6 +173,12 @@ Blade получает DTO/options/paginators и не вызывает models/se
 
 Recommendation rows reuse `x-catalog.title-card` recommendation layout. Type navigation is touch-scrollable with standard link fallback; result list is a responsive grid/list, not autoplay carousel. There is no inline CSS, `@php`, business JavaScript, client ranking, exposed candidate graph or polling. Keyboard focus, 44px controls, visible focus, long-label wrapping, missing poster alt, zoom/reduced-motion and phone/tablet/desktop layout follow `UI_STANDARDS.md`. No new Vite module was required.
 
+## Frontend lifecycle рейтингов Top 100
+
+Страницы `/top/{category}` полностью серверные и не добавляют JavaScript lifecycle. Общий hero объясняет источник мест, четыре обычные ссылки переключают категорию с `aria-current`, первые три позиции образуют визуальную витрину, а позиции 4–100 используют тот же `x-catalog.title-card`. Семантический ordered list и видимый номер сохраняют порядок без зависимости от CSS или клиента.
+
+Mobile-first layout остаётся одной колонкой на телефоне, podium расширяется до трёх колонок на больших экранах, основной список — до двух колонок на широком экране. Длинные названия переносятся, controls имеют видимый `focus-visible`, отсутствующий постер использует существующий fallback, а пустая категория показывает честное состояние и переход в каталог. Проверяемая viewport-матрица: 375, 768, 1280 и 1920 пикселей без горизонтального переполнения.
+
 ## File-size и download UI плеера
 
 `CatalogTitlePlayer` использует уже загруженный selected `LicensedMedia`: `CatalogTitlePlaybackQuery` выбирает file-size metadata, общий formatter строит B/KB/MB/GB/TB label, а `CatalogShowViewModel` готовит deterministic direct-file/download/login/reason state. Render не выполняет HEAD/Range/DNS и не принимает remote URL. Binary response не проходит через Livewire: обычная named-route ссылка открывает отдельный controller.

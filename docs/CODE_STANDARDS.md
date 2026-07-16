@@ -109,6 +109,13 @@
 - Public query/presenter готовит counts, canonical rating, permissions, spoiler body, author and vote totals; viewer vote/block/mute/restriction/pending state — отдельный overlay. Blade не lazy-load-ит models и не рассчитывает permission/average/helpfulness/verified/spoiler.
 - Stable ID/aliases переживают edit/delete/restore/slug/title merge. Create/vote/report must be idempotent and transaction-safe; cache invalidation is after commit and scoped. Visible actions require localized success/error/loading/confirmation and exact `lang/ru/reviews.php`/`lang/en/reviews.php` parity.
 
+## Рейтинги Top 100
+
+- Новая категория расширяет `CatalogTopListCategory` и общий `CatalogTopListQuery`; отдельные controller/query/view для каждого Top 100 запрещены. Route binding принимает только backed enum values.
+- Рейтинг строится только из canonical public/watchable eligibility и provider ratings, имеет bounded limit 100 и стабильный ID tie-breaker. Viewer overlay не может менять публичный candidate set, score, место, sitemap или shared cache key.
+- Формула и границы категорий документируются в `docs/catalog-search.md` и покрываются feature tests. Blade получает DTO, переиспользует `x-catalog.title-card` и не выполняет ranking/database/service logic.
+- Backed enum route parameters должны сериализоваться в public cache dimensions по их scalar value; отбрасывать enum parameter и объединять HTML разных категорий запрещено.
+
 <!-- project-docs:start -->
 ## Автоматизация документации, карты сайта и robots
 

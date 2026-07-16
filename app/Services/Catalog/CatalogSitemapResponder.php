@@ -4,6 +4,7 @@ namespace App\Services\Catalog;
 
 use App\DTOs\CatalogRecommendationContext;
 use App\Enums\CatalogRecommendationType;
+use App\Enums\CatalogTopListCategory;
 use App\Models\CatalogCollection;
 use App\Models\CatalogTitle;
 use App\Models\ContentRequest;
@@ -39,6 +40,7 @@ class CatalogSitemapResponder
         private readonly CatalogCollectionSchema $collectionSchema,
         private readonly ContentRequestSchema $contentRequestSchema,
         private readonly CatalogRecommendationService $recommendations,
+        private readonly CatalogTopListQuery $topLists,
     ) {}
 
     public function index(): StreamedResponse
@@ -89,6 +91,21 @@ class CatalogSitemapResponder
 
             $this->writeSitemapUrl(route('titles.index'), now(), 'daily', '0.9');
             $this->writeSitemapUrl(route('collections.index'), now(), 'daily', '0.8');
+
+            foreach (CatalogTopListCategory::cases() as $category) {
+                if (! $this->topLists->hasItems($category)) {
+                    continue;
+                }
+
+                $this->writeSitemapUrl(route('top.show', ['category' => $category->value]), now(), 'daily', '0.8');
+
+                foreach (config('catalog-collections.supported_locales', ['ru']) as $locale) {
+                    $this->writeSitemapUrl(route('localized.top.show', [
+                        'locale' => $locale,
+                        'category' => $category->value,
+                    ]), now(), 'daily', '0.8');
+                }
+            }
 
             if ($this->contentRequestSchema->ready()) {
                 $this->writeSitemapUrl(route('requests.index'), now(), 'daily', '0.6');

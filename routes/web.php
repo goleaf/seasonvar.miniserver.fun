@@ -3,6 +3,7 @@
 use App\Enums\AccountSettingsSection;
 use App\Enums\CatalogFilterType;
 use App\Enums\CatalogRecommendationType;
+use App\Enums\CatalogTopListCategory;
 use App\Http\Controllers\AccountDataExportController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\CatalogCollectionController;
@@ -10,6 +11,7 @@ use App\Http\Controllers\CatalogCollectionCoverController;
 use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\CatalogDirectoryRedirectController;
 use App\Http\Controllers\CatalogSitemapController;
+use App\Http\Controllers\CatalogTopListController;
 use App\Http\Controllers\CommentRedirectController;
 use App\Http\Controllers\DownloadLicensedMediaController;
 use App\Http\Controllers\InfrastructureHealthController;
@@ -248,6 +250,11 @@ Route::get('/discover/{type}', CatalogDiscoveryPage::class)
     ->whereIn('type', $discoveryRouteTypes)
     ->name('discover.index');
 Route::redirect('/recommendations', '/discover/popular', 301)->name('legacy.recommendations.index');
+Route::redirect('/top', '/top/movies', 302)->name('top.default');
+Route::get('/top/{category}', [CatalogTopListController::class, 'show'])
+    ->whereIn('category', CatalogTopListCategory::values())
+    ->middleware('public.page:catalog')
+    ->name('top.show');
 
 Route::get('/comments/{comment}', CommentRedirectController::class)
     ->whereNumber('comment')
@@ -309,6 +316,19 @@ Route::middleware('collection.locale')->group(function () use ($discoveryRouteTy
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->whereIn('type', $discoveryRouteTypes)
         ->name('localized.discover.index');
+    Route::get('/{locale}/top', function (string $locale) {
+        return redirect()->route('localized.top.show', [
+            'locale' => $locale,
+            'category' => CatalogTopListCategory::Movies->value,
+        ], 302);
+    })
+        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->name('localized.top.default');
+    Route::get('/{locale}/top/{category}', [CatalogTopListController::class, 'localized'])
+        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->whereIn('category', CatalogTopListCategory::values())
+        ->middleware('public.page:catalog')
+        ->name('localized.top.show');
     Route::get('/{locale}/recommendations', function (string $locale) {
         return redirect()->route('localized.discover.index', [
             'locale' => $locale,

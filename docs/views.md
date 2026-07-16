@@ -97,6 +97,12 @@ Create view показывает search-before-submit, type descriptions, stable
 
 Homepage показывает не более одной recommendation section; title detail — explicit related перед computed similar; discovery — filtered paginated list с working not-interested/blacklist/undo; library — link на personal discovery и owner-only hidden restore; search no-result — labelled popular link. Все состояния используют `lang/{ru,en}/recommendations.php`, existing cards/buttons/panels and escaped output. No fake percentage/AI label/dead feedback/carousel/hover-only reason exists.
 
+## Представление рейтингов Top 100
+
+`CatalogTopListPageBuilder` передаёт `catalog/top-list.blade.php` готовые category links, podium, основной список, count и SEO contract. Каждая строка — `CatalogTopListItem` с уже определёнными местом, источником рейтинга, форматированными оценкой/голосами и объясняющими признаками; Blade не вычисляет score, eligibility, category boundaries, URL или permissions и не обращается к базе.
+
+Шаблон переиспользует `x-catalog.title-card`, существующие panels/icons/focus styles и только безопасный escaped output. Отдельной Eloquent-сериализации, inline PHP/CSS/JS, client ranking и скрытого full list нет. `CollectionPage`/`ItemList`, canonical и hreflang строятся PHP SEO builder из того же упорядоченного набора, поэтому видимый порядок и structured data не расходятся.
+
 ## Представления технических обращений
 
 `livewire/technical-issues/*` и `components/technical-issues/*` получают prepared DTO/options из Livewire/query/presenter. Create, My Tickets, detail, notifications и staff queue используют existing light Tailwind panels/forms/badges, stable `wire:key`, responsive wrapping, visible focus, minimum touch targets, labelled upload/status/timeline controls и ARIA live regions. Follower view не получает requester evidence; internal notes/raw diagnostics никогда не передаются в normal-user view.

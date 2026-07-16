@@ -81,6 +81,16 @@ final class AppLayoutData
             );
         }
 
+        if ($this->router->has('top.show')) {
+            $layoutHeaderNavigation[] = $this->headerLink(
+                'top.show',
+                'fa-solid fa-trophy',
+                __('top_lists.navigation'),
+                $this->request->routeIs('top.*', 'localized.top.*'),
+                ['category' => 'movies'],
+            );
+        }
+
         if ($this->router->has('collections.index')) {
             $layoutHeaderNavigation[] = $this->headerLink(
                 'collections.index',
@@ -241,6 +251,16 @@ final class AppLayoutData
                 __('recommendations.navigation.discover'),
                 $this->request->routeIs('discover.*', 'localized.discover.*'),
                 ['type' => 'popular'],
+            );
+        }
+
+        if ($this->router->has('top.show')) {
+            $layoutFooterNavigation[] = $this->footerLink(
+                'top.show',
+                'fa-solid fa-trophy text-slate-400',
+                __('top_lists.navigation'),
+                $this->request->routeIs('top.*', 'localized.top.*'),
+                ['category' => 'movies'],
             );
         }
 

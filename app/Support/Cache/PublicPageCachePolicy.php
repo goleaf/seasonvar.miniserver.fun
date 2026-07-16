@@ -7,6 +7,7 @@ namespace App\Support\Cache;
 use App\Livewire\Forms\CatalogSeriesFilters;
 use App\Models\CatalogTitle;
 use App\Models\ContentRequest;
+use BackedEnum;
 use Illuminate\Contracts\Translation\Translator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -220,6 +221,10 @@ final class PublicPageCachePolicy
             ->map(function (mixed $value): mixed {
                 if ($value instanceof Model) {
                     return $value->getRouteKey();
+                }
+
+                if ($value instanceof BackedEnum) {
+                    return $value->value;
                 }
 
                 return is_scalar($value) || $value === null ? $value : null;
