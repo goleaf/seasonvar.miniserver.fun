@@ -345,4 +345,6 @@
 - `2026_07_15_235200_add_discussion_relationship_pagination_indexes.php`
 - `2026_07_16_000000_create_user_account_settings_table.php`
 - `2026_07_16_010000_add_terminal_reason_to_seasonvar_import_title_groups.php`
+- `2026_07_16_120000_add_canonical_recommendation_discovery.php`
+- `2026_07_16_180000_create_content_request_domain.php`
 <!-- project-docs:end -->
