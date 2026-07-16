@@ -401,7 +401,7 @@ Verified layout/SEO increment: AppLayoutData/layout shrink from 1,928/783 to 411
 
 ## Task 01 — multilingual home integration
 
-Status: application, route, translation, SEO, sitemap, cache, documentation and explicitly non-test static release gates completed on 16.07.2026. Commit/clean-tree handoff is blocked only by preserved concurrent Task 20 staged/overlapping changes. The mandatory 40-point baseline and design decision are recorded in [`../superpowers/specs/2026-07-16-multilingual-home-integration-design.md`](../superpowers/specs/2026-07-16-multilingual-home-integration-design.md); the executable checklist is [`../superpowers/plans/2026-07-16-multilingual-home-integration.md`](../superpowers/plans/2026-07-16-multilingual-home-integration.md).
+Status: application, route, translation, SEO, sitemap, cache, documentation and explicitly non-test static release gates completed on 16.07.2026. Task 01 was committed together with its overlapping Task 20 integration in `7753482` and pushed to the existing `main` branch. The mandatory 40-point baseline and design decision are recorded in [`../superpowers/specs/2026-07-16-multilingual-home-integration-design.md`](../superpowers/specs/2026-07-16-multilingual-home-integration-design.md); the executable checklist is [`../superpowers/plans/2026-07-16-multilingual-home-integration.md`](../superpowers/plans/2026-07-16-multilingual-home-integration.md).
 
 - [x] Preserve the existing Laravel PHP catalog, `ApplyAccountPreferences`, account settings, partial localized routes and collection/tag translation tables; do not introduce a package, JSON catalog, title-translation schema or machine translation.
 - [x] Add one localized `/{locale}` home alias, validated POST switcher, session/user persistence and web/Livewire locale reapplication with a strict `ru`/`en` allowlist.
@@ -409,7 +409,7 @@ Status: application, route, translation, SEO, sitemap, cache, documentation and 
 - [x] Localize home canonical, Open Graph/Twitter payload, JSON-LD, reciprocal `hreflang`, x-default and sitemap entries without translated-slug invention.
 - [x] Keep translated home cache keys separated by locale, warm every supported locale and invalidate all variants through the existing Homepage generation.
 - [x] Document locale selection/fallback, translation storage/admin workflow, Livewire lifecycle, cache, SEO and translator validation.
-- [x] Complete the explicitly non-test static/Pint/Vite/docs/diff gate and record the unrelated dirty-tree handoff without absorbing concurrent Task 20 work. Safe commit remains deferred until that unrelated staged/overlap state is resolved.
+- [x] Complete the explicitly non-test static/Pint/Vite/docs/diff gate, commit the reviewed Task 01/20 overlap as one coherent change and verify the pushed `main` SHA.
 
 ## Task 10 — canonical serial collections and curated lists
 
@@ -1231,7 +1231,7 @@ Production activation follow-up (16.07.2026): the first rollout attempt stopped 
 - [x] Implement create/My Tickets/detail/admin Livewire routes/views/JS and real player/title/search/account/notification/support entry points; unsupported release-calendar surface is documented rather than represented by a fake control.
 - [x] Add `ru`/`en` parity, private noindex/no-store/canonical/sitemap/cache boundaries and update every topic-owner document, maintenance log and English changelog.
 - [x] Run no automated tests; perform Pint, PHP/static syntax, fresh route, migration-on-disposable-SQLite/schema/index/query/policy/translation/cache/SEO/Vite/browser/accessibility and full manual acceptance inspection.
-- [ ] Reread Task 20 and changed/directly-related files, inspect final clean status on existing `main`, commit only Task 20 and push configured remote.
+- [x] Reread Task 20 and changed/directly-related files, commit the reviewed Task 01/20 overlap as `7753482` on existing `main` and verify the configured remote at the same SHA; unrelated concurrent working-tree changes were excluded.
 
 ### Rollback, protected files and risks
 
