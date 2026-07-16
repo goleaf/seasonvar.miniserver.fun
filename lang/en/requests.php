@@ -134,6 +134,7 @@ return [
         'filters' => 'Queue and filters', 'empty' => 'No requests match these filters.', 'private_note' => 'Private note',
         'completion_title_id' => 'Published series ID', 'completion_season_id' => 'Published season ID',
         'completion_episode_id' => 'Published episode ID', 'completion_media_id' => 'Verified media ID',
+        'import_run' => 'Linked importer run: #:id',
         'apply_status' => 'Apply status', 'apply_priority' => 'Save priority',
         'clarification_question' => 'Question for requester', 'request_clarification' => 'Request clarification', 'merge_target' => 'Canonical request UUID',
         'merge' => 'Merge', 'import_handoff' => 'Hand off to importer',

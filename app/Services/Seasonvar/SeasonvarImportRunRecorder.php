@@ -18,6 +18,12 @@ class SeasonvarImportRunRecorder
         'media_updated',
         'media_skipped',
         'media_failed',
+        'media_sizes_checked',
+        'media_sizes_known',
+        'media_sizes_unknown',
+        'media_sizes_unsupported',
+        'media_size_checks_failed',
+        'media_size_known_bytes',
     ];
 
     /**

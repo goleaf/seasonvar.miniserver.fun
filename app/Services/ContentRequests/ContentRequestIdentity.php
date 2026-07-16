@@ -24,6 +24,7 @@ final readonly class ContentRequestIdentity
             ->sort()
             ->implode('|');
         $usesStableTarget = $input->catalogTitleId !== null || $external !== '';
+        $externalIdentity = $input->catalogTitleId === null ? $external : '';
 
         return hash('sha256', implode('|', [
             $input->type->value,
@@ -41,7 +42,7 @@ final readonly class ContentRequestIdentity
             $input->translationType ?? '',
             $input->requestedQuality ?? '',
             $input->correctionField ?? '',
-            $external,
+            $externalIdentity,
         ]));
     }
 
@@ -51,6 +52,7 @@ final readonly class ContentRequestIdentity
             ->map(fn ($item): string => $item->provider->value.':'.$item->normalized_identifier)
             ->sort()->implode('|');
         $usesStableTarget = $request->catalog_title_id !== null || $external !== '';
+        $externalIdentity = $request->catalog_title_id === null ? $external : '';
 
         return hash('sha256', implode('|', [
             $request->type->value, $request->catalog_title_id ?? '', $request->season_id ?? '',
@@ -59,7 +61,7 @@ final readonly class ContentRequestIdentity
             $usesStableTarget ? '' : ($request->release_year ?? ''),
             $request->audio_language ?? '', $request->subtitle_language ?? '',
             $this->normalizer->key((string) $request->translation_studio), $request->translation_type ?? '',
-            $request->requested_quality ?? '', $request->correction_field ?? '', $external,
+            $request->requested_quality ?? '', $request->correction_field ?? '', $externalIdentity,
         ]));
     }
 }

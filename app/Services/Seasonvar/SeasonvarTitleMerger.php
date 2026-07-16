@@ -10,6 +10,8 @@ use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Services\Api\V1\Sync\CatalogSyncChangePublisher;
+use App\Services\Catalog\CatalogRecommendationCacheInvalidator;
+use App\Services\Catalog\CatalogTitleRelationService;
 use App\Services\Catalog\CatalogTitleUserDataMerger;
 use App\Services\Catalog\Search\CatalogSearchIndexer;
 use App\Services\Collections\CatalogCollectionItemService;
@@ -50,6 +52,8 @@ class SeasonvarTitleMerger
         private readonly ReviewMergeService $reviews,
         private readonly TagTitleMergeService $tagTitles,
         private readonly TagCacheInvalidator $tagCache,
+        private readonly CatalogTitleRelationService $titleRelations,
+        private readonly CatalogRecommendationCacheInvalidator $recommendationCache,
     ) {}
 
     /**
@@ -80,6 +84,7 @@ class SeasonvarTitleMerger
             $duplicateSlugs = $titles->slice(1)->pluck('slug')->filter()->values();
             $groupResult = DB::transaction(fn (): array => $this->mergeGroup($titles));
             $this->tagCache->publicChanged($titles->modelKeys());
+            $this->recommendationCache->publicSignalsChanged('title-merge');
             $result['titles'] += $groupResult['titles'];
             $result['seasons'] += $groupResult['seasons'];
             $result['episodes'] += $groupResult['episodes'];
@@ -161,6 +166,7 @@ class SeasonvarTitleMerger
         $duplicateSlugs = $titles->slice(1)->pluck('slug')->filter()->values();
         $groupResult = DB::transaction(fn (): array => $this->mergeGroup($titles));
         $this->tagCache->publicChanged($titles->modelKeys());
+        $this->recommendationCache->publicSignalsChanged('title-merge');
 
         $result['titles'] = $groupResult['titles'];
         $result['seasons'] = $groupResult['seasons'];
@@ -453,6 +459,7 @@ class SeasonvarTitleMerger
             $this->preservePublicSlugs($canonical, $duplicate);
             $this->collectionItems->mergeTitle($canonical, $duplicate);
             $this->tagTitles->moveTitle($canonical, $duplicate);
+            $this->titleRelations->mergeTitle($canonical, $duplicate);
 
             $duplicate->forceDelete();
             $mergedTitles++;
@@ -570,6 +577,9 @@ class SeasonvarTitleMerger
         $existing = $this->matchingCanonicalMedia($media, $canonical);
 
         if ($existing !== null && $existing->isNot($media)) {
+            $effectiveUrl = $media->playback_url ?: ($existing->playback_url ?: ($media->path ?: $existing->path));
+            $effectiveUrlChanged = $existing->effectivePlaybackUrl() !== $effectiveUrl;
+
             $existing->fill([
                 'season_id' => $season === null ? $existing->season_id : $season->id,
                 'episode_id' => $episode === null ? $existing->episode_id : $episode->id,
@@ -587,7 +597,22 @@ class SeasonvarTitleMerger
                 'check_status' => $media->check_status ?? $existing->check_status,
                 'last_http_status' => $media->last_http_status ?? $existing->last_http_status,
                 'checked_at' => $media->checked_at ?? $existing->checked_at,
-            ])->save();
+            ]);
+
+            if ($effectiveUrlChanged) {
+                $existing->resetFileSizeInspection();
+            } elseif ($media->hasKnownFileSize() && ! $existing->hasKnownFileSize()) {
+                $existing->forceFill([
+                    'file_size_bytes' => $media->file_size_bytes,
+                    'file_size_checked_at' => $media->file_size_checked_at,
+                    'file_size_check_status' => $media->file_size_check_status,
+                    'file_size_source' => $media->file_size_source,
+                    'file_size_http_status' => $media->file_size_http_status,
+                    'file_size_check_error' => $media->file_size_check_error,
+                ]);
+            }
+
+            $existing->save();
             $media->forceDelete();
 
             return $existing;

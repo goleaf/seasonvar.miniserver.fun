@@ -16,4 +16,15 @@ enum ContentRequestExternalProvider: string
     {
         return __('requests.providers.'.$this->value);
     }
+
+    public function publicUrl(string $identifier): ?string
+    {
+        return match ($this) {
+            self::Imdb => 'https://www.imdb.com/title/'.rawurlencode($identifier).'/',
+            self::Tmdb => 'https://www.themoviedb.org/tv/'.rawurlencode($identifier),
+            self::Tvdb => 'https://thetvdb.com/search?query='.rawurlencode($identifier),
+            self::Kinopoisk => 'https://www.kinopoisk.ru/film/'.rawurlencode($identifier).'/',
+            self::Seasonvar => null,
+        };
+    }
 }

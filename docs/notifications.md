@@ -62,3 +62,9 @@ php artisan test --filter=RunSeasonvarImportJobTest
 php artisan test --filter=SeasonvarImportFailedNotificationTest
 php artisan test --filter=ConfigurationEnvironmentTest
 ```
+
+## Уведомления по заявкам на материалы
+
+`ContentRequestActivityNotification` использует существующий database channel и body-free payload: stable category, request UUID, status code и optional canonical UUID. Categories: submitted, status changed, clarification, partial completion, completion и merge. Requester, voters и followers получают только относящиеся к ним updates; actor self-notification подавляется, moderator inbox при submit ограничен existing admin email gate.
+
+`content_request_notification_preferences` отдельно управляет requester/voted/followed updates из текущего account settings notification section. Deterministic UUID включает recipient+request revision+category, поэтому retry, repeated callback и merge не создают повтор. Delivery best-effort выполняется после committed domain change и не откатывает заявку; exception только report-ится. Inbox повторно разрешает public/owned canonical request и не вставляет title, explanation, evidence, private note, recipient list или importer error в notification data.

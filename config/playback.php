@@ -23,4 +23,14 @@ return [
         's3' => 80,
         'external_playlist' => 50,
     ],
+    'downloads' => [
+        'allowed_formats' => ['mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi'],
+        'chunk_bytes' => 65_536,
+        'timeout_seconds' => 120,
+        'connect_timeout_seconds' => 10,
+        'retry_times' => 1,
+        'retry_sleep_milliseconds' => 250,
+        'requests_per_minute' => 12,
+        'media_requests_per_minute' => 4,
+    ],
 ];

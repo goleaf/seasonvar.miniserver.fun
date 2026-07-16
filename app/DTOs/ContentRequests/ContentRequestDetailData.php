@@ -7,10 +7,10 @@ namespace App\DTOs\ContentRequests;
 final readonly class ContentRequestDetailData
 {
     /**
-     * @param list<array{status: string, label: string, reason: string|null, date: string}> $history
-     * @param list<array{url: string, label: string}> $sourceLinks
-     * @param list<array{provider: string, label: string, identifier: string}> $externalIdentifiers
-     * @param list<array{role: string, role_label: string, body: string, date: string}> $clarifications
+     * @param  list<array{status: string, label: string, reason: string|null, date: string}>  $history
+     * @param  list<array{url: string, label: string}>  $sourceLinks
+     * @param  list<array{provider: string, label: string, identifier: string, url: string|null}>  $externalIdentifiers
+     * @param  list<array{role: string, role_label: string, body: string, date: string}>  $clarifications
      */
     public function __construct(
         public ContentRequestCardData $card,

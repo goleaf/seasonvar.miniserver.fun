@@ -64,6 +64,50 @@ final class PoliteHttpClient
     }
 
     /**
+     * Open a validated upstream response without reading its body.
+     *
+     * The caller owns the returned stream and must close the response.
+     *
+     * @param  array<string, string>  $headers
+     */
+    public function requestVerifiedStream(
+        VerifiedExternalUrlData $target,
+        string $method,
+        array $headers = [],
+        int $timeoutSeconds = 10,
+        int $connectTimeoutSeconds = 5,
+        int $attempts = 1,
+        int $retrySleepMilliseconds = 250,
+    ): Response {
+        $safeHeaders = collect($headers)
+            ->only(['Accept', 'Accept-Encoding', 'Range', 'Referer'])
+            ->filter(fn (mixed $value): bool => is_string($value) && trim($value) !== '')
+            ->map(fn (string $value): string => trim($value))
+            ->all();
+        $attempts = max(1, min(3, $attempts));
+        $timeoutSeconds = max(1, min(120, $timeoutSeconds));
+        $connectTimeoutSeconds = max(1, min($timeoutSeconds, $connectTimeoutSeconds));
+
+        return Http::withHeaders([
+            'Accept' => '*/*',
+            'User-Agent' => 'SeasonvarCatalog/0.1 (+https://seasonvar.miniserver.fun)',
+            ...$safeHeaders,
+        ])
+            ->withOptions($target->httpOptions())
+            ->withoutRedirecting()
+            ->withOptions(['stream' => true])
+            ->timeout($timeoutSeconds)
+            ->connectTimeout($connectTimeoutSeconds)
+            ->retry(
+                $attempts,
+                max(0, min(5000, $retrySleepMilliseconds)),
+                $this->shouldRetry(...),
+                throw: false,
+            )
+            ->send(strtoupper($method), $target->url);
+    }
+
+    /**
      * @param  (callable(string, array<string, mixed>): void)|null  $progress
      * @param  array<string, string>  $headers
      * @param  array<string, mixed>  $transportOptions

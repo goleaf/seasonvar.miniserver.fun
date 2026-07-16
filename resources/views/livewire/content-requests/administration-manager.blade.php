@@ -58,6 +58,10 @@
                 <div wire:key="admin-request-{{ $request->publicId }}" class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
                     <x-content-requests.card :request="$request" />
 
+                    @if ($importRunIds[$request->id] ?? null)
+                        <p class="mt-3 text-xs font-bold text-slate-500">{{ __('requests.admin.import_run', ['id' => $importRunIds[$request->id]]) }}</p>
+                    @endif
+
                     <div class="mt-4 grid gap-4 border-t border-slate-100 pt-4 lg:grid-cols-2">
                         <div class="space-y-3">
                             <div class="grid gap-3 sm:grid-cols-2">

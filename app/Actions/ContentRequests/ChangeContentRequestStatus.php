@@ -6,6 +6,7 @@ namespace App\Actions\ContentRequests;
 
 use App\Enums\ContentRequestRejectionReason;
 use App\Enums\ContentRequestStatus;
+use App\Enums\ContentRequestType;
 use App\Exceptions\ContentRequests\ContentRequestActionException;
 use App\Models\CatalogTitle;
 use App\Models\ContentRequest;
@@ -81,7 +82,7 @@ final readonly class ChangeContentRequestStatus
                 throw new ContentRequestActionException('requests.errors.invalid_transition');
             }
 
-            $this->assertCompletion($desired, $completion);
+            $this->assertCompletion($request, $desired, $completion);
             $from = $request->status;
             $request->status = $desired;
             $request->version++;
@@ -137,7 +138,7 @@ final readonly class ChangeContentRequestStatus
     }
 
     /** @param array{catalog_title_id?: int|null, season_id?: int|null, episode_id?: int|null, media_id?: int|null} $completion */
-    private function assertCompletion(ContentRequestStatus $status, array $completion): void
+    private function assertCompletion(ContentRequest $request, ContentRequestStatus $status, array $completion): void
     {
         if (! in_array($status, [ContentRequestStatus::PartiallyCompleted, ContentRequestStatus::Completed], true)) {
             return;
@@ -154,24 +155,74 @@ final readonly class ChangeContentRequestStatus
             throw new ContentRequestActionException('requests.errors.completion_target_required');
         }
 
-        if (isset($targetIds['catalog_title_id'])
-            && ! CatalogTitle::query()->availableTo(null)->whereKey($targetIds['catalog_title_id'])->exists()) {
+        $title = isset($targetIds['catalog_title_id'])
+            ? CatalogTitle::query()->availableTo(null)->find($targetIds['catalog_title_id'])
+            : null;
+        $season = isset($targetIds['season_id'])
+            ? Season::query()->availableTo(null)->find($targetIds['season_id'])
+            : null;
+        $episode = isset($targetIds['episode_id'])
+            ? Episode::query()->availableTo(null)->with('season:id,catalog_title_id,number')->find($targetIds['episode_id'])
+            : null;
+        $media = isset($targetIds['media_id'])
+            ? LicensedMedia::query()->published()
+                ->with(['season:id,catalog_title_id', 'episode:id,season_id', 'episode.season:id,catalog_title_id'])
+                ->find($targetIds['media_id'])
+            : null;
+
+        if ((isset($targetIds['catalog_title_id']) && ! $title instanceof CatalogTitle)
+            || (isset($targetIds['season_id']) && ! $season instanceof Season)
+            || (isset($targetIds['episode_id']) && ! $episode instanceof Episode)
+            || (isset($targetIds['media_id']) && ! $media instanceof LicensedMedia)) {
             throw new ContentRequestActionException('requests.errors.completion_target_required');
         }
 
-        if (isset($targetIds['season_id'])
-            && ! Season::query()->availableTo(null)->whereKey($targetIds['season_id'])->exists()) {
+        if ($request->type === ContentRequestType::Serial && ! $title instanceof CatalogTitle) {
             throw new ContentRequestActionException('requests.errors.completion_target_required');
         }
 
-        if (isset($targetIds['episode_id'])
-            && ! Episode::query()->availableTo(null)->whereKey($targetIds['episode_id'])->exists()) {
+        if ($request->type === ContentRequestType::Season
+            && (! $season instanceof Season
+                || $season->catalog_title_id !== $request->catalog_title_id
+                || $season->number !== $request->season_number)) {
             throw new ContentRequestActionException('requests.errors.completion_target_required');
         }
 
-        if (isset($targetIds['media_id'])
-            && ! LicensedMedia::query()->published()->whereKey($targetIds['media_id'])->exists()) {
+        if ($request->type === ContentRequestType::Episode
+            && (! $episode instanceof Episode
+                || $episode->season_id !== $request->season_id
+                || $episode->number !== $request->episode_number)) {
             throw new ContentRequestActionException('requests.errors.completion_target_required');
+        }
+
+        $resultTitleId = $title?->id
+            ?? $season?->catalog_title_id
+            ?? $episode?->season?->catalog_title_id
+            ?? $media?->catalog_title_id
+            ?? $media?->season?->catalog_title_id
+            ?? $media?->episode?->season?->catalog_title_id;
+
+        if ($request->catalog_title_id !== null && $resultTitleId !== $request->catalog_title_id) {
+            throw new ContentRequestActionException('requests.errors.completion_target_required');
+        }
+
+        if (in_array($request->type, [
+            ContentRequestType::Translation,
+            ContentRequestType::Subtitles,
+            ContentRequestType::QualityUpgrade,
+            ContentRequestType::BrokenContentRestoration,
+        ], true) && ! $media instanceof LicensedMedia) {
+            throw new ContentRequestActionException('requests.errors.completion_target_required');
+        }
+
+        if ($media instanceof LicensedMedia) {
+            $mediaEpisodeId = $media->episode_id;
+            $mediaSeasonId = $media->season_id ?? $media->episode?->season_id;
+
+            if (($request->episode_id !== null && $mediaEpisodeId !== $request->episode_id)
+                || ($request->episode_id === null && $request->season_id !== null && $mediaSeasonId !== $request->season_id)) {
+                throw new ContentRequestActionException('requests.errors.completion_target_required');
+            }
         }
     }
 

@@ -110,3 +110,16 @@ Public user tags, unlisted tags, community global assignment, tag reporting и s
 | Экспортировать/удалить account | нет | current password и canonical export/delete service | другой account path отсутствует |
 
 `AccountSettingsPolicy` регистрирует self-context gates; service повторяет authorization. Normal settings URL никогда не принимает user ID, role, premium state, provider, произвольную notification category/privacy section/column/JSON path. Email, password, provider и session-sensitive actions не объединяются с generic save и продолжают требовать собственную canonical authorization.
+
+## Матрица авторизации заявок на материалы
+
+| Действие | Guest | Verified requester/participant | `manage-content-requests` |
+| --- | --- | --- | --- |
+| Public directory/detail | только `is_public`; merged UUID redirect | то же плюс own hidden request | любой request для moderation |
+| Create | нет | да; requester/status/priority назначаются server-side | по тем же create rules |
+| Edit/withdraw/clarify | нет | только owner и разрешённый status; community-supported withdrawal anonymizes | clarification/moderation через отдельные actions |
+| Vote/follow | нет | только public open request, desired state idempotent | без обхода terminal rule |
+| Status/priority/reject/merge/complete/import | нет | нет | gate + повторная policy/action authorization |
+| Private note/source/import run | нет | нет | только moderation context |
+
+`ContentRequestPolicy` и action boundaries повторно разрешают persisted request/target, не доверяют ID/type/status/priority/provider/language/quality/merge/completion values из Livewire. Public binding возвращает 404 для hidden чужой заявки; email/internal user ID/voter/follower list никогда не являются route или DTO полем. Все mutations идут через CSRF-protected Livewire POST, GET только читает или выполняет canonical merged redirect.

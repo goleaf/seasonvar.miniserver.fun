@@ -37,6 +37,8 @@ final readonly class HandoffContentRequestToImporter
 
         if ($request->catalog_title_id !== null) {
             $title = CatalogTitle::query()->findOrFail($request->catalog_title_id);
+            $request->source_page_id = $title->source_page_id;
+            $request->save();
             $state = $this->refresh->request($title);
 
             if ($state->status?->value === 'failed') {

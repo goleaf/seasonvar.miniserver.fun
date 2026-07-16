@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Seasonvar;
 
+use App\Actions\Media\InspectLicensedMediaFileSize;
 use App\Enums\MediaHealthStatus;
 use App\Models\CatalogTitle;
 use App\Models\LicensedMedia;
@@ -13,6 +14,7 @@ use App\Models\SeasonvarImportRun;
 use App\Models\SourcePage;
 use App\Services\Catalog\CatalogMetadataDeduplicator;
 use App\Services\Catalog\CatalogTitleRecommendationBuilder;
+use App\Services\ContentRequests\ContentRequestImportRunLinker;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\MediaSourceHealthManager;
 use Illuminate\Support\Carbon;
@@ -41,6 +43,9 @@ class SeasonvarImportPipeline
         private readonly SeasonvarSourceAvailabilityBackfill $sourceAvailabilityBackfill,
         private readonly SeasonvarCatalogMetadataBackfill $metadataBackfill,
         private readonly SeasonvarImportErrorSanitizer $errors,
+        private readonly InspectLicensedMediaFileSize $inspectFileSize,
+        private readonly SeasonvarImportRunRecorder $runRecorder,
+        private readonly ContentRequestImportRunLinker $contentRequests,
     ) {}
 
     /**
@@ -59,6 +64,9 @@ class SeasonvarImportPipeline
         ?callable $progress = null,
         ?array $pageTypes = null,
         ?SeasonvarImportRun $reservedRun = null,
+        bool $refreshMediaSizes = false,
+        bool $forceMediaSizes = false,
+        ?int $mediaSizeLimit = null,
     ): SeasonvarImportRun {
         $run = $reservedRun ?? SeasonvarImportRun::query()->create([
             'mode' => $argument === null ? 'sitemap' : 'url',
@@ -97,7 +105,18 @@ class SeasonvarImportPipeline
         try {
             do {
                 $cycle = ((int) $run->cycles) + 1;
-                $this->runCycle($run, $cycle, $argument, $force, $discover, $loggedProgress, $pageTypes);
+                $this->runCycle(
+                    $run,
+                    $cycle,
+                    $argument,
+                    $force,
+                    $discover,
+                    $loggedProgress,
+                    $pageTypes,
+                    $refreshMediaSizes,
+                    $forceMediaSizes,
+                    $mediaSizeLimit,
+                );
                 $run->refresh();
 
                 if (! $forever || $this->stopRequested) {
@@ -112,6 +131,7 @@ class SeasonvarImportPipeline
                 'finished_at' => now(),
                 'last_heartbeat_at' => now(),
             ])->save();
+            $this->contentRequests->link($run->refresh());
 
             $this->recordProgress($run, $progress, 'seasonvar-import-complete', [
                 'cycles' => $run->cycles,
@@ -124,6 +144,12 @@ class SeasonvarImportPipeline
                 'media_updated' => $run->media_updated,
                 'media_skipped' => $run->media_skipped,
                 'media_failed' => $run->media_failed,
+                'media_sizes_checked' => $run->media_sizes_checked,
+                'media_sizes_known' => $run->media_sizes_known,
+                'media_sizes_unknown' => $run->media_sizes_unknown,
+                'media_sizes_unsupported' => $run->media_sizes_unsupported,
+                'media_size_checks_failed' => $run->media_size_checks_failed,
+                'media_size_known_bytes' => $run->media_size_known_bytes,
             ]);
         } catch (Throwable $exception) {
             $run->fill([
@@ -132,6 +158,7 @@ class SeasonvarImportPipeline
                 'finished_at' => now(),
                 'last_heartbeat_at' => now(),
             ])->save();
+            $this->contentRequests->link($run->refresh());
 
             $this->recordProgress($run, $progress, 'seasonvar-import-failed', [
                 'exception' => $exception::class,
@@ -169,6 +196,7 @@ class SeasonvarImportPipeline
             $mediaMetadataResult = $this->refreshMediaMetadataBacklog($loggedProgress);
             $mediaSourceKeyResult = $this->backfillMediaSourceKeys($loggedProgress);
             $mediaBacklogResult = $this->refreshMediaBacklog($loggedProgress);
+            $mediaSizeBacklogResult = $this->refreshMediaFileSizeBacklog($loggedProgress);
             $relationCleanupResult = $this->metadataDeduplicator->run($loggedProgress);
             $mergeResult = $this->titleMerger->merge($loggedProgress);
             $recommendationResult = $this->recommendations->rebuild($loggedProgress);
@@ -185,6 +213,7 @@ class SeasonvarImportPipeline
                 'last_media_metadata_backlog' => $mediaMetadataResult,
                 'last_media_source_key_backlog' => $mediaSourceKeyResult,
                 'last_media_backlog' => $mediaBacklogResult,
+                'last_media_size_backlog' => $mediaSizeBacklogResult,
                 'last_relation_cleanup' => $relationCleanupResult,
                 'last_merge' => $mergeResult,
                 'last_recommendations' => $recommendationResult,
@@ -195,6 +224,7 @@ class SeasonvarImportPipeline
                 'finished_at' => now(),
                 'last_heartbeat_at' => now(),
             ])->save();
+            $this->contentRequests->link($run->refresh());
 
             return $run->refresh();
         } catch (Throwable $exception) {
@@ -204,6 +234,7 @@ class SeasonvarImportPipeline
                 'finished_at' => now(),
                 'last_heartbeat_at' => now(),
             ])->save();
+            $this->contentRequests->link($run->refresh());
 
             throw $exception;
         }
@@ -221,10 +252,32 @@ class SeasonvarImportPipeline
         bool $discover,
         callable $progress,
         ?array $pageTypes,
+        bool $refreshMediaSizes,
+        bool $forceMediaSizes,
+        ?int $mediaSizeLimit,
     ): void {
         $progress('seasonvar-import-cycle-started', [
             'cycle' => $cycle,
         ]);
+
+        if ($refreshMediaSizes) {
+            $mediaSizeBacklogResult = $this->refreshMediaFileSizeBacklog(
+                $progress,
+                $forceMediaSizes,
+                $mediaSizeLimit,
+            );
+            $this->addRunCounters($run, ['cycles' => 1], [
+                'media_size_only' => true,
+                'last_media_size_backlog' => $mediaSizeBacklogResult,
+            ]);
+            $progress('seasonvar-import-cycle-complete', [
+                'cycle' => $cycle,
+                'media_size_only' => true,
+                ...$mediaSizeBacklogResult,
+            ]);
+
+            return;
+        }
 
         if ($argument !== null) {
             $cycleResult = $this->runUrlCycle($run, $argument, $force, $progress);
@@ -255,6 +308,7 @@ class SeasonvarImportPipeline
         $mediaMetadataResult = $this->refreshMediaMetadataBacklog($progress);
         $mediaSourceKeyResult = $this->backfillMediaSourceKeys($progress);
         $mediaBacklogResult = $this->refreshMediaBacklog($progress);
+        $mediaSizeBacklogResult = $this->refreshMediaFileSizeBacklog($progress);
         $lateRelationCleanupResult = $this->metadataDeduplicator->run($progress);
         $relationCleanupResult = $this->mergeRelationCleanupResults($earlyRelationCleanupResult, $lateRelationCleanupResult);
         $mergeResult = $this->titleMerger->merge($progress);
@@ -273,6 +327,7 @@ class SeasonvarImportPipeline
             'last_media_metadata_backlog' => $mediaMetadataResult,
             'last_media_source_key_backlog' => $mediaSourceKeyResult,
             'last_media_backlog' => $mediaBacklogResult,
+            'last_media_size_backlog' => $mediaSizeBacklogResult,
             'last_relation_cleanup' => $relationCleanupResult,
             'last_recommendations' => $recommendationResult,
         ]);
@@ -299,6 +354,9 @@ class SeasonvarImportPipeline
             'media_checked' => $mediaBacklogResult['media_checked'],
             'media_check_available' => $mediaBacklogResult['media_available'],
             'media_check_unavailable' => $mediaBacklogResult['media_unavailable'],
+            'media_sizes_selected' => $mediaSizeBacklogResult['selected'],
+            'media_sizes_processed' => $mediaSizeBacklogResult['processed'],
+            'media_sizes_changed' => $mediaSizeBacklogResult['changed'],
             'relations_checked' => $relationCleanupResult['checked'],
             'relation_records_removed' => $relationCleanupResult['records_removed'],
             'relation_links_removed' => $relationCleanupResult['links_removed'],
@@ -705,6 +763,124 @@ class SeasonvarImportPipeline
             'media_updated' => $result['media_updated'],
             'media_failed' => $result['media_failed'],
         ];
+    }
+
+    /**
+     * @param  callable(string, array<string, mixed>): void  $progress
+     * @return array{selected: int, processed: int, changed: int, stopped: bool}
+     */
+    private function refreshMediaFileSizeBacklog(
+        callable $progress,
+        bool $force = false,
+        ?int $requestedLimit = null,
+    ): array {
+        if (! (bool) config('seasonvar.media_file_size.enabled', true)) {
+            return ['selected' => 0, 'processed' => 0, 'changed' => 0, 'stopped' => false];
+        }
+
+        $chunkSize = max(1, min(
+            500,
+            (int) config('seasonvar.media_file_size.backfill_chunk_size', 25),
+        ));
+        $limit = max(1, min(
+            100_000,
+            $requestedLimit ?? (int) config('seasonvar.media_file_size.max_checks_per_import_cycle', 20),
+        ));
+        $directFormats = array_values(array_map(
+            'strval',
+            (array) config('playback.downloads.allowed_formats', ['mp4', 'm4v', 'mov', 'webm', 'mkv', 'avi']),
+        ));
+        $query = LicensedMedia::query()
+            ->select([
+                'id',
+                'catalog_title_id',
+                'season_id',
+                'episode_id',
+                'path',
+                'playback_url',
+                'format',
+                'file_size_bytes',
+                'file_size_checked_at',
+                'file_size_check_status',
+                'file_size_source',
+                'file_size_http_status',
+                'file_size_check_error',
+            ])
+            ->with([
+                'catalogTitle:id,title',
+                'season:id,number',
+                'episode:id,number',
+            ])
+            ->where(function ($query) use ($directFormats): void {
+                $query->whereIn('format', $directFormats);
+
+                foreach ($directFormats as $format) {
+                    $query->orWhere('playback_url', 'like', '%.'.$format.'%')
+                        ->orWhere('path', 'like', '%.'.$format.'%');
+                }
+            })
+            ->where(function ($query): void {
+                $query->where('playback_url', 'like', 'http%')
+                    ->orWhere('path', 'like', 'http%');
+            });
+
+        if (! $force) {
+            $knownCutoff = now()->subSeconds(max(0, (int) config('seasonvar.media_file_size.known_ttl_seconds', 2_592_000)));
+            $unknownCutoff = now()->subSeconds(max(0, (int) config('seasonvar.media_file_size.unknown_retry_seconds', 86_400)));
+            $failedCutoff = now()->subSeconds(max(0, (int) config('seasonvar.media_file_size.failed_retry_seconds', 21_600)));
+
+            $query->where(function ($query) use ($knownCutoff, $unknownCutoff, $failedCutoff): void {
+                $query->whereNull('file_size_check_status')
+                    ->orWhereNull('file_size_checked_at')
+                    ->orWhere('file_size_check_status', 'pending')
+                    ->orWhere(function ($query) use ($knownCutoff): void {
+                        $query->where('file_size_check_status', 'known')
+                            ->where('file_size_checked_at', '<=', $knownCutoff);
+                    })
+                    ->orWhere(function ($query) use ($unknownCutoff): void {
+                        $query->where('file_size_check_status', 'unknown')
+                            ->where('file_size_checked_at', '<=', $unknownCutoff);
+                    })
+                    ->orWhere(function ($query) use ($failedCutoff): void {
+                        $query->where('file_size_check_status', 'failed')
+                            ->where('file_size_checked_at', '<=', $failedCutoff);
+                    });
+            });
+        }
+
+        $progress('seasonvar-media-size-backlog-started', [
+            'chunk_size' => $chunkSize,
+            'max_per_cycle' => $limit,
+            'force' => $force,
+        ]);
+
+        $result = ['selected' => 0, 'processed' => 0, 'changed' => 0, 'stopped' => false];
+
+        foreach ($query->lazyById($chunkSize)->take($limit) as $media) {
+            if ($this->stopRequested) {
+                $result['stopped'] = true;
+
+                break;
+            }
+
+            $result['selected']++;
+
+            if (! $this->inspectFileSize->shouldInspect($media, $force)) {
+                continue;
+            }
+
+            $result['processed']++;
+            $changed = $this->inspectFileSize->execute($media, $progress, $force, [
+                'catalog_title' => $media->catalogTitle?->title,
+                'season_number' => $media->season?->number,
+                'episode_number' => $media->episode?->number,
+            ]);
+            $result['changed'] += $changed ? 1 : 0;
+        }
+
+        $progress('seasonvar-media-size-backlog-complete', $result);
+
+        return $result;
     }
 
     /**
@@ -1123,11 +1299,41 @@ class SeasonvarImportPipeline
     {
         if ($run !== null) {
             $this->touchRunHeartbeat($run);
+            $this->recordMediaSizeCounters($run, $event, $context);
             $this->recordImportEvent($run, $event, $context);
         }
 
         if ($progress !== null) {
             $progress($event, $context);
+        }
+    }
+
+    /** @param array<string, mixed> $context */
+    private function recordMediaSizeCounters(SeasonvarImportRun $run, string $event, array $context): void
+    {
+        $counters = match ($event) {
+            'seasonvar-media-size-known' => [
+                'media_sizes_checked' => 1,
+                'media_sizes_known' => 1,
+                'media_size_known_bytes' => max(0, (int) ($context['file_size_bytes'] ?? 0)),
+            ],
+            'seasonvar-media-size-unknown' => [
+                'media_sizes_checked' => 1,
+                'media_sizes_unknown' => 1,
+            ],
+            'seasonvar-media-size-unsupported' => [
+                'media_sizes_checked' => 1,
+                'media_sizes_unsupported' => 1,
+            ],
+            'seasonvar-media-size-check-failed' => [
+                'media_sizes_checked' => 1,
+                'media_size_checks_failed' => 1,
+            ],
+            default => [],
+        };
+
+        if ($counters !== []) {
+            $this->runRecorder->addCounters((int) $run->id, $counters);
         }
     }
 

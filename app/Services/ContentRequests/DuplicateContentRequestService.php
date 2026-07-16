@@ -72,8 +72,7 @@ final readonly class DuplicateContentRequestService
             return new ContentRequestDuplicateResult(ContentRequestDuplicateConfidence::None, $hash);
         }
 
-        $probable = $candidates->contains(fn (ContentRequest $request): bool =>
-            $request->catalog_title_id === $input->catalogTitleId
+        $probable = $candidates->contains(fn (ContentRequest $request): bool => $request->catalog_title_id === $input->catalogTitleId
             || $request->normalized_title_hash === $normalizedHash
         );
 
@@ -84,10 +83,15 @@ final readonly class DuplicateContentRequestService
         );
     }
 
-    /** @return array{public_id: string, title: string, status: string, url: string} */
+    /** @return array{public_id: string|null, title: string|null, status: string, url: string|null} */
     private function summary(ContentRequest $request): array
     {
-        return ['public_id' => $request->public_id, 'title' => $request->title, 'status' => $request->status->value, 'url' => route('requests.show', $request)];
+        return [
+            'public_id' => $request->is_public ? $request->public_id : null,
+            'title' => $request->is_public ? $request->title : null,
+            'status' => $request->status->value,
+            'url' => $request->is_public ? route('requests.show', $request) : null,
+        ];
     }
 
     private function sameDimensions(ContentRequest $request, ContentRequestInput $input): bool

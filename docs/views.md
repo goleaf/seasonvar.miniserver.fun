@@ -79,3 +79,9 @@ Admin view receives bounded query results, enum options and merge impact from `T
 `resources/views/livewire/settings/account-settings-page.blade.php` отображает один active section из подготовленных DTO/options. Blade не читает модели/services/config/database, не вычисляет precedence/privacy/entitlement и не сериализует User, session payload или provider secret. Профиль/security/export/delete остаются canonical отдельными Livewire/routes и открываются из единой navigation.
 
 Section navigation, fieldsets, native checkbox/select/datalist/range, status/error live regions, confirmations и loading locks переиспользуют проектные components/classes. На phone navigation становится горизонтальным overflow-safe списком, forms — одной колонкой; long locale/timezone/notification/provider-unavailable text переносится. Settings/profile/security metadata имеют noindex и не содержат private values/social/JSON-LD.
+
+## Представления заявок на материалы
+
+`ContentRequestPresenter` — единственная card/detail preparation boundary. Public card не содержит requester identity/email/private evidence/note/import state; detail добавляет только public-safe timeline/results/references, а clarification появляется исключительно в owner/moderator context. Viewer vote/follow/permission flags вычисляются после guest-cache boundary. `x-content-requests.card` переиспользуется directory/My/admin и не выполняет query.
+
+Create view показывает search-before-submit, type descriptions, stable target selection, canonical season/episode sequence, language/translation/subtitle/quality/correction fields, bounded source/external-ID rows и probable-difference explanation. Не существует file/video upload, fake queue position/progress/ETA или public discussion. Empty/error/unavailable/merged/completed/rejected/partial states ведут к реальному действию или безопасной информации; visible copy/ARIA/confirmations имеют exact `ru`/`en` key parity и user prose остаётся untranslated escaped text.

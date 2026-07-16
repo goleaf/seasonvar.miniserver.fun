@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Seasonvar;
 
+use App\Actions\Media\InspectLicensedMediaFileSize;
 use App\Actions\Seasonvar\RecordSeasonvarPageFailure;
 use App\DTOs\MediaHealthCheckResultData;
 use App\DTOs\Seasonvar\SeasonvarCatalogData;
@@ -65,6 +66,7 @@ class SeasonvarCatalogImporter
         private readonly SeasonvarMediaAvailabilityChecker $mediaAvailabilityChecker,
         private readonly MediaSourceHealthManager $mediaHealth,
         private readonly ExternalMediaMetadata $mediaMetadata,
+        private readonly InspectLicensedMediaFileSize $inspectFileSize,
         private readonly SeasonvarCatalogRelationSyncer $relationSyncer,
         private readonly SeasonvarRelationMetadataNormalizer $relationMetadata,
         private readonly SeasonvarDatabaseTransaction $databaseTransaction,
@@ -1337,6 +1339,7 @@ class SeasonvarCatalogImporter
                     'source_media_key' => $sourceMediaKey,
                 ]);
             $wasExisting = $media->exists;
+            $effectiveUrlChanged = ! $wasExisting || $media->effectivePlaybackUrl() !== $playbackUrl;
 
             $mediaUpdates = [
                 'catalog_title_id' => $catalogTitle->id,
@@ -1363,6 +1366,7 @@ class SeasonvarCatalogImporter
             if ($wasExisting
                 && ! $this->mediaAttributesChanged($media, $mediaUpdates)
                 && ! $this->mediaAvailabilityCheckDue($media)
+                && ! $this->inspectFileSize->shouldInspect($media)
             ) {
                 $result['skipped']++;
                 $this->report($progress, 'seasonvar-media-skipped', [
@@ -1375,6 +1379,10 @@ class SeasonvarCatalogImporter
                 ]);
 
                 continue;
+            }
+
+            if ($effectiveUrlChanged) {
+                $media->resetFileSizeInspection();
             }
 
             $media->fill([
@@ -1392,6 +1400,12 @@ class SeasonvarCatalogImporter
                     );
                 }
             }
+
+            $this->inspectFileSize->execute($media, $progress, context: [
+                'catalog_title' => $catalogTitle->title,
+                'season_number' => $season?->number,
+                'episode_number' => $episode?->number,
+            ]);
 
             $result[$wasExisting ? 'updated' : 'attached']++;
             $this->report($progress, $media->wasRecentlyCreated ? 'seasonvar-media-attached' : 'seasonvar-media-updated', [

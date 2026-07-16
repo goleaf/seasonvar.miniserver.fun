@@ -78,3 +78,9 @@ Alias проверяется против canonical names/current/history/other 
 Merge требует source/target preview с counts/translations/aliases/provider impact и явное confirmation. Transaction reconciles pivots/provenance/translations/aliases/slugs/provider mappings/synonyms, оставляет merged source/legacy redirects, invalidates recommendations/search/cache/sitemap и пишет `TagMergeEvent` плюс `AdminAuditRecorder`. Repeat source→same target idempotent; personal tags и разные owners никогда не затрагиваются.
 
 Permanent global delete отсутствует: active tag archive-ится или merge-ится. Archive сохраняет pre-visibility/pre-moderation и прекращает public discovery/new assignment; restore возвращает recorded state и не публикует internal/rejected row. Все validation/result/loading/error labels локализованы; raw SQL, source credentials, moderation internals и private personal labels не выводятся.
+
+## Модерация заявок на материалы
+
+`/admin/requests` требует `manage-content-requests` на route, Livewire hydration и каждой action. Queue имеет deterministic pagination, search/type/status/sort, public card counts, private note, rejection reason, stable priority, clarification question, canonical merge UUID, verified completion title/season/episode/media IDs, importer handoff и связанный real import-run ID. Normal user не получает controls или underlying private fields.
+
+Transition matrix запрещает произвольный jump и direct terminal duplicate без canonical mapping. Rejection требует stable public-safe reason; optional public explanation и private note разделены. Partial/full completion требует published result нужного canonical target. Merge требует exact semantic compatibility, idempotently переносит votes/follows/evidence/external IDs/clarifications, сохраняет source history и redirect. Bulk moderation намеренно не добавлена: без подтверждённого большого объёма per-item preview/authorization безопаснее текущих bounded single-item actions.

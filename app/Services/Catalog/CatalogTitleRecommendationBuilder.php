@@ -100,6 +100,7 @@ final class CatalogTitleRecommendationBuilder
         private readonly CatalogTitleQuery $titles,
         private readonly CatalogRecommendationThemeExtractor $themes,
         private readonly ReviewSchema $reviewSchema,
+        private readonly CatalogRecommendationCacheInvalidator $cacheInvalidator,
     ) {}
 
     /**
@@ -197,6 +198,7 @@ final class CatalogTitleRecommendationBuilder
         ];
 
         $this->progress($progress, 'catalog-title-recommendations-complete', $result);
+        $this->cacheInvalidator->publicSignalsChanged('recommendation-rebuild');
 
         return $result;
     }

@@ -1,7 +1,7 @@
 <div class="relative space-y-6" data-catalog-discovery-page data-recommendation-type="{{ $type }}">
     <div
         wire:loading.flex
-        wire:target="period,ratingSource,genre,country,yearFrom,yearTo,quality,subtitles,ratingMin,votesMin,clearFilters,previousPage,nextPage,refreshRecommendations,setFeedback,undoFeedback"
+        wire:target="period,ratingSource,genre,country,tag,actor,director,translation,studio,yearFrom,yearTo,quality,subtitles,ratingMin,votesMin,clearFilters,previousPage,nextPage,refreshRecommendations,setFeedback,undoFeedback"
         class="fixed inset-x-3 bottom-4 z-40 mx-auto max-w-md items-center justify-center gap-3 rounded-panel bg-slate-900/95 px-5 py-4 text-sm font-bold text-white shadow-xl sm:inset-x-auto sm:right-6"
         role="status"
         aria-live="polite"
@@ -112,14 +112,39 @@
 
         <details class="group mt-4 rounded-control border border-slate-200 bg-slate-50">
             <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold text-slate-700">
+                <span>{{ __('recommendations.page.more_filters') }}</span>
+                <x-ui.icon name="fa-solid fa-chevron-down transition group-open:rotate-180" />
+            </summary>
+            <div class="grid gap-4 border-t border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                @foreach ([
+                    ['property' => 'tag', 'label' => __('recommendations.page.tag'), 'options' => $tags],
+                    ['property' => 'actor', 'label' => __('recommendations.page.actor'), 'options' => $actors],
+                    ['property' => 'director', 'label' => __('recommendations.page.director'), 'options' => $directors],
+                    ['property' => 'translation', 'label' => __('recommendations.page.translation'), 'options' => $translations],
+                    ['property' => 'studio', 'label' => __('recommendations.page.studio'), 'options' => $studios],
+                ] as $taxonomyFilter)
+                    <label class="min-w-0 text-sm font-bold text-slate-700">{{ $taxonomyFilter['label'] }}
+                        <select wire:model.live="{{ $taxonomyFilter['property'] }}" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 font-normal text-slate-700 focus:border-emerald-600 focus:outline-none focus:ring-4 focus:ring-emerald-100">
+                            <option value="">{{ __('recommendations.page.any') }}</option>
+                            @foreach ($taxonomyFilter['options'] as $taxonomyOption)
+                                <option value="{{ $taxonomyOption->slug }}">{{ $taxonomyOption->name }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                @endforeach
+            </div>
+        </details>
+
+        <details class="group mt-4 rounded-control border border-slate-200 bg-slate-50">
+            <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold text-slate-700">
                 <span>{{ __('recommendations.types.top_rated.title') }}</span>
                 <x-ui.icon name="fa-solid fa-chevron-down transition group-open:rotate-180" />
             </summary>
             <div class="grid gap-4 border-t border-slate-200 p-4 sm:grid-cols-2 lg:grid-cols-4">
                 <label class="text-sm font-bold text-slate-700">{{ __('recommendations.page.rating_source') }}
                     <select wire:model.live="ratingSource" class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 font-normal">
-                        <option value="kinopoisk">КиноПоиск</option>
-                        <option value="imdb">IMDb</option>
+                        <option value="kinopoisk">{{ __('recommendations.page.rating_kinopoisk') }}</option>
+                        <option value="imdb">{{ __('recommendations.page.rating_imdb') }}</option>
                         <option value="portal">{{ __('recommendations.page.portal_rating') }}</option>
                     </select>
                 </label>

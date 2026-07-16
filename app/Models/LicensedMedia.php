@@ -3,12 +3,15 @@
 namespace App\Models;
 
 use App\Enums\ContentAudience;
+use App\Enums\MediaFileSizeCheckStatus;
 use App\Enums\MediaHealthErrorCategory;
 use App\Enums\MediaHealthStatus;
 use App\Models\Concerns\HasPublicationAvailability;
+use App\Policies\LicensedMediaPolicy;
 use Carbon\CarbonInterface;
 use Database\Factories\LicensedMediaFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\UsePolicy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -29,6 +32,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string|null $variant_name
  * @property string|null $variant_key
  * @property string|null $format
+ * @property int|null $file_size_bytes
+ * @property CarbonInterface|null $file_size_checked_at
+ * @property MediaFileSizeCheckStatus|null $file_size_check_status
+ * @property string|null $file_size_source
+ * @property int|null $file_size_http_status
+ * @property string|null $file_size_check_error
  * @property string|null $check_status
  * @property MediaHealthStatus $health_status
  * @property ContentAudience $audience
@@ -40,6 +49,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property CarbonInterface|null $next_check_at
  * @property CarbonInterface|null $deleted_at
  */
+#[UsePolicy(LicensedMediaPolicy::class)]
 #[Fillable([
     'catalog_title_id',
     'season_id',
@@ -63,6 +73,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'variant_key',
     'has_subtitles',
     'format',
+    'file_size_bytes',
+    'file_size_checked_at',
+    'file_size_check_status',
+    'file_size_source',
+    'file_size_http_status',
+    'file_size_check_error',
     'check_status',
     'health_status',
     'last_http_status',
@@ -157,6 +173,33 @@ class LicensedMedia extends Model
         ]);
     }
 
+    public function effectivePlaybackUrl(): ?string
+    {
+        $url = trim((string) ($this->playback_url ?: $this->path));
+
+        return $url !== '' ? $url : null;
+    }
+
+    public function hasKnownFileSize(): bool
+    {
+        return $this->file_size_check_status === MediaFileSizeCheckStatus::Known
+            && $this->file_size_bytes !== null;
+    }
+
+    public function resetFileSizeInspection(): self
+    {
+        $this->forceFill([
+            'file_size_bytes' => null,
+            'file_size_checked_at' => null,
+            'file_size_check_status' => MediaFileSizeCheckStatus::Pending,
+            'file_size_source' => null,
+            'file_size_http_status' => null,
+            'file_size_check_error' => null,
+        ]);
+
+        return $this;
+    }
+
     /**
      * @return array<string, string>
      */
@@ -164,6 +207,10 @@ class LicensedMedia extends Model
     {
         return [
             'duration_seconds' => 'integer',
+            'file_size_bytes' => 'integer',
+            'file_size_checked_at' => 'datetime',
+            'file_size_check_status' => MediaFileSizeCheckStatus::class,
+            'file_size_http_status' => 'integer',
             'has_subtitles' => 'boolean',
             'last_http_status' => 'integer',
             'health_status' => MediaHealthStatus::class,

@@ -9,6 +9,7 @@ use App\Enums\ContentRequestExternalProvider;
 use App\Enums\ContentRequestType;
 use App\Exceptions\ContentRequests\ContentRequestActionException;
 use App\Models\CatalogTitle;
+use App\Models\ContentRequest;
 use App\Models\Episode;
 use App\Models\Season;
 use App\Models\User;
@@ -29,44 +30,75 @@ final class ContentRequestFormPage extends Component
     public string $search = '';
 
     public string $type = 'serial';
+
     public string $title = '';
+
     public string $originalTitle = '';
+
     public string $alternativeTitle = '';
+
     public string $releaseYear = '';
+
     public string $country = '';
+
     public string $contentLocale = '';
+
     public string $originalLanguage = '';
+
     public string $audioLanguage = '';
+
     public string $subtitleLanguage = '';
+
     public string $translationType = '';
+
     public string $translationStudio = '';
+
     public string $catalogTitleId = '';
+
     public string $seasonId = '';
+
     public string $episodeId = '';
+
     public string $seasonNumber = '';
+
     public string $seasonKind = 'regular';
+
     public string $episodeNumber = '';
+
     public string $episodeReleaseDate = '';
+
     public string $currentQuality = '';
+
     public string $requestedQuality = '';
+
     public string $correctionField = '';
+
     public string $currentValue = '';
+
     public string $proposedValue = '';
+
     public string $explanation = '';
+
     public string $differentExplanation = '';
+
     /** @var list<array{provider: string, identifier: string}> */
     public array $externalIdentifiers = [['provider' => 'imdb', 'identifier' => '']];
+
     /** @var list<string> */
     public array $sourceLinks = [''];
+
     #[Locked]
     public string $submissionToken = '';
+
     public ?string $actionError = null;
+
     public ?string $canonicalUrl = null;
+
     public bool $searchFailed = false;
 
     public function mount(?string $locale = null): void
     {
-        Gate::authorize('create', \App\Models\ContentRequest::class);
+        Gate::authorize('create', ContentRequest::class);
         $this->submissionToken = (string) Str::uuid();
         $requestedType = request()->query('type');
         $this->type = ContentRequestType::tryFrom(is_string($requestedType) ? $requestedType : '')?->value ?? ContentRequestType::Serial->value;
@@ -80,6 +112,32 @@ final class ContentRequestFormPage extends Component
     public function updatedType(): void
     {
         $this->type = ContentRequestType::tryFrom($this->type)?->value ?? ContentRequestType::Serial->value;
+        $type = ContentRequestType::from($this->type);
+
+        if (in_array($type, [ContentRequestType::Serial, ContentRequestType::Other], true)) {
+            $this->clearCatalogTitle();
+        } elseif ($type === ContentRequestType::Season) {
+            $this->seasonId = '';
+            $this->episodeId = '';
+        } elseif ($type === ContentRequestType::Episode) {
+            $this->episodeId = '';
+        }
+
+        if ($type !== ContentRequestType::Translation) {
+            $this->translationType = '';
+        }
+
+        if ($type !== ContentRequestType::QualityUpgrade) {
+            $this->currentQuality = '';
+            $this->requestedQuality = '';
+        }
+
+        if (! in_array($type, [ContentRequestType::MetadataCorrection, ContentRequestType::EpisodeListCorrection], true)) {
+            $this->correctionField = '';
+            $this->currentValue = '';
+            $this->proposedValue = '';
+        }
+
         $this->actionError = null;
     }
 

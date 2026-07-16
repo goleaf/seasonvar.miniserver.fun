@@ -43,6 +43,13 @@ final readonly class MergeContentRequests
 
             Gate::forUser($moderator)->authorize('moderate', $source);
             Gate::forUser($moderator)->authorize('moderate', $canonical);
+
+            if ($source->status === ContentRequestStatus::Merged && $source->merged_into_id === $canonical->id) {
+                $sourcePublicId = $source->public_id;
+
+                return $canonical;
+            }
+
             $this->assertCompatible($source, $canonical);
             if ($source->requester_id !== null) {
                 $recipients[$source->requester_id] = 'requester';

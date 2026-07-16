@@ -7,6 +7,7 @@ use BackedEnum;
 use DateTimeInterface;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
+use App\Support\HumanFileSizeFormatter;
 
 /**
  * @mixin Command
@@ -63,13 +64,13 @@ trait OutputsSeasonvarProgress
         $items = [];
 
         foreach ($context as $key => $value) {
-            $items[] = $this->formatSeasonvarKey((string) $key).'='.$this->formatSeasonvarValue($value);
+            $items[] = $this->formatSeasonvarKey((string) $key).'='.$this->formatSeasonvarValue($value, (string) $key);
         }
 
         return implode(' | ', $items);
     }
 
-    private function formatSeasonvarValue(mixed $value): string
+    private function formatSeasonvarValue(mixed $value, ?string $key = null): string
     {
         if ($value === null) {
             return 'пусто';
@@ -101,6 +102,12 @@ trait OutputsSeasonvarProgress
 
         if (is_float($value)) {
             return number_format($value, 3, '.', '');
+        }
+
+        if ($key === 'file_size_bytes' && is_int($value)) {
+            $human = app(HumanFileSizeFormatter::class)->format($value, 'ru');
+
+            return $human === null ? (string) $value : $human.' ('.$value.')';
         }
 
         return (string) $value;
@@ -208,6 +215,14 @@ trait OutputsSeasonvarProgress
             'seasonvar-media-attached' => 'Медиа из страницы подключено',
             'seasonvar-media-backlog-complete' => 'Допроверка старых медиа завершена',
             'seasonvar-media-backlog-started' => 'Допроверка старых медиа началась',
+            'seasonvar-media-size-backlog-complete' => 'Допроверка размеров старых медиа завершена',
+            'seasonvar-media-size-backlog-started' => 'Допроверка размеров старых медиа началась',
+            'seasonvar-media-size-check-failed' => 'Проверка размера видео завершилась ошибкой',
+            'seasonvar-media-size-check-skipped' => 'Проверка размера видео пропущена',
+            'seasonvar-media-size-check-started' => 'Проверка размера видео началась',
+            'seasonvar-media-size-known' => 'Размер видео определён',
+            'seasonvar-media-size-unknown' => 'Размер видео не определён',
+            'seasonvar-media-size-unsupported' => 'Размер видео не поддерживается для этого формата',
             'seasonvar-media-metadata-backlog-complete' => 'Дополнение данных медиа завершено',
             'seasonvar-media-metadata-backlog-started' => 'Дополнение данных медиа началось',
             'seasonvar-media-metadata-updated' => 'Данные медиа дополнены',
@@ -297,6 +312,7 @@ trait OutputsSeasonvarProgress
             'body_bytes' => 'байты',
             'backfilled' => 'дополнено',
             'catalog_title_id' => 'запись_каталога',
+            'catalog_title' => 'сериал',
             'candidates' => 'кандидатов',
             'child_sitemaps' => 'вложенных_карт',
             'check_status' => 'статус_проверки',
@@ -329,6 +345,9 @@ trait OutputsSeasonvarProgress
             'force' => 'принудительно',
             'forever' => 'постоянно',
             'format' => 'формат',
+            'file_size_bytes' => 'размер_байт',
+            'file_size_human' => 'размер',
+            'file_size_source' => 'источник_размера',
             'groups' => 'групп',
             'http_status' => 'код_http',
             'index' => 'номер',
@@ -363,6 +382,9 @@ trait OutputsSeasonvarProgress
             'media_source_keys_updated' => 'ключей_медиа_обновлено',
             'media_unavailable' => 'медиа_недоступно',
             'media_updated' => 'медиа_обновлено',
+            'media_sizes_selected' => 'размеров_выбрано',
+            'media_sizes_processed' => 'размеров_проверено',
+            'media_sizes_changed' => 'размеров_обновлено',
             'max_per_title' => 'максимум_на_карточку',
             'message' => 'сообщение',
             'merged_episodes' => 'серий_объединено',

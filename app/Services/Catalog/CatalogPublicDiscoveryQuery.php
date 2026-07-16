@@ -61,6 +61,12 @@ final class CatalogPublicDiscoveryQuery
             ->selectRaw('COUNT(DISTINCT user_id) * 40 AS activity_score')
             ->selectRaw('COUNT(DISTINCT user_id) AS watcher_count')
             ->where('last_watched_at', '>=', $after)
+            ->where(function (QueryBuilder $query): void {
+                $query
+                    ->where('position_seconds', '>=', max(1, (int) config('recommendations.meaningful_progress_seconds', 180)))
+                    ->orWhere('progress_percent', '>=', max(1, (int) config('recommendations.meaningful_progress_percent', 10)))
+                    ->orWhereNotNull('completed_at');
+            })
             ->groupBy('catalog_title_id')
             ->unionAll(DB::table('catalog_title_user_states')
                 ->select('catalog_title_id')

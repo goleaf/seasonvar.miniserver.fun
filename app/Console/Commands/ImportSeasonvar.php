@@ -16,6 +16,7 @@ use App\Services\Seasonvar\SeasonvarPageHandlerRegistry;
 use App\Services\Seasonvar\SeasonvarQueuedImportDispatcher;
 use App\Services\Seasonvar\SeasonvarQueueStatus;
 use App\Services\Seasonvar\SeasonvarSourceInventory;
+use App\Support\HumanFileSizeFormatter;
 use Illuminate\Cache\Repository as CacheRepository;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -27,7 +28,7 @@ use Illuminate\Support\Facades\Cache;
 use LogicException;
 use Throwable;
 
-#[Signature('seasonvar:import {url? : Ссылка страницы seasonvar.ru для обновления одной страницы} {--force : Обновить данные даже если страница не изменилась} {--forever : Работать циклами без остановки} {--sleep= : Пауза между циклами в секундах} {--no-discovery : Не обновлять карту сайта в этом запуске} {--queued : Поставить подходящие страницы в Redis-очередь для параллельной обработки} {--status : Показать состояние Redis-очереди и последнего запуска без импорта} {--inventory-only : Инвентаризировать типы URL из карты сайта без разбора и изменения каталога} {--page-type=* : Обрабатывать только явно включённые типы страниц, например serial или rss}')]
+#[Signature('seasonvar:import {url? : Ссылка страницы seasonvar.ru для обновления одной страницы} {--force : Обновить данные даже если страница не изменилась} {--forever : Работать циклами без остановки} {--sleep= : Пауза между циклами в секундах} {--no-discovery : Не обновлять карту сайта в этом запуске} {--queued : Поставить подходящие страницы в Redis-очередь для параллельной обработки} {--status : Показать состояние Redis-очереди и последнего запуска без импорта} {--inventory-only : Инвентаризировать типы URL из карты сайта без разбора и изменения каталога} {--page-type=* : Обрабатывать только явно включённые типы страниц, например serial или rss} {--refresh-media-sizes : Проверить размеры подходящих существующих прямых видеофайлов} {--force-media-sizes : Повторно проверить размеры независимо от срока свежести} {--media-size-limit= : Ограничить число проверок размера в этом запуске}')]
 #[Description('Инвентаризирует страницы seasonvar.ru или обновляет каталог, сезоны, серии и видео одной командой')]
 class ImportSeasonvar extends Command
 {
@@ -51,10 +52,15 @@ class ImportSeasonvar extends Command
         SeasonvarSourceInventory $sourceInventory,
         SeasonvarPageHandlerRegistry $pageHandlers,
         CatalogCacheInvalidator $cacheInvalidator,
+        HumanFileSizeFormatter $fileSizes,
     ): int {
         $pageTypes = $this->validatedPageTypes($pageHandlers);
 
         if ($pageTypes === false) {
+            return self::FAILURE;
+        }
+
+        if (! $this->mediaSizeOptionsAreValid()) {
             return self::FAILURE;
         }
 
@@ -141,12 +147,15 @@ class ImportSeasonvar extends Command
                 progress: $this->seasonvarProgress(),
                 pageTypes: $pageTypes,
                 reservedRun: $reservedRun,
+                refreshMediaSizes: (bool) $this->option('refresh-media-sizes'),
+                forceMediaSizes: (bool) $this->option('force-media-sizes'),
+                mediaSizeLimit: $this->mediaSizeLimit(),
             );
 
             $cacheInvalidator->catalogChanged();
 
             $this->info(sprintf(
-                'Готово: запуск #%d, циклов %d, страниц выбрано %d, обновлено %d, ошибок %d, видео добавлено %d, видео обновлено %d.',
+                'Готово: запуск #%d, циклов %d, страниц выбрано %d, обновлено %d, ошибок %d, видео добавлено %d, видео обновлено %d, размеров проверено %d, известно %d, неизвестно %d, не поддерживается %d, ошибок размера %d, найдено %s (%d байт).',
                 $run->id,
                 $run->cycles,
                 $run->selected,
@@ -154,6 +163,13 @@ class ImportSeasonvar extends Command
                 $run->failed,
                 $run->media_attached,
                 $run->media_updated,
+                $run->media_sizes_checked,
+                $run->media_sizes_known,
+                $run->media_sizes_unknown,
+                $run->media_sizes_unsupported,
+                $run->media_size_checks_failed,
+                $fileSizes->format((int) $run->media_size_known_bytes, 'ru') ?? '0 B',
+                $run->media_size_known_bytes,
             ));
 
             return in_array($run->status, ['completed', 'partial'], true) ? self::SUCCESS : self::FAILURE;
@@ -387,7 +403,7 @@ class ImportSeasonvar extends Command
             $conflicts[] = 'URL';
         }
 
-        foreach (['force', 'forever', 'no-discovery', 'queued', 'status'] as $option) {
+        foreach (['force', 'forever', 'no-discovery', 'queued', 'status', 'refresh-media-sizes', 'force-media-sizes'] as $option) {
             if ((bool) $this->option($option)) {
                 $conflicts[] = '--'.$option;
             }
@@ -408,6 +424,70 @@ class ImportSeasonvar extends Command
         $this->error('Опцию --inventory-only нельзя сочетать с: '.implode(', ', $conflicts).'.');
 
         return false;
+    }
+
+    private function mediaSizeOptionsAreValid(): bool
+    {
+        $refresh = (bool) $this->option('refresh-media-sizes');
+        $force = (bool) $this->option('force-media-sizes');
+        $limit = $this->option('media-size-limit');
+
+        if ($force && ! $refresh) {
+            $this->error('Опция --force-media-sizes требует --refresh-media-sizes.');
+
+            return false;
+        }
+
+        if ($limit !== null && $limit !== '' && (! ctype_digit((string) $limit) || (int) $limit < 1)) {
+            $this->error('Опция --media-size-limit должна быть положительным целым числом.');
+
+            return false;
+        }
+
+        if ($limit !== null && $limit !== '' && ! $refresh) {
+            $this->error('Опция --media-size-limit требует --refresh-media-sizes.');
+
+            return false;
+        }
+
+        if (! $refresh) {
+            return true;
+        }
+
+        $conflicts = [];
+
+        if ($this->argument('url')) {
+            $conflicts[] = 'URL';
+        }
+
+        foreach (['force', 'forever', 'no-discovery', 'queued', 'status', 'inventory-only'] as $option) {
+            if ((bool) $this->option($option)) {
+                $conflicts[] = '--'.$option;
+            }
+        }
+
+        if ($this->option('sleep') !== null && $this->option('sleep') !== '') {
+            $conflicts[] = '--sleep';
+        }
+
+        if ((array) $this->option('page-type') !== []) {
+            $conflicts[] = '--page-type';
+        }
+
+        if ($conflicts !== []) {
+            $this->error('Опцию --refresh-media-sizes нельзя сочетать с: '.implode(', ', $conflicts).'.');
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private function mediaSizeLimit(): ?int
+    {
+        $value = $this->option('media-size-limit');
+
+        return $value === null || $value === '' ? null : (int) $value;
     }
 
     /** @return list<string>|false|null */

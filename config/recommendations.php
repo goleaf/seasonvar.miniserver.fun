@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 'task18-v4',
+    'version' => 'task18-v5',
     'section_limit' => 12,
     'page_size' => 24,
     'candidate_limit' => 180,
@@ -13,9 +13,9 @@ return [
         'days' => 7,
     ],
     'diversity' => [
+        'franchise_limit' => 2,
         'primary_genre_limit' => 5,
         'leading_actor_limit' => 4,
-        'adjacent_discovery_ratio' => 0.25,
     ],
     'soft_demotions' => [
         'watchlist' => 40,

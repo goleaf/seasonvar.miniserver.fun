@@ -25,7 +25,13 @@ final class ContentRequestSeoPresenter
     /** @return array<string, mixed> */
     public function detail(ContentRequest $request, ?string $locale = null): array
     {
-        $indexable = $request->is_public && ! in_array($request->status->value, ['rejected', 'duplicate', 'merged', 'withdrawn', 'cancelled'], true);
+        $indexable = $request->is_public && in_array($request->status->value, [
+            'approved',
+            'planned',
+            'in_progress',
+            'partially_completed',
+            'completed',
+        ], true);
 
         $locales = (array) config('content-requests.supported_locales', ['ru']);
 

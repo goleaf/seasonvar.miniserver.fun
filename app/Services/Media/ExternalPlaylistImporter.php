@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Media;
 
+use App\Actions\Media\InspectLicensedMediaFileSize;
 use App\DTOs\VerifiedExternalUrlData;
 use App\Enums\ReleaseKind;
 use App\Models\CatalogTitle;
@@ -42,9 +43,6 @@ final class ExternalPlaylistImporter
         'text/plain',
     ];
 
-    /** @var array<string, list<string>> */
-    private array $publicHosts = [];
-
     /**
      * @var list<string>
      */
@@ -53,6 +51,8 @@ final class ExternalPlaylistImporter
     public function __construct(
         private readonly ExternalMediaMetadata $mediaMetadata,
         private readonly PoliteHttpClient $httpClient,
+        private readonly ExternalMediaUrlGuard $urls,
+        private readonly InspectLicensedMediaFileSize $inspectFileSize,
     ) {}
 
     /**
@@ -65,7 +65,12 @@ final class ExternalPlaylistImporter
      *     items: list<array<string, mixed>>
      * }
      */
-    public function importFromUrl(string $playlistUrl, ?CatalogTitle $forcedTitle = null, bool $dryRun = false): array
+    public function importFromUrl(
+        string $playlistUrl,
+        ?CatalogTitle $forcedTitle = null,
+        bool $dryRun = false,
+        ?callable $progress = null,
+    ): array
     {
         $target = $this->verifiedExternalUrl($playlistUrl);
         $safePlaylistUrl = $target->url;
@@ -80,6 +85,7 @@ final class ExternalPlaylistImporter
             $safePlaylistUrl,
             $forcedTitle,
             $dryRun,
+            $progress,
         );
     }
 
@@ -113,7 +119,13 @@ final class ExternalPlaylistImporter
      *     items: list<array<string, mixed>>
      * }
      */
-    public function importFromContent(string $content, string $baseUrl, ?CatalogTitle $forcedTitle = null, bool $dryRun = false): array
+    public function importFromContent(
+        string $content,
+        string $baseUrl,
+        ?CatalogTitle $forcedTitle = null,
+        bool $dryRun = false,
+        ?callable $progress = null,
+    ): array
     {
         $entries = $this->parse($content, $baseUrl);
         $titles = $forcedTitle === null
@@ -176,8 +188,13 @@ final class ExternalPlaylistImporter
                     'source_media_key' => $sourceMediaKey,
                 ]);
             $wasRecentlyCreated = ! $media->exists;
+            $effectiveUrlChanged = ! $media->exists || $media->effectivePlaybackUrl() !== $entry['url'];
 
             $variant = $this->mediaMetadata->playbackVariant($entry['title'], $baseUrl, $entry['url']);
+
+            if ($effectiveUrlChanged) {
+                $media->resetFileSizeInspection();
+            }
 
             $media->fill([
                 'catalog_title_id' => $match['catalogTitle']->id,
@@ -200,6 +217,12 @@ final class ExternalPlaylistImporter
                 'status' => 'published',
                 'published_at' => $media->published_at ?? now(),
             ])->save();
+
+            $this->inspectFileSize->execute($media, $progress, context: [
+                'catalog_title' => $match['catalogTitle']->title,
+                'season_number' => $match['season']?->number,
+                'episode_number' => $match['episode']?->number,
+            ]);
 
             $result[$wasRecentlyCreated ? 'imported' : 'updated']++;
             $result['items'][] = $entry + [
@@ -574,73 +597,12 @@ final class ExternalPlaylistImporter
 
     public function verifiedExternalUrl(string $url): VerifiedExternalUrlData
     {
-        if (filter_var($url, FILTER_VALIDATE_URL) === false) {
-            throw new InvalidArgumentException('Неверная ссылка.');
-        }
+        $target = $this->urls->verifiedExternalUrl($url);
 
-        $parts = parse_url($url);
-
-        if (! is_array($parts) || isset($parts['user'], $parts['pass'])) {
-            throw new InvalidArgumentException('Ссылка с учётными данными запрещена.');
-        }
-
-        $scheme = Str::lower((string) ($parts['scheme'] ?? ''));
-        $host = Str::lower(rtrim((string) ($parts['host'] ?? ''), '.'));
-        $port = (int) ($parts['port'] ?? ($scheme === 'https' ? 443 : 80));
-
-        if (! in_array($scheme, ['http', 'https'], true)
-            || $host === ''
-            || ! in_array($port, [80, 443], true)) {
-            throw new InvalidArgumentException('Разрешены только http/https ссылки.');
-        }
-
-        $addresses = $this->publicAddresses($host);
-
-        if ($addresses === null) {
+        if ($target === null) {
             throw new InvalidArgumentException('Этот хост заблокирован.');
         }
 
-        return new VerifiedExternalUrlData($url, $host, $addresses[0] ?? null, $port);
-    }
-
-    /** @return list<string>|null */
-    private function publicAddresses(string $host): ?array
-    {
-        if (! (bool) config('security.external_playlist_enforce_public_dns', true)) {
-            return [];
-        }
-
-        if (array_key_exists($host, $this->publicHosts)) {
-            return $this->publicHosts[$host];
-        }
-
-        if ($host === 'localhost' || Str::endsWith($host, '.local')) {
-            return null;
-        }
-
-        $addresses = filter_var($host, FILTER_VALIDATE_IP) !== false
-            ? [$host]
-            : (gethostbynamel($host) ?: []);
-        $ipv6Records = dns_get_record($host, DNS_AAAA);
-
-        if (is_array($ipv6Records)) {
-            foreach ($ipv6Records as $record) {
-                if (is_string($record['ipv6'] ?? null)) {
-                    $addresses[] = $record['ipv6'];
-                }
-            }
-        }
-
-        if ($addresses === []) {
-            return null;
-        }
-
-        foreach (array_unique($addresses) as $address) {
-            if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-                return null;
-            }
-        }
-
-        return $this->publicHosts[$host] = array_values(array_unique($addresses));
+        return $target;
     }
 }

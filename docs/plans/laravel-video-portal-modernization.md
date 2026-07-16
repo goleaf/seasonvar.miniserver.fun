@@ -885,6 +885,65 @@ Must remain semantically unchanged: provider review bodies/IDs/source/hash/date 
 - [ ] No Volt, new `@php`, inline CSS, business JavaScript, raw review HTML, Blade query, fake control, TODO/debug output, unused class/import or dead route remains.
 - [ ] Allowed diagnostics/build/browser smoke pass without creating/running tests; all relevant docs/changelog are current; final commit is on existing `main` and pushed.
 
+## Task 15: canonical registration, authentication and session security
+
+### Audit snapshot and integration decision
+
+- [x] The portal has one canonical browser guard (`web`) backed by the Eloquent `User` provider and Laravel sessions, plus Sanctum personal tokens for the mobile API. Breeze, Fortify, Jetstream and Laravel UI are not installed; the existing Livewire pages and typed services are the implementation boundary to harden rather than replace.
+- [x] Browser routes are the single guest set `/login`, `/register`, `/forgot-password`, `/reset-password/{token}` plus the signed verification callback and authenticated verification/password-confirm/profile/security routes. The API has one `/api/v1/auth/*` set for register/login/verify/resend/recovery/reset and owner-scoped Sanctum device revocation. No duplicate modal backend, translated auth route set or legacy auth controller was found.
+- [x] Registration and login are email/password only. There is no username column or task-14 username history/profile identity model, so username login and username registration cannot be added without inventing a competing identity architecture. Email lookup is already case-insensitive but normalization and privacy-safe limiter fingerprints are duplicated and need one canonical implementation.
+- [x] Passwords use Laravel's hashed model cast, `Hash` facade or guard provider; reset tokens use Laravel's broker table and hashing. Session login regenerates the session, logout invalidates it and rotates the CSRF token, and `auth.session` invalidates browser authentication after a password-hash change. Password policy rules are currently duplicated across web/API inputs.
+- [x] Verification callbacks are temporary signed URLs and compare the email hash before setting `email_verified_at`; resend and recovery have bounded rate limits. The current mail notifications and Livewire validation/status text are Russian literals rather than the existing `ru`/`en` translation catalogs.
+- [x] Session configuration is deployment-aware (`Secure` from environment, `HttpOnly=true`, `SameSite=lax`, scoped path/domain) and defaults to Redis. Database-session management is intentionally available only when the database driver is active; safe summaries omit payload, raw session ID, raw user agent and IP. Sanctum device tokens are hashed by Sanctum and owner-scoped.
+- [x] No Socialite/OAuth package, configured provider, external-identity table, encrypted provider-token store or callback state exists. No magic-link, MFA, trusted-device, account-status, soft-deleted-user, account-merge mapping or authentication-audit table exists. Adding controls or claiming provider/merge support would create fake behavior; adding Socialite is also a new production dependency requiring separate approval under project rules.
+- [x] No anonymous bookmark/progress/watch-status store exists. The only anonymous authentication-adjacent browser state is the versioned Task 16 device preference payload; its allowlisted, idempotent merge fills only unset account preferences and never blocks login. Auth work must not claim migration of data the guest portal never persists.
+- [x] Profile name/email and password/delete/export already use `AccountService` and related services. Exact history, progress, collections, comments, reviews, notification preferences, premium-independent account state and moderation data remain attached to the same user ID and are not rewritten by authentication hardening.
+- [x] Authenticated account pages are `private, no-store` and noindex; guest authentication pages declare noindex and are absent from sitemap/structured data. No authentication state, token or private intended URL is placed in shared cache.
+- [x] Main compatibility risks are email-case duplicates on database engines with case-sensitive uniqueness, raw identifiers in rate-limit keys, duplicated password rules, unsafe future use of arbitrary intended destinations, incomplete locale coverage, and security actions that must continue to require password ownership checks. Schema changes are not required for the safe in-place hardening.
+
+### Canonical contract
+
+- Framework and guards: retain Laravel's `web` guard, Eloquent provider, `users` password broker, signed verification and Sanctum. Browser and API presentations call the same account/authentication services; no manual password algorithm or second user/provider model is introduced.
+- Identity: canonical email normalization trims surrounding whitespace, lowercases without provider-specific dot/plus rewriting, rejects invalid input through validation and is reused by registration, login, recovery, reset and uniqueness checks. Stable HMAC fingerprints, never raw identifiers/passwords, partition limiter and security-log context.
+- Passwords: one Laravel `Password::defaults()` policy owns the 12-character letters/mixed-case/numbers/symbols rule; all write boundaries add a 255-character resource ceiling and confirmation where appropriate. Hashing, rehash-on-login, remember-token rotation and broker invalidation remain Laravel-owned.
+- Registration: a configuration flag can disable both web and API creation safely. The service accepts an explicit name/email/password allowlist, normalizes user text, creates exactly one normal unverified user transactionally, dispatches the canonical registration event and sends a locale-aware verification notification after commit. Role, premium and verification state are never client inputs.
+- Login and redirect: the guard performs browser credential checks with optional explicit remember-me and session regeneration. Mobile login performs the necessary Sanctum credential boundary and rehashes a valid password when Laravel requests it. Post-authentication destinations are resolved only from safe internal relative paths or known named-route fallbacks; absolute, protocol-relative, control-character, callback/logout and malformed destinations are discarded.
+- Verification/recovery: temporary signed verification and Laravel broker reset tokens remain canonical and idempotent. Recovery responses stay generic, reset rotates the remember token and revokes mobile tokens, and browser sessions become invalid through Laravel's authenticated-session password hash check. Tokens are never logged, cached, placed in SEO metadata or browser storage.
+- Sessions: logout remains CSRF-protected Livewire state change. Database-session revoke/logout-other requires current password and an HMAC action token; Sanctum token actions remain owner-scoped. Web security UI additionally requires current password before revoking mobile devices, and clears sensitive component state after every outcome.
+- Localization/accessibility: every auth page, validation state, notification and loading/confirmation label uses the existing PHP translation catalogs with exact `ru`/`en` parity. Forms retain visible labels, native input semantics, autocomplete, password-manager/paste support, error associations, keyboard submit, touch targets and no-JavaScript page availability.
+- Social/MFA/merge capability: providers, linking, unlinking, social recovery, account merge, magic links and MFA remain explicitly unsupported and absent from the UI until their provider configuration, proof-of-control policy, encrypted storage and approved dependencies exist. Matching email alone never links or merges accounts.
+- Auditing/privacy: security events use bounded stable event codes and one-way identifier/network fingerprints; passwords, reset/verification/OAuth tokens, cookies, session IDs and raw request bodies are forbidden. Retention follows the existing application log policy and normal administrators receive no secret fields.
+- Data/cache/lifecycle: auth mutations never globally cache or flush a user. Existing user ID and all profile/library/progress/collection/comment/review/notification/moderation data are preserved. Export continues excluding hashes/tokens/sessions; deletion continues through the transactional account service, revoking sessions/tokens and preventing later authentication.
+
+### Phased implementation checklist
+
+- [x] Inventory all project Markdown plus auth routes, guards/providers/broker, middleware, cookies, CSRF, rate limits, models/schema/indexes, Livewire/API/services, notifications, localization, cache, export/deletion and absent optional capabilities.
+- [x] Record the canonical/unsupported capability decisions, compatibility risks, protected files, rollback notes and manual acceptance matrix in this existing plan before code changes.
+- [ ] Centralize email normalization, password defaults, private rate-limit fingerprints, security event recording and internal redirect resolution; reuse them from browser and Sanctum flows.
+- [ ] Localize web auth pages/forms/emails and supported API auth messages in every existing locale; retain accessible loading/error/empty/unavailable states and Russian default behavior.
+- [ ] Harden registration availability/defaults, password rehash/rotation, email-change confirmation, device/session revocation and sensitive Livewire state without renaming routes or changing user/data identity.
+- [ ] Run only static/Pint/route/middleware/config/schema/translation/security/cache/accessibility/Vite/browser diagnostics; do not create or invoke automated tests for Task 15.
+- [ ] Update owner docs, maintenance record and English changelog; reread Task 15, inspect every changed/directly related file, commit only Task 15 paths on `main` and push the configured remote.
+
+### Rollback and protected boundaries
+
+No database migration or destructive reconciliation is planned. Rollback is a code/config/catalog revert: existing users, password hashes, verification dates, reset rows, remember tokens, sessions, Sanctum tokens and all portal-domain rows remain untouched. Existing route names/paths, guard/provider/broker names, cookies, session keys, mobile API fields, public IDs and settings browser-storage keys are protected. Optional provider/merge/MFA functionality stays unavailable rather than partially stored.
+
+### Final manual verification checklist
+
+- [ ] One web/Sanctum architecture remains; routes, guard, broker, signed verification, CSRF and noindex/sitemap boundaries are unchanged and inspectable.
+- [ ] Registration enabled/disabled states, canonical email/name validation, case-insensitive duplicate prevention and unprivileged unverified defaults work without mass assignment.
+- [ ] One password policy, Laravel hashing/rehash, remember behavior, session regeneration, generic failures and privacy-safe layered rate limits cover browser and API authentication.
+- [ ] Verification/recovery/reset are localized, signed/broker-owned, expiring, replay-safe and token-free in logs/cache/metadata; password reset/change rotates credentials and invalidates other access according to the documented driver limits.
+- [ ] Logout, database sessions and Sanctum device actions are CSRF/owner/password protected where applicable, preserve unrelated user data and expose no raw ID/payload/cookie/IP/user-agent/token.
+- [ ] Internal redirect resolver rejects external, protocol-relative, malformed and auth-loop destinations while preserving a safe intended portal path and locale fallback.
+- [ ] Provider/link/unlink/merge/magic/MFA controls are absent because their canonical domains are absent; matching email cannot cause takeover or automatic merge.
+- [ ] Anonymous preference migration remains allowlisted/idempotent/non-blocking; no nonexistent anonymous bookmarks/progress capability is advertised.
+- [ ] Russian/English keys have exact parity; web/API notifications and forms expose accessible labels, autocomplete, errors, loading states, mobile layout and password-manager-friendly semantics.
+- [ ] Export/deletion/admin/cache boundaries expose no hash/token/session secret and preserve all existing profile, library, progress, collection, discussion, premium-independent and moderation data.
+- [ ] No Volt, new `@php`, Blade query, inline CSS/business JavaScript, unsafe GET mutation, fake control, debug/TODO, unused class/import or unrelated behavior remains.
+- [ ] Allowed diagnostics and browser smoke pass without automated tests; relevant docs/changelog match the implementation; only Task 15 files are committed on existing `main` and pushed.
+
 ## Task 16: canonical account settings and preferences
 
 ### Audit snapshot and integration decision

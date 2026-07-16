@@ -28,7 +28,13 @@ final class CatalogPopularityQuery
                 ->where('in_watchlist', true), 'popularity_watchlist_count')
             ->selectSub(EpisodeViewProgress::query()
                 ->selectRaw('COUNT(DISTINCT user_id)')
-                ->whereColumn('catalog_title_id', 'catalog_titles.id'), 'popularity_watcher_count')
+                ->whereColumn('catalog_title_id', 'catalog_titles.id')
+                ->where(function (Builder $query): void {
+                    $query
+                        ->where('position_seconds', '>=', max(1, (int) config('recommendations.meaningful_progress_seconds', 180)))
+                        ->orWhere('progress_percent', '>=', max(1, (int) config('recommendations.meaningful_progress_percent', 10)))
+                        ->orWhereNotNull('completed_at');
+                }), 'popularity_watcher_count')
             ->selectSub(CatalogTitleReview::query()
                 ->selectRaw('COUNT(*)')
                 ->whereColumn('catalog_title_id', 'catalog_titles.id')

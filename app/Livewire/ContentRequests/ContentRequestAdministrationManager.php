@@ -9,6 +9,7 @@ use App\Actions\ContentRequests\ClarifyContentRequest;
 use App\Actions\ContentRequests\HandoffContentRequestToImporter;
 use App\Actions\ContentRequests\MergeContentRequests;
 use App\Actions\ContentRequests\SetContentRequestPriority;
+use App\DTOs\ContentRequests\ContentRequestCardData;
 use App\Enums\ContentRequestPriority;
 use App\Enums\ContentRequestRejectionReason;
 use App\Enums\ContentRequestSort;
@@ -36,35 +37,54 @@ final class ContentRequestAdministrationManager extends Component
 
     #[Url(as: 'q', history: true, except: '')]
     public string $search = '';
+
     #[Url(history: true, except: '')]
     public string $type = '';
+
     #[Url(history: true, except: 'submitted')]
     public string $status = 'submitted';
+
     #[Url(history: true, except: 'oldest')]
     public string $sort = 'oldest';
+
     /** @var array<int, string> */
     public array $desiredStatuses = [];
+
     /** @var array<int, string> */
     public array $priorities = [];
+
     /** @var array<int, string> */
     public array $rejectionReasons = [];
+
     /** @var array<int, string> */
     public array $publicReasons = [];
+
     /** @var array<int, string> */
     public array $privateNotes = [];
+
     /** @var array<int, string> */
     public array $completionTitleIds = [];
+
     /** @var array<int, string> */
     public array $completionSeasonIds = [];
+
     /** @var array<int, string> */
     public array $completionEpisodeIds = [];
+
     /** @var array<int, string> */
     public array $completionMediaIds = [];
+
     /** @var array<int, string> */
     public array $mergeTargets = [];
+
     /** @var array<int, string> */
     public array $clarificationQuestions = [];
+
+    /** @var array<int, int|null> */
+    public array $importRunIds = [];
+
     public ?string $statusMessage = null;
+
     public ?string $actionError = null;
 
     public function mount(): void
@@ -161,7 +181,7 @@ final class ContentRequestAdministrationManager extends Component
         $this->sort = ContentRequestSort::tryFrom($this->sort)?->value ?? ContentRequestSort::Oldest->value;
     }
 
-    /** @param LengthAwarePaginator<int, \App\DTOs\ContentRequests\ContentRequestCardData> $requests */
+    /** @param LengthAwarePaginator<int, ContentRequestCardData> $requests */
     private function prepareForms(LengthAwarePaginator $requests): void
     {
         $visible = array_fill_keys(collect($requests->items())->map(fn ($request): int => $request->id)->all(), true);
@@ -178,13 +198,14 @@ final class ContentRequestAdministrationManager extends Component
             'completionMediaIds',
             'mergeTargets',
             'clarificationQuestions',
+            'importRunIds',
         ] as $property) {
             $this->{$property} = array_intersect_key($this->{$property}, $visible);
         }
 
         $models = ContentRequest::query()
             ->whereKey(array_keys($visible))
-            ->get(['id', 'status', 'priority', 'private_moderator_note'])
+            ->get(['id', 'status', 'priority', 'private_moderator_note', 'import_run_id'])
             ->keyBy('id');
 
         foreach ($requests as $request) {
@@ -195,6 +216,7 @@ final class ContentRequestAdministrationManager extends Component
                 $this->priorities[$request->id] ??= $model->priority->value;
                 $this->rejectionReasons[$request->id] ??= ContentRequestRejectionReason::InsufficientInformation->value;
                 $this->privateNotes[$request->id] ??= (string) $model->private_moderator_note;
+                $this->importRunIds[$request->id] = $model->import_run_id;
             }
         }
     }

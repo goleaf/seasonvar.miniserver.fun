@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Catalog;
 
+use App\Enums\CatalogTitleRelationType;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 final class CatalogRecommendationDiversityService
 {
@@ -27,10 +29,13 @@ final class CatalogRecommendationDiversityService
             ->get(['catalog_title_id', 'actor_id']);
         $dominantGenres = $this->dominantFeatureByTitle($genreRows, 'genre_id');
         $dominantActors = $this->dominantFeatureByTitle($actorRows, 'actor_id');
+        $franchises = $this->franchiseByTitle($titleIds->all());
         $genreLimit = max(1, (int) config('recommendations.diversity.primary_genre_limit', 5));
         $actorLimit = max(1, (int) config('recommendations.diversity.leading_actor_limit', 4));
+        $franchiseLimit = max(1, (int) config('recommendations.diversity.franchise_limit', 2));
         $genreCounts = [];
         $actorCounts = [];
+        $franchiseCounts = [];
         $selected = [];
         $deferred = [];
 
@@ -38,10 +43,12 @@ final class CatalogRecommendationDiversityService
             $id = (int) $candidate['id'];
             $genre = $dominantGenres[$id] ?? null;
             $actor = $dominantActors[$id] ?? null;
+            $franchise = $franchises[$id] ?? null;
             $genreFull = $genre !== null && ($genreCounts[(int) $genre] ?? 0) >= $genreLimit;
             $actorFull = $actor !== null && ($actorCounts[(int) $actor] ?? 0) >= $actorLimit;
+            $franchiseFull = $franchise !== null && ($franchiseCounts[(int) $franchise] ?? 0) >= $franchiseLimit;
 
-            if ($genreFull || $actorFull) {
+            if ($genreFull || $actorFull || $franchiseFull) {
                 $deferred[] = $candidate;
 
                 continue;
@@ -55,6 +62,10 @@ final class CatalogRecommendationDiversityService
 
             if ($actor !== null) {
                 $actorCounts[(int) $actor] = ($actorCounts[(int) $actor] ?? 0) + 1;
+            }
+
+            if ($franchise !== null) {
+                $franchiseCounts[(int) $franchise] = ($franchiseCounts[(int) $franchise] ?? 0) + 1;
             }
 
             if (count($selected) >= $limit) {
@@ -92,5 +103,61 @@ final class CatalogRecommendationDiversityService
                     ->{$featureColumn};
             })
             ->all();
+    }
+
+    /** @param list<int> $titleIds @return array<int, int> */
+    private function franchiseByTitle(array $titleIds): array
+    {
+        if ($titleIds === [] || ! Schema::hasTable('catalog_title_relations')) {
+            return [];
+        }
+
+        $franchiseTypes = [
+            CatalogTitleRelationType::Sequel->value,
+            CatalogTitleRelationType::Prequel->value,
+            CatalogTitleRelationType::SpinOff->value,
+            CatalogTitleRelationType::SpinOffFrom->value,
+            CatalogTitleRelationType::Remake->value,
+            CatalogTitleRelationType::SameUniverse->value,
+        ];
+        /** @var array<int, int> $parents */
+        $parents = array_combine($titleIds, $titleIds);
+
+        DB::table('catalog_title_relations')
+            ->whereIn('source_title_id', $titleIds)
+            ->whereIn('target_title_id', $titleIds)
+            ->whereIn('relation_type', $franchiseTypes)
+            ->where('is_active', true)
+            ->get(['source_title_id', 'target_title_id'])
+            ->each(function (object $row) use (&$parents): void {
+                $source = $this->root($parents, (int) $row->source_title_id);
+                $target = $this->root($parents, (int) $row->target_title_id);
+
+                if ($source !== $target) {
+                    $parents[max($source, $target)] = min($source, $target);
+                }
+            });
+
+        return collect($titleIds)
+            ->mapWithKeys(fn (int $id): array => [$id => $this->root($parents, $id)])
+            ->all();
+    }
+
+    /** @param array<int, int> $parents */
+    private function root(array &$parents, int $id): int
+    {
+        $root = $id;
+
+        while (($parents[$root] ?? $root) !== $root) {
+            $root = $parents[$root];
+        }
+
+        while (($parents[$id] ?? $id) !== $id) {
+            $next = $parents[$id];
+            $parents[$id] = $root;
+            $id = $next;
+        }
+
+        return $root;
     }
 }

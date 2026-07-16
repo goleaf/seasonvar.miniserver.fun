@@ -109,6 +109,18 @@ return [
         'retry_max_minutes' => (int) env('SEASONVAR_MEDIA_CHECK_RETRY_MAX_MINUTES', 1440),
         'permanent_retry_minutes' => (int) env('SEASONVAR_MEDIA_CHECK_PERMANENT_RETRY_MINUTES', 360),
     ],
+    'media_file_size' => [
+        'enabled' => filter_var(env('SEASONVAR_MEDIA_FILE_SIZE_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'connect_timeout_seconds' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_CONNECT_TIMEOUT', 5),
+        'timeout_seconds' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_TIMEOUT', 10),
+        'retry_times' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_RETRY_TIMES', 2),
+        'retry_sleep_milliseconds' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_RETRY_SLEEP_MS', 250),
+        'known_ttl_seconds' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_KNOWN_TTL', 2_592_000),
+        'unknown_retry_seconds' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_UNKNOWN_RETRY', 86_400),
+        'failed_retry_seconds' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_FAILED_RETRY', 21_600),
+        'backfill_chunk_size' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_BACKFILL_CHUNK_SIZE', 25),
+        'max_checks_per_import_cycle' => (int) env('SEASONVAR_MEDIA_FILE_SIZE_MAX_CHECKS_PER_CYCLE', 20),
+    ],
     'media_metadata' => [
         'chunk_size' => (int) env('SEASONVAR_MEDIA_METADATA_CHUNK_SIZE', 100),
     ],

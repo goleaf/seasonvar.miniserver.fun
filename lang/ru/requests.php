@@ -140,6 +140,7 @@ return [
         'filters' => 'Очередь и фильтры', 'empty' => 'Заявок по выбранным условиям нет.', 'private_note' => 'Приватная заметка',
         'completion_title_id' => 'ID опубликованного сериала', 'completion_season_id' => 'ID опубликованного сезона',
         'completion_episode_id' => 'ID опубликованной серии', 'completion_media_id' => 'ID проверенного источника',
+        'import_run' => 'Связанный запуск импортера: #:id',
         'apply_status' => 'Применить статус', 'apply_priority' => 'Сохранить приоритет',
         'clarification_question' => 'Вопрос автору', 'request_clarification' => 'Запросить уточнение', 'merge_target' => 'UUID канонической заявки',
         'merge' => 'Объединить', 'import_handoff' => 'Передать импортеру',

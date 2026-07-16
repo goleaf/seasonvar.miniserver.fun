@@ -35,16 +35,10 @@ final class CatalogTitleRelationService
             ->where('is_active', true)
             ->where('target_title_id', '!=', $title->id)
             ->whereIn('target_title_id', $this->titles->visibleTo($viewer)->select('id'))
-            ->with(['targetTitle' => function ($query) use ($viewer): void {
-                $query
-                    ->whereIn('catalog_titles.id', $this->titles->visibleTo($viewer)->select('id'))
-                    ->select(['id', 'slug', 'title', 'original_title', 'type', 'year', 'description', 'poster_url', 'indexed_at']);
-            }])
             ->orderBy('priority')
             ->orderBy('id')
             ->limit(max(1, min(24, $limit)))
             ->get()
-            ->filter(fn (CatalogTitleRelation $relation): bool => $relation->targetTitle !== null)
             ->unique('target_title_id')
             ->values();
     }
@@ -118,6 +112,72 @@ final class CatalogTitleRelationService
 
             $this->cache->catalogChanged([$sourceId, $targetId]);
         }, attempts: 3);
+    }
+
+    /**
+     * Preserve explicit relations before the importer force-deletes a duplicate title.
+     * The source remains part of the identity, so imported rows cannot replace editorial rows.
+     */
+    public function mergeTitle(CatalogTitle $canonical, CatalogTitle $duplicate): void
+    {
+        if ($canonical->is($duplicate) || ! Schema::hasTable('catalog_title_relations')) {
+            return;
+        }
+
+        CatalogTitleRelation::query()
+            ->where(function (Builder $query) use ($duplicate): void {
+                $query
+                    ->where('source_title_id', $duplicate->id)
+                    ->orWhere('target_title_id', $duplicate->id);
+            })
+            ->orderByDesc('is_locked')
+            ->orderBy('priority')
+            ->orderBy('id')
+            ->get()
+            ->each(function (CatalogTitleRelation $relation) use ($canonical, $duplicate): void {
+                $sourceId = (int) $relation->source_title_id === (int) $duplicate->id
+                    ? (int) $canonical->id
+                    : (int) $relation->source_title_id;
+                $targetId = (int) $relation->target_title_id === (int) $duplicate->id
+                    ? (int) $canonical->id
+                    : (int) $relation->target_title_id;
+
+                if ($sourceId === $targetId) {
+                    $relation->delete();
+
+                    return;
+                }
+
+                $existing = CatalogTitleRelation::query()
+                    ->where('id', '!=', $relation->id)
+                    ->where('source_title_id', $sourceId)
+                    ->where('target_title_id', $targetId)
+                    ->where('relation_type', $relation->relation_type->value)
+                    ->where('source', $relation->source->value)
+                    ->first();
+
+                if ($existing !== null) {
+                    $existing->forceFill([
+                        'provider_key' => $existing->provider_key ?: $relation->provider_key,
+                        'priority' => min((int) $existing->priority, (int) $relation->priority),
+                        'is_locked' => $existing->is_locked || $relation->is_locked,
+                        'is_active' => $existing->is_active || $relation->is_active,
+                    ])->save();
+                    $relation->delete();
+
+                    return;
+                }
+
+                $relation->forceFill([
+                    'source_title_id' => $sourceId,
+                    'target_title_id' => $targetId,
+                ])->save();
+            });
+
+        CatalogTitleRelation::query()
+            ->where('source_title_id', $canonical->id)
+            ->where('target_title_id', $canonical->id)
+            ->delete();
     }
 
     private function save(

@@ -19,7 +19,7 @@ final class CatalogRecommendationCache
     ) {}
 
     /**
-     * @param Closure(): list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}> $rebuild
+     * @param  Closure(): list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>  $rebuild
      * @return list<array{id: int, score: int, source: string, reason: string, relation_type?: string|null}>
      */
     public function rememberPublic(CatalogRecommendationContext $context, Closure $rebuild, array $excludedIds = []): array
@@ -53,10 +53,8 @@ final class CatalogRecommendationCache
                 'rating_source' => $context->ratingSource,
                 'current_title' => $context->currentTitleId ?? 0,
                 'exclusions' => hash('sha256', json_encode($exclusions, JSON_THROW_ON_ERROR)),
-                'page' => $context->boundedPage(),
-                'per_page' => $context->boundedPerPage(),
                 'filters' => hash('sha256', json_encode($filters, JSON_THROW_ON_ERROR)),
-                'ranking_version' => (string) config('recommendations.version', 'task18-v4'),
+                'ranking_version' => (string) config('recommendations.version', 'task18-v5'),
             ],
             $this->ttl->for(CacheDomain::Recommendations),
             $rebuild,

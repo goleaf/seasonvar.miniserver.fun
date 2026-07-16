@@ -377,3 +377,22 @@ Additive migration `2026_07_16_000000_create_user_account_settings_table.php` н
 - `/sitemap-titles-{page}.xml` (`sitemap.titles`)
 - `/sitemap-videos-{page}.xml` (`sitemap.videos`)
 <!-- project-docs:end -->
+
+## Связи и schema заявок на материалы
+
+`content_requests.id` остаётся внутренним FK, `public_id` — уникальная route identity. Nullable requester и target/result FKs сохраняют общественно полезную историю при удалении account или canonical target; target merge retarget-ит их до удаления duplicate content. `type`, `status`, `priority`, rejection/provider/language/quality codes хранят только stable values, никогда translated labels.
+
+| Таблица | Назначение и ограничения |
+| --- | --- |
+| `content_requests` | Typed aggregate, canonical target/sequence, normalized title/hash, exact active identity, idempotent submission, public/private moderation fields, merge/completion/import references и optimistic version. |
+| `content_request_votes` | Один vote на `(content_request_id,user_id)`; count derived, voter list private. |
+| `content_request_followers` | Одна подписка на `(content_request_id,user_id)`; identities private. |
+| `content_request_status_histories` | Append-only transition/reason/private-note timeline с nullable actor и unique retry key. |
+| `content_request_source_links` | До трёх normalized HTTP(S) evidence links, private by default; per-request URL hash unique. |
+| `content_request_external_identifiers` | Allowlisted provider+normalized ID evidence; provider/ID/request index сужает duplicate candidates. |
+| `content_request_clarifications` | Requester/moderator plain-text thread с idempotent submission key; не public discussion. |
+| `content_request_notification_preferences` | Owner PK и requester/voted/followed boolean categories. |
+
+Exact active uniqueness обеспечивается nullable unique `active_identity_key`; terminal row очищает его, сохраняя historical `exact_identity_hash`. Composite indexes соответствуют public status pagination, type/status moderation, requester/My Requests, normalized title duplicate narrowing и title/season/episode target lookup. Vote/follow unique keys одновременно являются integrity boundary и count index prefix; history/source/external indexes обслуживают только реальные timeline/visibility/duplicate queries. SQLite `migrate --pretend` подтверждает additive FK/index DDL.
+
+Migration `2026_07_16_180000_create_content_request_domain.php` ничего не backfill-ит: audit не нашёл legacy request/ticket/suggestion data. Rollback безопасно удаляет только новые таблицы до появления production writes; после появления заявок сначала нужен export/backup, а importer source pages и уже доставленные notifications не откатываются.

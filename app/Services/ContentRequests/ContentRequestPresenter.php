@@ -83,6 +83,7 @@ final class ContentRequestPresenter
                 'provider' => $identifier->provider->value,
                 'label' => $identifier->provider->label(),
                 'identifier' => $identifier->identifier,
+                'url' => $identifier->provider->publicUrl($identifier->identifier),
             ])->all(),
             clarifications: $includeClarifications ? $request->clarifications->map(fn ($clarification): array => [
                 'role' => $clarification->author_role,

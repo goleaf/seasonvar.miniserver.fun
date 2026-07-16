@@ -48,6 +48,21 @@ final class CatalogDiscoveryPage extends Component
     #[Url(history: true, except: '')]
     public mixed $country = '';
 
+    #[Url(history: true, except: '')]
+    public mixed $tag = '';
+
+    #[Url(history: true, except: '')]
+    public mixed $actor = '';
+
+    #[Url(history: true, except: '')]
+    public mixed $director = '';
+
+    #[Url(history: true, except: '')]
+    public mixed $translation = '';
+
+    #[Url(history: true, except: '')]
+    public mixed $studio = '';
+
     #[Url(as: 'year_from', history: true, except: '')]
     public mixed $yearFrom = '';
 
@@ -114,7 +129,7 @@ final class CatalogDiscoveryPage extends Component
     public function updated(string $property): void
     {
         if (in_array($property, [
-            'period', 'ratingSource', 'genre', 'country', 'yearFrom', 'yearTo',
+            'period', 'ratingSource', 'genre', 'country', 'tag', 'actor', 'director', 'translation', 'studio', 'yearFrom', 'yearTo',
             'quality', 'subtitles', 'ratingMin', 'votesMin',
         ], true)) {
             $this->normalizeState();
@@ -126,7 +141,7 @@ final class CatalogDiscoveryPage extends Component
 
     public function clearFilters(): void
     {
-        $this->reset('genre', 'country', 'yearFrom', 'yearTo', 'quality', 'subtitles', 'ratingMin', 'votesMin');
+        $this->reset('genre', 'country', 'tag', 'actor', 'director', 'translation', 'studio', 'yearFrom', 'yearTo', 'quality', 'subtitles', 'ratingMin', 'votesMin');
         $this->page = 1;
         $this->notice = null;
         $this->resetErrorBag();
@@ -243,6 +258,11 @@ final class CatalogDiscoveryPage extends Component
         }
 
         $presentation = $this->presenter->type($result->displayType);
+        $discoveryFacets = $this->facets->taxonomyGroups(
+            ['genre', 'country', 'tag', 'actor', 'director', 'translation', 'studio'],
+            ['genre' => 60, 'country' => 60, 'tag' => 40, 'actor' => 40, 'director' => 40, 'translation' => 60, 'studio' => 40],
+            $this->user(),
+        );
         $viewItems = $result->items->map(fn (CatalogRecommendationItem $item): CatalogRecommendationListItem => new CatalogRecommendationListItem(
             title: $item->title,
             rank: $item->rank,
@@ -261,8 +281,13 @@ final class CatalogDiscoveryPage extends Component
             'viewItems' => $viewItems,
             'presentation' => $presentation,
             'typeLinks' => $this->typeLinks(),
-            'genres' => $this->facets->taxonomies('genre', 60),
-            'countries' => $this->facets->taxonomies('country', 60),
+            'genres' => $discoveryFacets->get('genre', collect()),
+            'countries' => $discoveryFacets->get('country', collect()),
+            'tags' => $discoveryFacets->get('tag', collect()),
+            'actors' => $discoveryFacets->get('actor', collect()),
+            'directors' => $discoveryFacets->get('director', collect()),
+            'translations' => $discoveryFacets->get('translation', collect()),
+            'studios' => $discoveryFacets->get('studio', collect()),
             'qualityOptions' => config('playback.supported_qualities', []),
             'maximumYear' => now()->year + 5,
             'hasFilters' => $hasFilters,
@@ -284,6 +309,11 @@ final class CatalogDiscoveryPage extends Component
             filters: array_filter([
                 'genre' => $this->genre,
                 'country' => $this->country,
+                'tag' => $this->tag,
+                'actor' => $this->actor,
+                'director' => $this->director,
+                'translation' => $this->translation,
+                'studio' => $this->studio,
                 'year_from' => $this->yearFrom,
                 'year_to' => $this->yearTo,
                 'quality' => $this->quality,
@@ -317,6 +347,11 @@ final class CatalogDiscoveryPage extends Component
         $this->ratingSource = in_array($this->ratingSource, ['kinopoisk', 'imdb', 'portal'], true) ? $this->ratingSource : 'kinopoisk';
         $this->genre = $this->slug($this->genre);
         $this->country = $this->slug($this->country);
+        $this->tag = $this->slug($this->tag);
+        $this->actor = $this->slug($this->actor);
+        $this->director = $this->slug($this->director);
+        $this->translation = $this->slug($this->translation);
+        $this->studio = $this->slug($this->studio);
         $this->quality = is_string($this->quality) && in_array($this->quality, config('playback.supported_qualities', []), true) ? $this->quality : '';
         $this->subtitles = $this->subtitles === 'available' ? 'available' : '';
         $this->yearFrom = $this->integer($this->yearFrom, 1900, now()->year + 5);
@@ -345,7 +380,7 @@ final class CatalogDiscoveryPage extends Component
 
     private function hasFilters(): bool
     {
-        return collect([$this->genre, $this->country, $this->yearFrom, $this->yearTo, $this->quality, $this->subtitles, $this->ratingMin, $this->votesMin])
+        return collect([$this->genre, $this->country, $this->tag, $this->actor, $this->director, $this->translation, $this->studio, $this->yearFrom, $this->yearTo, $this->quality, $this->subtitles, $this->ratingMin, $this->votesMin])
             ->contains(fn (mixed $value): bool => $value !== '' && $value !== null);
     }
 
@@ -356,6 +391,11 @@ final class CatalogDiscoveryPage extends Component
             'rating_source' => $this->ratingSource === 'kinopoisk' ? null : $this->ratingSource,
             'genre' => $this->genre,
             'country' => $this->country,
+            'tag' => $this->tag,
+            'actor' => $this->actor,
+            'director' => $this->director,
+            'translation' => $this->translation,
+            'studio' => $this->studio,
             'year_from' => $this->yearFrom,
             'year_to' => $this->yearTo,
             'quality' => $this->quality,

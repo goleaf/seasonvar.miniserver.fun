@@ -409,7 +409,7 @@ class CatalogSitemapResponder
     {
         return ContentRequest::query()
             ->publiclyVisible()
-            ->whereIn('status', ['submitted', 'pending_review', 'approved', 'planned', 'in_progress', 'partially_completed', 'completed']);
+            ->whereIn('status', ['approved', 'planned', 'in_progress', 'partially_completed', 'completed']);
     }
 
     public function feed(): StreamedResponse

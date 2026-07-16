@@ -552,6 +552,11 @@ final class CatalogAdministrationService
                 $current->forceFill(Arr::only($attributes, [
                     'title', 'quality', 'translation_name', 'format', 'has_subtitles', 'duration_seconds', 'status', 'audience', 'available_from', 'available_until',
                 ]));
+
+                if (! $current->exists || $current->file_size_check_status === null) {
+                    $current->resetFileSizeInspection();
+                }
+
                 $current->published_at = $current->status === 'published' ? ($current->published_at ?? now()) : null;
                 $current->save();
                 $this->touchTitle($currentTitle);

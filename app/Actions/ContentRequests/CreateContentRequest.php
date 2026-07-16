@@ -92,6 +92,7 @@ final readonly class CreateContentRequest
         $this->rateLimiter->hit('create', $user, $exactHash);
         $isReviewOnly = $links !== [] && $user->created_at?->isAfter(now()->subMinutes(30));
 
+        $created = false;
         $request = DB::transaction(function () use (
             $user,
             $input,
@@ -101,6 +102,7 @@ final readonly class CreateContentRequest
             $exactHash,
             $duplicate,
             $isReviewOnly,
+            &$created,
         ): ContentRequest {
             User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
             $existing = ContentRequest::query()
@@ -152,6 +154,7 @@ final readonly class CreateContentRequest
                 'probable_duplicate' => $duplicate->confidence === ContentRequestDuplicateConfidence::Probable,
                 'is_public' => ! $isReviewOnly,
             ]);
+            $created = true;
 
             ContentRequestStatusHistory::query()->create([
                 'content_request_id' => $request->id,
@@ -174,8 +177,20 @@ final readonly class CreateContentRequest
             return $request;
         }, attempts: 3);
 
+        if (! $created && ! $request->is_public && $request->requester_id !== $user->id) {
+            throw new ContentRequestActionException('requests.errors.exact_duplicate');
+        }
+
+        if (! $created) {
+            ContentRequestVote::query()->firstOrCreate(['content_request_id' => $request->id, 'user_id' => $user->id]);
+            ContentRequestFollower::query()->firstOrCreate(['content_request_id' => $request->id, 'user_id' => $user->id]);
+        }
+
         $this->cache->changed($request->public_id, sitemap: true);
-        $this->notifications->submitted($request);
+
+        if ($created) {
+            $this->notifications->submitted($request);
+        }
 
         return $request;
     }

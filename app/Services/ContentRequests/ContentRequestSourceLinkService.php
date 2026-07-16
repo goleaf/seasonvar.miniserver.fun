@@ -49,6 +49,7 @@ final readonly class ContentRequestSourceLinkService
             || $host === ''
             || isset($parts['user'])
             || isset($parts['pass'])
+            || $this->dangerousPath((string) ($parts['path'] ?? ''))
             || $this->privateHost($host)) {
             throw new ContentRequestActionException('requests.errors.invalid_source_url');
         }
@@ -82,5 +83,10 @@ final readonly class ContentRequestSourceLinkService
         }
 
         return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
+    }
+
+    private function dangerousPath(string $path): bool
+    {
+        return preg_match('/\.(?:avi|bat|cmd|com|exe|js|m3u8|mkv|mov|mp4|msi|scr|torrent|webm|zip)$/i', $path) === 1;
     }
 }
