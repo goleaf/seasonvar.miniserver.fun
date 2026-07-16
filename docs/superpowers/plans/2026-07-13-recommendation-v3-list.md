@@ -935,3 +935,37 @@ Verification evidence: a real `CatalogDiscoveryPage` instance produced `null` fo
 - [x] Reject the proposed full-pool output change because it would not change feature-query scope or result identity and would only remove the existing early loop stop.
 - [x] Run documentation consistency, managed-doc and task-scoped `git diff --check`; do not invoke PHPUnit/Pest or create test files. The managed documentation was current and both Task 18 files passed whitespace inspection.
 - [x] Correct the audit design on `main`, push and verify the remote SHA without absorbing concurrent work. Commit `d8d746183a48c458b76b8ab7c5287d172ccd5241` matched `origin/main` immediately after push; no application file was changed.
+
+## Follow-up: editorial recommendation invalidation scope, 2026-07-16
+
+> **For agentic workers:** execute inline on the existing `main`; project rules prohibit another branch/worktree or subagent delegation. Task 18 forbids creating or running automated tests, so acceptance uses isolated array-cache probes and static inspection.
+
+**Goal:** prevent private and ineligible collection mutations from invalidating shared public recommendation candidates while preserving freshness for every transition into or out of a visible featured editorial section.
+
+**Architecture:** retain `CatalogCollectionCacheInvalidator` as the sole collection cache mutation boundary. Gate only its Recommendations generation bump on current/previous public-editorial eligibility; keep unknown bulk calls conservative and narrow title-dependent lookup to the same eligibility predicate used by editorial discovery.
+
+**Tech stack:** PHP 8.5, Laravel 13.20 Eloquent saved-attribute history, existing cache version registry and SQLite-compatible collection queries; no migration, route, cache resource/key, frontend asset or translation change.
+
+### Task F15: scope collection-driven recommendation invalidation
+
+**Files:**
+
+- Modify: `app/Services/Collections/CatalogCollectionCacheInvalidator.php`
+- Modify: `docs/caching.md`
+- Modify: `docs/performance.md`
+- Modify: `docs/MAINTENANCE_LOG.md`
+- Modify: `CHANGELOG.md`
+- Modify: this plan and the existing Task 18 design spec.
+
+**Interfaces:**
+
+- Preserve `changed()`, `changedMany()` and `titleChanged()` signatures and all other cache-domain invalidation behavior.
+- Public editorial eligibility remains type `editorial`, visibility `public`, moderation `approved`, featured true, published timestamp present and soft deletion absent.
+- Unknown collection context remains conservative; private model attributes never become cache dimensions or telemetry values.
+
+- [ ] Compute recommendation impact for one/many collection models from current and previous raw attributes, covering both eligibility entry and exit.
+- [ ] Narrow `titleChanged()` to eligible public featured editorial collections before it requests a Recommendations bump.
+- [ ] Pass an explicit boolean into the existing after-commit invalidation closure and conditionally bump only `CacheDomain::Recommendations`; preserve every other domain/scope bump.
+- [ ] Prove with an isolated array store that private user, public unfeatured editorial and eligible featured editorial mutations produce recommendation version deltas `0`, `0` and `1`; prove an eligible-to-ineligible saved transition still produces delta `1`.
+- [ ] Run PHP syntax, task-file Pint, targeted Larastan, managed-doc check, debug/placeholder scan and task-scoped `git diff --check`; do not invoke PHPUnit/Pest or create test files.
+- [ ] Update owner documentation and English changelog, inspect the isolated patch, commit only Task 18 files on `main`, push and verify the remote SHA without absorbing concurrent work.
