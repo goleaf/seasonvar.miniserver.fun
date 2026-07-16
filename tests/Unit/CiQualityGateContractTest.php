@@ -95,6 +95,17 @@ final class CiQualityGateContractTest extends TestCase
         $this->assertStringContainsString('export BROWSER_TEST_DATABASE="$browser_database"', $qualityGate);
     }
 
+    public function test_all_profiles_prepare_isolated_manifest_paths_before_artisan_bootstrap(): void
+    {
+        $qualityGate = File::get(base_path('scripts/ci-check.sh'));
+        $mkdirPosition = strpos($qualityGate, 'mkdir -p "$ci_output_root" "$VIEW_COMPILED_PATH"');
+        $initialCleanupPosition = strpos($qualityGate, "\nclear_laravel_cache_artifacts\n\nrun_laravel_cache_validation");
+
+        $this->assertIsInt($mkdirPosition);
+        $this->assertIsInt($initialCleanupPosition);
+        $this->assertLessThan($initialCleanupPosition, $mkdirPosition);
+    }
+
     public function test_pre_push_runs_the_same_local_quality_gate_before_upload(): void
     {
         $hook = File::get(base_path('.githooks/pre-push'));

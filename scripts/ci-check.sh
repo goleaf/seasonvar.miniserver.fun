@@ -39,6 +39,7 @@ clear_laravel_cache_artifacts() {
     fi
 }
 
+mkdir -p "$ci_output_root" "$VIEW_COMPILED_PATH"
 clear_laravel_cache_artifacts
 
 run_laravel_cache_validation() (
