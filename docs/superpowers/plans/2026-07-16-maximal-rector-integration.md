@@ -20,6 +20,17 @@
 - Preserve all unrelated concurrent workspace changes and stage only files owned by this plan.
 - Update Russian `README.md`, `docs/development.md`, `docs/ci.md` and `CHANGELOG.md`; do not edit managed `project-docs` blocks manually.
 
+## Implementation Status — 2026-07-16
+
+- Tasks 1–4 are complete in commits `578a453`, `db493d8`, `5b4e434` and `5901770`; the design and this plan are recorded in `5efa50e` and `e4384e9`.
+- The required JSON audit reports `0` changed files and `0` errors. `composer rector:check`, Larastan and the focused Rector/CI contracts pass.
+- The first full PHPUnit verification completed with 998 passed, 11 skipped and 7,887 assertions across 1,009 tests.
+- The maximum read-only JSON audit completed with expected exit `2` in 2,800 seconds: 1,082 changed files, 0 errors, 125 applied rule classes and 4,923 rule occurrences.
+- Maximum execution keeps all reviewed rules and paths while using four workers, a 600-second per-worker timeout and `jobSize: 1`. A 20-file job could exceed the worker timeout, while sequential execution exceeded 25 minutes in one process; the one-file schedule completed without dropping rule coverage or adding a baseline.
+- Rector 2.5.7 `list` currently forwards an unsupported `--output-format` option in the installed binary. Version/help, both config parses and real process dry-runs are the executable validation boundary for this integration.
+- Final acceptance completed on the stabilized shared tree with 1,091 passed, 11 skipped and 8,378 assertions across 1,102 PHPUnit tests. Composer validation/audit, Pint, required Rector, Larastan, focused contracts, managed documentation and README policy also pass.
+- Tasks 1–5 are complete; raw Rector and PHPUnit diagnostic artifacts remain ignored under `output/rector`.
+
 ---
 
 ### Task 1: Pin the Rector integration contract with a failing PHPUnit test

@@ -78,12 +78,17 @@ scripts/check-readme-policy.sh README.md
 - `php artisan google:analytics:summary` — read-only сводка GA4, если Google credentials настроены вне Git.
 - `php artisan project:docs-refresh` — обновляет управляемые блоки документации.
 - `php artisan project:docs-refresh --check` — проверяет документацию без записи изменений, включая repository-relative Markdown links и migration inventory.
+- `composer rector:check` — обязательный read-only Rector-профиль для всего собственного PHP-кода; ненулевой exit означает новый неприменённый diff или ошибку анализа.
+- `composer rector:fix` — явно применяет только обязательный профиль; после него нужно просмотреть diff, запустить Pint, Larastan и релевантные тесты.
+- `composer rector:max` — максимальный стабильный dry-run с PHP, Laravel 13, PHPUnit, type/dead-code/quality/style/naming/privatization наборами; команда намеренно может завершиться с exit `2`, если показывает плановый долг.
 - `composer analyse` — запускает bounded Larastan/PHPStan по DTO, enums и критичным operational/admin boundaries без baseline и ignored errors.
 
 ## Проверки
 
 ```bash
 composer test
+composer rector:check
+composer rector:max
 composer analyse
 php artisan test --compact
 ./vendor/bin/pint --dirty --format agent
@@ -91,7 +96,7 @@ npm run build
 php artisan project:docs-refresh --check
 ```
 
-Pest, Rector и `npm run lint` сейчас не установлены. Larastan/PHPStan применяется как ограниченный high-value gate; расширять paths нужно постепенно и только с нулём ignored errors.
+Pest и `npm run lint` сейчас не установлены. Rector 2 использует `rector.php` как нулевой обязательный gate, а `rector-max.php` сохраняет весь текущий модернизационный backlog видимым без baseline. Правила из первого полного аудита, затрагивающие сотни файлов (`readonly`, типы констант, PHP callables и Laravel property attributes), перечислены по классам только в skip обязательного профиля и остаются активными в maximum; их следует применять отдельными небольшими партиями. Larastan/PHPStan применяется как ограниченный high-value gate; расширять paths нужно постепенно и только с нулём ignored errors.
 
 ### Добавление interface translations
 

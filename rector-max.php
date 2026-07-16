@@ -27,7 +27,7 @@ return RectorConfig::configure()
         cacheDirectory: __DIR__.'/output/rector/maximum',
         cacheClass: FileCacheStorage::class,
     )
-    ->withParallel(timeoutSeconds: 600, maxNumberOfProcess: 4, jobSize: 20)
+    ->withParallel(timeoutSeconds: 600, maxNumberOfProcess: 4, jobSize: 1)
     ->withSetProviders(LaravelSetProvider::class)
     ->withComposerBased(phpunit: true, laravel: true)
     ->withSets([

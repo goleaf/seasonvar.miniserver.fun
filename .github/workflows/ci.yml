@@ -99,6 +99,14 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      - name: Cache required Rector analysis
+        uses: actions/cache@v5
+        with:
+          path: output/rector/required
+          key: ${{ runner.os }}-php-8.5-rector-${{ hashFiles('composer.lock', 'rector.php') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.5-rector-
+
       - name: Run backend quality gate
         run: bash scripts/ci-check.sh backend
 

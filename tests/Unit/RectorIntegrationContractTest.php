@@ -62,6 +62,11 @@ final class RectorIntegrationContractTest extends TestCase
         }
 
         $this->assertStringContainsString('->withTreatClassesAsFinal()', $config);
+        $this->assertStringContainsString(
+            '->withParallel(timeoutSeconds: 600, maxNumberOfProcess: 4, jobSize: 1)',
+            $config,
+        );
+        $this->assertStringNotContainsString('->withoutParallel()', $config);
     }
 
     public function test_required_profile_keeps_the_first_audit_backlog_explicit_and_maximum_only(): void
@@ -95,6 +100,8 @@ final class RectorIntegrationContractTest extends TestCase
         $this->assertSame(1, substr_count($script, 'composer rector:check'));
         $this->assertStringNotContainsString('composer rector:fix', $script);
         $this->assertStringNotContainsString('rector process', $workflow);
+        $this->assertStringContainsString('path: output/rector/required', $workflow);
+        $this->assertStringContainsString("hashFiles('composer.lock', 'rector.php')", $workflow);
     }
 
     /** @return array<string, array{string}> */
