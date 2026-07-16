@@ -86,6 +86,24 @@ final class CiQualityGateContractTest extends TestCase
         $this->assertContains('output', $pint['exclude']);
     }
 
+    public function test_backend_profile_runs_required_rector_after_pint_and_before_php_analysis(): void
+    {
+        $qualityGate = File::get(base_path('scripts/ci-check.sh'));
+        $pintPosition = strpos($qualityGate, './vendor/bin/pint --test --format=agent');
+        $rectorPosition = strpos($qualityGate, 'composer rector:check');
+        $syntaxPosition = strpos($qualityGate, "find app bootstrap config database routes tests -type f -name '*.php'");
+        $analysisPosition = strpos($qualityGate, 'composer analyse');
+
+        $this->assertIsInt($pintPosition);
+        $this->assertIsInt($rectorPosition);
+        $this->assertIsInt($syntaxPosition);
+        $this->assertIsInt($analysisPosition);
+        $this->assertTrue($pintPosition < $rectorPosition);
+        $this->assertTrue($rectorPosition < $syntaxPosition);
+        $this->assertTrue($syntaxPosition < $analysisPosition);
+        $this->assertSame(1, substr_count($qualityGate, 'composer rector:check'));
+    }
+
     public function test_browser_profile_exports_one_absolute_fixture_database_path(): void
     {
         $qualityGate = File::get(base_path('scripts/ci-check.sh'));

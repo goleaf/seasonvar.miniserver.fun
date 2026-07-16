@@ -57,6 +57,7 @@ run_backend() (
     composer audit
     clear_laravel_cache_artifacts
     ./vendor/bin/pint --test --format=agent
+    composer rector:check
     find app bootstrap config database routes tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
     composer analyse
     php artisan project:docs-refresh --check --no-interaction
