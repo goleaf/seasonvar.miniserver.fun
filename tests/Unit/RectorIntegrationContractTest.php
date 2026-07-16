@@ -64,6 +64,29 @@ final class RectorIntegrationContractTest extends TestCase
         $this->assertStringContainsString('->withTreatClassesAsFinal()', $config);
     }
 
+    public function test_required_profile_keeps_the_first_audit_backlog_explicit_and_maximum_only(): void
+    {
+        $required = File::get(base_path('rector.php'));
+        $maximum = File::get(base_path('rector-max.php'));
+
+        foreach ([
+            'AddOverrideAttributeToOverriddenMethodsRector::class',
+            'ReadOnlyClassRector::class',
+            'AddTypeToConstRector::class',
+            'AddClosureVoidReturnTypeWhereNoReturnRector::class',
+            'ClosureToArrowFunctionRector::class',
+            'WithoutIncrementingPropertyToWithoutIncrementingAttributeRector::class',
+            'TriesPropertyToTriesAttributeRector::class',
+            'WithoutTimestampsPropertyToWithoutTimestampsAttributeRector::class',
+        ] as $rule) {
+            $this->assertStringContainsString($rule, $required);
+            $this->assertStringNotContainsString($rule, $maximum);
+        }
+
+        $this->assertStringContainsString('without baselining paths', $required);
+        $this->assertStringNotContainsString('baseline', strtolower($maximum));
+    }
+
     public function test_backend_ci_delegates_to_required_dry_run_once_and_never_writes(): void
     {
         $script = File::get(base_path('scripts/ci-check.sh'));
