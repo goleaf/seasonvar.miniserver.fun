@@ -37,6 +37,7 @@
     },
     "scripts": {
         "analyse": "phpstan analyse --memory-limit=1G",
+        "ci:check": "bash scripts/ci-check.sh full",
         "setup": [
             "composer install",
             "@hooks:install",

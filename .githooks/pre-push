@@ -14,3 +14,5 @@ seasonvar_git_guard_require_main
 seasonvar_git_guard_require_no_conflicts
 seasonvar_git_guard_require_safe_paths tracked
 seasonvar_git_guard_require_clean_tree
+
+bash "$repo_root/scripts/ci-check.sh" pre-push

@@ -55,16 +55,23 @@ final class BrowserCiContractTest extends TestCase
     public function test_ci_installs_chromium_and_runs_the_browser_suite_against_local_fixtures(): void
     {
         $workflow = File::get(base_path('.github/workflows/ci.yml'));
+        $qualityGate = File::get(base_path('scripts/ci-check.sh'));
 
         foreach ([
             'browser:',
-            'npm run test:browser:install',
-            'tests/browser/prepare-fixtures.php',
-            'npm run test:browser',
+            'bash scripts/ci-check.sh browser',
             'output/playwright/browser.sqlite',
             'playwright-report',
         ] as $contract) {
             $this->assertStringContainsString($contract, $workflow);
+        }
+
+        foreach ([
+            'npm run test:browser:install',
+            'tests/browser/prepare-fixtures.php',
+            'npm run test:browser',
+        ] as $contract) {
+            $this->assertStringContainsString($contract, $qualityGate);
         }
     }
 }

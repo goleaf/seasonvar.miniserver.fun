@@ -13,11 +13,13 @@ class StaticAnalysisContractTest extends TestCase
     {
         $composer = json_decode(File::get(base_path('composer.json')), true, flags: JSON_THROW_ON_ERROR);
         $workflow = File::get(base_path('.github/workflows/ci.yml'));
+        $qualityGate = File::get(base_path('scripts/ci-check.sh'));
         $configPath = base_path('phpstan.neon.dist');
 
         $this->assertArrayHasKey('analyse', $composer['scripts']);
         $this->assertStringContainsString('phpstan analyse', $composer['scripts']['analyse']);
-        $this->assertStringContainsString('composer analyse', $workflow);
+        $this->assertStringContainsString('bash scripts/ci-check.sh backend', $workflow);
+        $this->assertStringContainsString('composer analyse', $qualityGate);
         $this->assertFileExists($configPath);
 
         $config = File::get($configPath);
