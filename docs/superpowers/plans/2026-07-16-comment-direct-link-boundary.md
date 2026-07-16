@@ -28,7 +28,7 @@
 - Consumes: `CommentTargetResolver::fromComment(Comment, ?User, ?string): CommentTarget`, `CommentDiscussionQuery::rootFor(Comment): Comment`, `CommentDiscussionQuery::oldestPageFor(CommentTarget, Comment, ?User): int`, `CommentPolicy`, and the `manage-comments` gate.
 - Produces: `CommentDirectLinkResolver::resolve(int $commentId, ?User $viewer, ?string $interfaceLocale = null): string`.
 
-- [ ] **Step 1: Create the focused resolver**
+- [x] **Step 1: Create the focused resolver**
 
 ```php
 <?php
@@ -106,7 +106,7 @@ final readonly class CommentDirectLinkResolver
 }
 ```
 
-- [ ] **Step 2: Run exact-file syntax and formatting checks**
+- [x] **Step 2: Run exact-file syntax and formatting checks**
 
 Run:
 
@@ -118,7 +118,7 @@ php -l app/Services/Comments/CommentDirectLinkResolver.php
 
 Expected: both syntax checks report no errors and Pint exits `0` without touching unrelated files.
 
-- [ ] **Step 3: Commit only the resolver**
+- [x] **Step 3: Commit only the resolver**
 
 Create an atomic main-branch commit containing only `app/Services/Comments/CommentDirectLinkResolver.php` with message:
 
@@ -139,7 +139,7 @@ Before publishing, compare `main` and `origin/main`; never push unrelated interl
 - Consumes: `CommentDirectLinkResolver::resolve(int, ?User, ?string): string` and `CommentSchema::writable(): bool`.
 - Produces: the unchanged Laravel `RedirectResponse` with the existing URL contract and private no-store/noindex headers.
 
-- [ ] **Step 1: Replace application orchestration with resolver delegation**
+- [x] **Step 1: Replace application orchestration with resolver delegation**
 
 Keep only these imports:
 
@@ -178,7 +178,7 @@ final class CommentRedirectController extends Controller
 }
 ```
 
-- [ ] **Step 2: Run exact-file syntax and formatting checks**
+- [x] **Step 2: Run exact-file syntax and formatting checks**
 
 Run:
 
@@ -190,7 +190,7 @@ php -l app/Http/Controllers/CommentRedirectController.php
 
 Expected: both syntax checks report no errors and Pint exits `0` without touching unrelated files.
 
-- [ ] **Step 3: Commit only the controller**
+- [x] **Step 3: Commit only the controller**
 
 Create an atomic main-branch commit containing only `app/Http/Controllers/CommentRedirectController.php` with message:
 
@@ -211,7 +211,7 @@ refactor: thin comment redirect controller
 - Consumes: the completed resolver/controller boundary and the existing source route registry.
 - Produces: project documentation identifying the canonical service owner and a focused verification record.
 
-- [ ] **Step 1: Inspect exact routes without using an optimized route cache**
+- [x] **Step 1: Inspect exact routes without using an optimized route cache**
 
 Run:
 
@@ -222,7 +222,7 @@ APP_ENV=testing php artisan route:list --path=admin/comments --except-vendor
 
 Expected: `comments.show`, `localized.comments.show`, and `admin.comments` retain their methods, URIs, names, and middleware.
 
-- [ ] **Step 2: Run scoped static analysis**
+- [x] **Step 2: Run scoped static analysis**
 
 Run:
 
@@ -237,13 +237,13 @@ php -d memory_limit=1G ./vendor/bin/phpstan analyse \
 
 Expected: PHPStan exits `0` with no diagnostics.
 
-- [ ] **Step 3: Run a read-only container/schema probe**
+- [x] **Step 3: Run a read-only container/schema probe**
 
 Run a booted Laravel probe that resolves `CommentDirectLinkResolver`, reports `CommentSchema::available()`/`writable()`, and reports the number of existing comments without inserting, updating, or deleting any row.
 
 Expected: the resolver is container-resolvable; schema capability and fixture count are reported without exception or database mutation. If eligible fixture rows exist, additionally resolve one public root/reply and one moderator-only destination using existing users only; otherwise record that URL behavior was verified by static equivalence inspection.
 
-- [ ] **Step 4: Perform the security and compatibility inspection**
+- [x] **Step 4: Perform the security and compatibility inspection**
 
 Confirm all of the following directly from the changed and related files:
 
@@ -255,7 +255,7 @@ Confirm all of the following directly from the changed and related files:
 - both redirects retain `private, no-store` and `noindex, nofollow`;
 - no migrations, routes, translations, API/OpenAPI fields, caches, or stored records changed.
 
-- [ ] **Step 5: Update canonical documentation**
+- [x] **Step 5: Update canonical documentation**
 
 In `docs/architecture.md`, extend the existing direct-comment paragraph to name `CommentDirectLinkResolver` as the owner of lookup, authorization, moderator fallback, root/page resolution, and trusted URL assembly, while the controller owns request/response headers.
 
@@ -263,7 +263,7 @@ In `docs/plans/laravel-video-portal-modernization.md`, append a checked Phase 5.
 
 In the English `CHANGELOG.md`, add one concise unreleased entry stating that direct-comment resolution moved behind the canonical comments service without route, URL, policy, or data changes.
 
-- [ ] **Step 6: Review the final diff and commit only scoped documentation**
+- [x] **Step 6: Review the final diff and commit only scoped documentation**
 
 Run:
 
