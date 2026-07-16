@@ -84,6 +84,7 @@
                             wire:ignore
                             data-player-shell
                             data-player-state="loading"
+                            data-player-copy="{{ \Illuminate\Support\Js::encode($playerCopy) }}"
                             class="mt-3 overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50"
                         >
                             <div
@@ -132,6 +133,12 @@
                                 <source src="{{ $showView->selectedMediaUrl }}" @if ($showView->selectedMediaType) type="{{ $showView->selectedMediaType }}" @endif>
                                 {{ __('catalog.player.unsupported_browser') }}
                             </video>
+                            <p
+                                data-player-caption-status
+                                hidden
+                                aria-live="polite"
+                                class="bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800"
+                            ></p>
                         </div>
                     @else
                         <div wire:key="catalog-player-empty" class="mt-3 overflow-hidden rounded-lg border border-amber-200 bg-amber-50">

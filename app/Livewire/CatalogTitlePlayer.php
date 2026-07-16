@@ -26,6 +26,7 @@ use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\LicensedMediaDownloadFilename;
 use App\Services\TechnicalIssues\TechnicalIssueContext;
 use App\Support\HumanFileSizeFormatter;
+use App\View\ViewData\CatalogPlayerCopy;
 use App\View\ViewModels\CatalogShowViewModel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -330,7 +331,7 @@ class CatalogTitlePlayer extends Component
         );
     }
 
-    public function render(): View
+    public function render(CatalogPlayerCopy $playerCopy): View
     {
         $user = $this->user();
         $title = $this->title();
@@ -494,6 +495,7 @@ class CatalogTitlePlayer extends Component
             'isAuthenticated' => $user !== null,
             'canInteract' => $user?->hasVerifiedEmail() === true,
             'technicalIssueUrl' => $technicalIssueUrl,
+            'playerCopy' => $playerCopy->current(),
             'accountPlaybackPreferences' => [
                 'autoplay' => $this->accountPreferences()->autoplay,
                 'rememberVolume' => $this->accountPreferences()->rememberVolume,
