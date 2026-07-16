@@ -611,8 +611,8 @@ The appended URL list is derived from stable enum identity:
 - `CatalogRecommendationSource::Rating`, `CatalogRecommendationReason::TopRated`, the 180-candidate cap and configured portal/Kinopoisk/IMDb minimum votes remain unchanged.
 - No new public method, route, cache key, table, index, config value or dependency is introduced.
 
-- [ ] Remove the now-unused `CatalogTitleRating` import and import `Illuminate\Database\Query\JoinClause`.
-- [ ] Replace only `topRated()` with the following source-first query while retaining the existing provider fallback:
+- [x] Remove the now-unused `CatalogTitleRating` import and import `Illuminate\Database\Query\JoinClause`.
+- [x] Replace only `topRated()` with the following source-first query while retaining the existing provider fallback:
 
 ```php
 private function topRated(CatalogRecommendationContext $context, array $excludedIds): array
@@ -663,7 +663,7 @@ private function topRated(CatalogRecommendationContext $context, array $excluded
 }
 ```
 
-- [ ] Confirm the provider join uses the existing unique `(catalog_title_id,provider)` constraint and `catalog_ratings_provider_score_votes_title_idx`; do not add a migration.
+- [x] Confirm the provider join uses the existing unique `(catalog_title_id,provider)` constraint and `catalog_ratings_provider_score_votes_title_idx`; do not add a migration.
 
 ### Task F5: no-test verification, documentation and delivery
 
@@ -674,8 +674,8 @@ private function topRated(CatalogRecommendationContext $context, array $excluded
 - Modify: `CHANGELOG.md`
 - Modify: this plan and the existing Task 18 design spec only if implementation evidence changes the contract.
 
-- [ ] Run PHP syntax, task-file Pint, configured Larastan, `project:docs-refresh --check`, route inspection and `git diff --check`; do not run PHPUnit/Pest and do not run Vite because no frontend asset changes are authorized.
-- [ ] Re-run portal, Kinopoisk, IMDb, Kinopoisk genre-filter and top-ten-exclusion candidates. Preserve these pre-change public result hashes: portal empty `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`; Kinopoisk `8562907a32509b5489c79db64a918d7147277ead528f26a548a1f3e6c8876405`; IMDb `9f2a1f65723f25f6db01efde888b414ead1d2267c9b795707f86f9ee9c356a5b`; genre filter `e1875f185a11df935b405d282853e9719d547fafd0f73dfad63154df0f0bcf17`; top-ten exclusion `684d1aafa808c10d245d251c9de2ca2b15dc1280d7d138acaa2488cc69d52225` with zero overlap.
-- [ ] Inspect `EXPLAIN QUERY PLAN`: provider ranking must select `catalog_ratings_provider_score_votes_title_idx`; portal must materialize the grouped owner-safe rating source before joining visible titles.
-- [ ] Record actual post-change diagnostics without presenting them as p95/SLA. Browser-smoke `/discover/top_rated?rating_source=kinopoisk` only if the existing local QA server can be started without production cache warming or queue dispatch.
-- [ ] Inspect staged scope, commit only this follow-up on `main`, push fast-forward and verify the remote SHA while preserving unrelated player/auth/route worktree changes.
+- [x] Run PHP syntax, task-file Pint, configured Larastan, `project:docs-refresh --check`, route inspection and `git diff --check`; task-file Larastan returned zero errors, while the full repository gate truthfully stopped on one unrelated ignored in-progress `TechnicalIssueDetailData` paginator-generic error and was not suppressed or absorbed into Task 18. Do not run PHPUnit/Pest and do not run Vite because no frontend asset changes are authorized.
+- [x] Re-run portal, Kinopoisk, IMDb, Kinopoisk genre-filter and top-ten-exclusion candidates. Preserve these pre-change public result hashes: portal empty `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`; Kinopoisk `8562907a32509b5489c79db64a918d7147277ead528f26a548a1f3e6c8876405`; IMDb `9f2a1f65723f25f6db01efde888b414ead1d2267c9b795707f86f9ee9c356a5b`; genre filter `e1875f185a11df935b405d282853e9719d547fafd0f73dfad63154df0f0bcf17`; top-ten exclusion `684d1aafa808c10d245d251c9de2ca2b15dc1280d7d138acaa2488cc69d52225` with zero overlap.
+- [x] Inspect `EXPLAIN QUERY PLAN`: provider ranking selects `catalog_ratings_provider_score_votes_title_idx`; portal reads the grouped owner-safe rating source as a co-routine before joining visible titles.
+- [x] Record actual post-change diagnostics without presenting them as p95/SLA. Managed Chromium browser-smoked `/discover/top_rated?rating_source=kinopoisk` at desktop/mobile widths with production page cache warming and queue dispatch disabled.
+- [x] Inspect staged scope, commit only this follow-up on `main`, push fast-forward and verify the remote SHA while preserving unrelated player/auth/route worktree changes.

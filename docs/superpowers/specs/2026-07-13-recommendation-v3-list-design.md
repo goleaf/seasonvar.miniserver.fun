@@ -227,6 +227,8 @@ Three approaches were evaluated. A stored top-rated summary would make reads che
 
 Ordering remains `rating DESC`, `votes DESC`, `catalog_titles.id DESC`; portal, Kinopoisk and IMDb never mix. The result still emits the existing `rating` source and `top_rated` reason with rank-derived internal scores. No cache identity, route, translation, presenter, SEO, API, migration, queue or background summary changes. If a source has fewer than its configured minimum-vote candidates, the truthful bounded result may be empty exactly as before.
 
+Post-implementation read-only repeats preserved all five pre-change result hashes. Portal completed in 57 ms, Kinopoisk in 1.349 s, IMDb in 954 ms, the genre-filtered Kinopoisk set in 1.143 s and the top-ten-exclusion set in 1.120 s with zero overlap. Provider plans selected `catalog_ratings_provider_score_votes_title_idx` as covering; portal used a grouped co-routine followed by primary-key visibility lookup. These single local observations vary with OS cache and database load and are not an SLA.
+
 ### Routes, integrations, UI and localization
 
 Canonical routes are `/discover/{type}` and `/{locale}/discover/{type}`. `/discover` redirects to public popular; legacy `/recommendations` and localized equivalent 301 to the same canonical type. User IDs and private state are absent. Browser history preserves allowlisted filters, rating source, period and page. The existing API route/name and response shape remain `GET /api/v1/titles/{titleSlug}/recommendations`; it is intentionally public/contextual and never consumes authenticated signals.
