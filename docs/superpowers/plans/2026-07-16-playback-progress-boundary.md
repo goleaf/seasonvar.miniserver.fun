@@ -30,7 +30,7 @@
 - Consumes: `CatalogTitleQuery::visibleTo(?User $user)`, `CatalogUserStateService::recordProgress(User $user, CatalogTitle $catalogTitle, int $episodeId, string $playbackSessionToken, int $eventSequence, int $positionSeconds, int $reportedDurationSeconds, bool $ended): ?EpisodeViewProgress`.
 - Produces: immutable `PlaybackProgressInput`; `PlaybackProgressRecorder::record(User $user, string $titleSlug, int $episodeId, PlaybackProgressInput $input): ?EpisodeViewProgress`.
 
-- [ ] **Step 1: Create the immutable input DTO**
+- [x] **Step 1: Create the immutable input DTO**
 
 Create `app/DTOs/PlaybackProgressInput.php` with exactly this transport-only shape:
 
@@ -53,7 +53,7 @@ final readonly class PlaybackProgressInput
 }
 ```
 
-- [ ] **Step 2: Create the application recorder**
+- [x] **Step 2: Create the application recorder**
 
 Create `app/Services/Catalog/Api/V1/PlaybackProgressRecorder.php`:
 
@@ -101,7 +101,7 @@ final readonly class PlaybackProgressRecorder
 }
 ```
 
-- [ ] **Step 3: Run exact-file syntax checks**
+- [x] **Step 3: Run exact-file syntax checks**
 
 Run:
 
@@ -121,7 +121,7 @@ Expected: both commands report `No syntax errors detected`.
 - Consumes: `PlaybackProgressInput::__construct(...)`; `PlaybackProgressRecorder::record(...)`; existing `ApiErrorResponse` and `EpisodeProgressResource`.
 - Produces: the unchanged `PUT /api/v1/titles/{titleSlug}/episodes/{episode}/progress` success and rejection responses.
 
-- [ ] **Step 1: Replace query/domain dependencies with the recorder**
+- [x] **Step 1: Replace query/domain dependencies with the recorder**
 
 Change imports and invocation so the complete controller is:
 
@@ -186,7 +186,7 @@ final class PlaybackProgressController extends Controller
 }
 ```
 
-- [ ] **Step 2: Verify the controller is transport-only**
+- [x] **Step 2: Verify the controller is transport-only**
 
 Run:
 
@@ -196,7 +196,7 @@ rg -n "CatalogTitleQuery|CatalogUserStateService|->visibleTo\(|->where\(|->recor
 
 Expected: no matches and exit status `1`; the controller contains only authentication extraction, DTO assembly, recorder delegation and response selection.
 
-- [ ] **Step 3: Run the controller syntax check**
+- [x] **Step 3: Run the controller syntax check**
 
 Run:
 
@@ -220,7 +220,7 @@ Expected: `No syntax errors detected`.
 - Consumes: Laravel container autowiring and named route `api.v1.titles.episodes.progress.update`.
 - Produces: verification evidence only; no source mutation other than Pint formatting of the three exact owned PHP files.
 
-- [ ] **Step 1: Format only the owned PHP files**
+- [x] **Step 1: Format only the owned PHP files**
 
 Run:
 
@@ -230,7 +230,7 @@ Run:
 
 Expected: Pint completes successfully and does not touch unrelated paths.
 
-- [ ] **Step 2: Run scoped static analysis**
+- [x] **Step 2: Run scoped static analysis**
 
 Run:
 
@@ -240,27 +240,27 @@ Run:
 
 Expected: `[OK] No errors`.
 
-- [ ] **Step 3: Inspect the uncached route contract**
+- [x] **Step 3: Inspect the uncached route contract**
 
 Run:
 
 ```bash
-php artisan route:list --path=api/v1/titles --name=api.v1.titles.episodes.progress.update --columns=method,uri,name,action,middleware
+APP_ROUTES_CACHE=/tmp/codex-seasonvar-no-route-cache.php php artisan route:list --path=api/v1/titles --name=api.v1.titles.episodes.progress.update --json
 ```
 
 Expected: one `PUT` route to `PlaybackProgressController` with `auth:sanctum`, `abilities:mobile:write`, `verified.api` and `throttle:api-playback-progress`.
 
-- [ ] **Step 4: Resolve dependencies through the booted container**
+- [x] **Step 4: Resolve dependencies through the booted container**
 
 Run:
 
 ```bash
-php artisan tinker --execute="app(App\\Services\\Catalog\\Api\\V1\\PlaybackProgressRecorder::class); app(App\\Http\\Controllers\\Api\\V1\\PlaybackProgressController::class); dump('playback-progress-boundary-ok');"
+APP_ROUTES_CACHE=/tmp/codex-seasonvar-no-route-cache.php php artisan tinker --execute="app(App\\Services\\Catalog\\Api\\V1\\PlaybackProgressRecorder::class); app(App\\Http\\Controllers\\Api\\V1\\PlaybackProgressController::class); dump('playback-progress-boundary-ok');"
 ```
 
 Expected: `playback-progress-boundary-ok` and no container exception.
 
-- [ ] **Step 5: Perform the manual equivalence review**
+- [x] **Step 5: Perform the manual equivalence review**
 
 Confirm from the diff that:
 
@@ -283,19 +283,19 @@ Confirm from the diff that:
 - Consumes: actual verification outputs from Task 3.
 - Produces: architecture ownership, living-plan evidence, changelog record and a completed execution checklist.
 
-- [ ] **Step 1: Update architecture ownership**
+- [x] **Step 1: Update architecture ownership**
 
 Extend the existing mobile API controller paragraph to state that `PlaybackProgressRecorder` owns viewer-visible title resolution and typed HTTP-event adaptation while `CatalogUserStateService` remains the canonical writer. Do not copy the full playback security contract into this file.
 
-- [ ] **Step 2: Add Phase 5.3 evidence**
+- [x] **Step 2: Add Phase 5.3 evidence**
 
 Add one verified increment paragraph after the comment direct-link increment. Record the three-file boundary, preserved route/API/domain behavior, exact verification commands/results, and that no automated tests or fixture writes were performed under Task 12.
 
-- [ ] **Step 3: Add the English changelog entry**
+- [x] **Step 3: Add the English changelog entry**
 
 Add one English bullet under `## 2026-07-16` describing the thin controller, immutable input, focused recorder, preserved trusted-session/domain writer behavior, and absence of route/schema/API/data changes.
 
-- [ ] **Step 4: Re-run documentation and diff checks**
+- [x] **Step 4: Re-run documentation and diff checks**
 
 Run:
 
