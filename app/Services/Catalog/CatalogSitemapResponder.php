@@ -111,6 +111,12 @@ class CatalogSitemapResponder
                 $this->writeSitemapUrl(route('requests.index'), now(), 'daily', '0.6');
             }
 
+            $ratingSource = (string) config('recommendations.top_rated.default_source', 'kinopoisk');
+
+            if (! in_array($ratingSource, ['portal', 'kinopoisk', 'imdb'], true)) {
+                $ratingSource = 'kinopoisk';
+            }
+
             foreach (CatalogRecommendationType::publicCases() as $type) {
                 if (! $type->isIndexable()) {
                     continue;
@@ -121,6 +127,7 @@ class CatalogSitemapResponder
                         type: $type,
                         user: null,
                         locale: (string) config('app.locale', 'ru'),
+                        ratingSource: $ratingSource,
                         perPage: 1,
                     ));
                 } catch (Throwable $exception) {

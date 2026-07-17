@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'version' => 'task18-v6',
+    'version' => 'task18-v6-r2',
     'section_limit' => 12,
     'page_size' => 24,
     'candidate_limit' => 180,

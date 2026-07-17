@@ -193,8 +193,8 @@ final class CatalogPublicDiscoveryQuery
     {
         $query = $this->eligibleQuery($context, watchable: true, excludedIds: $excludedIds)
             ->select('catalog_titles.id')
-            ->whereNotNull('indexed_at')
-            ->orderByDesc('indexed_at')
+            ->whereNotNull('catalog_titles.created_at')
+            ->orderByDesc('catalog_titles.created_at')
             ->orderByDesc('catalog_titles.id');
 
         return $this->rows($query, CatalogRecommendationSource::CatalogPublication, CatalogRecommendationReason::RecentlyAdded);

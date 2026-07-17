@@ -57,7 +57,7 @@ final class CatalogRecommendationCache
                 'current_title' => $context->currentTitleId ?? 0,
                 'exclusions' => hash('sha256', json_encode($exclusions, JSON_THROW_ON_ERROR)),
                 'filters' => hash('sha256', json_encode($filters, JSON_THROW_ON_ERROR)),
-                'ranking_version' => (string) config('recommendations.version', 'task18-v6'),
+                'ranking_version' => (string) config('recommendations.version', 'task18-v6-r2'),
             ],
             $this->ttl->for(CacheDomain::Recommendations),
             $rebuild,
