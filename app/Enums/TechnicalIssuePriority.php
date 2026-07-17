@@ -15,4 +15,14 @@ enum TechnicalIssuePriority: string
     {
         return __("issues.priorities.{$this->value}");
     }
+
+    public function sortRank(): int
+    {
+        return match ($this) {
+            self::Urgent => 0,
+            self::High => 1,
+            self::Normal => 2,
+            self::Low => 3,
+        };
+    }
 }

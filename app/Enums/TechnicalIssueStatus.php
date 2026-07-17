@@ -60,6 +60,18 @@ enum TechnicalIssueStatus: string
         return in_array($this, [self::Submitted, self::TriagePending, self::ClarificationNeeded], true);
     }
 
+    public function requiresDedicatedAction(): bool
+    {
+        return in_array($this, [
+            self::Assigned,
+            self::Resolved,
+            self::ResolutionVerified,
+            self::Reopened,
+            self::Merged,
+            self::Withdrawn,
+        ], true);
+    }
+
     public function canTransitionTo(self $next): bool
     {
         if ($this === $next) {

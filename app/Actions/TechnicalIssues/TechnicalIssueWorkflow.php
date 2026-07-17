@@ -153,7 +153,12 @@ final readonly class TechnicalIssueWorkflow
         ?TechnicalIssueResolutionType $resolution = null,
         bool $markVerified = false,
         bool $incrementReopen = false,
+        bool $dedicatedTransition = false,
     ): TechnicalIssue {
+        if (! $dedicatedTransition && $next->requiresDedicatedAction()) {
+            throw new TechnicalIssueActionException('issues.errors.invalid_transition');
+        }
+
         $requesterWithdrawal = $next === TechnicalIssueStatus::Withdrawn && $issue->requester_id === $actor->id;
         $ability = match ($next) {
             TechnicalIssueStatus::ResolutionVerified => 'verify',
@@ -283,6 +288,8 @@ final readonly class TechnicalIssueWorkflow
 
             $locked->severity = $severity;
             $locked->priority = $priority;
+            $locked->severity_sort_rank = $severity->sortRank();
+            $locked->priority_sort_rank = $priority->sortRank();
             $locked->version++;
             $locked->save();
             TechnicalIssueStatusHistory::query()->create([
@@ -396,6 +403,7 @@ final readonly class TechnicalIssueWorkflow
             $public->value,
             $privateNote,
             resolution: $resolution,
+            dedicatedTransition: true,
         );
     }
 
@@ -421,6 +429,7 @@ final readonly class TechnicalIssueWorkflow
                 TechnicalIssueStatus::ResolutionVerified,
                 'requester_verified',
                 markVerified: true,
+                dedicatedTransition: true,
             );
         }
 
@@ -453,6 +462,7 @@ final readonly class TechnicalIssueWorkflow
             'problem_recurred',
             $public->value,
             incrementReopen: true,
+            dedicatedTransition: true,
         );
     }
 

@@ -341,14 +341,7 @@ final class TechnicalIssueDetailPage extends Component
         $staff = $detail->viewerMode === 'staff';
         $statusOptions = $staff
             ? collect(TechnicalIssueStatus::cases())
-                ->reject(fn (TechnicalIssueStatus $status): bool => in_array($status, [
-                    TechnicalIssueStatus::Assigned,
-                    TechnicalIssueStatus::Resolved,
-                    TechnicalIssueStatus::ResolutionVerified,
-                    TechnicalIssueStatus::Reopened,
-                    TechnicalIssueStatus::Merged,
-                    TechnicalIssueStatus::Withdrawn,
-                ], true))
+                ->reject(fn (TechnicalIssueStatus $status): bool => $status->requiresDedicatedAction())
                 ->filter(fn (TechnicalIssueStatus $status): bool => $status !== $issue->status && $issue->status->canTransitionTo($status))
                 ->map(fn (TechnicalIssueStatus $status): array => ['value' => $status->value, 'label' => $status->label()])
                 ->values()

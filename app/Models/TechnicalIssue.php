@@ -23,6 +23,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property TechnicalIssueStatus $status
  * @property TechnicalIssueSeverity $severity
  * @property TechnicalIssuePriority $priority
+ * @property int $severity_sort_rank
+ * @property int $priority_sort_rank
  * @property TechnicalIssueTargetType $target_type
  * @property TechnicalIssueResolutionType|null $resolution_type
  * @property bool $diagnostics_consent
@@ -49,6 +51,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'status',
     'severity',
     'priority',
+    'severity_sort_rank',
+    'priority_sort_rank',
     'target_type',
     'target_label_snapshot',
     'catalog_title_id',
@@ -88,6 +92,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 ])]
 final class TechnicalIssue extends Model
 {
+    /** @var array<string, mixed> */
+    protected $attributes = [
+        'severity_sort_rank' => 2,
+        'priority_sort_rank' => 2,
+    ];
+
     public function getRouteKeyName(): string
     {
         return 'public_id';
@@ -226,6 +236,8 @@ final class TechnicalIssue extends Model
             'status' => TechnicalIssueStatus::class,
             'severity' => TechnicalIssueSeverity::class,
             'priority' => TechnicalIssuePriority::class,
+            'severity_sort_rank' => 'integer',
+            'priority_sort_rank' => 'integer',
             'target_type' => TechnicalIssueTargetType::class,
             'resolution_type' => TechnicalIssueResolutionType::class,
             'diagnostics_consent' => 'boolean',

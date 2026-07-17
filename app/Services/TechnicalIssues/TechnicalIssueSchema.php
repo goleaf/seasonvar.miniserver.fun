@@ -18,7 +18,7 @@ final class TechnicalIssueSchema
         }
 
         $tables = [
-            'technical_issues' => ['id', 'public_id', 'public_number', 'requester_id', 'assigned_to_id', 'type', 'status', 'severity', 'priority', 'target_type', 'target_label_snapshot', 'exact_identity_hash', 'active_identity_key', 'submission_key', 'version'],
+            'technical_issues' => ['id', 'public_id', 'public_number', 'requester_id', 'assigned_to_id', 'type', 'status', 'severity', 'priority', 'severity_sort_rank', 'priority_sort_rank', 'target_type', 'target_label_snapshot', 'exact_identity_hash', 'active_identity_key', 'submission_key', 'version'],
             'technical_issue_diagnostics' => ['technical_issue_id', 'browser_family', 'operating_system', 'device_category', 'network_online'],
             'technical_issue_messages' => ['id', 'public_id', 'technical_issue_id', 'author_id', 'visibility', 'body', 'submission_key'],
             'technical_issue_attachments' => ['id', 'public_id', 'technical_issue_id', 'uploader_id', 'disk', 'path', 'mime_type', 'content_hash'],

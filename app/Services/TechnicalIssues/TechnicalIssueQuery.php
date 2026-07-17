@@ -319,14 +319,14 @@ final readonly class TechnicalIssueQuery
     private function sort(Builder $query, TechnicalIssueSort $sort, bool $support): void
     {
         if ($support && $sort === TechnicalIssueSort::Priority) {
-            $query->orderByRaw("CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END")
+            $query->orderBy('priority_sort_rank')
                 ->oldest('created_at')->oldest('id');
 
             return;
         }
 
         if ($support && $sort === TechnicalIssueSort::Severity) {
-            $query->orderByRaw("CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END")
+            $query->orderBy('severity_sort_rank')
                 ->oldest('created_at')->oldest('id');
 
             return;

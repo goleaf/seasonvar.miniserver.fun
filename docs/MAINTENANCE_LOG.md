@@ -389,6 +389,7 @@
 - `2026_07_16_240200_add_score_distribution_index_to_catalog_recommendation_build_rows.php`
 - `2026_07_16_250000_create_catalog_collection_source_sync.php`
 - `2026_07_16_250100_mark_missing_catalog_collection_sources.php`
+- `2026_07_17_141321_add_sort_ranks_to_technical_issues_table.php`
 <!-- project-docs:end -->
 
 ## 2026-07-16 — recommendation/discovery task 18

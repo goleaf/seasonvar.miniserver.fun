@@ -190,4 +190,4 @@ Discovery type route ограничен implemented enum cases; similar/related 
 | Verify / reopen | нет | requester/confirmer в eligible state; reopen rate-limited | да, через тот же transition boundary |
 | Status / classify / assign / merge / redact / source health | нет | нет | route gate плюс policy/action reauthorization |
 
-`TechnicalIssuePolicy` и every action не доверяют UUID/number, requester/target/source/track/status/severity/priority/assignee/resolution/attachment/merge IDs из Livewire. Знание `ISS-…` или UUID не даёт доступ. Полный contract: [`technical-issues.md`](technical-issues.md).
+`TechnicalIssuePolicy` и every action не доверяют UUID/number, requester/target/source/track/status/severity/priority/assignee/resolution/attachment/merge IDs из Livewire. Generic status boundary отдельно отвергает assignment, resolution, verification, reopen, merge и withdrawal states: их может завершить только dedicated action с повторной policy-проверкой и своим инвариантом. Знание `ISS-…` или UUID не даёт доступ. Полный contract: [`technical-issues.md`](technical-issues.md).

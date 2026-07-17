@@ -104,7 +104,9 @@ final readonly class DemoTechnicalIssueStage implements DemoDataStage
                     'type' => $type->value,
                     'status' => $status->value,
                     'severity' => $severity->value,
+                    'severity_sort_rank' => $severity->sortRank(),
                     'priority' => $priority->value,
+                    'priority_sort_rank' => $priority->sortRank(),
                     'target_type' => $targetType->value,
                     'target_label_snapshot' => $this->targetLabel($targetType, $context),
                     'catalog_title_id' => $catalogTarget ? $context->titleId : null,
@@ -530,7 +532,12 @@ final readonly class DemoTechnicalIssueStage implements DemoDataStage
         });
     }
 
-    /** @template T of \BackedEnum @param non-empty-list<T> $cases @return T */
+    /**
+     * @template T of \BackedEnum
+     *
+     * @param  non-empty-list<T>  $cases
+     * @return T
+     */
     private function enumAt(array $cases, int $ordinal): \BackedEnum
     {
         return $cases[$ordinal % count($cases)];
