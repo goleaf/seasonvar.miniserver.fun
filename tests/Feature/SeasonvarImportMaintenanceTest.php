@@ -34,6 +34,7 @@ use App\Services\Seasonvar\SeasonvarSitemapMirror;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -844,6 +845,46 @@ class SeasonvarImportMaintenanceTest extends TestCase
         ], $observedCounters);
         $this->assertSame(2, $run->selected);
         $this->assertSame(2, $run->parsed);
+    }
+
+    public function test_it_updates_multiple_import_run_counters_quietly(): void
+    {
+        $run = SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'status' => 'running',
+            'force' => false,
+            'forever' => false,
+            'selected' => 4,
+            'parsed' => 5,
+            'summary' => ['existing' => true],
+            'started_at' => now(),
+        ]);
+        $previousUpdatedAt = $run->updated_at;
+        $this->assertNotNull($previousUpdatedAt);
+        $this->travel(1)->second();
+
+        Event::fake();
+
+        $method = new \ReflectionMethod(SeasonvarImportPipeline::class, 'addRunCounters');
+        $method->invoke(
+            app(SeasonvarImportPipeline::class),
+            $run,
+            ['selected' => 2, 'parsed' => 3],
+            ['batch' => ['number' => 2]],
+        );
+
+        $freshRun = SeasonvarImportRun::query()->findOrFail($run->id);
+
+        $this->assertSame(6, $freshRun->selected);
+        $this->assertSame(8, $freshRun->parsed);
+        $this->assertSame([
+            'existing' => true,
+            'batch' => ['number' => 2],
+        ], $freshRun->summary);
+        $this->assertNotNull($freshRun->updated_at);
+        $this->assertTrue($freshRun->updated_at->greaterThan($previousUpdatedAt));
+        Event::assertNotDispatched('eloquent.updating: '.SeasonvarImportRun::class);
+        Event::assertNotDispatched('eloquent.updated: '.SeasonvarImportRun::class);
     }
 
     public function test_it_backfills_all_legacy_source_page_statuses_across_chunks(): void

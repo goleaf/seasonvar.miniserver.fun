@@ -1486,19 +1486,22 @@ class SeasonvarImportPipeline
     private function addRunCounters(SeasonvarImportRun $run, array $counters, array $summary = []): void
     {
         $run->refresh();
-        $run->fill([
-            'cycles' => ((int) $run->cycles) + ($counters['cycles'] ?? 0),
-            'discovered' => ((int) $run->discovered) + ($counters['discovered'] ?? 0),
-            'stored' => ((int) $run->stored) + ($counters['stored'] ?? 0),
-            'selected' => ((int) $run->selected) + ($counters['selected'] ?? 0),
-            'parsed' => ((int) $run->parsed) + ($counters['parsed'] ?? 0),
-            'failed' => ((int) $run->failed) + ($counters['failed'] ?? 0),
-            'media_attached' => ((int) $run->media_attached) + ($counters['media_attached'] ?? 0),
-            'media_updated' => ((int) $run->media_updated) + ($counters['media_updated'] ?? 0),
-            'media_skipped' => ((int) $run->media_skipped) + ($counters['media_skipped'] ?? 0),
-            'media_failed' => ((int) $run->media_failed) + ($counters['media_failed'] ?? 0),
+        $increments = array_filter([
+            'cycles' => (int) ($counters['cycles'] ?? 0),
+            'discovered' => (int) ($counters['discovered'] ?? 0),
+            'stored' => (int) ($counters['stored'] ?? 0),
+            'selected' => (int) ($counters['selected'] ?? 0),
+            'parsed' => (int) ($counters['parsed'] ?? 0),
+            'failed' => (int) ($counters['failed'] ?? 0),
+            'media_attached' => (int) ($counters['media_attached'] ?? 0),
+            'media_updated' => (int) ($counters['media_updated'] ?? 0),
+            'media_skipped' => (int) ($counters['media_skipped'] ?? 0),
+            'media_failed' => (int) ($counters['media_failed'] ?? 0),
+        ], fn (int $amount): bool => $amount !== 0);
+
+        $run->incrementEachQuietly($increments, [
             'summary' => array_merge($run->summary ?? [], $summary),
-        ])->save();
+        ]);
     }
 
     /**
