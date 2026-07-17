@@ -27,6 +27,7 @@ final class CatalogCacheInvalidator
         CacheDomain::SearchSuggestions,
         CacheDomain::Tags,
         CacheDomain::Collections,
+        CacheDomain::ReleaseCalendar,
     ];
 
     public function __construct(

@@ -223,7 +223,7 @@
                         <h2 class="text-xl font-black text-slate-900">{{ __('settings.notifications.title') }}</h2>
                         <p class="mt-1 text-sm leading-6 text-slate-600">{{ __('settings.notifications.description') }}</p>
 
-                        @if (! $commentNotificationsAvailable && ! $reviewNotificationsAvailable && ! $contentRequestNotificationsAvailable)
+                        @if (! $commentNotificationsAvailable && ! $reviewNotificationsAvailable && ! $contentRequestNotificationsAvailable && ! $releaseCalendarNotificationsAvailable)
                             <div class="mt-5 rounded-control bg-slate-50 p-5 text-sm leading-6 text-slate-600">{{ __('settings.notifications.unavailable') }}</div>
                         @else
                             <div class="mt-5 overflow-hidden rounded-control border border-slate-200">
@@ -255,6 +255,21 @@
                                             'requesterRequestNotifications' => 'request_requester_updates',
                                             'votedRequestNotifications' => 'request_voted_updates',
                                             'followedRequestNotifications' => 'request_followed_updates',
+                                        ] as $property => $label)
+                                            <label class="grid min-h-14 grid-cols-[minmax(0,1fr)_6rem] items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700"><span class="break-words">{{ __('settings.notifications.'.$label) }}</span><span class="flex justify-center"><input type="checkbox" wire:model="{{ $property }}" class="h-5 w-5 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600" /></span></label>
+                                        @endforeach
+                                    @endif
+                                    @if ($releaseCalendarNotificationsAvailable)
+                                        @foreach ([
+                                            'releasePremiereNotifications' => 'release_premieres',
+                                            'releaseSeasonNotifications' => 'release_seasons',
+                                            'releaseEpisodeNotifications' => 'release_episodes',
+                                            'releaseTranslationNotifications' => 'release_translations',
+                                            'releaseSubtitleNotifications' => 'release_subtitles',
+                                            'releaseDateChangeNotifications' => 'release_date_changes',
+                                            'releasePostponedNotifications' => 'release_postponed',
+                                            'releaseCancelledNotifications' => 'release_cancelled',
+                                            'releasePortalPublicationNotifications' => 'release_portal_publications',
                                         ] as $property => $label)
                                             <label class="grid min-h-14 grid-cols-[minmax(0,1fr)_6rem] items-center gap-3 px-3 py-2 text-sm font-bold text-slate-700"><span class="break-words">{{ __('settings.notifications.'.$label) }}</span><span class="flex justify-center"><input type="checkbox" wire:model="{{ $property }}" class="h-5 w-5 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600" /></span></label>
                                         @endforeach

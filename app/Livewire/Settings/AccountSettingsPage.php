@@ -6,6 +6,7 @@ namespace App\Livewire\Settings;
 
 use App\Actions\Comments\UpdateCommentNotificationPreferences;
 use App\Actions\ContentRequests\UpdateContentRequestNotificationPreferences;
+use App\Actions\ReleaseCalendar\UpdateReleaseCalendarNotificationPreferences;
 use App\Actions\Reviews\UpdateReviewNotificationPreferences;
 use App\DTOs\AccountSettingsData;
 use App\DTOs\PlaybackSettingsData;
@@ -14,12 +15,14 @@ use App\Enums\CatalogCollectionVisibility;
 use App\Models\CatalogTitleReviewNotificationPreference;
 use App\Models\CommentNotificationPreference;
 use App\Models\ContentRequestNotificationPreference;
+use App\Models\ReleaseCalendarNotificationPreference;
 use App\Models\User;
 use App\Services\Auth\AccountDateTimeFormatter;
 use App\Services\Auth\AccountSettingsService;
 use App\Services\Catalog\PlaybackPreferenceOptions;
 use App\Services\Comments\CommentSchema;
 use App\Services\ContentRequests\ContentRequestSchema;
+use App\Services\ReleaseCalendar\ReleaseCalendarSchema;
 use App\Services\Reviews\ReviewSchema;
 use App\ValueObjects\AccountTimezone;
 use Illuminate\Contracts\View\View;
@@ -84,6 +87,24 @@ final class AccountSettingsPage extends Component
 
     public bool $followedRequestNotifications = true;
 
+    public bool $releasePremiereNotifications = true;
+
+    public bool $releaseSeasonNotifications = true;
+
+    public bool $releaseEpisodeNotifications = true;
+
+    public bool $releaseTranslationNotifications = true;
+
+    public bool $releaseSubtitleNotifications = true;
+
+    public bool $releaseDateChangeNotifications = true;
+
+    public bool $releasePostponedNotifications = true;
+
+    public bool $releaseCancelledNotifications = true;
+
+    public bool $releasePortalPublicationNotifications = true;
+
     public ?string $statusMessage = null;
 
     public ?string $actionError = null;
@@ -93,6 +114,7 @@ final class AccountSettingsPage extends Component
         CommentSchema $commentSchema,
         ReviewSchema $reviewSchema,
         ContentRequestSchema $contentRequestSchema,
+        ReleaseCalendarSchema $releaseCalendarSchema,
         ?string $section = null,
         ?string $locale = null,
     ): void {
@@ -116,7 +138,7 @@ final class AccountSettingsPage extends Component
         }
 
         if ($resolvedSection === AccountSettingsSection::Notifications) {
-            $this->loadNotificationPreferences($commentSchema, $reviewSchema, $contentRequestSchema);
+            $this->loadNotificationPreferences($commentSchema, $reviewSchema, $contentRequestSchema, $releaseCalendarSchema);
         }
     }
 
@@ -249,9 +271,11 @@ final class AccountSettingsPage extends Component
         UpdateCommentNotificationPreferences $comments,
         UpdateReviewNotificationPreferences $reviews,
         UpdateContentRequestNotificationPreferences $contentRequests,
+        UpdateReleaseCalendarNotificationPreferences $releaseCalendar,
         CommentSchema $commentSchema,
         ReviewSchema $reviewSchema,
         ContentRequestSchema $contentRequestSchema,
+        ReleaseCalendarSchema $releaseCalendarSchema,
     ): void {
         $user = $this->user();
         Gate::forUser($user)->authorize('update-account-settings');
@@ -266,10 +290,19 @@ final class AccountSettingsPage extends Component
             'requesterRequestNotifications' => ['required', 'boolean'],
             'votedRequestNotifications' => ['required', 'boolean'],
             'followedRequestNotifications' => ['required', 'boolean'],
+            'releasePremiereNotifications' => ['required', 'boolean'],
+            'releaseSeasonNotifications' => ['required', 'boolean'],
+            'releaseEpisodeNotifications' => ['required', 'boolean'],
+            'releaseTranslationNotifications' => ['required', 'boolean'],
+            'releaseSubtitleNotifications' => ['required', 'boolean'],
+            'releaseDateChangeNotifications' => ['required', 'boolean'],
+            'releasePostponedNotifications' => ['required', 'boolean'],
+            'releaseCancelledNotifications' => ['required', 'boolean'],
+            'releasePortalPublicationNotifications' => ['required', 'boolean'],
         ]);
 
         try {
-            DB::transaction(function () use ($comments, $reviews, $contentRequests, $commentSchema, $reviewSchema, $contentRequestSchema, $user, $validated): void {
+            DB::transaction(function () use ($comments, $reviews, $contentRequests, $releaseCalendar, $commentSchema, $reviewSchema, $contentRequestSchema, $releaseCalendarSchema, $user, $validated): void {
                 if ($commentSchema->notificationsAvailable()) {
                     $comments->handle($user, [
                         'reply_notifications' => $validated['replyNotifications'],
@@ -294,6 +327,20 @@ final class AccountSettingsPage extends Component
                         'followed_updates' => $validated['followedRequestNotifications'],
                     ]);
                 }
+
+                if ($releaseCalendarSchema->ready()) {
+                    $releaseCalendar->handle($user, [
+                        'premiere_notifications' => $validated['releasePremiereNotifications'],
+                        'season_notifications' => $validated['releaseSeasonNotifications'],
+                        'episode_notifications' => $validated['releaseEpisodeNotifications'],
+                        'translation_notifications' => $validated['releaseTranslationNotifications'],
+                        'subtitle_notifications' => $validated['releaseSubtitleNotifications'],
+                        'date_change_notifications' => $validated['releaseDateChangeNotifications'],
+                        'postponed_notifications' => $validated['releasePostponedNotifications'],
+                        'cancelled_notifications' => $validated['releaseCancelledNotifications'],
+                        'portal_publication_notifications' => $validated['releasePortalPublicationNotifications'],
+                    ]);
+                }
             }, attempts: 3);
         } catch (Throwable $exception) {
             report($exception);
@@ -313,9 +360,11 @@ final class AccountSettingsPage extends Component
         UpdateCommentNotificationPreferences $comments,
         UpdateReviewNotificationPreferences $reviews,
         UpdateContentRequestNotificationPreferences $contentRequests,
+        UpdateReleaseCalendarNotificationPreferences $releaseCalendar,
         CommentSchema $commentSchema,
         ReviewSchema $reviewSchema,
         ContentRequestSchema $contentRequestSchema,
+        ReleaseCalendarSchema $releaseCalendarSchema,
     ): void {
         $this->replyNotifications = true;
         $this->reactionNotifications = true;
@@ -327,7 +376,16 @@ final class AccountSettingsPage extends Component
         $this->requesterRequestNotifications = true;
         $this->votedRequestNotifications = true;
         $this->followedRequestNotifications = true;
-        $this->saveNotifications($comments, $reviews, $contentRequests, $commentSchema, $reviewSchema, $contentRequestSchema);
+        $this->releasePremiereNotifications = true;
+        $this->releaseSeasonNotifications = true;
+        $this->releaseEpisodeNotifications = true;
+        $this->releaseTranslationNotifications = true;
+        $this->releaseSubtitleNotifications = true;
+        $this->releaseDateChangeNotifications = true;
+        $this->releasePostponedNotifications = true;
+        $this->releaseCancelledNotifications = true;
+        $this->releasePortalPublicationNotifications = true;
+        $this->saveNotifications($comments, $reviews, $contentRequests, $releaseCalendar, $commentSchema, $reviewSchema, $contentRequestSchema, $releaseCalendarSchema);
 
         if ($this->actionError === null) {
             $this->statusMessage = __('settings.status.notifications_reset');
@@ -339,12 +397,13 @@ final class AccountSettingsPage extends Component
         CommentSchema $commentSchema,
         ReviewSchema $reviewSchema,
         ContentRequestSchema $contentRequestSchema,
+        ReleaseCalendarSchema $releaseCalendarSchema,
     ): void {
         $this->resetValidation();
         $this->loadSettings($settings);
 
         if ($this->section === AccountSettingsSection::Notifications->value) {
-            $this->loadNotificationPreferences($commentSchema, $reviewSchema, $contentRequestSchema);
+            $this->loadNotificationPreferences($commentSchema, $reviewSchema, $contentRequestSchema, $releaseCalendarSchema);
         }
 
         $this->statusMessage = __('settings.status.changes_discarded');
@@ -358,6 +417,7 @@ final class AccountSettingsPage extends Component
         CommentSchema $commentSchema,
         ReviewSchema $reviewSchema,
         ContentRequestSchema $contentRequestSchema,
+        ReleaseCalendarSchema $releaseCalendarSchema,
     ): View {
         $active = AccountSettingsSection::from($this->section);
         $navigation = collect(AccountSettingsSection::cases())->map(fn (AccountSettingsSection $section): array => [
@@ -395,6 +455,7 @@ final class AccountSettingsPage extends Component
             'commentNotificationsAvailable' => $commentSchema->notificationsAvailable(),
             'reviewNotificationsAvailable' => $reviewSchema->notificationsAvailable(),
             'contentRequestNotificationsAvailable' => $contentRequestSchema->ready(),
+            'releaseCalendarNotificationsAvailable' => $releaseCalendarSchema->ready(),
             'databaseSessionsAvailable' => config('session.driver') === 'database',
             'anonymousStorageKey' => (string) config('account-settings.anonymous_storage_key'),
             'profileSummary' => [
@@ -457,7 +518,7 @@ final class AccountSettingsPage extends Component
         }
     }
 
-    private function loadNotificationPreferences(CommentSchema $comments, ReviewSchema $reviews, ContentRequestSchema $contentRequests): void
+    private function loadNotificationPreferences(CommentSchema $comments, ReviewSchema $reviews, ContentRequestSchema $contentRequests, ReleaseCalendarSchema $releaseCalendar): void
     {
         try {
             if ($comments->notificationsAvailable()) {
@@ -483,6 +544,20 @@ final class AccountSettingsPage extends Component
                 $this->requesterRequestNotifications = $preference->requester_updates;
                 $this->votedRequestNotifications = $preference->voted_updates;
                 $this->followedRequestNotifications = $preference->followed_updates;
+            }
+
+            if ($releaseCalendar->ready()) {
+                $preference = ReleaseCalendarNotificationPreference::query()->find($this->user()->id)
+                    ?? new ReleaseCalendarNotificationPreference(['user_id' => $this->user()->id]);
+                $this->releasePremiereNotifications = $preference->premiere_notifications;
+                $this->releaseSeasonNotifications = $preference->season_notifications;
+                $this->releaseEpisodeNotifications = $preference->episode_notifications;
+                $this->releaseTranslationNotifications = $preference->translation_notifications;
+                $this->releaseSubtitleNotifications = $preference->subtitle_notifications;
+                $this->releaseDateChangeNotifications = $preference->date_change_notifications;
+                $this->releasePostponedNotifications = $preference->postponed_notifications;
+                $this->releaseCancelledNotifications = $preference->cancelled_notifications;
+                $this->releasePortalPublicationNotifications = $preference->portal_publication_notifications;
             }
         } catch (Throwable $exception) {
             report($exception);

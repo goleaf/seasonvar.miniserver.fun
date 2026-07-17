@@ -5,6 +5,7 @@ namespace App\Services\Catalog;
 use App\DTOs\CatalogRecommendationContext;
 use App\Enums\CatalogRecommendationType;
 use App\Enums\CatalogTopListCategory;
+use App\Enums\ReleaseCalendarView;
 use App\Models\CatalogCollection;
 use App\Models\CatalogTitle;
 use App\Models\ContentRequest;
@@ -16,6 +17,10 @@ use App\Models\UserProfile;
 use App\Services\Collections\CatalogCollectionQuery;
 use App\Services\Collections\CatalogCollectionSchema;
 use App\Services\ContentRequests\ContentRequestSchema;
+use App\Services\ReleaseCalendar\ReleaseCalendarPeriod;
+use App\Services\ReleaseCalendar\ReleaseCalendarQuery;
+use App\Services\ReleaseCalendar\ReleaseCalendarSchema;
+use App\Services\ReleaseCalendar\ReleaseCalendarTimezone;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -39,6 +44,9 @@ class CatalogSitemapResponder
         private readonly CatalogCollectionQuery $collections,
         private readonly CatalogCollectionSchema $collectionSchema,
         private readonly ContentRequestSchema $contentRequestSchema,
+        private readonly ReleaseCalendarSchema $releaseCalendarSchema,
+        private readonly ReleaseCalendarQuery $releaseCalendarQuery,
+        private readonly ReleaseCalendarTimezone $releaseCalendarTimezone,
         private readonly CatalogRecommendationService $recommendations,
         private readonly CatalogTopListQuery $topLists,
     ) {}
@@ -109,6 +117,18 @@ class CatalogSitemapResponder
 
             if ($this->contentRequestSchema->ready()) {
                 $this->writeSitemapUrl(route('requests.index'), now(), 'daily', '0.6');
+            }
+
+            $calendarTimezone = $this->releaseCalendarTimezone->public();
+            $calendarPeriod = ReleaseCalendarPeriod::resolve(ReleaseCalendarView::Upcoming, null, $calendarTimezone);
+
+            if ($this->releaseCalendarSchema->ready()
+                && $this->releaseCalendarQuery->hasUpcoming($calendarPeriod, $calendarTimezone)) {
+                $this->writeSitemapUrl(route('calendar.upcoming'), now(), 'daily', '0.7');
+
+                foreach (config('release-calendar.supported_locales', ['ru']) as $locale) {
+                    $this->writeSitemapUrl(route('localized.calendar.upcoming', ['locale' => $locale]), now(), 'daily', '0.7');
+                }
             }
 
             $ratingSource = (string) config('recommendations.top_rated.default_source', 'kinopoisk');

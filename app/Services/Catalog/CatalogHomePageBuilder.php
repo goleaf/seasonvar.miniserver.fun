@@ -197,7 +197,7 @@ class CatalogHomePageBuilder
             'discoveryUrl' => $this->discoveryUrl($recommendationResult->displayType),
             'topRatedUrl' => $this->discoveryUrl(CatalogRecommendationType::TopRated),
             'recentlyAddedUrl' => $this->discoveryUrl(CatalogRecommendationType::RecentlyAdded),
-            'upcomingUrl' => $this->discoveryUrl(CatalogRecommendationType::Upcoming),
+            'upcomingUrl' => $this->localeRoute('calendar.upcoming'),
             'randomUrl' => $this->discoveryUrl(CatalogRecommendationType::Random),
             'continueWatchingUrl' => $user !== null
                 ? route('library.section', ['section' => 'continue-watching'])

@@ -25,6 +25,8 @@ LOG_DAILY_DAYS=14
 
 Production также обязан включить HTTPS-only session cookie, корректные domain/path/SameSite, секретный `APP_KEY`, warning-or-higher structured log policy и реальные credentials через secret manager/process environment. Эти значения не должны попадать в Git.
 
+`RELEASE_CALENDAR_TIMEZONE=UTC` задаёт валидный IANA timezone публичного календаря для гостя. Вошедший пользователь использует собственный timezone из настроек аккаунта; произвольный request parameter не переопределяет эту границу. Изменение значения требует `config:cache` и graceful reload web workers, но не миграции или нового scheduler.
+
 ## Аутентификация
 
 `AUTH_REGISTRATION_ENABLED=true` регистрирует web/API create-account routes; `false` убирает только регистрацию и links, сохраняя login/recovery/verification существующих accounts. `AUTH_AUDIT_DAYS=30` задаёт bounded retention отдельного `authentication` daily channel. Оба значения несекретные, но изменение требует совместной пересборки `config:cache` и `route:cache`, затем graceful reload web workers.

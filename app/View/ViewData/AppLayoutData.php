@@ -64,6 +64,8 @@ final class AppLayoutData
             && $this->gate->forUser($authenticatedUser)->allows('manage-content-requests');
         $canManageTechnicalIssues = $authenticatedUser !== null
             && $this->gate->forUser($authenticatedUser)->allows('manage-technical-issues');
+        $canManageReleaseCalendar = $authenticatedUser !== null
+            && $this->gate->forUser($authenticatedUser)->allows('manage-release-calendar');
         $canCreateTechnicalIssue = (bool) config('technical-issues.enabled', true)
             && $authenticatedUser !== null;
         $layoutHeaderNavigation = [
@@ -79,6 +81,15 @@ final class AppLayoutData
                 __('recommendations.navigation.discover'),
                 $this->request->routeIs('discover.*', 'localized.discover.*'),
                 ['type' => 'popular'],
+            );
+        }
+
+        if ($this->router->has('calendar.upcoming')) {
+            $layoutHeaderNavigation[] = $this->headerLink(
+                'calendar.upcoming',
+                'fa-regular fa-calendar-days',
+                __('calendar.title'),
+                $this->request->routeIs('calendar.*', 'localized.calendar.*'),
             );
         }
 
@@ -230,6 +241,14 @@ final class AppLayoutData
                     $this->request->routeIs('admin.issues'),
                 );
             }
+            if ($canManageReleaseCalendar && $this->router->has('admin.calendar')) {
+                $layoutHeaderNavigation[] = $this->headerLink(
+                    'admin.calendar',
+                    'fa-regular fa-calendar-check',
+                    __('calendar.admin.title'),
+                    $this->request->routeIs('admin.calendar'),
+                );
+            }
         } else {
             $layoutHeaderActions[] = $this->headerLinkUrl(
                 $this->authenticationRoutes->guestUrl('login'),
@@ -260,6 +279,15 @@ final class AppLayoutData
                 __('recommendations.navigation.discover'),
                 $this->request->routeIs('discover.*', 'localized.discover.*'),
                 ['type' => 'popular'],
+            );
+        }
+
+        if ($this->router->has('calendar.upcoming')) {
+            $layoutFooterNavigation[] = $this->footerLink(
+                'calendar.upcoming',
+                'fa-regular fa-calendar-days text-slate-400',
+                __('calendar.title'),
+                $this->request->routeIs('calendar.*', 'localized.calendar.*'),
             );
         }
 

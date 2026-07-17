@@ -2,15 +2,19 @@
 
 namespace App\Providers;
 
+use App\Models\Episode;
 use App\Models\LicensedMedia;
 use App\Models\TechnicalIssue;
 use App\Models\User;
+use App\Observers\EpisodeReleaseScheduleObserver;
+use App\Observers\LicensedMediaReleaseScheduleObserver;
 use App\Policies\AccountSettingsPolicy;
 use App\Policies\TechnicalIssuePolicy;
 use App\Services\Auth\AccountSettingsSchema;
 use App\Services\Collections\CatalogCollectionSchema;
 use App\Services\Comments\CommentSchema;
 use App\Services\ContentRequests\ContentRequestSchema;
+use App\Services\ReleaseCalendar\ReleaseCalendarSchema;
 use App\Services\Reviews\ReviewSchema;
 use App\Services\Tags\TagSchema;
 use App\Services\TechnicalIssues\TechnicalIssueSchema;
@@ -49,6 +53,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scopedIf(CommentSchema::class);
         $this->app->scopedIf(ContentRequestSchema::class);
         $this->app->scopedIf(ReviewSchema::class);
+        $this->app->scopedIf(ReleaseCalendarSchema::class);
         $this->app->scopedIf(TagSchema::class);
         $this->app->scopedIf(TechnicalIssueSchema::class);
     }
@@ -123,6 +128,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-reviews', $catalogAdministrator);
         Gate::define('manage-content-requests', $catalogAdministrator);
         Gate::define('manage-technical-issues', $catalogAdministrator);
+        Gate::define('manage-release-calendar', $catalogAdministrator);
         Gate::policy(TechnicalIssue::class, TechnicalIssuePolicy::class);
         Gate::define('view-account-settings', [AccountSettingsPolicy::class, 'view']);
         Gate::define('update-account-settings', [AccountSettingsPolicy::class, 'update']);
@@ -132,6 +138,9 @@ class AppServiceProvider extends ServiceProvider
                 ->middleware('web');
         });
         Livewire::addPersistentMiddleware(AuthenticateSession::class);
+
+        Episode::observe(EpisodeReleaseScheduleObserver::class);
+        LicensedMedia::observe(LicensedMediaReleaseScheduleObserver::class);
 
         Model::shouldBeStrict(! $this->app->isProduction());
         DB::prohibitDestructiveCommands($this->app->isProduction());

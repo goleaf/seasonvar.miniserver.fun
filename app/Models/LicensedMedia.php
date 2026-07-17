@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
@@ -122,6 +123,12 @@ class LicensedMedia extends Model
     public function episode(): BelongsTo
     {
         return $this->belongsTo(Episode::class);
+    }
+
+    /** @return HasMany<ReleaseScheduleEntry, $this> */
+    public function releaseScheduleEntries(): HasMany
+    {
+        return $this->hasMany(ReleaseScheduleEntry::class);
     }
 
     /**

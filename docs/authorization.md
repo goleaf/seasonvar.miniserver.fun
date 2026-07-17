@@ -191,3 +191,15 @@ Discovery type route ограничен implemented enum cases; similar/related 
 | Status / classify / assign / merge / redact / source health | нет | нет | route gate плюс policy/action reauthorization |
 
 `TechnicalIssuePolicy` и every action не доверяют UUID/number, requester/target/source/track/status/severity/priority/assignee/resolution/attachment/merge IDs из Livewire. Generic status boundary отдельно отвергает assignment, resolution, verification, reopen, merge и withdrawal states: их может завершить только dedicated action с повторной policy-проверкой и своим инвариантом. Знание `ISS-…` или UUID не даёт доступ. Полный contract: [`technical-issues.md`](technical-issues.md).
+
+## Матрица календаря релизов
+
+| Действие | Guest | Authenticated | `manage-release-calendar` |
+| --- | --- | --- | --- |
+| Публичный календарь | да, только public visible | да, через ту же visibility boundary | да |
+| Личный календарь | нет | только текущий пользователь | собственный calendar без impersonation |
+| Подписка и настройки | нет | только текущий пользователь, idempotent/rate-limited | те же owner rules |
+| Создать/исправить/отложить/отменить | нет | нет | route gate + hydration gate + service validation |
+| Private correction history | нет | нет | да |
+
+Client не выбирает user, logical key, revision, actor или notification recipient; target ancestry, enum, IANA timezone и status transition повторно проверяются. Полный contract: [`release-calendar.md`](release-calendar.md).

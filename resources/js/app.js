@@ -8,6 +8,7 @@ import { initializeAccountPreferenceMigration, initializeAccountSettings } from 
 import { initializeHeaderSearchInterfaces } from './header-search.js';
 import './reviews.js';
 import './issues.js';
+import { initializeReleaseCountdowns } from './release-calendar.js';
 
 let catalogPlayerModule = null;
 let catalogPlayerModulePromise = null;
@@ -488,6 +489,7 @@ const loadCatalogInterfaces = () => {
     initializeAccountSettings();
     initializeAccountPreferenceMigration();
     initializeHeaderSearchInterfaces();
+    initializeReleaseCountdowns();
 };
 
 if (document.readyState === 'loading') {

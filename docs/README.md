@@ -1,6 +1,6 @@
 # Карта документации проекта
 
-Обновлено: 16.07.2026
+Обновлено: 17.07.2026
 
 Этот файл — единый индекс проектной документации. У каждого контракта есть один основной файл-владелец; остальные документы должны ссылаться на него, а не копировать длинные правила. `README.md` остаётся точкой входа и содержит простую историю обновлений для посетителей, `AGENTS.md` — только обязательные инструкции для агентов, а подробный технический журнал ведётся в `CHANGELOG.md`.
 
@@ -22,6 +22,7 @@
 | Заявки на недостающие материалы | [`architecture.md`](architecture.md), [`DATA_RELATIONS.md`](DATA_RELATIONS.md), [`plans/laravel-video-portal-modernization.md`](plans/laravel-video-portal-modernization.md) | Каноническая identity, типы, цели, поиск существующего контента, дубликаты, голоса/подписки, статусы, модерация, импорт, уведомления, privacy/cache/SEO и полный Task 19 audit/acceptance. |
 | Технические обращения и поддержка | [`technical-issues.md`](technical-issues.md) | Единственный private Task 20 aggregate: identity, типы/цели, player context, diagnostics, screenshots, duplicates, workflow, support queue, source health, notifications, privacy, retention, cache/SEO и acceptance. |
 | Настройки аккаунта | [`architecture.md`](architecture.md), [`DATA_RELATIONS.md`](DATA_RELATIONS.md), [`plans/laravel-video-portal-modernization.md`](plans/laravel-video-portal-modernization.md) | Канонические owner-only разделы, storage и precedence preferences, locale/timezone, player integration, privacy, notifications, collection defaults, sessions, export/delete, anonymous merge, cache/security и полный живой Task 16 audit/acceptance. |
+| Календарь релизов | [`release-calendar.md`](release-calendar.md) | Identity событий, original/translation/subtitle/portal dates, precision/status/history, день/неделя/месяц, timezone, личные подписки, уведомления, импорт, cache/SEO/admin и ручная проверка Task 17. |
 | Аутентификация, авторизация и playback access | [`authorization.md`](authorization.md), [`security.md`](security.md), [`plans/laravel-video-portal-modernization.md`](plans/laravel-video-portal-modernization.md) | Web/Sanctum guards, регистрация, verification/recovery, sessions, rate limits, safe redirects, policies/gates, entitlement decisions и полный живой Task 15 audit/acceptance. |
 | Импорт Seasonvar | [`importer.md`](importer.md) | Response → DTO → identity → transaction/upsert → relation sync → counters/cache/index/UI, идемпотентность и владение полями. |
 | Размер и доставка внешнего видео | [`importer.md`](importer.md), [`architecture.md`](architecture.md), [`security.md`](security.md), [`frontend.md`](frontend.md) | HEAD/one-byte Range metadata, `licensed_media` fields, authenticated direct-file streaming, single Range, SSRF/authorization/cache/UI и запрет хранения полных video body. Execution checklist — [`superpowers/plans/2026-07-16-video-file-size-and-authenticated-downloads.md`](superpowers/plans/2026-07-16-video-file-size-and-authenticated-downloads.md). |

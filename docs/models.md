@@ -87,3 +87,10 @@
 - Stable recommendation type/source/reason/relation/watch-status/feedback/popularity-period enums store untranslated codes. Unsupported creator/audio/subtitle-language/premium/region/franchise entities remain absent rather than represented by nullable fake models.
 
 - `TechnicalIssue` — private Task 20 aggregate с explicit title/season/episode/media/translation belongs-to и child diagnostics/messages/attachments/status/assignment/confirmation/follower/occurrence/merge/redaction/source-action relations. Stable enum casts хранят untranslated codes; `public_id` — route key, но policy остаётся обязательной. Отдельных fake audio/subtitle/premium/region/calendar models не создано; точный контракт принадлежит [`technical-issues.md`](technical-issues.md).
+
+## Calendar models
+
+- `ReleaseScheduleEntry` — stable UUID/logical-key event с explicit nullable title/season/episode/media relations, precision/status/source enum casts, partial/civil/UTC date fields, revision и lock/public/notification flags.
+- `ReleaseScheduleCorrection` — owned append-style history; actor nullable, private note не входит в public presenter.
+- `ReleaseCalendarSubscription` и `ReleaseCalendarNotificationPreference` — owner-only unique state; follower identity не публикуется.
+- Relations добавлены к `CatalogTitle`, `Season`, `Episode`, `LicensedMedia` и `User`; title merge выполняется до hard-delete дубля. Полная семантика: [`release-calendar.md`](release-calendar.md).

@@ -184,6 +184,7 @@ class CatalogTitleDetail extends Component
             'contentRequestUrl' => $user instanceof User
                 ? route('requests.create', ['type' => 'broken_content_restoration', 'catalog_title_id' => $this->catalogTitleId])
                 : route('login'),
+            'releaseCalendarUrl' => route('calendar.upcoming', ['title' => $this->catalogTitleId]),
         ])->extends('layouts.app', [
             'title' => $seo['title'] ?? $title->display_title,
             'seo' => $seo,

@@ -242,3 +242,11 @@ Blade и Livewire Blade являются только presentation layer: зап
 - Form/type help, duplicate candidates, upload preview, timeline, messages, verification/reopen и filters имеют visible labels, focus ring, `min-h-11`, live-region feedback и disabled loading state. Цвет не является единственным status signal.
 - Layout должен выдерживать 390 px, landscape/tablet/desktop, browser zoom, длинные переводы/prose/codes и несколько screenshots без horizontal overflow; actions не hover-only, destructive controls отделены.
 - Internal notes/raw diagnostics/чужие attachments не скрываются CSS — они отсутствуют в normal-user DTO. Полный UI/privacy contract: [`technical-issues.md`](technical-issues.md).
+
+## Календарь релизов
+
+- Calendar переиспользует light panels, pills, controls, pagination, focus rings и минимум 44 px для actions; status всегда имеет текст, а не только цвет.
+- Day/week/upcoming отображаются agenda; month использует semantic table на широком экране и ту же agenda на телефоне, без горизонтально обязательного grid.
+- View/date/filter state остаётся в URL, loading/empty/error и mutation result объявляются live region, длинные title/locale labels переносятся без overlap.
+- Countdown получает trusted server timestamp, обновляется Vite-модулем не чаще минуты, имеет статичную screen-reader summary и очищается после Livewire navigation.
+- Personal/admin controls не скрывают authorization CSS; private state и correction note вообще отсутствуют из public presenter. Полный UI contract: [`release-calendar.md`](release-calendar.md).

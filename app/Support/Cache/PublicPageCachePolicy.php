@@ -8,6 +8,7 @@ use App\Enums\CatalogRecommendationType;
 use App\Livewire\Forms\CatalogSeriesFilters;
 use App\Models\CatalogTitle;
 use App\Models\ContentRequest;
+use App\Services\ReleaseCalendar\ReleaseCalendarTimezone;
 use BackedEnum;
 use Illuminate\Contracts\Translation\Translator;
 use Illuminate\Database\Eloquent\Model;
@@ -76,6 +77,7 @@ final class PublicPageCachePolicy
     public function __construct(
         private readonly CacheVersionRegistry $versions,
         private readonly Translator $translator,
+        private readonly ReleaseCalendarTimezone $releaseCalendarTimezone,
     ) {}
 
     public function context(Request $request, string $profile): ?PublicPageCacheContext
@@ -114,6 +116,10 @@ final class PublicPageCachePolicy
             $dimensions['translations'] = $this->homepageTranslationFingerprint();
         }
 
+        if ($profile === 'calendar') {
+            $dimensions['timezone'] = $this->releaseCalendarTimezone->public();
+        }
+
         return match ($profile) {
             'homepage' => $this->homepageParametersAreValid($parameters) && $query === []
                 ? new PublicPageCacheContext(CacheDomain::Homepage, $dimensions)
@@ -126,6 +132,7 @@ final class PublicPageCachePolicy
             'collections' => new PublicPageCacheContext(CacheDomain::Collections, $dimensions),
             'requests' => $this->contentRequestContext($request, $dimensions),
             'discovery' => $this->discoveryContext($request, $dimensions),
+            'calendar' => new PublicPageCacheContext(CacheDomain::ReleaseCalendar, $dimensions),
             default => null,
         };
     }
@@ -198,7 +205,7 @@ final class PublicPageCachePolicy
 
         $query = $request->query();
 
-        if (array_intersect(['q', 'title'], array_keys($query)) !== []) {
+        if (array_key_exists('q', $query) || ($profile !== 'calendar' && array_key_exists('title', $query))) {
             return null;
         }
 
@@ -212,6 +219,7 @@ final class PublicPageCachePolicy
             'collections' => self::COLLECTION_QUERY_KEYS,
             'requests' => self::CONTENT_REQUEST_QUERY_KEYS,
             'discovery' => ['page'],
+            'calendar' => ['calendarPage', 'type', 'status', 'sort', 'title'],
             default => null,
         };
 

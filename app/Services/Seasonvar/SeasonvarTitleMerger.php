@@ -17,6 +17,7 @@ use App\Services\Catalog\Search\CatalogSearchIndexer;
 use App\Services\Collections\CatalogCollectionItemService;
 use App\Services\Comments\CommentTargetMergeService;
 use App\Services\ContentRequests\ContentRequestTargetMergeService;
+use App\Services\ReleaseCalendar\ReleaseCalendarTargetMergeService;
 use App\Services\Reviews\ReviewMergeService;
 use App\Services\Tags\TagCacheInvalidator;
 use App\Services\Tags\TagTitleMergeService;
@@ -56,6 +57,7 @@ class SeasonvarTitleMerger
         private readonly TagCacheInvalidator $tagCache,
         private readonly CatalogTitleRelationService $titleRelations,
         private readonly CatalogRecommendationCacheInvalidator $recommendationCache,
+        private readonly ReleaseCalendarTargetMergeService $releaseCalendar,
     ) {}
 
     /**
@@ -405,6 +407,7 @@ class SeasonvarTitleMerger
             $this->comments->moveTitle($duplicate, $canonical);
             $this->contentRequests->moveTitle($duplicate->id, $canonical->id);
             $this->technicalIssues->moveTitle($duplicate->id, $canonical->id);
+            $this->releaseCalendar->moveTitle($duplicate, $canonical);
 
             foreach ($this->relationIds($duplicate) as $relation => $ids) {
                 $relationIds[$relation] = array_values(array_unique([
@@ -450,6 +453,7 @@ class SeasonvarTitleMerger
                 $this->comments->moveSeason($season, $targetSeason);
                 $this->contentRequests->moveSeason($season, $targetSeason);
                 $this->technicalIssues->moveSeason($season->id, $targetSeason->id);
+                $this->releaseCalendar->moveSeason($season, $targetSeason);
 
                 $season->forceDelete();
                 $mergedSeasons++;
@@ -543,6 +547,7 @@ class SeasonvarTitleMerger
             $this->comments->moveEpisode($episode, $targetEpisode);
             $this->contentRequests->moveEpisode($episode, $targetEpisode);
             $this->technicalIssues->moveEpisode($episode->id, $targetEpisode->id);
+            $this->releaseCalendar->moveEpisode($episode, $targetEpisode, $canonical, $targetSeason);
             $this->userData->moveEpisode($episode, $targetEpisode, $canonical);
 
             $episode->forceDelete();
@@ -619,6 +624,7 @@ class SeasonvarTitleMerger
             }
 
             $existing->save();
+            $this->releaseCalendar->moveMedia($media, $existing);
             $media->forceDelete();
 
             return $existing;

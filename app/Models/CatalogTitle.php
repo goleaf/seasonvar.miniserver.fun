@@ -232,6 +232,18 @@ class CatalogTitle extends Model
         return $this->hasMany(ContentRequest::class);
     }
 
+    /** @return HasMany<ReleaseScheduleEntry, $this> */
+    public function releaseScheduleEntries(): HasMany
+    {
+        return $this->hasMany(ReleaseScheduleEntry::class);
+    }
+
+    /** @return HasMany<ReleaseCalendarSubscription, $this> */
+    public function releaseCalendarSubscriptions(): HasMany
+    {
+        return $this->hasMany(ReleaseCalendarSubscription::class);
+    }
+
     /** @return HasMany<Comment, $this> */
     public function titleComments(): HasMany
     {

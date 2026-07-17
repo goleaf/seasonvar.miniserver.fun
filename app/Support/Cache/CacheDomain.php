@@ -16,6 +16,7 @@ enum CacheDomain: string
     case Tags = 'tags';
     case Collections = 'collections';
     case ContentRequests = 'content-requests';
+    case ReleaseCalendar = 'release-calendar';
     case Sitemap = 'sitemap';
     case Api = 'api';
     case Operational = 'operational';

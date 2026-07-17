@@ -157,6 +157,8 @@
             @endif
         </section>
 
+        <livewire:release-calendar.release-calendar-notifications-panel />
+
         @if ($notificationsAvailable)
             <section aria-labelledby="discussion-preferences-title" class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-5">
                 <h2 id="discussion-preferences-title" class="flex items-center gap-2 text-lg font-black text-slate-800"><x-ui.icon name="fa-solid fa-sliders text-emerald-700" />{{ __('comments.notifications.preferences') }}</h2>

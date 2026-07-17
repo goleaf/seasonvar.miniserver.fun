@@ -45,6 +45,11 @@
                         <span>{{ __('requests.actions.request_for_title') }}</span>
                     </a>
 
+                    <a href="{{ $releaseCalendarUrl }}" wire:navigate class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-100">
+                        <x-ui.icon name="fa-regular fa-calendar-days" />
+                        <span>{{ __('calendar.open_title_schedule') }}</span>
+                    </a>
+
                     <div class="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
                         <div class="grid min-h-16 content-center gap-1 rounded-lg bg-slate-50 px-3 py-3">
                             <div class="flex items-center justify-between gap-2">

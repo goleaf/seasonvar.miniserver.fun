@@ -39,6 +39,8 @@ use App\Livewire\Profile\PublicProfilePage;
 use App\Livewire\Profile\ReviewHistoryPage;
 use App\Livewire\Profile\SecurityPage;
 use App\Livewire\Profile\UserProfileAdministrationManager;
+use App\Livewire\ReleaseCalendar\ReleaseCalendarAdministrationManager;
+use App\Livewire\ReleaseCalendar\ReleaseCalendarPage;
 use App\Livewire\Reviews\ReviewModerationManager;
 use App\Livewire\SeasonvarImportManager;
 use App\Livewire\Settings\AccountSettingsPage;
@@ -86,6 +88,42 @@ $discoveryRouteTypes = collect(CatalogRecommendationType::values())
 Route::get('/', CatalogHomePage::class)
     ->middleware('public.page:homepage')
     ->name('home');
+Route::get('/calendar', ReleaseCalendarPage::class)
+    ->defaults('view', 'upcoming')
+    ->middleware('public.page:calendar')
+    ->name('calendar.upcoming');
+Route::get('/calendar/day/{period}', ReleaseCalendarPage::class)
+    ->defaults('view', 'day')
+    ->where('period', '\\d{4}-\\d{2}-\\d{2}')
+    ->middleware('public.page:calendar')
+    ->name('calendar.day');
+Route::get('/calendar/week/{period}', ReleaseCalendarPage::class)
+    ->defaults('view', 'week')
+    ->where('period', '\\d{4}-W\\d{2}')
+    ->middleware('public.page:calendar')
+    ->name('calendar.week');
+Route::get('/calendar/month/{period}', ReleaseCalendarPage::class)
+    ->defaults('view', 'month')
+    ->where('period', '\\d{4}-\\d{2}')
+    ->middleware('public.page:calendar')
+    ->name('calendar.month');
+Route::get('/calendar/recent', ReleaseCalendarPage::class)
+    ->defaults('view', 'recent')
+    ->middleware('public.page:calendar')
+    ->name('calendar.recent');
+Route::prefix('{locale}')
+    ->whereIn('locale', config('release-calendar.supported_locales', ['ru']))
+    ->middleware('collection.locale')
+    ->name('localized.calendar.')
+    ->group(function (): void {
+        Route::get('/calendar', ReleaseCalendarPage::class)->defaults('view', 'upcoming')->middleware('public.page:calendar')->name('upcoming');
+        Route::get('/calendar/day/{period}', ReleaseCalendarPage::class)->defaults('view', 'day')->where('period', '\\d{4}-\\d{2}-\\d{2}')->middleware('public.page:calendar')->name('day');
+        Route::get('/calendar/week/{period}', ReleaseCalendarPage::class)->defaults('view', 'week')->where('period', '\\d{4}-W\\d{2}')->middleware('public.page:calendar')->name('week');
+        Route::get('/calendar/month/{period}', ReleaseCalendarPage::class)->defaults('view', 'month')->where('period', '\\d{4}-\\d{2}')->middleware('public.page:calendar')->name('month');
+        Route::get('/calendar/recent', ReleaseCalendarPage::class)->defaults('view', 'recent')->middleware('public.page:calendar')->name('recent');
+    });
+Route::redirect('/schedule', '/calendar', 301)->name('legacy.calendar.schedule');
+Route::redirect('/release-calendar', '/calendar', 301)->name('legacy.calendar.index');
 Route::get('/search', GlobalSearchPage::class)->name('search.index');
 Route::get('/{locale}', CatalogHomePage::class)
     ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
@@ -124,6 +162,14 @@ Route::get('/email/verify/{id}/{hash}', fn (int $id, string $hash, AccountEmailV
     ->name('verification.verify');
 
 Route::middleware(['auth', 'auth.session', 'account.private'])->group(function (): void {
+    Route::get('/calendar/mine', ReleaseCalendarPage::class)
+        ->defaults('view', 'personal')
+        ->name('calendar.mine');
+    Route::get('/{locale}/calendar/mine', ReleaseCalendarPage::class)
+        ->defaults('view', 'personal')
+        ->whereIn('locale', config('release-calendar.supported_locales', ['ru']))
+        ->middleware('collection.locale')
+        ->name('localized.calendar.mine');
     Route::get('/titles/{catalogTitle:slug}/media/{licensedMedia}/download', fn (Request $request, CatalogTitle $catalogTitle, LicensedMedia $licensedMedia, LicensedMediaDownloadResponder $downloads) => $downloads->response($request, $catalogTitle, $licensedMedia))
         ->whereNumber('licensedMedia')
         ->scopeBindings()
@@ -417,6 +463,9 @@ Route::get('/admin/requests', ContentRequestAdministrationManager::class)
 Route::get('/admin/issues', TechnicalIssueAdministrationManager::class)
     ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-technical-issues'])
     ->name('admin.issues');
+Route::get('/admin/calendar', ReleaseCalendarAdministrationManager::class)
+    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-release-calendar'])
+    ->name('admin.calendar');
 Route::get('/titles/year/{year}', CatalogSeries::class)
     ->where('year', '(?:19|20)\d{2}')
     ->middleware('public.page:catalog')

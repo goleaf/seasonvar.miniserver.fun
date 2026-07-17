@@ -118,6 +118,13 @@
 - Формула и границы категорий документируются в `docs/catalog-search.md` и покрываются feature tests. Blade получает DTO, переиспользует `x-catalog.title-card` и не выполняет ranking/database/service logic.
 - Backed enum route parameters должны сериализоваться в public cache dimensions по их scalar value; отбрасывать enum parameter и объединять HTML разных категорий запрещено.
 
+## Календарь релизов
+
+- Date precision/status/type/source живут в backed enum и `ReleaseDateValue`; Blade не конвертирует timezone, не вычисляет status/countdown и не строит query.
+- HTML routes календаря реализуются full-page Livewire, period разбирает `ReleaseCalendarPeriod`, mutation проходит actions/`ReleaseScheduleService`, а public query — только `ReleaseCalendarQuery`.
+- Original, translation, subtitle и portal publication нельзя объединять в один generic date; `updated_at`/`created_at` не являются release date.
+- Все partial/unknown значения сохраняют точность, manual lock имеет приоритет над observer/import, side effects запускаются after commit. Полный contract: [`release-calendar.md`](release-calendar.md).
+
 <!-- project-docs:start -->
 ## Автоматизация документации, карты сайта и robots
 

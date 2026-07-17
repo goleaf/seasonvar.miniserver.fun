@@ -126,4 +126,10 @@ class Season extends Model
     {
         return $this->hasMany(ContentRequest::class);
     }
+
+    /** @return HasMany<ReleaseScheduleEntry, $this> */
+    public function releaseScheduleEntries(): HasMany
+    {
+        return $this->hasMany(ReleaseScheduleEntry::class);
+    }
 }
