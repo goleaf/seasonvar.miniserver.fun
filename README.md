@@ -310,7 +310,7 @@ php artisan project:docs-refresh
 <!-- project-docs:start -->
 ## Автоматически обновляемое состояние
 
-- Обновлено командой `php artisan project:docs-refresh`: 16.07.2026.
+- Обновлено командой `php artisan project:docs-refresh`: 17.07.2026.
 - Основная карта сайта портала: `https://seasonvar.miniserver.fun/sitemap-index.xml`.
 - Совместимый адрес `/sitemap.xml` отдает индекс карты сайта, чтобы поисковые системы получали все разделы карты.
 - `public/robots.txt` объявляет стабильный индекс карты сайта без ручного перечисления страниц `sitemap-titles-*` и `sitemap-videos-*`.
