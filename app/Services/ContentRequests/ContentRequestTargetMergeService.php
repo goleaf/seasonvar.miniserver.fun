@@ -87,14 +87,15 @@ final readonly class ContentRequestTargetMergeService
                 ->whereKeyNot($request->id)
                 ->first();
 
-            if ($request->status->isOpen() && $canonical !== null) {
+            if ($request->status->isOpen() && $canonical !== null && $this->canMerge($request, $canonical)) {
                 $this->merge($request, $canonical);
 
                 continue;
             }
 
             $request->exact_identity_hash = $hash;
-            $request->active_identity_key = $request->status->isOpen() ? $hash : null;
+            $request->active_identity_key = $request->status->isOpen() && $canonical === null ? $hash : null;
+            $request->probable_duplicate = $request->status->isOpen() && $canonical !== null;
             $request->version++;
             $request->save();
             $this->cache->changed($request->public_id, sitemap: true);
@@ -130,7 +131,9 @@ final readonly class ContentRequestTargetMergeService
             );
         }
 
-        $source->clarifications()->update(['content_request_id' => $canonical->id]);
+        if ($canonical->requester_id === null || $source->requester_id === $canonical->requester_id) {
+            $source->clarifications()->update(['content_request_id' => $canonical->id]);
+        }
         $source->votes()->delete();
         $source->followers()->delete();
         $from = $source->status;
@@ -144,6 +147,7 @@ final readonly class ContentRequestTargetMergeService
             $canonical->requester_id = $source->requester_id;
         }
 
+        $canonical->is_public = $canonical->is_public || $source->is_public;
         $canonical->version++;
         $canonical->save();
         ContentRequestStatusHistory::query()->create([
@@ -157,6 +161,12 @@ final readonly class ContentRequestTargetMergeService
         $this->cache->changed($canonical->public_id, sitemap: true);
         $notify = fn () => $this->notifications->merged($source, $canonical, null, $recipients);
         DB::transactionLevel() > 0 ? DB::afterCommit($notify) : $notify();
+    }
+
+    private function canMerge(ContentRequest $source, ContentRequest $canonical): bool
+    {
+        return ($source->is_public && $canonical->is_public)
+            || $source->requester_id === $canonical->requester_id;
     }
 
     private function moveCompletion(string $column, int $sourceId, int $canonicalId): void

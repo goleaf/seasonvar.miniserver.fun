@@ -87,7 +87,9 @@ final readonly class MergeContentRequests
                 );
             }
 
-            $source->clarifications()->update(['content_request_id' => $canonical->id]);
+            if ($canonical->requester_id === null || $source->requester_id === $canonical->requester_id) {
+                $source->clarifications()->update(['content_request_id' => $canonical->id]);
+            }
             $source->votes()->delete();
             $source->followers()->delete();
             $source->status = ContentRequestStatus::Merged;
@@ -100,6 +102,7 @@ final readonly class MergeContentRequests
                 $canonical->requester_id = $source->requester_id;
             }
 
+            $canonical->is_public = $canonical->is_public || $source->is_public;
             $canonical->probable_duplicate = false;
             $canonical->version++;
             $canonical->save();
@@ -136,6 +139,7 @@ final readonly class MergeContentRequests
     private function assertCompatible(ContentRequest $source, ContentRequest $canonical): void
     {
         if ($source->status->isTerminal() || $canonical->status->isTerminal()
+            || ((! $source->is_public || ! $canonical->is_public) && $source->requester_id !== $canonical->requester_id)
             || $source->type !== $canonical->type
             || $source->catalog_title_id !== $canonical->catalog_title_id
             || $source->season_id !== $canonical->season_id

@@ -157,13 +157,15 @@ final class ContentRequestAdministrationManager extends Component
         $requests = $schema->ready()
             ? $query->administration($this->search, ContentRequestType::tryFrom($this->type), ContentRequestStatus::tryFrom($this->status), ContentRequestSort::tryFrom($this->sort) ?? ContentRequestSort::Oldest)
             : $this->emptyPaginator();
-        $this->prepareForms($requests);
+        $adminState = $this->prepareForms($requests);
 
         return view('livewire.content-requests.administration-manager', [
             'requests' => $requests,
             'schemaReady' => $schema->ready(),
             'typeOptions' => $this->options(ContentRequestType::cases()),
-            'statusOptions' => $this->options(ContentRequestStatus::cases()),
+            'statusFilterOptions' => $this->options(ContentRequestStatus::cases()),
+            'statusActionOptions' => $adminState['statuses'],
+            'adminCapabilities' => $adminState['capabilities'],
             'priorityOptions' => $this->options(ContentRequestPriority::cases()),
             'sortOptions' => $this->options(ContentRequestSort::cases()),
             'rejectionOptions' => $this->options(ContentRequestRejectionReason::cases()),
@@ -181,10 +183,17 @@ final class ContentRequestAdministrationManager extends Component
         $this->sort = ContentRequestSort::tryFrom($this->sort)?->value ?? ContentRequestSort::Oldest->value;
     }
 
-    /** @param LengthAwarePaginator<int, ContentRequestCardData> $requests */
-    private function prepareForms(LengthAwarePaginator $requests): void
+    /** @param LengthAwarePaginator<int, ContentRequestCardData> $requests
+     * @return array{
+     *     statuses: array<int, list<array{value: string, label: string}>>,
+     *     capabilities: array<int, array{clarify: bool, merge: bool, handoff: bool, reject: bool, complete: bool}>
+     * }
+     */
+    private function prepareForms(LengthAwarePaginator $requests): array
     {
         $visible = array_fill_keys(collect($requests->items())->map(fn ($request): int => $request->id)->all(), true);
+        $statusActionOptions = [];
+        $adminCapabilities = [];
 
         foreach ([
             'desiredStatuses',
@@ -212,13 +221,37 @@ final class ContentRequestAdministrationManager extends Component
             $model = $models->get($request->id);
 
             if ($model !== null) {
-                $this->desiredStatuses[$request->id] ??= $model->status->value;
+                $transitions = array_values(array_filter(
+                    $model->status->transitions(),
+                    static fn (ContentRequestStatus $status): bool => ! $status->requiresDedicatedAction(),
+                ));
+                $statusActionOptions[$request->id] = $this->options($transitions);
+                $adminCapabilities[$request->id] = [
+                    'clarify' => in_array(ContentRequestStatus::ClarificationNeeded, $model->status->transitions(), true),
+                    'merge' => $model->status->isOpen(),
+                    'handoff' => in_array($model->status, [ContentRequestStatus::Approved, ContentRequestStatus::Planned, ContentRequestStatus::InProgress], true),
+                    'reject' => in_array(ContentRequestStatus::Rejected, $transitions, true),
+                    'complete' => in_array(ContentRequestStatus::PartiallyCompleted, $transitions, true)
+                        || in_array(ContentRequestStatus::Completed, $transitions, true),
+                ];
+
+                if ($transitions !== []) {
+                    $allowed = array_map(static fn (ContentRequestStatus $status): string => $status->value, $transitions);
+                    $this->desiredStatuses[$request->id] = in_array($this->desiredStatuses[$request->id] ?? null, $allowed, true)
+                        ? $this->desiredStatuses[$request->id]
+                        : $transitions[0]->value;
+                } else {
+                    unset($this->desiredStatuses[$request->id]);
+                }
+
                 $this->priorities[$request->id] ??= $model->priority->value;
                 $this->rejectionReasons[$request->id] ??= ContentRequestRejectionReason::InsufficientInformation->value;
                 $this->privateNotes[$request->id] ??= (string) $model->private_moderator_note;
                 $this->importRunIds[$request->id] = $model->import_run_id;
             }
         }
+
+        return ['statuses' => $statusActionOptions, 'capabilities' => $adminCapabilities];
     }
 
     /** @param array<int, ContentRequestType|ContentRequestStatus|ContentRequestPriority|ContentRequestSort|ContentRequestRejectionReason> $cases

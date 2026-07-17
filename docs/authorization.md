@@ -149,10 +149,10 @@ Section visibility никогда не отменяет whole-profile/moderation
 | Create | нет | да; requester/status/priority назначаются server-side | по тем же create rules |
 | Edit/withdraw/clarify | нет | только owner и разрешённый status; community-supported withdrawal anonymizes | clarification/moderation через отдельные actions |
 | Vote/follow | нет | только public open request, desired state idempotent | без обхода terminal rule |
-| Status/priority/reject/merge/complete/import | нет | нет | gate + повторная policy/action authorization |
+| Status/priority/reject/merge/complete/import | нет | нет | private session middleware + gate + повторная policy/action authorization; dedicated states нельзя выставить generic action |
 | Private note/source/import run | нет | нет | только moderation context |
 
-`ContentRequestPolicy` и action boundaries повторно разрешают persisted request/target, не доверяют ID/type/status/priority/provider/language/quality/merge/completion values из Livewire. Public binding возвращает 404 для hidden чужой заявки; email/internal user ID/voter/follower list никогда не являются route или DTO полем. Все mutations идут через CSRF-protected Livewire POST, GET только читает или выполняет canonical merged redirect.
+`ContentRequestPolicy` и action boundaries повторно разрешают persisted request/target, не доверяют ID/type/status/priority/provider/language/quality/merge/completion values из Livewire. `/admin/requests` требует `auth`, `auth.session`, `account.private` и `manage-content-requests`, поэтому initial page и Livewire lifecycle остаются `private, no-store`. Generic status action отклоняет `clarification_needed`, `duplicate`, `merged` и `withdrawn`: эти состояния требуют dedicated clarification/merge/withdraw invariants. Public binding допускает merged public UUID только до authorized canonical redirect; hidden чужая заявка возвращает 404, а private merge между разными requester запрещён. Email/internal user ID/voter/follower list никогда не являются route или DTO полем. Все mutations идут через CSRF-protected Livewire POST, GET только читает или выполняет canonical merged redirect.
 
 ## Матрица рекомендаций
 

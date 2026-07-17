@@ -48,8 +48,11 @@ final class ContentRequestDetailPage extends Component
 
     public function mount(ContentRequest $contentRequest): mixed
     {
+        Gate::authorize('view', $contentRequest);
+
         if ($contentRequest->merged_into_id !== null) {
             $canonical = ContentRequest::query()->findOrFail($contentRequest->merged_into_id);
+            Gate::authorize('view', $canonical);
             $locale = request()->route('locale');
 
             return $this->redirectRoute(
@@ -58,7 +61,6 @@ final class ContentRequestDetailPage extends Component
             );
         }
 
-        Gate::authorize('view', $contentRequest);
         $this->requestId = $contentRequest->id;
         $this->alternativeTitle = (string) $contentRequest->alternative_title;
         $this->explanation = (string) $contentRequest->explanation;

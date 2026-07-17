@@ -12,7 +12,7 @@ final class ContentRequestPolicy
 {
     public function view(?User $user, ContentRequest $request): bool
     {
-        return ($request->is_public && $request->merged_into_id === null)
+        return $request->is_public
             || ($user !== null && ($request->requester_id === $user->id || Gate::forUser($user)->allows('manage-content-requests')));
     }
 

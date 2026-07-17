@@ -49,6 +49,11 @@ final readonly class ChangeContentRequestStatus
 
         $request = ContentRequest::query()->findOrFail($requestId);
         Gate::forUser($actor)->authorize('moderate', $request);
+
+        if ($desired->requiresDedicatedAction()) {
+            throw new ContentRequestActionException('requests.errors.invalid_transition');
+        }
+
         $this->rateLimiter->hit('moderate', $actor, (string) $requestId);
         $publicReason = $this->clean($publicReason, 1_000);
         $privateNote = $this->clean($privateNote, 4_000);

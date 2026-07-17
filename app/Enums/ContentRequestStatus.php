@@ -50,6 +50,16 @@ enum ContentRequestStatus: string
         return in_array($this, [self::Submitted, self::PendingReview, self::ClarificationNeeded], true);
     }
 
+    public function requiresDedicatedAction(): bool
+    {
+        return in_array($this, [
+            self::ClarificationNeeded,
+            self::Duplicate,
+            self::Merged,
+            self::Withdrawn,
+        ], true);
+    }
+
     /** @return list<self> */
     public function transitions(): array
     {

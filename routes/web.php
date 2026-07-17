@@ -412,7 +412,7 @@ Route::get('/admin/tags', TagAdministrationManager::class)
     ->middleware('can:manage-catalog')
     ->name('admin.tags');
 Route::get('/admin/requests', ContentRequestAdministrationManager::class)
-    ->middleware('can:manage-content-requests')
+    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-content-requests'])
     ->name('admin.requests');
 Route::get('/admin/issues', TechnicalIssueAdministrationManager::class)
     ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-technical-issues'])
