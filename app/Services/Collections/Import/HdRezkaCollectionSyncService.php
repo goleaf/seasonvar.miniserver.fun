@@ -12,7 +12,6 @@ use App\Jobs\RebuildCatalogRecommendationsAfterCollectionSync;
 use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionSource;
 use App\Models\CatalogCollectionSyncRun;
-use App\Services\Catalog\CatalogCacheWarmRequestStore;
 use App\Services\Catalog\CatalogRecommendationDirtyTitleTracker;
 use App\Services\Crawler\PoliteHttpClient;
 use Illuminate\Contracts\Cache\Lock;
@@ -36,7 +35,6 @@ final readonly class HdRezkaCollectionSyncService
         private HdRezkaCollectionSignalSynchronizer $signals,
         private PoliteHttpClient $http,
         private CatalogRecommendationDirtyTitleTracker $dirtyTitles,
-        private CatalogCacheWarmRequestStore $warmRequests,
     ) {}
 
     /** @param (callable(string, array<string, mixed>): void)|null $progress */
@@ -160,6 +158,22 @@ final readonly class HdRezkaCollectionSyncService
             ? CatalogCollectionSyncStatus::Partial
             : CatalogCollectionSyncStatus::Completed;
 
+        if ($run instanceof CatalogCollectionSyncRun && $status === CatalogCollectionSyncStatus::Completed) {
+            try {
+                $missing = $this->reconciler->reconcileMissingSources($run);
+                $counters['sources_missing'] += $missing['sources_missing'];
+                $counters['removed'] += $missing['removed'];
+                $materialChanged = $materialChanged || $missing['sources_missing'] > 0;
+
+                foreach ($missing['title_ids'] as $catalogTitleId) {
+                    $matchedTitleIds[$catalogTitleId] = true;
+                }
+            } catch (Throwable) {
+                $status = CatalogCollectionSyncStatus::Partial;
+                $this->addError($errors, 'Исчезнувшие подборки источника не удалось безопасно сверить.');
+            }
+        }
+
         if ($run instanceof CatalogCollectionSyncRun) {
             $run->forceFill([
                 'status' => $status,
@@ -185,7 +199,6 @@ final readonly class HdRezkaCollectionSyncService
 
             if ($materialChanged && $titleIds !== []) {
                 $this->dirtyTitles->markMany($titleIds, 'editorial-collection-sync');
-                $this->warmRequests->request($titleIds, refresh: true);
 
                 if ((bool) config(
                     'catalog-collection-imports.hdrezka.recommendation_rebuild.enabled',
@@ -357,6 +370,8 @@ final readonly class HdRezkaCollectionSyncService
             'covers_updated' => 0,
             'covers_failed' => 0,
             'detail_failures' => $detailFailures,
+            'sources_reactivated' => 0,
+            'sources_missing' => 0,
         ];
         $materialChanged = false;
 
@@ -365,14 +380,19 @@ final readonly class HdRezkaCollectionSyncService
             $counters['created'] = $reconciliation['created'] ? 1 : 0;
             $counters['membership_changed'] = $reconciliation['membership_changed'] ? 1 : 0;
             $counters['removed'] = $reconciliation['removed'];
-            $materialChanged = $reconciliation['created'] || $reconciliation['membership_changed'];
+            $counters['sources_reactivated'] = $reconciliation['source_reactivated'] ? 1 : 0;
+            $materialChanged = $reconciliation['created']
+                || $reconciliation['membership_changed']
+                || $reconciliation['source_reactivated'];
 
             if ($definition->coverPath !== null) {
-                $preparedCover = $this->covers->prepare($definition->coverPath);
+                try {
+                    $preparedCover = $this->covers->prepare($definition->coverPath);
 
-                if ($preparedCover === null) {
-                    $counters['covers_failed']++;
-                } else {
+                    if ($preparedCover === null) {
+                        throw new RuntimeException('Обложка источника не прошла проверку.');
+                    }
+
                     $collection = CatalogCollection::query()->findOrFail($reconciliation['collection_id']);
                     $coverChanged = $this->covers->apply($collection, $preparedCover);
                     $counters['covers_updated'] += $coverChanged ? 1 : 0;
@@ -385,6 +405,9 @@ final readonly class HdRezkaCollectionSyncService
                             'cover_content_hash' => $preparedCover->contentHash,
                             'updated_at' => now(),
                         ]);
+                } catch (Throwable) {
+                    $counters['covers_failed']++;
+                    $errors[] = "Подборка №{$collectionPosition}: обложка не обновлена.";
                 }
             }
         }
@@ -514,6 +537,8 @@ final readonly class HdRezkaCollectionSyncService
             'covers_updated' => 0,
             'covers_failed' => 0,
             'detail_failures' => 0,
+            'sources_reactivated' => 0,
+            'sources_missing' => 0,
             'signals_upserted' => 0,
             'signals_deleted' => 0,
         ];

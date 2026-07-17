@@ -1,6 +1,20 @@
 # Деплой
 
-Обновлено: 16.07.2026
+Обновлено: 17.07.2026
+
+## Eloquent AutoCache rollout от 17.07.2026
+
+Интеграция не добавляет миграций, очередей, scheduler или нового backend. После установки locked Composer dependencies и пересборки config cache выполнить:
+
+```bash
+php artisan autocache:clear
+php artisan autocache:warm --all
+php artisan autocache:stats
+```
+
+`autocache:clear` инвалидирует только зарегистрированные AutoCache-модели `Country` и `Genre`, не выполняя store-wide `Cache::flush()`. `warm --all` должен сообщить ровно об этих двух моделях и одном bounded query на каждую; при default `AUTOCACHE_STATS=false` команда stats штатно сообщает, что counters выключены. Затем выполнить graceful reload PHP-FPM/workers и дважды проверить публичные фильтры стран и жанров на `/top/*`.
+
+Rollback сначала задаёт `AUTOCACHE_ENABLED=false`, затем пересобирает config cache и выполняет graceful reload PHP-FPM/workers. Только после подтверждения обычного database path можно рассматривать удаление package отдельным выпуском. Не переключать `AUTOCACHE_MODE=auto`, не применять `cache:clear`, `optimize:clear`, wildcard scan или Redis `KEYS`; конечный TTL и model-version invalidation обеспечивают безопасное восстановление без глобального удаления кеша.
 
 ## Authentication Task 15 rollout от 16.07.2026
 
@@ -142,6 +156,7 @@ Production-значения должны задаваться сервером, 
 - `FILESYSTEM_DISK=local`
 - `LOCAL_FILESYSTEM_SERVE=false`
 - `UPLOADS_DISK=uploads`
+- `UPLOADS_RUNTIME_GROUP=www` или фактическая общая Unix-группа PHP-FPM/scheduler/CLI
 - `UPLOADS_MAX_IMAGE_KILOBYTES=2048`
 - `NOTIFICATIONS_MAIL_QUEUE=default`
 - `LOG_CHANNEL=stack`, `LOG_STACK=daily`, `LOG_LEVEL=warning` и bounded `LOG_DAILY_DAYS`
@@ -167,6 +182,7 @@ Google-интеграции по умолчанию выключены. Если
 - `GOOGLE_SEARCH_CONSOLE_*` — read-only настройки Search Console.
 - `GOOGLE_ANALYTICS_*` — read-only настройки GA4 reporting.
 - `UPLOADS_DISK` — приватный disk для будущих user-upload файлов; по умолчанию `uploads`.
+- `UPLOADS_RUNTIME_GROUP` — общая Unix-группа процессов, которые создают и отдают локальные загрузки; default `www` нужно заменить, если PHP-FPM и scheduler работают в другой группе.
 - `UPLOADS_MAX_IMAGE_KILOBYTES` — максимальный размер изображения для reusable upload-валидации.
 - `NOTIFICATIONS_MAIL_QUEUE` — queue для email notification jobs.
 - `SEASONVAR_IMPORT_FAILURE_MAIL_TO` и `SEASONVAR_IMPORT_FAILURE_MAIL_TO_NAME` — optional получатель письма об ошибке queued import; пустое значение отключает отправку.
@@ -396,7 +412,7 @@ Existing per-minute `schedule:run` обслуживает `catalog-collections:p
 ### Rollout синхронизации редакционных подборок
 
 1. Оставьте `HDREZKA_COLLECTION_SYNC_ENABLED=false`, сделайте обычный verified backup и примените additive migration `2026_07_16_250000_create_catalog_collection_source_sync.php`. Она добавляет только source audit/reconciliation tables и два exact-match индекса search documents; существующие тайтлы, коллекции и memberships не переписываются.
-2. Убедитесь, что PHP GD собран с WebP, Redis lock store доступен, а worker слушает configured `HDREZKA_COLLECTION_RECOMMENDATION_QUEUE` (по умолчанию существующая `seasonvar-import`) и `cache-warm-v2`. Задайте лимиты/очередь из `.env.example`, включите flag, пересоберите config cache и graceful-restart PHP-FPM/workers; `.env` и credentials не коммитятся.
+2. Убедитесь, что PHP GD собран с WebP, Redis lock store доступен, а worker слушает configured `HDREZKA_COLLECTION_RECOMMENDATION_QUEUE` (по умолчанию существующая `seasonvar-import`) и `cache-warm-v2`. До запуска назначьте `storage/app/private/uploads` группе `UPLOADS_RUNTIME_GROUP` и режим `2770`; для уже существующего `catalog-collections` рекурсивно назначьте той же группе каталоги `2770`, а WebP — `0660`. Это позволяет безопасно чередовать CLI и PHP-FPM без world-readable файлов. Задайте лимиты/очередь из `.env.example`, включите flag, пересоберите config cache и graceful-restart PHP-FPM/workers; `.env` и credentials не коммитятся.
 3. До записи выполните `php artisan catalog-collections:sync-hdrezka --dry-run --limit-collections=3`, проверьте bounded counters и отсутствие writes. Затем запустите полный `php artisan catalog-collections:sync-hdrezka --dry-run`; ненулевой exit, partial/failure или неожиданная доля ambiguous/unmatched требуют диагностики до реального запуска.
 4. Выполните `php artisan catalog-collections:sync-hdrezka`. Проверьте latest safe summary в admin directory, локальные WebP, `/collections` и одну detail page; raw provider URL/path/error не должны появляться в HTML. При уже активной v6 убедитесь, что scoped recommendation job завершилась; при version mismatch dirty IDs должны сохраниться без отдельного full build до штатной границы `seasonvar:import`. Для warming допустим только объяснимый bounded `degraded` от fingerprinted HTTP target/занятого rebuild lock; постоянная infrastructure/fatal ошибка требует диагностики. Store-wide cache flush не нужен.
 5. Existing per-minute scheduler запускает включённую синхронизацию ежедневно во время `HDREZKA_COLLECTION_SYNC_SCHEDULE` (по умолчанию `03:37`) с `onOneServer` и шестичасовым overlap guard. Отдельный cron не добавляется; HTTP crawl остаётся bounded delay/limits. Для ручной повторной проверки unresolved metadata используйте `--retry-unresolved`, а лимит запуска — только положительный `--limit-collections`.

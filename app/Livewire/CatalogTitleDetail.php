@@ -7,6 +7,7 @@ namespace App\Livewire;
 use App\DTOs\CatalogTitleRefreshState;
 use App\Enums\CatalogRecommendationFeedback;
 use App\Enums\SeasonvarImportStatus;
+use App\Http\Requests\CatalogShowRequest;
 use App\Models\CatalogTitle;
 use App\Models\User;
 use App\Services\Catalog\CatalogTitlePageBuilder;
@@ -16,6 +17,8 @@ use App\Services\Collections\CatalogCollectionQuery;
 use App\Services\Seasonvar\CatalogTitleRefreshCoordinator;
 use App\Services\Seasonvar\CatalogTitleRefreshStateStore;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -64,10 +67,16 @@ class CatalogTitleDetail extends Component
         $this->userStates = $userStates;
     }
 
-    public function mount(int $catalogTitleId): void
+    public function mount(CatalogShowRequest $request, CatalogTitle $catalogTitle): void
     {
-        $this->catalogTitleId = $catalogTitleId;
-        $highlightedReviewId = request()->integer('review');
+        $requestedSlug = $request->route()?->originalParameter('catalogTitle');
+
+        if (is_string($requestedSlug) && $requestedSlug !== $catalogTitle->slug) {
+            throw new HttpResponseException(new RedirectResponse(route('titles.show', $catalogTitle), 301));
+        }
+
+        $this->catalogTitleId = $catalogTitle->id;
+        $highlightedReviewId = $request->integer('review');
         $this->highlightedReviewId = $highlightedReviewId > 0 ? $highlightedReviewId : null;
     }
 
@@ -151,6 +160,20 @@ class CatalogTitleDetail extends Component
         $user = $this->user();
         $page = $this->pages->dataForId($this->catalogTitleId, $user);
         $refreshState = $this->states->read($this->catalogTitleId);
+        $title = $page['title'];
+        abort_unless($title instanceof CatalogTitle, 404);
+        $seo = $this->pages->seo($title, $user);
+
+        if (request()->hasAny([
+            'review',
+            'reviewPage',
+            'review_sort',
+            'review_rating',
+            'review_spoiler',
+            'review_verified',
+        ])) {
+            $seo['robots'] = 'noindex,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
+        }
 
         return view('livewire.catalog-title-detail', [
             ...$page,
@@ -161,7 +184,10 @@ class CatalogTitleDetail extends Component
             'contentRequestUrl' => $user instanceof User
                 ? route('requests.create', ['type' => 'broken_content_restoration', 'catalog_title_id' => $this->catalogTitleId])
                 : route('login'),
-        ]);
+        ])->extends('layouts.app', [
+            'title' => $seo['title'] ?? $title->display_title,
+            'seo' => $seo,
+        ])->section('content');
     }
 
     private function title(): CatalogTitle

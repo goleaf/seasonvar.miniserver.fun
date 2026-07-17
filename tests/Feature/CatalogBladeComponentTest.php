@@ -17,19 +17,24 @@ class CatalogBladeComponentTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_header_keeps_logo_and_autocomplete_above_the_wrapping_navigation(): void
+    public function test_header_keeps_logo_search_and_auth_actions_above_the_wrapping_navigation(): void
     {
         $html = $this->get(route('home'))->assertOk()->getContent();
         $primaryPosition = strpos($html, 'data-site-header-primary');
         $searchPosition = strpos($html, 'data-header-search-autocomplete');
+        $actionsPosition = strpos($html, 'data-site-header-actions');
         $navigationPosition = strpos($html, 'data-site-header-navigation');
 
         $this->assertIsInt($primaryPosition);
         $this->assertIsInt($searchPosition);
+        $this->assertIsInt($actionsPosition);
         $this->assertIsInt($navigationPosition);
         $this->assertLessThan($searchPosition, $primaryPosition);
+        $this->assertLessThan($actionsPosition, $searchPosition);
         $this->assertLessThan($navigationPosition, $searchPosition);
+        $this->assertLessThan($navigationPosition, $actionsPosition);
         $this->assertSame(1, substr_count($html, 'data-header-search-autocomplete'));
+        $this->assertSame(1, substr_count($html, 'data-site-header-actions'));
         $this->assertStringContainsString('flex-wrap', $html);
     }
 

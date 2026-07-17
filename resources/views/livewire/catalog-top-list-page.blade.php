@@ -1,7 +1,4 @@
-@extends('layouts.app', ['title' => $seo['title'] ?? $category->title(), 'seo' => $seo ?? []])
-
-@section('content')
-    <div class="space-y-5 sm:space-y-6" data-top-list-page="{{ $category->value }}">
+<div class="space-y-5 sm:space-y-6" data-top-list-page="{{ $category->value }}">
         <header class="overflow-hidden rounded-panel border border-slate-200 bg-white shadow-panel">
             <div class="grid min-w-0 gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,28rem)] lg:items-end lg:px-8 lg:py-8">
                 <div class="min-w-0 max-w-4xl">
@@ -81,7 +78,7 @@
                 </p>
             </div>
 
-            <form method="GET" action="{{ $filterForm['action'] }}" aria-describedby="top-list-filters-description" class="mt-4 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(8rem,10rem)_minmax(8rem,10rem)_minmax(14rem,1fr)_auto] xl:items-end">
+            <form method="GET" action="{{ $filterForm['action'] }}" aria-describedby="top-list-filters-description" class="mt-4 grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(8rem,10rem)_minmax(8rem,10rem)_minmax(12rem,1fr)_minmax(12rem,1fr)_auto] xl:items-end">
                 <div class="min-w-0">
                     <label for="top-list-year-from" class="block text-sm font-bold text-slate-700">{{ __('top_lists.filters.year_from') }}</label>
                     <input
@@ -114,7 +111,7 @@
                     <x-form.input-error for="year_to" id="top-list-year-to-error" />
                 </div>
 
-                <div class="min-w-0 sm:col-span-2 xl:col-span-1">
+                <div class="min-w-0 xl:col-span-1">
                     <label for="top-list-country" class="block text-sm font-bold text-slate-700">{{ __('top_lists.filters.country') }}</label>
                     <select
                         id="top-list-country"
@@ -128,6 +125,22 @@
                         @endforeach
                     </select>
                     <x-form.input-error for="country" id="top-list-country-error" />
+                </div>
+
+                <div class="min-w-0 xl:col-span-1">
+                    <label for="top-list-genre" class="block text-sm font-bold text-slate-700">{{ __('top_lists.filters.genre') }}</label>
+                    <select
+                        id="top-list-genre"
+                        name="genre"
+                        @if ($errors->has('genre')) aria-invalid="true" aria-describedby="top-list-genre-error" @endif
+                        class="mt-2 min-h-11 w-full rounded-control border border-slate-300 bg-white px-3 py-2 text-slate-900 outline-none transition focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
+                    >
+                        <option value="">{{ __('top_lists.filters.all_genres') }}</option>
+                        @foreach ($filterForm['genres'] as $genreOption)
+                            <option value="{{ $genreOption['slug'] }}" @selected($filterForm['genre'] === $genreOption['slug'])>{{ $genreOption['name'] }}</option>
+                        @endforeach
+                    </select>
+                    <x-form.input-error for="genre" id="top-list-genre-error" />
                 </div>
 
                 <div class="flex min-w-0 flex-col gap-2 sm:col-span-2 sm:flex-row xl:col-span-1">
@@ -209,5 +222,4 @@
                 </section>
             @endif
         @endif
-    </div>
-@endsection
+</div>

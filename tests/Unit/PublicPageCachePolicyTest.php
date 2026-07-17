@@ -68,25 +68,31 @@ final class PublicPageCachePolicyTest extends TestCase
         $parameters = ['category' => CatalogTopListCategory::Movies];
         $first = $policy->context($this->request(
             'GET',
-            '/top/movies?year_from=2010&year_to=2020&country=litva',
+            '/top/movies?year_from=2010&year_to=2020&country=litva&genre=dramy',
             'top.show',
             $parameters,
         ), 'catalog');
         $reordered = $policy->context($this->request(
             'GET',
-            '/top/movies?country=litva&year_to=2020&year_from=2010',
+            '/top/movies?genre=dramy&country=litva&year_to=2020&year_from=2010',
             'top.show',
             $parameters,
         ), 'catalog');
         $otherCountry = $policy->context($this->request(
             'GET',
-            '/top/movies?year_from=2010&year_to=2020&country=latviya',
+            '/top/movies?year_from=2010&year_to=2020&country=latviya&genre=dramy',
             'top.show',
             $parameters,
         ), 'catalog');
         $otherRange = $policy->context($this->request(
             'GET',
-            '/top/movies?year_from=2011&year_to=2020&country=litva',
+            '/top/movies?year_from=2011&year_to=2020&country=litva&genre=dramy',
+            'top.show',
+            $parameters,
+        ), 'catalog');
+        $otherGenre = $policy->context($this->request(
+            'GET',
+            '/top/movies?year_from=2010&year_to=2020&country=litva&genre=komedii',
             'top.show',
             $parameters,
         ), 'catalog');
@@ -95,10 +101,12 @@ final class PublicPageCachePolicyTest extends TestCase
         $this->assertNotNull($reordered);
         $this->assertNotNull($otherCountry);
         $this->assertNotNull($otherRange);
+        $this->assertNotNull($otherGenre);
         $this->assertSame(['category' => 'movies'], $first->dimensions['parameters']);
         $this->assertSame($first->dimensions['query'], $reordered->dimensions['query']);
         $this->assertNotSame($first->dimensions['query'], $otherCountry->dimensions['query']);
         $this->assertNotSame($first->dimensions['query'], $otherRange->dimensions['query']);
+        $this->assertNotSame($first->dimensions['query'], $otherGenre->dimensions['query']);
     }
 
     public function test_it_bypasses_private_dynamic_or_unbounded_requests(): void

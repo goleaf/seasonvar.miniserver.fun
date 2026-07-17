@@ -1,6 +1,6 @@
 # Кеширование и Redis/Memcached
 
-Обновлено: 16.07.2026
+Обновлено: 17.07.2026
 
 Production rollout 15.07.2026 подтвердил, что исторические `cache-warm` envelopes имеют истёкший `retryUntil`: Laravel отклоняет их до application `handle()`, поэтому no-op compatibility не может безопасно drain-ить эту очередь. Pending/failed legacy payload не удаляются и не retry-ятся автоматически. Новый coalesced intent, heartbeat и единственный worker используют `cache-warm-v2`; job не публикует absolute retry deadline и ограничивает реальные ошибки тремя attempts. Redis/Memcached transports остаются раздельными, а отсутствие evictions не является доказательством корректной инвалидации.
 
@@ -91,6 +91,29 @@ HTTP API policy: browser `max-age=60`, shared `s-maxage=300`, SWR 60 s, stale-if
 | Watchlist/history/preferences/notifications | database or session where already designed | immediate authoritative read | private; not globally cached |
 | Import progress/admin counts | operational DB snapshot and queue heartbeat | bounded polling/health | no public cache |
 | Navigation/settings | static configuration/layout data | deployment/config cache | no database query in Blade |
+
+## Eloquent AutoCache для фильтров Top 100
+
+`wddyousuf/eloquent-autocache` подключён строго в режиме `opt-in` и не заменяет `TieredCache`, version registry или полностраничный кеш. Trait проекта `CachesCatalogFilterOptions` используют только модели `Country` и `Genre`; `CatalogTitle`, `User`, импортёр, отзывы, комментарии, media/access и любые личные данные в эту границу не входят.
+
+Единственный разрешённый cacheable query для каждой модели выбирает `id`, `name`, `slug`, сортирует по `name`, затем `id`, и ограничен 100 строками. Его вызывает `CatalogTopListFilterOptions` для публичных списков стран и жанров в Top 100. Обычный `Country::query()` или `Genre::query()` без явного `cache()` всегда остаётся cold Eloquent query.
+
+Production использует named store `recomputable-failover` (`redis-domain` → `file`), PHPUnit — изолированный `array`. TTL равен 300 секундам с jitter 10%; model version отделяет Country от Genre. Tags, row cache, stale-while-revalidate, pivot listener и кеширование внутри database transaction отключены. Payload состоит только из массивов и scalar attributes, поэтому сохраняется `cache.serializable_classes=false`.
+
+Записи через Eloquent `Country`/`Genre` автоматически повышают model version после create, update и delete. Прямой будущий `DB::table()`/raw SQL обход этой модели обязан явно вызвать `Country::flushCache()` или `Genre::flushCache()` в том же доменном процессе; массовый store flush для этого запрещён. При rollback query внутри transaction всегда обходит cache, а следующий committed read строит свежий payload.
+
+Операторские команды:
+
+```bash
+php artisan autocache:warm --all
+php artisan autocache:flush "App\Models\Country"
+php artisan autocache:clear
+php artisan autocache:stats
+```
+
+`warm --all` выполняет только два зарегистрированных bounded query. `flush` сбрасывает версию одной модели; `clear` инвалидирует зарегистрированные AutoCache-модели и не является `Cache::flush()` всего store. Counters выключены по умолчанию и появляются только при `AUTOCACHE_STATS=true`.
+
+Аварийное отключение: задать `AUTOCACHE_ENABLED=false`, выполнить `php artisan config:cache` и graceful reload PHP-FPM/workers. Удалять package до этого не нужно. Даже при ошибке инвалидации старый entry ограничен конечным TTL; wildcard scan, Redis `KEYS`, store-wide flush и превращение `AUTOCACHE_MODE=auto` в rollout-переключатель запрещены.
 
 ## Invalidation и warming
 
@@ -188,7 +211,7 @@ Cache key dimensions public summary включают domain version, collection 
 
 Source-sync не создаёт новый cache store и не выполняет store-wide flush. Material reconciliation переиспользует collection after-commit invalidator, а `HdRezkaCollectionSignalSynchronizer` возвращает union тайтлов из добавленных и удалённых `editorial_collection:*` signals. Эти IDs помечаются dirty, после commit одна `ShouldBeUniqueUntilProcessing` job в configured Redis queue выполняет scoped recommendation rebuild под overlap lock; failed activation остаётся retryable и не публикует неполное поколение.
 
-После успешной активации job записывает существующий catalog warm request и запускает `WarmCatalogCaches`; payload/page tiers продолжают использовать настроенные Redis/Memcached stores, а locks/unique state — выделенный lock store. Если активная feature-version ещё не совпадает с v6 или scoped limit превышен, collection job оставляет dirty IDs штатному полному import boundary и не запускает отдельный full build. Complete source snapshot удаляет stale membership/signals и инвалидирует затронутые scopes, partial snapshot сохраняет прежние связи и не создаёт destructive cache transition. Public карточка всегда читает локальный WebP через authorization-aware `private, no-store`, поэтому CDN/browser immutable cache для imported covers не допускается.
+После успешной активации job записывает существующий catalog warm request и запускает `WarmCatalogCaches`; payload/page tiers продолжают использовать настроенные Redis/Memcached stores, а locks/unique state — выделенный lock store. При активном Seasonvar run collection job вообще не забирает dirty IDs: их обрабатывает импортный pipeline, поэтому более новый marker не теряется и преждевременный warm не запускается. Если активная feature-version ещё не совпадает с v6 или scoped limit превышен вне импорта, job оставляет dirty IDs штатному полному import boundary и не запускает отдельный full build. Complete source snapshot удаляет stale membership/signals и инвалидирует затронутые scopes, partial snapshot сохраняет прежние связи и не создаёт destructive cache transition. Public карточка всегда читает локальный WebP через authorization-aware `private, no-store`, поэтому CDN/browser immutable cache для imported covers не допускается.
 
 Критический прогрев подтверждает coalesced intent после завершения bounded прохода, даже если отдельный HTTP target вернул ошибку, общий 240-секундный HTTP budget исчерпан или rebuild lock уже занят другим запросом. Успешные Redis/Memcached targets при этом не теряются и не пересобираются retry-штормом; lock contention записывается как safe skip, HTTP-ошибка — только fingerprint/status/class, а warming health становится `degraded` с bounded счётчиком failed/skipped. Job и отдельный worker согласованы на 600 s при Redis `retry_after=1200`; fatal data/cache infrastructure exception по-прежнему завершает job ошибкой и использует обычные три attempts. Request-time cold/stale path остаётся источником истины для пропущенной страницы; store-wide flush и автоматический retry failed history не выполняются.
 

@@ -15,7 +15,10 @@ use App\Services\Collections\CatalogCollectionItemService;
 use App\Services\Collections\CatalogCollectionQuery;
 use App\Services\Collections\CatalogCollectionReportService;
 use App\Services\Collections\CatalogCollectionResolver;
+use App\Services\Collections\CatalogCollectionSeoPresenter;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -31,6 +34,9 @@ final class CatalogCollectionPage extends Component
 
     #[Locked]
     public string $collectionPublicId = '';
+
+    #[Locked]
+    public bool $localizedAlias = false;
 
     #[Url(as: 'q', history: true, except: '')]
     public string $search = '';
@@ -71,12 +77,27 @@ final class CatalogCollectionPage extends Component
         $this->dispatch('collection-selector-closed');
     }
 
-    public function mount(string $collectionPublicId, CatalogCollectionResolver $resolver, string $interfaceLocale = 'ru'): void
-    {
-        $this->setCollectionLocale($interfaceLocale);
-        $this->collectionPublicId = $collectionPublicId;
-        $collection = $resolver->byPublicId($collectionPublicId);
+    public function mount(
+        string $collectionSlug,
+        CatalogCollectionResolver $resolver,
+        ?string $locale = null,
+    ): void {
+        $this->setCollectionLocale($locale);
+        $this->localizedAlias = $locale !== null;
+        $resolved = $resolver->resolve($collectionSlug);
+        $collection = $resolved['collection'];
         Gate::authorize('view', $collection);
+
+        if ($resolved['historical']) {
+            $routeName = $this->localizedAlias ? 'localized.collections.show' : 'collections.show';
+            $parameters = $this->localizedAlias
+                ? ['locale' => $this->interfaceLocale, 'collectionSlug' => $collection->slug]
+                : ['collectionSlug' => $collection->slug];
+
+            throw new HttpResponseException(new RedirectResponse(route($routeName, $parameters), 301));
+        }
+
+        $this->collectionPublicId = $collection->public_id;
 
         if ($this->sort === '') {
             $this->sort = $collection->sort_mode->value;
@@ -152,6 +173,7 @@ final class CatalogCollectionPage extends Component
         CatalogCollectionResolver $resolver,
         CatalogCollectionQuery $query,
         CatalogCollectionCoverService $covers,
+        CatalogCollectionSeoPresenter $seoPresenter,
     ): View {
         $collection = $query->summary($resolver->byPublicId($this->collectionPublicId));
         Gate::authorize('view', $collection);
@@ -177,6 +199,12 @@ final class CatalogCollectionPage extends Component
             'sort' => $this->sort !== $collection->sort_mode->value ? $this->sort : null,
             'collectionPage' => $items->currentPage() > 1 ? $items->currentPage() : null,
         ], fn (mixed $value): bool => $value !== null && $value !== '');
+        $seo = $seoPresenter->collection(
+            $collection,
+            $viewer,
+            $this->localizedAlias,
+            request()->routeIs('collections.show', 'localized.collections.show') && request()->query() !== [],
+        );
         $defaultLocale = (string) config('catalog-collections.default_locale', 'ru');
         $usesLocalizedEditorialCanonical = $collection->type->value === 'editorial'
             && $this->interfaceLocale !== $defaultLocale
@@ -246,7 +274,10 @@ final class CatalogCollectionPage extends Component
                     ...$queryState,
                 ])])
                 ->all(),
-        ]);
+        ])->extends('layouts.app', [
+            'title' => $seo['title'],
+            'seo' => $seo,
+        ])->section('content');
     }
 
     private function normalizeFilters(): void

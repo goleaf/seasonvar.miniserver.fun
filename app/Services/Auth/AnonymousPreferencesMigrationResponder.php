@@ -2,25 +2,24 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers;
+namespace App\Services\Auth;
 
 use App\DTOs\AnonymousAccountSettingsData;
 use App\Http\Requests\MigrateAnonymousPreferencesRequest;
 use App\Models\User;
-use App\Services\Auth\AccountSettingsService;
 use Illuminate\Http\Response;
 
-final class MigrateAnonymousPreferencesController extends Controller
+final readonly class AnonymousPreferencesMigrationResponder
 {
-    public function __invoke(
-        MigrateAnonymousPreferencesRequest $request,
-        AccountSettingsService $settings,
-    ): Response {
+    public function __construct(private AccountSettingsService $settings) {}
+
+    public function response(MigrateAnonymousPreferencesRequest $request): Response
+    {
         $user = $request->user();
         abort_unless($user instanceof User, 403);
         $validated = $request->validated();
 
-        $settings->migrateAnonymous($user, new AnonymousAccountSettingsData(
+        $this->settings->migrateAnonymous($user, new AnonymousAccountSettingsData(
             locale: $validated['locale'] ?? null,
             timezone: $validated['timezone'] ?? null,
             autoplay: $validated['autoplay'] ?? null,

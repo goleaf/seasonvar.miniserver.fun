@@ -5,16 +5,32 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\PublicationStatus;
+use App\Livewire\GlobalSearchPage;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
 use App\Models\Genre;
 use App\Models\Season;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 final class GlobalSearchPageTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_global_search_route_is_owned_by_full_page_livewire(): void
+    {
+        $this->assertSame(
+            GlobalSearchPage::class,
+            Route::getRoutes()->getByName('search.index')?->getActionName(),
+        );
+
+        Livewire::withQueryParams(['q' => '  тест  '])
+            ->test(GlobalSearchPage::class)
+            ->assertSet('query', 'тест')
+            ->assertSee('тест');
+    }
 
     public function test_global_search_shows_rich_public_titles_and_portal_results(): void
     {

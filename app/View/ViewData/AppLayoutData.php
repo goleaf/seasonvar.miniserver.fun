@@ -70,6 +70,7 @@ final class AppLayoutData
             $this->headerLinkUrl($layoutHomeUrl, 'fa-solid fa-house', __('catalog.navigation.home'), $this->request->routeIs('home', 'localized.home')),
             $this->headerLink('titles.index', 'fa-solid fa-list-ul', __('catalog.navigation.all_titles'), $this->request->routeIs('titles.*')),
         ];
+        $layoutHeaderActions = [];
 
         if ($this->router->has('discover.index')) {
             $layoutHeaderNavigation[] = $this->headerLink(
@@ -230,7 +231,7 @@ final class AppLayoutData
                 );
             }
         } else {
-            $layoutHeaderNavigation[] = $this->headerLinkUrl(
+            $layoutHeaderActions[] = $this->headerLinkUrl(
                 $this->authenticationRoutes->guestUrl('login'),
                 'fa-solid fa-right-to-bracket',
                 __('auth.actions.login'),
@@ -238,7 +239,7 @@ final class AppLayoutData
             );
 
             if (config('authentication.registration.enabled', true) && $this->router->has('register')) {
-                $layoutHeaderNavigation[] = $this->headerLinkUrl(
+                $layoutHeaderActions[] = $this->headerLinkUrl(
                     $this->authenticationRoutes->guestUrl('register'),
                     'fa-solid fa-user-plus',
                     __('auth.pages.register.title'),
@@ -329,6 +330,7 @@ final class AppLayoutData
             'home_url' => $layoutHomeUrl,
             'search_url' => $this->navigationRoute('search.index'),
             'navigation' => $layoutHeaderNavigation,
+            'actions' => $layoutHeaderActions,
             'show_logout' => $isAuthenticated,
         ];
         $layoutFooter = [

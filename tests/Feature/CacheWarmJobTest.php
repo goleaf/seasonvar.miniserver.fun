@@ -9,9 +9,11 @@ use App\Models\CatalogTitle;
 use App\Services\Catalog\CacheWarmingState;
 use App\Services\Catalog\CatalogCacheWarmer;
 use App\Services\Catalog\CatalogCacheWarmRequestStore;
+use App\Services\Catalog\CatalogStatsSnapshotCache;
 use App\Services\Catalog\PublicPageCacheWarmer;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheKeyFactory;
+use App\Support\Cache\CacheRebuildTimeout;
 use App\Support\Cache\CacheVersionRegistry;
 use Illuminate\Cache\Repository;
 use Illuminate\Contracts\Cache\LockProvider;
@@ -239,5 +241,26 @@ final class CacheWarmJobTest extends TestCase
         $this->assertContains("home_metrics:{$locale}", array_column($result['failures'], 'target'));
         $this->assertSame('degraded', app(CacheWarmingState::class)->read()['status'] ?? null);
         $this->assertArrayHasKey('home_snapshot', $result['targets']);
+    }
+
+    public function test_refresh_skips_a_contended_stats_target_and_keeps_warming_the_neighbors(): void
+    {
+        $this->app->instance(CatalogStatsSnapshotCache::class, new class extends CatalogStatsSnapshotCache
+        {
+            public function __construct() {}
+
+            public function refresh(): array
+            {
+                throw new CacheRebuildTimeout('stats lock is busy');
+            }
+        });
+
+        $result = app(CatalogCacheWarmer::class)->warmCritical(refresh: true);
+
+        $this->assertGreaterThanOrEqual(1, $result['failed']);
+        $this->assertContains('catalog_stats', array_column($result['failures'], 'target'));
+        $this->assertArrayHasKey('catalog_stats', $result['targets']);
+        $this->assertArrayHasKey('home_metrics', $result['targets']);
+        $this->assertSame('degraded', app(CacheWarmingState::class)->read()['status'] ?? null);
     }
 }

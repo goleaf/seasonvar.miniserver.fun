@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'last_retry_at',
     'last_seen_run_id',
     'last_successful_sync_at',
+    'missing_since_at',
 ])]
 final class CatalogCollectionSource extends Model
 {
@@ -66,6 +67,7 @@ final class CatalogCollectionSource extends Model
             'retry_count' => 'integer',
             'last_retry_at' => 'immutable_datetime',
             'last_successful_sync_at' => 'immutable_datetime',
+            'missing_since_at' => 'immutable_datetime',
         ];
     }
 }

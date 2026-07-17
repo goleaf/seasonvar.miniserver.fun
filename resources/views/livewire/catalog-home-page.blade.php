@@ -1,7 +1,4 @@
-@extends('layouts.app', ['title' => $seo['title'] ?? __('home.title'), 'seo' => $seo ?? []])
-
-@section('content')
-    <div class="space-y-5">
+<div class="space-y-5">
         <h1 class="sr-only">{{ __('home.title') }}</h1>
 
         <div data-home-metrics class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -207,5 +204,4 @@
                 </x-ui.panel>
             </aside>
         </section>
-    </div>
-@endsection
+</div>

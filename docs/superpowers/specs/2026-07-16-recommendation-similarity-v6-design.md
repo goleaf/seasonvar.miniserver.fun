@@ -135,11 +135,11 @@ Offline evaluator считает:
 - concentration: top candidate frequency и долю кандидатов с ≥100 входящими связями;
 - intra-list diversity;
 - explanation faithfulness;
-- долю явно оценённых строк golden pool (`judgment coverage`), чтобы не считать неразмеченные пары нерелевантными;
+- покрытие положительного golden pool (`judgment coverage`): долю вручную отмеченных релевантных пар, найденных в top-12; нулевые grades не повышают coverage, а неразмеченные пары не считаются нерелевантными;
 - churn относительно active version;
 - duration и peak memory rebuild.
 
-`v6` не активируется, если build не содержит ни одной строки либо ухудшает `nDCG@12`, availability или количество пустых выдач сверх явно записанного допуска. Первоначальный допуск: candidate rows > 0, availability не ниже 100%, `nDCG@12` не ниже baseline, empty-source count не растёт, а `judgment coverage` golden pool не ниже 80%. Явный override отсутствующей локальной golden-разметки не отменяет требования непустой, доступной и объяснимой выдачи. Неразмеченные пары исключаются из Precision/nDCG, а не получают вымышленную оценку `0`; остальные метрики публикуются в summary для ручной оценки.
+`v6` не активируется, если build не содержит ни одной строки либо ухудшает `nDCG@12`, availability или количество пустых выдач сверх явно записанного допуска. Первоначальный допуск: candidate rows > 0, availability не ниже 100%, `nDCG@12` не ниже baseline, empty-source count не растёт, а положительный golden pool найден не менее чем на 80%. Явный override отсутствующей локальной golden-разметки не отменяет требования непустой, доступной и объяснимой выдачи. Неразмеченные пары исключаются из Precision/nDCG, а не получают вымышленную оценку `0`; остальные метрики публикуются в summary для ручной оценки.
 
 ## Shadow build и активация
 
@@ -151,6 +151,8 @@ Offline evaluator считает:
 4. при успехе атомарно обозначить active version и инвалидировать только versioned cache namespace;
 5. удалить устаревшие shadow runs bounded maintenance-процессом.
 
+Builder и evaluator считают watchable только media, которое доступно по публикации, не имеет известного playback failure и содержит реальный playback location. Перед `insertUsing()` activator повторно проверяет весь shadow-набор в той же transaction: source остаётся публичным, candidate остаётся публичным и watchable, self-pairs отсутствуют, а число допустимых строк совпадает с числом строк build. Любое расхождение откатывает замену и переводит build в `failed`.
+
 Миграция additive и reversible. Сбой одного source-title сохраняет прежнюю активную выдачу и отражается в summary; сбой всего build не оставляет смешанную active version. Missing recommendation schema сохраняет существующий genre fallback.
 
 Публичная команда остаётся единственной: `php artisan seasonvar:import`. Отдельная production import-команда не создаётся; evaluator может быть internal service/test helper или опцией существующего maintenance path, не новым публичным импортом.
@@ -160,6 +162,8 @@ Offline evaluator считает:
 После устойчивого full `v6` targeted import помечает изменённый title и titles из затронутых inverted-feature buckets. Scoped rebuild обновляет source-title и bounded neighbours. Если dirty set превышает настраиваемый предел или меняется algorithm/feature version, выполняется полный build.
 
 Persistence сравнивает hash/rank payload и не переписывает неизменённые rows. Это уменьшает churn и invalidation, но full rebuild остаётся безопасным fallback.
+
+Collection-sync job не читает и не удаляет dirty rows при активном Seasonvar run в состоянии `queued`, `discovering`, `running` или `finalizing`: импортный pipeline владеет следующим rebuild. Это исключает lost update, когда новый marker мог быть удалён rebuild'ом, начавшимся по более старому snapshot; cache warm при таком defer не запускается.
 
 ## Тестирование и rollout
 

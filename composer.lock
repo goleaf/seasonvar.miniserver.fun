@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e3e8e6c2f2d3c35de8a90920920b0311",
+    "content-hash": "0a829c9e7c0e727295397ea22db356b8",
     "packages": [
         {
             "name": "brick/math",
@@ -854,16 +854,16 @@
         },
         {
             "name": "guzzlehttp/psr7",
-            "version": "2.12.5",
+            "version": "2.13.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/guzzle/psr7.git",
-                "reference": "9365d578a9fd1552ad6ca9c3cb530708526feb09"
+                "reference": "dad89620b7a6edb60c15858442eb2e408b45d8f4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/guzzle/psr7/zipball/9365d578a9fd1552ad6ca9c3cb530708526feb09",
-                "reference": "9365d578a9fd1552ad6ca9c3cb530708526feb09",
+                "url": "https://api.github.com/repos/guzzle/psr7/zipball/dad89620b7a6edb60c15858442eb2e408b45d8f4",
+                "reference": "dad89620b7a6edb60c15858442eb2e408b45d8f4",
                 "shasum": ""
             },
             "require": {
@@ -953,7 +953,7 @@
             ],
             "support": {
                 "issues": "https://github.com/guzzle/psr7/issues",
-                "source": "https://github.com/guzzle/psr7/tree/2.12.5"
+                "source": "https://github.com/guzzle/psr7/tree/2.13.0"
             },
             "funding": [
                 {
@@ -969,7 +969,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-07-13T01:27:20+00:00"
+            "time": "2026-07-16T22:23:49+00:00"
         },
         {
             "name": "guzzlehttp/uri-template",
@@ -6136,6 +6136,72 @@
                 }
             ],
             "time": "2026-04-26T05:33:54+00:00"
+        },
+        {
+            "name": "wddyousuf/eloquent-autocache",
+            "version": "v0.2.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/wddyousuf/eloquent-autocache.git",
+                "reference": "eac9229cc9a4a150f0ca768190be09a0780b2e75"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/wddyousuf/eloquent-autocache/zipball/eac9229cc9a4a150f0ca768190be09a0780b2e75",
+                "reference": "eac9229cc9a4a150f0ca768190be09a0780b2e75",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/cache": "^10.0|^11.0|^12.0|^13.0",
+                "illuminate/database": "^10.0|^11.0|^12.0|^13.0",
+                "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
+                "php": "^8.1"
+            },
+            "require-dev": {
+                "larastan/larastan": "^2.0|^3.0",
+                "laravel/pint": "^1.0",
+                "orchestra/testbench": "^8.0|^9.0|^10.0|^11.0",
+                "phpunit/phpunit": "^10.0|^11.0|^12.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "aliases": {
+                        "AutoCache": "Wddyousuf\\AutoCache\\Facades\\AutoCache"
+                    },
+                    "providers": [
+                        "Wddyousuf\\AutoCache\\AutoCacheServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Wddyousuf\\AutoCache\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Md. Yousuf Hossain",
+                    "email": "yousuf@hudsoncreativestudio.com"
+                }
+            ],
+            "description": "Automatic Eloquent model query caching for Laravel with self-flushing on create, update, and delete.",
+            "keywords": [
+                "cache",
+                "eloquent",
+                "laravel",
+                "model-caching",
+                "query-cache"
+            ],
+            "support": {
+                "issues": "https://github.com/wddyousuf/eloquent-autocache/issues",
+                "source": "https://github.com/wddyousuf/eloquent-autocache/tree/v0.2.3"
+            },
+            "time": "2026-07-17T06:27:37+00:00"
         }
     ],
     "packages-dev": [

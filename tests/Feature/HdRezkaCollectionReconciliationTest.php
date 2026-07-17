@@ -155,19 +155,19 @@ final class HdRezkaCollectionReconciliationTest extends TestCase
         $partialRun = $this->syncRun();
 
         $result = $this->reconciler()->reconcile($partialRun, $this->definition(), [
-            $this->resolvedItem('101', 'Первый', $first, 1),
+            $this->resolvedItem('102', 'Второй', $second, 1),
             $this->resolvedItem('103', 'Третий', $third, 2),
         ], complete: false);
         $source = CatalogCollectionSource::query()->firstOrFail();
 
         $this->assertSame(0, $result['removed']);
         $this->assertSame(
-            [$first->id, $third->id, $second->id],
+            [$first->id, $second->id, $third->id],
             $source->collection->items()->pluck('catalog_title_id')->all(),
         );
         $this->assertSame(1, $source->retry_count);
         $this->assertNotNull($source->last_retry_at);
-        $this->assertSame($completeRun->id, $source->items()->where('source_item_key', '102')->value('last_seen_run_id'));
+        $this->assertSame($completeRun->id, $source->items()->where('source_item_key', '101')->value('last_seen_run_id'));
     }
 
     public function test_sync_preserves_local_moderation_publication_description_and_feature_state(): void

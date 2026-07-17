@@ -8,7 +8,9 @@ use App\Enums\ReleaseKind;
 use App\Jobs\StartSeasonvarQueuedImport;
 use App\Livewire\CatalogAdministrationManager;
 use App\Livewire\CatalogDirectoryBrowser;
+use App\Livewire\CatalogHomePage;
 use App\Livewire\CatalogSeries;
+use App\Livewire\CatalogTitleDetail;
 use App\Livewire\CatalogTitlePlayer;
 use App\Livewire\SeasonvarImportManager;
 use App\Livewire\StatsDashboard;
@@ -51,6 +53,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -59,6 +62,44 @@ use Tests\TestCase;
 class CatalogPageTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_home_route_is_owned_by_full_page_livewire(): void
+    {
+        $this->assertSame(
+            CatalogHomePage::class,
+            Route::getRoutes()->getByName('home')?->getActionName(),
+        );
+
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSeeLivewire('catalog-home-page');
+    }
+
+    public function test_title_route_is_owned_by_full_page_livewire(): void
+    {
+        $title = CatalogTitle::factory()->create();
+
+        $this->assertSame(
+            CatalogTitleDetail::class,
+            Route::getRoutes()->getByName('titles.show')?->getActionName(),
+        );
+
+        $this->get(route('titles.show', $title))
+            ->assertOk()
+            ->assertSeeLivewire('catalog-title-detail');
+    }
+
+    public function test_stats_route_is_owned_by_full_page_livewire(): void
+    {
+        $this->assertSame(
+            StatsDashboard::class,
+            Route::getRoutes()->getByName('stats')?->getActionName(),
+        );
+
+        $this->get(route('stats'))
+            ->assertOk()
+            ->assertSeeLivewire('stats-dashboard');
+    }
 
     public function test_catalog_and_people_directories_render_separate_script_groups(): void
     {

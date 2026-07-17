@@ -12,5 +12,9 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             AdminSeeder::class,
         ]);
+
+        if (app()->environment('dev') && config('demo-data.enabled')) {
+            $this->call(PortalDemoSeeder::class);
+        }
     }
 }

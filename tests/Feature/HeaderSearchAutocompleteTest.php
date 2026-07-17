@@ -36,6 +36,11 @@ final class HeaderSearchAutocompleteTest extends TestCase
         $this->assertStringContainsString('data-header-search-title-results', $html);
         $this->assertStringContainsString('data-header-search-portal-results', $html);
         $this->assertStringContainsString('data-header-search-status', $html);
+        $this->assertStringContainsString('class="absolute left-0 top-[calc(100%+0.5rem)] z-[70] hidden w-full max-w-none rounded-control border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/15"', $html);
+        $this->assertLessThan(
+            strpos($html, 'data-header-search-dropdown'),
+            strpos($html, 'data-header-search-input-frame'),
+        );
         $this->assertStringNotContainsString('overflow-y-', $html);
     }
 

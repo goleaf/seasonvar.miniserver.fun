@@ -17,6 +17,8 @@ return [
 
     'visibility' => 'private',
 
+    'runtime_group' => env('UPLOADS_RUNTIME_GROUP', 'www'),
+
     'max_image_kilobytes' => (int) env('UPLOADS_MAX_IMAGE_KILOBYTES', 2048),
 
     'image_extensions' => [

@@ -36,6 +36,7 @@ final class HdRezkaCollectionSourceSchemaTest extends TestCase
             'semantic_content_hash',
             'last_seen_run_id',
             'last_successful_sync_at',
+            'missing_since_at',
         ]));
         $this->assertTrue(Schema::hasColumns('catalog_collection_source_items', [
             'catalog_collection_source_id',
@@ -88,6 +89,11 @@ final class HdRezkaCollectionSourceSchemaTest extends TestCase
             'catalog_title_id',
             'catalog_collection_source_id',
         ]);
+        $this->assertIndexColumns('catalog_collection_sources', 'catalog_collection_sources_provider_missing_idx', [
+            'provider',
+            'missing_since_at',
+            'id',
+        ]);
         $this->assertIndexColumns('catalog_title_search_documents', 'catalog_search_docs_title_key_idx', [
             'normalized_title_key',
             'catalog_title_id',
@@ -105,6 +111,7 @@ final class HdRezkaCollectionSourceSchemaTest extends TestCase
             'counters' => ['collections' => 1],
         ]);
         $source = new CatalogCollectionSource;
+        $source->missing_since_at = now();
         $item = new CatalogCollectionSourceItem([
             'match_status' => CatalogCollectionSourceMatchStatus::Matched,
             'countries' => ['США'],
@@ -116,6 +123,7 @@ final class HdRezkaCollectionSourceSchemaTest extends TestCase
         $this->assertSame(CatalogCollectionSourceMatchStatus::Matched, $item->match_status);
         $this->assertSame(['США'], $item->countries);
         $this->assertSame(['exact_title'], $item->match_reasons);
+        $this->assertNotNull($source->missing_since_at);
 
         $this->assertInstanceOf(BelongsTo::class, $source->collection());
         $this->assertInstanceOf(HasMany::class, $source->items());

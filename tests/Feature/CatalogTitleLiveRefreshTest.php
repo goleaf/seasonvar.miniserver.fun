@@ -55,7 +55,7 @@ class CatalogTitleLiveRefreshTest extends TestCase
 
         Queue::assertNothingPushed();
 
-        Livewire::test(CatalogTitleDetail::class, ['catalogTitleId' => $title->id])
+        Livewire::test(CatalogTitleDetail::class, ['catalogTitle' => $title])
             ->call('startRefresh')
             ->assertSee('wire:poll.3s.visible="refreshCatalog"', false)
             ->assertSee('Обновляем данные');
@@ -66,7 +66,7 @@ class CatalogTitleLiveRefreshTest extends TestCase
     public function test_livewire_poll_reloads_all_title_data_notifies_the_player_and_stops_after_completion(): void
     {
         $title = $this->refreshableTitle(['title' => 'Старое название']);
-        $component = Livewire::test(CatalogTitleDetail::class, ['catalogTitleId' => $title->id]);
+        $component = Livewire::test(CatalogTitleDetail::class, ['catalogTitle' => $title]);
 
         $title->update(['title' => 'Новое название', 'description' => 'Новое описание']);
 
@@ -87,7 +87,7 @@ class CatalogTitleLiveRefreshTest extends TestCase
     public function test_failed_refresh_keeps_current_catalog_data_and_exposes_no_source_url_or_error(): void
     {
         $title = $this->refreshableTitle(['title' => 'Последние сохраненные данные']);
-        $component = Livewire::test(CatalogTitleDetail::class, ['catalogTitleId' => $title->id]);
+        $component = Livewire::test(CatalogTitleDetail::class, ['catalogTitle' => $title]);
 
         app(CatalogTitleRefreshStateStore::class)->failed($title->id);
 
@@ -107,7 +107,7 @@ class CatalogTitleLiveRefreshTest extends TestCase
         ]);
 
         try {
-            Livewire::test(CatalogTitleDetail::class, ['catalogTitleId' => $title->id]);
+            Livewire::test(CatalogTitleDetail::class, ['catalogTitle' => $title]);
             $this->fail('Невидимый тайтл не должен монтироваться в Livewire.');
         } catch (ModelNotFoundException) {
             $this->assertTrue(true);

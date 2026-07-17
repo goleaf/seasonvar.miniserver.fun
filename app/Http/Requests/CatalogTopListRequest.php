@@ -6,6 +6,7 @@ namespace App\Http\Requests;
 
 use App\DTOs\CatalogTopListFilters;
 use App\Models\Country;
+use App\Models\Genre;
 use App\Rules\CatalogFilterSlug;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -34,6 +35,13 @@ final class CatalogTopListRequest extends FormRequest
                 new CatalogFilterSlug,
                 Rule::exists(Country::class, 'slug'),
             ],
+            'genre' => [
+                'nullable',
+                'string',
+                'max:'.CatalogFilterSlug::MAX_LENGTH,
+                new CatalogFilterSlug,
+                Rule::exists(Genre::class, 'slug'),
+            ],
         ];
     }
 
@@ -48,6 +56,9 @@ final class CatalogTopListRequest extends FormRequest
             'country.string' => __('top_lists.validation.country'),
             'country.max' => __('top_lists.validation.country'),
             'country.exists' => __('top_lists.validation.country'),
+            'genre.string' => __('top_lists.validation.genre'),
+            'genre.max' => __('top_lists.validation.genre'),
+            'genre.exists' => __('top_lists.validation.genre'),
         ];
     }
 
@@ -58,6 +69,7 @@ final class CatalogTopListRequest extends FormRequest
             'year_from' => __('top_lists.attributes.year_from'),
             'year_to' => __('top_lists.attributes.year_to'),
             'country' => __('top_lists.attributes.country'),
+            'genre' => __('top_lists.attributes.genre'),
         ];
     }
 
@@ -86,6 +98,9 @@ final class CatalogTopListRequest extends FormRequest
             country: isset($validated['country']) && is_string($validated['country'])
                 ? $validated['country']
                 : null,
+            genre: isset($validated['genre']) && is_string($validated['genre'])
+                ? $validated['genre']
+                : null,
         );
     }
 
@@ -93,7 +108,7 @@ final class CatalogTopListRequest extends FormRequest
     {
         $normalized = [];
 
-        foreach (['year_from', 'year_to', 'country'] as $key) {
+        foreach (['year_from', 'year_to', 'country', 'genre'] as $key) {
             if (! $this->query->has($key)) {
                 continue;
             }

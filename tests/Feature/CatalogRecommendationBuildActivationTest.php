@@ -20,6 +20,7 @@ use App\Support\Cache\CacheVersionRegistry;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 use Tests\TestCase;
 
 final class CatalogRecommendationBuildActivationTest extends TestCase
@@ -32,6 +33,14 @@ final class CatalogRecommendationBuildActivationTest extends TestCase
         $oldCandidate = CatalogTitle::factory()->create();
         $first = CatalogTitle::factory()->create();
         $second = CatalogTitle::factory()->create();
+        LicensedMedia::factory()->for($first)->create([
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        LicensedMedia::factory()->for($second)->create([
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
         $previousBuild = CatalogRecommendationBuild::query()->create([
             'algorithm_version' => 'v5',
             'feature_version' => 'regex-v1',
@@ -76,6 +85,85 @@ final class CatalogRecommendationBuildActivationTest extends TestCase
         $this->assertNotNull($build->fresh()->activated_at);
         $this->assertSame('evaluated', $previousBuild->fresh()->status);
         $this->assertGreaterThan($before, $versions->version(CacheDomain::Recommendations));
+    }
+
+    public function test_activation_rolls_back_when_candidate_becomes_unwatchable_after_evaluation(): void
+    {
+        $source = CatalogTitle::factory()->create();
+        $oldCandidate = CatalogTitle::factory()->create();
+        $newCandidate = CatalogTitle::factory()->create();
+        $media = LicensedMedia::factory()->for($newCandidate)->create([
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
+        CatalogTitleRecommendation::query()->create([
+            'catalog_title_id' => $source->id,
+            'recommended_title_id' => $oldCandidate->id,
+            'score' => 500,
+            'rank' => 1,
+            'algorithm_version' => 'v5',
+            'reasons' => ['genre' => ['score' => 400]],
+            'computed_at' => now()->subHour(),
+        ]);
+        $build = CatalogRecommendationBuild::query()->create([
+            'algorithm_version' => 'v6',
+            'feature_version' => 'tokens-v2',
+            'status' => 'evaluated',
+            'started_at' => now(),
+            'completed_at' => now(),
+        ]);
+        CatalogRecommendationBuildRow::query()->create($this->row($build, $source, $newCandidate, 1, 900));
+        $media->update(['health_status' => 'unavailable']);
+        $exception = null;
+
+        try {
+            app(CatalogRecommendationBuildActivator::class)->activate($build);
+        } catch (LogicException $caught) {
+            $exception = $caught;
+        }
+
+        $this->assertNotNull($exception);
+        $this->assertStringContainsString('недоступные', $exception->getMessage());
+        $this->assertSame(
+            [$oldCandidate->id],
+            CatalogTitleRecommendation::query()->pluck('recommended_title_id')->all(),
+        );
+        $this->assertSame('failed', $build->fresh()->status);
+    }
+
+    public function test_builder_never_persists_candidate_with_unplayable_media(): void
+    {
+        config([
+            'recommendations.similarity_v6.shadow_enabled' => true,
+            'recommendations.similarity_v6.allow_activation_without_golden' => true,
+        ]);
+        $source = CatalogTitle::factory()->create(['slug' => 'unplayable-source']);
+        $candidate = CatalogTitle::factory()->create(['slug' => 'unplayable-candidate']);
+        LicensedMedia::factory()->for($candidate)->create([
+            'status' => 'published',
+            'published_at' => now(),
+            'health_status' => 'unavailable',
+        ]);
+        CatalogTitleRelation::query()->create([
+            'source_title_id' => $source->id,
+            'target_title_id' => $candidate->id,
+            'relation_type' => CatalogTitleRelationType::ProviderRelated,
+            'source' => CatalogTitleRelationSource::ImportedProvider,
+            'provider_key' => 'unplayable-provider-relation',
+            'priority' => 100,
+            'is_locked' => false,
+            'is_active' => true,
+        ]);
+
+        $result = app(CatalogTitleRecommendationBuilder::class)->rebuild();
+
+        $this->assertFalse($result['gate_passed']);
+        $this->assertFalse($result['activated']);
+        $this->assertDatabaseMissing('catalog_recommendation_build_rows', [
+            'build_id' => $result['build_id'],
+            'recommended_title_id' => $candidate->id,
+        ]);
+        $this->assertDatabaseCount('catalog_title_recommendations', 0);
     }
 
     public function test_builder_rejects_an_unjudged_shadow_build_without_changing_active_rows(): void
@@ -174,6 +262,10 @@ final class CatalogRecommendationBuildActivationTest extends TestCase
         $candidate = CatalogTitle::factory()->create([
             'slug' => 'lucse-zvonite-solubetter-call-saul',
         ]);
+        LicensedMedia::factory()->for($source)->create([
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
         LicensedMedia::factory()->for($candidate)->create([
             'status' => 'published',
             'published_at' => now(),
@@ -184,6 +276,16 @@ final class CatalogRecommendationBuildActivationTest extends TestCase
             'relation_type' => CatalogTitleRelationType::ProviderRelated,
             'source' => CatalogTitleRelationSource::ImportedProvider,
             'provider_key' => 'forced-activation-failure',
+            'priority' => 100,
+            'is_locked' => false,
+            'is_active' => true,
+        ]);
+        CatalogTitleRelation::query()->create([
+            'source_title_id' => $candidate->id,
+            'target_title_id' => $source->id,
+            'relation_type' => CatalogTitleRelationType::ProviderRelated,
+            'source' => CatalogTitleRelationSource::ImportedProvider,
+            'provider_key' => 'forced-activation-failure-reverse',
             'priority' => 100,
             'is_locked' => false,
             'is_active' => true,
@@ -224,6 +326,10 @@ final class CatalogRecommendationBuildActivationTest extends TestCase
         $candidate = CatalogTitle::factory()->create([
             'slug' => 'lucse-zvonite-solubetter-call-saul',
         ]);
+        LicensedMedia::factory()->for($source)->create([
+            'status' => 'published',
+            'published_at' => now(),
+        ]);
         LicensedMedia::factory()->for($candidate)->create([
             'status' => 'published',
             'published_at' => now(),
@@ -234,6 +340,16 @@ final class CatalogRecommendationBuildActivationTest extends TestCase
             'relation_type' => CatalogTitleRelationType::ProviderRelated,
             'source' => CatalogTitleRelationSource::ImportedProvider,
             'provider_key' => 'golden-provider-relation',
+            'priority' => 100,
+            'is_locked' => false,
+            'is_active' => true,
+        ]);
+        CatalogTitleRelation::query()->create([
+            'source_title_id' => $candidate->id,
+            'target_title_id' => $source->id,
+            'relation_type' => CatalogTitleRelationType::ProviderRelated,
+            'source' => CatalogTitleRelationSource::ImportedProvider,
+            'provider_key' => 'golden-provider-relation-reverse',
             'priority' => 100,
             'is_locked' => false,
             'is_active' => true,

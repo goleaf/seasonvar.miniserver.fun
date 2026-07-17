@@ -8,6 +8,7 @@ use App\DTOs\PreparedImportedCollectionCover;
 use App\Models\CatalogCollection;
 use App\Services\Collections\CatalogCollectionCacheInvalidator;
 use App\Services\Crawler\PoliteHttpClient;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -192,6 +193,16 @@ final readonly class HdRezkaCollectionCoverImporter
         }
 
         try {
+            $this->ensureSharedRuntimeAccess($storage, $disk, $path);
+        } catch (Throwable $exception) {
+            if (! $alreadyExisted) {
+                $this->deleteBestEffort($disk, $path);
+            }
+
+            throw $exception;
+        }
+
+        try {
             $changed = DB::transaction(function () use ($collection, $cover, $disk, $path): bool {
                 $locked = CatalogCollection::query()->lockForUpdate()->findOrFail($collection->getKey());
 
@@ -271,6 +282,75 @@ final readonly class HdRezkaCollectionCoverImporter
     {
         return str_starts_with($path, "catalog-collections/{$publicId}/imported/")
             && str_ends_with($path, '.webp');
+    }
+
+    private function ensureSharedRuntimeAccess(FilesystemAdapter $storage, string $disk, string $path): void
+    {
+        if ((string) config("filesystems.disks.{$disk}.driver") !== 'local') {
+            throw new RuntimeException('Импортированные обложки должны храниться на локальном диске.');
+        }
+
+        $root = realpath($storage->path(''));
+        $absolutePath = realpath($storage->path($path));
+        $expectedCollectionRoot = is_string($root)
+            ? $root.DIRECTORY_SEPARATOR.'catalog-collections'
+            : null;
+        $collectionRoot = is_string($expectedCollectionRoot)
+            ? realpath($expectedCollectionRoot)
+            : false;
+        $expectedAbsolutePath = is_string($root)
+            ? $root.DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $path)
+            : null;
+
+        if (! is_string($root)
+            || ! is_string($absolutePath)
+            || ! is_string($collectionRoot)
+            || ! is_string($expectedCollectionRoot)
+            || ! is_string($expectedAbsolutePath)
+            || is_link($expectedCollectionRoot)
+            || $collectionRoot !== $expectedCollectionRoot
+            || $absolutePath !== $expectedAbsolutePath
+            || ! str_starts_with($absolutePath, $collectionRoot.DIRECTORY_SEPARATOR)) {
+            throw new RuntimeException('Путь импортированной обложки вышел за пределы локального хранилища.');
+        }
+
+        $directories = [];
+        $directory = dirname($absolutePath);
+
+        while (true) {
+            if ($directory === $collectionRoot) {
+                $directories[] = $directory;
+
+                break;
+            }
+
+            if (! str_starts_with($directory, $collectionRoot.DIRECTORY_SEPARATOR)) {
+                throw new RuntimeException('Не удалось проверить дерево импортированной обложки.');
+            }
+
+            $directories[] = $directory;
+            $directory = dirname($directory);
+        }
+
+        $configuredGroup = trim((string) config('uploads.runtime_group', ''));
+        $runtimeGroup = $configuredGroup !== '' ? $configuredGroup : filegroup($root);
+
+        if ($runtimeGroup === false) {
+            throw new RuntimeException('Не удалось определить группу процессов портала для обложки.');
+        }
+
+        $directoryMode = ((int) config("filesystems.disks.{$disk}.permissions.dir.private", 0770)) | 02000;
+        $fileMode = (int) config("filesystems.disks.{$disk}.permissions.file.private", 0660);
+
+        foreach (array_reverse($directories) as $directoryPath) {
+            if (! @chgrp($directoryPath, $runtimeGroup) || ! @chmod($directoryPath, $directoryMode)) {
+                throw new RuntimeException('Не удалось назначить права каталога импортированной обложки.');
+            }
+        }
+
+        if (! @chgrp($absolutePath, $runtimeGroup) || ! @chmod($absolutePath, $fileMode)) {
+            throw new RuntimeException('Не удалось назначить права файла импортированной обложки.');
+        }
     }
 
     private function deleteBestEffort(string $disk, string $path): bool

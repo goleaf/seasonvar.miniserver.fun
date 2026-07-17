@@ -1,12 +1,13 @@
 # Обновление Laravel и runtime
 
-Обновлено: 15.07.2026. Детальный package inventory и решения находятся в [`audits/dependency-report.md`](audits/dependency-report.md), исполняемый порядок — в [`plans/laravel-video-portal-modernization.md`](plans/laravel-video-portal-modernization.md). Этот файл — короткий owner-контракт controlled upgrades.
+Обновлено: 17.07.2026. Детальный package inventory и решения находятся в [`audits/dependency-report.md`](audits/dependency-report.md), исполняемый порядок — в [`plans/laravel-video-portal-modernization.md`](plans/laravel-video-portal-modernization.md). Этот файл — короткий owner-контракт controlled upgrades.
 
 ## Текущее состояние
 
 - PHP 8.5.8 — актуальный stable PHP 8.5 patch.
-- Laravel Framework 13.19.0; доступен совместимый 13.20.0 patch.
+- Laravel Framework 13.20.0.
 - Livewire 4.3.3, Laravel Boost 2.4.12, Pint 1.29.3, Larastan 3.10.0, PHPUnit 12.5.31.
+- `wddyousuf/eloquent-autocache` 0.2.3 закреплён как контролируемая production dependency для двух opt-in query моделей.
 - Tailwind CSS 4.3.2, Vite 8.1.4, Laravel Vite plugin 3.1.0; для plugin доступен 3.1.3 patch.
 - Node 26.4.0; официальный current — 26.5.0. npm 12.0.1 и Composer 2.10.2 актуальны.
 
@@ -37,6 +38,8 @@ npm run test:browser
 ```
 
 Laravel 13.20.0 release добавляет/fixes QueueFake hooks, worker memory event data, session prefix support, HTTP header normalization, sensitive parameters and several Eloquent/Storage helpers. Перед update выполняется targeted search по этим API; новые features не принимаются автоматически.
+
+Любое обновление `wddyousuf/eloquent-autocache` выполняется отдельным allowlisted Composer change set. Обязательны проверка совместимости с текущим Laravel 13, review config defaults и payload format, а также focused lifecycle tests `EloquentAutoCacheDependencyTest` и `EloquentAutoCacheIntegrationTest`: opt-in isolation, cache hit, warming, create/update/delete invalidation, model isolation, rollback и hydration при `cache.serializable_classes=false`.
 
 ## Запрещено
 

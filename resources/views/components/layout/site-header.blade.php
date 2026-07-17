@@ -1,7 +1,7 @@
 @props(['siteName', 'searchQuery' => '', 'header'])
 
 <header data-site-header {{ $attributes->class(['border-b border-slate-200 bg-white shadow-panel lg:sticky lg:top-0 lg:z-50']) }}>
-    <div data-site-header-primary class="mx-auto flex max-w-[1760px] min-w-0 items-center gap-3 px-3 py-3 sm:px-6 lg:px-8">
+    <div data-site-header-primary class="mx-auto flex max-w-[1760px] min-w-0 flex-wrap items-center gap-2 px-3 py-3 sm:gap-3 sm:px-6 lg:px-8">
         <a href="{{ $header['home_url'] }}" aria-label="{{ $siteName }}" class="flex min-w-11 shrink-0 items-center gap-3 rounded-control sm:min-w-0 sm:max-w-48 lg:max-w-72">
             <span class="grid h-11 w-11 shrink-0 place-items-center rounded-control bg-emerald-50 text-lg text-emerald-700">
                 <x-ui.icon name="fa-solid fa-film" />
@@ -10,6 +10,18 @@
         </a>
 
         <x-layout.header-search :initial-query="$searchQuery" :search-url="$header['search_url']" />
+
+        <div data-site-header-actions class="ml-auto flex shrink-0 items-center gap-1.5">
+            @foreach ($header['actions'] as $item)
+                <a href="{{ $item->url }}" class="{{ $item->className }}" @if ($item->ariaCurrent !== null) aria-current="{{ $item->ariaCurrent }}" @endif>
+                    <x-ui.icon :name="$item->icon" />
+                    <span class="sr-only sm:not-sr-only">{{ $item->label }}</span>
+                </a>
+            @endforeach
+            @if ($header['show_logout'])
+                <livewire:auth.logout-button />
+            @endif
+        </div>
     </div>
 
     <div class="border-t border-slate-200 bg-slate-50">
@@ -20,9 +32,6 @@
                     <span class="sr-only sm:not-sr-only">{{ $item->label }}</span>
                 </a>
             @endforeach
-            @if ($header['show_logout'])
-                <livewire:auth.logout-button />
-            @endif
         </nav>
     </div>
 </header>

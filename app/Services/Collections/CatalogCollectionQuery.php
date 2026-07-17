@@ -499,7 +499,9 @@ final class CatalogCollectionQuery
             ]);
 
         if ($this->schema->sourceSyncAvailable()) {
-            $query->withExists(['sourceRecord as has_import_source']);
+            $query
+                ->with('sourceRecord:id,catalog_collection_id,missing_since_at')
+                ->withExists(['sourceRecord as has_import_source']);
         } else {
             $query->selectRaw('0 as has_import_source');
         }

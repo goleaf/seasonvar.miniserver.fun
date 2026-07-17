@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Enums\CatalogTopListCategory;
 use App\Enums\ContentAudience;
 use App\Enums\MediaHealthStatus;
+use App\Livewire\CatalogTopListPage;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRating;
 use App\Models\Country;
@@ -18,6 +19,7 @@ use App\Models\User;
 use App\Services\Catalog\CatalogTopListQuery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 final class CatalogTopListPageTest extends TestCase
@@ -25,6 +27,18 @@ final class CatalogTopListPageTest extends TestCase
     use RefreshDatabase;
 
     private ?Genre $animationGenre = null;
+
+    public function test_top_list_route_is_owned_by_full_page_livewire(): void
+    {
+        $this->assertSame(
+            CatalogTopListPage::class,
+            Route::getRoutes()->getByName('top.show')?->getActionName(),
+        );
+
+        $this->get(route('top.show', ['category' => CatalogTopListCategory::Movies->value]))
+            ->assertOk()
+            ->assertSeeLivewire('catalog-top-list-page');
+    }
 
     public function test_four_top_list_routes_apply_distinct_catalog_boundaries(): void
     {
@@ -129,41 +143,55 @@ final class CatalogTopListPageTest extends TestCase
     {
         $lithuania = Country::query()->create(['name' => 'Литва', 'slug' => 'litva']);
         $unitedStates = Country::query()->create(['name' => 'США', 'slug' => 'ssha']);
+        $drama = Genre::query()->create(['name' => 'Драмы', 'slug' => 'dramy']);
+        $comedy = Genre::query()->create(['name' => 'Комедии', 'slug' => 'komedii']);
         $matching = $this->rankableTitle('Литовский сериал 2015', CatalogTopListCategory::Series);
         $tooOld = $this->rankableTitle('Литовский сериал 2009', CatalogTopListCategory::Series);
         $wrongCountry = $this->rankableTitle('Американский сериал 2015', CatalogTopListCategory::Series);
+        $wrongGenre = $this->rankableTitle('Литовская комедия 2015', CatalogTopListCategory::Series);
         $matching->update(['year' => 2015]);
         $tooOld->update(['year' => 2009]);
         $wrongCountry->update(['year' => 2015]);
+        $wrongGenre->update(['year' => 2015]);
         $matching->countries()->attach($lithuania);
         $tooOld->countries()->attach($lithuania);
         $wrongCountry->countries()->attach($unitedStates);
+        $wrongGenre->countries()->attach($lithuania);
+        $matching->genres()->attach($drama);
+        $tooOld->genres()->attach($drama);
+        $wrongCountry->genres()->attach($drama);
+        $wrongGenre->genres()->attach($comedy);
 
         $response = $this->get(route('top.show', [
             'category' => CatalogTopListCategory::Series->value,
             'year_from' => 2010,
             'year_to' => 2020,
             'country' => $lithuania->slug,
+            'genre' => $drama->slug,
         ]));
 
         $response
             ->assertOk()
             ->assertSee($matching->title)
             ->assertDontSee($tooOld->title)
-            ->assertDontSee($wrongCountry->title);
+            ->assertDontSee($wrongCountry->title)
+            ->assertDontSee($wrongGenre->title);
     }
 
     public function test_top_list_filter_form_preserves_state_across_category_links_and_uses_filtered_seo(): void
     {
         $lithuania = Country::query()->create(['name' => 'Литва', 'slug' => 'litva']);
+        $drama = Genre::query()->create(['name' => 'Драмы', 'slug' => 'dramy']);
         $matching = $this->rankableTitle('Литовский сериал с формой', CatalogTopListCategory::Series);
         $matching->update(['year' => 2015]);
         $matching->countries()->attach($lithuania);
+        $matching->genres()->attach($drama);
         $url = route('top.show', [
             'category' => CatalogTopListCategory::Series->value,
             'year_from' => 2010,
             'year_to' => 2020,
             'country' => $lithuania->slug,
+            'genre' => $drama->slug,
         ]);
         $canonical = route('top.show', ['category' => CatalogTopListCategory::Series->value]);
         $moviesUrl = route('top.show', [
@@ -171,6 +199,7 @@ final class CatalogTopListPageTest extends TestCase
             'year_from' => 2010,
             'year_to' => 2020,
             'country' => $lithuania->slug,
+            'genre' => $drama->slug,
         ]);
 
         $response = $this->get($url)->assertOk();
@@ -180,9 +209,11 @@ final class CatalogTopListPageTest extends TestCase
             ->assertSee('name="year_from"', false)
             ->assertSee('name="year_to"', false)
             ->assertSee('name="country"', false)
+            ->assertSee('name="genre"', false)
             ->assertSee('value="2010"', false)
             ->assertSee('value="2020"', false)
             ->assertSee('value="litva" selected', false)
+            ->assertSee('value="dramy" selected', false)
             ->assertSee($moviesUrl)
             ->assertSee('<link rel="canonical" href="'.$canonical.'">', false)
             ->assertSee('<meta name="robots" content="noindex,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">', false)
@@ -192,12 +223,12 @@ final class CatalogTopListPageTest extends TestCase
 
     public function test_filtered_empty_state_resets_to_the_current_top_list(): void
     {
-        $lithuania = Country::query()->create(['name' => 'Литва', 'slug' => 'litva']);
+        $drama = Genre::query()->create(['name' => 'Драмы', 'slug' => 'dramy']);
         $resetUrl = route('top.show', ['category' => CatalogTopListCategory::Movies->value]);
 
         $response = $this->get(route('top.show', [
             'category' => CatalogTopListCategory::Movies->value,
-            'country' => $lithuania->slug,
+            'genre' => $drama->slug,
         ]));
 
         $response
@@ -208,7 +239,7 @@ final class CatalogTopListPageTest extends TestCase
             ->assertDontSee('Сейчас в этой категории нет доступных тайтлов с оценками.');
     }
 
-    public function test_top_list_rejects_unknown_country_and_inverted_year_range(): void
+    public function test_top_list_rejects_unknown_country_genre_and_inverted_year_range(): void
     {
         $url = route('top.show', ['category' => CatalogTopListCategory::Movies->value]);
 
@@ -219,9 +250,10 @@ final class CatalogTopListPageTest extends TestCase
                 'year_from' => 2020,
                 'year_to' => 2010,
                 'country' => 'neizvestnaya-strana',
+                'genre' => 'neizvestnyi-zhanr',
             ]))
             ->assertRedirect($url)
-            ->assertSessionHasErrors(['year_from', 'country']);
+            ->assertSessionHasErrors(['year_from', 'country', 'genre']);
     }
 
     public function test_list_excludes_private_unrated_and_unwatchable_titles_even_for_authenticated_viewers(): void
@@ -251,9 +283,9 @@ final class CatalogTopListPageTest extends TestCase
     {
         $lowest = null;
         $highest = null;
-        $selectedCountry = Country::query()->create([
-            'name' => 'Страна нижней позиции',
-            'slug' => 'strana-nizhnei-pozicii',
+        $selectedGenre = Genre::query()->create([
+            'name' => 'Жанр нижней позиции',
+            'slug' => 'zhanr-nizhnei-pozicii',
         ]);
 
         foreach (range(1, 101) as $number) {
@@ -285,10 +317,10 @@ final class CatalogTopListPageTest extends TestCase
         $this->assertStringContainsString('data-top-list-podium', $html);
         $this->assertStringContainsString('data-top-list-main', $html);
 
-        $lowest->countries()->attach($selectedCountry);
+        $lowest->genres()->attach($selectedGenre);
         $filteredHtml = $this->get(route('top.show', [
             'category' => CatalogTopListCategory::Series->value,
-            'country' => $selectedCountry->slug,
+            'genre' => $selectedGenre->slug,
         ]))->assertOk()->getContent();
 
         $this->assertSame(1, substr_count($filteredHtml, 'data-top-list-row'));

@@ -20,13 +20,13 @@ final class CatalogCollectionResolver
         $normalized = Str::lower(trim($slug));
         abort_if($normalized === '' || mb_strlen($normalized) > 180, 404);
 
-        $collection = CatalogCollection::query()->where('slug', $normalized)->first();
+        $collection = $this->query()->where('slug', $normalized)->first();
 
         if ($collection !== null) {
             return ['collection' => $collection, 'historical' => $normalized !== $slug];
         }
 
-        $collection = CatalogCollection::query()
+        $collection = $this->query()
             ->whereHas('historicalSlugs', fn (Builder $query): Builder => $query->where('slug', $normalized))
             ->firstOrFail();
 
@@ -37,10 +37,22 @@ final class CatalogCollectionResolver
     {
         abort_unless($this->schema->available(), 404);
         abort_unless(Str::isUuid($publicId), 404);
-        $query = CatalogCollection::query();
+        $query = $this->query();
 
         return ($withTrashed ? $query->withTrashed() : $query)
             ->where('public_id', Str::lower($publicId))
             ->firstOrFail();
+    }
+
+    /** @return Builder<CatalogCollection> */
+    private function query(): Builder
+    {
+        $query = CatalogCollection::query();
+
+        if ($this->schema->sourceSyncAvailable()) {
+            $query->with('sourceRecord:id,catalog_collection_id,missing_since_at');
+        }
+
+        return $query;
     }
 }

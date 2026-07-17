@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Actor;
 use App\Models\CatalogRecommendationBuild;
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleRating;
 use App\Models\CatalogTitleRecommendation;
 use App\Models\CatalogTitleUserState;
 use App\Models\Country;
@@ -131,6 +132,14 @@ $media = LicensedMedia::factory()->create([
     'check_status' => 'available',
     'health_status' => 'active',
     'published_at' => now()->subMinute(),
+]);
+
+CatalogTitleRating::query()->create([
+    'catalog_title_id' => $title->id,
+    'provider' => 'kinopoisk',
+    'rating' => 8.4,
+    'votes' => 25_000,
+    'raw_value' => '8.4',
 ]);
 
 LicensedMedia::factory()->create([

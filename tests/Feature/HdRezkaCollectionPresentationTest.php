@@ -9,6 +9,7 @@ use App\Enums\CatalogCollectionSort;
 use App\Enums\CatalogCollectionSyncStatus;
 use App\Enums\CatalogCollectionType;
 use App\Enums\CatalogCollectionVisibility;
+use App\Livewire\Collections\CatalogCollectionPage;
 use App\Models\CatalogCollection;
 use App\Models\CatalogCollectionItem;
 use App\Models\CatalogCollectionSource;
@@ -17,6 +18,7 @@ use App\Models\CatalogTitle;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -31,6 +33,25 @@ final class HdRezkaCollectionPresentationTest extends TestCase
 
         Storage::fake('uploads');
         config(['uploads.disk' => 'uploads']);
+    }
+
+    public function test_collection_route_is_owned_by_full_page_livewire_and_keeps_private_headers(): void
+    {
+        $collection = $this->collection();
+
+        $this->assertSame(
+            CatalogCollectionPage::class,
+            Route::getRoutes()->getByName('collections.show')?->getActionName(),
+        );
+
+        $response = $this->get(route('collections.show', ['collectionSlug' => $collection->slug]))
+            ->assertOk()
+            ->assertSeeLivewire('collections.catalog-collection-page');
+
+        $cacheControl = (string) $response->headers->get('Cache-Control');
+        $this->assertStringContainsString('private', $cacheControl);
+        $this->assertStringContainsString('no-store', $cacheControl);
+        $this->assertStringContainsString('max-age=0', $cacheControl);
     }
 
     public function test_public_directory_uses_local_cover_responsive_grid_and_imported_editorial_badges(): void
@@ -114,6 +135,15 @@ final class HdRezkaCollectionPresentationTest extends TestCase
             ->assertDontSee('https://hdrezka.my', false)
             ->assertDontSee('/xfsearch/collections/secret-source/', false);
         $this->assertCount(1, $syncQueries);
+    }
+
+    public function test_public_collection_comment_status_region_has_an_accessible_role(): void
+    {
+        $collection = $this->collection();
+
+        $this->get(route('collections.show', ['collectionSlug' => $collection->slug]))
+            ->assertOk()
+            ->assertSee('role="status" aria-live="polite" aria-atomic="true" aria-label="Результат действия с комментариями"', false);
     }
 
     private function collection(): CatalogCollection

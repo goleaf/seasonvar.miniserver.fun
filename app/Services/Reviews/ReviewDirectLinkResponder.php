@@ -2,34 +2,33 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers;
+namespace App\Services\Reviews;
 
 use App\Enums\ReviewStatus;
 use App\Models\CatalogTitleReview;
 use App\Models\CatalogTitleReviewAlias;
 use App\Models\User;
 use App\Services\Catalog\CatalogTitleQuery;
-use App\Services\Reviews\CatalogTitleReviewQuery;
-use App\Services\Reviews\ReviewSchema;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
-final class ReviewDirectLinkController extends Controller
+final readonly class ReviewDirectLinkResponder
 {
-    public function __invoke(
-        Request $request,
-        string $review,
-        ReviewSchema $schema,
-        CatalogTitleQuery $titles,
-        CatalogTitleReviewQuery $reviews,
-    ): RedirectResponse {
-        abort_unless($schema->legacyAvailable() && ctype_digit($review) && (int) $review > 0, 404);
+    public function __construct(
+        private ReviewSchema $schema,
+        private CatalogTitleQuery $titles,
+        private CatalogTitleReviewQuery $reviews,
+    ) {}
+
+    public function response(Request $request, string $review): RedirectResponse
+    {
+        abort_unless($this->schema->legacyAvailable() && ctype_digit($review) && (int) $review > 0, 404);
         $reviewId = (int) $review;
         $viewer = $request->user();
         $viewer = $viewer instanceof User ? $viewer : null;
         $record = CatalogTitleReview::query()->find($reviewId);
 
-        if ($record === null && $schema->writable()) {
+        if ($record === null && $this->schema->writable()) {
             $alias = CatalogTitleReviewAlias::query()
                 ->with('canonicalReview:id,catalog_title_id,status,merged_into_id,deleted_at')
                 ->find($reviewId);
@@ -38,7 +37,7 @@ final class ReviewDirectLinkController extends Controller
 
         abort_unless($record instanceof CatalogTitleReview, 404);
 
-        if ($schema->communityAvailable()) {
+        if ($this->schema->communityAvailable()) {
             $visited = [];
 
             while ($record->merged_into_id !== null) {
@@ -53,12 +52,12 @@ final class ReviewDirectLinkController extends Controller
                 && $record->deleted_at === null,
                 404,
             );
-            abort_unless($reviews->publicReviewById((int) $record->id, $viewer)->exists(), 404);
+            abort_unless($this->reviews->publicReviewById((int) $record->id, $viewer)->exists(), 404);
         }
 
-        $title = $titles->visibleTo($viewer)->find($record->catalog_title_id);
+        $title = $this->titles->visibleTo($viewer)->find($record->catalog_title_id);
         abort_unless($title !== null, 404);
-        $page = $reviews->pageForPublicReview($record, $viewer);
+        $page = $this->reviews->pageForPublicReview($record, $viewer);
         $url = route('titles.show', [
             'catalogTitle' => $title,
             'review' => $record->id,

@@ -70,6 +70,27 @@ final class CatalogRecommendationQualityEvaluatorTest extends TestCase
         $this->assertSame(0.5, $report->precisionAtLimit);
         $this->assertSame(1.0, $report->ndcgAtLimit);
         $this->assertSame(2, $report->judgedRowCount);
-        $this->assertSame(0.6667, $report->judgmentCoverage);
+        $this->assertSame(1.0, $report->judgmentCoverage);
+    }
+
+    public function test_judgment_coverage_measures_retrieved_positive_golden_pairs(): void
+    {
+        $rows = [
+            ['source' => 'source-a', 'candidate' => 'relevant', 'rank' => 1, 'watchable' => true, 'reasons' => ['genre']],
+            ['source' => 'source-a', 'candidate' => 'known-negative', 'rank' => 2, 'watchable' => true, 'reasons' => ['actor']],
+            ['source' => 'source-a', 'candidate' => 'unjudged', 'rank' => 3, 'watchable' => true, 'reasons' => ['theme_romance']],
+        ];
+        $grades = [
+            'source-a' => [
+                'relevant' => 2,
+                'known-negative' => 0,
+                'missed-relevant' => 1,
+            ],
+        ];
+
+        $report = app(CatalogRecommendationQualityEvaluator::class)->evaluate($rows, $grades, 3);
+
+        $this->assertSame(2, $report->judgedRowCount);
+        $this->assertSame(0.5, $report->judgmentCoverage);
     }
 }

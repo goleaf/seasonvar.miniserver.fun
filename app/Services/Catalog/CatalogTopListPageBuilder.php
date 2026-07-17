@@ -48,6 +48,8 @@ final class CatalogTopListPageBuilder
                 'yearTo' => $filters->yearTo,
                 'country' => $filters->country,
                 'countries' => $this->filterOptions->countries(),
+                'genre' => $filters->genre,
+                'genres' => $this->filterOptions->genres(),
                 'maximumYear' => (int) now()->format('Y') + 1,
                 'active' => $filters->active(),
             ],
@@ -70,7 +72,7 @@ final class CatalogTopListPageBuilder
         ];
     }
 
-    /** @param array{year_from?: int, year_to?: int, country?: string} $query */
+    /** @param array{year_from?: int, year_to?: int, country?: string, genre?: string} $query */
     private function categoryUrl(
         CatalogTopListCategory $category,
         bool $localizedAlias,

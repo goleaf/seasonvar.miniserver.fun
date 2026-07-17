@@ -17,13 +17,14 @@ final class CatalogTopListFiltersTest extends TestCase
 
     public function test_filters_expose_only_active_normalized_values(): void
     {
-        $filters = new CatalogTopListFilters(2010, 2019, 'litva');
+        $filters = new CatalogTopListFilters(2010, 2019, 'litva', 'dramy');
 
         $this->assertTrue($filters->active());
         $this->assertSame([
             'year_from' => 2010,
             'year_to' => 2019,
             'country' => 'litva',
+            'genre' => 'dramy',
         ], $filters->query());
         $this->assertSame($filters->query(), $filters->contextFilters());
         $this->assertFalse(CatalogTopListFilters::empty()->active());
@@ -39,6 +40,17 @@ final class CatalogTopListFiltersTest extends TestCase
 
         $this->assertTrue($validator->fails());
         $this->assertArrayHasKey('country', $validator->errors()->toArray());
+    }
+
+    public function test_request_rejects_unknown_genre(): void
+    {
+        $request = CatalogTopListRequest::create('/top/movies', 'GET', [
+            'genre' => 'unknown',
+        ]);
+        $validator = $this->validator($request);
+
+        $this->assertTrue($validator->fails());
+        $this->assertArrayHasKey('genre', $validator->errors()->toArray());
     }
 
     public function test_request_rejects_inverted_years(): void

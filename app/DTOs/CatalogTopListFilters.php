@@ -10,6 +10,7 @@ final readonly class CatalogTopListFilters
         public ?int $yearFrom = null,
         public ?int $yearTo = null,
         public ?string $country = null,
+        public ?string $genre = null,
     ) {}
 
     public static function empty(): self
@@ -17,17 +18,18 @@ final readonly class CatalogTopListFilters
         return new self;
     }
 
-    /** @return array{year_from?: int, year_to?: int, country?: string} */
+    /** @return array{year_from?: int, year_to?: int, country?: string, genre?: string} */
     public function query(): array
     {
         return array_filter([
             'year_from' => $this->yearFrom,
             'year_to' => $this->yearTo,
             'country' => $this->country,
+            'genre' => $this->genre,
         ], static fn (int|string|null $value): bool => $value !== null && $value !== '');
     }
 
-    /** @return array{year_from?: int, year_to?: int, country?: string} */
+    /** @return array{year_from?: int, year_to?: int, country?: string, genre?: string} */
     public function contextFilters(): array
     {
         return $this->query();

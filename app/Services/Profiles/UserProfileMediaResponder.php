@@ -2,25 +2,25 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers;
+namespace App\Services\Profiles;
 
-use App\Services\Profiles\UserProfileResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\Response;
 
-final class UserProfileMediaController extends Controller
+final readonly class UserProfileMediaResponder
 {
-    public function __invoke(
+    public function __construct(private UserProfileResolver $profiles) {}
+
+    public function response(
         Request $request,
         string $userPublicId,
         string $kind,
         int $version,
-        UserProfileResolver $profiles,
     ): Response {
         abort_unless(in_array($kind, ['avatar', 'cover'], true), 404);
-        $profile = $profiles->byUserPublicId($userPublicId);
+        $profile = $this->profiles->byUserPublicId($userPublicId);
         Gate::authorize('view', $profile);
         $diskName = $profile->getAttribute($kind.'_disk');
         $path = $profile->getAttribute($kind.'_path');

@@ -2,24 +2,22 @@
 
 declare(strict_types=1);
 
-namespace App\Http\Controllers;
+namespace App\Services\TechnicalIssues;
 
 use App\Models\TechnicalIssue;
 use App\Models\TechnicalIssueAttachment;
-use App\Services\TechnicalIssues\TechnicalIssueSchema;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-final class TechnicalIssueAttachmentController
+final readonly class TechnicalIssueAttachmentResponder
 {
-    public function __invoke(
-        string $technicalIssue,
-        string $attachment,
-        TechnicalIssueSchema $schema,
-    ): StreamedResponse|Response {
-        if (! $schema->ready()) {
+    public function __construct(private TechnicalIssueSchema $schema) {}
+
+    public function response(string $technicalIssue, string $attachment): StreamedResponse|Response
+    {
+        if (! $this->schema->ready()) {
             return response(__('issues.errors.action_unavailable'), 503, [
                 'Cache-Control' => 'private, no-store, max-age=0',
                 'X-Content-Type-Options' => 'nosniff',

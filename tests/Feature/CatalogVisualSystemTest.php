@@ -26,6 +26,7 @@ class CatalogVisualSystemTest extends TestCase
             ->assertSee('data-site-header', false)
             ->assertSee('aria-label="Поиск по каталогу"', false)
             ->assertSee('placeholder="Введите название или раздел"', false)
+            ->assertSee('data-site-header-actions', false)
             ->assertSee('aria-label="Основная навигация"', false)
             ->assertSee('aria-current="page"', false)
             ->assertSee('data-site-footer', false)
@@ -41,11 +42,20 @@ class CatalogVisualSystemTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('data-site-header-primary', false)
+            ->assertSee('data-site-header-actions', false)
             ->assertSee('data-site-header-navigation', false);
 
         $this->assertLessThan(
             strpos($html, 'data-site-header-navigation'),
             strpos($html, 'data-site-header-primary'),
+        );
+        $this->assertLessThan(
+            strpos($html, 'data-site-header-navigation'),
+            strpos($html, 'data-site-header-actions'),
+        );
+        $this->assertLessThan(
+            strpos($html, 'data-site-header-actions'),
+            strpos($html, 'data-header-search-autocomplete'),
         );
         $this->assertStringContainsString('flex flex-wrap', $component);
         $this->assertStringContainsString('<span class="sr-only sm:not-sr-only">{{ $item->label }}</span>', $component);

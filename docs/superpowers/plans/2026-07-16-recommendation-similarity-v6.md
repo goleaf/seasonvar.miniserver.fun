@@ -84,7 +84,7 @@ $gain = static fn (int $grade): float => (2 ** max(0, min(2, $grade))) - 1;
 $discount = static fn (int $rank): float => 1 / log($rank + 1, 2);
 ```
 
-Group rows by source and truncate to `$limit`. Для Precision/nDCG учитывать только candidates, которые явно присутствуют в grade map; неразмеченные строки исключать, а не считать нулём. Отдельно считать `judgedRowCount` и его долю среди ранжированных строк. Compute DCG/ideal DCG per graded source, then average sources. A row is reason-faithful only when `reasons !== []`. `watchableRate` is watchable rows divided by all rows. Round ratios to four decimals in the DTO factory.
+Group rows by source and truncate to `$limit`. Для Precision/nDCG учитывать только candidates, которые явно присутствуют в grade map; неразмеченные строки исключать, а не считать нулём. `judgedRowCount` сохраняет число явно оценённых output rows, а `judgmentCoverage` считает долю положительных golden-пар, найденных в top-`$limit`; grades `0` не должны искусственно повышать coverage. Compute DCG/ideal DCG per graded source, then average sources. A row is reason-faithful only when `reasons !== []`. `watchableRate` is watchable rows divided by all rows. Round ratios to four decimals in the DTO factory.
 
 - [x] **Step 4: Добавить stratified golden JSON**
 
@@ -597,9 +597,11 @@ Expected: `0` failures. If unrelated concurrent work fails, preserve complete ou
 
 Confirm no active `php artisan seasonvar:import` process. Run the existing import command in its normal supported mode; never kill the current import. Capture build ID, duration, rows, empty count, availability, nDCG, concentration, churn and peak memory.
 
+Baseline 16 июля 2026 года до v6: все 36 golden source доступны и watchable; v4 даёт 370 rows для 32 source, `nDCG@12=0.4666`, 4 пустых source и находит 26 из 58 положительных golden-пар (`judgment_coverage=0.4483`). Во всей active таблице 383232 rows, 0 self-pairs, 0 скрытых/невоспроизводимых candidates, 0 пустых reasons и 0 duplicate pairs; legacy v4 содержит 1870 source с rank gaps, которые должен устранить атомарный v6 rebuild.
+
 - [ ] **Step 5: Activate only on gate pass and perform SQL QA**
 
-Verify one active algorithm version, no self-pairs, no unavailable candidates, ranks 1..N without gaps, and no source above configured max rows. Compare the audited sample titles before/after.
+Verify one active algorithm version, no self-pairs, no unavailable candidates, ranks 1..N without gaps, and no source above configured max rows. Activator обязан повторно проверить strict playable media и равенство полного/допустимого row count внутри transaction; расхождение откатывает active rows. Compare the audited sample titles before/after.
 
 - [x] **Step 6: Browser QA**
 

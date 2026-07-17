@@ -11,6 +11,7 @@ use App\Models\CatalogTitle;
 use App\Models\CatalogTitleRecommendation;
 use App\Models\CatalogTitleRecommendationSignal;
 use App\Models\LicensedMedia;
+use App\Models\SeasonvarImportRun;
 use App\Services\Catalog\CatalogCacheWarmRequestStore;
 use App\Services\Catalog\CatalogRecommendationDirtyTitleTracker;
 use App\Services\Catalog\CatalogTitleRecommendationBuilder;
@@ -118,6 +119,41 @@ final class RebuildCatalogRecommendationsAfterCollectionSyncTest extends TestCas
             'catalog_title_id' => $title->id,
         ]);
         $this->assertDatabaseCount('catalog_recommendation_builds', 0);
+        $this->assertNull(app(CatalogCacheWarmRequestStore::class)->claim(10));
+        Queue::assertNotPushed(WarmCatalogCaches::class);
+    }
+
+    public function test_job_leaves_dirty_titles_for_an_active_import_pipeline_without_warming_cache(): void
+    {
+        Queue::fake();
+        CatalogRecommendationBuild::query()->create([
+            'algorithm_version' => 'v6',
+            'feature_version' => 'tokens-v2',
+            'status' => 'active',
+            'started_at' => now()->subMinutes(5),
+            'completed_at' => now()->subMinutes(4),
+            'activated_at' => now()->subMinutes(4),
+        ]);
+        SeasonvarImportRun::query()->create([
+            'mode' => 'sitemap',
+            'status' => 'running',
+            'started_at' => now()->subMinute(),
+            'last_heartbeat_at' => now(),
+        ]);
+        $title = CatalogTitle::factory()->create();
+        app(CatalogRecommendationDirtyTitleTracker::class)->mark(
+            $title->id,
+            'editorial-collection-sync',
+        );
+
+        (new RebuildCatalogRecommendationsAfterCollectionSync)->handle(
+            app(CatalogTitleRecommendationBuilder::class),
+            app(CatalogCacheWarmRequestStore::class),
+        );
+
+        $this->assertDatabaseHas('catalog_recommendation_dirty_titles', [
+            'catalog_title_id' => $title->id,
+        ]);
         $this->assertNull(app(CatalogCacheWarmRequestStore::class)->claim(10));
         Queue::assertNotPushed(WarmCatalogCaches::class);
     }

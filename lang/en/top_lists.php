@@ -22,27 +22,31 @@ return [
     'empty_description' => 'There are currently no rated, available titles in this category.',
     'empty_action' => 'Open the full catalog',
     'empty_filtered_title' => 'Nothing matches the selected conditions',
-    'empty_filtered_description' => 'Change the year or country to see more ranking positions.',
+    'empty_filtered_description' => 'Change the year, country or genre to see more ranking positions.',
     'empty_filtered_action' => 'Reset filters',
     'filters' => [
         'title' => 'Refine the ranking',
-        'description' => 'Choose release years and a country. Conditions are applied before the first 100 positions are selected.',
+        'description' => 'Choose release years, a country and a genre. Conditions are applied before the first 100 positions are selected.',
         'year_from' => 'Year from',
         'year_to' => 'Year to',
         'country' => 'Country',
         'all_countries' => 'All countries',
+        'genre' => 'Genre',
+        'all_genres' => 'All genres',
         'submit' => 'Show results',
         'reset' => 'Reset',
     ],
     'validation' => [
         'year' => 'Enter a supported year from 1900 through the next calendar year.',
         'country' => 'Select a country from the available list.',
+        'genre' => 'Select a genre from the available list.',
         'range' => 'The first year cannot be later than the last year.',
     ],
     'attributes' => [
         'year_from' => 'first year',
         'year_to' => 'last year',
         'country' => 'country',
+        'genre' => 'genre',
     ],
     'categories' => [
         'movies' => [

@@ -164,7 +164,9 @@ final class CatalogCollection extends Model
     {
         $query
             ->where('visibility', CatalogCollectionVisibility::Public->value)
-            ->where('moderation_status', CatalogCollectionModerationStatus::Approved->value);
+            ->where('moderation_status', CatalogCollectionModerationStatus::Approved->value)
+            ->whereDoesntHave('sourceRecord', fn (Builder $source): Builder => $source
+                ->whereNotNull('missing_since_at'));
     }
 
     public function isOwnedBy(?User $user): bool
@@ -176,6 +178,7 @@ final class CatalogCollection extends Model
     {
         return $this->visibility->isDirectlyViewable()
             && $this->moderation_status->isPubliclyViewable()
+            && (! $this->relationLoaded('sourceRecord') || $this->sourceRecord?->missing_since_at === null)
             && $this->deleted_at === null;
     }
 

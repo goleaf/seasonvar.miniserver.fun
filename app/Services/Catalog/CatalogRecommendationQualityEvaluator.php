@@ -40,20 +40,24 @@ final class CatalogRecommendationQualityEvaluator
         $ndcgSources = 0;
         $emptySourceCount = 0;
         $judgedRowCount = 0;
-        $rankedRowCount = 0;
+        $positiveJudgmentCount = 0;
+        $retrievedPositiveJudgmentCount = 0;
 
         foreach ($sourceNames as $source) {
             $sourceRows = $rowsBySource[$source] ?? [];
             usort($sourceRows, fn (array $left, array $right): int => ($left['rank'] <=> $right['rank'])
                 ?: strcmp($left['candidate'], $right['candidate']));
             $sourceRows = array_slice($sourceRows, 0, $limit);
-            $rankedRowCount += count($sourceRows);
 
             if ($sourceRows === []) {
                 $emptySourceCount++;
             }
 
             $sourceGrades = $normalizedGrades[$source] ?? [];
+            $positiveJudgmentCount += count(array_filter(
+                $sourceGrades,
+                static fn (int $grade): bool => $grade > 0,
+            ));
             $judgedRows = array_values(array_filter(
                 $sourceRows,
                 fn (array $row): bool => array_key_exists($row['candidate'], $sourceGrades),
@@ -63,6 +67,7 @@ final class CatalogRecommendationQualityEvaluator
                 $judgedRows,
                 fn (array $row): bool => $sourceGrades[$row['candidate']] > 0,
             ));
+            $retrievedPositiveJudgmentCount += $relevant;
 
             if ($judgedRows !== []) {
                 $precision += $relevant / count($judgedRows);
@@ -99,7 +104,12 @@ final class CatalogRecommendationQualityEvaluator
             incomingAtLeast100: count(array_filter($incoming, fn (int $count): bool => $count >= 100)),
             reasonFaithfulnessFailures: $reasonFaithfulnessFailures,
             judgedRowCount: $judgedRowCount,
-            judgmentCoverage: round($rankedRowCount > 0 ? $judgedRowCount / $rankedRowCount : 0.0, 4),
+            judgmentCoverage: round(
+                $positiveJudgmentCount > 0
+                    ? $retrievedPositiveJudgmentCount / $positiveJudgmentCount
+                    : 0.0,
+                4,
+            ),
         );
     }
 

@@ -41,7 +41,7 @@
         </div>
     </header>
 
-    <div aria-live="polite" aria-atomic="true" aria-label="{{ __('comments.accessibility.status_region') }}">
+    <div role="status" aria-live="polite" aria-atomic="true" aria-label="{{ __('comments.accessibility.status_region') }}">
         @if ($notice !== null)
             <div class="rounded-control border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800" role="status">
                 <span class="inline-flex items-center gap-2"><x-ui.icon name="fa-solid fa-circle-check" />{{ $notice }}</span>

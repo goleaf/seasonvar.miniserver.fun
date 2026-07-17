@@ -165,11 +165,56 @@ test('catalog keeps URL state, unified filters and responsive geometry', async (
 
     await expect(filters).toHaveAttribute('open', '');
     await expect(page.locator('[data-catalog-filter-groups]')).toBeVisible();
-    await expect(page.getByText('Актеры', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Актёры', { exact: true }).first()).toBeVisible();
 
     await assertPageGeometry(page);
     await assertTouchTargets(page);
     await assertAccessibility(page);
+    expect(browserErrors.localAssetFailures).toEqual([]);
+    expect(browserErrors.consoleErrors).toEqual([]);
+    expect(browserErrors.pageErrors).toEqual([]);
+});
+
+test('Top 100 genre filter submits, resets and keeps responsive geometry', async ({ page, baseURL }, testInfo) => {
+    test.setTimeout(180_000);
+
+    const browserErrors = await installNetworkGuard(page, baseURL);
+    const widthsByProject = {
+        'Desktop Chromium': [1440, 1920],
+        'Mobile Chromium': [390],
+        'Tablet Chromium': [768],
+    };
+
+    for (const width of widthsByProject[testInfo.project.name] ?? [1440]) {
+        await page.setViewportSize({ width, height: width < 800 ? 1024 : 1200 });
+        await page.goto('/top/movies');
+
+        const genre = page.locator('#top-list-genre');
+
+        await expect(genre).toBeVisible();
+        await genre.selectOption('brauzernaia-drama');
+        await page.getByRole('button', { name: 'Показать' }).click();
+        await expect.poll(() => new URL(page.url()).searchParams.get('genre')).toBe('brauzernaia-drama');
+        await expect(genre).toHaveValue('brauzernaia-drama');
+        await expect(page.getByText('Browser Smoke', { exact: true }).first()).toBeVisible();
+        await expect(page.getByRole('link', { name: 'Сериалы', exact: true })).toHaveAttribute('href', /genre=brauzernaia-drama/);
+        await assertPageGeometry(page);
+        await assertAccessibility(page);
+
+        const controlHeights = await page.locator([
+            '[data-top-list-filters] input',
+            '[data-top-list-filters] select',
+            '[data-top-list-filters] button',
+            '[data-top-list-filters] a',
+        ].join(',')).evaluateAll((controls) => controls
+            .filter((control) => control.getClientRects().length > 0)
+            .map((control) => control.getBoundingClientRect().height));
+
+        expect(controlHeights.every((height) => height >= 44)).toBe(true);
+        await page.getByRole('link', { name: 'Сбросить' }).click();
+        await expect(page).toHaveURL(/\/top\/movies$/);
+    }
+
     expect(browserErrors.localAssetFailures).toEqual([]);
     expect(browserErrors.consoleErrors).toEqual([]);
     expect(browserErrors.pageErrors).toEqual([]);
@@ -269,7 +314,7 @@ test('header autocomplete works by keyboard and keeps two responsive rows', asyn
             const style = window.getComputedStyle(dropdown);
             const primary = document.querySelector('[data-site-header-primary]')?.getBoundingClientRect();
             const navigation = document.querySelector('[data-site-header-navigation]')?.getBoundingClientRect();
-            const input = document.querySelector('#site-search')?.getBoundingClientRect();
+            const inputFrame = document.querySelector('[data-header-search-input-frame]')?.getBoundingClientRect();
             const submit = document.querySelector('[data-header-search-autocomplete] button[type="submit"]')?.getBoundingClientRect();
 
             return {
@@ -277,7 +322,9 @@ test('header autocomplete works by keyboard and keeps two responsive rows', asyn
                 right: box.right,
                 viewportWidth: window.innerWidth,
                 overflowY: style.overflowY,
-                inputHeight: input?.height ?? 0,
+                inputLeft: inputFrame?.left ?? 0,
+                inputWidth: inputFrame?.width ?? 0,
+                inputHeight: inputFrame?.height ?? 0,
                 submitHeight: submit?.height ?? 0,
                 submitWidth: submit?.width ?? 0,
                 primaryBottom: primary?.bottom ?? 0,
@@ -285,7 +332,8 @@ test('header autocomplete works by keyboard and keeps two responsive rows', asyn
             };
         });
 
-        expect(dropdownGeometry.left).toBeGreaterThanOrEqual(0);
+        expect(Math.abs(dropdownGeometry.left - dropdownGeometry.inputLeft)).toBeLessThanOrEqual(12);
+        expect(Math.abs((dropdownGeometry.right - dropdownGeometry.left) - dropdownGeometry.inputWidth)).toBeLessThanOrEqual(24);
         expect(dropdownGeometry.right).toBeLessThanOrEqual(dropdownGeometry.viewportWidth + 1);
         expect(['auto', 'scroll']).not.toContain(dropdownGeometry.overflowY);
         expect(dropdownGeometry.inputHeight).toBeGreaterThanOrEqual(44);

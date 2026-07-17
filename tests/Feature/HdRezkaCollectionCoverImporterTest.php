@@ -12,9 +12,11 @@ use App\Models\CatalogCollection;
 use App\Services\Collections\Import\HdRezkaCollectionCoverImporter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Tests\TestCase;
 
 final class HdRezkaCollectionCoverImporterTest extends TestCase
@@ -30,6 +32,7 @@ final class HdRezkaCollectionCoverImporterTest extends TestCase
         config([
             'uploads.disk' => 'uploads',
             'uploads.visibility' => 'private',
+            'uploads.runtime_group' => '',
             'catalog-collection-imports.hdrezka.delay_seconds' => 0,
             'catalog-collection-imports.hdrezka.cover.max_source_bytes' => 1_000_000,
             'catalog-collection-imports.hdrezka.cover.max_source_dimension' => 4000,
@@ -81,6 +84,37 @@ final class HdRezkaCollectionCoverImporterTest extends TestCase
         $this->assertSame(2, $collection->content_version);
         Storage::disk('uploads')->assertExists($expectedPath);
         $this->assertSame($cover->bytes, Storage::disk('uploads')->get($expectedPath));
+    }
+
+    public function test_apply_makes_the_imported_cover_tree_available_to_the_shared_runtime_group(): void
+    {
+        $root = storage_path('framework/testing/disks/hdrezka-cover-permissions-'.Str::uuid());
+        File::ensureDirectoryExists($root, 02770);
+        chmod($root, 02770);
+        Storage::forgetDisk('uploads');
+        config([
+            'filesystems.disks.uploads.root' => $root,
+        ]);
+
+        try {
+            $collection = $this->collection();
+            $cover = $this->preparedCover([25, 125, 225]);
+
+            app(HdRezkaCollectionCoverImporter::class)->apply($collection, $cover);
+            $collection->refresh();
+            $path = (string) $collection->cover_path;
+            $absolutePath = Storage::disk('uploads')->path($path);
+
+            clearstatcache(true, $absolutePath);
+
+            $this->assertSame(02770, fileperms($root) & 07777);
+            $this->assertSame(02770, fileperms($root.'/catalog-collections') & 07777);
+            $this->assertSame(02770, fileperms(dirname($absolutePath)) & 07777);
+            $this->assertSame(0660, fileperms($absolutePath) & 0777);
+        } finally {
+            Storage::forgetDisk('uploads');
+            File::deleteDirectory($root);
+        }
     }
 
     public function test_identical_cover_is_idempotent_and_does_not_bump_versions(): void
@@ -166,6 +200,49 @@ final class HdRezkaCollectionCoverImporterTest extends TestCase
         ]);
 
         $this->assertNull(app(HdRezkaCollectionCoverImporter::class)->prepare($url));
+    }
+
+    public function test_apply_rejects_a_symlinked_managed_tree_that_escapes_the_upload_root(): void
+    {
+        $root = storage_path('framework/testing/disks/hdrezka-cover-root-'.Str::uuid());
+        $outside = storage_path('framework/testing/disks/hdrezka-cover-outside-'.Str::uuid());
+        File::ensureDirectoryExists($root, 02770);
+        File::ensureDirectoryExists($outside, 02770);
+        $link = $root.'/catalog-collections';
+
+        if (! @symlink($outside, $link)) {
+            File::deleteDirectory($root);
+            File::deleteDirectory($outside);
+            $this->markTestSkipped('Символические ссылки недоступны в текущем окружении.');
+        }
+
+        Storage::forgetDisk('uploads');
+        config(['filesystems.disks.uploads.root' => $root]);
+
+        try {
+            $collection = $this->collection();
+            $cover = $this->preparedCover([80, 120, 160]);
+            $exception = null;
+
+            try {
+                app(HdRezkaCollectionCoverImporter::class)->apply($collection, $cover);
+            } catch (RuntimeException $caught) {
+                $exception = $caught;
+            }
+
+            $this->assertInstanceOf(RuntimeException::class, $exception);
+            $this->assertNull($collection->fresh()?->cover_path);
+            $this->assertSame([], File::allFiles($outside));
+        } finally {
+            Storage::forgetDisk('uploads');
+
+            if (is_link($link)) {
+                unlink($link);
+            }
+
+            File::deleteDirectory($root);
+            File::deleteDirectory($outside);
+        }
     }
 
     private function collection(): CatalogCollection

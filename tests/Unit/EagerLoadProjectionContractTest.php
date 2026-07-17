@@ -41,8 +41,7 @@ final class EagerLoadProjectionContractTest extends TestCase
                 && in_array($node->name->toString(), self::ELOQUENT_LOAD_METHODS, true));
 
             foreach ($calls as $call) {
-                if ($relativePath === 'app/Http/Controllers/Auth/VerifyEmailController.php'
-                    || $call->args === []) {
+                if ($call->args === [] || $this->isRedirectFlashCall($call)) {
                     continue;
                 }
 
@@ -57,6 +56,16 @@ final class EagerLoadProjectionContractTest extends TestCase
         }
 
         $this->assertSame([], $violations, implode("\n", $violations));
+    }
+
+    private function isRedirectFlashCall(Node\Expr\MethodCall $call): bool
+    {
+        return $call->name instanceof Node\Identifier
+            && $call->name->toString() === 'with'
+            && count($call->args) === 2
+            && $call->var instanceof Node\Expr\FuncCall
+            && $call->var->name instanceof Node\Name
+            && $call->var->name->toString() === 'redirect';
     }
 
     /** @param list<string> $violations */

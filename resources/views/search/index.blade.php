@@ -1,7 +1,4 @@
-@extends('layouts.app', ['title' => $seo['title'], 'seo' => $seo])
-
-@section('content')
-    <div class="space-y-5">
+<div class="space-y-5">
         <section class="rounded-panel border border-slate-200 bg-white p-4 shadow-panel sm:p-6">
             <div class="max-w-3xl">
                 <p class="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">{{ __('catalog.global_search.eyebrow') }}</p>
@@ -124,5 +121,4 @@
                 </div>
             @endif
         @endif
-    </div>
-@endsection
+</div>

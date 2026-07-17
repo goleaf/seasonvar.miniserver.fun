@@ -197,7 +197,9 @@ final class CatalogRecommendationBuildEvaluator
         $watchableIds = $this->titles->visibleTo(null)
             ->whereKey($candidateIds)
             ->withCount([
-                'licensedMedia as published_media_count' => $publicCounts['licensedMedia as published_media_count'],
+                'licensedMedia as published_media_count' => fn ($query) => $publicCounts['licensedMedia as published_media_count']($query)
+                    ->withoutKnownFailures()
+                    ->withPlaybackLocation(),
             ])
             ->get(['catalog_titles.id'])
             ->filter(fn (CatalogTitle $title): bool => (int) $title->published_media_count > 0)

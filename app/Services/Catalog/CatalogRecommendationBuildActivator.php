@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Catalog;
 
+use App\DTOs\CatalogRecommendationContext;
+use App\Enums\CatalogRecommendationType;
 use App\Models\CatalogRecommendationBuild;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -14,6 +16,7 @@ final class CatalogRecommendationBuildActivator
 {
     public function __construct(
         private readonly CatalogRecommendationCacheInvalidator $cacheInvalidator,
+        private readonly CatalogRecommendationVisibilityService $visibility,
     ) {}
 
     public function activate(CatalogRecommendationBuild $build): void
@@ -29,8 +32,29 @@ final class CatalogRecommendationBuildActivator
                     throw new LogicException('Активировать можно только оценённый recommendation build.');
                 }
 
+                $context = new CatalogRecommendationContext(
+                    type: CatalogRecommendationType::Similar,
+                    user: null,
+                    locale: 'ru',
+                );
+                $buildRows = DB::table('catalog_recommendation_build_rows')
+                    ->where('build_id', $selected->id);
+                $expectedRows = (clone $buildRows)->count();
+                $eligibleRows = (clone $buildRows)
+                    ->whereColumn('catalog_title_id', '!=', 'recommended_title_id')
+                    ->whereIn('catalog_title_id', $this->visibility
+                        ->eligible($context, watchable: false)
+                        ->select('catalog_titles.id'))
+                    ->whereIn('recommended_title_id', $this->visibility
+                        ->eligible($context, watchable: true)
+                        ->select('catalog_titles.id'));
+
+                if ($expectedRows < 1) {
+                    throw new LogicException('Shadow build не содержит рекомендаций для активации.');
+                }
+
                 DB::table('catalog_title_recommendations')->delete();
-                DB::table('catalog_title_recommendations')->insertUsing(
+                $insertedRows = DB::table('catalog_title_recommendations')->insertUsing(
                     [
                         'catalog_title_id',
                         'recommended_title_id',
@@ -46,8 +70,7 @@ final class CatalogRecommendationBuildActivator
                         'created_at',
                         'updated_at',
                     ],
-                    DB::table('catalog_recommendation_build_rows')
-                        ->where('build_id', $selected->id)
+                    $eligibleRows
                         ->select([
                             'catalog_title_id',
                             'recommended_title_id',
@@ -66,6 +89,10 @@ final class CatalogRecommendationBuildActivator
                             'updated_at',
                         ]),
                 );
+
+                if ($insertedRows !== $expectedRows) {
+                    throw new LogicException('Shadow build содержит недоступные или некорректные рекомендации.');
+                }
 
                 CatalogRecommendationBuild::query()
                     ->where('status', 'active')

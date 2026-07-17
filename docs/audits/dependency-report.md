@@ -1,14 +1,15 @@
 # Отчёт по зависимостям
 
-Проверено: 15.07.2026. Перед любым update сохраняется текущий `composer.lock`/`package-lock.json`; rollback — восстановить оба lockfile из фазового commit, выполнить `composer install` и `npm ci`, затем повторить build/tests.
+Проверено: 17.07.2026. Перед любым update сохраняется текущий `composer.lock`/`package-lock.json`; rollback — восстановить оба lockfile из фазового commit, выполнить `composer install` и `npm ci`, затем повторить build/tests.
 
 ## Текущее состояние
 
 | Runtime / package | Installed | Latest compatible / decision | Evidence | Status / remaining risk |
 | --- | --- | --- | --- | --- |
 | PHP | 8.5.8 | 8.5.8 | [Official PHP 8.5 release JSON](https://www.php.net/releases/index.php?json&version=8.5) | Current; FPM and CLI share the same build family |
-| Laravel | 13.19.0 | 13.20.0 | `composer outdated --direct`; [official 13.20.0 notes](https://github.com/laravel/framework/releases/tag/v13.20.0) | Planned isolated Composer patch update |
+| Laravel | 13.20.0 | Locked compatible patch | Composer metadata; [official 13.20.0 notes](https://github.com/laravel/framework/releases/tag/v13.20.0) | Current locked Laravel 13 runtime |
 | Livewire | 4.3.3 | 4.3.3 | Composer metadata; [official release](https://github.com/livewire/livewire/releases/tag/v4.3.3) | Current; Volt intentionally absent |
+| `wddyousuf/eloquent-autocache` | 0.2.3 | `^0.2.3` controlled updates | Composer metadata; package source and MIT `LICENSE` | Laravel 13 compatible; production scope limited to opt-in Country/Genre filter queries |
 | Tailwind CSS / Vite integration | 4.3.2 / 4.3.2 | Same | npm metadata; [official Vite setup](https://tailwindcss.com/docs/installation/using-vite) | Current and already CSS-first |
 | Vite | 8.1.4 | 8.1.4 | npm metadata; [Vite 8 migration](https://vite.dev/guide/migration.html) | Current; Node requirement satisfied |
 | Laravel Vite plugin | 3.1.0 | 3.1.3 | `npm outdated`; [official 3.1.3 release](https://github.com/laravel/vite-plugin/releases/tag/v3.1.3) | Planned isolated npm patch update |
@@ -33,6 +34,7 @@ Laravel 13 requires PHP >=8.3 and recommends compatible `^13`, Boost `^2`, Tinke
 | Octane | Traditional PHP-FPM; no benchmark or long-lived audit | Reject now | High state-leak/Livewire risk without evidence | Not installed |
 | Reverb | No real-time product requirement | Reject | Extra daemon/network surface | None |
 | Sanctum | Already required by mobile API | Keep | Token hashing/abilities/expiry already tested | Not removable without API migration |
+| `wddyousuf/eloquent-autocache` | Repeated bounded public Country/Genre filter reads | Keep in strict `opt-in` mode | 300 s TTL; array/scalar payloads; automatic model-version invalidation; no private data, tags, row cache or transaction caching | Set `AUTOCACHE_ENABLED=false`, rebuild config and gracefully reload before a separate package removal |
 | Pennant | No staged feature rollout requirement | Reject | Avoid unused tables/abstraction | None |
 | `hls.js` | Native HLS fallback required for MSE browsers | Keep lazy 331.9 kB chunk | Loaded only for compatible non-native playback | Revert package/player import |
 | Prettier / ESLint | Two focused JS modules, existing build/browser checks | Defer until an actual style/defect gap is measured | Adds dev dependencies and config | Remove config/package |
@@ -46,4 +48,4 @@ Laravel 13 requires PHP >=8.3 and recommends compatible `^13`, Boost `^2`, Tinke
 5. Update Vite plugin separately; run `npm ci`, audit, production build, asset-size comparison and full browser suite.
 6. Revert the isolated lockfile commit if any behavior, asset or compatibility gate regresses.
 
-Current audits: Composer 118 packages and npm 113 lock packages; both security audits report zero advisories. No dependency was added during the audit phase.
+Current audits: Composer 122 locked packages and npm 113 lock packages; `composer audit --locked` and npm security audit report zero advisories. `wddyousuf/eloquent-autocache` is the only new runtime dependency in this integration and is covered by focused dependency and lifecycle tests.

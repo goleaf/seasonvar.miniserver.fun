@@ -4,24 +4,8 @@ use App\Enums\AccountSettingsSection;
 use App\Enums\CatalogFilterType;
 use App\Enums\CatalogRecommendationType;
 use App\Enums\CatalogTopListCategory;
-use App\Http\Controllers\AccountDataExportController;
-use App\Http\Controllers\Auth\VerifyEmailController;
-use App\Http\Controllers\CatalogCollectionController;
-use App\Http\Controllers\CatalogCollectionCoverController;
-use App\Http\Controllers\CatalogController;
-use App\Http\Controllers\CatalogDirectoryRedirectController;
-use App\Http\Controllers\CatalogSitemapController;
-use App\Http\Controllers\CatalogTopListController;
-use App\Http\Controllers\CommentRedirectController;
-use App\Http\Controllers\DownloadLicensedMediaController;
-use App\Http\Controllers\GlobalSearchController;
-use App\Http\Controllers\InfrastructureHealthController;
-use App\Http\Controllers\MigrateAnonymousPreferencesController;
-use App\Http\Controllers\PlaybackSourceController;
-use App\Http\Controllers\ReviewDirectLinkController;
-use App\Http\Controllers\TechnicalIssueAttachmentController;
-use App\Http\Controllers\UserProfileMediaController;
 use App\Http\Middleware\SetSignedAuthenticationLocale;
+use App\Http\Requests\MigrateAnonymousPreferencesRequest;
 use App\Livewire\Auth\ConfirmPasswordPage;
 use App\Livewire\Auth\ForgotPasswordPage;
 use App\Livewire\Auth\LoginPage;
@@ -31,11 +15,15 @@ use App\Livewire\Auth\VerifyEmailPage;
 use App\Livewire\CatalogAdministrationManager;
 use App\Livewire\CatalogDirectoryBrowser;
 use App\Livewire\CatalogDiscoveryPage;
+use App\Livewire\CatalogHomePage;
 use App\Livewire\CatalogSeries;
+use App\Livewire\CatalogTitleDetail;
+use App\Livewire\CatalogTopListPage;
 use App\Livewire\Collections\CatalogCollectionAdministrationManager;
 use App\Livewire\Collections\CatalogCollectionDashboard;
 use App\Livewire\Collections\CatalogCollectionDirectory;
 use App\Livewire\Collections\CatalogCollectionEditor;
+use App\Livewire\Collections\CatalogCollectionPage;
 use App\Livewire\Collections\CatalogCollectionProfile;
 use App\Livewire\Comments\CommentAdministrationManager;
 use App\Livewire\ContentRequests\ContentRequestAdministrationManager;
@@ -43,6 +31,7 @@ use App\Livewire\ContentRequests\ContentRequestDetailPage;
 use App\Livewire\ContentRequests\ContentRequestDirectory;
 use App\Livewire\ContentRequests\ContentRequestFormPage;
 use App\Livewire\ContentRequests\MyContentRequestsPage;
+use App\Livewire\GlobalSearchPage;
 use App\Livewire\Library\UserLibraryPage;
 use App\Livewire\Profile\DiscussionPage;
 use App\Livewire\Profile\ProfilePage;
@@ -53,13 +42,31 @@ use App\Livewire\Profile\UserProfileAdministrationManager;
 use App\Livewire\Reviews\ReviewModerationManager;
 use App\Livewire\SeasonvarImportManager;
 use App\Livewire\Settings\AccountSettingsPage;
+use App\Livewire\StatsDashboard;
 use App\Livewire\Tags\PersonalTagManager;
 use App\Livewire\Tags\TagAdministrationManager;
 use App\Livewire\TechnicalIssues\MyTechnicalIssuesPage;
 use App\Livewire\TechnicalIssues\TechnicalIssueAdministrationManager;
 use App\Livewire\TechnicalIssues\TechnicalIssueDetailPage;
 use App\Livewire\TechnicalIssues\TechnicalIssueFormPage;
+use App\Models\CatalogTitle;
+use App\Models\LicensedMedia;
+use App\Services\Auth\AccountDataExportResponder;
+use App\Services\Auth\AccountEmailVerificationResponder;
+use App\Services\Auth\AnonymousPreferencesMigrationResponder;
+use App\Services\Catalog\CatalogDirectoryRedirectResponder;
 use App\Services\Catalog\CatalogDirectoryRegistry;
+use App\Services\Catalog\CatalogPlaybackSourceResponder;
+use App\Services\Catalog\CatalogSitemapResponder;
+use App\Services\Catalog\CatalogStatsPosterResponder;
+use App\Services\Collections\CatalogCollectionCoverResponder;
+use App\Services\Collections\CatalogCollectionLegacyRedirectResponder;
+use App\Services\Comments\CommentDirectLinkResponder;
+use App\Services\Media\LicensedMediaDownloadResponder;
+use App\Services\Operations\InfrastructureHealthResponder;
+use App\Services\Profiles\UserProfileMediaResponder;
+use App\Services\Reviews\ReviewDirectLinkResponder;
+use App\Services\TechnicalIssues\TechnicalIssueAttachmentResponder;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -76,11 +83,11 @@ $discoveryRouteTypes = collect(CatalogRecommendationType::values())
     ->values()
     ->all();
 
-Route::get('/', [CatalogController::class, 'index'])
+Route::get('/', CatalogHomePage::class)
     ->middleware('public.page:homepage')
     ->name('home');
-Route::get('/search', GlobalSearchController::class)->name('search.index');
-Route::get('/{locale}', [CatalogController::class, 'index'])
+Route::get('/search', GlobalSearchPage::class)->name('search.index');
+Route::get('/{locale}', CatalogHomePage::class)
     ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
     ->middleware(['collection.locale', 'public.page:homepage'])
     ->name('localized.home');
@@ -110,14 +117,14 @@ Route::prefix('{locale}')
             ->name('password.reset');
     });
 
-Route::get('/email/verify/{id}/{hash}', VerifyEmailController::class)
+Route::get('/email/verify/{id}/{hash}', fn (int $id, string $hash, AccountEmailVerificationResponder $verification) => $verification->response($id, $hash))
     ->whereNumber('id')
     ->where('hash', '[a-f0-9]{40}')
     ->middleware([SetSignedAuthenticationLocale::class, 'signed'])
     ->name('verification.verify');
 
 Route::middleware(['auth', 'auth.session', 'account.private'])->group(function (): void {
-    Route::get('/titles/{catalogTitle:slug}/media/{licensedMedia}/download', DownloadLicensedMediaController::class)
+    Route::get('/titles/{catalogTitle:slug}/media/{licensedMedia}/download', fn (Request $request, CatalogTitle $catalogTitle, LicensedMedia $licensedMedia, LicensedMediaDownloadResponder $downloads) => $downloads->response($request, $catalogTitle, $licensedMedia))
         ->whereNumber('licensedMedia')
         ->scopeBindings()
         ->middleware('throttle:media-downloads')
@@ -137,10 +144,10 @@ Route::middleware(['auth', 'auth.session', 'account.private'])->group(function (
         ->whereIn('section', AccountSettingsSection::values())
         ->middleware('collection.locale')
         ->name('localized.settings.index');
-    Route::post('/settings/preferences/migrate', MigrateAnonymousPreferencesController::class)
+    Route::post('/settings/preferences/migrate', fn (MigrateAnonymousPreferencesRequest $request, AnonymousPreferencesMigrationResponder $preferences) => $preferences->response($request))
         ->middleware('throttle:12,1')
         ->name('settings.preferences.migrate');
-    Route::get('/profile/export', AccountDataExportController::class)
+    Route::get('/profile/export', fn (Request $request, AccountDataExportResponder $exports) => $exports->response($request))
         ->middleware(['password.confirm', 'throttle:6,1'])
         ->name('profile.export');
     Route::get('/my/collections', CatalogCollectionDashboard::class)->name('collections.mine');
@@ -151,7 +158,7 @@ Route::middleware(['auth', 'auth.session', 'account.private'])->group(function (
     Route::get('/issues/{technicalIssue}', TechnicalIssueDetailPage::class)
         ->whereUuid('technicalIssue')
         ->name('issues.show');
-    Route::get('/issues/{technicalIssue}/attachments/{attachment}', TechnicalIssueAttachmentController::class)
+    Route::get('/issues/{technicalIssue}/attachments/{attachment}', fn (string $technicalIssue, string $attachment, TechnicalIssueAttachmentResponder $attachments) => $attachments->response($technicalIssue, $attachment))
         ->whereUuid('technicalIssue')
         ->whereUuid('attachment')
         ->scopeBindings()
@@ -204,40 +211,40 @@ $publicDocumentMiddleware = [
 Route::middleware('public.cache:documents')
     ->withoutMiddleware($publicDocumentMiddleware)
     ->group(function (): void {
-        Route::get('/sitemap.xml', [CatalogSitemapController::class, 'sitemap'])->name('sitemap');
-        Route::get('/sitemap-index.xml', [CatalogSitemapController::class, 'sitemapIndex'])->name('sitemap.index');
-        Route::get('/sitemap-static.xml', [CatalogSitemapController::class, 'sitemapStatic'])->name('sitemap.static');
-        Route::get('/sitemap-taxonomies.xml', [CatalogSitemapController::class, 'sitemapTaxonomies'])->name('sitemap.taxonomies');
-        Route::get('/sitemap-landings.xml', [CatalogSitemapController::class, 'sitemapLandings'])->name('sitemap.landings');
-        Route::get('/sitemap-titles-{page}.xml', [CatalogSitemapController::class, 'sitemapTitles'])
+        Route::get('/sitemap.xml', fn (CatalogSitemapResponder $sitemaps) => $sitemaps->index())->name('sitemap');
+        Route::get('/sitemap-index.xml', fn (CatalogSitemapResponder $sitemaps) => $sitemaps->index())->name('sitemap.index');
+        Route::get('/sitemap-static.xml', fn (CatalogSitemapResponder $sitemaps) => $sitemaps->staticPages())->name('sitemap.static');
+        Route::get('/sitemap-taxonomies.xml', fn (CatalogSitemapResponder $sitemaps) => $sitemaps->taxonomies())->name('sitemap.taxonomies');
+        Route::get('/sitemap-landings.xml', fn (CatalogSitemapResponder $sitemaps) => $sitemaps->landings())->name('sitemap.landings');
+        Route::get('/sitemap-titles-{page}.xml', fn (int $page, CatalogSitemapResponder $sitemaps) => $sitemaps->titles($page))
             ->whereNumber('page')
             ->name('sitemap.titles');
-        Route::get('/sitemap-videos-{page}.xml', [CatalogSitemapController::class, 'sitemapVideos'])
+        Route::get('/sitemap-videos-{page}.xml', fn (int $page, CatalogSitemapResponder $sitemaps) => $sitemaps->videos($page))
             ->whereNumber('page')
             ->name('sitemap.videos');
-        Route::get('/sitemap-requests-{page}.xml', [CatalogSitemapController::class, 'sitemapRequests'])
+        Route::get('/sitemap-requests-{page}.xml', fn (int $page, CatalogSitemapResponder $sitemaps) => $sitemaps->requests($page))
             ->whereNumber('page')
             ->name('sitemap.requests');
-        Route::get('/feed.xml', [CatalogSitemapController::class, 'feed'])->name('feed');
-        Route::get('/opensearch.xml', [CatalogSitemapController::class, 'openSearch'])->name('opensearch');
-        Route::get('/llms.txt', [CatalogSitemapController::class, 'llms'])->name('llms');
+        Route::get('/feed.xml', fn (CatalogSitemapResponder $sitemaps) => $sitemaps->feed())->name('feed');
+        Route::get('/opensearch.xml', fn (CatalogSitemapResponder $sitemaps) => $sitemaps->openSearch())->name('opensearch');
+        Route::get('/llms.txt', fn (CatalogSitemapResponder $sitemaps) => $sitemaps->llms())->name('llms');
     });
-Route::get('/sitemap-collections.xml', [CatalogSitemapController::class, 'sitemapCollections'])
+Route::get('/sitemap-collections.xml', fn (CatalogSitemapResponder $sitemaps) => $sitemaps->collections())
     ->middleware('public.cache:collection_documents')
     ->withoutMiddleware($publicDocumentMiddleware)
     ->name('sitemap.collections');
-Route::get('/sitemap-profiles.xml', [CatalogSitemapController::class, 'sitemapProfiles'])
+Route::get('/sitemap-profiles.xml', fn (CatalogSitemapResponder $sitemaps) => $sitemaps->profiles())
     ->withoutMiddleware($publicDocumentMiddleware)
     ->name('sitemap.profiles');
-Route::get('/health/ready', InfrastructureHealthController::class)
+Route::get('/health/ready', fn (InfrastructureHealthResponder $health) => $health->response())
     ->withoutMiddleware($publicDocumentMiddleware)
     ->name('health.ready');
-Route::get('/stats', [CatalogController::class, 'stats'])
+Route::get('/stats', StatsDashboard::class)
     ->middleware('public.page:stats')
     ->name('stats');
-Route::get('/stats/poster/{catalogTitle:slug}', [CatalogController::class, 'statsPoster'])
+Route::get('/stats/poster/{catalogTitle:slug}', fn (CatalogTitle $catalogTitle, CatalogStatsPosterResponder $posters) => $posters->response($catalogTitle))
     ->name('stats.poster');
-Route::get('/playback/{licensedMedia}', PlaybackSourceController::class)
+Route::get('/playback/{licensedMedia}', fn (Request $request, LicensedMedia $licensedMedia, CatalogPlaybackSourceResponder $sources) => $sources->response($request, $licensedMedia))
     ->middleware('signed')
     ->whereNumber('licensedMedia')
     ->name('playback.source');
@@ -249,15 +256,15 @@ Route::get('/discover/{type}', CatalogDiscoveryPage::class)
     ->name('discover.index');
 Route::redirect('/recommendations', '/discover/popular', 301)->name('legacy.recommendations.index');
 Route::redirect('/top', '/top/movies', 302)->name('top.default');
-Route::get('/top/{category}', [CatalogTopListController::class, 'show'])
+Route::get('/top/{category}', CatalogTopListPage::class)
     ->whereIn('category', CatalogTopListCategory::values())
     ->middleware('public.page:catalog')
     ->name('top.show');
 
-Route::get('/comments/{comment}', CommentRedirectController::class)
+Route::get('/comments/{comment}', fn (Request $request, string $comment, CommentDirectLinkResponder $comments) => $comments->response($request, $comment))
     ->whereNumber('comment')
     ->name('comments.show');
-Route::get('/reviews/{review}', ReviewDirectLinkController::class)
+Route::get('/reviews/{review}', fn (Request $request, string $review, ReviewDirectLinkResponder $reviews) => $reviews->response($request, $review))
     ->whereNumber('review')
     ->name('reviews.show');
 
@@ -272,14 +279,15 @@ Route::get('/requests/{contentRequest}', ContentRequestDetailPage::class)
 Route::get('/collections', CatalogCollectionDirectory::class)
     ->middleware('public.page:collections')
     ->name('collections.index');
-Route::get('/collections/covers/{publicId}/{version}', CatalogCollectionCoverController::class)
+Route::get('/collections/covers/{publicId}/{version}', fn (Request $request, string $publicId, int $version, CatalogCollectionCoverResponder $covers) => $covers->response($request, $publicId, $version))
     ->whereUuid('publicId')
     ->whereNumber('version')
     ->name('collections.cover');
-Route::get('/collections/{collectionSlug}', [CatalogCollectionController::class, 'show'])
+Route::get('/collections/{collectionSlug}', CatalogCollectionPage::class)
     ->where('collectionSlug', '[^/]+')
+    ->middleware('collection.response')
     ->name('collections.show');
-Route::get('/profiles/media/{userPublicId}/{kind}/{version}', UserProfileMediaController::class)
+Route::get('/profiles/media/{userPublicId}/{kind}/{version}', fn (Request $request, string $userPublicId, string $kind, int $version, UserProfileMediaResponder $media) => $media->response($request, $userPublicId, $kind, $version))
     ->whereUuid('userPublicId')
     ->whereIn('kind', ['avatar', 'cover'])
     ->whereNumber('version')
@@ -292,7 +300,7 @@ Route::get('/profiles/{userPublicId}/collections', CatalogCollectionProfile::cla
     ->name('profiles.collections');
 
 Route::middleware('collection.locale')->group(function () use ($discoveryRouteTypes): void {
-    Route::get('/{locale}/search', GlobalSearchController::class)
+    Route::get('/{locale}/search', GlobalSearchPage::class)
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->name('localized.search.index');
     Route::get('/{locale}/requests', ContentRequestDirectory::class)
@@ -325,7 +333,7 @@ Route::middleware('collection.locale')->group(function () use ($discoveryRouteTy
     })
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->name('localized.top.default');
-    Route::get('/{locale}/top/{category}', [CatalogTopListController::class, 'localized'])
+    Route::get('/{locale}/top/{category}', CatalogTopListPage::class)
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->whereIn('category', CatalogTopListCategory::values())
         ->middleware('public.page:catalog')
@@ -338,7 +346,7 @@ Route::middleware('collection.locale')->group(function () use ($discoveryRouteTy
     })
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->name('localized.legacy.recommendations.index');
-    Route::get('/{locale}/comments/{comment}', CommentRedirectController::class)
+    Route::get('/{locale}/comments/{comment}', fn (Request $request, string $comment, CommentDirectLinkResponder $comments) => $comments->response($request, $comment))
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->whereNumber('comment')
         ->name('localized.comments.show');
@@ -346,9 +354,10 @@ Route::middleware('collection.locale')->group(function () use ($discoveryRouteTy
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->middleware('public.page:collections')
         ->name('localized.collections.index');
-    Route::get('/{locale}/collections/{collectionSlug}', [CatalogCollectionController::class, 'localizedShow'])
+    Route::get('/{locale}/collections/{collectionSlug}', CatalogCollectionPage::class)
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->where('collectionSlug', '[^/]+')
+        ->middleware('collection.response')
         ->name('localized.collections.show');
     Route::get('/{locale}/profiles/{userPublicId}/collections', CatalogCollectionProfile::class)
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
@@ -361,10 +370,10 @@ Route::middleware('collection.locale')->group(function () use ($discoveryRouteTy
 });
 
 Route::redirect('/lists', '/collections', 301)->name('legacy.collections.index');
-Route::get('/lists/{collectionSlug}', [CatalogCollectionController::class, 'legacyShow'])
+Route::get('/lists/{collectionSlug}', fn (string $collectionSlug, CatalogCollectionLegacyRedirectResponder $collections) => $collections->response($collectionSlug))
     ->where('collectionSlug', '[^/]+')
     ->name('legacy.collections.show');
-Route::get('/selections/{collectionSlug}', [CatalogCollectionController::class, 'legacyShow'])
+Route::get('/selections/{collectionSlug}', fn (string $collectionSlug, CatalogCollectionLegacyRedirectResponder $collections) => $collections->response($collectionSlug))
     ->where('collectionSlug', '[^/]+')
     ->name('legacy.selections.show');
 
@@ -373,7 +382,7 @@ foreach (CatalogDirectoryRegistry::routeMap() as $directory => $config) {
         ->defaults('directory', $directory)
         ->middleware('public.page:catalog')
         ->name($directory.'.index');
-    Route::get('/'.$config['path'].'/{value}', CatalogDirectoryRedirectController::class)
+    Route::get('/'.$config['path'].'/{value}', fn (Request $request, string $value, CatalogDirectoryRedirectResponder $redirects) => $redirects->response($request, $value))
         ->defaults('directory', $directory)
         ->name($directory.'.show');
 }
@@ -422,7 +431,7 @@ Route::get('/titles/{type}/{taxonomy}', CatalogSeries::class)
     ->where('taxonomy', '[A-Za-z0-9][A-Za-z0-9-]*')
     ->middleware(['canonical.tag', 'public.page:catalog'])
     ->name('titles.taxonomy');
-Route::get('/titles/{catalogTitle:slug}', [CatalogController::class, 'show'])
+Route::get('/titles/{catalogTitle:slug}', CatalogTitleDetail::class)
     ->middleware('public.page:title')
     ->name('titles.show');
 

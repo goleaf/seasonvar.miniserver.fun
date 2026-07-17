@@ -47,7 +47,7 @@ final class HdRezkaCollectionUrlGuard
         $allowed = match ($purpose) {
             self::PURPOSE_INDEX => $decodedPath === '/collections.html',
             self::PURPOSE_COLLECTION => preg_match(
-                '~^/xfsearch/collections/[^/]+/(?:page/[1-9][0-9]*/)?$~u',
+                '~^/xfsearch/collections/[\p{L}\p{M}\p{N} +()&.,:;!_-]+/(?:page/[1-9][0-9]*/)?$~u',
                 $decodedPath,
             ) === 1,
             self::PURPOSE_COVER => preg_match(
@@ -72,13 +72,17 @@ final class HdRezkaCollectionUrlGuard
     {
         if ($path === ''
             || preg_match('/%(?![a-f0-9]{2})/i', $path) === 1
+            || preg_match('/%(?:2f|5c)/i', $path) === 1
             || preg_match('/[\x00-\x1F\x7F]/', $path) === 1) {
             throw new InvalidArgumentException('Некорректный путь источника коллекций.');
         }
 
         $decodedPath = rawurldecode($path);
 
-        if (! mb_check_encoding($decodedPath, 'UTF-8') || str_contains($decodedPath, '\\')) {
+        if (! mb_check_encoding($decodedPath, 'UTF-8')
+            || preg_match('/[\x00-\x1F\x7F]/', $decodedPath) === 1
+            || str_contains($decodedPath, '%')
+            || str_contains($decodedPath, '\\')) {
             throw new InvalidArgumentException('Некорректная кодировка пути источника коллекций.');
         }
 

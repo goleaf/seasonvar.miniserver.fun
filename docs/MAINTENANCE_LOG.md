@@ -1,5 +1,7 @@
 # Журнал обслуживания
 
+- 16.07.2026: завершён production-проход синхронизации HDRezka: 54/54 источника, 260 страниц и 5 633 карточки обработаны; 100 наблюдений сопоставлены с 99 уникальными membership/signals, 5 533 оставлены несопоставленными без создания фиктивных тайтлов, ambiguous — 0. Сохранены 54 локальные WebP; один upstream canonical `404` дал безопасный partial без stale-removal. Найденный browser QA `404` обложки оказался разделением Unix-владельцев ручного CLI (`root`) и PHP-FPM (`www`): существующее дерево переведено на общую группу/setgid с `0660/2770`, а importer и конфигурация закрепляют это для следующих запусков. Проверочный URL вернул `200 image/webp`; desktop/mobile Chromium подтвердил обе страницы `200`, один `h1`/`main`, отсутствие overflow, broken images, raw provider URL, console errors и serious/critical axe findings. Отдельный cache worker с timeout 600 завершил три последовательных critical warm за 246, 79 и 127 секунд; последняя деградация ограничена четырьмя `302` устаревших `/top/*` targets из параллельно изменяемого route cache. Full Seasonvar run #887 продолжает штатную обработку; 92 dirty recommendation title ID намеренно сохраняются до его v6 boundary вместо конкурентного полного rebuild.
+
 - 16.07.2026: добавлены четыре канонические страницы Top 100 для фильмов, сериалов, аниме и мультфильмов. Один bounded query использует публичную watchable eligibility, рейтинги КиноПоиска/IMDb, статистическое сглаживание и stable tie-breaker; episode classification выполняет один grouped subquery вместо per-title correlated count, новые таблицы и внешние запросы не добавлены. SSR-витрина переиспользует карточки каталога, имеет RU/EN metadata, canonical/hreflang, синхронный `CollectionPage`/`ItemList`, пункт навигации и sitemap inclusion только для непустых категорий. Исправлена общая cache dimension backed enum routes, чтобы HTML категорий не пересекался.
 
 - 16.07.2026: Top 100 дополнен серверными фильтрами диапазона лет и страны без новой схемы, зависимости или JavaScript. Валидированный immutable DTO проходит от Form Request через page builder в общую visibility boundary до score и `LIMIT 100`; category links сохраняют условия, пустая выдача предлагает reset. Filtered SEO использует clean canonical и `noindex,follow` без `hreflang`/`ItemList`, а cache characterization подтверждает стабильный hash при перестановке query keys и разные hashes для других значений.
@@ -384,7 +386,9 @@
 - `2026_07_16_230100_add_recommendation_signal_owner_indexes.php`
 - `2026_07_16_240000_create_catalog_recommendation_shadow_builds.php`
 - `2026_07_16_240100_create_catalog_recommendation_dirty_titles.php`
+- `2026_07_16_240200_add_score_distribution_index_to_catalog_recommendation_build_rows.php`
 - `2026_07_16_250000_create_catalog_collection_source_sync.php`
+- `2026_07_16_250100_mark_missing_catalog_collection_sources.php`
 <!-- project-docs:end -->
 
 ## 2026-07-16 — recommendation/discovery task 18

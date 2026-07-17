@@ -8,6 +8,19 @@
 
 **Tech Stack:** PHP 8.5, Laravel 13.20, Eloquent/SQLite, Laravel HTTP client, DOM/XPath, GD WebP, Redis locks/queue, Memcached-compatible tiered cache, PHPUnit 12.5, Livewire 4, Tailwind CSS 4.3.
 
+## Фактический статус — 16.07.2026
+
+Подробные checkboxes ниже сохранены как исполняемый TDD-рецепт. Текущее состояние задачи:
+
+- [x] Tasks 1–8 реализованы: additive schema, модели/DTO, URL guard, HTTP/2 bounded transport, index/pagination/detail parser, matcher, private WebP importer, reconciliation, source audit, recommendation signals/scoring, Artisan/scheduler и UI.
+- [x] Focused tests, полный PHPUnit до последних эксплуатационных hardening-правок и Vite build прошли; после hardening повторно прошли focused cache/recommendation suites.
+- [x] Production dry-run и реальная синхронизация завершены: 54/54 источника обработаны, 260 страниц и 5 633 source items сохранены; 100 source observations дали 99 уникальных memberships, 54/54 обложки сохранены как WebP. Одна недоступная upstream-подборка корректно оставила общий run в `partial` без destructive cleanup.
+- [x] 99 `editorial_collection:*` signals сохранены, 92 уникальных тайтла отмечены dirty. Collection job при отсутствии активной v6 теперь не запускает обречённый full bootstrap, сохраняет dirty set штатному `seasonvar:import`; build с отсутствующим heartbeat переводится в `failed` без изменения действующей v4-выдачи.
+- [x] Retry-шторм `cache-warm-v2` устранён: lock/page failures fail-soft и наблюдаемы как `degraded`, critical self-HTTP имеет общий 240-секундный budget, job/systemd timeout согласован на 600 секунд при Redis `retry_after=1200`.
+- [ ] Дождаться завершения уже работающего полного `seasonvar:import` run `#887` и подтвердить первую активацию shadow v6; до неё 92 dirty IDs намеренно сохраняются, а действующие 383k строк v4 не подменяются частичной/ложно переименованной сборкой.
+- [ ] Повторить полный PHPUnit после последних cache hardening-правок и выполнить browser QA `/collections`/detail на desktop/mobile.
+- [ ] Commit на `main` возможен только после разрешения большого параллельного dirty tree; обход hook, временная ветка и включение посторонних файлов запрещены.
+
 ## Global Constraints
 
 - Работать только в существующей ветке `main`; не создавать branch/worktree.

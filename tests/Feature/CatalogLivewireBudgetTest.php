@@ -141,7 +141,7 @@ class CatalogLivewireBudgetTest extends TestCase
         }
 
         [$component, $initialQueries] = $this->captureQueries(
-            fn (): Testable => Livewire::test(CatalogTitleDetail::class, ['catalogTitleId' => $source->id]),
+            fn (): Testable => Livewire::test(CatalogTitleDetail::class, ['catalogTitle' => $source]),
         );
         $initialContent = $this->livewireResponseContent($component);
 

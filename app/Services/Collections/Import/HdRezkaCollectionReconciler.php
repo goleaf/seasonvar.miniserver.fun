@@ -20,6 +20,7 @@ use App\Models\CatalogCollectionSyncRun;
 use App\Services\Collections\CatalogCollectionCacheInvalidator;
 use App\Services\Collections\CatalogCollectionSlugService;
 use App\Support\UserPlainText;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -34,7 +35,7 @@ final readonly class HdRezkaCollectionReconciler
 
     /**
      * @param  list<array{item: HdRezkaCollectionItemData, match: CatalogCollectionSourceMatch}>  $items
-     * @return array{collection_id: int, created: bool, membership_changed: bool, matched: int, ambiguous: int, unmatched: int, removed: int}
+     * @return array{collection_id: int, created: bool, membership_changed: bool, source_reactivated: bool, matched: int, ambiguous: int, unmatched: int, removed: int}
      */
     public function reconcile(
         CatalogCollectionSyncRun $run,
@@ -56,6 +57,8 @@ final readonly class HdRezkaCollectionReconciler
                 ->lockForUpdate()
                 ->first();
             $created = false;
+            $sourceReactivated = $source instanceof CatalogCollectionSource
+                && $source->missing_since_at !== null;
             $collection = $source?->catalog_collection_id !== null
                 ? CatalogCollection::query()->withTrashed()->lockForUpdate()->find($source->catalog_collection_id)
                 : null;
@@ -78,6 +81,7 @@ final readonly class HdRezkaCollectionReconciler
             $source->cover_source_path = $definition->coverPath;
             $source->semantic_content_hash = $this->semanticHash($resolvedItems);
             $source->last_seen_run_id = $run->id;
+            $source->missing_since_at = null;
 
             if ($complete) {
                 $source->retry_count = 0;
@@ -128,11 +132,12 @@ final readonly class HdRezkaCollectionReconciler
                 'collection_id' => (int) $collection->id,
                 'created' => $created,
                 'membership_changed' => $membershipChanged,
+                'source_reactivated' => $sourceReactivated,
                 'matched' => (int) $counts->get(CatalogCollectionSourceMatchStatus::Matched->value, 0),
                 'ambiguous' => (int) $counts->get(CatalogCollectionSourceMatchStatus::Ambiguous->value, 0),
                 'unmatched' => (int) $counts->get(CatalogCollectionSourceMatchStatus::Unmatched->value, 0),
                 'removed' => $removed,
-                'public_changed' => $created || $nameChanged || $membershipChanged,
+                'public_changed' => $created || $nameChanged || $membershipChanged || $sourceReactivated,
             ];
         }, attempts: 3);
 
@@ -142,7 +147,86 @@ final readonly class HdRezkaCollectionReconciler
 
         unset($result['public_changed']);
 
-        /** @var array{collection_id: int, created: bool, membership_changed: bool, matched: int, ambiguous: int, unmatched: int, removed: int} $result */
+        /** @var array{collection_id: int, created: bool, membership_changed: bool, source_reactivated: bool, matched: int, ambiguous: int, unmatched: int, removed: int} $result */
+        return $result;
+    }
+
+    /**
+     * @return array{sources_missing: int, removed: int, title_ids: list<int>}
+     */
+    public function reconcileMissingSources(CatalogCollectionSyncRun $run): array
+    {
+        if ($run->getKey() === null || $run->provider === '') {
+            throw new InvalidArgumentException('Некорректный run для reconciliation исчезнувших коллекций.');
+        }
+
+        $result = DB::transaction(function () use ($run): array {
+            $sources = CatalogCollectionSource::query()
+                ->select(['id', 'catalog_collection_id'])
+                ->where('provider', $run->provider)
+                ->whereNull('missing_since_at')
+                ->where(fn (Builder $query): Builder => $query
+                    ->whereNull('last_seen_run_id')
+                    ->orWhere('last_seen_run_id', '!=', $run->id))
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            $collectionIds = [];
+            $titleIds = [];
+            $removed = 0;
+            $missingSince = now();
+
+            foreach ($sources as $source) {
+                $collection = $source->catalog_collection_id !== null
+                    ? CatalogCollection::query()->withTrashed()->lockForUpdate()->find($source->catalog_collection_id)
+                    : null;
+
+                if ($collection instanceof CatalogCollection) {
+                    $membershipTitleIds = CatalogCollectionItem::query()
+                        ->where('catalog_collection_id', $collection->id)
+                        ->orderBy('id')
+                        ->pluck('catalog_title_id')
+                        ->map(fn (mixed $id): int => (int) $id)
+                        ->all();
+
+                    if ($membershipTitleIds !== []) {
+                        $removed += CatalogCollectionItem::query()
+                            ->where('catalog_collection_id', $collection->id)
+                            ->delete();
+                        $collection->content_version = (int) $collection->content_version + 1;
+                        $collection->save();
+
+                        foreach ($membershipTitleIds as $catalogTitleId) {
+                            $titleIds[$catalogTitleId] = true;
+                        }
+                    }
+
+                    $collectionIds[(int) $collection->id] = true;
+                }
+
+                $source->missing_since_at = $missingSince;
+                $source->save();
+            }
+
+            return [
+                'sources_missing' => $sources->count(),
+                'removed' => $removed,
+                'title_ids' => array_map('intval', array_keys($titleIds)),
+                'collection_ids' => array_map('intval', array_keys($collectionIds)),
+            ];
+        }, attempts: 3);
+
+        if ($result['collection_ids'] !== []) {
+            $this->cache->changedMany(CatalogCollection::query()
+                ->withTrashed()
+                ->whereKey($result['collection_ids'])
+                ->get());
+        }
+
+        sort($result['title_ids'], SORT_NUMERIC);
+        unset($result['collection_ids']);
+
+        /** @var array{sources_missing: int, removed: int, title_ids: list<int>} $result */
         return $result;
     }
 
@@ -281,7 +365,9 @@ final readonly class HdRezkaCollectionReconciler
      */
     private function desiredMembership(array $items, array $existing, bool $complete): array
     {
-        $orderedIds = [];
+        $orderedIds = $complete
+            ? []
+            : array_map('intval', array_keys($existing));
 
         foreach ($items as $resolved) {
             $match = $resolved['match'];
@@ -290,14 +376,6 @@ final readonly class HdRezkaCollectionReconciler
                 && $match->catalogTitleId !== null
                 && ! in_array($match->catalogTitleId, $orderedIds, true)) {
                 $orderedIds[] = $match->catalogTitleId;
-            }
-        }
-
-        if (! $complete) {
-            foreach (array_keys($existing) as $catalogTitleId) {
-                if (! in_array($catalogTitleId, $orderedIds, true)) {
-                    $orderedIds[] = $catalogTitleId;
-                }
             }
         }
 

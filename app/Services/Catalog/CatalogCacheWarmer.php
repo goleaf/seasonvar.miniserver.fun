@@ -58,7 +58,11 @@ final class CatalogCacheWarmer
         $this->state->started();
 
         try {
-            $targets['catalog_stats'] = $this->measure(fn () => $refresh ? $this->stats->refresh() : $this->stats->snapshot());
+            $targets['catalog_stats'] = $this->measureTarget(
+                'catalog_stats',
+                fn () => $refresh ? $this->stats->refresh() : $this->stats->snapshot(),
+                $failures,
+            );
             $targets['home_metrics'] = $this->measureLocales(
                 'home_metrics',
                 fn () => $refresh ? $this->homeMetrics->refresh() : $this->homeMetrics->metrics(),
@@ -131,6 +135,24 @@ final class CatalogCacheWarmer
     {
         $started = hrtime(true);
         $callback();
+
+        return (int) ((hrtime(true) - $started) / 1_000_000);
+    }
+
+    /** @param list<array{target: string, exception: class-string}> $failures */
+    private function measureTarget(string $target, callable $callback, array &$failures): int
+    {
+        $started = hrtime(true);
+
+        try {
+            $callback();
+        } catch (CacheRebuildTimeout $exception) {
+            $failures[] = [
+                'target' => $target,
+                'exception' => $exception::class,
+            ];
+            $this->telemetry->increment(CacheDomain::Operational, 'warming-lock-skip');
+        }
 
         return (int) ((hrtime(true) - $started) / 1_000_000);
     }

@@ -649,7 +649,9 @@ final class CatalogTitleRecommendationBuilder
             ]))
             ->withCount([
                 ...$reviewCount,
-                'licensedMedia as published_media_count' => $publicCounts['licensedMedia as published_media_count'],
+                'licensedMedia as published_media_count' => fn (Builder $query): Builder => $publicCounts['licensedMedia as published_media_count']($query)
+                    ->withoutKnownFailures()
+                    ->withPlaybackLocation(),
             ])
             ->lazyById($chunkSize)
             ->each(function (CatalogTitle $title) use (&$loaded, &$profiles, $build, $chunkSize): void {

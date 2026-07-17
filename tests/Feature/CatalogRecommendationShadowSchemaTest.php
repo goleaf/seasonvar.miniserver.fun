@@ -9,11 +9,21 @@ use App\Models\CatalogRecommendationBuildRow;
 use App\Models\CatalogTitle;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 final class CatalogRecommendationShadowSchemaTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_build_rows_have_a_covering_score_distribution_index(): void
+    {
+        $index = collect(Schema::getIndexes('catalog_recommendation_build_rows'))
+            ->firstWhere('name', 'catalog_recommendation_build_rows_build_score_idx');
+
+        $this->assertNotNull($index);
+        $this->assertSame(['build_id', 'score', 'id'], $index['columns']);
+    }
 
     public function test_build_rows_are_ranked_unique_and_deleted_with_their_build(): void
     {

@@ -48,7 +48,7 @@ test('catalog card surfaces never render the redundant open-title action', async
 
     expect(personalizedResponse?.status()).toBe(200);
     await expect(personalizedRows.getByRole('link', { name: 'Рекомендованный браузерный сериал' })).toBeVisible();
-    await expect(personalizedRows.getByText('По вашей истории просмотра', { exact: true })).toBeVisible();
+    await expect(personalizedRows.getByText('По сериалам из вашего списка', { exact: true })).toBeVisible();
     await expect(page.getByText('Открыть тайтл', { exact: true })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(1);
 

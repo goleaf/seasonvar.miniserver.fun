@@ -67,6 +67,24 @@ final class HdRezkaCollectionParserTest extends TestCase
         $this->assertNull($result['next_path']);
     }
 
+    public function test_parser_rejects_a_pagination_gap_instead_of_treating_the_snapshot_as_complete(): void
+    {
+        $this->expectException(UnexpectedValueException::class);
+
+        app(HdRezkaCollectionParser::class)->page(<<<'HTML'
+            <div id="dle-content">
+                <div class="card_item">
+                    <a class="card_item__title" href="/668-mufasa.html">Муфаса</a>
+                    <div class="card_item__misc">2024, США</div>
+                </div>
+                <div class="pagination">
+                    <span>1</span>
+                    <a href="/xfsearch/collections/films/page/3/">3</a>
+                </div>
+            </div>
+            HTML, '/xfsearch/collections/films/', 1);
+    }
+
     public function test_detail_parser_uses_the_title_json_ld_object(): void
     {
         $detail = app(HdRezkaCollectionParser::class)->detail($this->fixture('title-detail.html'));

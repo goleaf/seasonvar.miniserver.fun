@@ -308,6 +308,7 @@ final class HdRezkaCollectionParser
     private function nextPath(DOMXPath $xpath, string $collectionPath, int $currentPage): ?string
     {
         $nextPaths = [];
+        $hasLaterPage = false;
 
         foreach ($xpath->query(
             '//*[@id="dle-content"]//*[contains(concat(" ", normalize-space(@class), " "), " pagination ")]//a[@href]',
@@ -325,13 +326,23 @@ final class HdRezkaCollectionParser
                 throw new UnexpectedValueException('Pagination вышла за пределы текущей коллекции.');
             }
 
-            if ($this->pageNumber($path) === $currentPage + 1) {
+            $pageNumber = $this->pageNumber($path);
+
+            if ($pageNumber === $currentPage + 1) {
                 $nextPaths[$path] = true;
+            }
+
+            if ($pageNumber > $currentPage + 1) {
+                $hasLaterPage = true;
             }
         }
 
         if (count($nextPaths) > 1) {
             throw new UnexpectedValueException('Pagination содержит несколько разных следующих страниц.');
+        }
+
+        if ($nextPaths === [] && $hasLaterPage) {
+            throw new UnexpectedValueException('Pagination содержит разрыв перед следующей страницей.');
         }
 
         return array_key_first($nextPaths);

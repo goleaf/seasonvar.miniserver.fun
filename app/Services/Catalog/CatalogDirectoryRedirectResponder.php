@@ -1,36 +1,36 @@
 <?php
 
-namespace App\Http\Controllers;
+declare(strict_types=1);
 
-use App\Services\Catalog\CatalogDirectoryQuery;
-use App\Services\Catalog\CatalogDirectoryRegistry;
+namespace App\Services\Catalog;
+
 use App\Services\Tags\TagResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 
-class CatalogDirectoryRedirectController extends Controller
+final readonly class CatalogDirectoryRedirectResponder
 {
-    public function __invoke(
-        Request $request,
-        CatalogDirectoryRegistry $registry,
-        CatalogDirectoryQuery $directories,
-        TagResolver $tags,
-        string $value,
-    ): RedirectResponse {
-        $directory = $registry->find($request->route('directory'));
+    public function __construct(
+        private CatalogDirectoryRegistry $registry,
+        private CatalogDirectoryQuery $directories,
+        private TagResolver $tags,
+    ) {}
+
+    public function response(Request $request, string $value): RedirectResponse
+    {
+        $directory = $this->registry->find($request->route('directory'));
         abort_if($directory === null, 404);
 
         if ($directory->isYear()) {
-            abort_unless($directories->detailExists($directory, $value), 404);
+            abort_unless($this->directories->detailExists($directory, $value), 404);
 
             return redirect()->route('titles.year', ['year' => (int) $value], 301);
         }
 
         if ($directory->filterType?->value === 'tag') {
-            $resolved = $tags->resolvePublic($value);
+            $resolved = $this->tags->resolvePublic($value);
             abort_if($resolved === null, 404);
-
             $url = route('titles.taxonomy', [
                 'type' => 'tag',
                 'taxonomy' => $resolved->tag->slug,
@@ -39,7 +39,7 @@ class CatalogDirectoryRedirectController extends Controller
             return redirect()->to($this->withQuery($url, $request), 301);
         }
 
-        abort_unless($directories->detailExists($directory, $value), 404);
+        abort_unless($this->directories->detailExists($directory, $value), 404);
 
         return redirect()->route('titles.taxonomy', [
             'type' => $directory->filterType?->value,

@@ -1,6 +1,6 @@
 # Переменные окружения
 
-Обновлено: 16.07.2026
+Обновлено: 17.07.2026
 
 Полный безопасный шаблон находится в `.env.example`. Реальный `.env` не изменяется deployment-кодом и не коммитится.
 
@@ -49,6 +49,28 @@ Standalone default DBs: cache 1, queues 2, sessions 3, locks 5, broadcasting 6. 
 
 `RUN_CACHE_INFRASTRUCTURE_TESTS=false` — только test/CI switch. Его включают в изолированном тестовом окружении с run-specific Redis/Memcached prefixes; это не runtime feature flag production-приложения.
 
+## Eloquent AutoCache
+
+AutoCache обслуживает только явно кэшируемые публичные списки стран и жанров в фильтрах Top 100. Defaults принадлежат `config/autocache.php`:
+
+| Переменная | Значение по умолчанию | Назначение |
+| --- | --- | --- |
+| `AUTOCACHE_ENABLED` | `true` | Общий kill switch этой узкой границы |
+| `AUTOCACHE_STORE` | `recomputable-failover` | Production store Redis → file; PHPUnit принудительно использует `array` |
+| `AUTOCACHE_TTL` | `300` | Конечный TTL query payload в секундах |
+| `AUTOCACHE_TTL_JITTER` | `0.1` | Разброс TTL 10% против одновременного истечения |
+| `AUTOCACHE_PREFIX` | `{APP_NAME}:{APP_ENV}:eloquent-autocache:v1` | Отдельный versioned namespace; имя приложения нормализуется через `Str::slug()` |
+| `AUTOCACHE_USE_TAGS` | `false` | Version invalidation без store-specific tags |
+| `AUTOCACHE_LOCK_FOR` | `5` | Bounded single-flight lock в секундах |
+| `AUTOCACHE_MODE` | `opt-in` | Кешируются только запросы с явным `cache()` |
+| `AUTOCACHE_ROW_CACHE` | `false` | Отдельный row cache выключен |
+| `AUTOCACHE_CACHE_IN_TRANSACTIONS` | `false` | Reads внутри transaction всегда обходят cache |
+| `AUTOCACHE_SWR` | `0` | Stale-while-revalidate выключен |
+| `AUTOCACHE_MAX_ROWS` | `100` | Верхняя граница кэшируемого результата |
+| `AUTOCACHE_STATS` | `false` | Низкокардинальные counters выключены до диагностики |
+
+`AUTOCACHE_MODE=auto` не является операторским флагом поэтапного включения: он расширил бы scope на все запросы двух моделей и запрещён текущим контрактом. После изменения любой переменной выполнить `php artisan config:cache` и graceful reload PHP-FPM/workers. Для emergency rollback сначала используется `AUTOCACHE_ENABLED=false`; обычные Eloquent reads продолжают работать без package cache.
+
 ## Рекомендации каталога
 
 `SEASONVAR_RECOMMENDATION_CHUNK_SIZE`, `MIN_SCORE`, `MAX_PER_TITLE`, `CANDIDATE_LIMIT` и `CANDIDATE_SCAN_PER_FEATURE` ограничивают локальную catalog-wide пересборку. `SEASONVAR_RECOMMENDATION_DIVERSITY_PENALTY` задаёт bounded MMR-штраф за повтор одинаковых тем и связей; default `120` не может изменить первый, самый релевантный результат. Эти параметры не включают HTTP и не меняют единственную публичную команду импорта.
@@ -58,6 +80,8 @@ Standalone default DBs: cache 1, queues 2, sessions 3, locks 5, broadcasting 6. 
 `HDREZKA_COLLECTION_SYNC_ENABLED=false` является production kill switch отдельной синхронизации подборок. `SYNC_SCHEDULE`, `SYNC_DELAY_SECONDS`, `SYNC_MAX_RESPONSE_BYTES`, `SYNC_MAX_COLLECTIONS`, `SYNC_MAX_PAGES`, `SYNC_MAX_ITEMS`, `SYNC_LOCK_STORE` и `SYNC_LOCK_SECONDS` с тем же префиксом ограничивают расписание, сеть, объём обхода и single-flight. Они не расширяют точный HTTPS/host/path allowlist из versioned config.
 
 `HDREZKA_COLLECTION_RECOMMENDATION_REBUILD_ENABLED`, `..._QUEUE_CONNECTION`, `..._QUEUE`, `..._TIMEOUT` и `..._UNIQUE_SECONDS` управляют только after-sync scoped recommendation job; defaults переиспользуют Redis и `seasonvar-import`. `HDREZKA_COLLECTION_COVER_MAX_SOURCE_BYTES`, `..._MAX_SOURCE_DIMENSION`, `..._MAX_SOURCE_PIXELS`, `..._MAX_WIDTH`, `..._MAX_HEIGHT` и `..._WEBP_QUALITY` ограничивают декодирование и локальный WebP. Полный безопасный набор/defaults находится в `.env.example`; изменение требует `config:cache` и graceful reload PHP-FPM/scheduler/workers.
+
+`UPLOADS_RUNTIME_GROUP=www` задаёт общую Unix-группу PHP-FPM, scheduler и ручного CLI для локального private uploads disk. Flysystem создаёт приватные файлы с `0660` и каталоги с `0770`; importer дополнительно назначает эту группу, `setgid` и те же права только дереву `catalog-collections/*/imported`. Файлы остаются вне `public/` и выдаются контроллером. Production должен заранее назначить ту же группу и `setgid` корню `storage/app/private/uploads`; на сервере с другой runtime-группой default обязательно переопределяется до синхронизации.
 
 ## Размер внешних видеофайлов
 

@@ -45,6 +45,7 @@
 
 ## Архитектура
 
+- Новые HTML-маршруты `routes/web.php` реализовывать только как full-page Livewire-компоненты. Контроллеры допустимы только для `routes/api.php`; XML, JSON health-check, файлы, redirects, signed playback и streamed downloads должны использовать тонкие route handlers и доменные responders, а не маскироваться под Livewire.
 - Контроллеры должны оставаться тонкими: разбор запроса, передача валидации, передача авторизации, orchestration сервисов/запросов и выбор ответа.
 - Бизнес-логику размещать в сервисах, actions, jobs или доменных классах, когда это уместно. Сначала использовать текущие сервисы, а не вводить новый паттерн.
 - Соблюдать текущие границы сервисов в `app/Services/Seasonvar`, `app/Services/Media` и `app/Services/Crawler`.
