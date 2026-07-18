@@ -2,7 +2,7 @@
     <div class="flex items-start justify-between gap-2">
         <div class="inline-flex min-w-0 items-center gap-2 font-bold text-slate-700">
             <x-ui.icon name="fa-solid fa-circle-play text-emerald-700" />
-            <span>{{ $episode->number }} серия</span>
+            <span>{{ __('catalog.viewing.episode_number', ['number' => $episode->number]) }}</span>
         </div>
 
         @if ($hasMedia)

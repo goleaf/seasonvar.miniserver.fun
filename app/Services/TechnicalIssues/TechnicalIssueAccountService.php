@@ -33,7 +33,13 @@ final readonly class TechnicalIssueAccountService
     public function export(User $user): array
     {
         if (! $this->schema->ready()) {
-            return ['tickets' => [], 'confirmations' => [], 'follows' => [], 'occurrences' => []];
+            return [
+                'tickets' => [],
+                'confirmations' => [],
+                'follows' => [],
+                'occurrences' => [],
+                'notification_preferences' => null,
+            ];
         }
 
         $tickets = TechnicalIssue::query()
@@ -130,6 +136,12 @@ final readonly class TechnicalIssueAccountService
                     'public_error_code' => $occurrence->public_error_code,
                     'occurred_at' => $occurrence->occurred_at->toAtomString(),
                 ])->all(),
+            'notification_preferences' => TechnicalIssueNotificationPreference::query()->find($user->id)?->only([
+                'requester_updates',
+                'confirmer_updates',
+                'follower_updates',
+                'support_replies',
+            ]),
         ];
     }
 

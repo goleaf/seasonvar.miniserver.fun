@@ -6,7 +6,7 @@
 
 Текущий стек и соглашения:
 
-- PHP 8.5, Laravel 13.19, Laravel Boost 2.4, Laravel Pint 1.29, PHPUnit 12.5.
+- PHP 8.5, Laravel 13.20, Laravel Boost 2.4, Laravel Pint 1.29, PHPUnit 12.5.
 - Tailwind CSS 4.3 с Vite 8; локальные FontAwesome, Plyr и HLS-ресурсы установлены через npm.
 - SQLite используется локально и в тестах; PHPUnit использует SQLite в памяти.
 - Web-маршруты находятся в `routes/web.php`; read-only JSON API находится в `routes/api.php`.
@@ -15,6 +15,16 @@
 - Документация проекта находится в `README.md` и `docs/*.md`; она должна быть конкретной для проекта, а не текстом стартового шаблона Laravel.
 
 Перед изменением кода нужно смотреть соседние файлы и существующие паттерны. Предпочитать структуру, которая уже используется в `app/Http/Controllers`, `app/Models`, `app/Services`, `app/Console/Commands`, `resources/views`, `database/migrations` и `tests`.
+
+## Обязательный workflow требований и интеграции
+
+- Перед любой работой читать канонические требования в порядке из `docs/requirements/index.md`, проверять существование всех ссылок и обновлять `docs/plans/current-task-plan.md`.
+- Для каждой задачи создавать или актуализировать compliance matrix со статусами `completed`, `already_compliant`, `not_applicable` и `unresolved`; нельзя отмечать требование выполненным без проверки.
+- Каждая задача обязана оценить cross-feature impact. Нельзя изменять возможность изолированно, если она влияет на authentication, authorization, translations, caching, search, notifications, SEO, privacy, mobile behavior, administration, audit, imports, premium access, regional access, legal restrictions или существующие public routes.
+- До реализации проверять связанные ранее внедрённые модули и публичные contracts; новое постоянное правило сначала добавлять в канонический документ-владелец требований.
+- Перед завершением перечитывать применимые требования и текущую задачу, повторно сверять compliance matrix и честно фиксировать unresolved conflicts или непроверенные состояния.
+- Перед финальным завершением искать по всему repository оставшиеся legacy implementations, duplicate services/routes/translations, stale cache paths, dead controls и unfinished code, относящиеся к текущей задаче. Текстовый результат поиска сам по себе не доказывает, что код можно удалить: сначала проверяются все зависимости.
+- Каждая задача обновляет затронутые канонические документы и `CHANGELOG.md`, сохраняет completed plan/compliance evidence, затем commit-ит разрешённые изменения только в `main` и выполняет настроенную отправку; внешний отказ Git-аутентификации фиксируется честно и не маскируется как успешный push.
 
 ## Обязательная граница сопровождения и обновлений
 
@@ -96,7 +106,7 @@
 
 ## Авторизация
 
-- Сейчас в кодовой базе нет project-specific policies. Перед authenticated write, admin, import-control или moderation endpoints нужно добавить policies или gates.
+- Существующие project-specific policies и gates являются каноническими server-side boundaries. Перед authenticated write, admin, import-control или moderation endpoints нужно переиспользовать подходящую policy/gate либо добавить новую только при отсутствии эквивалента.
 - Нельзя считать скрытые UI-кнопки авторизацией.
 - Поведение `/api/*` должно оставаться удобным для JSON, как настроено в `bootstrap/app.php`.
 

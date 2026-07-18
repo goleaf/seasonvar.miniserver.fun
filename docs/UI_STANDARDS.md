@@ -2,6 +2,10 @@
 
 Обновлено: 18.07.2026
 
+## Финальная cross-system UI verification
+
+Крупные изменения проверяются на narrow mobile, standard mobile, tablet, desktop и browser zoom; клавиатурой, screen reader semantics и reduced motion; с long translated labels, empty/failure/unauthorized/unsupported states, virtual keyboard, safe areas, focus restoration и Livewire navigation. Essential action не бывает hover-only, dead или fake; loading/error/success announcements не зависят только от цвета, а скрытый control не заменяет server-side authorization.
+
 ## Frontend dependency upgrades
 
 - Keyboard support, screen-reader semantics, focus order/return и visible focus сохраняются.

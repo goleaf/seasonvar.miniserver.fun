@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
     'component_placeholder' => 'livewire.placeholder',
 
@@ -12,4 +14,6 @@ return [
             'mimetypes:image/jpeg,image/png,image/webp',
         ],
     ],
+
+    'csp_safe' => true,
 ];

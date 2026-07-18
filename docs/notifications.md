@@ -1,6 +1,6 @@
 # Notifications и emails
 
-Обновлено: 15.07.2026
+Обновлено: 18.07.2026
 
 ## Текущее состояние
 
@@ -58,6 +58,12 @@ Task 14 does not invent follower/profile-activity notifications because no follo
 `/settings/notifications` показывает только реально поддержанные in-portal database categories: comment reply/reaction/moderation/report и review helpful/moderation/report. Stable DB booleans остаются в существующих dedicated tables; `UpdateCommentNotificationPreferences` и `UpdateReviewNotificationPreferences` являются единственными write actions, а delivery services продолжают применять их до создания уведомления.
 
 Отсутствующая preference row означает неперсистентный opt-in default и создаётся только после explicit Apply/Reset. Email, push, episode/season/translation/subtitle/quality, collection follow/like, mention, follower и premium reminder controls не показываются, потому что соответствующие event/channel domains отсутствуют. Critical account security mail остаётся mandatory в своих auth workflows и не представляется configurable category.
+
+## Export и deletion boundary
+
+Account export включает stored comment/review/content-request/technical-issue preferences и database notifications только шести реально зарегистрированных stable types: `comment.activity`, `review.activity`, `content-request.activity`, `technical-issue.activity`, `release-calendar.activity`, `premium.activity`. Для каждого типа применяется отдельный field allowlist; произвольный future payload, body, private note, actor identity, raw URL и provider data автоматически не экспортируются. `read_at`/`created_at` сохраняются как UTC timestamps.
+
+Canonical account deletion удаляет все morph notifications текущего owner до удаления `users`, потому что generic `notifications` table намеренно не имеет user FK. Domain preference tables удаляются собственными service cleanup или FK cascade. Это не удаляет уведомления другого recipient и не меняет append-only administrative audit.
 
 ## Проверки
 

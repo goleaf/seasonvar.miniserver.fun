@@ -125,6 +125,8 @@ final class UserProfileMediaService
                 DB::afterCommit(fn () => $this->deleteBestEffort($path));
             }
         }
+
+        $this->cache->deleted($profile);
     }
 
     private function ensureRateLimit(User $user, string $kind): void

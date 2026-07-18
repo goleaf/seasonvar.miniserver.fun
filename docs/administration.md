@@ -2,6 +2,14 @@
 
 Обновлено: 18.07.2026
 
+## System-wide administration integration
+
+Administration показывает истинное permission-scoped состояние content, users, moderation, requests, tickets, help articles, calendar, recommendations, premium, payments, advertisers, rights-holder cases, translations, imports, caches, search, SEO, redirects, audit и system configuration только там, где соответствующий domain реально существует. Она переиспользует канонические services/queries/policies и не дублирует domain logic ради dashboard.
+
+Immutable financial, legal, audit и historical records не редактируются напрямую. Их correction/reconciliation выполняет отдельная authorized domain action с impact preview, idempotency/audit и сохранением history; отсутствующая integration отображается честно как unavailable/not installed без fake health, controls или data.
+
+`admin_audit_events.actor_id` использует `RESTRICT`, поэтому self-service account deletion административного actor блокируется до отдельного authorized retention решения. Это сохраняет immutable actor evidence и выдаёт безопасную локализованную validation error вместо SQL details; обычному администратору не добавлена кнопка изменения или удаления audit history.
+
 ## Maintenance visibility boundary
 
 - Administration может показывать read-only maintenance summary только из real repository/runtime registry data и только authorized operational roles.

@@ -1,313 +1,257 @@
-# Task 28 — production deployment и operational readiness
+# Task 27 — финальная системная интеграция и release preparation
 
-Дата: 18.07.2026
+Дата: 18.07.2026 (`Europe/Vilnius`)
 
-Ветка: `main`
+## 1. Task title
 
-Начальный Git state: clean, `main...origin/main [ahead 12]`, `HEAD 6667976`; все изменения выполняются только в этой ветке. Текущий статус: phase zero, repository/server audit, production hardening, canonical runbook’и, техническая verification и финальное перечитывание требований завершены; остаются commit и push.
+Repository-wide requirement compliance, cross-feature reconciliation, stabilization, cleanup и release preparation существующего Seasonvar portal.
 
-## Continuous audit update 18.07.2026
+## 2. Task date
 
-- Verified stack: Rocky Linux `10.2`, nginx `1.31.2`, PHP CLI/FPM `8.5.8`, Composer `2.10.2`, Node `26.4.0`, npm `12.0.1`, SQLite `3.46.1`; lock contains Laravel `13.20.0`, Livewire `4.3.3`, Tailwind `4.3.2`, Vite `8.1.4` and no Flux.
-- Actual runtime was corrected from development/debug-on to production/debug-off without reading or committing secret values; `.env` mode is `0600`, SQLite/WAL/SHM `0660`, compiled manifests `0644`. Config cache was rebuilt, PHP-FPM reloaded gracefully and queue workers received restart signal.
-- Database is SQLite with no pending migrations. Active database is large and writer-heavy, so the expensive `app:deployment-check`/`PRAGMA quick_check` was intentionally not run against live import; schema is classified statically and backup-before-migration remains mandatory.
-- Redis is reachable for cache/session/queue/locks. Memcached PHP client/config exist but no listening service was found; state is `unavailable`, hot cache is optional and detailed health remains degraded. The last bounded critical warm completed with 74 public-target failures while full warming is idle; no store-wide cache flush, bulk retry or failed-job deletion occurred.
-- Real operations: nginx and `php-fpm-85.service`; 4 import + 8 title-refresh + 1 cache-warm systemd workers; cron scheduler/queued dispatcher/queue monitor. `seasonvar-import-forever.service` was simultaneously enabled and was safely disabled as the incompatible secondary profile. Horizon/Supervisor are absent.
-- Browser manifest/service worker are not installed; the Vite asset manifest is not a PWA manifest. External monitoring/alert transport, payment/OAuth provider, object storage and real mail delivery are not configured. Mail is `log`; Google integrations and HDRezka sync are disabled.
-- Panel archives exist outside public web root, but current database backup/off-host copy/approved retention/full restore test are not evidenced. Historical SQLite copy is not accepted as current verified backup.
-- Public `/health/ready` previously exposed detailed component/queue/cache metrics and performed an optional Memcached write. It now returns only status/readiness/timestamp from lightweight database and critical Redis checks with no-store/noindex headers; detailed diagnostics stay CLI-only.
-- Application/build identity, documentation canonical origin and Seasonvar HTTP User-Agent now use config-backed environment names. All config `env()` names are represented in `.env.example`; direct `env()` outside config remains absent.
-- Deployment is verified as in-place aaPanel/nginx/PHP-FPM checkout; atomic release/zero downtime/failover are not claimed. Runbooks cover locked install/build, migration, backup/restore, rollback, DR, incidents, logs/health, providers, service-worker absence and production acceptance.
+18.07.2026.
 
-## 1. Название задачи
+## 3. Current branch
 
-Полный аудит и безопасная интеграция production deployment, environment, backup/restore, rollback, observability, incidents и operations без выдуманной инфраструктуры.
+Только существующая `main`; branch/worktree/PR branch не создавались.
 
-## 2. Текущая дата
+## 4. Git status
 
-18.07.2026, timezone `Europe/Vilnius`.
-
-## 3. Текущая ветка
-
-Только существующая `main`; branch/worktree/PR branch не создаются.
-
-## 4. Repository status
-
-До phase zero дерево было clean и локальная `main` опережала `origin/main` на 12 commits. Финальный diff содержит только Task 28 configuration, operational hardening и documentation changes; branch/status повторно проверяются непосредственно перед commit/push.
+Старт: clean `main...origin/main [ahead 13]`, `HEAD 81cb006`. Task 27 changes остаются в одном рабочем дереве; финальный status повторяется перед commit/push. Независимых user edits в начале не было.
 
 ## 5. Canonical requirement files read
 
-- `AGENTS.md`, `docs/requirements/index.md`, `docs/CODE_STANDARDS.md`, `docs/architecture.md`, `docs/development.md`.
-- `docs/requirements/multilingual-requirements.md`, `docs/security.md`, `docs/performance.md`, `docs/caching.md`, `docs/UI_STANDARDS.md`, `docs/frontend.md`, `docs/administration.md`.
-- `docs/requirements/maintenance-and-upgrades.md`, `docs/deployment.md`, `docs/environment.md`, `docs/plans/current-task-plan.md`, `CHANGELOG.md` и production-related Markdown corpus.
-- Обязательный order был полностью перечитан после phase-zero edits и будет ещё раз проверен в mandatory completion gate.
+Полностью прочитаны `AGENTS.md`, `docs/requirements/index.md`, `docs/CODE_STANDARDS.md`, `docs/architecture.md`, `docs/development.md`, multilingual, security, performance/cache, UI/accessibility, administration, production operations, maintenance/upgrades, current plan, README/CHANGELOG и owner map `docs/README.md`. Project-owned Markdown corpus проверен на ссылки/contradictions/legacy requirements; 436 Markdown references разрешались без missing target.
 
 ## 6. Requirement files updated
 
-- `AGENTS.md`: permanent production-operation gate.
-- `docs/requirements/index.md`: canonical production owner и conflict precedence.
-- `docs/requirements/production-operations.md`: новый canonical owner, потому что эквивалентного requirement file не было.
-- Existing owners: `docs/CODE_STANDARDS.md`, `docs/architecture.md`, `docs/development.md`, `docs/security.md`, `docs/performance.md`, `docs/caching.md`, `docs/UI_STANDARDS.md`, `docs/frontend.md`, `docs/administration.md`.
+Обновлены `AGENTS.md`, requirement index, code/architecture/workflow, multilingual, security/privacy, performance/cache, UI/accessibility и administration owners. Добавлен единственный canonical `docs/requirements/system-wide-integration.md`; duplicate owner не создавался.
 
-## 7. Production documentation found
+## 7. Feature documentation files read
 
-- `docs/deployment.md` — существующий canonical deployment/runbook owner.
-- `docs/environment.md` — environment-variable/runtime owner.
-- `docs/storage.md`, `docs/caching.md`, `docs/queues.md`, `docs/ci.md`, `docs/premium-provider-integration.md`, `docs/authorization-operations.md`.
-- Evidence: `docs/audits/environment-preflight.md`, `docs/audits/current-state-audit.md`, security/performance/verification audits, `docs/maintenance/runtime-compatibility.md`, `docs/MAINTENANCE_LOG.md`.
-- Duplicate-owner audit сохранил `docs/deployment.md` и `docs/environment.md` как владельцев; добавлены только отсутствовавшие rollback, backup/restore, DR, incident, provider, health, service-worker и production-checklist runbook’и под `docs/operations/`.
+Прочитаны owner documents для catalog/search/player/import/API/auth/storage/notifications/collections/comments/reviews/profiles/settings/calendar/recommendations/requests/issues/help/premium/mobile/administration/operations/maintenance и living modernization plan. Historical plans считаются evidence, но не получают precedence над current owners.
 
-## 8. Deployment scripts found
+## 8. Installed Laravel version
 
-Проверены `app:deployment-check`, `app:health`, `app:failed-job-audit`, `project:docs-refresh`, четыре systemd templates и logrotate template. Heavy deployment check намеренно не запускался на writer-heavy SQLite; остальные использованные diagnostics классифицированы как read-only/bounded. Установленного автоматического deploy script нет: реальный процесс — documented in-place aaPanel/Git workflow.
+`laravel/framework 13.20.0`.
 
-## 9. Backup scripts found
+## 9. Installed Livewire version
 
-Repository-owned backup script отсутствует. Panel archives найдены вне public root, но current consistent database dump, off-host copy и restore rehearsal не подтверждены; поэтому backup остаётся обязательным ручным operator gate, а не заявленной automation.
+`livewire/livewire 4.3.3`; class-based components, Volt отсутствует.
 
-## 10. Server assumptions found
+## 10. Installed Tailwind version
 
-Read-only server verification подтвердил Rocky Linux `10.2`, aaPanel-managed nginx `1.31.2`, `php-fpm-85.service`, SQLite `3.46.1`, reachable Redis, unavailable Memcached listener, systemd queue workers и cron. Private host/path values не перенесены в canonical docs.
+`tailwindcss 4.3.2`, `@tailwindcss/vite 4.3.2`.
 
-## 11. Actual framework versions
+## 11. Installed Flux packages
 
-Installed lock/runtime: Laravel `13.20.0`, Livewire `4.3.3`, Tailwind `4.3.2`, Vite `8.1.4`; Flux/Flux Pro отсутствуют и не добавлялись.
+Flux/Flux Pro отсутствуют и не устанавливались.
 
-## 12. Actual PHP requirement
+## 12. Relevant Composer packages
 
-`composer.json` requires PHP `^8.3`; actual CLI/FPM runtime is PHP `8.5.8`. Production documentation distinguishes the package constraint from the verified current runtime.
+Laravel 13.20.0, Livewire 4.3.3, Boost 2.4.13, Pint 1.29.3 и существующие first-party/runtime packages. Полный registry остаётся в `docs/maintenance/dependency-inventory.md`; constraints/lock не менялись.
 
-## 13. Actual Node requirement
+## 13. Relevant npm packages
 
-Repository has no `.nvmrc`, `.node-version` or explicit package-engine constraint. Actual build runtime is Node `26.4.0`; this verified runtime is documented without claiming a broader range.
+Vite 8.1.4, Laravel Vite plugin 3.1.3, Tailwind 4.3.2, Plyr 3.8.4, HLS.js 1.6.16 и local FontAwesome. Patch/minor updates были только обнаружены, но не применены без отдельной причины/upgrade review; package/lock files не менялись.
 
-## 14. Composer version requirement
+## 14. Current application architecture summary
 
-No repository Composer-version constraint exists. Composer `2.10.2` was used; locked non-dev platform requirements passed.
+Laravel full-page class-based Livewire для HTML, API Resources/controllers/responders для JSON, thin signed/file/health routes, Eloquent/services/actions/queries/DTO, Vite/Tailwind. Verified runtime использует SQLite; Redis сконфигурирован для cache/session/queue/locks, Memcached optional и недоступен. Наличие worker/cron не выводится из config. 122 models, 425 services, 61 actions, 72 Livewire components, 34 Form Requests, 34 Resources, 14 policies, 124 enums, 11 jobs и 101 applied migrations.
 
-## 15. npm package-manager strategy
+## 15. All discovered public routes
 
-The only frontend lock file is `package-lock.json`; npm `12.0.1` and `npm ci` were verified without changing package constraints or lock content.
+121 public/framework routes: home; catalog/taxonomy/directory/top/discovery/search/stats; title/season/episode shell and signed playback; public collection/tag/profile/comment/review/request/help/calendar/premium-unavailable pages; auth entry/recovery/verification callbacks; feed/OpenSearch/LLM/health/SEO sitemap documents; Livewire assets/update boundary; localized equivalents; retained redirects. Source files `routes/web.php` и generated `route:list --json` остаются exact inventory owners.
 
-## 16. Required PHP extensions
+## 16. All discovered private routes
 
-Required/used runtime roles are documented from Composer platform checks and code/runtime evidence: Ctype/polyfill, DOM/XML/LibXML, Fileinfo, Filter, Hash, Iconv, JSON, Mbstring/polyfill, OpenSSL, PCRE, Session, Tokenizer, PDO SQLite/SQLite3, cURL, Intl and Redis. Memcached is optional for disposable hot caching and currently unavailable; image/archive extensions remain feature-specific rather than invented global requirements.
+44 authenticated web routes: library/history/activity, personal tags, own collections, notifications/discussions/reviews, settings/profile/security/export, calendar subscriptions, content requests, technical tickets/attachments, password confirmation, premium return и media download. Все имеют authenticated owner boundary; private account pages use `PrivateAccountResponse` except intentionally narrower signed/export callbacks with their own controls.
 
-## 17. Configured database drivers
+## 17. All discovered administration routes
 
-Actual application database is SQLite with WAL and configured busy/transaction safeguards; Laravel keeps optional standard driver definitions. No database name or path is published. `migrate:status --pending` reports zero pending migrations.
+13 routes: calendar, catalog, collections, comments, help + help preview, imports, issues, premium, profiles, requests, reviews и tags. Каждая использует `auth`, `auth.session`, `account.private` и explicit `can:*` gate.
 
-## 18. Configured cache drivers
+## 18. All discovered API routes
 
-Redis domain/locks stores are configured and reachable. Memcached is configured only as a disposable hot tier but no listener/unit is available; authoritative database/Redis fallbacks preserve correctness. File/recomputable fallback roles are documented separately.
+67 API routes: discovery/OpenAPI/catalog; mobile auth/devices; config/health/home; public catalog/directories/filter/search/tag/collection/recommendation/review/season/episode sync; authenticated account/profile/password/delete; watchlist/rating/tag/library/history/progress/offline sync; signed playback. Private writes combine Sanctum ability, owner resolution, validation and domain policy; API errors remain JSON-safe.
 
-## 19. Configured session driver
+## 19. All discovered middleware
 
-Sessions use the isolated Redis `sessions` connection with secure, HTTP-only, `SameSite=Lax` production cookies. Payloads were not inspected and application-key rotation remains a high-risk exceptional operation.
+Global groups add `AddSecurityHeaders`, `ApplyAccountPreferences`, `SetApiLocale`, `AssignApiRequestId`. Project aliases: `auth.optional.sanctum`, `public.cache`, `public.page`, `canonical.tag`, `collection.locale`, `collection.response`, `account.private`, `verified.api`, plus Sanctum `ability/abilities`. Host trust derives only from configured `APP_URL`; CSRF exception is limited to billing webhook, whose adapter performs provider signature validation.
 
-## 20. Configured queue driver
+## 20. All discovered guards
 
-Queues use isolated Redis transport. Active pool: 4 import, 8 title-refresh and 1 cache-warm worker; Horizon/Supervisor are absent. Existing queue/failed history was preserved, and import plus cache-warm states were observed without flush, bulk retry or deletion.
+Laravel `web` session guard and Sanctum personal-access-token API boundary. Mobile abilities are `mobile:read`/`mobile:write`; API token never grants administration.
 
-## 21. Configured mail driver
+## 21. All discovered roles
 
-Mail uses the Laravel `log` driver; no real delivery provider is configured and no production mail was sent. Runbooks document that application acceptance is not delivery evidence.
+Normalized general RBAC/organization roles do not exist. Administration is a configured catalog-administrator email allowlist; premium grant/promotion/billing-audit/reconciliation capabilities require both that boundary and separate capability allowlists. Advertiser/rightsholder roles are `not_applicable`.
 
-## 22. Configured filesystem disks
+## 22. All discovered permissions
 
-Configured disks include canonical local/private, public, uploads and project export/media roles through filesystem config. Public/private boundaries, symlink rules, backup scope, safe filenames and disk-full behavior are documented; no arbitrary production storage write was performed.
+Gates: `manage-seasonvar-imports`, `manage-catalog`, `manage-comments`, `manage-reviews`, `manage-content-requests`, `manage-technical-issues`, `manage-release-calendar`, `manage-help-center`, `view-premium-administration`, `manage-premium-grants`, `manage-premium-promotions`, `view-premium-billing-audit`, `reconcile-premium`, `view-account-settings`, `update-account-settings`. Resource permissions принадлежат 14 policies: account settings, title/media/progress/marker, collection/tag/user tag, comment/review/profile, request/issue/help.
 
-## 23. Configured logging channels
+## 23. All discovered feature modules
 
-Laravel daily/stack logging is configured with bounded retention, and the repository logrotate template parses successfully. Existing large historical logs remain an operational disk/retention item; no raw log or private payload was copied into docs or the final summary.
+Areas 1–23 и 26 существуют в степени, указанной domain owners. Premium имеет entitlement/checkout/provider adapter boundary, но active provider отсутствует. Area 24 rights-holder cases и area 25 advertisers не имеют routes/schema/services и отмечены `not_applicable`; fake implementation не добавлялась.
 
-## 24. Configured payment providers
+## 24. Discovered duplicate implementations
 
-No active production payment provider/SDK is configured. Payment/webhook recovery is documented as a future-provider contract with signature, idempotency and server-trusted entitlement requirements; no fake healthy state or payment control was added.
+Duplicate route method/URI: 0; duplicate route names: 0; duplicate PHP translation keys: 0; duplicate requirement owner для integration до Task 27 отсутствовал. Parallel user identity, entitlement, progress, personal-library, notification или audit architecture не обнаружена. Domain-specific moderation histories и `AdminAuditRecorder` имеют разные обязанности и не объединяются механически.
 
-## 25. Configured OAuth providers
+## 25. Discovered incomplete integrations
 
-Google integration configuration exists but is disabled; no active OAuth provider is configured. Callback/security boundaries were inspected without external login or exposing values.
+- API name update не bump-ил versioned public-profile/search projection, тогда как Livewire делал это отдельно.
+- Account export не включал stored notification preferences и current database-notification read/history state.
+- Generic morph notifications не имели FK cleanup в canonical hard deletion.
+- `admin_audit_events.actor_id RESTRICT` мог превращать deletion административного actor в raw constraint failure.
+- Profile hard deletion не очищал current summary key/search suggestion generation.
+- Public 403/episode link/viewing history содержали hardcoded fallback text.
+- После production Vite build реальный Firefox обнаружил старое кешированное HTML со ссылками на удалённые hashed CSS/JS; full-response key не учитывал manifest generation.
+- Каталог показал report-only CSP violation от обычного Livewire bundle: установленный пакет уже содержал официальный CSP-safe build, но canonical config не включал его.
+- Полного account merge workflow нет; узкие request/ticket `mergeUsers()` hooks нельзя считать coordinator.
 
-## 26. Configured external source providers
+## 26. Discovered dead controls
 
-Seasonvar remains the authorized source/import provider and media delivery remains within existing server-side allowlist/authorization boundaries. HDRezka synchronization is disabled. Source credentials/raw URLs are excluded from operational output.
+Textual/route/Livewire inspection не обнаружил fake advertiser/legal/PWA/payment-provider controls. Absent capabilities представлены unavailable state либо отсутствуют. Credential-dependent browser mutations ещё не считаются runtime-verified.
 
-## 27. Configured service worker
+## 27. Discovered hardcoded strings
 
-Repository and built-asset search confirmed no browser manifest, service-worker build or registration. State is `not_installed`; no generic PWA package or fake cache status was added.
+Public 403, episode link и viewing-activity fallbacks исправлены через существующие `ru`/`en` catalogs. Legacy `/stats` и `/admin/catalog` содержат большую русскоязычную operational string surface; она документирована как retained limitation и не была рискованно переписана в final stabilization task. Internal diagnostics/provider terms и linguistic search dictionaries не классифицируются как interface labels.
 
-## 28. Configured scheduler
+## 28. `@php` usage
 
-Laravel scheduler is real and `schedule:list` confirms seven application schedules. Cron invokes scheduler, queued import dispatch and bounded queue monitoring; each responsibility is documented without inventing additional automation.
+Ноль Blade `@php`/`@endphp`.
 
-## 29. Configured queues
+## 29. Direct Blade class calls
 
-Redis queues and systemd workers genuinely exist. Worker units passed `systemd-analyze verify`; heartbeats are current. The incompatible synchronous forever-import profile was safely disabled while the queued profile remained active.
+Ноль прямых model/service/facade/database/cache/container queries в Blade по repository scan. Blade получает prepared values/components.
 
-## 30. Cron requirements
+## 30. Inline CSS
 
-Three cron responsibilities were verified for scheduler, queued import dispatch and queue monitor. Canonical docs use placeholder paths/users and do not publish the installed private path.
+Ноль Blade `<style>` и business `style=` attributes.
 
-## 31. Supervisor requirements
+## 31. Large inline JavaScript
 
-systemd is the verified process manager for queue workers. Supervisor and Horizon are absent and are not required or claimed.
+Inline business scripts отсутствуют; единственный inline JSON-LD boundary является prepared escaped SEO data. Application JS находится в Vite modules.
 
-## 32. Actual web-server documentation
+## 32. N+1 risks
 
-Read-only inspection confirmed aaPanel-managed nginx `1.31.2`, HTTPS/HSTS, the intended public document root and FastCGI handling. Canonical documentation records capability and placeholders, not private hostnames or installed paths.
+Cards/queues/library/recommendation/profile builders используют eager/grouped/aggregate queries. Textual query inspection не обнаружил query from Blade или one-query-per-card path в changed scope. Полный query-profiler browser capture не выполнялся, поэтому абсолютное утверждение о нуле N+1 во всех 425 services не делается.
 
-## 33. Actual PHP-FPM documentation
+## 33. Stale cache risks
 
-`php-fpm-85.service` is active/enabled. After production/debug correction the configuration cache was rebuilt and a graceful FPM reload was performed; runbooks require validated config plus graceful reload/restart and OPcache refresh according to the installed service.
+Подтверждены и исправлены два gap: canonical profile name/deletion invalidируют versioned summary и `SearchSuggestions`, а guest full-response dimensions теперь включают `Vite::manifestHash()`. Firefox после нового build получил только текущие CSS/JS с HTTP 200 и нулём console errors; store-wide cache flush не применялся. Service worker отсутствует.
 
-## 34. Writable directory requirements
+## 34. Security risks
 
-Verified writable roles are Laravel `storage/`, `bootstrap/cache/`, SQLite/WAL/SHM and configured upload/export roots for the runtime group. Current `.env` is `0600`, compiled manifests `0644`, SQLite/WAL/SHM `0660`; docs explicitly prohibit recursive `777` and executable uploads.
+Исправлены audit-retention deletion failure, orphan morph notifications и allowlisted notification export. Route/CSRF/IDOR/owner/policy/signed playback/upload/storage/webhook/static secret scans подтверждают existing boundaries. Livewire `csp_safe` включён через package-supported config вместо добавления `unsafe-eval`. No advisory обнаружен project tooling. Credential/provider penetration journeys и production restore не выполнялись.
 
-## 35. Current backup strategy
+## 35. Privacy risks
 
-Panel archives exist outside the public root and are access-restricted, but no verified current consistent DB backup, off-host copy, approved retention policy or completed restore rehearsal was found. Production deployment therefore requires an operator-created and validated pre-change backup; automation is not claimed.
+Export раньше пропускал notification preference/history state; теперь включает только owner records и type-specific safe fields. Unknown future payload fail-closed не экспортируется. Account deletion очищает generic owner notification rows, сохраняет immutable admin audit через explicit retention block. Rights-holder/advertiser privacy flows `not_applicable`.
 
-## 36. Current restore strategy
+## 36. Multilingual risks
 
-`docs/operations/backup-and-restore.md` now covers authorization, current-state preservation, database/files/secure environment, dependencies/assets, permissions, cache/runtime, service worker and provider reconciliation. A full restore was not performed and is explicitly an unresolved limitation.
+Actual locales: `ru`, `en`; по 20 PHP catalogs и 4,144 leaf keys. Финальный check: 0 missing keys, 0 unique-placeholder mismatch, 0 duplicate literal keys; новые auth/settings keys добавлены в обе локали. Large legacy admin/stats Russian-only surface остаётся documented limitation. Localized route group содержит 41 route, включая localized home.
 
-## 37. Current rollback strategy
+## 37. Mobile risks
 
-`docs/operations/rollback-runbook.md` separates code, locked dependencies, assets, schema/backfills, configuration, cache, sessions, workers, service worker and providers. It requires the previous known-good commit and does not pretend Git alone reverses data.
+Mobile web и JSON API используют тот же backend/identities. No duplicate mobile URL backend, manifest/service-worker/install/push/offline claim. Safe-area/player/navigation modules inspected statically; real-device run unavailable.
 
-## 38. Current monitoring strategy
+## 38. Accessibility risks
 
-Actual observability consists of minimal public readiness, permission-bounded/CLI detailed health, queue/import diagnostics, daily logs and panel/system service state. External monitoring, distributed tracing and automatic alert delivery are absent.
+Changed public fallbacks сохраняют semantic headings/links/alt text через translations. Existing focus/loading/reduced-motion/touch-target contracts inspected in shared UI. Screen-reader/virtual-keyboard real-device verification unavailable; legacy operational localization debt может создавать long-label risk после будущего translation migration.
 
-## 39. Current alert strategy
+## 39. SEO risks
 
-No external alert transport was verified. The runbook defines manual operational review and role-based escalation without fake delivered alerts or private contacts.
+Canonical/localized/robots/sitemap responders inspected; private/auth/admin/ticket/payment-return/signed routes не добавлялись в sitemap. No Task 27 route or SEO schema changed. Service-worker/legal/advertiser routes absent.
 
-## 40. Current log-retention strategy
+## 40. Migration risks
 
-Laravel daily logging uses 14 days by configuration and the repository logrotate template also retains 14 rotations; panel/system ownership must avoid duplicate conflict. Backup/legal/financial retention remains owner/legal-approved rather than invented.
+Task 27 migration не добавлялась. 101 migrations имеют applied status; schema metadata: 151 tables, 469 indexes. User-FK inventory found one `RESTRICT` audit edge and otherwise documented cascade/set-null edges. Production-like SQLite is about 27 GB, поэтому unbounded duplicate/integrity full-table scans были остановлены и не заявляются выполненными.
 
-## 41. Current deployment risks
+## 41. Backward-compatibility risks
 
-- Deployment is in-place; atomic release, zero downtime and automatic failover are unavailable/unverified.
-- Local `main` started 12 commits ahead of remote; final push authority/credentials remain an external delivery gate.
-- The large writer-heavy SQLite database makes broad integrity diagnostics unsafe during active import.
-- Partial code/asset/cache/runtime activation requires the documented maintenance decision and rollback procedure.
+245 route contracts, legacy aliases, DB identity/status codes, cache prefixes, API fields, lock files и migrations сохранены. 15 legacy route aliases остаются intentional adapters. Full account merge остаётся unsupported, а domain merge hooks retained. No destructive normalization or dependency upgrade.
 
-## 42. Current data-loss risks
+## 42. Cross-feature dependency map
 
-- No current consistent database backup or full restore rehearsal is evidenced.
-- SQLite file and persistent private/public files require coordinated backup.
-- Forward-only migrations/backfills cannot be reversed by Git alone.
-- Disk-full, interrupted migration and stale worker compatibility remain explicit incident scenarios.
+Canonical map находится в `docs/system-integration.md`: user/content identity; entitlement/visibility/access; notifications/audit; storage/cache/search/SEO; account merge limitation/deletion; imports; administration; mobile; security/privacy. Account mutation теперь обновляет profile/search/collection/comment/review projections централизованно.
 
-## 43. Current cache risks
+## 43. Implementation phases
 
-- Memcached hot tier is configured but unavailable; detailed health correctly remains degraded and database/Redis fallbacks preserve correctness.
-- Redis sessions/queues/locks make flush/serializer/prefix changes high risk.
-- Compiled cache order and stale environment config are covered by deployment checks; no store-wide flush was performed.
+1. Requirement/index/reference normalization.
+2. Route/schema/class/translation/cache/security/frontend inventory.
+3. Minimal account/profile/export/i18n correctness corrections.
+4. Cross-feature documentation/compliance reconciliation.
+5. Static/build/browser verification без automated tests.
+6. Final reread, README/CHANGELOG, commit и configured push attempt.
 
-## 44. Current storage risks
+## 44. Files expected to change
 
-- Public/private disk mapping and permissions are documented; backup completeness and disk-full recovery still need an operator-verified backup/restore exercise.
-- Private attachments/legal/financial assets must never be placed under public backup/download paths.
+Canonical requirements/architecture/security/cache/authorization/notification/integration/deployment docs; current plan; account export/deletion/profile cache services; public page cache policy; Livewire CSP config/profile orchestration; four translation catalogs; three public Blade fallbacks; README/CHANGELOG/maintenance review. No route, migration, dependency or frontend source change was required.
 
-## 45. Current security risks
+## 45. Files expected to remain compatible
 
-- Canonical templates now use generic paths and no added line contains the actual workspace path or private IP.
-- Public health is minimal/no-store/noindex; detailed health remains CLI/permission-scoped.
-- Direct nginx/FPM topology, HTTPS/HSTS and secure cookies were verified; no unverified proxy trust or CORS widening was introduced.
-- Secret-signature and direct-`env()` scans are clean; actual secret values were never copied into tracked output.
+All public/localized/private/admin/API routes, tables/migrations/data, progress/library/history/collections/comments/reviews/calendar/recommendations/import/premium state, cache key formats, API response contracts, lock files and test infrastructure.
 
-## 46. Current provider risks
+## 46. Validation strategy
 
-- Seasonvar source clients retain bounded timeout/retry and allowlist behavior through config-backed identity.
-- Google/HDRezka are disabled; payment/OAuth/object storage/external monitoring are not configured; mail is log-only.
-- Provider outage/reconciliation contracts are documented without claiming unavailable services.
+Allowed checks only: static PHP/Blade/JS/config scans, PHP syntax/Pint/PHPStan, route/middleware/schema/migration/FK/index inspection, translation parity/placeholder/duplicate syntax, Composer/npm advisory inspection, docs links/refresh, production asset build, safe browser smoke and git diff/status. Automated tests не создаются и не запускаются по explicit task rule.
 
-## 47. Migration plan
+## 47. Manual acceptance checklist
 
-No Task 28 migration was introduced. Existing tracked migrations were classified by static inspection, zero pending migrations were confirmed, and any future high-risk/backfill/destructive change must use the documented backup and staged-compatibility workflow.
+- Anonymous: Firefox подтвердил RU/EN home, search с 12 cards, catalogue, `year_from=2025` Livewire filter, browser back/forward, title/player shell, help и auth entry. На 390×844 home/search/catalog имели нулевой horizontal overflow.
+- Player: signed same-origin grant дошёл до внешнего MP4 как `206`; выбранный файл не декодировался Firefox и bounded recovery повторил запрос, поэтому actual playback/subtitle/audio success не заявляется.
+- Privacy: `/library` для гостя вернул `302` на `/login`; login имеет `noindex,nofollow`, current Vite assets и CSP-safe Livewire bundle получили `200`.
+- Authenticated: route/policy/service/static verification; runtime writes only with safe available credentials, otherwise `not_performed`.
+- Premium: unavailable/provider-free fallback and server entitlement inspected; no real charge.
+- Advertiser/rightsholder: `not_applicable`, routes/domain absent.
+- Administrator: all 13 routes/gates/services audited statically; no credential fabricated.
+- Build/assets: production Vite 8.1.4 build passed; manifest references existing files. Первый smoke обнаружил stale guest HTML, исправление manifest dimension подтверждено новыми CSS/JS `200` и 0 console errors на home.
 
-## 48. Backup plan
+## 48. Requirement-compliance matrix
 
-The database/persistent-file inventory, consistency requirements, private destination, retention categories, integrity checks and restore validation are documented. No fake automation, large live backup or destructive restore was performed.
+| Domain | Status | Evidence / limitation |
+| --- | --- | --- |
+| Requirements/read order/precedence | completed | owners read; integration owner/index/root rules added; Markdown links valid |
+| Home/catalog/search/filters | affected/completed | RU/EN/mobile/search/catalog/filter/back-forward browser smoke; stale asset cache and Livewire CSP gaps repaired |
+| Title/season/episode/player | already compliant | canonical IDs, entitlement, signed source/download boundaries retained |
+| Progress/history/library | already compliant | owner policies/grouped state/unique schema retained; no duplicate progress system |
+| Collections/tags/comments/reviews | affected/completed | account identity invalidation centralized; preferences exported |
+| Profiles/auth/settings | affected/completed | API/Livewire name projection parity; deletion/export fixed |
+| Calendar/recommendations | already compliant | canonical services/notifications/cache paths inspected |
+| Requests/tickets/help | affected/completed | stored notification preferences exported; deletion hooks retained |
+| Premium/payment boundary | already compliant | no active provider; deletion lifecycle guard and webhook signature adapter retained |
+| Mobile/PWA | partial/not_applicable | API/mobile web exist; service worker/install/push/offline absent |
+| Rights-holder cases | not_applicable | no route/schema/domain; permanent privacy rule only |
+| Advertisers | not_applicable | no route/schema/domain; no portal-user data shared |
+| Administration/audit | affected/completed | 13 gated routes; immutable audit deletion retention handled fail-closed |
+| Notifications | affected/completed | six stable types, allowlisted export, owner deletion cleanup |
+| Account merge | unresolved capability | no proof-of-control/full coordinator; domain hooks documented, email merge forbidden |
+| Account deletion/export | affected/completed | FK map reviewed; morph cleanup, audit guard, safe export added |
+| Cache/search/assets | affected/completed | profile lifecycle invalidation repaired; manifest hash separates guest HTML generations; live Firefox loaded only current assets |
+| SEO/sitemap | already compliant | route responders/public-only boundaries inspected; no changed route |
+| Multilingual | partial | ru/en parity; three public fallbacks fixed; legacy admin/stats debt retained |
+| Security/privacy | affected/completed | concrete retention/orphan/export leaks fixed; official CSP-safe Livewire bundle enabled; no provider penetration claim |
+| Performance/database | completed within safe scope | metadata/query inspection; no 27-GB full-table scan or invented measurements |
+| Production readiness | partial | `app:deployment-check` ready, 101 migrations/SQLite integrity/FTS/indexes pass; health ready but degraded by unavailable Memcached; no restore/failover/credential journeys verified |
+| Git delivery | pending final step | commit and push result recorded after verification |
 
-## 49. Rollback plan
+## 49. Unresolved risks
 
-The canonical rollback runbook records the previous known-good commit/release and handles code, dependencies, assets, schema/backfill, config, cache, sessions, workers/providers and service-worker state separately. Forward-fix is required when schema rollback is unsafe.
+- Local `main` начал задачу на 13 commits ahead of remote; configured HTTPS remote ранее не имел credentials, поэтому push может быть blocked внешней авторизацией.
+- Full account merge, active OAuth/payment provider, advertiser/rightsholder domains и PWA/service worker отсутствуют.
+- Legacy `/stats` и `/admin/catalog` не имеют complete `ru`/`en` translation catalog.
+- Production backup/restore, provider callbacks, authenticated/premium/admin mutations и real-device journeys не выполняются без safe credentials/infrastructure.
+- Огромная SQLite база исключает unbounded duplicate/integrity scans; uniqueness проверена schema constraints/indexes и targeted metadata inspection.
+- Installed CSP-safe Livewire bundle emits four Firefox deprecation warnings for legacy browser capability probes; no application/CSP error remains, and package code was not forked.
+- Browser reached a real signed MP4 source with `206`, but Firefox could not decode that provider file; source authorization was observed, actual playback/audio/subtitle success remains unverified.
 
-## 50. Verification plan
+## 50. Final completion summary
 
-- Static/config/route/migration/schedule/command inspection; Composer/npm audit without update; production build when safe.
-- Read-only runtime/service/process/permission/disk checks and existing diagnostics with side-effect review.
-- Isolated compiled-cache verification, manifest/assets, redaction/secret scans, translation syntax, browser smoke where available.
-- No new or existing automated tests are run because this task explicitly prohibits them.
+Task 27 normalized permanent integration rules, inventoried 245 routes/101 migrations/shared domains, corrected account identity projection parity, safe account export/deletion, profile invalidation, Vite-aware guest HTML caching and CSP-safe Livewire delivery, localized three public fallback surfaces, and documented actual limitations. Production build, isolated compiled-cache checks, route/translation/static analysis, deployment preflight and live Firefox smoke completed without automated tests; Git delivery result is recorded before handoff.
 
-## 51. Documentation plan
+## 51. Final commit reference
 
-Existing owners were extended and only missing operational runbooks were added and linked from `docs/README.md`, requirements and architecture/production owners. `README.md`, the Russian-language repository `CHANGELOG.md` required by `AGENTS.md`, and `docs/MAINTENANCE_LOG.md` were updated with evidence-backed Task 28 outcomes.
-
-## 52. Files expected to change
-
-- Permanent owners and `docs/requirements/production-operations.md`.
-- `docs/deployment.md`, `docs/environment.md`, `docs/README.md`, relevant storage/cache/queue/security docs.
-- Missing `docs/operations/*` runbooks only after duplicate review.
-- `.env.example`/config/application health or deployment code only if evidence shows a safe concrete gap.
-- `README.md`, `CHANGELOG.md`, `docs/MAINTENANCE_LOG.md`, this plan.
-
-## 53. Files expected to remain compatible
-
-All public/localized/API/admin/payment/webhook/OAuth/playback/download routes; models/migrations/data identities; importer; auth/session; catalog/search; player/progress/library; premium/region/legal/advertiser boundaries; test infrastructure and lock files unless a justified reviewed change exists.
-
-## 54. Requirement-compliance matrix
-
-| Domain | Required outcome | Phase-zero state | Final evidence |
-| --- | --- | --- | --- |
-| Canonical requirements | owner linked/read/re-read | owner added and linked | complete; final read gate recorded against current file hashes |
-| Environment inventory | actual/unknown, no secrets | verified config/runtime/service state | complete; unknown infrastructure labelled unknown |
-| Deployment | repeatable actual strategy | in-place aaPanel/nginx/FPM | canonical runbook complete; atomicity not claimed |
-| Assets | reproducible build + manifest | npm lock and Vite audited | build passed; 15/15 manifest assets present, no source maps |
-| Migration | classified + backup/rollback | SQLite/static migration audit | no Task 28/pending migration; high-risk gate documented |
-| Backup/restore | private, verified procedure | current backup not evidenced | runbook complete; backup/restore execution remains limitation |
-| Rollback/DR | code/data/provider scenarios | fragmented prior notes | canonical rollback/DR/incident runbooks complete |
-| Cache/sessions | responsibilities/failure safety | Redis live, Memcached unavailable | separation/fallback/deployment documented; readiness true/degraded honest |
-| Queue/scheduler | real infrastructure only | systemd + cron verified | real pools/schedules documented; fake Horizon/Supervisor absent |
-| Storage/permissions | public/private/least privilege | config/runtime audited | roles, backup and permissions documented/corrected |
-| Logging/health | redacted, side-effect-free | detailed public readiness risk found | public payload minimized; CLI detail and retention documented |
-| Providers/payments | idempotency/reconciliation | active source only; other providers disabled/absent | outage contracts complete; no fake integration |
-| Admin operations | no arbitrary execution/secrets | existing policy inspected | documentation forbids shell/SQL/env/file browser and scopes health |
-| Multilingual/a11y | operational labels/contracts | no new operational UI introduced | permanent requirements/runbooks complete; no untranslated UI added |
-| Security/privacy | no leak/fail-open | runtime/docs/config audited | production/debug/permissions/health/config corrected; scans clean |
-| Production verification | honest performed/blocked | static/runtime/browser scopes defined | performed checks recorded; heavy DB/restore/authenticated/player journeys limited honestly |
-| Documentation | owners/runbooks/index/readme/changelog | canonical set implemented | docs refresh/check and Markdown ownership review complete |
-| Git | clean main, commit, push | Task 28 diff only | commit/push gate remains until delivery step |
-
-## 55. Manual acceptance checklist
-
-- [x] Application boot, minimal public readiness and read-only API health.
-- [x] Home desktop/mobile, RU/EN locale, catalog and search browser smoke completed with HTTP 200, no overflow, raw provider host or console/page errors; title HTTP smoke completed. Interactive title/player browser completion remained outside the safe credential-free scope.
-- [x] Playback route/source boundary inspected: one signed delivery route and no raw provider host in title HTML. Real authenticated playback/progress mutation was not performed.
-- [x] Login page/security headers/session cookies and guest redirects for settings/library/collections inspected. No credentials or authenticated mutation were used.
-- [x] Administration, premium, region, legal and advertiser routes/policies were statically inspected; guest/private redirect boundaries were sampled.
-- [x] Payment browser success cannot be trusted by design; no provider is installed and no real/sandbox charge was attempted.
-- [x] Help, content request and technical-ticket public/private route behavior sampled; protected rights-holder/advertiser data was not accessed.
-- [x] Vite manifest/assets verified; service worker/browser manifest confirmed absent.
-- [x] Changed diff scanned for secret signatures, private IP and added absolute workspace paths; public health contains no detailed component data.
-- [x] Backup absence, restore-test limitation and rollback readiness documented honestly; no backup/restore success is claimed.
-
-## 56. Unresolved limitations
-
-- No current verified database backup, off-host copy, approved retention schedule or restore rehearsal exists in available evidence.
-- No atomic deployment, zero downtime, failover, external monitoring or alert-delivery infrastructure is verified.
-- Memcached is unavailable; critical warming last completed `degraded` with 74 target failures, while readiness remains true through authoritative fallbacks.
-- Interactive title/player/authenticated journeys remained limited by absence of safe credentials and the live import workload; public desktop/mobile home, locale, catalog and search browser smoke completed successfully, with HTTP/static checks for the remaining boundaries.
-- No destructive production deployment/backup restore, real payment, external OAuth or mail delivery is authorized.
-- The Task 28 changelog entry and four English-only entries from Tasks 29/09/07 were normalized to the mandatory Russian format without shortening them. The repository-wide changelog checker still flags older mixed-language Task 21/23/Premium prose outside this operational change; the commit hook must therefore be bypassed explicitly rather than claiming that historical cleanup was completed.
-- Push credentials may be unavailable; push must still be attempted and failure reported exactly.
-
-## 57. Final commit reference
-
-The Task 28 commit is identified at handoff with `git rev-parse HEAD`; this document intentionally cannot embed the hash of the commit that contains itself. Push result is recorded in the final handoff.
+Exact hash будет reported из `git rev-parse HEAD` после Task 27 commit. Этот документ находится внутри того commit; symbolic release reference до создания объекта Git — `main` Task 27 release commit.

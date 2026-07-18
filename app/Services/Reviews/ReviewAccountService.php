@@ -21,11 +21,11 @@ final class ReviewAccountService
         private readonly ReviewSchema $schema,
     ) {}
 
-    /** @return array{reviews: list<array<string, mixed>>, votes: list<array<string, mixed>>} */
+    /** @return array{reviews: list<array<string, mixed>>, votes: list<array<string, mixed>>, notification_preferences: array<string, mixed>|null} */
     public function export(User $user): array
     {
         if (! $this->schema->communityAvailable()) {
-            return ['reviews' => [], 'votes' => []];
+            return ['reviews' => [], 'votes' => [], 'notification_preferences' => null];
         }
 
         $reviews = CatalogTitleReview::query()
@@ -76,7 +76,17 @@ final class ReviewAccountService
                 ])->all()
             : [];
 
-        return ['reviews' => $reviewExport, 'votes' => $votes];
+        return [
+            'reviews' => $reviewExport,
+            'votes' => $votes,
+            'notification_preferences' => $this->schema->notificationsAvailable()
+                ? CatalogTitleReviewNotificationPreference::query()->find($user->id)?->only([
+                    'helpful_notifications',
+                    'moderation_notifications',
+                    'report_notifications',
+                ])
+                : null,
+        ];
     }
 
     public function prepareForDeletion(User $user): void

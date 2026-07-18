@@ -2,6 +2,14 @@
 
 Обновлено: 18.07.2026
 
+## Обязательный system-wide security и privacy review
+
+Каждое крупное cross-system изменение проверяет единообразие authorization, IDOR, CSRF, mass assignment, XSS, SSRF, path traversal, open redirects, uploads/private files, token/session handling, cache leakage, service-worker caching, payment/webhook integrity, advertiser privacy, legal-case privacy, ticket privacy, account merge/deletion, audit secrecy, export protection и administration least privilege. Решение остаётся server-side; browser-supplied permission, ownership, premium, region, price, status или legal state никогда не является authority.
+
+Пункт считается исправленным только после конкретного code/configuration change и доступной проверки. Непроверенные provider, production или credential-dependent boundaries отмечаются `unresolved`/`not_performed`, а не «secure».
+
+Task 27 verified account lifecycle against every SQLite FK to `users`. Единственный `RESTRICT` — immutable `admin_audit_events.actor_id`; `AccountService` теперь проверяет его до cleanup и возвращает локализованную retention validation вместо SQL error/partial deletion. Generic morph notifications, не защищённые FK, удаляются явно. Export выдаёт database notification data только по stable type/field allowlist и не включает private notes, message body, raw URL или неизвестные future fields.
+
 ## Security requirements для upgrades
 
 - Advisories оцениваются только verified package tooling или authoritative source; package не называется compromised/vulnerable без evidence применимости к installed version.
@@ -64,7 +72,7 @@
 ## HTTP
 
 - Web-ответы добавляют защитные заголовки: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` и `X-Permitted-Cross-Domain-Policies`.
-- HTML-ответы дополнительно получают `Content-Security-Policy-Report-Only`. Fixed policy запрещает objects, ограничивает base/form/frame, не содержит `unsafe-eval`, а image/media/connect sources берёт только из очищенных `SECURITY_CSP_*_SOURCES`. JSON API не получает этот body-dependent header.
+- HTML-ответы дополнительно получают `Content-Security-Policy-Report-Only`. Fixed policy запрещает objects, ограничивает base/form/frame, не содержит `unsafe-eval`, а image/media/connect sources берёт только из очищенных `SECURITY_CSP_*_SOURCES`. Livewire 4 использует официальный CSP-safe bundle через `config/livewire.php`, поэтому каталог не требует добавлять `unsafe-eval`. JSON API не получает этот body-dependent header.
 - CSP пока не enforced: текущий каталог использует несколько external poster/media origins, а inline styles нужны существующему UI/framework. Сначала нужно наблюдать violations, сузить `https:` до подтверждённых origins и только затем включать enforcement; публичный report collector намеренно не добавлен.
 - Laravel web middleware сохраняет стандартные encrypted cookies и `PreventRequestForgery` для небезопасных HTTP-методов.
 

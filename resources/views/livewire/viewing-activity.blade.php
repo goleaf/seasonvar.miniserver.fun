@@ -51,7 +51,7 @@
                     @foreach ($continueWatching as $item)
                         <x-ui.poster-card
                             :src="$item->title->poster_url"
-                            alt="Постер {{ $item->title->display_title }}"
+                            :alt="__('catalog.seo.poster_alt', ['title' => $item->title->display_title])"
                             layout="list"
                             data-continue-watching-card
                             wire:key="continue-watching-{{ $item->title->id }}"
@@ -123,7 +123,7 @@
                 @foreach ($history as $progress)
                     <x-ui.poster-card
                         :src="$progress->is_accessible && $progress->catalogTitle ? $progress->catalogTitle->poster_url : null"
-                        :alt="$progress->is_accessible && $progress->catalogTitle ? 'Постер '.$progress->catalogTitle->display_title : __('catalog.viewing.unavailable_episode')"
+                        :alt="$progress->is_accessible && $progress->catalogTitle ? __('catalog.seo.poster_alt', ['title' => $progress->catalogTitle->display_title]) : __('catalog.viewing.unavailable_episode')"
                         empty-label=""
                         layout="compact"
                         wire:key="viewing-history-{{ $progress->id }}"

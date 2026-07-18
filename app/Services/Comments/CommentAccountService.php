@@ -22,11 +22,11 @@ final class CommentAccountService
         private readonly CommentSchema $schema,
     ) {}
 
-    /** @return array{comments: list<array<string, mixed>>, reactions: list<array<string, mixed>>} */
+    /** @return array{comments: list<array<string, mixed>>, reactions: list<array<string, mixed>>, notification_preferences: array<string, mixed>|null} */
     public function export(User $user): array
     {
         if (! $this->schema->available()) {
-            return ['comments' => [], 'reactions' => []];
+            return ['comments' => [], 'reactions' => [], 'notification_preferences' => null];
         }
 
         $comments = Comment::query()
@@ -81,7 +81,18 @@ final class CommentAccountService
                 ])->all()
             : [];
 
-        return compact('comments', 'reactions');
+        return [
+            'comments' => $comments,
+            'reactions' => $reactions,
+            'notification_preferences' => $this->schema->notificationsAvailable()
+                ? CommentNotificationPreference::query()->find($user->id)?->only([
+                    'reply_notifications',
+                    'reaction_notifications',
+                    'moderation_notifications',
+                    'report_notifications',
+                ])
+                : null,
+        ];
     }
 
     public function prepareForDeletion(User $user): void

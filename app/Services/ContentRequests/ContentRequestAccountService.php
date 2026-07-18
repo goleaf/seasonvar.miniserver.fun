@@ -21,7 +21,13 @@ final readonly class ContentRequestAccountService
     public function export(User $user): array
     {
         if (! $this->schema->ready()) {
-            return ['created' => [], 'voted' => [], 'followed' => [], 'clarifications' => []];
+            return [
+                'created' => [],
+                'voted' => [],
+                'followed' => [],
+                'clarifications' => [],
+                'notification_preferences' => null,
+            ];
         }
 
         return [
@@ -40,6 +46,11 @@ final readonly class ContentRequestAccountService
                 ->map(fn (ContentRequestFollower $follow): array => ['request_public_id' => $follow->contentRequest?->public_id, 'created_at' => $follow->created_at?->toAtomString()])->all(),
             'clarifications' => ContentRequestClarification::query()->where('author_id', $user->id)->with('contentRequest:id,public_id')->orderBy('created_at')->get()
                 ->map(fn (ContentRequestClarification $message): array => ['request_public_id' => $message->contentRequest?->public_id, 'role' => $message->author_role, 'body' => $message->body, 'created_at' => $message->created_at?->toAtomString()])->all(),
+            'notification_preferences' => ContentRequestNotificationPreference::query()->find($user->id)?->only([
+                'requester_updates',
+                'voted_updates',
+                'followed_updates',
+            ]),
         ];
     }
 

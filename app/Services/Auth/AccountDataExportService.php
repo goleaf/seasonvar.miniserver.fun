@@ -20,10 +20,21 @@ use App\Services\Premium\PremiumAccountService;
 use App\Services\ReleaseCalendar\ReleaseCalendarAccountService;
 use App\Services\Reviews\ReviewAccountService;
 use App\Services\TechnicalIssues\TechnicalIssueAccountService;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\DB;
 
 final class AccountDataExportService
 {
+    /** @var array<string, list<string>> */
+    private const NOTIFICATION_FIELDS = [
+        'comment.activity' => ['kind', 'comment_id', 'reaction_id', 'report_id', 'moderation_status'],
+        'review.activity' => ['kind', 'review_id', 'vote_id', 'report_id', 'moderation_status'],
+        'content-request.activity' => ['kind', 'request_public_id', 'status', 'canonical_public_id'],
+        'technical-issue.activity' => ['kind', 'issue_public_id', 'public_number', 'issue_type', 'status', 'revision', 'canonical_public_id'],
+        'release-calendar.activity' => ['kind', 'entry_public_id', 'entry_type', 'status', 'revision', 'previous_date', 'new_date'],
+        'premium.activity' => ['kind', 'resource_public_id', 'expires_at', 'lifetime'],
+    ];
+
     public function __construct(
         private readonly CatalogCollectionAccountService $collections,
         private readonly CommentAccountService $comments,
@@ -102,6 +113,7 @@ final class AccountDataExportService
             'release_calendar' => $this->releaseCalendar->export($user),
             'premium' => $this->premium->export($user),
             'help_center' => $this->helpCenter->export($user),
+            'notifications' => $this->notifications($user),
             'library' => CatalogTitleUserState::query()
                 ->whereBelongsTo($user)
                 ->with('catalogTitle:id,slug,title')
@@ -140,6 +152,30 @@ final class AccountDataExportService
             'playback_markers' => $this->playbackMarkers($user),
             'library_update_acknowledgements' => $this->updateAcknowledgements($user),
         ];
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function notifications(User $user): array
+    {
+        return $user->notifications()
+            ->whereIn('type', array_keys(self::NOTIFICATION_FIELDS))
+            ->oldest('created_at')
+            ->oldest('id')
+            ->get()
+            ->map(function (DatabaseNotification $notification): array {
+                $data = $notification->data;
+
+                return [
+                    'type' => $notification->type,
+                    'data' => array_intersect_key(
+                        $data,
+                        array_flip(self::NOTIFICATION_FIELDS[$notification->type] ?? []),
+                    ),
+                    'read_at' => $notification->read_at?->toAtomString(),
+                    'created_at' => $notification->created_at?->toAtomString(),
+                ];
+            })
+            ->all();
     }
 
     /** @return list<array<string, mixed>> */

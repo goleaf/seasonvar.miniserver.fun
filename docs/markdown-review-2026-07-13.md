@@ -4,6 +4,8 @@
 
 Повторный corpus-pass Task 22 от 18.07.2026 прочитал каждый из 254 существовавших tracked/non-ignored Markdown-файлов (58 671 строка) до реализации Premium-домена. Новым владельцем темы стал один [`premium.md`](premium.md); конкурирующие billing documents не создавались. Живой аудит, риски, phased checklist и verification evidence сохранены в Task 22 общего плана.
 
+Повторный corpus-pass Task 27 от 18.07.2026 проверил 282 tracked Markdown-файла (62 251 строка) до добавления двух canonical integration documents, прочитал requirement/feature/architecture owners полностью и выполнил repository-wide link/contradiction/legacy scan: 436 Markdown references имели существующие targets. Добавлены только [`requirements/system-wide-integration.md`](requirements/system-wide-integration.md) и [`system-integration.md`](system-integration.md); feature-specific owner documents не дублировались. Exact evidence, непроверенные journeys и ограничения сохранены в [`plans/current-task-plan.md`](plans/current-task-plan.md).
+
 ## Изменены
 
 - `CHANGELOG.md`

@@ -12,10 +12,13 @@ use App\Services\ReleaseCalendar\ReleaseCalendarTimezone;
 use BackedEnum;
 use Illuminate\Contracts\Translation\Translator;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Vite;
 use Illuminate\Http\Request;
 
 final class PublicPageCachePolicy
 {
+    private ?string $assetBuildFingerprint = null;
+
     private const CATALOG_QUERY_KEYS = [
         'page',
         'year',
@@ -78,6 +81,7 @@ final class PublicPageCachePolicy
         private readonly CacheVersionRegistry $versions,
         private readonly Translator $translator,
         private readonly ReleaseCalendarTimezone $releaseCalendarTimezone,
+        private readonly Vite $vite,
     ) {}
 
     public function context(Request $request, string $profile): ?PublicPageCacheContext
@@ -106,6 +110,7 @@ final class PublicPageCachePolicy
         $parameters = $this->parameters($request);
         $dimensions = [
             'audience' => 'public',
+            'assets' => $this->assetBuildFingerprint(),
             'locale' => app()->getLocale(),
             'route' => $routeName,
             'parameters' => $parameters,
@@ -332,5 +337,10 @@ final class PublicPageCachePolicy
         }
 
         return hash('sha256', json_encode($catalogs, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+    }
+
+    private function assetBuildFingerprint(): string
+    {
+        return $this->assetBuildFingerprint ??= $this->vite->manifestHash() ?? 'manifest-unavailable';
     }
 }

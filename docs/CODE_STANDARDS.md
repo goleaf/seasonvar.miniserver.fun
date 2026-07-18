@@ -10,6 +10,20 @@
 
 `CODE_STANDARDS.md` владеет правилами PHP/Laravel и именования. Архитектурные boundaries принадлежат `architecture.md`, интерфейсные правила — `UI_STANDARDS.md`, а эксплуатационная история — `MAINTENANCE_LOG.md`.
 
+## Постоянные требования системной интеграции
+
+- Каждая feature использует канонические shared services и не копирует domain logic в соседний модуль.
+- Duplicate domain logic удаляется либо сохраняется только как документированный compatibility adapter с условием удаления.
+- Каждая state-changing action обновляет все зависимые системы и выполняет targeted cache invalidation после успешной transaction.
+- Любая content mutation оценивает search, cache, SEO, sitemap, recommendations, calendar, notifications и administration.
+- Любая account mutation оценивает sessions, permissions, profile, premium, billing, advertiser membership, legal cases, tickets, requests, notifications, exports, deletion и caches.
+- Любая visibility mutation оценивает player access, search, catalogue, recommendations, calendar, sitemaps, structured data и public caches.
+- Любая translation mutation оценивает locale fallback, search, SEO, cache, routes и administration.
+- Любая premium mutation оценивает player access, downloads, advertising, regional rules, account settings, notifications и caches.
+- Любое legal restriction оценивает sources, player, search, recommendations, calendar, SEO, sitemap, downloads, premium и caches.
+- Любая advertiser mutation оценивает delivery, premium exclusion, consent, region, placements, analytics, billing и cache invalidation.
+- Unresolved integration risk остаётся видимым в current task plan/compliance matrix и не переименовывается в completed без evidence.
+
 ## Постоянные требования к dependencies и runtime
 
 - Проект поддерживает canonical dependency inventory, runtime compatibility matrix и package-purpose registry; каждая direct dependency имеет документированный purpose.

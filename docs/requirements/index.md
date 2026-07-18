@@ -18,9 +18,27 @@
 10. [`administration.md`](../administration.md) — администрация и least privilege.
 11. [`production-operations.md`](production-operations.md) — обязательные production, deployment, backup, restore и incident boundaries; [`deployment.md`](../deployment.md), [`environment.md`](../environment.md) и [`operations/README.md`](../operations/README.md) содержат фактические runbooks и inventory.
 12. [`maintenance-and-upgrades.md`](maintenance-and-upgrades.md) — сопровождение, зависимости, deprecations и upgrades.
-13. Feature-specific документы из [`docs/README.md`](../README.md), соответствующие затронутым системам.
-14. [`docs/plans/current-task-plan.md`](../plans/current-task-plan.md) — текущий план и compliance matrix.
-15. Релевантные architecture, audit, implementation и rollback документы из [`docs/README.md`](../README.md).
+13. [`system-wide-integration.md`](system-wide-integration.md) — обязательные cross-feature identity, state, privacy, cache и completion rules.
+14. Feature-specific документы из [`docs/README.md`](../README.md), соответствующие затронутым системам.
+15. [`docs/plans/current-task-plan.md`](../plans/current-task-plan.md) — текущий план и compliance matrix.
+16. Релевантные architecture, audit, implementation и rollback документы из [`docs/README.md`](../README.md).
+
+Cross-feature integration обязательна: feature нельзя считать завершённой, пока не проверены все затронутые shared domains и related existing modules.
+
+## Общий приоритет конфликтующих требований
+
+1. Security, privacy, legal integrity, financial integrity и защита user/private data.
+2. Сохранность database и persistent files.
+3. Постоянные architecture и system-integration rules.
+4. Подтверждённая production compatibility и server limitations.
+5. Backward compatibility и сохранение public/persisted contracts.
+6. Functional correctness и cross-feature consistency.
+7. Supported framework/package APIs.
+8. Recoverability и rollback.
+9. Performance.
+10. Developer convenience и preference for newer syntax.
+
+Новый синтаксис и удобство реализации никогда не отменяют безопасность, сохранность данных, совместимость, correctness или восстановимость.
 
 ## Приоритет конфликтующих maintenance-решений
 
@@ -49,6 +67,37 @@
 8. Удобство реализации.
 
 Оптимизация производительности никогда не отменяет безопасность данных, privacy, восстановимость или проверенную server compatibility.
+
+## Канонические feature areas 1–26
+
+1. Home page — [`frontend.md`](../frontend.md), [`architecture.md`](../architecture.md), [`caching.md`](../caching.md).
+2. Search — [`catalog-search.md`](../catalog-search.md), [`api.md`](../api.md).
+3. Alphabetical catalogue — [`catalog-search.md`](../catalog-search.md), [`frontend.md`](../frontend.md).
+4. Advanced filters — [`catalog-search.md`](../catalog-search.md), [`DATA_RELATIONS.md`](../DATA_RELATIONS.md).
+5. Serial details — [`architecture.md`](../architecture.md), [`DATA_RELATIONS.md`](../DATA_RELATIONS.md), [`audits/video-playback-report.md`](../audits/video-playback-report.md).
+6. Seasons and episodes — [`DATA_RELATIONS.md`](../DATA_RELATIONS.md), [`importer.md`](../importer.md).
+7. Player — [`audits/video-playback-report.md`](../audits/video-playback-report.md), [`frontend.md`](../frontend.md), [`security.md`](../security.md).
+8. Progress and history — [`DATA_RELATIONS.md`](../DATA_RELATIONS.md), [`frontend.md`](../frontend.md), [`api.md`](../api.md).
+9. Personal library — [`DATA_RELATIONS.md`](../DATA_RELATIONS.md), [`authorization.md`](../authorization.md), [`plans/laravel-video-portal-modernization.md`](../plans/laravel-video-portal-modernization.md#task-09--canonical-personal-library-statuses-markers-and-update-tracking).
+10. Collections — [`architecture.md`](../architecture.md), [`DATA_RELATIONS.md`](../DATA_RELATIONS.md).
+11. Tags — [`architecture.md`](../architecture.md), [`DATA_RELATIONS.md`](../DATA_RELATIONS.md).
+12. Comments — [`architecture.md`](../architecture.md), [`DATA_RELATIONS.md`](../DATA_RELATIONS.md).
+13. Reviews — [`architecture.md`](../architecture.md), [`DATA_RELATIONS.md`](../DATA_RELATIONS.md).
+14. Profiles — [`architecture.md`](../architecture.md), [`authorization.md`](../authorization.md), [`DATA_RELATIONS.md`](../DATA_RELATIONS.md).
+15. Authentication — [`authorization.md`](../authorization.md), [`security.md`](../security.md).
+16. Account settings — [`architecture.md`](../architecture.md), [`DATA_RELATIONS.md`](../DATA_RELATIONS.md), [`frontend.md`](../frontend.md).
+17. Release calendar — [`release-calendar.md`](../release-calendar.md).
+18. Recommendations — [`superpowers/specs/2026-07-13-recommendation-v3-list-design.md`](../superpowers/specs/2026-07-13-recommendation-v3-list-design.md), [`caching.md`](../caching.md).
+19. Content requests — [`architecture.md`](../architecture.md), [`DATA_RELATIONS.md`](../DATA_RELATIONS.md).
+20. Technical tickets — [`technical-issues.md`](../technical-issues.md).
+21. Help center — [`help-center.md`](../help-center.md).
+22. Premium — [`premium.md`](../premium.md), [`authorization.md`](../authorization.md).
+23. Mobile and PWA — [`UI_STANDARDS.md`](../UI_STANDARDS.md), [`frontend.md`](../frontend.md), [`operations/service-worker-deployment.md`](../operations/service-worker-deployment.md).
+24. Rights-holder cases — текущая product capability не установлена; permanent privacy/storage/legal boundaries принадлежат [`security.md`](../security.md), [`storage.md`](../storage.md) и [`administration.md`](../administration.md).
+25. Advertisers — текущая product capability не установлена; permanent consent/privacy/premium/admin boundaries принадлежат [`security.md`](../security.md), [`premium.md`](../premium.md) и [`administration.md`](../administration.md).
+26. Administration — [`administration.md`](../administration.md), [`authorization.md`](../authorization.md).
+
+System-wide evidence и финальная dependency matrix принадлежат [`system-integration.md`](../system-integration.md); текущий status/compliance — [`current-task-plan.md`](../plans/current-task-plan.md), техническая история — [`CHANGELOG.md`](../../CHANGELOG.md).
 
 ## Maintenance-документы
 

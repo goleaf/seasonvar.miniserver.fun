@@ -25,6 +25,16 @@ final class UserProfileCacheInvalidator
         DB::transactionLevel() > 0 ? DB::afterCommit($invalidate) : $invalidate();
     }
 
+    public function deleted(UserProfile $profile): void
+    {
+        $invalidate = function () use ($profile): void {
+            Cache::forget($this->summaryKey($profile, (int) $profile->content_version));
+            $this->versions->bump(CacheDomain::SearchSuggestions);
+        };
+
+        DB::transactionLevel() > 0 ? DB::afterCommit($invalidate) : $invalidate();
+    }
+
     public function summaryKey(UserProfile $profile, int $version): string
     {
         return 'user-profile:summary:v1:user:'.$profile->user_id.':version:'.$version;

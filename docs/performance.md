@@ -2,6 +2,10 @@
 
 Обновлено: 18.07.2026
 
+## Обязательный integration performance audit
+
+Крупное cross-system изменение проверяет duplicate queries across sections, repeated entitlement/region/visibility/translation resolution, one query per navigation badge/dashboard card/serial card, oversized Livewire state, duplicated JavaScript initialization, stale service-worker caches, missing invalidation, unbounded pagination/date ranges, unnecessary provider/external calls, duplicate notifications/analytics events и duplicate progress writes. Измерения фиксируются только там, где реально выполнены; отсутствие измерения не превращается в заявленное улучшение.
+
 ## Performance requirements для upgrades
 
 - Dependency updates включают query-count и payload/bundle-size review в затронутых paths.

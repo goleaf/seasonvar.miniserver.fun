@@ -180,6 +180,7 @@ return [
         'password_changed' => 'Password changed successfully.',
         'current_password_invalid' => 'The current password is incorrect.',
         'deletion_password_invalid' => 'The password could not be confirmed.',
+        'deletion_audit_retention' => 'This account has immutable administrative audit records and cannot be deleted through self-service. Contact an authorized administrator for a retention review.',
         'browser_sessions' => 'Browser sessions',
         'browser_sessions_hint' => 'Only safe summaries are shown. Session IDs, IP addresses, cookies, and full User-Agent values stay hidden.',
         'session_driver_limited' => 'The current driver cannot provide a safe per-session list. Ending all other sign-ins remains available.',

@@ -68,7 +68,6 @@ final class ProfilePage extends Component
         AccountService $accounts,
         AccountSettingsService $settings,
         AccountDateTimeFormatter $dateTimes,
-        UserProfileService $profiles,
     ): void {
         $this->resetValidation();
         $this->name = Str::squish($this->name);
@@ -116,7 +115,6 @@ final class ProfilePage extends Component
         }
 
         $emailChanged = NormalizedEmail::value($user->email) !== $validated['email'];
-        $nameChanged = $user->name !== $validated['name'];
 
         try {
             $updated = $accounts->updateProfile($user, [
@@ -141,9 +139,6 @@ final class ProfilePage extends Component
         $this->reset('currentPassword');
         $this->fillFromUser($updated, $settings, $dateTimes);
 
-        if ($nameChanged) {
-            $profiles->identityChanged($profiles->forUser($updated));
-        }
         $this->status = $emailChanged
             ? __('settings.profile_page.updated_verify_email')
             : __('settings.profile_page.updated');

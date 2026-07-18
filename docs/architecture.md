@@ -2,6 +2,21 @@
 
 Обновлено: 18.07.2026
 
+## Постоянные cross-system contracts
+
+- Domain services предоставляют стабильные application-owned contracts; provider/package objects не протекают в Blade, Livewire public state или несвязанные modules.
+- Feature modules не копируют authorization, visibility, locale fallback, premium entitlement, regional access или legal-restriction logic. Они вызывают соответствующую каноническую boundary и получают минимальный typed result.
+- Feature modules не создают независимые notification categories, audit systems, cache infrastructures или user-state overlays для уже существующего события/состояния.
+- Shared read models и DTO остаются presentation-safe: private notes, secrets, raw provider URLs, permissions graph и полные Eloquent models в них не включаются.
+- Shared actions остаются idempotent там, где request, webhook, queue job или import может быть повторён.
+- Cross-feature events используют стабильные codes. Event не заменяет явный invariant и не становится местом скрытой business logic либо причиной обязательной unsupported queue infrastructure.
+- Прямая synchronous integration допустима, когда она проще, безопаснее и гарантирует correctness; optional infrastructure всегда имеет documented fallback.
+- Изменение shared contract требует affected-feature map, compatibility strategy, targeted invalidation и rollback до implementation.
+
+## Route inventory Task 27
+
+`php artisan route:list --json` зарегистрировал 245 routes: 121 public/framework, 44 authenticated web, 13 administration и 67 API; 41 entry входит в localized route group, 15 сохраняют legacy compatibility. Duplicate method/URI и duplicate route names отсутствуют. Administration routes имеют `auth`, `auth.session`, `account.private` и явный gate; mobile writes используют Sanctum abilities, verification middleware и domain policies. Signed playback/download, attachment, payment-return и webhook boundaries остаются отдельными узкими routes. Destructive mutation через `GET` не зарегистрирована; multi-method legacy aliases выполняют только redirect и не изменяют state.
+
 ## Third-party и upgrade boundaries
 
 - Используются framework-supported public APIs, а не undocumented internals. Version-specific решения подтверждаются официальной документацией.

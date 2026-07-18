@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Auth;
 
 use App\Enums\AuthenticationEvent;
+use App\Models\AdminAuditEvent;
 use App\Models\User;
 use App\Services\Catalog\CatalogRecommendationCacheInvalidator;
 use App\Services\Collections\CatalogCollectionAccountService;
@@ -13,6 +14,7 @@ use App\Services\ContentRequests\ContentRequestAccountService;
 use App\Services\HelpCenter\HelpAccountService;
 use App\Services\Premium\PremiumAccountService;
 use App\Services\Profiles\UserProfileMediaService;
+use App\Services\Profiles\UserProfileService;
 use App\Services\Reviews\ReviewAccountService;
 use App\Services\TechnicalIssues\TechnicalIssueAccountService;
 use App\Support\UserPlainText;
@@ -21,6 +23,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -33,6 +36,7 @@ final class AccountService
         private readonly ContentRequestAccountService $contentRequests,
         private readonly TechnicalIssueAccountService $technicalIssues,
         private readonly UserProfileMediaService $profileMedia,
+        private readonly UserProfileService $profiles,
         private readonly CatalogRecommendationCacheInvalidator $recommendationCache,
         private readonly PremiumAccountService $premium,
         private readonly HelpAccountService $helpCenter,
@@ -110,6 +114,7 @@ final class AccountService
         }
 
         if ($nameChanged) {
+            $this->profiles->identityChanged($this->profiles->forUser($user));
             $this->collections->ownerIdentityChanged($user);
             $this->comments->authorIdentityChanged($user);
             $this->reviews->authorIdentityChanged($user);
@@ -183,6 +188,7 @@ final class AccountService
             }
 
             $this->premium->ensureDeletionSafe($lockedUser);
+            $this->ensureAuditRetentionSafe($lockedUser);
 
             $this->collections->purgeOwned($lockedUser);
             $this->comments->prepareForDeletion($lockedUser);
@@ -201,12 +207,26 @@ final class AccountService
                 ->whereRaw('lower(email) = ?', [NormalizedEmail::value((string) $lockedUser->email)])
                 ->delete();
             DB::table('sessions')->where('user_id', $lockedUser->getKey())->delete();
+            $lockedUser->notifications()->delete();
             $lockedUser->deleteOrFail();
         }, attempts: 3);
 
         $this->recommendationCache->publicSignalsChanged('account-deleted');
         $this->audit->record(AuthenticationEvent::AccountDeleted, $user, $user->email);
         RateLimiter::clear($rateKey);
+    }
+
+    private function ensureAuditRetentionSafe(User $user): void
+    {
+        if (! Schema::hasTable('admin_audit_events')) {
+            return;
+        }
+
+        if (AdminAuditEvent::query()->where('actor_id', $user->getKey())->exists()) {
+            throw ValidationException::withMessages([
+                'password' => [__('settings.security_page.deletion_audit_retention')],
+            ]);
+        }
     }
 
     private function confirmEmailChange(User $user, ?string $currentPassword): void
