@@ -9,6 +9,7 @@ use App\Enums\UserProfileReportStatus;
 use App\Models\User;
 use App\Models\UserProfile;
 use App\Models\UserProfileReport;
+use App\Support\UserPlainText;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -32,9 +33,9 @@ final class UserProfileReportService
         }
 
         RateLimiter::hit($key, $decay);
-        $details = is_string($details) ? trim(strip_tags($details)) : null;
+        $details = UserPlainText::description($details);
         $maximum = max(1, (int) config('user-profiles.reports.maximum_details_length', 1500));
-        $details = $details !== '' ? Str::limit($details, $maximum, '') : null;
+        $details = $details !== null ? Str::limit($details, $maximum, '') : null;
         $deduplicationKey = hash('sha256', implode(':', [
             $profile->user_id,
             $reporter->id,

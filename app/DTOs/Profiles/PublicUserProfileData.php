@@ -15,6 +15,8 @@ final readonly class PublicUserProfileData
         public string $username,
         public string $initial,
         public ?string $biography,
+        public ?string $biographyPreview,
+        public bool $biographyIsLong,
         public ?string $memberSince,
         public ?string $avatarUrl,
         public ?string $coverUrl,

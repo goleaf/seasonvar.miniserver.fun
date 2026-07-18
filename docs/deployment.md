@@ -415,6 +415,8 @@ php artisan project:docs-refresh --check
 4. Smoke one guest public profile, owner `/profile`, private/blocked response, versioned avatar response, profile sitemap and admin denial/allow path. Confirm no email/progress/private fields, noindex owner/private variants and private/no-store media/account headers.
 5. Rollback before accepting profile writes may revert code and drop the additive schema. After usernames/privacy/media/report data exists, export/restore and deploy a forward repair; never drop the live tables as routine rollback.
 
+Повторный аудит 19.07.2026 не добавил миграций. `UserProfileSchema` теперь требует все реально читаемые columns и ловит недоступность schema: profile search/sitemap возвращают пустой public set, а owner/profile account mutations остаются fail-closed. Сначала обязательны backup и обе profile migration, затем code/config/route/view rebuild и graceful reload; иначе registration может попасть под legacy-public backfill, а account deletion — пропустить private-media cleanup. После rollout следует проверить `available=true`, canonical/history redirect, private 404, профильный search suggestion и streamed sitemap; глобальный cache flush не требуется.
+
 ## Rollout настроек аккаунта
 
 1. Выполните verified DB backup и deploy code/assets на обычном writer-pause boundary. Примените единственную additive reversible migration `2026_07_16_000000_create_user_account_settings_table.php`; она создаёт one-row-per-user preference table и не backfill-ит/не переписывает users, profile, player, progress/history, library, collections, notification preferences, sessions или account lifecycle data.

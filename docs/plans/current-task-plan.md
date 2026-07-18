@@ -1,18 +1,18 @@
-# Task 13 — повторный аудит и безопасное усиление отзывов
+# Task 14 — повторный аудит и безопасное усиление профилей пользователей
 
-Обновлено: 18.07.2026
+Обновлено: 19.07.2026
 
 ## Цель
 
-Повторно проверить уже существующий canonical reviews domain после поздних интеграций портала, устранить только доказанные дефекты identity, authorization, privacy, rating/helpfulness, verified watching, moderation, cache, SEO, structured data, query/UI и compatibility и сохранить все отзывы, оценки, голоса, отчёты, ограничения, уведомления, stable anchors и moderation evidence.
+Повторно проверить уже существующий canonical profile domain после интеграций Tasks 15–23, устранить только доказанные дефекты stable identity, username history, public/private presentation, privacy, media, moderation, search, cache, SEO, account lifecycle и cross-feature visibility и сохранить все accounts, usernames, profile URLs, media, user content, privacy choices, blocks/mutes, reports and historical compatibility.
 
 ## Обязательные ограничения
 
 - Работа ведётся только в существующей `main`; branches, worktrees и subagents не создаются.
-- Пользователю не задаются вопросы. Design и scope выводятся из repository contracts; отдельный competing spec/plan не создаётся.
+- Пользователю не задаются вопросы. Scope и design выводятся из repository contracts; отдельный competing profile spec/plan не создаётся.
 - Автоматизированные тесты не создаются и не запускаются. Разрешены static/runtime read-only inspection, route/schema/query/translation/security/browser smoke, Pint, Larastan, Blade compilation и Vite build.
 - Existing tests и test infrastructure не удаляются и не повреждаются.
-- Новые dependencies, queue/scheduler/Supervisor, произвольные review target classes, rich HTML/Markdown, translated identity values и отдельная comments/reviews architecture не добавляются.
+- Новые dependencies, queue/scheduler/Supervisor, parallel profile/user/media/privacy/search/SEO/cache systems и fake roles/badges/ranks/follows/activity controls не добавляются.
 - Schema/data mutations допускаются только после доказанного legacy reconciliation, compatibility, backup, writer-pause, rollback и production-impact review.
 - `CHANGELOG.md` остаётся на русском по каноническому `AGENTS.md`, несмотря на конфликтующее требование задачи об английском changelog.
 - `README.md` проверяется перед завершением и меняется только при visitor-visible результате.
@@ -20,102 +20,112 @@
 
 ## Документационный baseline
 
-- В Task 13 потоково прочитан полный tracked corpus: `284` Markdown-файла / `62 489` строк / SHA-256 `8a4cced84b4dbb86bf5289d6f0309355f00dd4b75cf313050d9335d8209bfa01`.
+- В repeat Task 14 полностью прочитан tracked corpus: `284` Markdown-файла / `62 494` строки / SHA-256 `45f2b56ad3c31c08f6a5a0582b3b343c7bc57dfd55a10aa9d476ff8b076633bb`.
 - Применён обязательный порядок `docs/requirements/index.md`, включая multilingual, security, performance/cache, UI, administration, production operations, maintenance/upgrades и system-wide integration.
-- Feature owners: `architecture.md`, `DATA_RELATIONS.md`, `authorization.md`, `security.md`, `performance.md`, `caching.md`, `views.md`, `frontend.md`, `administration.md`, `deployment.md`, SEO/sitemap owners и account/profile/recommendation requirements.
+- Feature owners: `architecture.md`, `DATA_RELATIONS.md`, `authorization.md`, `security.md`, `performance.md`, `caching.md`, `views.md`, `frontend.md`, `administration.md`, `deployment.md`, `catalog-search.md`, sitemap/SEO и account/profile/recommendation owners.
+- Existing Task 14 living contract в `laravel-video-portal-modernization.md` перечитан полностью; current plan расширяет его только свежим audit/compliance evidence и не создаёт второй domain document.
 - Task не меняет framework/runtime/package/database engine/build tooling по намерению. Любая доказанная schema/browser/cache/runtime поправка получает compatibility и rollout evidence до edit.
 
 ## Выбранный дизайн
 
 Рассмотрены три подхода:
 
-1. **Additive hardening существующего canonical domain — выбран.** Сохраняются `CatalogTitleReview`, существующие actions/query/presenter/policy/notification/cache/admin boundaries, stable IDs, routes, enums и rows; исправляются только воспроизводимые расхождения.
-2. Полная перестройка review/rating/helpfulness — отклонена: создаёт competing system и рискует потерять provider/community rows, votes, reports, aliases и public anchors.
-3. Автоматическое расширение на season/episode reviews — отклонено до доказательства существующего product requirement. Unsupported target scopes останутся отсутствующими без fake controls.
+1. **Additive hardening существующего canonical domain — выбран.** Сохраняются `User`, `UserProfile`, public UUID, username history, policies/services/query/DTO/Livewire/media/report/admin/cache/SEO boundaries, route names, enum codes and rows; исправляются только воспроизводимые расхождения.
+2. Полная перестройка profile/user/privacy/media — отклонена: создаёт competing system и рискует accounts, usernames, URLs, content, files, privacy and account lifecycle.
+3. Автоматическое добавление roles/badges/ranks/follows/profile directory/favorite genres/location/activity — отклонено до доказательства существующей product architecture. Уже существующие public-profile suggestions в canonical portal search сохраняются и усиливаются, но отдельный profile index/directory или второй search system не создаётся.
 
-UI сохраняет существующую светлую Seasonvar product vocabulary: текущие form, rating, badges, cards, dialogs, pagination, focus/reduced-motion и mobile patterns. Визуальная переработка допускается только для доказанного accessibility/responsive/functionality defect.
+UI сохраняет существующую светлую Seasonvar product vocabulary: текущие profile header, tabs, forms, native file inputs, cards, pagination, dialogs, focus/reduced-motion и mobile patterns. Визуальная переработка допускается только для доказанного accessibility/responsive/functionality defect; новая тема или рекламный profile landing не создаётся.
 
 ## Предварительная canonical architecture для проверки
 
-- Dedicated `catalog_title_reviews` domain отделён от threaded `comments`; public/user review workflow использует `CatalogTitleReview`, imported/provider provenance не превращается в comment.
-- Stable numeric review ID и alias/direct-link boundary должны оставаться независимыми от title/body/rating/locale/slug/author/sort/page.
-- `ReviewTargetType`, `ReviewRating`, `ReviewTitle`, `ReviewBody`, `ReviewStatus`, `ReviewVoteType`, reports/restrictions/origin enums должны быть единственными persisted value boundaries.
-- Web UI использует one page-level `CatalogTitleReviews`; profile/admin/direct-link/API consumers должны delegate canonical query/presenter rather than copy visibility.
-- Review rating и general `CatalogTitleRating` semantics, verified-watching evidence, one-review rule, origin behavior and deletion/restore relationship требуют fresh code/schema/data verification before any conclusion.
-- Public review payload and aggregate may be cacheable only without viewer vote, permissions, blocks/mutes, pending ownership, restriction/report/moderation/private progress evidence.
+- `users.id` должен оставаться internal FK, `users.public_id` — stable opaque cross-domain identity; public route username обязан разрешаться только в тот же user/profile row.
+- `user_profiles` должен быть единственным profile presentation row per user; `users.name` остаётся display name, email/auth/permissions/session/provider data не входят в public DTO.
+- `ProfileUsername`, current normalized username и `user_profile_username_histories` должны централизованно обеспечивать case/reserved/route-safe validation, collision handling and loop-free redirects.
+- `ProfileVisibility`, `ProfileSection`, `ProfileModerationStatus`, report categories/status and media kinds должны быть единственными persisted value boundaries; translated labels не сохраняются.
+- Public page должен загружать только выбранную privacy-eligible секцию через canonical Task 10/12/13/library queries; owner page/settings/export/delete должны оставаться separate private payloads.
+- Avatar/cover должны храниться на private upload disk, иметь server-generated paths и authorization-aware `private, no-store` delivery без SVG/executable/path leakage.
+- Public cache/SEO/sitemap eligibility должна зависеть от actual current privacy/moderation/content state; block/mute/owner controls остаются viewer-specific and never globally cached.
 
 ## Cross-feature impact matrix
 
 | Domain | State | Required verification |
 | --- | --- | --- |
-| Title/season/episode/player | affected | exact supported scope, target visibility, direct focus, no progress/player mutation |
-| General ratings/library/bookmarks/history | affected | rating independence/synchronization, verified evidence, no unintended state changes |
-| Comments | affected | dedicated models/routes/renderers, no automatic conversion or duplicate notification |
-| Profiles/privacy/account | affected | public section privacy, spoiler-safe excerpt, export/delete/anonymization |
-| Blocks/mutes | affected | viewer-aware list/direct/vote/notification behavior without shared-cache leakage |
-| Reports/moderation/restrictions/audit | affected | stable enums, authorization, expiry, private evidence, atomic transitions |
-| Notifications | affected | preferences, deduplication, body/spoiler exclusion, deleted target/review behavior |
-| Search/recommendations | affected | no review-body leakage; signals and invalidation remain bounded and privacy-safe |
-| SEO/structured data/sitemap | affected | canonical/noindex, valid rating source, spoiler exclusion, no review sitemap entries |
-| Cache/performance | affected | public/private dimensions, counts/aggregates, grouped overlays, real index plans |
-| API/imports | affected | read-only API compatibility, provider provenance, no new write/public target surface |
-| Administration | affected | `manage-reviews`, bounded queue/context/reports, private note/reporter protection |
-| Premium/region/legal | affected | target eligibility reused; no fake premium review feature or policy bypass |
-| Mobile/a11y/translations | affected | RU/EN parity, rating/spoiler/vote/filter/focus/loading/error states |
+| Authentication/registration/settings | affected | one user identity, registration defaults, password-confirmed username/media/privacy writes, no credential exposure |
+| Comments/reviews | affected | canonical published/spoiler-safe profile queries, stable author links, block/mute and target eligibility |
+| Collections | affected | public/unlisted/private owner boundaries, legacy UUID owner route and canonical username link |
+| Library/progress/history/bookmarks | affected | explicit public watching/completed only; no episode/progress/history/timestamp/translation leakage |
+| Blocks/mutes | affected | bilateral block 404, private mute overlay and direct-link behavior without shared-cache leakage |
+| Reports/moderation/restrictions | affected | stable codes, reporter/private note secrecy, media/biography moderation and account-state separation |
+| Notifications | affected | safe display name/profile links, preferences, block/mute and deleted-user behavior |
+| Search/recommendations | affected | no email/private biography indexing; private activity signals remain owner-only |
+| SEO/structured data/sitemap | affected | canonical username, localized alias policy, indexable public overview only, no private fields |
+| Cache/performance | affected | no global viewer payload, targeted version bump, matching counts, grouped/eager paginated sections and real indexes |
+| API/imports | affected | user/public ID and API field compatibility; no new public account/profile write surface |
+| Administration | affected | `manage-catalog`, bounded report queue, safe identity/media context and no credential/role mutation |
+| Account export/delete | affected | allowlisted profile export; media/profile/search/cache cleanup and historical content anonymization |
+| Premium/region/legal | affected | no public premium badge inference, target eligibility reused, no access-state exposure |
+| Mobile/a11y/translations | affected | RU/EN parity, long identity/biography/tabs, file/privacy/report/loading/error/focus states |
 
 ## Phased implementation checklist
 
 ### Phase A — requirements, routes, schema and data
 
-- [x] Confirm `main`, clean Task 12 baseline, recent history and configured remote state.
+- [x] Confirm `main`, clean Task 13 baseline, recent history and configured remote state.
 - [x] Read complete tracked Markdown inventory and canonical requirements in required order.
-- [x] Inventory all public/localized/profile/admin/API review routes, names, middleware, binding and destructive methods.
-- [x] Inventory review/rating/vote/report/restriction/notification/alias tables, migrations, models, enums, FKs, unique constraints and indexes.
-- [x] Measure production-style rows, target/origin/status/rating/vote distributions and bounded anomaly counts.
-- [x] Inspect query plans for public page/count/aggregate, viewer vote/relationship overlay, profile, API and moderation queue.
+- [x] Inventory public/localized/legacy/private/admin/media/API profile routes, names, middleware, binding and destructive methods.
+- [x] Inventory user/profile/history/privacy/media/block/mute/report/notification/account tables, migrations, models, enums, FKs, unique constraints and indexes.
+- [x] Measure production-style row counts, visibility/moderation/media/section distributions and bounded duplicate/orphan/invalid-value anomalies.
+- [x] Inspect query plans for current/history route lookup, public search/sitemap and moderation queue; selected-section/count plans remain in the final query pass.
 
 ### Phase B — domain/security/privacy/concurrency
 
-- [x] Inspect target allowlist, identity/alias/direct-link, title merge/target deletion and comment separation.
-- [x] Inspect title/body normalization, XSS/link policy, spoiler/long-body source omission and UGC locale handling.
-- [x] Inspect create/edit/delete/restore one-review rule, idempotency, optimistic locking and rating behavior.
-- [x] Inspect rating scale, optionality, external/general rating separation and aggregate definitions.
-- [x] Inspect verified-watching service against canonical progress/history without exposing exact evidence.
-- [x] Inspect helpful vote TOCTOU, uniqueness, self/block rules, totals and sorting formula.
-- [x] Inspect reports/moderation/restrictions/audit, private evidence, expiration and safe errors.
-- [x] Inspect notifications/preferences/dedup, profile/account export/delete, block/mute and cache separation.
-- [x] Inspect anti-spam/rate/content duplicate/link controls and normal-user false-positive bounds.
+- [x] Inspect stable ID, username normalization/history/case/reserved/change/race/redirect and deleted-user behavior.
+- [x] Inspect public DTO allowlist versus owner/settings/admin/export payloads and raw Livewire/HTML/JSON leakage.
+- [x] Inspect biography/display-name normalization, Unicode/original language, XSS/link/control/bidi policy and empty/long states.
+- [x] Inspect avatar/cover upload validation, private storage, dimensions/size/MIME, replacement cleanup, media delivery and moderation.
+- [x] Inspect profile/section privacy defaults and exact public comments/reviews/collections/watching/completed predicates.
+- [x] Inspect block/mute/report/moderation/account restriction/deletion/notification interactions and private evidence.
+- [x] Inspect update actions for ownership, password confirmation, mass assignment, optimistic locking, idempotency and after-commit effects.
+- [x] Inspect account export/delete, registration and title/user-data compatibility after later tasks.
 
 ### Phase C — SEO/performance/UI/integration
 
-- [x] Inspect public counts/aggregates/cache invalidation/search/recommendation/title merge dependencies.
-- [x] Inspect SEO canonical/robots/JSON-LD/aggregate rating/sitemap for valid source and spoiler/private exclusion.
-- [x] Inspect selected columns/eager/grouped queries/pagination/filters/sorts/Livewire payload and actual indexes.
-- [x] Inspect Blade/JS for raw UGC, DOM sinks, model calls, full graphs, hardcoded labels, Volt, `@php`, inline CSS/business JS and dead controls.
-- [x] Inspect RU/EN key/placeholder/plural parity and locale hydration without translating reviews.
-- [x] Browser smoke public/direct/localized title review UI, desktop/mobile/zoom/focus/spoiler/filter/pagination/console/network where safe.
+- [x] Inspect cache keys/versions/invalidation and prove viewer/private data never enters global cache.
+- [x] Inspect public counts, selected projections, eager/grouped queries, pagination, tab lazy loading and actual index plans.
+- [x] Inspect profile search absence/presence, author/profile link consumers and recommendation privacy.
+- [x] Inspect SEO title/description/canonical/robots/hreflang/JSON-LD/sitemap eligibility and legacy redirects.
+- [x] Inspect Blade/JS for raw UGC, DOM sinks, model/service calls, full graphs, hardcoded labels, Volt, `@php`, inline CSS/business JS and dead controls.
+- [x] Inspect RU/EN key/placeholder/plural parity and locale hydration without translating usernames/display names/biographies.
+- [x] Browser smoke public/private/localized/legacy/media states at desktop/mobile with accessibility/console/network evidence where safe; owner mutation was intentionally not executed against production-style data.
 - [x] Implement only proven defects and immediately add each discovery below.
 
 ### Phase D — documentation, verification and delivery
 
-- [x] Reread Task 13 and applicable requirements; complete compliance only from fresh evidence.
-- [x] Update canonical owners, verification report, maintenance log, Russian changelog and visitor README when behavior changes.
-- [x] Run allowed Pint/PHP syntax/Larastan/Blade/docs/translation/security/browser checks; no test runner. Vite build is not applicable because no Blade/JS/CSS/Tailwind asset changed.
-- [x] Repository-wide legacy/duplicate/dead/private-cache/spoiler-source scan and changed/related file review.
+- [x] Reread Task 14 and applicable requirements; complete compliance only from fresh evidence.
+- [x] Update canonical owners, verification report, maintenance log, Russian changelog and visitor README for the actual behavior changes.
+- [x] Run allowed Pint/PHP syntax/Larastan/Blade/Vite/docs/translation/security/browser checks; no test runner.
+- [x] Repository-wide legacy/duplicate/dead/private-cache/profile-data scan and changed/related file review.
 - [ ] Commit intentional tracked changes on clean `main`; attempt configured push without invoking prohibited automated tests.
 
 ## Audit discoveries — update immediately
 
-- Existing inventory already exposes one substantial Reviews namespace: dedicated actions, DTOs, enums, value objects, model/policy/services, full-page Livewire title/profile/admin components, RU/EN catalogs, Vite module, direct route and read-only API resource/query.
-- Review and comments class namespaces/tables are distinct; provider/community origin and rating relationship remain unverified until schema and service inspection.
-- Public web inventory currently shows `reviews.show`, authenticated `profile.reviews`, gated `admin.reviews`; API exposes read-only title reviews and separate current-user general rating writes. Localized review route compatibility is not yet established.
-- Prior Task 12 push remains externally blocked by missing GitHub HTTPS credentials; Task 13 will still create its own local `main` commit and retry configured push.
-- Read-only production-style audit measured `1 720 085` reviews, `3 294 158` helpfulness votes, `79` aliases, zero reports/restrictions and `1 646 903` non-null portal ratings. Existing unique indexes cover ownership/submission and `(review,user)` vote identity.
-- A concrete lifecycle anomaly exists: exactly one `origin=user,status=removed` row has `deleted_at IS NULL`; all `79` provider `removed` rows are merge tombstones with both deletion and merge state. Its provenance and existing demo/convergence path must be established before an additive idempotent repair; public visibility currently remains fail-closed because only `published` is public.
-- Public title review lists/direct resolution exclude viewer-blocked and viewer-muted authors through `ReviewRelationshipService`, but `CatalogTitleReviewQuery::forPublicAuthor()` and `publicCountForAuthor()` currently omit that boundary. A blocked profile is denied by `UserProfilePolicy`, while a muted profile intentionally remains viewable, so its review tab/count leaks muted-author activity and diverges from canonical comment-profile behavior. Both public-profile reads must share one viewer-aware review builder.
-- Locale-route parity is incomplete: comments expose both `comments.show` and `localized.comments.show`, while reviews expose only `reviews.show` and always generate that unprefixed direct URL. A backward-compatible `localized.reviews.show` alias must delegate the same responder, keep stable ID/404/block/no-store rules and preserve locale through the existing `collection.locale` session boundary before redirecting to the unchanged canonical title route.
-- The removed-state anomaly is a shared writer defect, not only legacy data: `ModerateCatalogTitleReview` persists `status=removed` without moderator `deletion_reason/deleted_by_id/deleted_at` and does not restore a moderator tombstone when moderation returns to another state; `DemoCommunityStage` mirrors the same incomplete lifecycle. The action must preserve author/privacy deletion, create/restore only moderator deletion atomically, the demo writer/auditor must enforce the same invariant, and an additive idempotent convergence migration must repair only already-removed rows using existing moderator/moderated timestamps without touching text/identity/votes/reports.
-- `ReviewSchema::communityAvailable()` does not currently require every column used by edit/delete/moderation (`edited_at`, deletion reason/actor, moderation actor/reason/note/time). The configured database is complete, but an incomplete rollout could incorrectly expose writable UI and then fail at SQL time. Capability detection must include the existing lifecycle columns while retaining the legacy provider read-only fallback.
+- Existing Task 14 implementation already exposes one substantial Profiles namespace: `UserProfile`, username history, reports, typed actions/services/query/DTO/policy, public/private/admin full-page Livewire components, private media responder, RU/EN catalogs, sitemap/SEO integration and account lifecycle hooks.
+- Route inspection confirms canonical `/users/{username}`, localized interface alias `/{locale}/users/{username}`, private `/profile*`, authorized `/admin/profiles`, authorized versioned `/profiles/media/*`, streamed `/sitemap-profiles.xml` and retained UUID collection-owner compatibility. All profile mutations remain Livewire POST requests; no destructive profile GET was found.
+- Current product intentionally has no durable public roles, badges, ranks, follows, favorite genres, location, standalone profile directory/index or public activity feed. Later Task 02 did add public active-profile suggestions to the one canonical portal search using only username/display name; the old Task 14 statement that profile search was wholly absent is stale and must be corrected in canonical docs.
+- Configured SQLite has `102` users and exactly `102` profile rows, zero missing/orphan profiles, zero normalized/shape-invalid usernames, invalid visibility/moderation values, over-limit/markup biography candidates, partial media metadata, current/history conflicts, profile reports, self blocks/mutes or duplicate block/mute relations. It contains `77` active public and `25` active private profiles; existing section choices are preserved.
+- Exact query-plan inspection confirms unique-index lookup for current username and history, the moderation queue composite index, and directional block/mute unique indexes. Public search and sitemap correctly narrow through `user_profiles_public_listing_idx`, but use bounded temporary ordering; at the current 77-row public corpus this does not justify a speculative redundant index.
+- `UserProfileService::changeUsername()` currently calls `RateLimiter::clear()` after every successful change and on a same-name retry. Therefore configured `5/hour` successful changes never accumulate and a no-op can erase prior attempts; this is a confirmed abuse-control defect to fix without changing username identity or rows.
+- Final diff review additionally confirmed that password verification for a same-name request must remain after the limiter hit: putting the no-op before the limiter would create an unbounded current-password oracle. The delivered order rate-limits valid and invalid no-op attempts, verifies password, preserves identity/version/history and never clears the accumulated bucket.
+- `UserProfileSchema::available()` checks only three table names. Portal search and profile sitemap directly query `user_profiles` without the schema boundary. A code-before/additive-migration or partial-schema deployment can therefore produce a public 500 instead of fail-closed empty search/sitemap or profile 404; complete required-column readiness and consumer guards are required.
+- Public `PublicUserProfileData` is an explicit allowlist without email/provider/session/progress/history/private collection/report/moderation-note fields. Owner settings/export and admin moderation use separate private/no-store payloads; selected public review/comment/collection/watch sections reuse canonical queries and never emit exact progress.
+- Avatar/cover delivery reauthorizes the current profile, checks exact public UUID/kind/version/private disk/owned prefix/MIME/existence/traversal and returns `private, no-store`, `nosniff`, `noindex`. Upload accepts bounded JPEG/PNG/WebP only; SVG/executable/public paths are absent and the current no-derivative/no-EXIF-processor limitation is already documented honestly.
+- Public username/display-name suggestions already exist in the canonical Task 02 portal search. The repeat audit added a full-schema guard and corrected stale documentation; no profile biography/email search, standalone directory or competing index was added.
+- Case/history/localized redirects previously discarded selected public tab/pagination. They now retain only the allowlisted active tab and its positive paginator while removing tracking and unrelated page keys; the browser reproduced canonical `/users/polzovatel?tab=reviews&reviewsPage=2` from an English uppercase alias.
+- Owner profile actions previously had no explicit recoverable failure presentation, and the service key `profile_password` did not bind to Livewire `profilePassword`. The component now maps the field, announces localized safe failure and retains non-secret biography/privacy/file drafts while clearing secret password state.
+- Biography/report details allowed part of the control-character space and long public biography had no accessible collapse. Canonical plain-text normalization and server validation now cover control/surrogate/bidi input; a prepared preview plus native `<details>` supplies keyboard/screen-reader expand/collapse without JavaScript business logic.
+- A proposed registration/account-lifecycle bypass while profile schema is unavailable was rejected after inspecting the immutable backfill: a user created in that gap would be treated as legacy and become public, while deletion could skip private-media cleanup. Migration-before-code remains mandatory; only public read-only search/sitemap degrade to an empty result.
+- Fresh HTTPS/Chromium evidence: public profile 200, one canonical/index metadata and ProfilePage/Person JSON-LD, `private,no-store`, no private field markers or horizontal overflow at 320px, zero public console errors; active private profile returned non-disclosing 404; sitemap contained 75 eligible URLs and no profile tabs.
+- Prior Task 13 push remains externally blocked by missing GitHub HTTPS credentials; repeat Task 14 will still create its own local `main` commit and retry the configured push.
 
 ## Database, migration and production review
 
@@ -128,69 +138,60 @@ UI сохраняет существующую светлую Seasonvar product 
 
 Only evidence may determine the final set. Likely owners if defects exist:
 
-- `app/Actions/Reviews/*`, `app/Services/Reviews/*`, `app/Livewire/Reviews/*`, `app/Models/CatalogTitleReview*.php`, `app/Policies/CatalogTitleReviewPolicy.php`;
-- `app/DTOs/Reviews/*`, `app/Enums/Review*.php`, `app/ValueObjects/Review*.php`, `app/Notifications/ReviewActivityNotification.php`;
-- title/profile/account/recommendation/cache/merge/direct-link/API/SEO boundaries;
-- `resources/views/livewire/reviews/*`, `resources/views/components/reviews/*`, `resources/js/reviews.js`, `lang/{ru,en}/reviews.php`, `config/reviews.php`;
+- `app/Actions/Profiles/*`, `app/Services/Profiles/*`, `app/Livewire/Profile/*`, `app/Models/UserProfile*.php`, `app/Policies/UserProfilePolicy.php`;
+- `app/DTOs/Profiles/*`, `app/Enums/Profile*.php`, `app/ValueObjects/Profile*.php`, media/report/moderation/notification/account services;
+- author-link consumers in comments/reviews/collections, search/recommendations/cache/sitemap/SEO/account lifecycle/API boundaries;
+- `resources/views/livewire/profile/*`, `resources/views/components/profile/*`, Vite-managed profile module when one exists, `lang/{ru,en}/profiles.php`, `config/profiles.php`;
 - canonical documentation owners, `docs/plans/current-task-plan.md`, verification report, maintenance log, `CHANGELOG.md` and `README.md` only for factual visitor-visible change.
 
 ## Contracts that must remain unchanged unless complete dependency migration is proven
 
-- Stable review IDs, aliases, public anchors, route names/URIs, enum values, provider origin, persisted title/body/rating/spoiler/status/deletion/edit/moderation timestamps.
-- `CatalogTitleRating` public/API semantics, comments, title/season/episode IDs/slugs, player/progress/history/library/tags/collections/recommendations/import command.
-- Existing cache/version keys, notification types/preferences, report/restriction/vote codes, admin gate names, Composer/npm locks and test infrastructure.
+- Stable `users.id`, `users.public_id`, username/history mappings, display names/emails/passwords/verification, public profile and legacy route names/URIs.
+- Existing profile/privacy/moderation/report/media enum values, database columns, public IDs, storage paths, content/media versions and account lifecycle semantics.
+- Comment/review/collection/title/season/episode IDs/slugs, library/progress/history/bookmarks/tags/recommendations/importer/player/premium behavior.
+- Existing cache/version keys, notification types/preferences, gate names, API fields, Composer/npm locks and test infrastructure.
 
 ## Rollback and failure recovery
 
-- Code-only hardening reverts as one Task 13 commit while stable rows/schema/routes remain readable.
+- Code-only hardening reverts as one repeat Task 14 commit while stable rows/schema/routes/media remain readable.
 - Additive schema requires verified backup, stopped writers where locking is possible, disposable down/up rehearsal and forward-fix plan before production activation.
-- Failed mutation rolls back domain/audit transaction; notifications/cache effects occur only after commit and remain idempotent.
-- Cache outage rebuilds authoritative public state or fails closed for permissions; no shared viewer overlay is introduced.
+- Failed mutation rolls back domain/audit transaction; media cleanup, notifications, cache/search/sitemap effects occur only after commit and remain idempotent or best-effort.
+- Cache outage reads authoritative privacy or fails closed for permissions; no shared viewer overlay is introduced.
 - Partial asset build retains previous compatible manifest/assets; no broad asset/cache deletion is used as recovery.
+- Media rollback never deletes an existing owned file until the replacement transaction succeeds; missing/corrupt files fail with non-disclosing response.
 
 ## Compliance matrix — final evidence state
 
 | Requirement group | Status | Evidence / unresolved work |
 | --- | --- | --- |
-| One canonical model/stable identity/targets | already_compliant | one `CatalogTitleReview`, numeric ID + aliases, title allowlist; season/episode review targets are absent by product contract |
-| Separation from comments/imported reviews | already_compliant | dedicated comment/review models, tables, actions and engagement; `provider|user` origin preserves importer/API compatibility |
-| Title/body/Unicode/XSS/link validation | already_compliant | `ReviewTitle`/`ReviewBody`/`UserPlainText`, escaped plain text, bounded links/lines/repetition, no raw renderer |
-| Rating scale/general-rating relationship | already_compliant | optional integer `1–10` reuses unique `catalog_title_user_states`; review deletion preserves independent portal rating; external ratings remain separate |
-| One-review rule/duplicates/idempotency | already_compliant | ownership/submission keys, locks and current data show zero duplicate current reviews/keys; historical merge aliases retained |
-| Verified watching/privacy | already_compliant | server-only meaningful progress/completion snapshot, non-downgrading boolean, no client flag/exact evidence exposure |
-| Spoiler/previews | already_compliant | unrevealed title/body absent from DTO/HTML/profile/notification/search/SEO/schema; server reveal/hide preserved |
-| Edit/delete/restore | completed | owner lifecycle remains; moderator removed lifecycle now has complete reason/actor/time and restores only moderator tombstone |
-| Helpful voting/sorting/filtering/pagination | already_compliant | one `helpful|not_helpful` vote, self/block enforcement, derived score, allowlisted deterministic filters/sorts and pagination |
-| Profiles/direct links | completed | list/count share bounded block/mute-aware builder; localized route/helper added while `reviews.show` and aliases remain compatible |
-| Reports/moderation/restrictions/audit | completed | stable private/gated domain retained; deletion reason/actor added to exact audit fingerprint and demo integrity audit |
-| Notifications/preferences/dedup | completed | body-free deterministic payload retained; direct destination now reuses canonical presenter with account locale |
-| Anti-spam/rate/duplicate prevention | already_compliant | per-action/global budgets, submission UUID, ownership/hash windows and bounded text/link controls re-inspected |
-| Counts/aggregates/cache/performance | already_compliant | public/user predicates distinct, no stored drift, viewer overlay private; actual existing indexes selected and no speculative DDL justified |
-| SEO/structured data/sitemap/search | already_compliant | review URLs/query state noindex/canonical; individual reviews absent from sitemap/search/schema and spoilers excluded |
-| Multilingual/Livewire/a11y/mobile | completed | RU/EN 223/223 parity; locked scalar state, prepared DTO and existing accessible responsive UI preserved; RU desktop/EN mobile smoke passed |
-| Account export/delete/merge/admin/API | already_compliant | owner export/anonymization, alias-preserving merge, gated queue and provider-only read API re-inspected without shape changes |
-| Sentiment, season/episode reviews, emoji reactions, edit history, public directory | not_applicable | no current product/domain support; fake fields, routes and controls were intentionally not added |
-| Production data application | unresolved | safe migration is implemented and rehearsed but remains pending until an operator provides verified backup and writer pause; working DB was not mutated |
-| Automated tests / Vite asset build | not_applicable | user explicitly prohibited test creation/execution; no frontend asset changed, so Vite build would not verify this code/docs-only UI integration |
-| Documentation/README/changelog | completed | canonical owners, audits, compatibility, rollout, plan, Russian changelog and visitor history updated; managed blocks refreshed |
-| Git commit/push | unresolved | scoped local `main` commit created; configured HTTPS push attempted and rejected because this environment has no GitHub credential (`could not read Username`); remote and secrets were not changed |
-
-## Final evidence summary
-
-- Configured database: migration status inspected read-only; new repair remains `Pending`, no working rows were written.
-- Disposable migration: fully in-memory SQLite, config isolation asserted, repair applied twice; malformed/merge/published fixture outcomes matched the documented invariant.
-- Static checks: PHP syntax clean, focused PHPStan zero diagnostics, Pint passed, RU/EN 223/223 keys/placeholders, template/security/route duplicate/docs checks clean.
-- Query evidence: public list, author activity, portal rating and vote totals select the documented existing indexes; author ordering has a bounded per-author temporary sort and does not justify another 1.7M-row write index.
-- Browser: RU `1440×1200` and EN `390×844` direct links returned final 200, correct locale, stable initial anchor, clean canonical/noindex, no overflow or unlabeled visible controls. Five unrelated missing demo collection covers on mobile and six on desktop remain documented adjacent data debt.
-- Preserved: review/provider/comment/rating/progress/library/profile/notification/report/restriction/cache/search/recommendation/API/SEO identities and test infrastructure; no dependency, queue, scheduler, cache flush or production migration.
+| One canonical model/stable identity | already_compliant | one `User` + one PK/FK `UserProfile`; exact 102/102 production-style census, public UUID and no competing profile table |
+| Username/history/redirects | completed | limiter accumulates real changes, password/no-op/concurrent state is safe, current/history/case/localized redirects preserve only allowlisted tab/page state |
+| Public/private payload separation | already_compliant | public DTO and selected relations are allowlisted; owner/export/admin use separate private boundaries and no public query selects email/security fields |
+| Biography/display name/original language | already_compliant | display name stays separate; escaped Unicode plain text, control/bidi/HTML stripping, 1,200 limit and zero stored anomalies confirmed |
+| Avatar/cover/private media | already_compliant | private raster-only upload and policy/version/path/MIME/existence-checked no-store responder confirmed; derivative/EXIF processing remains documented unsupported |
+| Privacy/sections/history | already_compliant | stable public/private per-section codes, 77 public/25 private preserved choices and serial-level-only watch output confirmed; exact history/progress has no public field |
+| Roles/badges/ranks/follows/genres/location/activity | not_applicable | no canonical product model documented; absence must be confirmed in code/schema/UI |
+| Reviews/comments/collections | already_compliant | selected sections reuse canonical Task 10/12/13 queries/presenters, exact target/spoiler/block/mute rules and matching counts |
+| Blocking/muting | already_compliant | bilateral block is a non-disclosing 404; mute is a viewer-only overlay/action and neither relation enters public cache/SEO |
+| Reports/moderation/restrictions | completed | stable enum/auth/dedup/rate/admin boundaries confirmed; report/private-note prose now uses canonical plain-text sanitation and private evidence remains excluded |
+| Search/recommendations | completed | active-public username/display-name suggestions are canonical, full-schema guarded and private fields absent; recommendations remain owner/private-signal scoped |
+| Cache/performance/counts | already_compliant | direct public reads, selected paginators/grouped counts/eager profiles and existing selected indexes confirmed; no viewer HTML cache or speculative DDL |
+| SEO/structured data/sitemap | already_compliant | overview-only canonical/ProfilePage/Person policy, no alternates for untranslated UGC, 75 eligible streamed sitemap URLs and private 404 confirmed |
+| Multilingual/Livewire/a11y/mobile | completed | RU/EN 113-key/placeholder parity, correct password-field mapping, accessible native biography disclosure, safe failure state and 320px no-overflow browser evidence |
+| Account export/delete/registration/admin/API | already_compliant | allowlisted export, media-first deletion, privacy-safe admin queue and API/auth contracts re-inspected; migration-before-code remains mandatory |
+| Production data application | already_compliant | audit is read-only; no migration or destructive operation planned before evidence |
+| Automated tests | not_applicable | user explicitly prohibited test creation/execution; existing infrastructure remains protected |
+| Documentation/README/changelog | completed | canonical owners, search correction, verification/maintenance evidence, Russian changelog and visitor README updated without duplicate domain docs |
+| Git commit/push | unresolved | final local `main` commit and configured push occur after the last clean verification pass |
 
 ## Final verification checklist
 
-- Reread Task 13, requirements, this plan and every applicable review owner.
-- Inspect all changed files and directly related unchanged routes/models/actions/services/DTOs/policies/queries/cache/SEO/notifications/account/merge/API files.
-- Verify identity/targets/comments separation/title/body/rating/general rating/duplicates/verified watching/spoilers/edit/delete/restore/votes/reports/moderation/restrictions/notifications/anti-spam.
-- Verify counts/aggregates/query plans/uniqueness/index usefulness, no N+1, bounded lists and no private shared state.
-- Verify target merge/delete, account deletion/export, profile privacy, locale, search/recommendations, SEO/JSON-LD/sitemap and cross-feature independence.
-- Verify Blade/JS/Livewire security and accessibility: no raw UGC/DOM sink/hidden spoiler source/Volt/`@php`/inline CSS/business JS/model query/dead control.
+- Reread Task 14, requirements, this plan and every applicable profile owner.
+- Inspect every changed file and directly related unchanged route/model/action/service/DTO/policy/query/cache/SEO/media/account/admin/API file.
+- Verify stable identity, username/history/redirect, public/private payload, privacy defaults/sections, UGC sanitization, media, blocks/mutes, reports/moderation and account lifecycle.
+- Verify canonical comments/reviews/collections/watch sections, matching counts, target visibility and absence of detailed history/progress/private collection leakage.
+- Verify query plans/uniqueness/index usefulness, bounded pagination/lazy tabs, no N+1 and no private shared state.
+- Verify route/localized/legacy/canonical/robots/hreflang/JSON-LD/sitemap/search/recommendation behavior.
+- Verify Blade/JS/Livewire security and accessibility: no raw UGC/DOM sink/Volt/`@php`/inline CSS/business JS/model query/dead control.
 - Run only allowed diagnostics and safe browser smoke; preserve tests without invoking them.
 - Update documentation/compliance honestly, including not-performed or externally blocked evidence, then commit and attempt configured push from clean `main`.

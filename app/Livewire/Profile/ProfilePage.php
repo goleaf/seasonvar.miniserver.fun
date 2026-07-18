@@ -23,6 +23,8 @@ use Illuminate\Validation\Validator;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Throwable;
 
 final class ProfilePage extends Component
 {
@@ -39,6 +41,8 @@ final class ProfilePage extends Component
     public string $createdAt = '';
 
     public ?string $status = null;
+
+    public ?string $profileActionError = null;
 
     public string $username = '';
 
@@ -69,6 +73,7 @@ final class ProfilePage extends Component
         AccountSettingsService $settings,
         AccountDateTimeFormatter $dateTimes,
     ): void {
+        $this->beginProfileAction();
         $this->resetValidation();
         $this->name = Str::squish($this->name);
         $this->email = NormalizedEmail::value($this->email);
@@ -134,6 +139,11 @@ final class ProfilePage extends Component
             }
 
             return;
+        } catch (Throwable $exception) {
+            $this->reset('currentPassword');
+            $this->recordProfileFailure($exception);
+
+            return;
         }
 
         $this->reset('currentPassword');
@@ -146,21 +156,30 @@ final class ProfilePage extends Component
 
     public function savePublicDetails(UserProfileService $profiles): void
     {
+        $this->beginProfileAction();
         $validated = $this->validate([
-            'biography' => ['nullable', 'string', 'max:'.max(1, (int) config('user-profiles.biography_maximum_length', 1200)), 'not_regex:/[\p{Cs}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u'],
+            'biography' => ['nullable', 'string', 'max:'.max(1, (int) config('user-profiles.biography_maximum_length', 1200)), 'not_regex:/(?!\n|\t)[\p{Cc}\p{Cs}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u'],
         ], [
             'biography.max' => __('profiles.validation.biography_max'),
-            'biography.not_regex' => __('profiles.validation.biography_max'),
+            'biography.not_regex' => __('profiles.validation.biography_controls'),
         ]);
-        $profile = $profiles->updateDetails($this->user(), $profiles->forUser($this->user()), [
-            'biography' => $validated['biography'] !== '' ? $validated['biography'] : null,
-        ]);
+        try {
+            $profile = $profiles->updateDetails($this->user(), $profiles->forUser($this->user()), [
+                'biography' => $validated['biography'] !== '' ? $validated['biography'] : null,
+            ]);
+        } catch (Throwable $exception) {
+            $this->recordProfileFailure($exception);
+
+            return;
+        }
+
         $this->fillFromProfile($profile);
         $this->status = __('profiles.settings.updated');
     }
 
     public function saveUsername(UserProfileService $profiles): void
     {
+        $this->beginProfileAction();
         $this->username = ProfileUsername::normalize($this->username);
         $validated = $this->validate([
             'username' => [
@@ -192,8 +211,13 @@ final class ProfilePage extends Component
             $this->reset('profilePassword');
 
             foreach ($exception->errors() as $field => $messages) {
-                $this->addError($field, $messages[0]);
+                $this->addError($field === 'profile_password' ? 'profilePassword' : $field, $messages[0]);
             }
+
+            return;
+        } catch (Throwable $exception) {
+            $this->reset('profilePassword');
+            $this->recordProfileFailure($exception);
 
             return;
         }
@@ -205,6 +229,7 @@ final class ProfilePage extends Component
 
     public function saveProfilePrivacy(UserProfileService $profiles): void
     {
+        $this->beginProfileAction();
         $visibilityValues = ['public', 'private'];
         $rules = ['profileVisibility' => ['required', Rule::in($visibilityValues)]];
 
@@ -222,13 +247,21 @@ final class ProfilePage extends Component
             $visibility[$section.'_visibility'] = $validated['sectionVisibility'][$section];
         }
 
-        $profile = $profiles->updatePrivacy($this->user(), $profiles->forUser($this->user()), $visibility);
+        try {
+            $profile = $profiles->updatePrivacy($this->user(), $profiles->forUser($this->user()), $visibility);
+        } catch (Throwable $exception) {
+            $this->recordProfileFailure($exception);
+
+            return;
+        }
+
         $this->fillFromProfile($profile);
         $this->status = __('profiles.settings.privacy_updated');
     }
 
     public function saveAvatar(UserProfileMediaService $media, UserProfileService $profiles): void
     {
+        $this->beginProfileAction();
         $this->validate([
             'avatarUpload' => [
                 'required', 'image', 'mimes:jpg,jpeg,png,webp',
@@ -237,7 +270,14 @@ final class ProfilePage extends Component
                 'dimensions:min_width=128,min_height=128,max_width=4096,max_height=4096',
             ],
         ], ['avatarUpload.*' => __('profiles.validation.avatar')]);
-        $profile = $media->replace($this->user(), $profiles->forUser($this->user()), 'avatar', $this->avatarUpload);
+        try {
+            $profile = $media->replace($this->user(), $profiles->forUser($this->user()), 'avatar', $this->avatarUpload);
+        } catch (Throwable $exception) {
+            $this->recordProfileFailure($exception);
+
+            return;
+        }
+
         $this->reset('avatarUpload');
         $this->fillFromProfile($profile);
         $this->status = __('profiles.settings.media_updated');
@@ -245,6 +285,7 @@ final class ProfilePage extends Component
 
     public function saveCover(UserProfileMediaService $media, UserProfileService $profiles): void
     {
+        $this->beginProfileAction();
         $this->validate([
             'coverUpload' => [
                 'required', 'image', 'mimes:jpg,jpeg,png,webp',
@@ -253,7 +294,14 @@ final class ProfilePage extends Component
                 'dimensions:min_width=640,min_height=180,max_width=6000,max_height=3000',
             ],
         ], ['coverUpload.*' => __('profiles.validation.cover')]);
-        $profile = $media->replace($this->user(), $profiles->forUser($this->user()), 'cover', $this->coverUpload);
+        try {
+            $profile = $media->replace($this->user(), $profiles->forUser($this->user()), 'cover', $this->coverUpload);
+        } catch (Throwable $exception) {
+            $this->recordProfileFailure($exception);
+
+            return;
+        }
+
         $this->reset('coverUpload');
         $this->fillFromProfile($profile);
         $this->status = __('profiles.settings.media_updated');
@@ -261,14 +309,32 @@ final class ProfilePage extends Component
 
     public function removeAvatar(UserProfileMediaService $media, UserProfileService $profiles): void
     {
-        $profile = $media->remove($this->user(), $profiles->forUser($this->user()), 'avatar');
+        $this->beginProfileAction();
+
+        try {
+            $profile = $media->remove($this->user(), $profiles->forUser($this->user()), 'avatar');
+        } catch (Throwable $exception) {
+            $this->recordProfileFailure($exception);
+
+            return;
+        }
+
         $this->fillFromProfile($profile);
         $this->status = __('profiles.settings.media_removed');
     }
 
     public function removeCover(UserProfileMediaService $media, UserProfileService $profiles): void
     {
-        $profile = $media->remove($this->user(), $profiles->forUser($this->user()), 'cover');
+        $this->beginProfileAction();
+
+        try {
+            $profile = $media->remove($this->user(), $profiles->forUser($this->user()), 'cover');
+        } catch (Throwable $exception) {
+            $this->recordProfileFailure($exception);
+
+            return;
+        }
+
         $this->fillFromProfile($profile);
         $this->status = __('profiles.settings.media_removed');
     }
@@ -334,6 +400,24 @@ final class ProfilePage extends Component
         $this->sectionVisibility = collect($this->profileSections())->mapWithKeys(fn (string $section): array => [
             $section => $profile->getAttribute($section.'_visibility')->value,
         ])->all();
+    }
+
+    private function beginProfileAction(): void
+    {
+        $this->status = null;
+        $this->profileActionError = null;
+    }
+
+    private function recordProfileFailure(Throwable $exception): void
+    {
+        if ($exception instanceof HttpExceptionInterface && $exception->getStatusCode() === 429) {
+            $this->profileActionError = __('profiles.errors.rate_limited');
+
+            return;
+        }
+
+        report($exception);
+        $this->profileActionError = __('profiles.errors.action_failed');
     }
 
     /** @return list<string> */

@@ -19,6 +19,7 @@ use App\Services\Collections\CatalogCollectionSchema;
 use App\Services\ContentRequests\ContentRequestSchema;
 use App\Services\HelpCenter\HelpSitemapQuery;
 use App\Services\HelpCenter\HelpUrlGenerator;
+use App\Services\Profiles\UserProfileSchema;
 use App\Services\ReleaseCalendar\ReleaseCalendarPeriod;
 use App\Services\ReleaseCalendar\ReleaseCalendarQuery;
 use App\Services\ReleaseCalendar\ReleaseCalendarSchema;
@@ -53,6 +54,7 @@ class CatalogSitemapResponder
         private readonly CatalogTopListQuery $topLists,
         private readonly HelpSitemapQuery $helpSitemap,
         private readonly HelpUrlGenerator $helpUrls,
+        private readonly UserProfileSchema $profileSchema,
     ) {}
 
     public function index(): StreamedResponse
@@ -398,6 +400,12 @@ class CatalogSitemapResponder
         return response()->stream(function (): void {
             echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
             echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
+
+            if (! $this->profileSchema->available()) {
+                echo '</urlset>'."\n";
+
+                return;
+            }
 
             UserProfile::query()
                 ->publiclyVisible()

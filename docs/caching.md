@@ -278,6 +278,7 @@ Public review payloads remain title/version scoped and never contain viewer vote
 - `content_version`, avatar/cover version и `UserProfileCacheInvalidator` дают exact user/version/locale key shape для будущих public summaries. Profile/detail/privacy/identity/media/moderation/delete changes bump only affected profile versions; application-wide flush запрещён.
 - Private media URLs contain stable public user UUID, allowlisted kind and non-secret version, но response остаётся `private, no-store`. Email, private values, session IDs, report details/notes, raw disk paths and block/mute state никогда не входят в key/value.
 - Public→private/moderated transition immediately changes policy/query/sitemap output; direct queries are the source of truth, so stale cached HTML cannot survive. Sitemap profile response remains streamed and privacy-filtered.
+- Public username/display-name suggestions входят только в общий versioned `SearchSuggestions` payload. `UserProfileCacheInvalidator` bump-ит этот домен after commit; `UserProfileSchema` при неполном rollout возвращает пустой профильный источник до shared-cache builder, поэтому частичная схема не создаёт stale/private entry. Owner errors, report state и username limiter никогда не кэшируются глобально.
 
 ## Cache lifecycle настроек аккаунта
 

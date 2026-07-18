@@ -34,6 +34,8 @@ return [
         'unmuted' => 'User activity is visible again.',
         'report' => 'Report',
         'retry' => 'Try again',
+        'show_more' => 'Show full biography',
+        'show_less' => 'Collapse biography',
     ],
     'empty' => [
         'no_public_activity' => 'The user has not made any sections public yet.',
@@ -69,11 +71,13 @@ return [
         'username_rate_limited' => 'Too many username change attempts. Try again later.',
         'current_password' => 'The current password is incorrect.',
         'biography_max' => 'The biography is too long.',
+        'biography_controls' => 'The biography contains unsupported control characters.',
         'visibility' => 'Select an allowed privacy value.',
         'avatar' => 'Choose a JPEG, PNG, or WebP image of an allowed size.',
         'cover' => 'Choose a JPEG, PNG, or WebP image of an allowed size.',
         'report_category' => 'Select an allowed report reason.',
         'report_details_max' => 'The report details are too long.',
+        'report_details_controls' => 'The report details contain unsupported control characters.',
     ],
     'errors' => [
         'action_failed' => 'The action could not be completed. Try again.',

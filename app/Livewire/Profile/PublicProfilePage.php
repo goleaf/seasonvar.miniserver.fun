@@ -65,7 +65,7 @@ final class PublicProfilePage extends Component
         }
 
         if ($resolved->fromHistory || $username !== $this->username) {
-            $this->redirectRoute('users.show', ['username' => $this->username], navigate: false);
+            $this->redirectRoute('users.show', $this->canonicalRedirectParameters(), navigate: false);
         }
     }
 
@@ -136,11 +136,12 @@ final class PublicProfilePage extends Component
     {
         $validated = $this->validate([
             'reportCategory' => ['required', Rule::enum(UserProfileReportCategory::class)],
-            'reportDetails' => ['nullable', 'string', 'max:'.max(1, (int) config('user-profiles.reports.maximum_details_length', 1500))],
+            'reportDetails' => ['nullable', 'string', 'max:'.max(1, (int) config('user-profiles.reports.maximum_details_length', 1500)), 'not_regex:/(?!\n|\t)[\p{Cc}\p{Cs}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u'],
         ], [
             'reportCategory.required' => __('profiles.validation.report_category'),
             'reportCategory.enum' => __('profiles.validation.report_category'),
             'reportDetails.max' => __('profiles.validation.report_details_max'),
+            'reportDetails.not_regex' => __('profiles.validation.report_details_controls'),
         ]);
         $viewer = $this->viewer(required: true);
         $profile = $this->profile($profiles);
@@ -245,6 +246,33 @@ final class PublicProfilePage extends Component
     private function allowedTabs(): array
     {
         return ['overview', 'reviews', 'comments', 'collections', 'watching', 'completed'];
+    }
+
+    /** @return array<string, int|string> */
+    private function canonicalRedirectParameters(): array
+    {
+        $parameters = ['username' => $this->username];
+
+        if ($this->tab === 'overview' || ! in_array($this->tab, $this->allowedTabs(), true)) {
+            return $parameters;
+        }
+
+        $parameters['tab'] = $this->tab;
+        $pageName = match ($this->tab) {
+            'reviews' => 'reviewsPage',
+            'comments' => 'commentsPage',
+            'collections' => 'profileCollectionsPage',
+            'watching' => 'watchingPage',
+            'completed' => 'completedPage',
+            default => null,
+        };
+        $page = $pageName !== null ? request()->query($pageName) : null;
+
+        if ($pageName !== null && is_string($page) && ctype_digit($page) && (int) $page > 1) {
+            $parameters[$pageName] = (int) $page;
+        }
+
+        return $parameters;
     }
 
     private function unavailableView(): View

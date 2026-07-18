@@ -10,6 +10,18 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $public_id
+ * @property int|null $target_user_id
+ * @property string $target_public_id
+ * @property int $reporter_id
+ * @property UserProfileReportCategory $category
+ * @property string|null $details
+ * @property UserProfileReportStatus $status
+ * @property string $deduplication_key
+ * @property int|null $moderator_id
+ * @property string|null $private_note
+ */
 #[Fillable([
     'public_id',
     'target_user_id',

@@ -26,6 +26,7 @@ return [
         ],
     ],
     'biography_maximum_length' => 1200,
+    'biography_collapse_after' => 420,
     'pagination' => [
         'reviews' => 10,
         'comments' => 12,

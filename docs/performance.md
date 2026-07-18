@@ -193,6 +193,7 @@ Static acceptance must inspect generated SQL and SQLite `EXPLAIN QUERY PLAN` aga
 - Public overview selects one profile plus safe user columns and grouped/independent counts only for explicitly public sections. Each tab loads one deterministic paginator; reviews/comments eager-load visible target summaries, collections reuse their canonical owner query and watch lists eager-load only title card fields.
 - Current/history username lookup uses unique indexes. Sitemap uses `(profile_visibility, moderation_status, updated_at, user_id)` eligibility and streams results. Report moderation uses the exact status/time/id composite; no page loads full report evidence, session/provider data or all sections.
 - Author profile links in comment/review lists use eager `author.profile`; collection owner profile loads the same one-to-one relation. Blade never adds per-card profile/count queries. Viewer block/mute checks are bounded existence queries and are never mixed into a shared cache.
+- Повторный `EXPLAIN QUERY PLAN` 19.07.2026 выбрал unique current/history username indexes, moderation queue composite и directional block/mute unique indexes. Search/sitemap сначала используют `user_profiles_public_listing_idx`; временная сортировка ограничена текущими `77` eligible rows, поэтому без измеренной деградации новый write-cost index не добавлялся.
 
 ## Query contract заявок на материалы
 

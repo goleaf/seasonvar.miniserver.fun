@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\UserProfile;
 use App\Models\UserProfileReport;
 use App\Services\Storage\PrivateUploadStorage;
+use App\Support\UserPlainText;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -65,7 +66,8 @@ final class UserProfileModerationService
         abort_unless(in_array($action, [
             'activate', 'hide', 'suspend', 'hide_biography', 'remove_avatar', 'remove_cover', 'dismiss',
         ], true), 422);
-        $privateNote = is_string($privateNote) ? Str::limit(trim(strip_tags($privateNote)), 2000, '') : null;
+        $privateNote = UserPlainText::description($privateNote);
+        $privateNote = $privateNote !== null ? Str::limit($privateNote, 2000, '') : null;
         $uploadsToDelete = [];
         $profileForCache = null;
         $previousVersion = null;

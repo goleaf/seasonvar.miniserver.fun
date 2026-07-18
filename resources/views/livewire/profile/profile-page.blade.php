@@ -30,6 +30,11 @@
                 <x-form.status-message :message="$status" />
             </div>
         @endif
+        @if ($profileActionError)
+            <div role="alert" class="mb-5 rounded-control border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
+                {{ $profileActionError }}
+            </div>
+        @endif
 
         <div class="space-y-6">
             <div class="rounded-control border border-slate-200 bg-slate-50 p-4">

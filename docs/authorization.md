@@ -131,6 +131,8 @@ Public user tags, unlisted tags, community global assignment, tag reporting и s
 
 Section visibility никогда не отменяет whole-profile/moderation/block check. Unblock остаётся в существующем relationship account UI, поэтому blocked direct profile URL не становится side channel. Viewer overlay не входит в shared cache/SEO.
 
+Username, display name и public UUID разрешают профиль, но не становятся credentials или client-trusted owner ID. Username mutation повторно проверяет owner/password под lock; search/sitemap читают только public active profiles после полной schema-readiness. Public read-only consumers дают пустой результат при code-before-migration, но registration/account mutations fail closed: это не позволяет новому account попасть в legacy public backfill и не пропускает очистку private profile media.
+
 ## Матрица доступа настроек аккаунта
 
 | Действие | Гость | Авторизованный пользователь | Чужой account / администратор |

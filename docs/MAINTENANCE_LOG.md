@@ -298,6 +298,12 @@
 - Rebuilt the canonical route cache after production HTTPS smoke exposed a stale snapshot that knew `/profile` but not the new `users.show` route. The same authenticated desktop/mobile scenario then returned 200 with no browser errors or overflow; no application cache flush, queue action or user-data rewrite was used.
 - Task 14 forbids automated tests. Allowed acceptance consists of focused syntax/Pint/route/schema/index/translation/public-payload/privacy/cache/SEO/Blade inspection, Vite build and managed Chromium guest/owner checks. Full architecture, rollback and unsupported feature decisions are in Task 14 of the shared modernization plan.
 
+## 2026-07-19 — repeat profile privacy and rollout hardening
+
+- Полностью перечитаны `284` tracked Markdown-файла и повторно проверены canonical profile/account/search/cache/SEO/media/admin consumers. Read-only база содержит `102` users и `102` profiles, zero identity/privacy/media/relation anomalies, `77` public и `25` private active rows; миграции, indexes и production data не менялись.
+- Исправлено фактическое обнуление username rate-limit после success/no-op, mapping password validation к Livewire field, concurrent no-op version bump, control/bidi sanitation и отсутствие доступного long-biography collapse. Alias/localized redirects теперь сохраняют только selected tab и его paginator, отбрасывая tracking state.
+- Full-column `UserProfileSchema` fail-closed защищает search/sitemap. Registration/account mutations намеренно требуют migration-before-code: это исключает ошибочный legacy-public backfill и пропуск private-media cleanup. Pint, focused PHPStan, PHP syntax, routes, translations, schema/query/privacy/cache/SEO, Blade, Vite и read-only Chromium checks выполнены; automated tests по запрету задачи не запускались.
+
 ## 2026-07-16 — canonical technical issues and support Task 20
 
 - Полный Markdown/routes/schema/model/policy/player/progress/account/notification/moderation/Task 19/import/source-health/storage/cache/SEO audit подтвердил отсутствие legacy technical/support/playback ticket data и competing route/table architecture. Добавлен первый private canonical aggregate без изменения Task 19 и moderation reports.

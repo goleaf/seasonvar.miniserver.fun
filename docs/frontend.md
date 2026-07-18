@@ -166,6 +166,7 @@ Review business state remains in Livewire/actions/DTO: viewer vote, permission, 
 - Owner editing extends the existing `/profile` page with independent username, biography, avatar, cover and privacy forms. Complex privacy is staged until its Apply submit; upload/username actions disable only relevant controls, clear password/file state after outcome and use native accessible inputs/confirmations.
 - Public/owner layouts reuse current panels, cards, typography, buttons, focus and responsive rules. Navigation wraps instead of introducing an internal horizontal scrollbar; long username/biography/URL text wraps, 390px desktop/mobile browser smoke has no document overflow.
 - User text remains original language and escaped. Russian/English labels, errors, loading, empty/private/moderated states and ARIA descriptions live only in the existing PHP translation catalogs. No inline CSS, business JavaScript, Volt or Blade query was added.
+- Long public biography uses native keyboard/screen-reader-aware `<details>` with prepared preview and localized expand/collapse labels; no hidden-text JavaScript or raw HTML renderer exists. Owner mutations retain the relevant draft/upload after recoverable failure, announce a localized safe error and clear secret password state; field validation remains attached to the exact Livewire property.
 
 ## Frontend lifecycle настроек аккаунта
 

@@ -12,6 +12,7 @@ use App\Models\UserProfile;
 use App\Services\Catalog\CatalogDirectoryRegistry;
 use App\Services\Catalog\CatalogTaxonomyRegistry;
 use App\Services\Catalog\CatalogTitleQuery;
+use App\Services\Profiles\UserProfileSchema;
 use App\Services\Tags\TagQuery;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -29,6 +30,7 @@ final readonly class PortalSearchSuggestionQuery
         private CatalogTitleQuery $titles,
         private TagQuery $tags,
         private HeaderPortalSectionRegistry $sections,
+        private UserProfileSchema $profileSchema,
     ) {}
 
     /**
@@ -205,6 +207,10 @@ final readonly class PortalSearchSuggestionQuery
      */
     private function profileSuggestions(string $query, string $needle): Collection
     {
+        if (! $this->profileSchema->available()) {
+            return collect();
+        }
+
         $variants = $this->searchVariants($query);
 
         return UserProfile::query()

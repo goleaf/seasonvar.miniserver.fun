@@ -100,6 +100,7 @@ final class UserProfileService
         string $currentPassword,
     ): UserProfile {
         Gate::forUser($actor)->authorize('update', $profile);
+        $normalized = (string) new ProfileUsername($username);
         $rateKey = 'profile-username-change:'.$actor->id;
         $attempts = max(1, (int) config('user-profiles.username.change_attempts', 5));
         $decay = max(60, (int) config('user-profiles.username.change_decay_seconds', 3600));
@@ -110,10 +111,10 @@ final class UserProfileService
 
         RateLimiter::hit($rateKey, $decay);
 
-        $normalized = (string) new ProfileUsername($username);
-
         if ($normalized === $profile->normalized_username) {
-            RateLimiter::clear($rateKey);
+            if (! Hash::check($currentPassword, $actor->getAuthPassword())) {
+                throw ValidationException::withMessages(['profile_password' => [__('profiles.validation.current_password')]]);
+            }
 
             return $profile;
         }
@@ -129,6 +130,10 @@ final class UserProfileService
 
                 $locked = UserProfile::query()->lockForUpdate()->findOrFail($profile->user_id);
                 Gate::forUser($lockedActor)->authorize('update', $locked);
+
+                if ($locked->normalized_username === $normalized) {
+                    return;
+                }
 
                 if (UserProfileUsernameHistory::query()->where('normalized_username', $normalized)->exists()) {
                     throw ValidationException::withMessages(['username' => [__('profiles.validation.username_unique')]]);
@@ -149,13 +154,16 @@ final class UserProfileService
             throw ValidationException::withMessages(['username' => [__('profiles.validation.username_unique')]]);
         }
 
-        RateLimiter::clear($rateKey);
         $profile->refresh();
-        $this->cache->changed($profile, is_int($previousVersion) ? $previousVersion : (int) $profile->content_version - 1);
+
+        if (is_int($previousVersion)) {
+            $this->cache->changed($profile, $previousVersion);
+        }
 
         return $profile;
     }
 
+    /** @return array<string, mixed> */
     public function export(User $user): array
     {
         $profile = UserProfile::query()->whereKey($user->id)->first();

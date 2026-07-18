@@ -14,6 +14,33 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property int $user_id
+ * @property string $username
+ * @property string $normalized_username
+ * @property string|null $biography
+ * @property UserProfileVisibility $profile_visibility
+ * @property UserProfileVisibility $biography_visibility
+ * @property UserProfileVisibility $member_since_visibility
+ * @property UserProfileVisibility $collections_visibility
+ * @property UserProfileVisibility $reviews_visibility
+ * @property UserProfileVisibility $comments_visibility
+ * @property UserProfileVisibility $watching_visibility
+ * @property UserProfileVisibility $completed_visibility
+ * @property UserProfileVisibility $activity_visibility
+ * @property UserProfileModerationStatus $moderation_status
+ * @property string|null $avatar_disk
+ * @property string|null $avatar_path
+ * @property string|null $avatar_mime_type
+ * @property int|null $avatar_size
+ * @property int $avatar_version
+ * @property string|null $cover_disk
+ * @property string|null $cover_path
+ * @property string|null $cover_mime_type
+ * @property int|null $cover_size
+ * @property int $cover_version
+ * @property int $content_version
+ */
 #[UsePolicy(UserProfilePolicy::class)]
 #[Fillable([
     'user_id',

@@ -42,7 +42,24 @@
             @endif
 
             @if ($profileData->biography)
-                <p class="mt-4 max-w-3xl whitespace-pre-line break-words text-sm leading-7 text-slate-700">{{ $profileData->biography }}</p>
+                @if ($profileData->biographyIsLong)
+                    <details class="group mt-4 max-w-3xl">
+                        <summary class="cursor-pointer list-none rounded-control text-sm leading-7 text-slate-700 marker:hidden focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-200">
+                            <span class="whitespace-pre-line break-words group-open:hidden">{{ $profileData->biographyPreview }}</span>
+                            <span class="mt-2 inline-flex min-h-11 items-center gap-2 font-bold text-emerald-700 group-open:hidden">
+                                {{ __('profiles.actions.show_more') }}
+                                <x-ui.icon name="fa-solid fa-chevron-down text-xs" />
+                            </span>
+                            <span class="hidden min-h-11 items-center gap-2 font-bold text-emerald-700 group-open:inline-flex">
+                                {{ __('profiles.actions.show_less') }}
+                                <x-ui.icon name="fa-solid fa-chevron-up text-xs" />
+                            </span>
+                        </summary>
+                        <p class="mt-2 whitespace-pre-line break-words text-sm leading-7 text-slate-700">{{ $profileData->biography }}</p>
+                    </details>
+                @else
+                    <p class="mt-4 max-w-3xl whitespace-pre-line break-words text-sm leading-7 text-slate-700">{{ $profileData->biography }}</p>
+                @endif
             @endif
         </div>
     </article>

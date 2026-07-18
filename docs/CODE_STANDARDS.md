@@ -148,6 +148,14 @@
 - Stable ID/aliases переживают edit/delete/restore/slug/title merge. Create/vote/report must be idempotent and transaction-safe; cache invalidation is after commit and scoped. Visible actions require localized success/error/loading/confirmation and exact `lang/ru/reviews.php`/`lang/en/reviews.php` parity.
 - Stable `removed` review обязан иметь deletion reason, actor при наличии moderation evidence и timestamp; переход статуса восстанавливает только moderator tombstone и не отменяет author/merge deletion. Public/list/profile/notification direct URL строится одним presenter helper через route name, включая optional supported locale; Blade/JavaScript не конкатенируют review URL.
 
+## Профили пользователей
+
+- Единственная stable identity — существующий `User`; `UserProfile` хранит one-to-one presentation username/privacy/media metadata, а email/display name никогда не становятся route identity или client-trusted owner ID. Current/history username разрешает только canonical resolver.
+- Public profile query/DTO выбирает explicit safe fields и одну выбранную section. Email, credentials, exact progress/history, private collections, block/mute/report/moderator data не загружаются для public presentation и не скрываются только CSS.
+- Username/media/privacy/report/moderation mutations расширяют существующие profile services/policy и повторно authorizes actor server-side. Username limiter нельзя очищать успешной сменой; same-name retry не изменяет version/history. User prose проходит `UserPlainText`, а raster upload — private storage/MIME/dimensions/path boundary.
+- Portal search может предлагать только active-public username/display name через общий `PortalSearchSuggestionQuery`; standalone profile index не создаётся. Public read-only consumers fail closed по полному readiness contract, а registration/account lifecycle требуют migration-before-code и не обходят profile creation/media cleanup.
+- Blade получает `PublicUserProfileData`/prepared paginator DTO, не решает privacy/SEO/counts/authorization. Long biography использует native accessible disclosure; labels/errors обязаны сохранять exact parity `lang/ru/profiles.php` и `lang/en/profiles.php`.
+
 ## Рейтинги Top 100
 
 - Новая категория расширяет `CatalogTopListCategory` и общий `CatalogTopListQuery`; отдельные controller/query/view для каждого Top 100 запрещены. Route binding принимает только backed enum values.

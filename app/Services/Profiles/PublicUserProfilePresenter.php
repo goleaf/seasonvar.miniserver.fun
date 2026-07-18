@@ -44,12 +44,16 @@ final class PublicUserProfilePresenter
             ->where('muter_id', $viewer->id)
             ->where('muted_id', $owner->id)
             ->exists();
+        $biography = $sections['biography'] ? $profile->biography : null;
+        $biographyCollapseAfter = max(1, (int) config('user-profiles.biography_collapse_after', 420));
 
         return new PublicUserProfileData(
             displayName: (string) $owner->name,
             username: (string) $profile->username,
             initial: Str::upper(Str::substr((string) $owner->name, 0, 1)),
-            biography: $sections['biography'] ? $profile->biography : null,
+            biography: $biography,
+            biographyPreview: $biography !== null ? Str::limit($biography, $biographyCollapseAfter) : null,
+            biographyIsLong: $biography !== null && Str::length($biography) > $biographyCollapseAfter,
             memberSince: $sections['member_since'] && $owner->created_at !== null
                 ? $owner->created_at->translatedFormat('F Y')
                 : null,

@@ -120,7 +120,7 @@ Permanent global delete отсутствует: active tag archive-ится ил
 
 ## Модерация профилей пользователей
 
-`/admin/profiles` requires the existing `manage-catalog` gate at route, Livewire hydration and service action. The deterministic bounded queue shows safe target identity/category/status/date without reporter email, account credentials, raw media path or unrelated private activity. Moderator may set stable profile moderation status, hide biography, remove avatar/cover and resolve/dismiss a report with a private note; it cannot edit password/email/role/premium or restore deleted account data. Every public-presentation transition increments the profile version so policy/SEO/sitemap reads change immediately.
+`/admin/profiles` requires the existing `manage-catalog` gate at route, Livewire hydration and service action. The deterministic bounded queue shows safe target identity/category/status/date without reporter email, account credentials, raw media path or unrelated private activity. Moderator may set stable profile moderation status, hide biography, remove avatar/cover and resolve/dismiss a report with a private note; it cannot edit password/email/role/premium or restore deleted account data. Report details and private notes pass the same Unicode plain-text/control/bidi boundary as other UGC, remain bounded and are never rendered as raw HTML. Every public-presentation transition increments the profile version so policy/SEO/sitemap reads change immediately.
 
 ## Модерация заявок на материалы
 
