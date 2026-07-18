@@ -1,6 +1,8 @@
 # Очереди и jobs
 
-Обновлено: 16.07.2026
+Обновлено: 18.07.2026
+
+Task 28 production verification: Redis queue reachable; активны 4 `seasonvar-import`, 8 `seasonvar-title-refresh` и 1 `cache-warm-v2` systemd worker. Cron реально вызывает scheduler каждую минуту, queued import dispatcher по расписанию и bounded queue monitor. Supervisor/Horizon отсутствуют. Взаимоисключающий `seasonvar-import-forever.service` отключён и не должен запускаться одновременно с queued profile. Redis process manager unit name не подтверждён, поэтому runbook не использует выдуманный `redis.service` restart.
 
 ## Конфигурация
 

@@ -18,6 +18,15 @@
 - Framework upgrade сохраняет route names/public URLs, event/notification codes, cache identities, translation/permission keys и DB identity values либо предоставляет полную compatibility migration.
 - Канонические package purposes, runtime states, decisions, shims и removal conditions находятся только в [`maintenance/`](maintenance/dependency-inventory.md); этот раздел задаёт architectural boundary, но не копирует registry.
 
+## Production configuration и deployment boundaries
+
+- Environment values читаются только через `config/*.php`; application code не вызывает `env()` напрямую и не содержит absolute server paths или production hostnames.
+- Filesystem disks, cache/session/queue drivers и mail transports используют canonical Laravel configuration. External clients получают typed configuration, bounded timeouts и безопасное failure behavior; retryable mutations используют idempotency там, где повтор может повредить state.
+- Application version и build identity доступны через безопасную конфигурацию без secret context. Service-worker cache names versioned; manifest и соответствующие hashed assets разворачиваются как одна совместимая единица.
+- Миграции не предполагают background workers. Long/locking migrations выявляются до deployment; destructive schema changes используют staged compatibility, когда old/new code могут сосуществовать.
+- Maintenance mode не раскрывает debug context. Public health возвращает только минимальный summary, а детальное operational state требует авторизации.
+- Logs используют структурированный безопасный context и не содержат secrets, cookies, authorization headers, protected URLs или private file contents.
+
 ## Целевая архитектура и data flow
 
 Цель — сохранить Laravel-native слои и текущие доменные сервисы, уменьшая только доказанные god boundaries. Не вводится универсальный repository/action/interface слой.

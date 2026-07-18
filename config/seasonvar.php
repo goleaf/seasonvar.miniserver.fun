@@ -10,6 +10,7 @@ return [
         explode(',', (string) env('SEASONVAR_IMPORT_ADMIN_EMAILS', '')),
     ))),
     'base_url' => env('SEASONVAR_BASE_URL', 'https://seasonvar.ru'),
+    'http_user_agent' => env('SEASONVAR_HTTP_USER_AGENT', 'SeasonvarCatalog/0.1'),
     'sitemap_url' => env('SEASONVAR_SITEMAP_URL', 'https://seasonvar.ru/sitemap_index.xml'),
     'sitemap_storage_directory' => 'seasonvar/sitemaps',
     'crawl_delay_seconds' => (int) env('SEASONVAR_CRAWL_DELAY', 3),

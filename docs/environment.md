@@ -4,7 +4,24 @@
 
 Полный безопасный шаблон находится в `.env.example`. Реальный `.env` не изменяется deployment-кодом и не коммитится.
 
-Canonical runtime evidence и честные статусы `verified|documented compatible|unknown|requires review` находятся в [`maintenance/runtime-compatibility.md`](maintenance/runtime-compatibility.md). Локально Task 29 наблюдал PHP CLI/FPM `8.5.8`, Composer `2.10.2`, Node `26.4.0`, npm `12.0.1`, SQLite `3.46.1`, `pdo_mysql`, Redis и Memcached PHP extensions и nginx; это не подменяет production-host preflight. Node 26 остаётся Current, поэтому future LTS migration требует отдельного decision и locked build verification. Composer self-update public keys устанавливаются на build host по официальной процедуре и не являются application `.env` secrets.
+## Verified production snapshot 18.07.2026
+
+- Rocky Linux `10.2`, nginx `1.31.2`, PHP CLI/FPM `8.5.8`, Composer `2.10.2`, Node `26.4.0`, npm `12.0.1`, SQLite `3.46.1`.
+- Installed application: Laravel `13.20.0`, Livewire `4.3.3`, Tailwind CSS `4.3.2`, Vite `8.1.4`; Composer project constraint remains PHP `^8.3`, while this host runs PHP 8.5.
+- Runtime state is `APP_ENV=production`, `APP_DEBUG=false`, HTTPS `APP_URL`, configured `APP_KEY`, SQLite database, Redis cache/session/queue/locks, local private uploads and Laravel daily warning logs. Значения и private paths не выводились.
+- Redis реально reachable, но владельца процесса нельзя выводить из отсутствующего `redis.service`: restart выполняется только через verified panel/system owner. Memcached extension/config есть, однако listener/service не обнаружен и health state — `unavailable`; correctness использует documented fallback.
+- Mail использует `log`, active payment/OAuth/object-storage/monitoring providers не подтверждены. Google reporting и HDRezka sync выключены. Service worker не установлен.
+- aaPanel/nginx/PHP-FPM и systemd/cron реально используются. Активный queued import profile: 4 import workers, 8 title-refresh workers, 1 cache-warm worker; scheduler, queued dispatcher и queue monitor запускаются cron. Взаимоисключающий `seasonvar-import-forever.service` отключён.
+
+Эта проверка не подтверждает zero downtime, automatic failover, off-host backup, external alert delivery или full restore. Операционные ограничения и runbook’и: [`operations/README.md`](operations/README.md).
+
+Canonical runtime compatibility states находятся в [`maintenance/runtime-compatibility.md`](maintenance/runtime-compatibility.md). Node 26 остаётся Current, поэтому future LTS migration требует отдельного decision и locked build verification. Composer self-update public keys устанавливаются на build host по официальной процедуре и не являются application `.env` secrets.
+
+## Environment-variable inventory policy
+
+`.env.example` — канонический безопасный inventory: имя и placeholder группируются по app/auth/log/database/session/queue/cache/Redis/Memcached/mail/storage/provider/import/playback/security/frontend subsystem. Required production keys — `APP_ENV`, `APP_KEY`, `APP_DEBUG`, `APP_URL`, database, session/cache/queue, logging и configured provider keys. Optional keys имеют safe default/disabled behavior. `APP_VERSION` и `APP_BUILD_ID` задают public-safe release identity; `PROJECT_DOCS_PUBLIC_BASE_URL` — public docs canonical origin; `SEASONVAR_HTTP_USER_AGENT` — provider identity без hardcoded production hostname.
+
+Любая переменная имеет sensitivity по subsystem: key/password/token/credential values secret; host/path/database/provider identifiers operational-private; version, bounded limits и feature switches non-secret. Изменение server-side `.env` требует `config:cache` и graceful PHP-FPM/worker refresh, если ключ читается Laravel config. Единственная client-exposed переменная `VITE_APP_NAME` содержит только publishable display name.
 
 `SEASONVAR_INTEGRATION_HOME` — необязательный operator-only путь для CLI-команды `integrations:doctor`, если процесс не наследует корректный home directory. Значение не показывается в web/admin UI и не должно указывать на shared public directory; при отсутствии override конфигурация использует home процесса, в котором строится config cache.
 
@@ -28,6 +45,10 @@ LOG_DAILY_DAYS=14
 ```
 
 Production также обязан включить HTTPS-only session cookie, корректные domain/path/SameSite, секретный `APP_KEY`, warning-or-higher structured log policy и реальные credentials через secret manager/process environment. Эти значения не должны попадать в Git.
+
+## PHP extensions
+
+`composer check-platform-reqs --no-dev` на текущем runtime подтвердил PHP `8.5.8` и mandatory Composer platform extensions `dom`, `fileinfo`, `filter`, `hash`, `iconv`, `json`, `libxml`, `openssl`, `pcre`, `session`, `tokenizer`; `ctype`/`mbstring` также реально загружены, хотя dependencies умеют polyfill. Для фактической архитектуры дополнительно required: `pdo_sqlite`/`sqlite3` (production database), `redis` (sessions/queues/locks/cache), `curl` (outbound provider HTTP), `intl` (locale dates/numbers), `fileinfo` (uploads), `openssl`/`sodium` (crypto) и `opcache` для FPM. `gd` и `imagick` поддерживают current raster upload/image flows. `memcached` client загружен, но server optional/unavailable; `pdo_mysql` — optional driver evidence, не production-engine proof; `zip` нужен для approved archive workflows. FFmpeg/transcoding не требуется и не подтверждено.
 
 `RELEASE_CALENDAR_TIMEZONE=UTC` задаёт валидный IANA timezone публичного календаря для гостя. Вошедший пользователь использует собственный timezone из настроек аккаунта; произвольный request parameter не переопределяет эту границу. Изменение значения требует `config:cache` и graceful reload web workers, но не миграции или нового scheduler.
 

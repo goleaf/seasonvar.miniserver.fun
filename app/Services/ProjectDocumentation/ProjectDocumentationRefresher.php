@@ -158,7 +158,7 @@ class ProjectDocumentationRefresher
     {
         return $this->section('Автоматически обновляемое состояние', [
             'Обновлено командой `php artisan project:docs-refresh`: '.$this->today().'.',
-            'Основная карта сайта портала: `https://seasonvar.miniserver.fun/sitemap-index.xml`.',
+            'Основная карта сайта портала: `'.$this->publicBaseUrl().'/sitemap-index.xml`.',
             'Совместимый адрес `/sitemap.xml` отдает индекс карты сайта, чтобы поисковые системы получали все разделы карты.',
             'Опубликованные общедоступные статьи и непустые разделы центра помощи входят в отдельный потоковый `/sitemap-help.xml`.',
             '`public/robots.txt` объявляет стабильный индекс карты сайта без ручного перечисления страниц `sitemap-titles-*` и `sitemap-videos-*`.',
@@ -211,7 +211,7 @@ class ProjectDocumentationRefresher
             'Последнее автоматическое обновление блоков документации: '.$this->today().'.',
             'Команда обновления: `php artisan project:docs-refresh`.',
             'Хук автокоммита: `.githooks/post-commit` через `scripts/docs-autocommit-push.sh`; отправка в Git включается только через `SEASONVAR_DOCS_AUTO_PUSH=1`.',
-            'Основной sitemap для robots и поисковых систем: `https://seasonvar.miniserver.fun/sitemap-index.xml`.',
+            'Основной sitemap для robots и поисковых систем: `'.$this->publicBaseUrl().'/sitemap-index.xml`.',
         ]);
         $migrations = $this->migrationInventory();
 
@@ -384,6 +384,13 @@ class ProjectDocumentationRefresher
         }
 
         return '/'.ltrim($route->uri(), '/');
+    }
+
+    private function publicBaseUrl(): string
+    {
+        $configured = trim((string) config('project-docs.public_base_url'));
+
+        return rtrim($configured !== '' ? $configured : (string) config('app.url'), '/');
     }
 
     /** @return list<string> */

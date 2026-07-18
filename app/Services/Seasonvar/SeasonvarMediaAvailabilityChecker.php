@@ -56,7 +56,7 @@ final class SeasonvarMediaAvailabilityChecker
                 'Accept' => $this->isManifest($target->url) ? 'application/vnd.apple.mpegurl, application/x-mpegURL' : '*/*',
                 'Range' => 'bytes=0-'.$this->rangeEnd(),
                 'Referer' => $this->seasonvarUrl->baseUrl().'/',
-                'User-Agent' => 'SeasonvarCatalog/0.1 (+https://seasonvar.miniserver.fun)',
+                'User-Agent' => (string) config('seasonvar.http_user_agent'),
             ])
                 ->timeout($this->timeoutSeconds())
                 ->connectTimeout($this->connectTimeoutSeconds())

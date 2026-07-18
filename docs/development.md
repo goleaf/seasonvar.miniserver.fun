@@ -31,6 +31,24 @@
 
 Lock files не меняются без анализа причины. Проверяется каждый direct и существенный transitive change; unrelated upgrades не принимаются внутри lock rewrite. Lock files не удаляются для принудительного resolution и не создаются другим package manager без explicit migration plan.
 
+## Обязательный production-impact review
+
+До production-affecting реализации:
+
+1. Проверить `composer.json`, `composer.lock`, `package.json` и фактически используемый frontend lock file.
+2. Проверить PHP/Node constraints, требуемые PHP extensions, Vite и build output.
+3. Проверить filesystem disks, cache, session, queue, mail, database и logging configuration.
+4. Проверить trusted proxies, URL/HTTPS configuration, scheduler, service worker, deployment/backup scripts и server documentation.
+5. Зафиксировать writable directories, maintenance decision, rollback, data backup, cache invalidation и external-provider risks в current task plan.
+
+Перед production completion:
+
+1. Проверить совместимость config, route, view и event caches только доступными безопасными командами.
+2. Проверить Vite manifest/assets, writable storage и наличие application key без вывода значения.
+3. Проверить database/cache/session/storage через существующие side-effect-free diagnostics; mail/payment/webhook — только configuration state без несанкционированной отправки или оплаты.
+4. Проверить service-worker versioning/exclusions, maintenance/rollback runbooks, документацию и changelog.
+5. Commit/push выполнять только из `main` после полного `git status` review.
+
 ## Локальная установка
 
 Требования для разработки:

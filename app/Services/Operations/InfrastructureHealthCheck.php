@@ -62,6 +62,25 @@ final class InfrastructureHealthCheck
         ];
     }
 
+    /** @return array{status: string, ready: bool, checked_at: string} */
+    public function readiness(): array
+    {
+        $components = [
+            $this->check(fn (): bool => DB::selectOne('select 1 as healthy') !== null),
+            $this->redis('sessions'),
+            $this->redis('queues'),
+            $this->redis('locks'),
+        ];
+        $ready = collect($components)
+            ->every(fn (array $component): bool => $component['status'] === 'ok');
+
+        return [
+            'status' => $ready ? 'ok' : 'unavailable',
+            'ready' => $ready,
+            'checked_at' => now()->toIso8601String(),
+        ];
+    }
+
     /** @return array{status: string, latency_ms?: int, message?: string} */
     private function redis(string $connection): array
     {

@@ -11,6 +11,15 @@
 - Approved plans, compatibility warnings, registry counts и documentation links допустимы; package changes остаются repository/deployment workflow в `main`.
 - Permissions для summary, compatibility matrix, debt, deprecations, approval, advisories и production compatibility разделяются по least privilege; content admin не управляет dependencies.
 
+## Production operations boundary
+
+- Administration может показывать только real, permission-scoped status: `configured`, `reachable`, `degraded`, `unavailable`, `not_installed` или `unknown`; fake health/backup/queue/scheduler/deployment state запрещён.
+- Secret values, `.env`, connection strings, private hostnames/paths, provider responses и raw logs не показываются. Log access bounded, redacted и path-safe.
+- Unrestricted `.env` editor, shell, arbitrary Artisan/SQL/filesystem browser и browser-triggered Composer/npm updates запрещены.
+- Targeted cache/health/idempotent retry actions допустимы только при существующем application-owned boundary, separate permission, recent authentication, impact preview, confirmation, audit и rollback guidance.
+- Backup/restore/deployment controls не добавляются без реально существующей safe orchestration. Restore permission отделено от general administration и выдаётся только operational role.
+- Task 28 не добавляет browser deployment/backup/restore/cache-shell panel: реальной application-owned execution/audit/backup platform нет. Detailed `app:health`, migration/import/queue checks и runbooks остаются operator CLI/panel workflow; existing `/admin/imports` показывает только domain-safe importer/media aggregates. Поэтому новые operational UI labels, permissions и fake events не создаются.
+
 ## Доступ и границы
 
 - Full-page Livewire 4 компонент `App\Livewire\CatalogAdministrationManager` доступен по `/admin/catalog` только authenticated user из `SEASONVAR_IMPORT_ADMIN_EMAILS`.

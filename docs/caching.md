@@ -8,6 +8,15 @@
 
 Production rollout 15.07.2026 подтвердил, что исторические `cache-warm` envelopes имеют истёкший `retryUntil`: Laravel отклоняет их до application `handle()`, поэтому no-op compatibility не может безопасно drain-ить эту очередь. Pending/failed legacy payload не удаляются и не retry-ятся автоматически. Новый coalesced intent, heartbeat и единственный worker используют `cache-warm-v2`; job не публикует absolute retry deadline и ограничивает реальные ошибки тремя attempts. Redis/Memcached transports остаются раздельными, а отсутствие evictions не является доказательством корректной инвалидации.
 
+## Production operations contract
+
+- Cache backend считается доступным только после safe connectivity check; configured, unavailable и not installed — разные состояния.
+- Task 28: Redis domain/session/queue/lock roles были reachable; Memcached hot tier настроен, но unavailable. Detailed health поэтому остаётся `degraded`, correctness использует recomputable fallback, а public readiness зависит только от database и critical Redis roles.
+- Redis владеет sessions, queues, atomic locks/rate limits/version registry и domain/stale cache по named connections. Memcached — только disposable hot public DTO cache; данные не зеркалируются между ними без отдельного documented reason.
+- Cache outage не может grant permission, premium, regional/legal access или показать ads premium user; security-sensitive decisions восстанавливаются из authoritative storage либо fail closed.
+- Deployment не использует store-wide flush. Schema/code rollout включает targeted version bump/invalidation, config/route/view/event cache rebuild только при совместимости и documented stale-key handling.
+- Serializer/prefix/format changes требуют versioned keys, stale-key plan и rollback; sessions/queues проверяются отдельно.
+
 ## Неподвижные границы
 
 - База данных остаётся единственным источником истины. Redis и Memcached содержат только производные или операционные данные.

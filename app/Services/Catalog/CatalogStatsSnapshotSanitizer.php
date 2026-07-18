@@ -114,7 +114,6 @@ class CatalogStatsSnapshotSanitizer
             request()->getHost(),
             'localhost',
             '127.0.0.1',
-            'seasonvar.miniserver.fun',
         ])
             ->filter()
             ->map(fn (string $allowedHost): string => Str::lower($allowedHost))

@@ -1,6 +1,6 @@
 # Хранилище и uploads
 
-Обновлено: 09.07.2026
+Обновлено: 18.07.2026
 
 ## Текущее состояние
 
@@ -8,6 +8,9 @@
 - Основной filesystem disk остается `local` и указывает на `storage/app/private`.
 - Локальная выдача temporary storage URLs выключена через `LOCAL_FILESYSTEM_SERVE=false`.
 - Для будущих пользовательских upload-файлов добавлен отдельный private disk `uploads` с корнем `storage/app/private/uploads`.
+- Task 28 подтвердил отсутствие `public/storage` symlink: текущие uploads остаются private и это корректно. `storage/` и `bootstrap/cache` writable общей runtime-группой без recursive `777`; active SQLite/WAL/SHM ограничены owner/group mode `0660`.
+- Persistent backup обязан охватывать SQLite consistent snapshot и non-reproducible private uploads одной согласованной точкой. Panel archives не считаются verified database backup; scope и restore описаны в [`operations/backup-and-restore.md`](operations/backup-and-restore.md).
+- Disk consumers включают большую SQLite database, WAL во время импорта, logs, panel backups, private uploads, temp exports и build artifacts. Cleanup не удаляет active DB/WAL, referenced files, legal/financial evidence или единственный known-good backup.
 
 ## Правила upload-функций
 
@@ -25,6 +28,7 @@
 - Если upload заменяет старый файл, новый файл нужно сначала успешно сохранить, а потом удалить старый через `PrivateUploadStorage::delete()`.
 - При удалении модели, которая владеет upload-файлом, добавляйте cleanup в service/action или model observer с тестом.
 - Для временных upload-областей нужна отдельная команда cleanup с ограниченным scope и тестом на безопасное удаление.
+- Дополнительный fake scheduler job не создаётся: cleanup использует только существующий bounded importer/scheduler behavior либо отдельно авторизованную ручную операцию. Legal/financial retention periods не выдумываются.
 
 ## Тесты
 

@@ -16,7 +16,7 @@
 8. [`performance.md`](../performance.md) и [`caching.md`](../caching.md) — производительность и кеширование.
 9. [`UI_STANDARDS.md`](../UI_STANDARDS.md) и [`frontend.md`](../frontend.md) — UI, UX, mobile и accessibility.
 10. [`administration.md`](../administration.md) — администрация и least privilege.
-11. [`deployment.md`](../deployment.md) и [`environment.md`](../environment.md) — production operations.
+11. [`production-operations.md`](production-operations.md) — обязательные production, deployment, backup, restore и incident boundaries; [`deployment.md`](../deployment.md), [`environment.md`](../environment.md) и [`operations/README.md`](../operations/README.md) содержат фактические runbooks и inventory.
 12. [`maintenance-and-upgrades.md`](maintenance-and-upgrades.md) — сопровождение, зависимости, deprecations и upgrades.
 13. Feature-specific документы из [`docs/README.md`](../README.md), соответствующие затронутым системам.
 14. [`docs/plans/current-task-plan.md`](../plans/current-task-plan.md) — текущий план и compliance matrix.
@@ -37,6 +37,19 @@
 
 Новый синтаксис никогда не отменяет безопасность, совместимость или сопровождаемость.
 
+## Приоритет конфликтующих production-решений
+
+1. Security и защита user, payment, legal и private data.
+2. Сохранность базы данных и постоянных файлов.
+3. Постоянные архитектурные правила.
+4. Подтверждённые ограничения сервера.
+5. Обратная совместимость.
+6. Операционная простота и восстановимость.
+7. Производительность.
+8. Удобство реализации.
+
+Оптимизация производительности никогда не отменяет безопасность данных, privacy, восстановимость или проверенную server compatibility.
+
 ## Maintenance-документы
 
 - [Dependency inventory](../maintenance/dependency-inventory.md)
@@ -53,3 +66,16 @@
 - [Maintenance review checklist](../maintenance/maintenance-review-checklist.md)
 
 Отсутствующий registry создаётся только после фактического аудита и не должен содержать выдуманные package states, advisories или результаты проверок.
+
+## Production runbook’и
+
+- [Verified environment and variable inventory](../environment.md)
+- [Deployment](../deployment.md)
+- [Rollback](../operations/rollback-runbook.md)
+- [Backup and restore](../operations/backup-and-restore.md)
+- [Disaster recovery](../operations/disaster-recovery.md)
+- [Incident response](../operations/incident-response.md)
+- [Logging and health](../operations/logging-and-health.md)
+- [External providers](../operations/external-providers.md)
+- [Service-worker deployment](../operations/service-worker-deployment.md)
+- [Production acceptance](../operations/production-checklist.md)

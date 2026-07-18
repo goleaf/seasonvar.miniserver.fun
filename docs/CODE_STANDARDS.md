@@ -20,6 +20,16 @@
 - Obsolete compatibility adapter удаляется только после подтверждения миграции всех dependants.
 - Technical debt и unresolved maintenance risk остаются видимыми в current plan и registries; security update приоритетен, но всё равно требует compatibility/rollback review.
 - Новый package не заменяет малую стабильную internal function без justified value и требует purpose, maintenance, security, license, bundle/memory/runtime/deployment и removal assessment.
+
+## Постоянные production requirements
+
+- Production configuration соответствует фактически установленному окружению; неизвестные возможности помечаются `unknown`, а не угадываются.
+- `.env` и secret values не коммитятся. `.env.example` содержит только имена, безопасные placeholders и несекретные defaults.
+- Опциональная инфраструктура должна улучшать работу, но её отсутствие не может повреждать state или обходить authorization, premium, region и legal boundaries.
+- Production-critical workflows имеют канонические runbooks; deployment не зависит от недокументированного ручного знания.
+- Каждая schema change получает backup/rollback assessment; package, cache, storage и external-provider changes — compatibility, invalidation/migration/restore, timeout/retry/failure/reconciliation assessment соответственно.
+- Deployment сохраняет authentication, payment, premium, legal/region restrictions, progress, history, bookmarks, files, translations, administration и free-user functionality.
+- Production changes проходят только через существующую `main`; deployment branch не создаётся, завершённые изменения commit/push-ятся по canonical workflow.
 - Lock files не удаляются и не переписываются другим package manager без явного migration plan.
 
 ## Правила Laravel

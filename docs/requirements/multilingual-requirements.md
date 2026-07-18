@@ -14,4 +14,5 @@
 - Mail и notifications сохраняют locale пользователя.
 - Обновления administration packages сохраняют переведённую навигацию и permission semantics.
 - После major framework, Livewire, validation, mail, notification или frontend upgrade обязателен translation completeness audit всех поддерживаемых locale, ключей, placeholders и plural forms.
+- Operational UI, когда он реально существует, переводит system status, database/cache/session/storage/mail/provider/queue/scheduler/service-worker/backup/restore/deployment/rollback/incident, loading/empty/error и accessibility labels во всех поддерживаемых locale. В persistence/API/audit остаются только стабильные codes (`healthy|degraded|unavailable|misconfigured|not_installed|unknown`), не переведённый текст.
 - Interface locale не становится media-language, provider, status, cache или persisted identity.

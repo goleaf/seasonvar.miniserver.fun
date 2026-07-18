@@ -103,7 +103,7 @@ final class PoliteHttpClient
 
         return Http::withHeaders([
             'Accept' => '*/*',
-            'User-Agent' => 'SeasonvarCatalog/0.1 (+https://seasonvar.miniserver.fun)',
+            'User-Agent' => (string) config('seasonvar.http_user_agent'),
             ...$safeHeaders,
         ])
             ->withOptions($target->httpOptions())
@@ -158,7 +158,7 @@ final class PoliteHttpClient
 
         $response = Http::withHeaders([
             'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'User-Agent' => 'SeasonvarCatalog/0.1 (+https://seasonvar.miniserver.fun)',
+            'User-Agent' => (string) config('seasonvar.http_user_agent'),
             ...$safeHeaders,
         ])
             ->withOptions($transportOptions)

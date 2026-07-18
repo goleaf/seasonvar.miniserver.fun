@@ -12,10 +12,11 @@ final readonly class InfrastructureHealthResponder
 
     public function response(): JsonResponse
     {
-        $result = $this->health->run();
+        $result = $this->health->readiness();
 
         return response()->json($result, $result['ready'] ? 200 : 503, [
             'Cache-Control' => 'no-store, private',
+            'X-Robots-Tag' => 'noindex, nofollow',
         ]);
     }
 }

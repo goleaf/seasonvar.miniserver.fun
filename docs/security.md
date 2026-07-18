@@ -13,6 +13,16 @@
 - Source maps, debug packages, toolbars, profilers и local diagnostics не включаются в production случайно.
 - Broad CORS, debug output и new public endpoints не принимаются как package defaults без authorization/privacy review.
 
+## Production secrets, backups и diagnostics
+
+- Secrets остаются вне Git, administration, health payloads, screenshots и документации; diagnostics показывают только configured/missing/reachable state с redaction.
+- Production требует `APP_DEBUG=false`, safe error pages и secure cookies за HTTPS. Trusted proxy/CORS boundaries не расширяются без проверки фактического reverse proxy.
+- Logs не содержат passwords, tokens, authorization headers, cookies/session IDs, payment/private-provider data, protected source URLs и legal/private attachment paths or contents.
+- Public upload storage не исполняет scripts; private storage и backups не публикуются web server. Database dumps и backup archives никогда не хранятся под public web root.
+- Backup retention и restore authorization документируются; restore/emergency admin требуют отдельного least-privilege permission, recent authentication и audit.
+- Webhook signatures проверяются server-side; production callback URLs используют HTTPS там, где это требует provider. Health endpoints не раскрывают packages, hostnames, database names, usernames, paths, exceptions или stack traces.
+- Log/file viewers используют allowlisted targets и защищены от path traversal; incident exports остаются private. Emergency access отзывается после инцидента.
+
 ## Правила
 
 - `.env`, ключи, токены, cookies, приватные логи и локальные базы не коммитятся; публично отслеживается только `.env.example` без значений секретов.
@@ -43,7 +53,7 @@
 - Google service-account access token не сохраняется в Redis, Memcached, session или другом cross-request cache; он существует только в памяти текущего API-вызова. Cache layer не хранит passwords, CSRF, raw tokens, credential paths, raw signed media URL или private authorization state.
 - DRM/license exchange, хранение provider credentials и browser delivery таких credentials не реализованы и не являются незавершённой security-задачей текущего продукта. Приложение хранит только проверенные внешние playback URL; добавление DRM требует отдельного provider contract, secret storage, license proxy boundary и threat model до изменения кода.
 - Public cache dimensions валидируются, ограничиваются и canonical-hash-ируются; raw search, IP, user ID и token не становятся ключом или metric label. Shared snapshots имеют explicit public audience/locale, а authenticated/non-default facets bypass-ят public tier.
-- `/health/ready` не создаёт session, имеет `no-store, private` и возвращает только component status/latency без Redis/Memcached hostnames, DB paths или credentials.
+- `/health/ready` не создаёт session, имеет `no-store, private`, `noindex,nofollow` и возвращает только общий `status`, `ready` и `checked_at`. Component names/latency/metrics, Redis/Memcached hostnames, queue state, DB paths и credentials остаются только в operator CLI diagnostics.
 - Внешние MCP и Google Workspace данные считаются недоверенным контентом; write tools и широкие scopes включаются только под конкретную задачу и с user-level authorization.
 - Локальные temporary storage URLs отключены по умолчанию через `LOCAL_FILESYSTEM_SERVE=false`; включать их можно только для явной функции загрузки/выдачи файлов с отдельной авторизацией.
 - Пользовательские uploads по умолчанию сохраняются на приватный disk `uploads`; нельзя доверять клиентским именам файлов, делать upload-файлы публичными без отдельной авторизации или отдавать private paths наружу.

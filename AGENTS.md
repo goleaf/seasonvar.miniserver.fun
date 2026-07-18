@@ -28,6 +28,15 @@
 - Каждое завершённое обновление актуализирует canonical dependency inventory, compatibility matrix, known limitations, production requirements, changelog и current-task compliance matrix.
 - Все ранее реализованные системы портала являются защищёнными compatibility domains. Обновление неполно, если не проверено влияние на authentication, Livewire state, translations, caching, search, notifications, player, premium, payments, advertisements, rights-holder restrictions, administration, service workers, deployment, backups и rollback.
 
+## Обязательная граница production operations
+
+- Каждая задача, способная повлиять на production runtime, storage, database state, cache, dependencies, environment configuration, external providers, service worker, scheduled work или deployment, до изменений обязана прочитать [`docs/requirements/production-operations.md`](docs/requirements/production-operations.md) в порядке из [`docs/requirements/index.md`](docs/requirements/index.md).
+- Никогда не считать local и production одинаковыми по OS, PHP/Node, extensions, web server, paths, permissions, database, cache, session, queue или process manager. Сначала проверяются repository contracts и доступные production evidence.
+- Никогда не помещать secrets, реальные environment values, private hostnames, passwords, tokens, keys, provider credentials, protected source URLs или private file paths в tracked documentation, code examples, logs, changelog, screenshots или final summary.
+- До production-affecting реализации фиксируются rollback strategy, data-safety и backup assessment, cache strategy, deployment verification и failure-recovery strategy.
+- Deployment/operations документация описывает инфраструктуру честно: zero downtime, automation, backup, restore, high availability, failover, monitoring и alerts не заявляются без реально существующей и проверенной реализации.
+- Перед завершением production-affecting задачи проверяются документированные пути восстановления после partial deployment, stale cache, failed migration, unavailable provider, storage failure и interrupted asset build в пределах реально доступной инфраструктуры.
+
 ## Источники истины документации
 
 - `docs/README.md` — единая карта владельцев тем. Не копировать доменные контракты из неё или из тематических документов в `AGENTS.md`.

@@ -13,6 +13,15 @@
 - Cache/session/queue serialization changes требуют stale-data/pending-job compatibility и deployment/rollback order.
 - Runtime change обновляет opcache/PHP-FPM restart instructions; frontend compatibility change обновляет service-worker cache version только при реальной необходимости.
 
+## Production runtime review
+
+- Production cache driver проверяется, а не предполагается. Redis и Memcached используются только при configured/reachable state и имеют раздельные документированные responsibilities.
+- Cache failure безопасно деградирует, correctness не зависит от stale cache, warming bounded и не требует несуществующего scheduler/worker.
+- Config/route/event/view caches пересобираются вместе с relevant code/config changes; stale config не переживает environment update.
+- OPcache/PHP-FPM refresh, Vite production build, source-map policy и bundle review документируются по фактическому runtime.
+- Operational health/dashboard queries остаются bounded, не выполняют full-table scans per render и не собирают private/high-cardinality telemetry.
+- Database indexes оцениваются на фактических production query patterns; измерения не выдумываются.
+
 Основание общепроектного projection audit — [«Your Laravel with() Queries May Be Loading Too Much Data»](https://vivekmistry.in/lara-blogs/your-laravel-with-queries-may-be-loading-too-much-data): eager loading не должен забирать все столбцы связи, а explicit projection обязана сохранять ключ, по которому Eloquent сопоставляет модели.
 
 ## Правила

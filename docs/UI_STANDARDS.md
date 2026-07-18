@@ -12,6 +12,13 @@
 - Frontend update сохраняет documented browser support, virtual-keyboard behavior, service-worker private exclusions и accessible hosted payment flows.
 - Chart changes сохраняют textual summaries и meaning, не зависящий только от цвета.
 
+## Operational administration UI
+
+- Operational state использует stable internal codes и локализованные visible labels; состояние не передаётся только цветом и всегда имеет текст.
+- Safe summaries работают на desktop, tablet, narrow emergency mobile viewport и при zoom; tables/cards допускают длинные переводы без horizontal page overflow.
+- Refresh bounded и manual либо не нарушает screen reader; loading/success/error объявляются доступно, focus сохраняется.
+- High-impact actions визуально отделены, требуют impact preview, confirmation, recent authentication и keyboard-accessible dialog. Fake charts, fake health и arbitrary command controls запрещены.
+
 ## Текущее визуальное направление
 
 Seasonvar — не промо-лендинг, а плотный продуктовый каталог. Текущее направление называется «тихий технологичный каталог»: светлая slate-основа, белые непрозрачные поверхности, emerald как единственный основной action-цвет, локальные FontAwesome-иконки, системный кириллический шрифт, крупные постеры и спокойная типографическая иерархия. Интерфейс должен помогать найти тайтл, понять его состояние и начать просмотр, а не конкурировать с контентом декоративными эффектами.

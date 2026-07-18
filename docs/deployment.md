@@ -2,6 +2,18 @@
 
 Обновлено: 18.07.2026
 
+## Canonical Task 28 production strategy
+
+Текущий verified strategy — aaPanel-managed nginx + PHP-FPM и in-place Git checkout. Release directories/current symlink/atomic switch не обнаружены, поэтому zero-downtime не заявляется. Canonical sequence: clean intended `main` commit → verified private backup → maintenance/write decision → locked Composer/npm install and production build → manifest/assets verification → migration classification/execution → storage/permissions → compiled caches → graceful PHP-FPM reload and `queue:restart` → one importer profile → [`operations/production-checklist.md`](operations/production-checklist.md). Rollback, backup/restore, DR и incidents находятся в [`operations/README.md`](operations/README.md).
+
+Task 28 verified Laravel `13.20.0`, Livewire `4.3.3`, PHP CLI/FPM `8.5.8`, Composer `2.10.2`, Node `26.4.0`, npm `12.0.1`, Tailwind `4.3.2`, Vite `8.1.4` и SQLite `3.46.1`. Redis reachable; Memcached configured but unavailable. Queue/scheduler genuinely exist; Horizon/Supervisor/service worker/external monitoring/alert delivery не установлены. Panel archives не доказывают current database backup, а full restore rehearsal не выполнялся.
+
+Repository templates use deployment-neutral `/srv/seasonvar/current`. Перед installation оператор обязан заменить его на verified checkout в copied unit/logrotate file; template не доказывает фактический server path. Units depend only on `network-online.target`, потому что Redis/Memcached service-unit names на panel host не подтверждены.
+
+### Migration classification 18.07.2026
+
+`php artisan migrate:status --pending` сообщил `No pending migrations`; все 101 tracked migrations имеют `down()`, но rollback bodies содержат table/column drops и поэтому считаются destructive recovery operations, а не обычным deployment rollback. Последние Task 22/09/21 migrations добавляют premium, personal-library и help-center tables/nullable fields/indexes и уже применены. Старый publication-integrity migration использует SQLite table-altering `change()` и search migration создаёт FTS triggers через raw SQL: при повторном engine/schema rollout они требуют `manual_review|potentially_locking`. Task 28 не добавляет schema/data migration. Любое следующее изменение: остановить writers → consistent verified backup → classify → `migrate --force` → targeted cache/derived reconciliation; `migrate:rollback` только после отдельного data-loss impact approval.
+
 ## Dependency/runtime upgrade deployment contract
 
 - Framework/dependency update до deploy подтверждает production PHP/extensions, Node/package manager/Vite, database driver/schema, Redis/Memcached client/serialization, web-server/PHP-FPM, sessions, queues/scheduler и service-worker compatibility.
@@ -234,7 +246,7 @@ journalctl -u seasonvar-import-forever.service -f
 Перед запуском примените additive migrations и проверьте Redis:
 
 ```bash
-cd /www/wwwroot/seasonvar.miniserver.fun
+cd /path/to/seasonvar
 redis-cli ping
 php artisan migrate --force
 php artisan seasonvar:import --queued
@@ -243,7 +255,7 @@ php artisan seasonvar:import --queued
 Для временного фонового запуска без нового process-manager:
 
 ```bash
-cd /www/wwwroot/seasonvar.miniserver.fun
+cd /path/to/seasonvar
 for worker in $(seq 1 10); do
   nohup /usr/bin/php -d memory_limit=256M artisan queue:work redis --queue=seasonvar-import --sleep=1 --tries=0 --timeout=900 --memory=192 --max-time=3600 \
     >> "storage/logs/seasonvar-worker-${worker}.log" 2>&1 &
@@ -284,14 +296,14 @@ php artisan app:failed-job-audit --json --samples=1
 В crontab пользователя `www` сохранены dispatcher с десятью запусками в сутки и read-only монитор очереди каждые пять минут; 15.07.2026 к ним добавлен Laravel scheduler каждую минуту:
 
 ```cron
-* * * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan schedule:run >> /dev/null 2>&1
-0 0,2,5,7,10,12,14,17,19,22 * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan seasonvar:import --queued >> storage/logs/seasonvar-cron.log 2>&1
-*/5 * * * * cd /www/wwwroot/seasonvar.miniserver.fun && /usr/bin/php artisan queue:monitor 'redis:seasonvar-title-refresh,redis:seasonvar-import' --max=5000 >> storage/logs/seasonvar-queue-monitor.log 2>&1
+* * * * * cd /path/to/seasonvar && /usr/bin/php artisan schedule:run >> /dev/null 2>&1
+0 0,2,5,7,10,12,14,17,19,22 * * * cd /path/to/seasonvar && /usr/bin/php artisan seasonvar:import --queued >> storage/logs/seasonvar-cron.log 2>&1
+*/5 * * * * cd /path/to/seasonvar && /usr/bin/php artisan queue:monitor 'redis:seasonvar-title-refresh,redis:seasonvar-import' --max=5000 >> storage/logs/seasonvar-queue-monitor.log 2>&1
 ```
 
 15.07.2026 production evidence опровергло прежнее предположение о полном lifecycle deduplication: baseline содержал 11 queued runs, 8037 pending jobs и 5670 live claims; более поздний snapshot — 12 running sitemap runs и 1601 active groups. Новый общий coordinator переиспользует один active global run, а повторный cron вызов дополнительно dispatches уникальный finalizer watchdog. Установленный `schedule:run` обслуживает полный project schedule, включая десятиминутный резервный cache warm. Existing failed/backlog jobs не retry-ить и не очищать массово: сначала сопоставить их с текущим run/group/claim state через `app:failed-job-audit`.
 
-## Server requirements snapshot 15.07.2026
+## Historical server requirements snapshot 15.07.2026
 
 - Rocky Linux 10.2, x86_64, 4 physical cores Intel i5-6500T, 62 GiB RAM and 31 GiB swap.
 - NVMe-backed XFS root: 920 GiB, ~807 GiB available at audit time.
