@@ -1,6 +1,6 @@
 # Архитектура приложения
 
-Обновлено: 18.07.2026
+Обновлено: 19.07.2026
 
 ## Постоянные cross-system contracts
 
@@ -15,7 +15,7 @@
 
 ## Route inventory Task 27
 
-`php artisan route:list --json` зарегистрировал 245 routes: 121 public/framework, 44 authenticated web, 13 administration и 67 API; 41 entry входит в localized route group, 15 сохраняют legacy compatibility. Duplicate method/URI и duplicate route names отсутствуют. Administration routes имеют `auth`, `auth.session`, `account.private` и явный gate; mobile writes используют Sanctum abilities, verification middleware и domain policies. Signed playback/download, attachment, payment-return и webhook boundaries остаются отдельными узкими routes. Destructive mutation через `GET` не зарегистрирована; multi-method legacy aliases выполняют только redirect и не изменяют state.
+`php artisan route:list --json` зарегистрировал 246 routes: 66 под `/api`, 13 под `/admin` и 167 остальных web/framework entries; 41 entry входит в localized route group, а legacy compatibility aliases сохранены. Duplicate method/URI и duplicate route names отсутствуют. Administration routes имеют `auth`, `auth.session`, `account.private` и явный gate; mobile writes используют Sanctum abilities, verification middleware и domain policies. Signed playback/download, attachment, payment-return и webhook boundaries остаются отдельными узкими routes. Destructive mutation через `GET` не зарегистрирована; multi-method legacy aliases выполняют только redirect и не изменяют state.
 
 ## Third-party и upgrade boundaries
 
@@ -187,7 +187,7 @@ Target boundaries:
 - Database-session UI доступен только при database driver, показывает bounded summary и принимает HMAC opaque action token вместо session ID. Logout и logout-other используют canonical guard/session methods; mobile devices owner-scoped, а sensitive web actions требуют текущий пароль и очищают только использованное secret state.
 - `AuthenticationAuditService` пишет стабильный event code, internal user ID и HMAC email/network fingerprints в отдельный daily channel. Passwords, raw email/IP/user-agent, reset/verification/OAuth code/provider token, cookie, session ID и request payload запрещены; channel retention задаёт `AUTH_AUDIT_DAYS`.
 - Socialite/OAuth providers, external identities, provider linking/unlinking, automatic merging, magic links, MFA, trusted devices и account-status model отсутствуют. Соответствующие controls/routes/data не создаются; совпавший provider email никогда не считается доказательством владения или основанием для auto-merge.
-- Guest bookmark/progress/watch-status storage отсутствует. После login только существующий Task 16 versioned preference adapter может idempotently заполнить unset allowlisted preferences и не блокирует authentication; account library/history/progress/collections/comments/reviews/premium-independent/moderation data остаются на прежнем `user_id`.
+- Guest bookmark/watch-status storage отсутствует. Проигрыватель хранит максимум 50 свежих позиций за 30 дней в versioned `seasonvar.playback-progress.v1`; после входа и подтверждения email существующий `/settings/preferences/migrate` передаёт только stable episode/position/duration/time в канонический `CatalogUserStateService`. Batch visibility query повторно разрешает доступные цели, любая существующая account progress строка имеет приоритет, imported completion не доверяется, а `completion_source=anonymous` исключает ложную verified-watching отметку до настоящего playback event. Миграция идемпотентна, возвращает в private response только принятые episode IDs, очищает только их неизменившиеся local snapshots и никогда не блокирует authentication; остальная библиотека, коллекции, комментарии, рецензии, Premium и moderation остаются на прежнем `user_id`.
 
 ## Защитные ограничения
 

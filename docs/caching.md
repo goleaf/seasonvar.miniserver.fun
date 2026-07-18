@@ -1,6 +1,6 @@
 # Кеширование и Redis/Memcached
 
-Обновлено: 18.07.2026
+Обновлено: 19.07.2026
 
 ## Обязательный cross-feature cache audit
 
@@ -267,7 +267,7 @@ Public review payloads remain title/version scoped and never contain viewer vote
 
 ## Cache lifecycle аутентификации
 
-- Guard user, session/remember state, verification, password/reset token, intended redirect, limiter secret input, OAuth-ready state, audit payload и anonymous preference merge никогда не попадают в shared response/data cache. Guest auth pages могут быть SSR, но page metadata noindex и forms/CSRF/session responses bypass shared full-page storage.
+- Guard user, session/remember state, verification, password/reset token, intended redirect, limiter secret input, OAuth-ready state, audit payload и anonymous preference/progress migration никогда не попадают в shared response/data cache. Browser progress snapshot остаётся local до owner-authenticated request, canonical account row читается непосредственно из database, а viewer/session marker не становится public key. Guest auth pages могут быть SSR, но page metadata noindex и forms/CSRF/session responses bypass shared full-page storage.
 - Named authentication limiters use existing RateLimiter store with HMAC email/network/scope fingerprints; raw email, IP, user ID, password, provider token and session ID are absent from keys. Limiter outage does not create an allow decision inside credential/session/domain services.
 - Login/logout/verification/password/email/device/session/deletion actions do not flush the application cache. Existing owner/domain invalidators remain authoritative; auth/session state is read from guard/database on each boundary. Account settings locale adoption changes only an unset owner row through its existing targeted lifecycle.
 - `config/authentication.php` owns registration availability; `config/logging.php` owns the bounded authentication channel. Rolling deployment must rebuild config and route caches together, because disabled registration changes both web/API route registration. PHP-FPM/workers then require graceful reload; stale config is not repaired with global data-cache flush.

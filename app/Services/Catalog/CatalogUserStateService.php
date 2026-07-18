@@ -10,11 +10,14 @@ use App\Enums\CatalogWatchStatus;
 use App\Enums\PlaybackCompletionSource;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUserState;
+use App\Models\Episode;
 use App\Models\EpisodeViewProgress;
 use App\Models\User;
 use App\Services\Api\V1\Sync\ApiSyncReadiness;
 use App\Services\Api\V1\Sync\UserSyncChangePublisher;
 use App\Services\Reviews\ReviewCacheInvalidator;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
@@ -294,6 +297,10 @@ class CatalogUserStateService
                 ? $progress->completion_source
                 : null;
 
+            if ($completionSource === PlaybackCompletionSource::Anonymous) {
+                $completionSource = null;
+            }
+
             if ($completedAt === null && $this->completionRule->isComplete($trustedPosition, $trustedDuration, $ended)) {
                 $completedAt = $now;
                 $completionSource = PlaybackCompletionSource::Playback;
@@ -329,6 +336,195 @@ class CatalogUserStateService
         }
 
         return $progress;
+    }
+
+    /**
+     * @param  list<array{episode_id: int, position: int, duration: int, completed: bool, updated_at: int}>  $entries
+     * @return list<int>
+     */
+    public function migrateAnonymousProgress(User $user, array $entries): array
+    {
+        if ($entries === []) {
+            return [];
+        }
+
+        abort_unless($user->hasVerifiedEmail(), 403);
+        abort_unless($this->personalLibrarySchema->ready(), 503, __('library.errors.unavailable'));
+        $maximumDuration = max(60, min(604800, (int) config('playback.progress.max_duration_seconds', 86400)));
+        $positionTolerance = max(0, min(60, (int) config('playback.progress.position_tolerance_seconds', 5)));
+        $now = now();
+        $oldest = $now->copy()->subDays(30);
+        $newest = $now->copy()->addMinutes(5);
+        $candidates = collect($entries)
+            ->take(50)
+            ->map(function (array $entry) use ($maximumDuration, $newest, $oldest, $positionTolerance): ?array {
+                $episodeId = $entry['episode_id'];
+                $position = $entry['position'];
+                $duration = $entry['duration'];
+                $updatedAtMilliseconds = $entry['updated_at'];
+
+                if ($episodeId < 1
+                    || $position < 1
+                    || $position > $maximumDuration
+                    || $duration < 0
+                    || $duration > $maximumDuration
+                    || ($duration > 0 && $position > $duration + $positionTolerance)
+                    || $updatedAtMilliseconds < 1) {
+                    return null;
+                }
+
+                $updatedAt = CarbonImmutable::createFromTimestampUTC($updatedAtMilliseconds / 1000);
+
+                if ($updatedAt->isBefore($oldest) || $updatedAt->isAfter($newest)) {
+                    return null;
+                }
+
+                return [
+                    'episode_id' => $episodeId,
+                    'position' => $duration > 0 ? min($position, $duration) : $position,
+                    'duration' => $duration,
+                    'updated_at' => $updatedAt,
+                ];
+            })
+            ->filter(fn (?array $entry): bool => $entry !== null)
+            ->sortByDesc(fn (array $entry): int => $entry['updated_at']->getTimestamp())
+            ->unique('episode_id')
+            ->values();
+
+        if ($candidates->isEmpty()) {
+            return [];
+        }
+
+        $episode = new Episode;
+        $episodes = $this->playback
+            ->watchableEpisodesForVisibleTitles($user)
+            ->whereIn($episode->qualifyColumn('id'), $candidates->pluck('episode_id'))
+            ->get()
+            ->keyBy('id');
+        $titles = CatalogTitle::query()
+            ->whereKey($episodes->pluck('playback_catalog_title_id')->unique())
+            ->get()
+            ->keyBy('id');
+
+        /** @var list<EpisodeViewProgress> $changed */
+        $changed = DB::transaction(function () use ($candidates, $episodes, $now, $titles, $user): array {
+            $existing = EpisodeViewProgress::query()
+                ->whereBelongsTo($user)
+                ->whereIn('episode_id', $episodes->keys())
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('episode_id');
+            $changed = [];
+
+            foreach ($candidates as $candidate) {
+                $episode = $episodes->get($candidate['episode_id']);
+
+                if ($episode === null) {
+                    continue;
+                }
+
+                $title = $titles->get((int) $episode->getAttribute('playback_catalog_title_id'));
+                $progress = $existing->get($episode->id);
+
+                if ($title === null
+                    || ($progress !== null && $progress->completion_source !== PlaybackCompletionSource::Anonymous)) {
+                    continue;
+                }
+
+                if ($progress === null) {
+                    EpisodeViewProgress::query()->insertOrIgnore([
+                        'user_id' => $user->id,
+                        'catalog_title_id' => $title->id,
+                        'episode_id' => $episode->id,
+                        'position_seconds' => 0,
+                        'duration_seconds' => 0,
+                        'progress_percent' => 0,
+                        'first_started_at' => $candidate['updated_at'],
+                        'playback_event_sequence' => 0,
+                        'completion_source' => PlaybackCompletionSource::Anonymous->value,
+                        'last_watched_at' => $candidate['updated_at'],
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                    $progress = EpisodeViewProgress::query()
+                        ->whereBelongsTo($user)
+                        ->where('episode_id', $episode->id)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($progress === null || $progress->completion_source !== PlaybackCompletionSource::Anonymous) {
+                        continue;
+                    }
+
+                    $existing->put($episode->id, $progress);
+                }
+
+                if (! $this->anonymousCandidateAdvances(
+                    $progress,
+                    $candidate['position'],
+                    $candidate['duration'],
+                    $candidate['updated_at'],
+                )) {
+                    continue;
+                }
+
+                $progress->forceFill([
+                    'catalog_title_id' => $title->id,
+                    'position_seconds' => $candidate['position'],
+                    'duration_seconds' => $candidate['duration'],
+                    'progress_percent' => $this->completionRule->percentage($candidate['position'], $candidate['duration']),
+                    'first_started_at' => $progress->first_started_at ?? $candidate['updated_at'],
+                    'playback_session_id' => null,
+                    'playback_event_sequence' => 0,
+                    'completed_at' => null,
+                    'completion_source' => PlaybackCompletionSource::Anonymous,
+                    'last_watched_at' => $candidate['updated_at'],
+                ])->save();
+                $this->syncChanges->publishProgress($user, $title, $episode->id);
+                $changed[] = $progress->refresh();
+            }
+
+            return $changed;
+        }, attempts: 3);
+
+        /** @var array<int, list<EpisodeViewProgress>> $changedByTitle */
+        $changedByTitle = [];
+        foreach ($changed as $progress) {
+            $changedByTitle[(int) $progress->catalog_title_id][] = $progress;
+        }
+
+        $meaningful = false;
+
+        foreach ($changedByTitle as $catalogTitleId => $titleProgress) {
+            $title = $titles->get($catalogTitleId);
+
+            if ($title === null) {
+                continue;
+            }
+
+            $representative = $titleProgress[0];
+
+            foreach ($titleProgress as $progress) {
+                if ($this->isMeaningfulProgress($progress)) {
+                    $meaningful = true;
+                    $representative = $progress;
+
+                    break;
+                }
+            }
+
+            $this->synchronizeWatchStatusFromProgress($user, $title, $representative);
+            $this->personalUpdates->acknowledge($user, $title, enforceRateLimit: false);
+        }
+
+        if ($meaningful) {
+            $this->recommendationCache->publicSignalsChanged('anonymous-progress-migration');
+        }
+
+        return $episodes->keys()
+            ->map(fn (mixed $episodeId): int => (int) $episodeId)
+            ->values()
+            ->all();
     }
 
     public function restartProgress(
@@ -398,7 +594,8 @@ class CatalogUserStateService
         EpisodeViewProgress $progress,
     ): void {
         $this->authorizeInteraction($user, $catalogTitle);
-        $current = $this->state($user, $catalogTitle)?->watch_status;
+        $rawCurrent = $this->state($user, $catalogTitle)?->getRawOriginal('watch_status');
+        $current = is_string($rawCurrent) ? CatalogWatchStatus::tryFrom($rawCurrent) : null;
         $next = $this->watchStatusTransitions->afterProgress($user, $catalogTitle, $progress, $current);
 
         if ($next === $current) {
@@ -525,6 +722,29 @@ class CatalogUserStateService
     private function isMeaningfulProgress(EpisodeViewProgress $progress): bool
     {
         return $this->watchStatusTransitions->meaningful($progress);
+    }
+
+    private function anonymousCandidateAdvances(
+        EpisodeViewProgress $progress,
+        int $position,
+        int $duration,
+        CarbonInterface $updatedAt,
+    ): bool {
+        $candidateRank = [
+            $this->completionRule->percentage($position, $duration) ?? 0,
+            $position,
+        ];
+        $currentRank = [
+            (int) ($progress->progress_percent ?? 0),
+            (int) $progress->position_seconds,
+        ];
+
+        if ($candidateRank <= $currentRank) {
+            return false;
+        }
+
+        return (int) $progress->position_seconds === 0
+            || $updatedAt->isAfter($progress->last_watched_at);
     }
 
     /** @param array<string, mixed> $timestamps */

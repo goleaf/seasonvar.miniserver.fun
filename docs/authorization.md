@@ -1,6 +1,6 @@
 # Авторизация
 
-Обновлено: 18.07.2026
+Обновлено: 19.07.2026
 
 ## Правила
 
@@ -251,7 +251,7 @@ Client не задаёт editor/reporter identity, произвольный stat
 | Открыть public title/episode/source | да | да | title→season→episode→media hierarchy, publication, window, audience, health |
 | Открыть authenticated audience | нет | да | `CatalogEntitlementService`, session/user binding |
 | Получить/обновить signed grant | да для public | да | signed viewer, opaque media ID, URL/DNS/path/format revalidation, rate limit |
-| Сохранить anonymous progress/preferences | local device only | local mirror | bounded stable values, no source URL/token |
+| Сохранить anonymous progress/preferences | local device only | verified account может однократно принять safe snapshot | bounded stable values, batch visible/watchable target query, existing account progress wins, no trusted completion/source URL/token |
 | Сохранить server progress/restart/settings | нет | да | verified interaction, encrypted progress session, event sequence, CSRF/Livewire, rate limit |
 | Скачать direct file | нет | да | auth/session/private middleware, policy, source/hierarchy/range guard |
 | Source fallback | public equivalent only | authorized equivalent only | failed ID list + full canonical resolver; no rule bypass |

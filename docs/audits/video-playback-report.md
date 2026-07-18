@@ -1,6 +1,6 @@
 # Каноническая архитектура video playback
 
-Проверено: 18.07.2026. Этот документ — владелец фактического playback-контракта Task 07. Живой чек-лист реализации и отката находится в `docs/plans/laravel-video-portal-modernization.md`. Портал воспроизводит только разрешённые проекту источники и не реализует обход DRM, подписи, оплаты, региона или ограничений поставщика.
+Проверено: 19.07.2026. Этот документ — владелец фактического playback-контракта Task 07. Живой чек-лист реализации и отката находится в `docs/plans/laravel-video-portal-modernization.md`. Портал воспроизводит только разрешённые проекту источники и не реализует обход DRM, подписи, оплаты, региона или ограничений поставщика.
 
 ## Итог аудита
 
@@ -120,7 +120,7 @@ Client-provided source ID никогда не превращается в URL н
 
 ### Anonymous
 
-- Гость хранит только episode ID, position, duration, completion и timestamp в `seasonvar.playback-progress.v1` local storage.
+- Гость хранит только episode ID, position, duration, completion hint и timestamp в `seasonvar.playback-progress.v1` local storage; единый Vite module ограничивает store 50 строками и 30 днями.
 - Retention — 30 дней, максимум 50 episode entries. Нет source URL, grant, token, account/user ID или provider metadata.
 - Storage failure не блокирует playback. Server write и cookie на каждый checkpoint не создаются. Автоматического merge в аккаунт текущий продукт не обещает.
 
@@ -197,7 +197,7 @@ Player различает preparing/loading/ready/playing/paused/seeking/bufferi
 3. Premium существует как отдельный account/billing domain, но ни один playback feature/source не привязан к нему. Region-country и user-age playback schema также отсутствуют.
 4. External provider отвечает за codec, CORS, Range, manifest и segment availability. Portal может безопасно retry/fallback, но не обходит provider controls.
 5. Fullscreen/PiP/background/orientation отличаются между browser/OS и проверяются feature detection, а не обещанием идентичности.
-6. Anonymous progress не переносится в аккаунт автоматически.
+6. После verified login anonymous progress переносится best-effort через существующий settings migration endpoint: сервер повторно разрешает playable episode, сохраняет только position provenance `anonymous`, не доверяет completion hint и никогда не заменяет уже существующую account row.
 7. DRM, MPEG-DASH, transcoding, offline video, generic proxy, HLS merge и protected-stream scraping не поддерживаются.
 
 ## Manual acceptance и rollback

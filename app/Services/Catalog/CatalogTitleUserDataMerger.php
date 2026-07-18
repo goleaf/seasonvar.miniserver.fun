@@ -6,6 +6,7 @@ namespace App\Services\Catalog;
 
 use App\Enums\CatalogRecommendationFeedback;
 use App\Enums\CatalogWatchStatus;
+use App\Enums\PlaybackCompletionSource;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUpdateState;
 use App\Models\CatalogTitleUserState;
@@ -273,12 +274,23 @@ final class CatalogTitleUserDataMerger
     private function mergedCompletionSource(
         EpisodeViewProgress $existing,
         EpisodeViewProgress $incoming,
-    ): mixed {
-        if ($existing->completion_source?->value === 'manual' || $incoming->completion_source?->value === 'manual') {
-            return 'manual';
+    ): ?PlaybackCompletionSource {
+        if ($existing->completion_source === PlaybackCompletionSource::Manual
+            || $incoming->completion_source === PlaybackCompletionSource::Manual) {
+            return PlaybackCompletionSource::Manual;
         }
 
-        return $existing->completion_source ?? $incoming->completion_source;
+        if ($existing->completion_source === PlaybackCompletionSource::Playback
+            || $incoming->completion_source === PlaybackCompletionSource::Playback
+            || ($existing->completion_source === null && $existing->playback_session_id !== null)
+            || ($incoming->completion_source === null && $incoming->playback_session_id !== null)) {
+            return PlaybackCompletionSource::Playback;
+        }
+
+        return $existing->completion_source === PlaybackCompletionSource::Anonymous
+            || $incoming->completion_source === PlaybackCompletionSource::Anonymous
+                ? PlaybackCompletionSource::Anonymous
+                : null;
     }
 
     private function advancedProgress(

@@ -1,6 +1,6 @@
 # Безопасность
 
-Обновлено: 18.07.2026
+Обновлено: 19.07.2026
 
 ## Обязательный system-wide security и privacy review
 
@@ -206,7 +206,7 @@ Public periods/types/status/sort/title и admin type/precision/status/source/tim
 
 - Responsive/capability state не является доверием: viewport, orientation, `navigator.onLine`, Network Information, fullscreen/PiP/Media Session availability, local preference и user agent не разрешают source, premium, region, download, mutation или private route. Все решения остаются в existing policies/services/middleware.
 - Layout отмечает только routes с `PrivateAccountResponse`; persisted bfcache restoration такой страницы выполняет server revalidation. Settings, history/library, tickets, premium/admin, invoices/checkout и attachment/download routes остаются `private, no-store`/noindex. Добавленные admin routes получают `auth`, `auth.session`, `account.private` до gate, поэтому initial HTML и Livewire lifecycle имеют одну private boundary.
-- Browser-storage audit не нашёл auth/password/provider/payment/media tokens, protected source URLs или ticket diagnostics в local/session storage/IndexedDB. Сохраняются только существующие versioned device player preferences/anonymous progress и opaque settings-migration state. Task 23 не добавляет storage key, cookie, IndexedDB, device fingerprint или invasive permission.
+- Browser-storage audit не нашёл auth/password/provider/payment/media tokens, protected source URLs или ticket diagnostics в local/session storage/IndexedDB. Сохраняются только существующие versioned device player preferences, максимум 50 anonymous episode positions за 30 дней и opaque settings-migration state. После verified login отправляются только bounded stable IDs/position/duration/time; сервер повторно валидирует формат, visibility и target relation, не принимает completion как доказательство просмотра, не перезаписывает canonical account row и не включает payload в shared cache/log. Private response перечисляет только accepted episode IDs; local snapshot удаляется лишь для них и лишь если за время запроса не стал новее, поэтому временно недоступная цель не теряется.
 - Share принимает prepared canonical public URL, разрешает только HTTP(S), передаёт public title и имеет explicit write-only clipboard fallback. Clipboard никогда не читается; private ticket/settings/progress/source URL не поддерживает share action.
 - Media Session получает только public title/episode/season/poster и authorized previous/next page URL; source URL, signed grant, user progress и entitlement не попадают в metadata. Action handlers очищаются при destroy/navigation.
 - Manifest/service worker/push subscription/backend отсутствуют. Поэтому браузер не регистрирует worker, не запрашивает install/notification permission и не держит browser cache portal responses. Будущий worker обязан использовать versioned static-asset allowlist, method/response checks и абсолютный denylist authenticated HTML/API, settings, premium/payment/invoice, ticket/attachment, history/progress, personal recommendations/calendar, protected video, signed grants/downloads; logout/account switch требует server reauthorization и удаления user-scoped client data.

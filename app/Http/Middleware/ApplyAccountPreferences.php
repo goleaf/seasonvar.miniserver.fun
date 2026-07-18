@@ -53,6 +53,7 @@ final class ApplyAccountPreferences
             'accountPreferenceMigrationScope' => $user instanceof User
                 ? hash_hmac('sha256', (string) $user->getKey(), (string) config('app.key'))
                 : null,
+            'accountPlaybackProgressMigrationEnabled' => $user instanceof User && $user->hasVerifiedEmail(),
             'accountTimezone' => $resolved->timezone,
         ]);
 

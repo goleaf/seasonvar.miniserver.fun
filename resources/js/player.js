@@ -1,6 +1,11 @@
 import 'plyr/dist/plyr.css';
 import plyrIconUrl from '../images/plyr.svg?url';
 import { accountDevicePreferences, persistAccountDevicePreferences } from './settings.js';
+import {
+    anonymousResumePosition,
+    persistAnonymousProgress,
+    removeAnonymousProgress,
+} from './anonymous-playback-progress.js';
 
 const PROGRESS_HEARTBEAT_MS = 30_000;
 const PROGRESS_HEARTBEAT_MIN_DELTA_SECONDS = 10;
@@ -11,9 +16,6 @@ const DEVICE_PREFERENCE_WRITE_DELAY_MS = 600;
 const MEDIA_SESSION_POSITION_INTERVAL_MS = 5_000;
 const BUFFERING_WARNING_DELAY_MS = 15_000;
 const PLAYER_NOTICE_DURATION_MS = 8_000;
-const ANONYMOUS_PROGRESS_STORAGE_KEY = 'seasonvar.playback-progress.v1';
-const ANONYMOUS_PROGRESS_RETENTION_MS = 30 * 24 * 60 * 60 * 1_000;
-const ANONYMOUS_PROGRESS_LIMIT = 50;
 const TRANSIENT_RESUME_PREFIX = 'seasonvar.player-resume.v1:';
 const SUPPORTED_PLAYBACK_SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
@@ -208,100 +210,6 @@ const takeTransientResume = (episodeId) => {
         };
     } catch {
         return null;
-    }
-};
-
-const anonymousProgressEntries = () => {
-    const storage = safeStorage('localStorage');
-
-    if (!storage) {
-        return { storage: null, entries: {} };
-    }
-
-    try {
-        const parsed = JSON.parse(storage.getItem(ANONYMOUS_PROGRESS_STORAGE_KEY) || '{}');
-        const entries = parsed?.version === 1 && parsed.entries && typeof parsed.entries === 'object'
-            ? parsed.entries
-            : {};
-
-        return { storage, entries };
-    } catch {
-        return { storage, entries: {} };
-    }
-};
-
-const anonymousResumePosition = (episodeId) => {
-    if (!Number.isInteger(episodeId) || episodeId < 1) {
-        return 0;
-    }
-
-    const { entries } = anonymousProgressEntries();
-    const entry = entries[String(episodeId)];
-    const updatedAt = boundedInteger(entry?.updated_at, 1, Number.MAX_SAFE_INTEGER);
-    const position = boundedInteger(entry?.position);
-    const duration = boundedInteger(entry?.duration);
-
-    if (
-        updatedAt === null
-        || Date.now() - updatedAt > ANONYMOUS_PROGRESS_RETENTION_MS
-        || position === null
-        || entry?.completed === true
-        || (duration !== null && duration > 0 && position >= duration - 5)
-    ) {
-        return 0;
-    }
-
-    return position;
-};
-
-const persistAnonymousProgress = (episodeId, position, duration, completed) => {
-    const { storage, entries } = anonymousProgressEntries();
-
-    if (!storage || !Number.isInteger(episodeId) || episodeId < 1) {
-        return;
-    }
-
-    const now = Date.now();
-    const retained = Object.entries(entries)
-        .filter(([, entry]) => {
-            const updatedAt = boundedInteger(entry?.updated_at, 1, Number.MAX_SAFE_INTEGER);
-
-            return updatedAt !== null && now - updatedAt <= ANONYMOUS_PROGRESS_RETENTION_MS;
-        })
-        .sort(([, left], [, right]) => Number(right.updated_at) - Number(left.updated_at))
-        .slice(0, ANONYMOUS_PROGRESS_LIMIT - 1);
-    const nextEntries = Object.fromEntries(retained);
-
-    nextEntries[String(episodeId)] = {
-        position,
-        duration,
-        completed,
-        updated_at: now,
-    };
-
-    try {
-        storage.setItem(ANONYMOUS_PROGRESS_STORAGE_KEY, JSON.stringify({
-            version: 1,
-            entries: nextEntries,
-        }));
-    } catch {
-        // Playback never depends on optional anonymous device storage.
-    }
-};
-
-const removeAnonymousProgress = (episodeId) => {
-    const { storage, entries } = anonymousProgressEntries();
-
-    if (!storage || !Object.hasOwn(entries, String(episodeId))) {
-        return;
-    }
-
-    delete entries[String(episodeId)];
-
-    try {
-        storage.setItem(ANONYMOUS_PROGRESS_STORAGE_KEY, JSON.stringify({ version: 1, entries }));
-    } catch {
-        // Playback never depends on optional anonymous device storage.
     }
 };
 

@@ -8,4 +8,5 @@ enum PlaybackCompletionSource: string
 {
     case Playback = 'playback';
     case Manual = 'manual';
+    case Anonymous = 'anonymous';
 }

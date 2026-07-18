@@ -1,6 +1,6 @@
 # Системная интеграция портала
 
-Обновлено: 18.07.2026
+Обновлено: 19.07.2026
 
 Этот документ — единый владелец финальной cross-feature dependency matrix и production-readiness evidence. Постоянные правила находятся в [`requirements/system-wide-integration.md`](requirements/system-wide-integration.md), а детальные domain contracts — в [`README.md`](README.md). Статусы здесь означают только подтверждённое состояние repository; отсутствующие capabilities не изображаются реализованными.
 
@@ -15,6 +15,8 @@ Portal использует Laravel 13.20.0, class-based Livewire 4.3.3, Eloquen
 ## 3. Shared services
 
 Shared services владеют entitlement/playback (`CatalogEntitlementService`), progress и canonical user overlay, library transitions, cache invalidation, search, recommendations, notifications, audit, imports и account lifecycle. `AccountService` теперь одинаково обновляет identity-dependent profile/search/collection/comment/review projections для Livewire и API. Feature components не создают parallel resolver.
+
+Authentication остаётся одной Laravel-native границей: `web` guard/Eloquent provider/Password Broker/signed verification для browser и Sanctum abilities для mobile. Verified guest-progress migration не создаёт новый user state service: existing settings responder передаёт bounded snapshot в `CatalogUserStateService`, который batch-разрешает canonical episode/title identity, сохраняет existing account row precedence и non-completion provenance `anonymous`.
 
 Review integration использует один `CatalogTitleReviewQuery`/`ReviewPresenter` для title, own history, public profile и notification destinations. Profile list/count передают только relevant author в общий block/mute service, а localized/unlocalized direct routes делегируют одному responder; следовательно locale, profile privacy и notification presentation не создают параллельный review visibility или URL resolver.
 
@@ -52,11 +54,11 @@ Public catalog/portal/help/profile/collection search использует отд
 
 ## 12. SEO model
 
-Canonical/localized URLs, `hreflang`, robots, structured data и sitemap включают только public resources. Auth/account/admin/ticket/payment-return/signed endpoints не индексируются; legal/advertiser/service-worker routes отсутствуют. Проверено 245 registered routes: 121 public/framework, 44 authenticated web, 13 administration и 67 API; 41 route входит в localized boundary, 15 являются retained legacy aliases. Duplicate method/URI и duplicate names не обнаружены, destructive GET mutation не зарегистрирована.
+Canonical/localized URLs, `hreflang`, robots, structured data и sitemap включают только public resources. Auth/account/admin/ticket/payment-return/signed endpoints не индексируются; legal/advertiser/service-worker routes отсутствуют. Проверено 246 registered routes: 66 под `/api`, 13 под `/admin` и 167 остальных web/framework entries; 41 route входит в localized boundary, legacy aliases сохранены. Duplicate method/URI и duplicate names не обнаружены, destructive GET mutation не зарегистрирована.
 
 ## 13. Account merge flow
 
-Полный account-to-account merge намеренно не поддерживается: Social/OAuth provider identity и proof-of-control workflow отсутствуют, а совпадение email запрещено считать authority. `ContentRequestAccountService::mergeUsers()` и `TechnicalIssueAccountService::mergeUsers()` — domain migration hooks для безопасного переноса заявок/тикетов при отдельно подтверждённой будущей операции; они не являются публичным account merge coordinator и не покрывают progress, library, premium или sessions. Anonymous playback/settings merge остаётся отдельным idempotent guest-to-authenticated flow по owner-scoped keys. До появления явного proof-of-control и полного conflict matrix user accounts не объединяются.
+Полный account-to-account merge намеренно не поддерживается: Social/OAuth provider identity и proof-of-control workflow отсутствуют, а совпадение email запрещено считать authority. `ContentRequestAccountService::mergeUsers()` и `TechnicalIssueAccountService::mergeUsers()` — domain migration hooks для безопасного переноса заявок/тикетов при отдельно подтверждённой будущей операции; они не являются публичным account merge coordinator и не покрывают progress, library, premium или sessions. Anonymous playback/settings migration остаётся отдельным idempotent guest-to-authenticated flow по owner-scoped keys: только verified user, не более 50 recent positions, visible/watchable targets, no trusted completion, existing account progress always wins, accepted-snapshot cleanup и optional failure без отмены login. До появления явного proof-of-control и полного conflict matrix user accounts не объединяются.
 
 ## 14. Account deletion flow
 

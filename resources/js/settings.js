@@ -1,3 +1,8 @@
+import {
+    anonymousProgressMigrationPayload,
+    clearMigratedAnonymousProgress,
+} from './anonymous-playback-progress.js';
+
 const SETTINGS_VERSION = 1;
 const DEFAULT_STORAGE_KEY = 'seasonvar.account-preferences.v1';
 let migrationStarted = false;
@@ -239,7 +244,8 @@ export const initializeAccountPreferenceMigration = () => {
     const endpoint = document.body.dataset.accountMigrationUrl || '';
     const storageKey = document.body.dataset.accountStorageKey || DEFAULT_STORAGE_KEY;
     const migrationScope = document.body.dataset.accountMigrationScope || 'guest';
-    const migrationMarker = `${storageKey}.merged.${migrationScope}`;
+    const progressMigrationEnabled = document.body.dataset.accountProgressMigrationEnabled === '1';
+    const migrationMarker = `${storageKey}.merged.${migrationScope}.${progressMigrationEnabled ? 'verified' : 'account'}`;
     const alreadyMerged = safeStorage(window.sessionStorage, (storage) => storage.getItem(migrationMarker)) === '1';
 
     if (endpoint === '' || alreadyMerged) {
@@ -248,8 +254,9 @@ export const initializeAccountPreferenceMigration = () => {
 
     const preferences = accountDevicePreferences(storageKey);
     const meaningfulPreferences = Object.keys(preferences).filter((key) => !['version', 'account_version'].includes(key));
+    const playbackProgress = progressMigrationEnabled ? anonymousProgressMigrationPayload() : [];
 
-    if (meaningfulPreferences.length === 0) {
+    if (meaningfulPreferences.length === 0 && playbackProgress.length === 0) {
         safeStorage(window.sessionStorage, (storage) => storage.setItem(migrationMarker, '1'));
         return;
     }
@@ -265,9 +272,17 @@ export const initializeAccountPreferenceMigration = () => {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': csrfToken,
         },
-        body: JSON.stringify(preferences),
+        body: JSON.stringify({
+            ...preferences,
+            playback_progress: playbackProgress,
+        }),
     }).then((response) => {
         if (response.ok) {
+            const acceptedEpisodeIds = new Set((response.headers.get('X-Seasonvar-Anonymous-Progress-Accepted') || '')
+                .split(',')
+                .map((episodeId) => Number.parseInt(episodeId, 10))
+                .filter((episodeId) => Number.isInteger(episodeId) && episodeId > 0));
+
             storePreferences(storageKey, {
                 version: SETTINGS_VERSION,
                 owner_scope: migrationScope,
@@ -275,6 +290,9 @@ export const initializeAccountPreferenceMigration = () => {
                 volume: preferences.volume,
                 muted: preferences.muted,
             });
+            clearMigratedAnonymousProgress(playbackProgress.filter(
+                (entry) => acceptedEpisodeIds.has(entry.episode_id),
+            ));
             safeStorage(window.sessionStorage, (storage) => storage.setItem(migrationMarker, '1'));
         }
     }).catch(() => {}).finally(() => {

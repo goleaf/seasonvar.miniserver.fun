@@ -1,197 +1,156 @@
-# Task 14 — повторный аудит и безопасное усиление профилей пользователей
+# Task 15 — canonical registration, authentication and session architecture
 
-Обновлено: 19.07.2026
+Updated: 19.07.2026
 
-## Цель
+Status: implementation, documentation and local commit complete on existing `main`; configured HTTPS push was attempted and remains externally blocked by absent GitHub credentials.
 
-Повторно проверить уже существующий canonical profile domain после интеграций Tasks 15–23, устранить только доказанные дефекты stable identity, username history, public/private presentation, privacy, media, moderation, search, cache, SEO, account lifecycle и cross-feature visibility и сохранить все accounts, usernames, profile URLs, media, user content, privacy choices, blocks/mutes, reports and historical compatibility.
+## Goal and architecture
 
-## Обязательные ограничения
+Audit and harden the existing Laravel authentication domain without a second guard, starter kit, provider model or account system. Browser authentication remains native Laravel `web` guard + encrypted/HttpOnly session cookie + CSRF + class-based Livewire; mobile API remains Sanctum bearer authentication with explicit abilities. Transport-neutral account services, Laravel Password Broker/Hash/email verification, the existing profile/account lifecycle and existing owner-state services remain the only mutation boundaries.
 
-- Работа ведётся только в существующей `main`; branches, worktrees и subagents не создаются.
-- Пользователю не задаются вопросы. Scope и design выводятся из repository contracts; отдельный competing profile spec/plan не создаётся.
-- Автоматизированные тесты не создаются и не запускаются. Разрешены static/runtime read-only inspection, route/schema/query/translation/security/browser smoke, Pint, Larastan, Blade compilation и Vite build.
-- Existing tests и test infrastructure не удаляются и не повреждаются.
-- Новые dependencies, queue/scheduler/Supervisor, parallel profile/user/media/privacy/search/SEO/cache systems и fake roles/badges/ranks/follows/activity controls не добавляются.
-- Schema/data mutations допускаются только после доказанного legacy reconciliation, compatibility, backup, writer-pause, rollback и production-impact review.
-- `CHANGELOG.md` остаётся на русском по каноническому `AGENTS.md`, несмотря на конфликтующее требование задачи об английском changelog.
-- `README.md` проверяется перед завершением и меняется только при visitor-visible результате.
-- Финальный commit создаётся только в `main`; configured push выполняется, а внешний отказ GitHub authentication фиксируется без изменения remote или secrets.
+The user explicitly prohibits creating or running automated tests for Task 15. Existing tests and CI remain untouched; evidence is limited to static inspection, route/config/schema/data/query inspection, syntax/Pint/static analysis, Blade/Vite, safe browser/cookie/session smoke and the manual acceptance matrix.
 
-## Документационный baseline
+## Immutable constraints
 
-- В repeat Task 14 полностью прочитан tracked corpus: `284` Markdown-файла / `62 494` строки / SHA-256 `45f2b56ad3c31c08f6a5a0582b3b343c7bc57dfd55a10aa9d476ff8b076633bb`.
-- Применён обязательный порядок `docs/requirements/index.md`, включая multilingual, security, performance/cache, UI, administration, production operations, maintenance/upgrades и system-wide integration.
-- Feature owners: `architecture.md`, `DATA_RELATIONS.md`, `authorization.md`, `security.md`, `performance.md`, `caching.md`, `views.md`, `frontend.md`, `administration.md`, `deployment.md`, `catalog-search.md`, sitemap/SEO и account/profile/recommendation owners.
-- Existing Task 14 living contract в `laravel-video-portal-modernization.md` перечитан полностью; current plan расширяет его только свежим audit/compliance evidence и не создаёт второй domain document.
-- Task не меняет framework/runtime/package/database engine/build tooling по намерению. Любая доказанная schema/browser/cache/runtime поправка получает compatibility и rollout evidence до edit.
+- Work only on existing `main`; no branch, worktree, PR branch, dependency or `.env` mutation.
+- Preserve every user, password hash, verification timestamp, remember token, session, Sanctum token, profile, privacy choice, entitlement, restriction and owned portal record.
+- No destructive production-like migration or writer operation; database inspection is read-only.
+- Do not add Socialite, Fortify, Breeze, Jetstream, Volt, custom hashing, custom cryptography, mandatory queue/cron or fake provider controls.
+- Social login/link/unlink, magic link, MFA, trusted-device UI and account merging are added only if a real current product model/provider/workflow exists; otherwise their absence and security boundary are documented.
+- All state-changing browser actions remain CSRF-protected Livewire/POST operations; OAuth callback state is applicable only if an OAuth provider exists.
+- Do not run any automated test command. Run `Pint`, syntax/static inspection, routes/config/schema, translation parity, Blade/Vite and safe browser evidence only.
+- Changelog and README prose follow repository Russian-language policy despite the conflicting Task 15 request for an English changelog.
+- Final delivery uses local `main` commit and attempts the configured push; external authentication failure remains `unresolved` and is not disguised.
 
-## Выбранный дизайн
+## Documentation intake
 
-Рассмотрены три подхода:
+- [x] Read `AGENTS.md`, `docs/requirements/index.md` and resolve required reading order.
+- [x] Scan all existing Markdown files byte-for-byte: 175 files, 39,164 lines, 4,354,460 bytes; record SHA-256 inventory before implementation.
+- [x] Read the applicable canonical owners in index order and validate linked-file existence.
+- [x] Read the prior canonical Livewire auth design and implementation plan; treat implemented contracts as protected compatibility boundaries.
+- [x] Re-read applicable requirements and Task 15 before final compliance closure.
 
-1. **Additive hardening существующего canonical domain — выбран.** Сохраняются `User`, `UserProfile`, public UUID, username history, policies/services/query/DTO/Livewire/media/report/admin/cache/SEO boundaries, route names, enum codes and rows; исправляются только воспроизводимые расхождения.
-2. Полная перестройка profile/user/privacy/media — отклонена: создаёт competing system и рискует accounts, usernames, URLs, content, files, privacy and account lifecycle.
-3. Автоматическое добавление roles/badges/ranks/follows/profile directory/favorite genres/location/activity — отклонено до доказательства существующей product architecture. Уже существующие public-profile suggestions в canonical portal search сохраняются и усиливаются, но отдельный profile index/directory или второй search system не создаётся.
+## Current architecture — verified inventory
 
-UI сохраняет существующую светлую Seasonvar product vocabulary: текущие profile header, tabs, forms, native file inputs, cards, pagination, dialogs, focus/reduced-motion и mobile patterns. Визуальная переработка допускается только для доказанного accessibility/responsive/functionality defect; новая тема или рекламный profile landing не создаётся.
+- Framework: Laravel 13 with native authentication; no Breeze, Fortify, Jetstream, Laravel UI, Socialite, Passport or external OAuth dependency.
+- Browser guard: one configured `web` session guard using the Eloquent `users` provider. No separate administrator guard; admin access uses project gates on the same user identity.
+- API guard: Sanctum bearer tokens with `mobile:read`/`mobile:write` abilities and owner-scoped controllers/resources.
+- Passwords: Laravel `Hash` through the model `hashed` cast/guard; shared 12-character mixed-case/number/symbol `Password::defaults()` policy.
+- Password recovery: one `users` Password Broker, `password_reset_tokens`, 60-minute expiry and 60-second broker throttle.
+- Browser auth UI: one set of full-page class-based Livewire login/register/forgot/reset/verify/confirm components and one logout component; localized guest aliases reuse the same classes.
+- Shared domain: `AccountRegistrationService`, `AccountService`, `AccountPasswordResetService`, `AccountEmailVerificationService`, `WebAuthenticationService`, `WebAuthenticationRateLimiter`, `AuthenticationRedirectService`, `AuthenticationAuditService`, `BrowserSessionService`, mobile token/auth services and registration availability.
+- Registration: configurable `AUTH_REGISTRATION_ENABLED`; Web/API routes are conditionally registered and share account creation.
+- Sessions: repository default is Redis; database sessions are supported without assuming production uses them. Cookie defaults are HttpOnly, SameSite=Lax, root-only domain unless configured and JSON session serialization.
+- Verification: signed expiring Web/API completion routes and locale middleware; resend is authenticated and rate limited.
+- Anonymous state: one existing `/settings/preferences/migrate` boundary migrates supported device preferences and, after this repair, a verified account's bounded `seasonvar.playback-progress.v1` snapshot. The canonical progress service accepts only visible/watchable episodes, preserves every existing account row, ignores client completion and returns accepted IDs for safe local cleanup. Anonymous bookmarks/statuses do not exist.
+- Social authentication: no installed Socialite/OAuth provider package, provider routes, external-identity model/table or visible provider control found in initial inventory.
+- Account merging: no user-account merge model/action/route found in initial inventory; content-target merge services are unrelated and must not be repurposed.
+- Optional magic links/MFA/trusted-device identities: no initial model, package or route evidence; do not fabricate support.
 
-## Предварительная canonical architecture для проверки
+## Audit and implementation phases
 
-- `users.id` должен оставаться internal FK, `users.public_id` — stable opaque cross-domain identity; public route username обязан разрешаться только в тот же user/profile row.
-- `user_profiles` должен быть единственным profile presentation row per user; `users.name` остаётся display name, email/auth/permissions/session/provider data не входят в public DTO.
-- `ProfileUsername`, current normalized username и `user_profile_username_histories` должны централизованно обеспечивать case/reserved/route-safe validation, collision handling and loop-free redirects.
-- `ProfileVisibility`, `ProfileSection`, `ProfileModerationStatus`, report categories/status and media kinds должны быть единственными persisted value boundaries; translated labels не сохраняются.
-- Public page должен загружать только выбранную privacy-eligible секцию через canonical Task 10/12/13/library queries; owner page/settings/export/delete должны оставаться separate private payloads.
-- Avatar/cover должны храниться на private upload disk, иметь server-generated paths и authorization-aware `private, no-store` delivery без SVG/executable/path leakage.
-- Public cache/SEO/sitemap eligibility должна зависеть от actual current privacy/moderation/content state; block/mute/owner controls остаются viewer-specific and never globally cached.
+### Phase A — architecture, routes, configuration and schema
 
-## Cross-feature impact matrix
+- [x] Inspect every Web/API auth route/name/method/middleware, localized alias, signed handler, legacy contract and conditional registration behavior.
+- [x] Inspect `config/auth.php`, `config/session.php`, `config/sanctum.php`, `config/authentication.php`, cookie/CSRF middleware, exception redirects and trusted proxy/host behavior.
+- [x] Inspect guard/provider/broker/Hash/version contracts against installed Laravel 13 source and version-matched official documentation.
+- [x] Inspect users, profiles, reset tokens, sessions, personal access tokens, audit events and username history migrations/schema/indexes/foreign keys.
+- [x] Inspect database for duplicate normalized emails/usernames, invalid hashes, missing/duplicate profiles, invalid verification/remember state, orphan tokens/sessions/audits and provider/merge artifacts.
+- [x] Inspect registration, login identifier, email normalization, password policy/hashing/rehash, safe defaults, restrictions and retry behavior.
+- [x] Inspect verification/resend/email-change and recovery/reset notification locale, signatures, expiry, hashing, replay and enumeration behavior.
+- [x] Inspect login/logout/remember/session regeneration, `auth.session`, logout-other-devices, database/Redis limitations and token revocation.
+- [x] Inspect redirect validation for intended/return/next/callback/reset/localized destinations, encoded/protocol-relative/external inputs and loops.
+- [x] Inspect rate-limit definitions/keys/responses for Web and API registration/login/recovery/reset/verification/token refresh.
+- [x] Inspect authentication audit payloads/retention/privacy and verify no password/token/session secret enters logs or exports.
+- [x] Inspect access-status behavior for unverified, profile-limited/hidden/suspended/deleted and premium/restricted users across Web/API/social absence.
 
-| Domain | State | Required verification |
-| --- | --- | --- |
-| Authentication/registration/settings | affected | one user identity, registration defaults, password-confirmed username/media/privacy writes, no credential exposure |
-| Comments/reviews | affected | canonical published/spoiler-safe profile queries, stable author links, block/mute and target eligibility |
-| Collections | affected | public/unlisted/private owner boundaries, legacy UUID owner route and canonical username link |
-| Library/progress/history/bookmarks | affected | explicit public watching/completed only; no episode/progress/history/timestamp/translation leakage |
-| Blocks/mutes | affected | bilateral block 404, private mute overlay and direct-link behavior without shared-cache leakage |
-| Reports/moderation/restrictions | affected | stable codes, reporter/private note secrecy, media/biography moderation and account-state separation |
-| Notifications | affected | safe display name/profile links, preferences, block/mute and deleted-user behavior |
-| Search/recommendations | affected | no email/private biography indexing; private activity signals remain owner-only |
-| SEO/structured data/sitemap | affected | canonical username, localized alias policy, indexable public overview only, no private fields |
-| Cache/performance | affected | no global viewer payload, targeted version bump, matching counts, grouped/eager paginated sections and real indexes |
-| API/imports | affected | user/public ID and API field compatibility; no new public account/profile write surface |
-| Administration | affected | `manage-catalog`, bounded report queue, safe identity/media context and no credential/role mutation |
-| Account export/delete | affected | allowlisted profile export; media/profile/search/cache cleanup and historical content anonymization |
-| Premium/region/legal | affected | no public premium badge inference, target eligibility reused, no access-state exposure |
-| Mobile/a11y/translations | affected | RU/EN parity, long identity/biography/tabs, file/privacy/report/loading/error/focus states |
+### Phase B — providers, collisions, anonymous state and lifecycle
 
-## Phased implementation checklist
+- [x] Search code/schema/routes/config/UI/docs for real social providers, OAuth state, PKCE, external subjects, tokens, linking, unlinking and collision flows.
+- [x] If absent, document social login/link/unlink/provider recovery/PKCE as unsupported and ensure no dead provider control or permissive callback exists.
+- [x] Search for duplicate-account/merge workflows; verify matching email never triggers destructive automatic merge and document explicit administrator review requirement.
+- [x] Inspect anonymous browser state stores and migration boundary: progress, history, bookmarks/statuses versus device-only locale/player/settings.
+- [x] Verify login/registration cannot lose or overwrite stronger/newer authenticated state; nonessential migration failure cannot corrupt authentication.
+- [x] Inspect account export allowlist for linked provider names/session summaries versus forbidden hashes/tokens/cookies/audit secrets.
+- [x] Inspect deletion ordering for password confirmation, media/content policies, reset/session/Sanctum/remember revocation, future login and callbacks.
+- [x] Inspect administration exposure: verification/status/provider metadata/session revocation boundaries without hashes/tokens/private payload.
 
-### Phase A — requirements, routes, schema and data
+### Phase C — Livewire, translations, UI, cache and SEO
 
-- [x] Confirm `main`, clean Task 13 baseline, recent history and configured remote state.
-- [x] Read complete tracked Markdown inventory and canonical requirements in required order.
-- [x] Inventory public/localized/legacy/private/admin/media/API profile routes, names, middleware, binding and destructive methods.
-- [x] Inventory user/profile/history/privacy/media/block/mute/report/notification/account tables, migrations, models, enums, FKs, unique constraints and indexes.
-- [x] Measure production-style row counts, visibility/moderation/media/section distributions and bounded duplicate/orphan/invalid-value anomalies.
-- [x] Inspect query plans for current/history route lookup, public search/sitemap and moderation queue; selected-section/count plans remain in the final query pass.
-
-### Phase B — domain/security/privacy/concurrency
-
-- [x] Inspect stable ID, username normalization/history/case/reserved/change/race/redirect and deleted-user behavior.
-- [x] Inspect public DTO allowlist versus owner/settings/admin/export payloads and raw Livewire/HTML/JSON leakage.
-- [x] Inspect biography/display-name normalization, Unicode/original language, XSS/link/control/bidi policy and empty/long states.
-- [x] Inspect avatar/cover upload validation, private storage, dimensions/size/MIME, replacement cleanup, media delivery and moderation.
-- [x] Inspect profile/section privacy defaults and exact public comments/reviews/collections/watching/completed predicates.
-- [x] Inspect block/mute/report/moderation/account restriction/deletion/notification interactions and private evidence.
-- [x] Inspect update actions for ownership, password confirmation, mass assignment, optimistic locking, idempotency and after-commit effects.
-- [x] Inspect account export/delete, registration and title/user-data compatibility after later tasks.
-
-### Phase C — SEO/performance/UI/integration
-
-- [x] Inspect cache keys/versions/invalidation and prove viewer/private data never enters global cache.
-- [x] Inspect public counts, selected projections, eager/grouped queries, pagination, tab lazy loading and actual index plans.
-- [x] Inspect profile search absence/presence, author/profile link consumers and recommendation privacy.
-- [x] Inspect SEO title/description/canonical/robots/hreflang/JSON-LD/sitemap eligibility and legacy redirects.
-- [x] Inspect Blade/JS for raw UGC, DOM sinks, model/service calls, full graphs, hardcoded labels, Volt, `@php`, inline CSS/business JS and dead controls.
-- [x] Inspect RU/EN key/placeholder/plural parity and locale hydration without translating usernames/display names/biographies.
-- [x] Browser smoke public/private/localized/legacy/media states at desktop/mobile with accessibility/console/network evidence where safe; owner mutation was intentionally not executed against production-style data.
-- [x] Implement only proven defects and immediately add each discovery below.
+- [x] Inspect Livewire public properties/actions for model serialization, password retention, stale/double submission, validation, locale and safe intended state.
+- [x] Inspect Blade for direct queries/services, raw secrets/UGC, `@php`, inline CSS/business JS, missing labels/autocomplete/error association/loading and dead controls.
+- [x] Inspect RU/EN auth catalogs and notification mail text for key/placeholder/plural parity and raw-key fallback.
+- [x] Inspect responsive/accessibility states at narrow mobile, desktop and zoom/long-label equivalents; verify keyboard/touch/error/loading/unavailable behavior.
+- [x] Inspect private response middleware/cache isolation; auth/session/reset/provider/intended state must never enter global cache or public page cache.
+- [x] Inspect auth page robots/canonical/structured-data/sitemap behavior: noindex, no tokens or private state, no sitemap entries.
+- [x] Implement only proven defects with the smallest compatible typed boundary; update this plan immediately per discovery.
 
 ### Phase D — documentation, verification and delivery
 
-- [x] Reread Task 14 and applicable requirements; complete compliance only from fresh evidence.
-- [x] Update canonical owners, verification report, maintenance log, Russian changelog and visitor README for the actual behavior changes.
-- [x] Run allowed Pint/PHP syntax/Larastan/Blade/Vite/docs/translation/security/browser checks; no test runner.
-- [x] Repository-wide legacy/duplicate/dead/private-cache/profile-data scan and changed/related file review.
-- [x] Commit intentional tracked changes on clean `main`; configured push attempted without invoking prohibited automated tests and was externally rejected because GitHub HTTPS credentials are unavailable.
+- [x] Update canonical authentication/security/authorization/data/UI/operations owners, known limitations and rollback/manual checklist without duplicate domain docs.
+- [x] Update Russian `README.md` visitor history only for real visitor-facing change and add a separate Russian `CHANGELOG.md` entry without changing older entries.
+- [x] Inspect all changed and directly related unchanged files; repository-wide duplicate/legacy/dead/token/cache/debug scan.
+- [x] Run allowed fresh Pint/PHP syntax/focused PHPStan/routes/config/schema/query/translation/Blade/Vite/browser checks; do not invoke tests.
+- [x] Reconcile every Task 15 acceptance item to `completed`, `already_compliant`, `not_applicable` or honest `unresolved` evidence.
+- [x] Commit intentional tracked changes on clean `main`, then attempt configured push without invoking the prohibited test hook; GitHub rejected HTTPS publication with `could not read Username`, so no remote/security configuration was changed.
 
-## Audit discoveries — update immediately
+## Discoveries — append immediately
 
-- Existing Task 14 implementation already exposes one substantial Profiles namespace: `UserProfile`, username history, reports, typed actions/services/query/DTO/policy, public/private/admin full-page Livewire components, private media responder, RU/EN catalogs, sitemap/SEO integration and account lifecycle hooks.
-- Route inspection confirms canonical `/users/{username}`, localized interface alias `/{locale}/users/{username}`, private `/profile*`, authorized `/admin/profiles`, authorized versioned `/profiles/media/*`, streamed `/sitemap-profiles.xml` and retained UUID collection-owner compatibility. All profile mutations remain Livewire POST requests; no destructive profile GET was found.
-- Current product intentionally has no durable public roles, badges, ranks, follows, favorite genres, location, standalone profile directory/index or public activity feed. Later Task 02 did add public active-profile suggestions to the one canonical portal search using only username/display name; the old Task 14 statement that profile search was wholly absent is stale and must be corrected in canonical docs.
-- Configured SQLite has `102` users and exactly `102` profile rows, zero missing/orphan profiles, zero normalized/shape-invalid usernames, invalid visibility/moderation values, over-limit/markup biography candidates, partial media metadata, current/history conflicts, profile reports, self blocks/mutes or duplicate block/mute relations. It contains `77` active public and `25` active private profiles; existing section choices are preserved.
-- Exact query-plan inspection confirms unique-index lookup for current username and history, the moderation queue composite index, and directional block/mute unique indexes. Public search and sitemap correctly narrow through `user_profiles_public_listing_idx`, but use bounded temporary ordering; at the current 77-row public corpus this does not justify a speculative redundant index.
-- `UserProfileService::changeUsername()` currently calls `RateLimiter::clear()` after every successful change and on a same-name retry. Therefore configured `5/hour` successful changes never accumulate and a no-op can erase prior attempts; this is a confirmed abuse-control defect to fix without changing username identity or rows.
-- Final diff review additionally confirmed that password verification for a same-name request must remain after the limiter hit: putting the no-op before the limiter would create an unbounded current-password oracle. The delivered order rate-limits valid and invalid no-op attempts, verifies password, preserves identity/version/history and never clears the accumulated bucket.
-- `UserProfileSchema::available()` checks only three table names. Portal search and profile sitemap directly query `user_profiles` without the schema boundary. A code-before/additive-migration or partial-schema deployment can therefore produce a public 500 instead of fail-closed empty search/sitemap or profile 404; complete required-column readiness and consumer guards are required.
-- Public `PublicUserProfileData` is an explicit allowlist without email/provider/session/progress/history/private collection/report/moderation-note fields. Owner settings/export and admin moderation use separate private/no-store payloads; selected public review/comment/collection/watch sections reuse canonical queries and never emit exact progress.
-- Avatar/cover delivery reauthorizes the current profile, checks exact public UUID/kind/version/private disk/owned prefix/MIME/existence/traversal and returns `private, no-store`, `nosniff`, `noindex`. Upload accepts bounded JPEG/PNG/WebP only; SVG/executable/public paths are absent and the current no-derivative/no-EXIF-processor limitation is already documented honestly.
-- Public username/display-name suggestions already exist in the canonical Task 02 portal search. The repeat audit added a full-schema guard and corrected stale documentation; no profile biography/email search, standalone directory or competing index was added.
-- Case/history/localized redirects previously discarded selected public tab/pagination. They now retain only the allowlisted active tab and its positive paginator while removing tracking and unrelated page keys; the browser reproduced canonical `/users/polzovatel?tab=reviews&reviewsPage=2` from an English uppercase alias.
-- Owner profile actions previously had no explicit recoverable failure presentation, and the service key `profile_password` did not bind to Livewire `profilePassword`. The component now maps the field, announces localized safe failure and retains non-secret biography/privacy/file drafts while clearing secret password state.
-- Biography/report details allowed part of the control-character space and long public biography had no accessible collapse. Canonical plain-text normalization and server validation now cover control/surrogate/bidi input; a prepared preview plus native `<details>` supplies keyboard/screen-reader expand/collapse without JavaScript business logic.
-- A proposed registration/account-lifecycle bypass while profile schema is unavailable was rejected after inspecting the immutable backfill: a user created in that gap would be treated as legacy and become public, while deletion could skip private-media cleanup. Migration-before-code remains mandatory; only public read-only search/sitemap degrade to an empty result.
-- Fresh HTTPS/Chromium evidence: public profile 200, one canonical/index metadata and ProfilePage/Person JSON-LD, `private,no-store`, no private field markers or horizontal overflow at 320px, zero public console errors; active private profile returned non-disclosing 404; sitemap contained 75 eligible URLs and no profile tabs.
-- Task 14 implementation was committed as `392d7d7` on `main`; the configured HTTPS push was retried with the prohibited automated-test hook skipped and failed only because GitHub credentials are unavailable. Remote configuration and secrets remain unchanged.
+- Existing auth implementation is the completed 15.07.2026 native Laravel/Livewire design, not a starter kit. Web and API share account services rather than calling each other over HTTP.
+- All listed HTML auth routes are GET full-page Livewire surfaces; mutations occur through Livewire update POST. Verification completion is the intentional signed thin route handler. API mutations use controllers/requests/resources.
+- The route inventory contains localized aliases only for login/register/forgot/reset; provider callback routes do not exist. Provider codes in billing/import domains are unrelated to authentication.
+- Repository default session driver is Redis, with database sessions as a supported conditional visibility/revocation path; no implementation may claim raw Redis session enumeration or device identity.
+- Task 14 delivery left local `main` 19 commits ahead because configured GitHub HTTPS credentials are absent; Task 15 still commits independently and retries the configured remote.
+- The configured SQLite census contains 102 users/profiles, all verified with bcrypt hashes, zero case-folded email duplicates, zero reset rows, 175 non-orphan database-session rows and 204 unique 64-character non-orphan Sanctum token hashes. No external-identity/social/MFA/magic-link/account-merge table exists.
+- Contrary to the earlier Task 15 note, `resources/js/player.js` has a real bounded anonymous progress store. It contains only stable episode ID, position, duration, completion hint and timestamp, but the existing preference migration sends none of it. The compatible repair must reuse `episode_view_progress`, tag imported rows with non-verified provenance, preserve any pre-existing account row and keep authentication successful when optional migration fails.
+- `anonymous-playback-progress.js` now owns the unchanged storage key. A verified-only migration returns accepted visible/watchable episode IDs in a private `204` header, so the client clears only the identical accepted snapshot; unavailable targets and positions written during the request remain local.
+- Catalog-title merge is a directly related writer: its completion-source precedence is now `manual > playback/legacy playback session > anonymous > none`, preventing imported local state from replacing stronger evidence.
+- Managed Chromium used the documented demo account and an existing canonical episode row to exercise the real HTTPS flow: login regenerated the private session, migration returned `204` with accepted ID `1`, the exact local snapshot was removed, the pre-existing database position/duration/source/completion remained byte-for-byte equivalent, and logout removed authenticated presentation without exposing the HttpOnly session cookie.
 
-## Database, migration and production review
+## Data safety, rollback and production impact
 
-- Deployed migrations are immutable. No uniqueness/index is added before actual duplicate/anomaly reconciliation and `EXPLAIN` evidence.
-- Potential changes are `safe_additive`, `additive_backfill` or `compatibility` only unless an unavoidable conflict is documented.
-- Production-style database remains read-only during audit. Any migration is rehearsed on a new disposable SQLite database and documented with backup, writer pause, disk/locking, rollback and forward-fix behavior.
-- No cache flush, `migrate:fresh`, `db:wipe`, hard-delete, queue/scheduler or provider call is used.
+- Production-style database remains read-only. No `migrate`, destructive cache/session command, session scan, password/reset operation or real authentication mutation is allowed during audit.
+- Any necessary migration must be additive, SQLite-compatible, idempotent, rehearsed only on a disposable database, preceded by duplicate reconciliation and documented with backup/writer-pause/locking/rollback/forward-fix steps.
+- Code-before-migration must fail closed for writes without creating an account with unsafe defaults. Migration-before-code remains the deployment default where existing backfills would misclassify new rows.
+- Rollback preserves hashes, verification timestamps, reset/session/remember/token records and old route names; newly emitted state must remain readable by the previous release or be guarded by deployment order.
+- Authentication failures must not flush global cache, disclose infrastructure, invalidate unrelated user data or block login merely because nonessential anonymous preference migration fails.
 
-## Files expected to change
-
-Only evidence may determine the final set. Likely owners if defects exist:
-
-- `app/Actions/Profiles/*`, `app/Services/Profiles/*`, `app/Livewire/Profile/*`, `app/Models/UserProfile*.php`, `app/Policies/UserProfilePolicy.php`;
-- `app/DTOs/Profiles/*`, `app/Enums/Profile*.php`, `app/ValueObjects/Profile*.php`, media/report/moderation/notification/account services;
-- author-link consumers in comments/reviews/collections, search/recommendations/cache/sitemap/SEO/account lifecycle/API boundaries;
-- `resources/views/livewire/profile/*`, `resources/views/components/profile/*`, Vite-managed profile module when one exists, `lang/{ru,en}/profiles.php`, `config/profiles.php`;
-- canonical documentation owners, `docs/plans/current-task-plan.md`, verification report, maintenance log, `CHANGELOG.md` and `README.md` only for factual visitor-visible change.
-
-## Contracts that must remain unchanged unless complete dependency migration is proven
-
-- Stable `users.id`, `users.public_id`, username/history mappings, display names/emails/passwords/verification, public profile and legacy route names/URIs.
-- Existing profile/privacy/moderation/report/media enum values, database columns, public IDs, storage paths, content/media versions and account lifecycle semantics.
-- Comment/review/collection/title/season/episode IDs/slugs, library/progress/history/bookmarks/tags/recommendations/importer/player/premium behavior.
-- Existing cache/version keys, notification types/preferences, gate names, API fields, Composer/npm locks and test infrastructure.
-
-## Rollback and failure recovery
-
-- Code-only hardening reverts as one repeat Task 14 commit while stable rows/schema/routes/media remain readable.
-- Additive schema requires verified backup, stopped writers where locking is possible, disposable down/up rehearsal and forward-fix plan before production activation.
-- Failed mutation rolls back domain/audit transaction; media cleanup, notifications, cache/search/sitemap effects occur only after commit and remain idempotent or best-effort.
-- Cache outage reads authoritative privacy or fails closed for permissions; no shared viewer overlay is introduced.
-- Partial asset build retains previous compatible manifest/assets; no broad asset/cache deletion is used as recovery.
-- Media rollback never deletes an existing owned file until the replacement transaction succeeds; missing/corrupt files fail with non-disclosing response.
-
-## Compliance matrix — final evidence state
+## Compliance matrix — living evidence
 
 | Requirement group | Status | Evidence / unresolved work |
 | --- | --- | --- |
-| One canonical model/stable identity | already_compliant | one `User` + one PK/FK `UserProfile`; exact 102/102 production-style census, public UUID and no competing profile table |
-| Username/history/redirects | completed | limiter accumulates real changes, password/no-op/concurrent state is safe, current/history/case/localized redirects preserve only allowlisted tab/page state |
-| Public/private payload separation | already_compliant | public DTO and selected relations are allowlisted; owner/export/admin use separate private boundaries and no public query selects email/security fields |
-| Biography/display name/original language | already_compliant | display name stays separate; escaped Unicode plain text, control/bidi/HTML stripping, 1,200 limit and zero stored anomalies confirmed |
-| Avatar/cover/private media | already_compliant | private raster-only upload and policy/version/path/MIME/existence-checked no-store responder confirmed; derivative/EXIF processing remains documented unsupported |
-| Privacy/sections/history | already_compliant | stable public/private per-section codes, 77 public/25 private preserved choices and serial-level-only watch output confirmed; exact history/progress has no public field |
-| Roles/badges/ranks/follows/genres/location/activity | not_applicable | no canonical product model documented; absence must be confirmed in code/schema/UI |
-| Reviews/comments/collections | already_compliant | selected sections reuse canonical Task 10/12/13 queries/presenters, exact target/spoiler/block/mute rules and matching counts |
-| Blocking/muting | already_compliant | bilateral block is a non-disclosing 404; mute is a viewer-only overlay/action and neither relation enters public cache/SEO |
-| Reports/moderation/restrictions | completed | stable enum/auth/dedup/rate/admin boundaries confirmed; report/private-note prose now uses canonical plain-text sanitation and private evidence remains excluded |
-| Search/recommendations | completed | active-public username/display-name suggestions are canonical, full-schema guarded and private fields absent; recommendations remain owner/private-signal scoped |
-| Cache/performance/counts | already_compliant | direct public reads, selected paginators/grouped counts/eager profiles and existing selected indexes confirmed; no viewer HTML cache or speculative DDL |
-| SEO/structured data/sitemap | already_compliant | overview-only canonical/ProfilePage/Person policy, no alternates for untranslated UGC, 75 eligible streamed sitemap URLs and private 404 confirmed |
-| Multilingual/Livewire/a11y/mobile | completed | RU/EN 113-key/placeholder parity, correct password-field mapping, accessible native biography disclosure, safe failure state and 320px no-overflow browser evidence |
-| Account export/delete/registration/admin/API | already_compliant | allowlisted export, media-first deletion, privacy-safe admin queue and API/auth contracts re-inspected; migration-before-code remains mandatory |
-| Production data application | already_compliant | audit is read-only; no migration or destructive operation planned before evidence |
-| Automated tests | not_applicable | user explicitly prohibited test creation/execution; existing infrastructure remains protected |
-| Documentation/README/changelog | completed | canonical owners, search correction, verification/maintenance evidence, Russian changelog and visitor README updated without duplicate domain docs |
-| Git commit/push | unresolved | implementation commit `392d7d7` exists on clean local `main`; configured HTTPS push was attempted after verification and rejected because GitHub credentials are unavailable, with remote/secrets unchanged |
+| One canonical auth architecture/guards | already_compliant | one native Laravel `web` guard + Eloquent provider; Sanctum is the separate existing API transport, not a competing user identity |
+| Registration/defaults/email normalization | already_compliant | shared transactional service, canonical lowercased `NormalizedEmail`, conditional Web/API routes, profile privacy defaults and normalized preflight plus database uniqueness race handling verified; census has zero case-fold duplicates |
+| Password policy/hashing | already_compliant | one Laravel `Password::defaults()` boundary, hashed model cast/guard and `Hash` service; census has 102 bcrypt hashes and zero blank/short hashes |
+| Email verification | already_compliant | temporary signed ID/hash routes, 60-minute expiry, idempotent verification event, authenticated throttled resend and locale-aware project notification inspected |
+| Recovery/reset/password change | already_compliant | Laravel broker owns hashed expiring tokens; generic recovery, replay removal, shared Password policy, remember rotation, current-password locks, session/Sanctum revocation inspected |
+| Login/remember/logout | already_compliant | email-only canonical Livewire service, generic failures, explicit remember, guard rehash, session regeneration and CSRF logout invalidation inspected and browser-smoked |
+| Sessions/logout-other/devices | already_compliant | Redis is opaque current-session storage; database driver exposes bounded HMAC summaries/revocation, Sanctum exposes owner-scoped hashed devices, and limitations are explicit |
+| Redirect/open-redirect protection | already_compliant | one internal/same-origin resolver rejects protocol-relative, external, control, malformed/double-encoded and auth-loop destinations across all consumers |
+| Rate limiting/brute force | already_compliant | HMAC identifier/network/scope buckets cover Web/API login/register/recovery/reset/verification/refresh without raw passwords/identifiers in keys |
+| Social login/link/unlink/collisions | not_applicable | repository/package/route/schema/UI scan found no Socialite/OAuth identity boundary or provider controls; provider-email matching cannot link accounts because no callback exists |
+| Safe account merging | not_applicable | repository/schema scan found no user merge capability or mapping; matching email is rejected by uniqueness and never merged automatically |
+| Anonymous state migration | completed | existing bounded browser progress now best-effort migrates to canonical verified-account progress with target revalidation, existing-row precedence, non-completion provenance and accepted-snapshot cleanup; anonymous bookmarks/statuses remain absent |
+| Locale/translations/emails | already_compliant | 116 RU/EN auth leaves have exact key/placeholder parity; Livewire routes, signed mail links and notification locale use the allowlisted active/stored locale |
+| Livewire/a11y/responsive | already_compliant | single class-based components validate scalar/form state; visible labels/autocomplete/errors/loading/touch/keyboard states and 390/1440 Chromium layouts passed |
+| CSRF/cookies/session fixation | already_compliant | native Web CSRF stack covers mutations, login regenerates session, logout invalidates/regenerates token; HTTPS headers confirm Secure, HttpOnly session and SameSite=Lax |
+| Audit/privacy/cache | already_compliant | HMAC-only bounded auth audit, private/no-store middleware and shared-cache bypass exclude secrets, tokens, session/user state and anonymous payload |
+| Account status/restrictions/premium | already_compliant | no separate login-status model exists; verified/restriction/premium permissions remain domain-owned, profile moderation does not become login authority, and deleted users cannot authenticate |
+| Database uniqueness/indexes | already_compliant | users email/public ID, reset email, session ID and Sanctum hash uniqueness plus user/activity/tokenable/expiry indexes inspected; no duplicate/orphan auth records and no new auth DDL justified |
+| Administration/export/deletion | already_compliant | existing gates/services expose no hashes/tokens/raw sessions; export allowlist excludes secrets and deletion requires fresh password then revokes reset/session/Sanctum/remember access |
+| SEO/noindex/sitemap | already_compliant | guest and owner browser smoke returned noindex/nofollow; auth/reset/verification/callback management routes are absent from streamed sitemap and token-free metadata |
+| Optional magic link/MFA/trusted devices | not_applicable | repository-wide package/model/config/route/schema/UI scan confirms these capabilities are absent and no fake control was added |
+| Credential-dependent production delivery | unresolved | real verification/reset mail delivery and unavailable OAuth/provider callbacks were not invoked; repository/config/notification paths are inspected, OAuth is not installed, and no credentials or real user recovery action was requested |
+| Automated tests | not_applicable | Task 15 explicitly prohibits creating or running them; existing test infrastructure is protected |
+| Documentation/README/changelog | completed | architecture/security/authorization/data/frontend/cache/player/adapter/maintenance/plan owners plus Russian README and CHANGELOG reflect verified implementation |
+| Git commit/push | unresolved | completed changes are committed on local `main`; `git push --no-verify origin main` was attempted after a clean-tree/main check and GitHub rejected it with `could not read Username`, so publication requires external credential restoration |
 
 ## Final verification checklist
 
-- Reread Task 14, requirements, this plan and every applicable profile owner.
-- Inspect every changed file and directly related unchanged route/model/action/service/DTO/policy/query/cache/SEO/media/account/admin/API file.
-- Verify stable identity, username/history/redirect, public/private payload, privacy defaults/sections, UGC sanitization, media, blocks/mutes, reports/moderation and account lifecycle.
-- Verify canonical comments/reviews/collections/watch sections, matching counts, target visibility and absence of detailed history/progress/private collection leakage.
-- Verify query plans/uniqueness/index usefulness, bounded pagination/lazy tabs, no N+1 and no private shared state.
-- Verify route/localized/legacy/canonical/robots/hreflang/JSON-LD/sitemap/search/recommendation behavior.
-- Verify Blade/JS/Livewire security and accessibility: no raw UGC/DOM sink/Volt/`@php`/inline CSS/business JS/model query/dead control.
-- Run only allowed diagnostics and safe browser smoke; preserve tests without invoking them.
-- Update documentation/compliance honestly, including not-performed or externally blocked evidence, then commit and attempt configured push from clean `main`.
+- Re-read Task 15, this plan and every applicable canonical owner; map all 158 acceptance items honestly.
+- Inspect routes, guards/providers/broker, registration/login/logout, verification/recovery/reset/change, remember/session/Sanctum devices and status checks.
+- Inspect social/provider/identity/link/unlink/collision/merge absence or implementation, anonymous-state migration and locale/intended redirect.
+- Inspect schema/data uniqueness/indexes, account deletion/export/admin, audit/cache/notifications and no secret/token exposure.
+- Inspect Livewire/Blade/translation/email/a11y/responsive/loading/error/unavailable states and auth page noindex/sitemap exclusion.
+- Inspect repository-wide duplicate/legacy/dead/auth control, custom hash, raw token, public cache and unfinished/debug patterns before delivery.
+- Run only allowed fresh verification, update compliance/docs, commit on clean `main` and attempt configured push.

@@ -73,7 +73,7 @@
     <body @class([
         'app-shell bg-slate-50 text-slate-700 antialiased',
         'account-reduced-motion' => $accountReducedMotion ?? false,
-    ]) data-account-settings-version="{{ $accountSettingsVersion ?? 1 }}" data-account-storage-key="{{ $accountAnonymousStorageKey ?? '' }}" @if ($isPrivatePage) data-private-page="1" @endif @if (($accountPreferenceMigrationUrl ?? null) !== null) data-account-migration-url="{{ $accountPreferenceMigrationUrl }}" data-account-migration-scope="{{ $accountPreferenceMigrationScope }}" @endif>
+    ]) data-account-settings-version="{{ $accountSettingsVersion ?? 1 }}" data-account-storage-key="{{ $accountAnonymousStorageKey ?? '' }}" data-account-progress-migration-enabled="{{ ($accountPlaybackProgressMigrationEnabled ?? false) ? '1' : '0' }}" @if ($isPrivatePage) data-private-page="1" @endif @if (($accountPreferenceMigrationUrl ?? null) !== null) data-account-migration-url="{{ $accountPreferenceMigrationUrl }}" data-account-migration-scope="{{ $accountPreferenceMigrationScope }}" @endif>
         <a href="#main-content" data-skip-link class="fixed z-[100] -translate-y-24 rounded-control bg-emerald-700 px-4 py-3 font-bold text-white shadow-lg transition focus:translate-y-0">
             {{ __('catalog.layout.skip_to_content') }}
         </a>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Reviews;
 
+use App\Enums\PlaybackCompletionSource;
 use App\Models\CatalogTitle;
 use App\Models\EpisodeViewProgress;
 use App\Models\User;
@@ -18,6 +19,15 @@ final class VerifiedWatchingService
         return EpisodeViewProgress::query()
             ->where('user_id', $user->id)
             ->where('catalog_title_id', $title->id)
+            ->where(function ($query): void {
+                $query
+                    ->where('completion_source', PlaybackCompletionSource::Playback->value)
+                    ->orWhere(function ($query): void {
+                        $query
+                            ->whereNull('completion_source')
+                            ->whereNotNull('playback_session_id');
+                    });
+            })
             ->where(function ($query) use ($minimumPercent, $minimumSeconds): void {
                 $query
                     ->whereNotNull('completed_at')

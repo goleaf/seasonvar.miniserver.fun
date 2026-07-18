@@ -21,6 +21,7 @@ final class MigrateAnonymousPreferencesRequest extends FormRequest
     {
         $variantKeys = collect(app(PlaybackPreferenceOptions::class)->variants(user: $this->user()))->pluck('value')->all();
         $qualityKeys = collect(app(PlaybackPreferenceOptions::class)->qualities(user: $this->user()))->pluck('value')->all();
+        $maximumDuration = max(60, min(604800, (int) config('playback.progress.max_duration_seconds', 86400)));
 
         return [
             'version' => ['required', 'integer', Rule::in([1])],
@@ -36,6 +37,13 @@ final class MigrateAnonymousPreferencesRequest extends FormRequest
             'subtitles_enabled' => ['sometimes', 'nullable', 'boolean'],
             'keyboard_shortcuts_enabled' => ['sometimes', 'nullable', 'boolean'],
             'reduced_motion' => ['sometimes', 'nullable', 'boolean'],
+            'playback_progress' => ['sometimes', 'array', 'max:50'],
+            'playback_progress.*' => ['required', 'array:episode_id,position,duration,completed,updated_at'],
+            'playback_progress.*.episode_id' => ['required', 'integer', 'min:1', 'distinct:strict'],
+            'playback_progress.*.position' => ['required', 'integer', 'min:0', 'max:'.$maximumDuration],
+            'playback_progress.*.duration' => ['required', 'integer', 'min:0', 'max:'.$maximumDuration],
+            'playback_progress.*.completed' => ['required', 'boolean'],
+            'playback_progress.*.updated_at' => ['required', 'integer', 'min:1'],
         ];
     }
 }

@@ -22,7 +22,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $duration_seconds
  * @property int|null $progress_percent
  * @property CarbonInterface|null $first_started_at
+ * @property string|null $playback_session_id
+ * @property int $playback_event_sequence
  * @property CarbonInterface|null $completed_at
+ * @property PlaybackCompletionSource|null $completion_source
  * @property CarbonInterface $last_watched_at
  */
 #[Fillable([
