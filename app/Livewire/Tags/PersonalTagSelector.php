@@ -94,7 +94,6 @@ final class PersonalTagSelector extends Component
         try {
             $tag = $this->tags->create($user, new PersonalTagData(
                 name: $this->newName,
-                contentLocale: app()->getLocale(),
             ));
         } catch (ValidationException $exception) {
             foreach ($exception->errors()['name'] ?? [__('tags.states.error')] as $message) {

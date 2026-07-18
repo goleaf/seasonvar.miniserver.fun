@@ -10,7 +10,6 @@ use App\Models\Tag;
 use App\Models\TagAlias;
 use App\Models\TagSlug;
 use App\Services\Catalog\CatalogTitleQuery;
-use Illuminate\Database\Eloquent\Builder;
 
 final readonly class TagResolver
 {
@@ -51,31 +50,38 @@ final readonly class TagResolver
         }
 
         if ($tag === null) {
+            $alias = TagAlias::query()
+                ->where('moderation_status', TagModerationStatus::Approved->value)
+                ->where('slug', $requested)
+                ->first();
+            $tag = $alias?->tag;
+            $matchType = 'alias';
+        }
+
+        if ($tag === null) {
             $activeLocale = app()->getLocale();
             $fallbackLocale = (string) config('app.fallback_locale', 'ru');
             $locales = collect([$activeLocale, $fallbackLocale, 'und'])
                 ->unique()
                 ->values()
                 ->all();
-            $alias = TagAlias::query()
+            $aliasTagIds = TagAlias::query()
                 ->where('moderation_status', TagModerationStatus::Approved->value)
-                ->where(function (Builder $query) use ($requested): void {
-                    $query->where('slug', $requested)
-                        ->orWhere(function (Builder $query) use ($requested): void {
-                            $query->whereNull('slug')
-                                ->where('normalized_name_hash', $this->normalizer->hash($requested));
-                        });
-                })
-                ->where(fn (Builder $query): Builder => $query
-                    ->whereNotNull('slug')
-                    ->orWhereIn('locale', $locales))
-                ->orderByRaw(
-                    'case locale when ? then 0 when ? then 1 when ? then 2 else 3 end',
-                    [$activeLocale, $fallbackLocale, 'und'],
-                )
-                ->orderBy('id')
-                ->first();
-            $tag = $alias?->tag;
+                ->whereNull('slug')
+                ->where('normalized_name_hash', $this->normalizer->hash($requested))
+                ->whereIn('locale', $locales)
+                ->select('tag_id')
+                ->distinct()
+                ->limit(2)
+                ->pluck('tag_id');
+
+            if ($aliasTagIds->count() > 1) {
+                return null;
+            }
+
+            $tag = $aliasTagIds->count() === 1
+                ? Tag::query()->find($aliasTagIds->first())
+                : null;
             $matchType = 'alias';
         }
 

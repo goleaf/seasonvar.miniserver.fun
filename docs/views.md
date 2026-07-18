@@ -77,7 +77,7 @@ Public tag page data готовят `TagPagePresenter`, `TagSeoPresenter` и exi
 
 `PersonalTagManager`/`PersonalTagSelector` держат public state только в bounded strings, booleans, locked title/UUID/version and draft UUID list. Owner tags/counts/title cards разрешает `PersonalTagLibraryQuery`, writes — `PersonalTagService`; templates loops only prepared rows. Private badge не имеет public link, personal text escaped, stable `wire:key` uses opaque UUID.
 
-Personal tag manager не показывает content-language control и всегда передаёт `ru` в write DTO. Tag administration выводит одну русскую translation form и alias input без locale badge/select; подпись текущего языка не показывается, а существующие non-Russian rows не удаляются.
+Personal tag manager не показывает content-language control: новый UGC получает `null`, а edit сохраняет ранее explicit content locale. Tag administration выводит одну translation и alias form за раз с allowlisted `ru|en` selector и понятной подписью языка; public state содержит только bounded scalar forms configured locales, не Eloquent translations graph, а существующие переводы не удаляются при переключении.
 
 Admin view receives bounded query results, enum options and merge impact from `TagAdministrationQuery`; it does not resolve aliases, normalize names, authorize, count usage or query provider mappings in Blade. Loading/empty/error/confirmation state maps to real Livewire action. No tag template introduces Volt, `@php`, raw HTML, inline CSS, inline business JavaScript, DB/facade/service call or complete Eloquent graph public serialization.
 

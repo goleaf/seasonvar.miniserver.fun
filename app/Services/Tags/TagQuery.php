@@ -137,6 +137,7 @@ final readonly class TagQuery
     {
         $limit = max(1, min(50, $limit ?? (int) config('tags.popular_limit', 24)));
         $rows = $this->cache->remember('popular', [
+            'projection' => 'tag-summary-v2',
             'locale' => app()->getLocale(),
             'fallback' => config('app.fallback_locale'),
             'limit' => $limit,
@@ -162,6 +163,7 @@ final readonly class TagQuery
     {
         $limit = max(1, min(24, $limit ?? (int) config('tags.related_limit', 12)));
         $rows = $this->cache->remember('related', [
+            'projection' => 'tag-summary-v2',
             'tag' => (string) $tag->public_id,
             'locale' => app()->getLocale(),
             'fallback' => config('app.fallback_locale'),
@@ -259,6 +261,7 @@ final readonly class TagQuery
         return [
             'id' => (int) $tag->id,
             'public_id' => (string) $tag->public_id,
+            'code' => $tag->code,
             'name' => (string) $tag->name,
             'slug' => (string) $tag->slug,
             'type' => $tag->type->value,

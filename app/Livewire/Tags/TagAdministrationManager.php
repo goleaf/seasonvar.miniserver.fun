@@ -23,14 +23,13 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 final class TagAdministrationManager extends Component
 {
-    private const AUTHORING_LOCALE = 'ru';
-
     use WithPagination;
 
     public string $search = '';
@@ -43,7 +42,11 @@ final class TagAdministrationManager extends Component
     /** @var array<string, array<string, string>> */
     public array $translationForms = [];
 
+    public string $translationLocale = '';
+
     public string $aliasName = '';
+
+    public string $aliasLocale = '';
 
     public string $relationshipSearch = '';
 
@@ -82,6 +85,8 @@ final class TagAdministrationManager extends Component
 
     public function mount(): void
     {
+        $this->translationLocale = $this->defaultAuthoringLocale();
+        $this->aliasLocale = $this->defaultAuthoringLocale();
         $this->newTag();
     }
 
@@ -98,6 +103,25 @@ final class TagAdministrationManager extends Component
         }
 
         $this->resetPage(pageName: 'tagAdminPage');
+    }
+
+    public function updatedTranslationLocale(): void
+    {
+        if (! in_array($this->translationLocale, $this->supportedLocales(), true)) {
+            $this->translationLocale = $this->defaultAuthoringLocale();
+        }
+
+        $this->resetErrorBag();
+        $this->notice = null;
+    }
+
+    public function updatedAliasLocale(): void
+    {
+        if (! in_array($this->aliasLocale, ['und', ...$this->supportedLocales()], true)) {
+            $this->aliasLocale = $this->defaultAuthoringLocale();
+        }
+
+        $this->resetErrorBag(['aliasName', 'alias']);
     }
 
     public function newTag(): void
@@ -160,7 +184,7 @@ final class TagAdministrationManager extends Component
 
     public function saveTranslation(): void
     {
-        $locale = self::AUTHORING_LOCALE;
+        $locale = $this->validatedAuthoringLocale($this->translationLocale);
         $key = 'translationForms.'.$locale;
         $validated = Validator::make(['translationForms' => $this->translationForms], [
             $key.'.label' => ['required', 'string', 'max:80'],
@@ -169,7 +193,13 @@ final class TagAdministrationManager extends Component
             $key.'.seo_title' => ['nullable', 'string', 'max:180'],
             $key.'.seo_description' => ['nullable', 'string', 'max:320'],
         ], $this->validationMessages())->validate()['translationForms'][$locale];
-        $this->tags->saveTranslation($this->user(), $this->selectedTag(), $locale, $validated);
+        $this->tags->saveTranslation(
+            $this->user(),
+            $this->selectedTag(),
+            $locale,
+            $validated,
+            $this->tagVersion,
+        );
         $this->fillTagForm($this->query->tag((string) $this->selectedPublicId) ?? $this->selectedTag());
         $this->notice = __('tags.admin.translation_saved');
     }
@@ -186,7 +216,7 @@ final class TagAdministrationManager extends Component
             $this->user(),
             $this->selectedTag(),
             (string) $validated['aliasName'],
-            self::AUTHORING_LOCALE,
+            $this->validatedAliasLocale($this->aliasLocale),
             TagAliasSource::Editorial,
         );
         $this->aliasName = '';
@@ -293,6 +323,12 @@ final class TagAdministrationManager extends Component
 
     public function render(): View
     {
+        $this->translationLocale = in_array($this->translationLocale, $this->supportedLocales(), true)
+            ? $this->translationLocale
+            : $this->defaultAuthoringLocale();
+        $this->aliasLocale = in_array($this->aliasLocale, ['und', ...$this->supportedLocales()], true)
+            ? $this->aliasLocale
+            : $this->defaultAuthoringLocale();
         $tag = $this->selectedPublicId === null ? null : $this->query->tag($this->selectedPublicId);
         $assignedTitles = $tag === null ? collect() : $this->query->assignedTitles($tag);
         $assignedTitles->each(function (CatalogTitle $title): void {
@@ -337,6 +373,21 @@ final class TagAdministrationManager extends Component
                 'value' => $source->value,
                 'label' => __('tags.sources.'.$source->value),
             ], TagSource::cases()),
+            'translationLocales' => $this->localeOptions(),
+            'aliasLocales' => [
+                [
+                    'value' => 'und',
+                    'label' => __('tags.fields.language_unspecified'),
+                ],
+                ...$this->localeOptions(),
+            ],
+            'tagLocaleLabels' => collect($this->localeOptions())
+                ->prepend([
+                    'value' => 'und',
+                    'label' => __('tags.fields.language_unspecified'),
+                ])
+                ->pluck('label', 'value')
+                ->all(),
         ])->extends('layouts.app', [
             'title' => __('tags.admin.title'),
             'seo' => ['title' => __('tags.admin.title'), 'robots' => 'noindex,nofollow', 'alternates' => []],
@@ -366,8 +417,12 @@ final class TagAdministrationManager extends Component
         $this->tagVersion = $this->tags->version($tag);
         $forms = $this->emptyTranslationForms();
 
-        foreach ($tag->translations->where('locale', self::AUTHORING_LOCALE) as $translation) {
-            $forms[self::AUTHORING_LOCALE] = [
+        foreach ($tag->translations as $translation) {
+            if (! array_key_exists($translation->locale, $forms)) {
+                continue;
+            }
+
+            $forms[$translation->locale] = [
                 'label' => (string) $translation->label,
                 'short_description' => (string) ($translation->short_description ?? ''),
                 'description' => (string) ($translation->description ?? ''),
@@ -382,15 +437,15 @@ final class TagAdministrationManager extends Component
     /** @return array<string, array<string, string>> */
     private function emptyTranslationForms(): array
     {
-        return [
-            self::AUTHORING_LOCALE => [
+        return collect($this->supportedLocales())
+            ->mapWithKeys(fn (string $locale): array => [$locale => [
                 'label' => '',
                 'short_description' => '',
                 'description' => '',
                 'seo_title' => '',
                 'seo_description' => '',
-            ],
-        ];
+            ]])
+            ->all();
     }
 
     private function resetSecondaryForms(): void
@@ -401,6 +456,59 @@ final class TagAdministrationManager extends Component
         $this->mergeSearch = '';
         $this->mergeTarget = null;
         $this->titleSearch = '';
+    }
+
+    /** @return list<string> */
+    private function supportedLocales(): array
+    {
+        return collect((array) config('tags.supported_locales', []))
+            ->filter(fn (mixed $locale): bool => is_string($locale) && $locale !== '')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function defaultAuthoringLocale(): string
+    {
+        $supported = $this->supportedLocales();
+        $configured = (string) config('tags.default_locale', 'ru');
+
+        return in_array($configured, $supported, true)
+            ? $configured
+            : ($supported[0] ?? 'ru');
+    }
+
+    private function validatedAuthoringLocale(string $locale): string
+    {
+        if (! in_array($locale, $this->supportedLocales(), true)) {
+            throw ValidationException::withMessages([
+                'translationLocale' => [__('tags.validation.locale')],
+            ]);
+        }
+
+        return $locale;
+    }
+
+    private function validatedAliasLocale(string $locale): string
+    {
+        if (! in_array($locale, ['und', ...$this->supportedLocales()], true)) {
+            throw ValidationException::withMessages([
+                'aliasLocale' => [__('tags.validation.locale')],
+            ]);
+        }
+
+        return $locale;
+    }
+
+    /** @return list<array{value: string, label: string}> */
+    private function localeOptions(): array
+    {
+        return collect($this->supportedLocales())
+            ->map(fn (string $locale): array => [
+                'value' => $locale,
+                'label' => (string) __("tags.locales.{$locale}"),
+            ])
+            ->all();
     }
 
     /** @return array<string, string> */

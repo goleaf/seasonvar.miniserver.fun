@@ -1,257 +1,207 @@
-# Task 27 — финальная системная интеграция и release preparation
-
-Дата: 18.07.2026 (`Europe/Vilnius`)
-
-## 1. Task title
-
-Repository-wide requirement compliance, cross-feature reconciliation, stabilization, cleanup и release preparation существующего Seasonvar portal.
-
-## 2. Task date
-
-18.07.2026.
-
-## 3. Current branch
-
-Только существующая `main`; branch/worktree/PR branch не создавались.
-
-## 4. Git status
-
-Старт: clean `main...origin/main [ahead 13]`, `HEAD 81cb006`. Task 27 changes остаются в одном рабочем дереве; финальный status повторяется перед commit/push. Независимых user edits в начале не было.
-
-## 5. Canonical requirement files read
-
-Полностью прочитаны `AGENTS.md`, `docs/requirements/index.md`, `docs/CODE_STANDARDS.md`, `docs/architecture.md`, `docs/development.md`, multilingual, security, performance/cache, UI/accessibility, administration, production operations, maintenance/upgrades, current plan, README/CHANGELOG и owner map `docs/README.md`. Project-owned Markdown corpus проверен на ссылки/contradictions/legacy requirements; 436 Markdown references разрешались без missing target.
-
-## 6. Requirement files updated
-
-Обновлены `AGENTS.md`, requirement index, code/architecture/workflow, multilingual, security/privacy, performance/cache, UI/accessibility и administration owners. Добавлен единственный canonical `docs/requirements/system-wide-integration.md`; duplicate owner не создавался.
-
-## 7. Feature documentation files read
-
-Прочитаны owner documents для catalog/search/player/import/API/auth/storage/notifications/collections/comments/reviews/profiles/settings/calendar/recommendations/requests/issues/help/premium/mobile/administration/operations/maintenance и living modernization plan. Historical plans считаются evidence, но не получают precedence над current owners.
-
-## 8. Installed Laravel version
-
-`laravel/framework 13.20.0`.
-
-## 9. Installed Livewire version
-
-`livewire/livewire 4.3.3`; class-based components, Volt отсутствует.
-
-## 10. Installed Tailwind version
-
-`tailwindcss 4.3.2`, `@tailwindcss/vite 4.3.2`.
-
-## 11. Installed Flux packages
-
-Flux/Flux Pro отсутствуют и не устанавливались.
-
-## 12. Relevant Composer packages
-
-Laravel 13.20.0, Livewire 4.3.3, Boost 2.4.13, Pint 1.29.3 и существующие first-party/runtime packages. Полный registry остаётся в `docs/maintenance/dependency-inventory.md`; constraints/lock не менялись.
-
-## 13. Relevant npm packages
-
-Vite 8.1.4, Laravel Vite plugin 3.1.3, Tailwind 4.3.2, Plyr 3.8.4, HLS.js 1.6.16 и local FontAwesome. Patch/minor updates были только обнаружены, но не применены без отдельной причины/upgrade review; package/lock files не менялись.
-
-## 14. Current application architecture summary
-
-Laravel full-page class-based Livewire для HTML, API Resources/controllers/responders для JSON, thin signed/file/health routes, Eloquent/services/actions/queries/DTO, Vite/Tailwind. Verified runtime использует SQLite; Redis сконфигурирован для cache/session/queue/locks, Memcached optional и недоступен. Наличие worker/cron не выводится из config. 122 models, 425 services, 61 actions, 72 Livewire components, 34 Form Requests, 34 Resources, 14 policies, 124 enums, 11 jobs и 101 applied migrations.
-
-## 15. All discovered public routes
-
-121 public/framework routes: home; catalog/taxonomy/directory/top/discovery/search/stats; title/season/episode shell and signed playback; public collection/tag/profile/comment/review/request/help/calendar/premium-unavailable pages; auth entry/recovery/verification callbacks; feed/OpenSearch/LLM/health/SEO sitemap documents; Livewire assets/update boundary; localized equivalents; retained redirects. Source files `routes/web.php` и generated `route:list --json` остаются exact inventory owners.
-
-## 16. All discovered private routes
-
-44 authenticated web routes: library/history/activity, personal tags, own collections, notifications/discussions/reviews, settings/profile/security/export, calendar subscriptions, content requests, technical tickets/attachments, password confirmation, premium return и media download. Все имеют authenticated owner boundary; private account pages use `PrivateAccountResponse` except intentionally narrower signed/export callbacks with their own controls.
-
-## 17. All discovered administration routes
-
-13 routes: calendar, catalog, collections, comments, help + help preview, imports, issues, premium, profiles, requests, reviews и tags. Каждая использует `auth`, `auth.session`, `account.private` и explicit `can:*` gate.
-
-## 18. All discovered API routes
-
-67 API routes: discovery/OpenAPI/catalog; mobile auth/devices; config/health/home; public catalog/directories/filter/search/tag/collection/recommendation/review/season/episode sync; authenticated account/profile/password/delete; watchlist/rating/tag/library/history/progress/offline sync; signed playback. Private writes combine Sanctum ability, owner resolution, validation and domain policy; API errors remain JSON-safe.
-
-## 19. All discovered middleware
-
-Global groups add `AddSecurityHeaders`, `ApplyAccountPreferences`, `SetApiLocale`, `AssignApiRequestId`. Project aliases: `auth.optional.sanctum`, `public.cache`, `public.page`, `canonical.tag`, `collection.locale`, `collection.response`, `account.private`, `verified.api`, plus Sanctum `ability/abilities`. Host trust derives only from configured `APP_URL`; CSRF exception is limited to billing webhook, whose adapter performs provider signature validation.
-
-## 20. All discovered guards
-
-Laravel `web` session guard and Sanctum personal-access-token API boundary. Mobile abilities are `mobile:read`/`mobile:write`; API token never grants administration.
-
-## 21. All discovered roles
-
-Normalized general RBAC/organization roles do not exist. Administration is a configured catalog-administrator email allowlist; premium grant/promotion/billing-audit/reconciliation capabilities require both that boundary and separate capability allowlists. Advertiser/rightsholder roles are `not_applicable`.
-
-## 22. All discovered permissions
-
-Gates: `manage-seasonvar-imports`, `manage-catalog`, `manage-comments`, `manage-reviews`, `manage-content-requests`, `manage-technical-issues`, `manage-release-calendar`, `manage-help-center`, `view-premium-administration`, `manage-premium-grants`, `manage-premium-promotions`, `view-premium-billing-audit`, `reconcile-premium`, `view-account-settings`, `update-account-settings`. Resource permissions принадлежат 14 policies: account settings, title/media/progress/marker, collection/tag/user tag, comment/review/profile, request/issue/help.
-
-## 23. All discovered feature modules
-
-Areas 1–23 и 26 существуют в степени, указанной domain owners. Premium имеет entitlement/checkout/provider adapter boundary, но active provider отсутствует. Area 24 rights-holder cases и area 25 advertisers не имеют routes/schema/services и отмечены `not_applicable`; fake implementation не добавлялась.
-
-## 24. Discovered duplicate implementations
-
-Duplicate route method/URI: 0; duplicate route names: 0; duplicate PHP translation keys: 0; duplicate requirement owner для integration до Task 27 отсутствовал. Parallel user identity, entitlement, progress, personal-library, notification или audit architecture не обнаружена. Domain-specific moderation histories и `AdminAuditRecorder` имеют разные обязанности и не объединяются механически.
-
-## 25. Discovered incomplete integrations
-
-- API name update не bump-ил versioned public-profile/search projection, тогда как Livewire делал это отдельно.
-- Account export не включал stored notification preferences и current database-notification read/history state.
-- Generic morph notifications не имели FK cleanup в canonical hard deletion.
-- `admin_audit_events.actor_id RESTRICT` мог превращать deletion административного actor в raw constraint failure.
-- Profile hard deletion не очищал current summary key/search suggestion generation.
-- Public 403/episode link/viewing history содержали hardcoded fallback text.
-- После production Vite build реальный Firefox обнаружил старое кешированное HTML со ссылками на удалённые hashed CSS/JS; full-response key не учитывал manifest generation.
-- Каталог показал report-only CSP violation от обычного Livewire bundle: установленный пакет уже содержал официальный CSP-safe build, но canonical config не включал его.
-- Полного account merge workflow нет; узкие request/ticket `mergeUsers()` hooks нельзя считать coordinator.
-
-## 26. Discovered dead controls
-
-Textual/route/Livewire inspection не обнаружил fake advertiser/legal/PWA/payment-provider controls. Absent capabilities представлены unavailable state либо отсутствуют. Credential-dependent browser mutations ещё не считаются runtime-verified.
-
-## 27. Discovered hardcoded strings
-
-Public 403, episode link и viewing-activity fallbacks исправлены через существующие `ru`/`en` catalogs. Legacy `/stats` и `/admin/catalog` содержат большую русскоязычную operational string surface; она документирована как retained limitation и не была рискованно переписана в final stabilization task. Internal diagnostics/provider terms и linguistic search dictionaries не классифицируются как interface labels.
-
-## 28. `@php` usage
-
-Ноль Blade `@php`/`@endphp`.
-
-## 29. Direct Blade class calls
-
-Ноль прямых model/service/facade/database/cache/container queries в Blade по repository scan. Blade получает prepared values/components.
-
-## 30. Inline CSS
-
-Ноль Blade `<style>` и business `style=` attributes.
-
-## 31. Large inline JavaScript
-
-Inline business scripts отсутствуют; единственный inline JSON-LD boundary является prepared escaped SEO data. Application JS находится в Vite modules.
-
-## 32. N+1 risks
-
-Cards/queues/library/recommendation/profile builders используют eager/grouped/aggregate queries. Textual query inspection не обнаружил query from Blade или one-query-per-card path в changed scope. Полный query-profiler browser capture не выполнялся, поэтому абсолютное утверждение о нуле N+1 во всех 425 services не делается.
-
-## 33. Stale cache risks
-
-Подтверждены и исправлены два gap: canonical profile name/deletion invalidируют versioned summary и `SearchSuggestions`, а guest full-response dimensions теперь включают `Vite::manifestHash()`. Firefox после нового build получил только текущие CSS/JS с HTTP 200 и нулём console errors; store-wide cache flush не применялся. Service worker отсутствует.
-
-## 34. Security risks
-
-Исправлены audit-retention deletion failure, orphan morph notifications и allowlisted notification export. Route/CSRF/IDOR/owner/policy/signed playback/upload/storage/webhook/static secret scans подтверждают existing boundaries. Livewire `csp_safe` включён через package-supported config вместо добавления `unsafe-eval`. No advisory обнаружен project tooling. Credential/provider penetration journeys и production restore не выполнялись.
-
-## 35. Privacy risks
-
-Export раньше пропускал notification preference/history state; теперь включает только owner records и type-specific safe fields. Unknown future payload fail-closed не экспортируется. Account deletion очищает generic owner notification rows, сохраняет immutable admin audit через explicit retention block. Rights-holder/advertiser privacy flows `not_applicable`.
-
-## 36. Multilingual risks
-
-Actual locales: `ru`, `en`; по 20 PHP catalogs и 4,144 leaf keys. Финальный check: 0 missing keys, 0 unique-placeholder mismatch, 0 duplicate literal keys; новые auth/settings keys добавлены в обе локали. Large legacy admin/stats Russian-only surface остаётся documented limitation. Localized route group содержит 41 route, включая localized home.
-
-## 37. Mobile risks
-
-Mobile web и JSON API используют тот же backend/identities. No duplicate mobile URL backend, manifest/service-worker/install/push/offline claim. Safe-area/player/navigation modules inspected statically; real-device run unavailable.
-
-## 38. Accessibility risks
-
-Changed public fallbacks сохраняют semantic headings/links/alt text через translations. Existing focus/loading/reduced-motion/touch-target contracts inspected in shared UI. Screen-reader/virtual-keyboard real-device verification unavailable; legacy operational localization debt может создавать long-label risk после будущего translation migration.
-
-## 39. SEO risks
-
-Canonical/localized/robots/sitemap responders inspected; private/auth/admin/ticket/payment-return/signed routes не добавлялись в sitemap. No Task 27 route or SEO schema changed. Service-worker/legal/advertiser routes absent.
-
-## 40. Migration risks
-
-Task 27 migration не добавлялась. 101 migrations имеют applied status; schema metadata: 151 tables, 469 indexes. User-FK inventory found one `RESTRICT` audit edge and otherwise documented cascade/set-null edges. Production-like SQLite is about 27 GB, поэтому unbounded duplicate/integrity full-table scans были остановлены и не заявляются выполненными.
-
-## 41. Backward-compatibility risks
-
-245 route contracts, legacy aliases, DB identity/status codes, cache prefixes, API fields, lock files и migrations сохранены. 15 legacy route aliases остаются intentional adapters. Full account merge остаётся unsupported, а domain merge hooks retained. No destructive normalization or dependency upgrade.
-
-## 42. Cross-feature dependency map
-
-Canonical map находится в `docs/system-integration.md`: user/content identity; entitlement/visibility/access; notifications/audit; storage/cache/search/SEO; account merge limitation/deletion; imports; administration; mobile; security/privacy. Account mutation теперь обновляет profile/search/collection/comment/review projections централизованно.
-
-## 43. Implementation phases
-
-1. Requirement/index/reference normalization.
-2. Route/schema/class/translation/cache/security/frontend inventory.
-3. Minimal account/profile/export/i18n correctness corrections.
-4. Cross-feature documentation/compliance reconciliation.
-5. Static/build/browser verification без automated tests.
-6. Final reread, README/CHANGELOG, commit и configured push attempt.
-
-## 44. Files expected to change
-
-Canonical requirements/architecture/security/cache/authorization/notification/integration/deployment docs; current plan; account export/deletion/profile cache services; public page cache policy; Livewire CSP config/profile orchestration; four translation catalogs; three public Blade fallbacks; README/CHANGELOG/maintenance review. No route, migration, dependency or frontend source change was required.
-
-## 45. Files expected to remain compatible
-
-All public/localized/private/admin/API routes, tables/migrations/data, progress/library/history/collections/comments/reviews/calendar/recommendations/import/premium state, cache key formats, API response contracts, lock files and test infrastructure.
-
-## 46. Validation strategy
-
-Allowed checks only: static PHP/Blade/JS/config scans, PHP syntax/Pint/PHPStan, route/middleware/schema/migration/FK/index inspection, translation parity/placeholder/duplicate syntax, Composer/npm advisory inspection, docs links/refresh, production asset build, safe browser smoke and git diff/status. Automated tests не создаются и не запускаются по explicit task rule.
-
-## 47. Manual acceptance checklist
-
-- Anonymous: Firefox подтвердил RU/EN home, search с 12 cards, catalogue, `year_from=2025` Livewire filter, browser back/forward, title/player shell, help и auth entry. На 390×844 home/search/catalog имели нулевой horizontal overflow.
-- Player: signed same-origin grant дошёл до внешнего MP4 как `206`; выбранный файл не декодировался Firefox и bounded recovery повторил запрос, поэтому actual playback/subtitle/audio success не заявляется.
-- Privacy: `/library` для гостя вернул `302` на `/login`; login имеет `noindex,nofollow`, current Vite assets и CSP-safe Livewire bundle получили `200`.
-- Authenticated: route/policy/service/static verification; runtime writes only with safe available credentials, otherwise `not_performed`.
-- Premium: unavailable/provider-free fallback and server entitlement inspected; no real charge.
-- Advertiser/rightsholder: `not_applicable`, routes/domain absent.
-- Administrator: all 13 routes/gates/services audited statically; no credential fabricated.
-- Build/assets: production Vite 8.1.4 build passed; manifest references existing files. Первый smoke обнаружил stale guest HTML, исправление manifest dimension подтверждено новыми CSS/JS `200` и 0 console errors на home.
-
-## 48. Requirement-compliance matrix
-
-| Domain | Status | Evidence / limitation |
+# Task 11 — полный аудит и безопасная интеграция тегов
+
+Дата начала: 18.07.2026 (`Europe/Vilnius`)
+
+## Цель
+
+Проверить и довести до единого production-ready состояния уже существующий канонический домен системных, редакционных и личных тегов, не создавая второй tag aggregate и не меняя публичные/постоянные contracts без совместимого перехода.
+
+## Обязательные ограничения
+
+- Работа выполняется только в существующей `main`; branch/worktree/PR не создаются.
+- Стартовый `HEAD`: `f983ad3`; `main...origin/main [ahead 14]`; рабочее дерево после внешнего commit чистое.
+- До implementation читаются все project-owned Markdown-файлы, канонические owners — в порядке `docs/requirements/index.md`; repository-relative links проверяются.
+- Новые automated tests не создаются и существующие automated tests не запускаются по прямому требованию Task 11. Проверки: static inspection, route/schema/query/policy/cache/SEO/translation inspection, Pint, PHP syntax/static analysis, docs diagnostics, Vite build и browser smoke, где доступно.
+- Новые production dependencies, обязательные queues/scheduler/workers, Volt, `@php`, inline CSS и inline business JavaScript не добавляются.
+- Все database changes только additive/reversible и SQLite-compatible. Legacy tags, translations, assignments, order, slugs, aliases, provider provenance, moderation и privacy data сохраняются.
+- `CHANGELOG.md` остаётся на русском по каноническому project policy, несмотря на противоречивое требование Task 11 об английском changelog.
+
+## Исходная архитектура, подтверждённая документацией и Git history
+
+Commit `ca70246` уже ввёл канонический tag domain. Task 11 является audit/hardening существующей системы, а не новой реализацией.
+
+### Identity и модели
+
+- Глобальный canonical base: `App\Models\Tag` + существующие `tags` и `catalog_title_tag`.
+- Stable database identity: `tags.id`; opaque public/API identity: `tags.public_id`; optional language-independent integration identity: `tags.code`.
+- Mutable `name`, translation label, slug и alias не являются identity.
+- Глобальные adjunct models: `TagTranslation`, `TagAlias`, `TagSynonym`, `TagSlug`, `TagProviderMapping`, `CatalogTitleTagSource`, `TagMergeEvent`.
+- Личный owner aggregate: `UserTag` + `user_tags` и explicit `catalog_title_user_tag`; он не смешан с global classification.
+- Season/episode/collection/comment polymorphic tag pivots отсутствуют; необходимость их добавления пока не подтверждена доменом.
+
+### Stable values
+
+- Global type allowlist: `system`, `editorial`, `imported`, `hidden_internal`.
+- Global visibility: `public`, `internal`.
+- Moderation: `pending`, `approved`, `rejected`, `hidden`, `merged`, `archived`.
+- Public-user/unlisted tags намеренно не поддерживаются; public-user moderation/report/appeal surface не должен имитироваться.
+- Personal tags owner-scoped и private by design; original Unicode label/content locale сохраняются без machine translation.
+
+### Translation, alias, synonym и slug model
+
+- `tag_translations` хранит locale-specific label/plain-text descriptions/SEO fields с unique tag+locale; active/fallback locale выбирается query boundary без размножения rows.
+- `tag_aliases` хранит normalized locale/source-aware alternative labels и разрешается в один canonical tag.
+- `tag_synonyms` — bounded explicit relationship, не автоматический merge; search expansion должна оставаться ограниченной одним hop.
+- `tag_slugs` сохраняет current/history/alias/merge-compatible URL identity; public canonical URL — `/titles/tag/{slug}`.
+- `/tags/{slug}` и `/tag/{slug}` сохраняются как compatibility redirects; loops/case/history/merged targets проверяет `ResolveCanonicalTagRoute`.
+
+### Assignment, routes и UI
+
+- Global title assignment остаётся в `catalog_title_tag`; personal assignment — в `catalog_title_user_tag` с deterministic `position`.
+- Global mutations проходят `TagPolicy`, `manage-catalog`, `TagService`/`TagAssignmentService`; personal mutations — `UserTagPolicy`, current authenticated owner и `PersonalTagService`.
+- Public page переиспользует full-page `CatalogSeries`, `CatalogTitlesPageBuilder`, canonical filters/sorts/cards и public title visibility.
+- Personal management: `/library/tags/manage`; selector хранит только UUID draft, `Apply` transactionally reconciles, `Cancel` не пишет state.
+- Administration: `/admin/tags`, `TagAdministrationManager`, bounded `TagAdministrationQuery`, explicit merge/archive confirmation.
+- API: public tag list/detail и owner-only personal CRUD/assignment under existing `/api/v1` contracts.
+
+### Search, recommendations, cache, SEO и import
+
+- `TagQuery`/`TagResolver` владеют public search, alias resolution, active/fallback presentation, popularity и bounded related tags.
+- Public tag pages/results/counts use public approved eligible global tags and distinct visible titles; personal assignments are excluded.
+- Recommendations may use eligible global tags only for public similarity; personal tags remain private personalization input only.
+- `TagSnapshotCache` reuses `TieredCache` and `CacheDomain::Tags`; `TagCacheInvalidator` delegates after commit to existing `CatalogCacheInvalidator`. Personal tags never enter shared cache.
+- `TagSeoPresenter` owns canonical/meta/breadcrumb/structured-data decisions; alias/history redirects and private/unapproved/internal/archived/empty tags are non-indexable.
+- Existing sitemap includes only non-empty canonical eligible tags.
+- `TagImportSynchronizer` and provider mapping/provenance records converge Seasonvar values idempotently; unknown provider values remain pending and do not publish automatically.
+
+## Оперативные результаты аудита
+
+- Полный tracked Markdown corpus: `284` файла / `62 381` строк; files readable, canonical owner order and repository-relative documentation contracts reviewed. До product edits `php artisan project:docs-refresh --check` завершился сообщением `Документация уже актуальна.`
+- Web/API route inventory подтверждает один canonical public route `titles.taxonomy` (`/titles/tag/{taxonomy}`), compatibility routes `tags.show` (`/tags/{value}`) и `legacy.tags.show` (`/tag/{taxonomy}`), owner-only `personal-tags.index`, gated `admin.tags`, public `/api/v1/tags*` и private `/api/v1/me/tags*`. Деструктивные действия не используют `GET`; отдельные localized tag routes отсутствуют по текущему product contract.
+- Фактическая SQLite schema содержит только canonical global/personal aggregates: `tags` + adjunct tables + `catalog_title_tag` и отдельные `user_tags` + `catalog_title_user_tag`; polymorphic/season/episode/comment tag pivots не обнаружены.
+- Bounded read-only audit текущих данных: `800` global tags, `2 621` personal tags, `134 040` global и `7 411 528` personal assignments. Не обнаружены missing canonical identities/hashes/slugs, invalid enum states, duplicate hashes/slugs/translations/assignments, orphan assignments/owners, self-synonyms, alias conflicts, provider/provenance gaps или merge self/two-node cycles. Все eligible public tags имеют assignment; private rows не смешаны с global aggregate.
+- Existing indexes реально обслуживают owner and pivot lookup; `EXPLAIN QUERY PLAN` подтверждает indexed owner/tag and composite pivot access. Temporary sort для bounded owner tag set допустим; новый index без доказанной пользы не добавляется.
+- Выявлен подтверждённый multilingual administration gap: domain/service/schema поддерживают все `config('tags.supported_locales')`, но `TagAdministrationManager` и его Blade form жёстко авторят только `ru`; alias authoring также принудительно помечает записи как `ru`. Это не повреждает public fallback, но не даёт редактору безопасно управлять существующим `en` content. План обновлён до реализации locale-selectable translation/alias authoring без изменения route/schema/cache contracts.
+- Главная страница получает subtitle system tag из snapshot по mutable slug `subtitry`, а Blade повторно hardcode-ит тот же slug в filter URL. Это нарушает уже существующий stable-code contract и оставляет dead control после archive/visibility change. Исправление: resolve snapshot только по `code=subtitle-available` + public eligibility, передавать фактический slug и генерировать canonical tag route helper в prepared view data.
+- `TagService::storeAlias()` предотвращает conflict только внутри одного locale, хотя public tag URL не locale-scoped. В потенциальном legacy состоянии одинаковый normalized alias мог бы указывать на разные canonical tags в разных locale и resolver выбирал бы первый row. Текущие данные чисты (`0` conflicts); исправление остаётся additive на code boundary: запрещать cross-tag conflicts независимо от locale и заставлять resolver fail closed при неоднозначном hash match, сохраняя одинаковые locale variants одного canonical tag.
+- Global tag edit защищён optimistic version, но translation update мог перезаписать concurrent editorial change без expected version. Translation save будет использовать уже существующий `tagVersion` и тот же localized stale-edit response; alias/provider additive actions не перезаписывают translation payload.
+- Browser smoke выявил cross-origin cache-poisoning gap на общей full-page cache boundary: read-only запрос к локальному `artisan serve` с production Host и нестандартным port создал HTML с `:8014` asset URLs, который затем был получен через canonical HTTPS tag route. До завершения требуется проверить `PublicPageCachePolicy`/cache key, включить нормализованный canonical origin или fail-closed cache eligibility для non-canonical authority, адресно bump-нуть затронутую public cache version и повторить exact-origin smoke. Глобальный cache flush запрещён.
+- Public API smoke выявил projection inconsistency: cached popular tag summary не сохраняет language-independent `code`, поэтому `/api/v1/tags` может вернуть `code=null`, тогда как тот же tag через `?q=` возвращает реальный code. Исправление: добавить `code` в единственный canonical summary projection и изменить bounded snapshot projection dimension, чтобы legacy cached payload не обслуживался после deploy.
+- Personal web create flows ошибочно присваивают `content_locale` из `ru` или interface locale, хотя отдельного выбора/детектора языка нет. Original Unicode label при этом сохраняется, но metadata ложно описывает английский или mixed-script UGC как язык интерфейса. Additive correction: новые web-created personal tags сохраняют `content_locale=null`; web edit не стирает уже явно выбранный API locale; API PATCH различает absent field (preserve) и explicit nullable field (clear). Существующие строки не переписываются автоматически.
+
+## Завершённый фактический аудит
+
+1. ~~Прочитать весь Markdown corpus и проверить links/owner contradictions.~~ Выполнено; final link/owner validation повторяется после documentation edits.
+2. ~~Инвентаризировать exact tag web/API/localized/legacy routes, names, middleware, bindings and destructive methods.~~ Выполнено; final route snapshot остаётся в checklist.
+3. ~~Инвентаризировать migrations/schema/indexes/FKs/uniqueness/data anomalies и выполнить только bounded read-only reconciliation checks.~~ Выполнено для текущей schema/data; final migration/FK check остаётся в checklist.
+4. ~~Проверить enums/models/casts/scopes/relationships/projections/soft-delete/account lifecycle/title merge.~~ Выполнено; competing aggregate или потеря user/global rows не обнаружены.
+5. ~~Проверить normalization/validation/reserved-name/duplicate/slug/alias/synonym/merge loop invariants.~~ Выполнено; cross-locale alias ambiguity закрыта, fuzzy auto-merge отсутствует.
+6. ~~Проверить policy/gate/Form Request/Livewire/API authorization, IDOR, CSRF, rate/batch limits, mass assignment and safe errors.~~ Выполнено статически; authenticated mutation smoke не выполнялся без безопасной учётной записи.
+7. ~~Проверить public/private queries: eligibility, distinct counts, regional/premium documented behavior, N+1, active/fallback translation projection, deterministic pagination.~~ Выполнено; отдельной regional schema нет, public eligibility использует единый catalog audience/window contract.
+8. ~~Проверить personal CRUD/restore/assignment/batch/cancel/order/private cache/export/delete flows.~~ Выполнено; interface locale больше не записывается как неподтверждённый язык UGC.
+9. ~~Проверить public directory/page/filter/sort/search/autocomplete/popular/related/empty/error/loading/a11y/mobile behavior.~~ Выполнено статически и direct managed-Chromium smoke на desktop/mobile.
+10. ~~Проверить admin create/edit/translation/alias/synonym/provider/global assignment/archive/restore/merge impact preview and audit.~~ Выполнено по route/policy/service/DTO/Blade contracts; `ru|en` translation/alias authoring и optimistic version усилены.
+11. ~~Проверить importer normalization/idempotency/editorial-lock/provenance and title-merge integration.~~ Выполнено; existing mapping/provenance/pivot uniqueness и editorial suppression сохранены.
+12. ~~Проверить cache dimensions/invalidation/failure fallback/search synchronization/recommendation invalidation.~~ Выполнено; origin/projection dimensions закрывают обнаруженные stale/poisoned variants без flush.
+13. ~~Проверить canonical URLs/legacy redirects/noindex/hreflang distinction/structured data/sitemap eligibility.~~ Выполнено; sitemap HEAD/code/eligibility проверены, полный streamed body не завершился в bounded timeout.
+14. ~~Найти repository-wide legacy/duplicate tag logic, dead controls, hardcoded UI text, raw keys, Blade queries, `@php`, inline CSS/JS and unfinished code.~~ Выполнено; оставшийся `subtitry` используется только как documented pre-migration fallback.
+15. ~~Внести только подтверждённые coherent fixes, затем повторить полный acceptance/compliance review.~~ Выполнено без schema/dependency/route/data mutations.
+
+## Cross-feature impact map
+
+| Domain | Impact | Planned verification |
 | --- | --- | --- |
-| Requirements/read order/precedence | completed | owners read; integration owner/index/root rules added; Markdown links valid |
-| Home/catalog/search/filters | affected/completed | RU/EN/mobile/search/catalog/filter/back-forward browser smoke; stale asset cache and Livewire CSP gaps repaired |
-| Title/season/episode/player | already compliant | canonical IDs, entitlement, signed source/download boundaries retained |
-| Progress/history/library | already compliant | owner policies/grouped state/unique schema retained; no duplicate progress system |
-| Collections/tags/comments/reviews | affected/completed | account identity invalidation centralized; preferences exported |
-| Profiles/auth/settings | affected/completed | API/Livewire name projection parity; deletion/export fixed |
-| Calendar/recommendations | already compliant | canonical services/notifications/cache paths inspected |
-| Requests/tickets/help | affected/completed | stored notification preferences exported; deletion hooks retained |
-| Premium/payment boundary | already compliant | no active provider; deletion lifecycle guard and webhook signature adapter retained |
-| Mobile/PWA | partial/not_applicable | API/mobile web exist; service worker/install/push/offline absent |
-| Rights-holder cases | not_applicable | no route/schema/domain; permanent privacy rule only |
-| Advertisers | not_applicable | no route/schema/domain; no portal-user data shared |
-| Administration/audit | affected/completed | 13 gated routes; immutable audit deletion retention handled fail-closed |
-| Notifications | affected/completed | six stable types, allowlisted export, owner deletion cleanup |
-| Account merge | unresolved capability | no proof-of-control/full coordinator; domain hooks documented, email merge forbidden |
-| Account deletion/export | affected/completed | FK map reviewed; morph cleanup, audit guard, safe export added |
-| Cache/search/assets | affected/completed | profile lifecycle invalidation repaired; manifest hash separates guest HTML generations; live Firefox loaded only current assets |
-| SEO/sitemap | already compliant | route responders/public-only boundaries inspected; no changed route |
-| Multilingual | partial | ru/en parity; three public fallbacks fixed; legacy admin/stats debt retained |
-| Security/privacy | affected/completed | concrete retention/orphan/export leaks fixed; official CSP-safe Livewire bundle enabled; no provider penetration claim |
-| Performance/database | completed within safe scope | metadata/query inspection; no 27-GB full-table scan or invented measurements |
-| Production readiness | partial | `app:deployment-check` ready, 101 migrations/SQLite integrity/FTS/indexes pass; health ready but degraded by unavailable Memcached; no restore/failover/credential journeys verified |
-| Git delivery | pending final step | commit and push result recorded after verification |
+| Home | affected | public tag cards/counts/cache/recommendation inputs |
+| Search/autocomplete | affected | canonical/translation/alias/synonym public-only results; private exclusion |
+| Catalogue/alphabet/filter/sort | affected | shared query architecture, no duplicate titles, validated URL state |
+| Title pages | affected | public badges + owner personal overlay without N+1/leakage |
+| Seasons/episodes/player | expected unaffected | confirm no tag pivots/access/source side effects |
+| Progress/history/bookmarks/library | affected | personal assignment independence and owner filters |
+| Collections | affected | no implicit membership/tag coupling; private identity separation |
+| Recommendations | affected | global/public signal only; owner-private personalization only |
+| Profiles/public profiles | affected | no private personal tag DTO/source leakage |
+| Comments/reviews | expected unaffected | confirm hashtags do not create catalogue tags |
+| Authentication/sessions | affected | verified owner mutation and no client-owned actor ID |
+| Account export/deletion | affected | owner tags/assignments export and cascade lifecycle |
+| Notifications | expected unaffected | confirm no fake/unowned category added |
+| Administration/audit | affected | gate, per-action authorization, merge/audit evidence |
+| Imports | affected | mapping/provenance/idempotency/editorial preservation |
+| API | affected | public/private resource separation and stable opaque IDs |
+| Translations/localized routes | affected | ru/en parity, fallback, user label preservation, no raw keys |
+| Cache/search index | affected | public/private separation and targeted invalidation |
+| SEO/sitemap | affected | canonical redirects, eligible-only metadata/indexing |
+| Premium/region/legal | affected by visibility | reuse canonical eligibility; document absent schema honestly |
+| Mobile/accessibility | affected | 320px/zoom/keyboard/touch/live-region checks |
+| Production/deployment/rollback | affected | additive schema capability, migration/cache/build recovery |
 
-## 49. Unresolved risks
+## Database and migration review
 
-- Local `main` начал задачу на 13 commits ahead of remote; configured HTTPS remote ранее не имел credentials, поэтому push может быть blocked внешней авторизацией.
-- Full account merge, active OAuth/payment provider, advertiser/rightsholder domains и PWA/service worker отсутствуют.
-- Legacy `/stats` и `/admin/catalog` не имеют complete `ru`/`en` translation catalog.
-- Production backup/restore, provider callbacks, authenticated/premium/admin mutations и real-device journeys не выполняются без safe credentials/infrastructure.
-- Огромная SQLite база исключает unbounded duplicate/integrity scans; uniqueness проверена schema constraints/indexes и targeted metadata inspection.
-- Installed CSP-safe Livewire bundle emits four Firefox deprecation warnings for legacy browser capability probes; no application/CSP error remains, and package code was not forked.
-- Browser reached a real signed MP4 source with `206`, but Firefox could not decode that provider file; source authorization was observed, actual playback/audio/subtitle success remains unverified.
+- Existing additive migrations `2026_07_15_230000` through `230200` are authoritative history and are not edited.
+- Before any new constraint/index: inspect real duplicate/orphan/loop collisions, existing indexes and `EXPLAIN QUERY PLAN`; no constraint is added merely because it appears desirable.
+- Data safety: no tag/pivot/translation/alias/provider row is deleted by audit code. Merge/archive remains explicit authorized transaction.
+- Rollback preference: feature/schema capability falls back through `TagSchema`; new code must remain compatible with legacy `tags/catalog_title_tag` until migrations are applied.
+- Deployment requires normal backup assessment, migration preflight, application/config/route/view cache rebuild where applicable, Vite build when UI changes, and targeted tag/catalog namespace invalidation rather than global flush.
 
-## 50. Final completion summary
+## Files expected to change
 
-Task 27 normalized permanent integration rules, inventoried 245 routes/101 migrations/shared domains, corrected account identity projection parity, safe account export/deletion, profile invalidation, Vite-aware guest HTML caching and CSP-safe Livewire delivery, localized three public fallback surfaces, and documented actual limitations. Production build, isolated compiled-cache checks, route/translation/static analysis, deployment preflight and live Firefox smoke completed without automated tests; Git delivery result is recorded before handoff.
+Exact list depends on audit findings. Expected owners: `app/Services/Tags/*`, tag models/enums/policies/requests/resources/Livewire, `routes/web.php`, `routes/api.php`, tag Blade views/components, `lang/ru/tags.php`, `lang/en/tags.php`, relevant importer/catalog/search/cache/SEO/sitemap/account lifecycle boundaries, additive migration only if proven necessary, canonical tag sections in architecture/data relations/search/importer/authorization/security/caching/UI/API/administration docs, `README.md`, `CHANGELOG.md`, and this plan.
 
-## 51. Final commit reference
+## Files/contracts that must remain compatible
 
-Exact hash будет reported из `git rev-parse HEAD` после Task 27 commit. Этот документ находится внутри того commit; symbolic release reference до создания объекта Git — `main` Task 27 release commit.
+- Existing public/localized/legacy route names and tag slugs/history/aliases.
+- `tags.id`, `tags.public_id`, optional `code`, provider identifiers and all tag/pivot rows.
+- Current title/season/episode/player/progress/history/watchlist/collection/comment/review behavior.
+- Existing cache domain/key infrastructure, search/catalog/recommendation/SEO/sitemap owners and `php artisan seasonvar:import` public command.
+- Existing ru/en locale identifiers, fallback behavior and API field names.
+- Test infrastructure and dependency/lock files.
+
+## Rollback and failure recovery
+
+- Code rollback must leave additive tag schema/data readable; irreversible data rewrite is prohibited.
+- Failed migration: stop rollout, run only its safe `down()` where verified, restore database backup when DDL/data state is uncertain, keep legacy reads through `TagSchema`.
+- Stale cache/search/sitemap: bump only canonical tag/catalog/search/sitemap/recommendation versions and rebuild bounded snapshots; never `Cache::flush()`.
+- Import/provider outage: preserve last canonical mapping/assignments and pending/rejected decisions; retry through existing importer only.
+- Failed merge/assignment: database transaction rolls back; after-commit invalidation/audit occurs only for committed changes.
+- Interrupted Vite build/deploy: retain previous manifest/assets until new compatible unit is fully published; guest HTML is manifest-dimensioned.
+
+## Compliance matrix — final state
+
+Статусы выставлены после повторного чтения требований, изменённых файлов и непосредственно связанных неизменённых boundaries. `completed` означает изменение в этой задаче, `already_compliant` — проверенное существующее поведение, `not_applicable` — намеренно отсутствующий product contract.
+
+| Requirement group | Status | Evidence / unresolved work |
+| --- | --- | --- |
+| One canonical global/personal architecture | already_compliant | `Tag`/adjunct global domain and separate owner-private `UserTag`; no competing table/service discovered |
+| Stable identity/codes/slugs/history | completed | UUID/ID/code remain independent of label/slug; subtitle control now resolves stable code; current/history/alias/merge routes verified |
+| Types/visibility/moderation/source | already_compliant | Enum allowlists and public/assignable predicates checked in model/service/query paths |
+| Translation/user original language | completed | Explicit supported-locale admin forms, optimistic translation version, 183/183 RU/EN keys; personal web UGC uses null unknown locale and preserves explicit API value |
+| Unicode normalization/validation/reserved terms | already_compliant | One normalization service, Unicode-preserving display, safe comparison hash, bounded plain-text validation and narrow reserved policy verified |
+| Aliases/synonyms/search expansion | completed | Cross-locale/canonical target collision prevention and fail-closed ambiguity added; slug uniqueness and bounded one-hop synonyms retained |
+| Duplicate detection/admin merge | already_compliant | Exact-scope reconciliation/transaction moves pivots, translations, aliases, slugs, provider mappings and evidence; fuzzy merge absent |
+| Personal CRUD/restore/privacy | completed | Owner UUID/policy/version/soft-delete/30-day restore/no-store boundaries verified; false interface-locale metadata removed |
+| Global/personal assignments/order/batch cancel | already_compliant | Authorized transaction, unique pivots, deterministic positions, Apply/Cancel and unrelated library-state preservation verified |
+| Public pages/filter/sort/counts | already_compliant | Canonical catalog query, public title eligibility, distinct counts, stable sorting/pagination and canonical cards verified |
+| Search/autocomplete/popular/related | completed | Public/private separation and UI behavior verified; cached summary now preserves stable code under projection v2 |
+| Public-user tags/reporting | not_applicable | product intentionally does not support public user tags |
+| Season/episode tag assignment | not_applicable | no explicit domain requirement or pivot; no hidden dependency found |
+| Hierarchy | not_applicable | no hierarchy contract/table/control; related/synonym semantics do not imply inheritance |
+| Administration/moderation/archive | completed | Gate/service/policy/audit/private exclusion retained; locale selectors and stale translation protection added |
+| Import/provider mapping/idempotency | already_compliant | Stable provider identity, pending mapping, provenance/current observation and editorial preservation verified |
+| Recommendations/collections/library/profile | already_compliant | Public similarity excludes private tags; personal filters remain owner-only and collection/progress state independent |
+| Account deletion/export | already_compliant | Owner export allowlist and cascade cleanup verified; no private orphan or foreign-user data |
+| Cache/search index/privacy | completed | Canonical origin and projection versions added; targeted invalidation retained; private tags never shared/indexed |
+| SEO/canonical/hreflang/structured data/sitemap | already_compliant | Eligible-only canonical metadata/redirects/schemas/sitemap; no false locale routes/hreflang or private pages |
+| Security/IDOR/XSS/CSRF/rate limits | completed | Existing policies/CSRF/plain-text/rate/batch controls verified; alias ambiguity and cache-origin poisoning closed |
+| Query performance/indexes/N+1 | already_compliant | Zero duplicate data anomalies, existing composite indexes and bounded `EXPLAIN`; no new index justified |
+| Mobile/accessibility/loading/empty/error | completed | Existing controls retained; locale fields use labelled touch-sized controls; public desktop/mobile Chromium has no overflow/errors |
+| Documentation/README/changelog | completed | Canonical owners, visitor history, Russian changelog, deployment, verification evidence and this plan updated |
+| Git commit/push | unresolved | Final delivery commit создан в `main`, но configured HTTPS remote отклонил push из-за отсутствующего credential; `gh` не установлен, SSH отклонён `Permission denied (publickey)`. Remote и secrets не менялись |
+
+## Known limitations and explicitly unresolved verification evidence
+
+- Public user tags, tag reporting, tag hierarchy and season/episode assignments remain `not_applicable`; no fake controls or schema were added.
+- The product has no separate tag-specific regional or Premium schema. Public tag pages use the same real catalogue publication/audience/window eligibility as all public cards.
+- The large streamed sitemap returned `200` with the expected XML/cache headers, but its full multi-megabyte body exceeded the bounded 30-second smoke; code and database eligibility were inspected instead of claiming a completed transfer.
+- Authenticated admin writes were not executed against production-style data without a supplied safe account. Route gate, hydration authorization, services, validation, optimistic version, transaction and audit calls were inspected; browser success is not claimed.
+- Automated tests were neither created nor run because Task 11 explicitly prohibited both. Existing test infrastructure was preserved and the pre-existing affected expectation was updated for future normal CI.
+- Configured HTTPS Git push не может пройти без внешней GitHub-аутентификации; `gh` отсутствует, а SSH key не авторизован. Commit остаётся в локальном `main`; изменение remote или credentials вне полномочий задачи.
+
+## Final verification checklist
+
+- [x] Task 11, canonical requirements and final matrix reread; no unchecked implementation requirement promoted without evidence.
+- [x] Every changed file and directly related route/model/service/query/policy/cache/SEO/import/account boundary reviewed.
+- [x] Route/schema/migration/index/data anomaly and bounded query-plan evidence reviewed; no schema change justified.
+- [x] PHP syntax, Pint, configured Larastan, translation parity/raw-key/hardcoded-text scans, docs-refresh check, Blade compilation and Vite build passed; no automated test command used.
+- [x] Public canonical/legacy/invalid tag routes, API, cache origin, desktop/mobile layout and anonymous privacy smoke passed; credential-dependent limitation recorded above.
+- [x] Repository-wide legacy/duplicate/dead/TODO/debug/`@php`/Blade-call/inline-style/script scans completed with only documented compatibility fallback remaining.
+- [x] README relevance/visitor history and Russian `CHANGELOG.md` updated; final commit создан в `main`, дерево после commit чистое.
+- [ ] Configured remote push заблокирован внешней GitHub-аутентификацией после HTTPS и SSH попыток; ошибка и локальный commit должны быть переданы без ложного заявления об отправке.

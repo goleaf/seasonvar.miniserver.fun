@@ -23,7 +23,7 @@ final class RussianOnlyAuthoringTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_personal_tag_editor_has_no_language_control_and_saves_russian_content(): void
+    public function test_personal_tag_editor_has_no_language_control_and_does_not_claim_a_content_language(): void
     {
         $user = User::factory()->create();
 
@@ -38,7 +38,7 @@ final class RussianOnlyAuthoringTest extends TestCase
         $this->assertDatabaseHas('user_tags', [
             'user_id' => $user->id,
             'name' => 'Любимые детективы',
-            'content_locale' => 'ru',
+            'content_locale' => null,
         ]);
     }
 
@@ -104,7 +104,7 @@ final class RussianOnlyAuthoringTest extends TestCase
         ]);
     }
 
-    public function test_tag_administration_edits_russian_translation_and_aliases_without_language_controls(): void
+    public function test_tag_administration_edits_supported_translation_and_alias_locales(): void
     {
         $admin = $this->admin();
         $tag = Tag::query()->create([
@@ -119,30 +119,31 @@ final class RussianOnlyAuthoringTest extends TestCase
         $component = Livewire::actingAs($admin)
             ->test(TagAdministrationManager::class)
             ->call('selectTag', $tag->public_id)
-            ->assertDontSeeHtml('admin-tag-translation-en')
-            ->assertDontSeeHtml('id="admin-tag-alias-locale"')
-            ->assertDontSeeText('Русский')
-            ->set('translationForms.ru.label', 'Русский детектив')
+            ->assertSeeHtml('id="admin-tag-translation-locale"')
+            ->assertSeeHtml('id="admin-tag-alias-locale"')
+            ->set('translationLocale', 'en')
+            ->set('translationForms.en.label', 'English detective')
             ->call('saveTranslation')
             ->assertHasNoErrors()
-            ->set('aliasName', 'Сыщик')
+            ->set('aliasLocale', 'en')
+            ->set('aliasName', 'Sleuth')
             ->call('addAlias')
             ->assertHasNoErrors();
 
         $this->assertDatabaseHas('tag_translations', [
             'tag_id' => $tag->id,
             'locale' => 'ru',
-            'label' => 'Русский детектив',
+            'label' => 'Детектив',
         ]);
         $this->assertDatabaseHas('tag_translations', [
             'tag_id' => $tag->id,
             'locale' => 'en',
-            'label' => 'Detective',
+            'label' => 'English detective',
         ]);
         $this->assertDatabaseHas('tag_aliases', [
             'tag_id' => $tag->id,
-            'locale' => 'ru',
-            'name' => 'Сыщик',
+            'locale' => 'en',
+            'name' => 'Sleuth',
         ]);
     }
 

@@ -86,7 +86,11 @@ final class PublicPageCachePolicy
 
     public function context(Request $request, string $profile): ?PublicPageCacheContext
     {
-        if (! (bool) config('cache-architecture.page_cache.enabled', true)
+        $canonicalOrigin = $this->canonicalOrigin();
+
+        if ($canonicalOrigin === null
+            || ! hash_equals($canonicalOrigin, strtolower($request->getSchemeAndHttpHost()))
+            || ! (bool) config('cache-architecture.page_cache.enabled', true)
             || ! $request->isMethod('GET')
             || $request->headers->has('Authorization')
             || $request->headers->has('X-Livewire')
@@ -111,6 +115,7 @@ final class PublicPageCachePolicy
         $dimensions = [
             'audience' => 'public',
             'assets' => $this->assetBuildFingerprint(),
+            'origin' => $canonicalOrigin,
             'locale' => app()->getLocale(),
             'route' => $routeName,
             'parameters' => $parameters,
@@ -342,5 +347,33 @@ final class PublicPageCachePolicy
     private function assetBuildFingerprint(): string
     {
         return $this->assetBuildFingerprint ??= $this->vite->manifestHash() ?? 'manifest-unavailable';
+    }
+
+    private function canonicalOrigin(): ?string
+    {
+        $parts = parse_url(trim((string) config('app.url')));
+
+        if (! is_array($parts)
+            || ! is_string($parts['scheme'] ?? null)
+            || ! is_string($parts['host'] ?? null)) {
+            return null;
+        }
+
+        $scheme = strtolower($parts['scheme']);
+        $host = strtolower($parts['host']);
+        $port = $parts['port'] ?? null;
+
+        if (! in_array($scheme, ['http', 'https'], true)
+            || $host === ''
+            || ($port !== null && (! is_int($port) || $port < 1 || $port > 65_535))) {
+            return null;
+        }
+
+        $portSuffix = is_int($port)
+            && ! (($scheme === 'http' && $port === 80) || ($scheme === 'https' && $port === 443))
+                ? ':'.$port
+                : '';
+
+        return $scheme.'://'.$host.$portSuffix;
     }
 }

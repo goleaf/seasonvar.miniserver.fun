@@ -164,8 +164,13 @@ final readonly class TagService
     }
 
     /** @param array{label: string, short_description?: string|null, description?: string|null, seo_title?: string|null, seo_description?: string|null} $data */
-    public function saveTranslation(User $actor, Tag $tag, string $locale, array $data): TagTranslation
-    {
+    public function saveTranslation(
+        User $actor,
+        Tag $tag,
+        string $locale,
+        array $data,
+        string $expectedVersion,
+    ): TagTranslation {
         Gate::forUser($actor)->authorize('update', $tag);
         $this->assertContentEditable($tag);
 
@@ -174,10 +179,11 @@ final readonly class TagService
         }
 
         $label = $this->validLabel($data['label']);
-        $translation = DB::transaction(function () use ($actor, $tag, $locale, $data, $label): TagTranslation {
+        $translation = DB::transaction(function () use ($actor, $tag, $locale, $data, $label, $expectedVersion): TagTranslation {
             $locked = Tag::query()->lockForUpdate()->findOrFail($tag->id);
             $this->assertContentEditable($locked);
             $beforeVersion = $this->version($locked);
+            $this->assertVersion($expectedVersion, $beforeVersion);
             $translation = TagTranslation::query()->updateOrCreate([
                 'tag_id' => $locked->id,
                 'locale' => $locale,
@@ -820,7 +826,6 @@ final readonly class TagService
 
         $conflictingTag = Tag::query()->whereKeyNot($tag->id)->where('normalized_name_hash', $hash)->exists();
         $conflictingAlias = TagAlias::query()
-            ->where('locale', $locale)
             ->where('normalized_name_hash', $hash)
             ->where('tag_id', '!=', $tag->id)
             ->exists();

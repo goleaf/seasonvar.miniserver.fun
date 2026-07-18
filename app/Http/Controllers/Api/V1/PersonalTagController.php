@@ -47,7 +47,7 @@ final class PersonalTagController extends Controller
         return (new PersonalTagResource($tags->update(
             $this->user($request),
             $tag,
-            $request->tagData(),
+            $request->tagData($tag->content_locale),
             $request->contentVersion(),
         )))->response()->header('Cache-Control', 'private, no-store');
     }

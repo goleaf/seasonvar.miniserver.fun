@@ -111,9 +111,17 @@ final class CatalogHomeSnapshotCache
                 'titles_count' => (int) $bucket->getAttribute('titles_count'),
             ])
             ->all();
-        $subtitleTag = Tag::query()
-            ->select(['id', 'name', 'slug'])
-            ->where('slug', 'subtitry')
+        $subtitleTagQuery = Tag::query()->select(['id', 'name', 'slug']);
+
+        if (Tag::usesCanonicalSchema()) {
+            $subtitleTagQuery
+                ->where('code', 'subtitle-available')
+                ->publiclyEligible();
+        } else {
+            $subtitleTagQuery->where('slug', 'subtitry');
+        }
+
+        $subtitleTag = $subtitleTagQuery
             ->withCount(['catalogTitles' => fn (Builder $query): Builder => $this->titles->constrainVisible($query, null)])
             ->first();
 

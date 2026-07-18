@@ -126,8 +126,8 @@
                             <x-ui.icon name="fa-solid fa-compass" />
                             <span>{{ __('home.navigation.recommendations') }}</span>
                         </a>
-                        @if (($subtitleTag?->catalog_titles_count ?? 0) > 0)
-                            <a href="{{ route('titles.index', ['tag' => 'subtitry']) }}" class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
+                        @if (($subtitleTag?->catalog_titles_count ?? 0) > 0 && $subtitleTagUrl !== null)
+                            <a href="{{ $subtitleTagUrl }}" class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">
                                 <span class="inline-flex items-center gap-2">
                                     <x-ui.icon name="fa-solid fa-closed-captioning" />
                                     <span>{{ __('home.navigation.subtitles') }}</span>

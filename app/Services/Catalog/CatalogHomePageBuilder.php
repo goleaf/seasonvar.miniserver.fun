@@ -190,6 +190,9 @@ class CatalogHomePageBuilder
             'genres' => $genres->take(18)->values(),
             'countries' => $countries,
             'subtitleTag' => $subtitleTag,
+            'subtitleTagUrl' => $subtitleTag instanceof Tag
+                ? route('titles.taxonomy', ['type' => 'tag', 'taxonomy' => $subtitleTag->slug])
+                : null,
             'featuredCollections' => $this->collections->featured(),
             'homeRecommendationItems' => $homeRecommendationItems,
             'homeRecommendationPresentation' => $homeRecommendationPresentation,

@@ -42,12 +42,16 @@ class PersonalTagStoreRequest extends FormRequest
         ];
     }
 
-    public function tagData(): PersonalTagData
+    public function tagData(?string $contentLocaleFallback = null): PersonalTagData
     {
+        $contentLocale = $this->exists('content_locale')
+            ? $this->validated('content_locale')
+            : $contentLocaleFallback;
+
         return new PersonalTagData(
             name: (string) $this->validated('name'),
             description: is_string($this->validated('description')) ? $this->validated('description') : null,
-            contentLocale: is_string($this->validated('content_locale')) ? $this->validated('content_locale') : null,
+            contentLocale: is_string($contentLocale) ? $contentLocale : null,
         );
     }
 }

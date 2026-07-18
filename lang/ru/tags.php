@@ -128,6 +128,8 @@ return [
         'serial_count' => 'Назначения сериалам',
         'translations' => 'Переводы',
         'provider_mappings' => 'Связи с провайдерами',
+        'translation_language' => 'Язык перевода',
+        'alias_language' => 'Язык другого названия',
         'short_description' => 'Краткое описание',
         'seo_title' => 'SEO-заголовок',
         'seo_description' => 'SEO-описание',

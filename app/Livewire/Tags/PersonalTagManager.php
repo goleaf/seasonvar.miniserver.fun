@@ -95,14 +95,17 @@ final class PersonalTagManager extends Component
     public function save(): void
     {
         $user = $this->user();
-        $data = new PersonalTagData($this->name, $this->description, 'ru');
 
         if ($this->editingPublicId === null) {
-            $tag = $this->tags->create($user, $data);
+            $tag = $this->tags->create($user, new PersonalTagData($this->name, $this->description));
         } else {
             $tag = $this->tagQuery->owned($user, $this->editingPublicId);
             abort_if($tag === null, 404);
-            $tag = $this->tags->update($user, $tag, $data, $this->editingVersion);
+            $tag = $this->tags->update($user, $tag, new PersonalTagData(
+                $this->name,
+                $this->description,
+                $tag->content_locale,
+            ), $this->editingVersion);
         }
 
         $this->selectedPublicId = (string) $tag->public_id;
