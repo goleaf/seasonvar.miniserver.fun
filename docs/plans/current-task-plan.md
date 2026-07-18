@@ -105,7 +105,7 @@ UI сохраняет существующую светлую Seasonvar product 
 - [x] Update canonical owners, verification report, maintenance log, Russian changelog and visitor README for the actual behavior changes.
 - [x] Run allowed Pint/PHP syntax/Larastan/Blade/Vite/docs/translation/security/browser checks; no test runner.
 - [x] Repository-wide legacy/duplicate/dead/private-cache/profile-data scan and changed/related file review.
-- [ ] Commit intentional tracked changes on clean `main`; attempt configured push without invoking prohibited automated tests.
+- [x] Commit intentional tracked changes on clean `main`; configured push attempted without invoking prohibited automated tests and was externally rejected because GitHub HTTPS credentials are unavailable.
 
 ## Audit discoveries — update immediately
 
@@ -125,7 +125,7 @@ UI сохраняет существующую светлую Seasonvar product 
 - Biography/report details allowed part of the control-character space and long public biography had no accessible collapse. Canonical plain-text normalization and server validation now cover control/surrogate/bidi input; a prepared preview plus native `<details>` supplies keyboard/screen-reader expand/collapse without JavaScript business logic.
 - A proposed registration/account-lifecycle bypass while profile schema is unavailable was rejected after inspecting the immutable backfill: a user created in that gap would be treated as legacy and become public, while deletion could skip private-media cleanup. Migration-before-code remains mandatory; only public read-only search/sitemap degrade to an empty result.
 - Fresh HTTPS/Chromium evidence: public profile 200, one canonical/index metadata and ProfilePage/Person JSON-LD, `private,no-store`, no private field markers or horizontal overflow at 320px, zero public console errors; active private profile returned non-disclosing 404; sitemap contained 75 eligible URLs and no profile tabs.
-- Prior Task 13 push remains externally blocked by missing GitHub HTTPS credentials; repeat Task 14 will still create its own local `main` commit and retry the configured push.
+- Task 14 implementation was committed as `392d7d7` on `main`; the configured HTTPS push was retried with the prohibited automated-test hook skipped and failed only because GitHub credentials are unavailable. Remote configuration and secrets remain unchanged.
 
 ## Database, migration and production review
 
@@ -182,7 +182,7 @@ Only evidence may determine the final set. Likely owners if defects exist:
 | Production data application | already_compliant | audit is read-only; no migration or destructive operation planned before evidence |
 | Automated tests | not_applicable | user explicitly prohibited test creation/execution; existing infrastructure remains protected |
 | Documentation/README/changelog | completed | canonical owners, search correction, verification/maintenance evidence, Russian changelog and visitor README updated without duplicate domain docs |
-| Git commit/push | unresolved | final local `main` commit and configured push occur after the last clean verification pass |
+| Git commit/push | unresolved | implementation commit `392d7d7` exists on clean local `main`; configured HTTPS push was attempted after verification and rejected because GitHub credentials are unavailable, with remote/secrets unchanged |
 
 ## Final verification checklist
 
