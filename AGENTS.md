@@ -16,6 +16,18 @@
 
 Перед изменением кода нужно смотреть соседние файлы и существующие паттерны. Предпочитать структуру, которая уже используется в `app/Http/Controllers`, `app/Models`, `app/Services`, `app/Console/Commands`, `resources/views`, `database/migrations` и `tests`.
 
+## Обязательная граница сопровождения и обновлений
+
+- Каждая задача, меняющая зависимости, API фреймворка, архитектурные паттерны, package configuration, runtime requirements, поведение базы данных, build tooling, browser behavior или production services, до начала работы обязана прочитать [`docs/requirements/maintenance-and-upgrades.md`](docs/requirements/maintenance-and-upgrades.md) в порядке из [`docs/requirements/index.md`](docs/requirements/index.md).
+- Никогда не выполнять обновление только потому, что существует более новая версия. Сначала зафиксировать бизнес-, security-, compatibility-, performance- или maintenance-причину.
+- Каждое обновление требует compatibility review, карты затронутых функций, migration strategy, rollback strategy, production-impact review, обновления документации и verification checklist.
+- Не объединять несвязанные major upgrades в одно неконтролируемое изменение. Framework, runtime, package, database, cache и infrastructure upgrades разделяются, когда это повышает безопасность, проверяемость или обратимость.
+- Перед удалением package или архитектурной границы искать по всему репозиторию routes, configuration, service providers, facades, aliases, Blade/Livewire usage, JavaScript/CSS imports, database fields, cache keys, документацию, deployment steps и production dependencies.
+- Каждая maintenance-задача ищет architectural regression против постоянных правил: Volt, `@php`, прямые Blade calls, inline CSS, inline business JavaScript, hardcoded user-facing strings, translated identity values, client-trusted access state, fake integrations, duplicate services, stale cache invalidation и missing documentation.
+- Не полагаться на память о framework/package behavior, когда решение зависит от версии. Использовать проверенную актуальную официальную документацию и фиксировать источник решения.
+- Каждое завершённое обновление актуализирует canonical dependency inventory, compatibility matrix, known limitations, production requirements, changelog и current-task compliance matrix.
+- Все ранее реализованные системы портала являются защищёнными compatibility domains. Обновление неполно, если не проверено влияние на authentication, Livewire state, translations, caching, search, notifications, player, premium, payments, advertisements, rights-holder restrictions, administration, service workers, deployment, backups и rollback.
+
 ## Источники истины документации
 
 - `docs/README.md` — единая карта владельцев тем. Не копировать доменные контракты из неё или из тематических документов в `AGENTS.md`.

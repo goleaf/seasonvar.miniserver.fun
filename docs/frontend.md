@@ -2,6 +2,10 @@
 
 Обновлено: 18.07.2026
 
+## Upgrade compatibility
+
+Livewire, Tailwind, Flux, Vite и browser-library changes выполняются по [`requirements/maintenance-and-upgrades.md`](requirements/maintenance-and-upgrades.md). Class-based Livewire, locale/navigation history, prepared public state, lifecycle cleanup, accessibility и existing bundle ownership сохраняются. Package translations не перекрывают project catalogs; validation, mail, notifications, numbers/dates/pluralization и JavaScript dictionaries проверяются для `ru` и `en` после affected major update.
+
 ## Стек
 
 - Vite 8 и `laravel-vite-plugin` 3 собирают фронтенд.

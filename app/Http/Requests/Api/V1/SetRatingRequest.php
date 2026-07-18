@@ -33,9 +33,9 @@ final class SetRatingRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'rating.required' => 'Укажите оценку.',
-            'rating.integer' => 'Оценка должна быть целым числом.',
-            'rating.between' => 'Оценка находится вне допустимого диапазона.',
+            'rating.required' => __('api.validation.rating.required'),
+            'rating.integer' => __('api.validation.rating.integer'),
+            'rating.between' => __('api.validation.rating.range'),
         ];
     }
 

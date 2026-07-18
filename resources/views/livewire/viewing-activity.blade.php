@@ -78,9 +78,12 @@
 
                                 @if ($item->actionType === 'continue' && $item->progressPercent !== null)
                                     <div class="mt-3" aria-label="{{ __('catalog.viewing.watched_percent', ['percent' => $item->progressPercent]) }}">
-                                        <div class="h-1.5 overflow-hidden rounded-full bg-slate-100">
-                                            <div class="h-full rounded-full bg-emerald-600" style="width: {{ $item->progressPercent }}%"></div>
-                                        </div>
+                                        <x-ui.progress
+                                            :value="$item->progressPercent"
+                                            :label="__('catalog.viewing.watched_percent', ['percent' => $item->progressPercent])"
+                                            :value-text="__('catalog.viewing.watched_percent_label', ['percent' => $item->progressPercent])"
+                                            size="sm"
+                                        />
                                         <div class="mt-1 text-xs font-semibold text-slate-500">{{ __('catalog.viewing.watched_percent_label', ['percent' => $item->progressPercent]) }}</div>
                                     </div>
                                 @endif

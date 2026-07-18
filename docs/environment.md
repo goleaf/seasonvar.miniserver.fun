@@ -1,8 +1,12 @@
 # Переменные окружения
 
-Обновлено: 17.07.2026
+Обновлено: 18.07.2026
 
 Полный безопасный шаблон находится в `.env.example`. Реальный `.env` не изменяется deployment-кодом и не коммитится.
+
+Canonical runtime evidence и честные статусы `verified|documented compatible|unknown|requires review` находятся в [`maintenance/runtime-compatibility.md`](maintenance/runtime-compatibility.md). Локально Task 29 наблюдал PHP CLI/FPM `8.5.8`, Composer `2.10.2`, Node `26.4.0`, npm `12.0.1`, SQLite `3.46.1`, `pdo_mysql`, Redis и Memcached PHP extensions и nginx; это не подменяет production-host preflight. Node 26 остаётся Current, поэтому future LTS migration требует отдельного decision и locked build verification. Composer self-update public keys устанавливаются на build host по официальной процедуре и не являются application `.env` secrets.
+
+`SEASONVAR_INTEGRATION_HOME` — необязательный operator-only путь для CLI-команды `integrations:doctor`, если процесс не наследует корректный home directory. Значение не показывается в web/admin UI и не должно указывать на shared public directory; при отсутствии override конфигурация использует home процесса, в котором строится config cache.
 
 ## Production baseline
 

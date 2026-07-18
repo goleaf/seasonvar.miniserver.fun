@@ -156,14 +156,13 @@
                             <div class="text-xs font-semibold text-slate-400">{{ $row['meta'] }}</div>
                         </div>
                     </div>
-                    <div class="mt-3 h-2 overflow-hidden rounded-full bg-white">
-                        <div @class([
-                            'h-full rounded-full',
-                            'bg-rose-500' => $row['severity'] === 'critical',
-                            'bg-amber-500' => $row['severity'] === 'warning',
-                            'bg-slate-400' => ! in_array($row['severity'], ['critical', 'warning'], true),
-                        ]) style="width: {{ $row['percent_value'] }}%"></div>
-                    </div>
+                    <x-ui.progress
+                        class="mt-3"
+                        :value="$row['percent_value']"
+                        :label="$row['label']"
+                        :value-text="$row['meta']"
+                        :tone="$row['severity']"
+                    />
                 </article>
             @empty
                 <div class="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500 md:col-span-2">

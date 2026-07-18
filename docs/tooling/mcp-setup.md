@@ -10,6 +10,8 @@
 
 Все servers `required=false`: documentation/browser package startup не блокирует Codex. API keys, cookies, persistent profiles и credentials в tracked files отсутствуют. `default_tools_approval_mode` применяется только там, где текущий Codex config его поддерживает.
 
+CLI `integrations:doctor` читает operator home только через `config('services.integration_doctor.operator_home')`. Обычно config получает home текущего процесса; если build/CLI process его не наследует, можно задать несекретный `SEASONVAR_INTEGRATION_HOME` вне Git. Web/admin output не раскрывает путь.
+
 ## Ошибки и исправления
 
 1. `php artisan boost:mcp --env=local` запускал parent в local, но дочерние Artisan processes не наследовали option и видели production. Добавлен `env = { APP_ENV = "local" }`; исходная application-info проверка повторена успешно.

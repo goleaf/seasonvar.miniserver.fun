@@ -57,20 +57,20 @@ final class UserLibraryIndexRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'q.string' => 'Поисковый запрос должен быть строкой.',
-            'q.max' => 'Поисковый запрос не должен быть длиннее 160 символов.',
-            'type.enum' => 'Выбран неизвестный тип публикации.',
-            'year.integer' => 'Год должен быть целым числом.',
-            'year.min' => 'Год должен быть не меньше 1900.',
-            'year.max' => 'Указан недопустимый год.',
+            'q.string' => __('api.validation.library.query_string'),
+            'q.max' => __('api.validation.library.query_maximum', ['maximum' => 160]),
+            'type.enum' => __('api.validation.library.publication_type'),
+            'year.integer' => __('api.validation.library.year_integer'),
+            'year.min' => __('api.validation.library.year_minimum', ['minimum' => 1900]),
+            'year.max' => __('api.validation.library.year_maximum'),
             'tag.uuid' => __('tags.validation.personal_tag'),
-            'sort.in' => 'Выбран недоступный способ сортировки.',
-            'direction.in' => 'Направление сортировки должно быть asc или desc.',
-            'page.integer' => 'Номер страницы должен быть целым числом.',
-            'page.min' => 'Номер страницы должен быть не меньше 1.',
-            'per_page.integer' => 'Размер страницы должен быть целым числом.',
-            'per_page.min' => 'Размер страницы должен быть не меньше 1.',
-            'per_page.max' => 'Размер страницы не должен быть больше 50.',
+            'sort.in' => __('api.validation.library.sort'),
+            'direction.in' => __('api.validation.library.direction'),
+            'page.integer' => __('api.validation.pagination.page_integer'),
+            'page.min' => __('api.validation.pagination.page_minimum'),
+            'per_page.integer' => __('api.validation.pagination.per_page_integer'),
+            'per_page.min' => __('api.validation.pagination.per_page_minimum'),
+            'per_page.max' => __('api.validation.pagination.per_page_maximum', ['maximum' => 50]),
         ];
     }
 

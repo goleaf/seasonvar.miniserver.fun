@@ -26,11 +26,11 @@ final class SyncPullRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'cursor.string' => 'Курсор синхронизации должен быть строкой.',
-            'cursor.max' => 'Курсор синхронизации слишком длинный.',
-            'limit.integer' => 'Лимит должен быть целым числом.',
-            'limit.min' => 'Лимит должен быть не меньше 1.',
-            'limit.max' => 'Лимит не должен быть больше 200.',
+            'cursor.string' => __('api.validation.sync.cursor_string'),
+            'cursor.max' => __('api.validation.sync.cursor_maximum'),
+            'limit.integer' => __('api.validation.pagination.limit_integer'),
+            'limit.min' => __('api.validation.pagination.limit_minimum'),
+            'limit.max' => __('api.validation.pagination.limit_maximum', ['maximum' => 200]),
         ];
     }
 

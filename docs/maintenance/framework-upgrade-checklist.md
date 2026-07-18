@@ -1,0 +1,27 @@
+# Checklist Laravel/framework upgrade
+
+- [ ] Requirements и maintenance contract обновлены до package work.
+- [ ] Current/proposed PHP, Laravel и first-party package versions записаны.
+- [ ] Прочитана official version-specific upgrade guidance.
+- [ ] Проверены Composer constraints, relevant transitive changes и lock diff plan.
+- [ ] Проверены bootstrap, middleware, exception и route registration.
+- [ ] Проверены application/package providers и auto-discovery.
+- [ ] Проверены console commands, scheduler and production scripts.
+- [ ] Проверены authentication, Sanctum, authorization/policies и CSRF.
+- [ ] Проверены validation, localized errors и pagination.
+- [ ] Проверены Eloquent casts, dates, enums, transactions, schema и SQLite/production DB.
+- [ ] Проверены cache, rate limits, locks и serialization/versioning.
+- [ ] Проверены sessions, encrypted cookies, remember-me, OAuth/checkout returns.
+- [ ] Проверены queues, pending jobs, retries, idempotency и worker restart.
+- [ ] Проверены filesystem, secure downloads, uploads и storage URLs.
+- [ ] Проверены mail, notifications и user locale.
+- [ ] Проверены API Resources, JSON errors, route names и versioned contracts.
+- [ ] Проверены Livewire lifecycle/navigation/public properties без Volt.
+- [ ] Проверены Vite/Tailwind/assets and production manifest.
+- [ ] Проверены player/progress/library/search/payment/legal/region/admin boundaries.
+- [ ] Deprecated APIs повторно поисканы после smallest coherent migration.
+- [ ] Existing test infrastructure только инспектируется или запускается согласно конкретной task policy.
+- [ ] Production extensions, web server, PHP-FPM/opcache and deployment order проверены.
+- [ ] Database/cache/session/job rollback and backup requirements описаны.
+- [ ] Compatibility matrix, inventory, decisions, deprecations, production docs обновлены.
+- [ ] Cross-feature matrix и manual/browser verification содержат фактически выполненный evidence.

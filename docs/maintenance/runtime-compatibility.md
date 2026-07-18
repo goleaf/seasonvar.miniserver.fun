@@ -1,0 +1,68 @@
+# Матрица runtime-совместимости
+
+Аудит: 18.07.2026. Матрица разделяет локально установленное, проверенное инструментами, требуемое проектом и внешнее production-состояние. Статус `verified` относится только к перечисленной проверке и не означает поддержку любого будущего patch release.
+
+## Значения статусов
+
+- `verified` — команда или реальный локальный flow выполнен в этой среде.
+- `documented compatible` — constraint/config/официальная документация совместимы, но полный runtime flow в Task 29 не выполнен.
+- `project-required` — постоянный production contract проекта.
+- `optional` — путь настроен, но не является обязательным для корректности.
+- `unsupported` — пакет/сервис отсутствует или явно не входит в текущий продукт.
+- `unknown` — доказательства из внешней production-среды недоступны.
+- `requires review` — работоспособность не равна одобренной production-политике.
+
+## Framework, language и build runtime
+
+| Boundary | Current evidence | Status | Compatibility decision / limitation |
+| --- | --- | --- | --- |
+| Laravel | lock `13.20.0`, constraint `^13.20` | verified installed; documented compatible | Laravel 13 officially requires PHP 8.3+. Framework major changes remain separate. [Laravel 13 release notes](https://laravel.com/docs/13.x/releases) |
+| Livewire | lock `4.3.3`, constraint `^4.3` | verified installed | Class components retained; Volt absent. Hashed update route uses the v4 two-argument callback; deprecated `commit`/`request` JS hooks are absent. `.blur` bindings intentionally synchronize on blur under v4.1+ semantics. [Livewire 4 upgrade guide](https://livewire.laravel.com/docs/4.x/upgrading) |
+| Tailwind CSS | lock `4.3.2`, Vite plugin `4.3.2` | verified installed and production build | CSS-first `@import`/`@source` architecture is already v4; no v3 config migration is needed. [Tailwind upgrade guide](https://tailwindcss.com/docs/upgrade-guide) |
+| Flux / Flux Pro | no Composer/npm package or source usage | unsupported, intentional | Do not install or claim licensed Pro components. Existing custom components remain canonical. |
+| PHP requirement | Composer `^8.3`; production docs require 8.5 | project-required | Laravel minimum and project production baseline are different facts; do not raise Composer minimum without deployment review. |
+| Local PHP CLI / FPM | `8.5.8` / `8.5.8` | verified version | Loaded: PDO SQLite/MySQL, Redis, Memcached, intl, mbstring, curl, fileinfo, sodium, Imagick, GD and OPcache. FPM pool/traffic behavior remains production verification. |
+| PHP support policy | PHP 8.5 active support through 31.12.2027, security through 31.12.2029 | documented compatible | Future PHP minor requires official migration/deprecation review. [PHP supported versions](https://www.php.net/supported-versions.php), [PHP 8.5 migration](https://www.php.net/manual/en/migration85.php) |
+| Composer | local `2.10.2`; lock validation succeeds | verified tool; requires review | `composer diagnose` reports missing global tag/dev verification pubkeys. No repository update used self-update; operator key setup is tracked before future Composer self-update. |
+| Node.js | local `26.4.0`; deployment docs currently say 26; no `.nvmrc`, `.node-version` or `engines` | documented build-compatible; requires review | Vite 8 supports this range, but Node 26 is still `Current` on audit date and official policy recommends LTS for production. Evaluate Node 24 LTS as a separate build-runtime migration; do not rewrite lock now. [Node release status](https://nodejs.org/en/about/previous-releases) |
+| npm | local `12.0.1`, only lock format v3 | verified tool | Package manager remains npm. Global `--init.module` config warning is external to repository and must be removed before the next npm major. |
+| Vite | lock `8.1.4`, Laravel plugin `3.1.3` | verified installed, build and manifest | One public entry `resources/js/app.js`; production build emitted 15 manifest entries, valid referenced assets and no source maps. Vite 8 requires Node 20.19+ or 22.12+. [Vite 8 announcement](https://vite.dev/blog/announcing-vite8) |
+
+## Database, cache, session и queue
+
+| Boundary | Current evidence | Status | Compatibility decision / limitation |
+| --- | --- | --- | --- |
+| SQLite | config default and `.env.example`; local CLI/PDO `3.46.1`; production-style repository runbooks | project-required; locally verified driver | 101 additive project migrations and SQLite-specific backup/writer-stop/FTS/WAL runbooks remain canonical. No Task 29 migration or production data write. |
+| MySQL | PDO MySQL/mysqlnd `8.5.8`, Laravel config present | optional / unknown server | Driver availability is not schema/query compatibility proof. Do not claim production MySQL support until migrations, JSON, indexes, FTS, locks, money and backup/restore are rehearsed. |
+| PostgreSQL / SQL Server | framework sample config only; no current project evidence | unsupported | Adding a driver is a separate database migration, not a package toggle. |
+| Redis client | PHP Redis extension `6.3.0`; no direct Predis package | project-required | Cache, sessions, queues, locks and broadcasting use separate connections/prefixes. Serializer/compression/prefix/client changes require stale-key/session/job rollout. |
+| Redis server | no local `redis-server` binary/version evidence | unknown | Application health may verify connectivity, but server version, persistence and failover belong to production operations. |
+| Memcached client | PHP extension `3.4.0`, libmemcached `1.0.18` | project-required for hot cache | Values are recomputable; eviction is expected. Serializer/persistent ID/pool changes require fallback review. |
+| Memcached server | binary `1.6.39` present; local service/unit/port unavailable during Task 29 health inspection | requires review; local runtime unavailable | Application readiness remains available through the documented recomputable-cache fallback, but this is degraded operation rather than a verified hot-cache tier. Production Memcached service/config/metrics still require redacted host evidence. |
+| Cache format | application `CACHE_SCHEMA_VERSION`/`CACHE_FORMAT_VERSION`; Redis domain + Memcached hot + failover | project-required | No Task 29 key, serializer, TTL or payload format change. Global `Cache::flush()` remains prohibited. |
+| Session | production Redis connection `sessions`, encrypted/signed cookie framework contract | project-required | No driver, cookie, serialization or `APP_KEY` change. Any future change must preserve OAuth/payment returns and account switching. |
+| Queue | production Redis, `after_commit=true`; synchronous fallbacks exist where documented | project-required | Ten application job classes and queued notifications were inventoried. Class/constructor changes require pending-job compatibility and worker restart. |
+| Scheduler | seven named bounded schedules using lock store | verified source configuration | No new cron/queue infrastructure. Scheduler availability in production remains operational evidence. |
+
+## Web, browser, provider и storage compatibility
+
+| Boundary | Current evidence | Status | Compatibility decision / limitation |
+| --- | --- | --- | --- |
+| nginx | local binary `1.31.2` | verified version; production config unknown | Rewrites, headers, range/proxy/upload/static rules must be checked on upgrade; binary version alone is not verification. |
+| PHP-FPM | local `8.5.8` | verified version; pool unknown | Pool user/group, timeouts, OPcache, graceful reload and workers remain deployment checks. |
+| OPcache | extension `8.5.8`; enabled for FPM configuration, CLI cache disabled | documented compatible | Runtime deployment must reload FPM after PHP/config/package changes; CLI status does not prove FPM hit rate. |
+| Chromium | Task 29 headless desktop/mobile smoke on the configured HTTPS host | partially verified | RU/EN login, registration, password-recovery and guest library redirect rendered without horizontal overflow, raw keys, console/page errors or service-worker registration. Home/catalog/admin timed out under the active SQLite/import workload and are not claimed verified. |
+| Firefox, Safari, iOS Safari, Android device/WebView | capability-aware code and documented fallbacks | unknown real-device | No emulation may be described as real-device verification. Player/PiP/fullscreen/safe-area/upload/payment/OAuth require device checks when affected. |
+| Service worker / PWA | no manifest, registration, worker or package | unsupported, intentional | Private/payment/ticket/legal/advertiser/admin/media caching exclusions are preserved by absence. A future PWA is a separately designed allowlist architecture. |
+| Payment provider SDK | none; provider registry/currencies/plans inactive by default | unsupported until reviewed provider rollout | Internal exact-money, signature, idempotency and reconciliation boundaries remain protected; no browser success trust. |
+| OAuth/social login SDK | none | unsupported | Google analytics/search integrations are read-only HTTP services, not account OAuth. No callback route/account-link behavior exists to claim. |
+| Mail | Laravel/Symfony Mailer transitive; configurable SMTP/sendmail/log/failover | project-required; external delivery unknown | Application acceptance is not delivery proof. Locale/verification/reset/security/premium/ticket/legal notifications remain compatibility journeys. |
+| Local/private storage | Flysystem local; private uploads outside `public/` | project-required | PHP-FPM/CLI group and `0660/0770` contract preserved. No Task 29 file identity change. |
+| S3/object storage | config stub exists; S3 adapter is not a direct installed package | unsupported until approved | Do not enable from environment alone. Package/license/credentials/private delivery/migration/rollback review is required. |
+| Search provider | application Eloquent/SQLite FTS5; no Scout/remote engine | project-required | External search package is not installed and may not replace canonical identity/ranking without migration. |
+| Media | Plyr `3.8.4`, hls.js `1.6.16`, native media APIs | project-required | MP4/HLS capability detection and authorized source resolver remain canonical. Package update requires player lifecycle/mobile/subtitle/quality/progress review. |
+| Image processing | PHP Imagick `3.8.1` and GD `8.5.8` loaded | documented compatible | Format, pixel/memory, EXIF/metadata, private upload and existing reference behavior require separate extension/library upgrade review. |
+
+## Production compatibility conclusion
+
+Task 29 does not change PHP, Node, Composer/npm, framework/package constraints, database, Redis/Memcached, cache/session/job serialization, provider state or service worker. Therefore deployment uses the existing locked-install/build/cache/reload runbook. Local `app:health` remained ready but degraded because Memcached was unavailable and cache warming reported existing failures; Task 29 neither concealed this state nor started/reconfigured services. Outstanding production evidence is explicit: Node 26 LTS policy, Composer self-update pubkeys, Redis/Memcached server/failover state, actual FPM/nginx config, non-Chromium devices and external provider delivery.

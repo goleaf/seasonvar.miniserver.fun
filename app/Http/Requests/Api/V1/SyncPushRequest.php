@@ -52,17 +52,17 @@ final class SyncPushRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'operations.required' => 'Передайте операции синхронизации.',
-            'operations.array' => 'Операции синхронизации должны быть массивом.',
-            'operations.list' => 'Операции синхронизации должны быть последовательным списком.',
-            'operations.min' => 'Передайте хотя бы одну операцию синхронизации.',
-            'operations.max' => 'За один запрос можно передать не более 50 операций.',
-            'operations.*.mutation_id.required' => 'Для каждой операции нужен mutation_id.',
-            'operations.*.mutation_id.uuid' => 'mutation_id должен быть UUID.',
-            'operations.*.mutation_id.distinct' => 'mutation_id не должен повторяться в одном запросе.',
-            'operations.*.type.required' => 'Укажите тип операции.',
-            'operations.*.type.in' => 'Тип операции не поддерживается.',
-            'operations.*.title_slug.regex' => 'Slug тайтла имеет некорректный формат.',
+            'operations.required' => __('api.validation.sync.operations_required'),
+            'operations.array' => __('api.validation.sync.operations_array'),
+            'operations.list' => __('api.validation.sync.operations_list'),
+            'operations.min' => __('api.validation.sync.operations_minimum'),
+            'operations.max' => __('api.validation.sync.operations_maximum'),
+            'operations.*.mutation_id.required' => __('api.validation.sync.mutation_required'),
+            'operations.*.mutation_id.uuid' => __('api.validation.sync.mutation_uuid'),
+            'operations.*.mutation_id.distinct' => __('api.validation.sync.mutation_distinct'),
+            'operations.*.type.required' => __('api.validation.sync.type_required'),
+            'operations.*.type.in' => __('api.validation.sync.type_unsupported'),
+            'operations.*.title_slug.regex' => __('api.validation.sync.title_slug_invalid'),
         ];
     }
 
@@ -73,7 +73,7 @@ final class SyncPushRequest extends FormRequest
             foreach (array_diff(array_keys($this->all()), ['operations']) as $extraKey) {
                 $validator->errors()->add(
                     (string) $extraKey,
-                    'Поле верхнего уровня не поддерживается.',
+                    __('api.validation.sync.top_level_field_unsupported'),
                 );
             }
 
@@ -99,19 +99,19 @@ final class SyncPushRequest extends FormRequest
                 foreach (array_diff(array_keys($operation), $allowed) as $extraKey) {
                     $validator->errors()->add(
                         "operations.{$index}.{$extraKey}",
-                        'Поле не поддерживается для выбранной операции.',
+                        __('api.validation.sync.field_unsupported'),
                     );
                 }
 
                 foreach (array_diff($allowed, array_keys($operation)) as $missingKey) {
                     $validator->errors()->add(
                         "operations.{$index}.{$missingKey}",
-                        'Поле обязательно для выбранной операции.',
+                        __('api.validation.sync.field_required'),
                     );
                 }
 
                 if ($type === 'watchlist.set' && array_key_exists('value', $operation) && ! is_bool($operation['value'])) {
-                    $validator->errors()->add("operations.{$index}.value", 'Значение списка просмотра должно быть логическим.');
+                    $validator->errors()->add("operations.{$index}.value", __('api.validation.sync.watchlist_boolean'));
                 }
 
                 if ($type === 'rating.set' && array_key_exists('value', $operation)) {
@@ -122,7 +122,10 @@ final class SyncPushRequest extends FormRequest
                     if ($value !== null && (! is_int($value) || $value < $minimum || $value > $maximum)) {
                         $validator->errors()->add(
                             "operations.{$index}.value",
-                            "Оценка должна быть от {$minimum} до {$maximum} или null.",
+                            __('api.validation.rating.range_or_null', [
+                                'minimum' => $minimum,
+                                'maximum' => $maximum,
+                            ]),
                         );
                     }
                 }

@@ -2,6 +2,16 @@
 
 Обновлено: 18.07.2026
 
+## Frontend dependency upgrades
+
+- Keyboard support, screen-reader semantics, focus order/return и visible focus сохраняются.
+- Modal, sheet, dropdown, popover, autocomplete, select и menu upgrades требуют accessibility verification.
+- Tailwind changes сохраняют responsive layouts, 320px/200% zoom, long translated labels, touch targets, safe areas и reduced motion.
+- Flux/Flux Pro update не вводит Volt, не предполагает absent license/package и сохраняет current component behavior.
+- Deprecated browser APIs заменяются capability-detected alternatives; hover-only controls и disabling zoom запрещены.
+- Frontend update сохраняет documented browser support, virtual-keyboard behavior, service-worker private exclusions и accessible hosted payment flows.
+- Chart changes сохраняют textual summaries и meaning, не зависящий только от цвета.
+
 ## Текущее визуальное направление
 
 Seasonvar — не промо-лендинг, а плотный продуктовый каталог. Текущее направление называется «тихий технологичный каталог»: светлая slate-основа, белые непрозрачные поверхности, emerald как единственный основной action-цвет, локальные FontAwesome-иконки, системный кириллический шрифт, крупные постеры и спокойная типографическая иерархия. Интерфейс должен помогать найти тайтл, понять его состояние и начать просмотр, а не конкурировать с контентом декоративными эффектами.

@@ -2,6 +2,35 @@
 
 Обновлено: 16.07.2026
 
+## Обязательный upgrade decision record
+
+До изменения dependency/runtime в [`maintenance/update-decisions.md`](maintenance/update-decisions.md) фиксируются: dependency/runtime, current/proposed version, direct/transitive scope, purpose, reason, security/maintenance relevance, compatibility requirements, affected files/features, config/database/assets/production changes, deprecated/replacement APIs, backward compatibility, rollback, verification и решение `update|retain|replace|remove`.
+
+Обязательный staged workflow:
+
+1. Обновить requirements.
+2. Инвентаризировать текущий state и lock hashes.
+3. Найти официальное version-specific guidance.
+4. Зафиксировать breaking changes.
+5. Найти deprecated APIs.
+6. Составить affected portal-module map.
+7. Обновить current task plan/compliance matrix.
+8. Выполнить smallest coherent change.
+9. Обновить configuration.
+10. Обновить application code.
+11. Проверить translations, если затронуты.
+12. Проверить cache identities/invalidation.
+13. Обновить production requirements.
+14. Обновить deployment и rollback.
+15. Выполнить доступную разрешённую verification.
+16. Повторно найти оставшееся old-API usage.
+17. Обновить inventory/compatibility/registries.
+18. Обновить changelog.
+19. Commit только в `main`.
+20. Push configured remote.
+
+Lock files не меняются без анализа причины. Проверяется каждый direct и существенный transitive change; unrelated upgrades не принимаются внутри lock rewrite. Lock files не удаляются для принудительного resolution и не создаются другим package manager без explicit migration plan.
+
 ## Локальная установка
 
 Требования для разработки:

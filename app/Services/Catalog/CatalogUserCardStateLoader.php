@@ -106,7 +106,7 @@ final class CatalogUserCardStateLoader
 
         return [
             'type' => $completed ? 'replay' : 'continue',
-            'label' => $completed ? 'Смотреть снова' : 'Продолжить просмотр',
+            'label' => $completed ? __('catalog.player.watch_again') : __('catalog.player.continue'),
             'url' => $url,
         ];
     }

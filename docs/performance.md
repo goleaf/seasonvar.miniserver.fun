@@ -2,6 +2,17 @@
 
 Обновлено: 18.07.2026
 
+## Performance requirements для upgrades
+
+- Dependency updates включают query-count и payload/bundle-size review в затронутых paths.
+- Livewire update требует hydration, serialization, request count, stale response, duplicate action/listener и navigation review.
+- Tailwind/Vite update требует content scanning, generated CSS, manifest/chunks, cache/service-worker и bundle-size review.
+- Image/media update проверяет formats, quality, memory и metadata behavior; database/driver update — query generation и index usage.
+- Redis/Memcached client update проверяет timeout, serializer, prefix, connection/retry и failure fallback.
+- Update не вводит one-query-per-card/component, one-provider-call-per-render, unreviewed public JavaScript growth или global cache invalidation.
+- Cache/session/queue serialization changes требуют stale-data/pending-job compatibility и deployment/rollback order.
+- Runtime change обновляет opcache/PHP-FPM restart instructions; frontend compatibility change обновляет service-worker cache version только при реальной необходимости.
+
 Основание общепроектного projection audit — [«Your Laravel with() Queries May Be Loading Too Much Data»](https://vivekmistry.in/lara-blogs/your-laravel-with-queries-may-be-loading-too-much-data): eager loading не должен забирать все столбцы связи, а explicit projection обязана сохранять ключ, по которому Eloquent сопоставляет модели.
 
 ## Правила

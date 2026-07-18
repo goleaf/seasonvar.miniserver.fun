@@ -32,17 +32,17 @@ final class RecordProgressRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'playback_session_token.required' => 'Отсутствует сессия просмотра.',
-            'playback_session_token.max' => 'Сессия просмотра некорректна.',
-            'event_sequence.integer' => 'Номер события должен быть целым числом.',
-            'event_sequence.min' => 'Номер события должен быть не меньше 1.',
-            'position_seconds.integer' => 'Позиция должна быть целым числом.',
-            'position_seconds.min' => 'Позиция не может быть отрицательной.',
-            'position_seconds.max' => 'Позиция превышает допустимую длительность.',
-            'reported_duration_seconds.integer' => 'Длительность должна быть целым числом.',
-            'reported_duration_seconds.min' => 'Длительность не может быть отрицательной.',
-            'reported_duration_seconds.max' => 'Длительность превышает допустимое значение.',
-            'ended.boolean' => 'Признак завершения должен быть логическим значением.',
+            'playback_session_token.required' => __('api.validation.playback.session_required'),
+            'playback_session_token.max' => __('api.validation.playback.session_invalid'),
+            'event_sequence.integer' => __('api.validation.playback.event_sequence_integer'),
+            'event_sequence.min' => __('api.validation.playback.event_sequence_minimum'),
+            'position_seconds.integer' => __('api.validation.playback.position_integer'),
+            'position_seconds.min' => __('api.validation.playback.position_minimum'),
+            'position_seconds.max' => __('api.validation.playback.position_maximum'),
+            'reported_duration_seconds.integer' => __('api.validation.playback.duration_integer'),
+            'reported_duration_seconds.min' => __('api.validation.playback.duration_minimum'),
+            'reported_duration_seconds.max' => __('api.validation.playback.duration_maximum'),
+            'ended.boolean' => __('api.validation.playback.ended_boolean'),
         ];
     }
 

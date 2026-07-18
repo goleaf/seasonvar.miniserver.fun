@@ -419,8 +419,7 @@ final class IntegrationDoctor
 
     private function homePath(string $suffix): ?string
     {
-        $serverHome = $_SERVER['HOME'] ?? null;
-        $home = is_string($serverHome) && $serverHome !== '' ? $serverHome : getenv('HOME');
+        $home = config('services.integration_doctor.operator_home');
 
         if (! is_string($home) || $home === '') {
             return null;

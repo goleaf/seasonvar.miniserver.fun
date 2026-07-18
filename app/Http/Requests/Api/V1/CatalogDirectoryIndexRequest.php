@@ -33,12 +33,12 @@ final class CatalogDirectoryIndexRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'q.string' => 'Поиск по справочнику должен быть строкой.',
-            'q.max' => 'Поиск по справочнику слишком длинный.',
-            'letter.regex' => 'Выбрана неподдерживаемая буква.',
-            'sort.in' => 'Выбрана неподдерживаемая сортировка.',
-            'decade.multiple_of' => 'Десятилетие должно начинаться с года, кратного десяти.',
-            'per_page.max' => 'Размер страницы не должен быть больше 50.',
+            'q.string' => __('api.validation.directory.query_string'),
+            'q.max' => __('api.validation.directory.query_maximum'),
+            'letter.regex' => __('api.validation.directory.letter'),
+            'sort.in' => __('api.validation.directory.sort'),
+            'decade.multiple_of' => __('api.validation.directory.decade'),
+            'per_page.max' => __('api.validation.pagination.per_page_maximum', ['maximum' => 50]),
         ];
     }
 

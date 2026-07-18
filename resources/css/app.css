@@ -180,6 +180,54 @@
         margin-block-start: 0.125em;
     }
 
+    .ui-progress {
+        --ui-progress-color: var(--color-emerald-600);
+        display: block;
+        inline-size: 100%;
+        block-size: 0.5rem;
+        overflow: hidden;
+        appearance: none;
+        border: 0;
+        border-radius: 9999px;
+        background-color: var(--color-slate-100);
+        color: var(--ui-progress-color);
+    }
+
+    .ui-progress--sm {
+        block-size: 0.375rem;
+    }
+
+    .ui-progress--critical {
+        --ui-progress-color: var(--color-rose-500);
+        background-color: white;
+    }
+
+    .ui-progress--warning {
+        --ui-progress-color: var(--color-amber-500);
+        background-color: white;
+    }
+
+    .ui-progress--info,
+    .ui-progress--slate {
+        --ui-progress-color: var(--color-slate-400);
+        background-color: white;
+    }
+
+    .ui-progress::-webkit-progress-bar {
+        border-radius: inherit;
+        background-color: inherit;
+    }
+
+    .ui-progress::-webkit-progress-value {
+        border-radius: inherit;
+        background-color: var(--ui-progress-color);
+    }
+
+    .ui-progress::-moz-progress-bar {
+        border-radius: inherit;
+        background-color: var(--ui-progress-color);
+    }
+
     .help-article-content {
         overflow-wrap: anywhere;
         color: var(--color-slate-700);

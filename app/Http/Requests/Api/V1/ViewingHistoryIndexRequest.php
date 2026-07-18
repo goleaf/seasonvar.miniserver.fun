@@ -28,14 +28,14 @@ final class ViewingHistoryIndexRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'limit.integer' => 'Лимит должен быть целым числом.',
-            'limit.min' => 'Лимит должен быть не меньше 1.',
-            'limit.max' => 'Лимит не должен быть больше 24.',
-            'page.integer' => 'Номер страницы должен быть целым числом.',
-            'page.min' => 'Номер страницы должен быть не меньше 1.',
-            'per_page.integer' => 'Размер страницы должен быть целым числом.',
-            'per_page.min' => 'Размер страницы должен быть не меньше 1.',
-            'per_page.max' => 'Размер страницы не должен быть больше 48.',
+            'limit.integer' => __('api.validation.pagination.limit_integer'),
+            'limit.min' => __('api.validation.pagination.limit_minimum'),
+            'limit.max' => __('api.validation.pagination.limit_maximum', ['maximum' => 24]),
+            'page.integer' => __('api.validation.pagination.page_integer'),
+            'page.min' => __('api.validation.pagination.page_minimum'),
+            'per_page.integer' => __('api.validation.pagination.per_page_integer'),
+            'per_page.min' => __('api.validation.pagination.per_page_minimum'),
+            'per_page.max' => __('api.validation.pagination.per_page_maximum', ['maximum' => 48]),
         ];
     }
 

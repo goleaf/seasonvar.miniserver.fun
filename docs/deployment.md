@@ -2,6 +2,17 @@
 
 Обновлено: 18.07.2026
 
+## Dependency/runtime upgrade deployment contract
+
+- Framework/dependency update до deploy подтверждает production PHP/extensions, Node/package manager/Vite, database driver/schema, Redis/Memcached client/serialization, web-server/PHP-FPM, sessions, queues/scheduler и service-worker compatibility.
+- Production устанавливает только locked dependencies и не выполняет uncontrolled version resolution.
+- PHP update проверяет extensions, opcache и PHP-FPM pool/restart; Node update — lock format, engines и Vite; database update — driver, migrations, backup/restore и rollback.
+- Redis/Memcached update проверяет prefix/serializer/timeouts/failure behavior. Pending serialized jobs/sessions учитываются до class/constructor/format changes.
+- Web-server update проверяет rewrites, headers, upload/proxy/range limits и static assets.
+- Provider SDK update проверяет webhook signature/idempotency/callback/reconciliation; mail update — verification/reset/security/billing/advertiser/ticket/legal messages.
+- High-risk package migration требует подтверждённого backup. Каждый dependency change явно указан в release/rollback runbook; service-worker rollback и stale clients учитываются.
+- Перед выпуском dependency/runtime group заполняется [`maintenance/production-compatibility-checklist.md`](maintenance/production-compatibility-checklist.md); package/framework/frontend-specific gates находятся в соседних checklists и ссылаются на один [`update-decisions.md`](maintenance/update-decisions.md).
+
 ## Eloquent AutoCache rollout от 17.07.2026
 
 Интеграция не добавляет миграций, очередей, scheduler или нового backend. После установки locked Composer dependencies и пересборки config cache выполнить:

@@ -33,14 +33,14 @@ final class CreatePlaybackSessionRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'episode_id.integer' => 'Идентификатор серии должен быть целым числом.',
-            'episode_id.min' => 'Идентификатор серии некорректен.',
-            'media_id.integer' => 'Идентификатор видео должен быть целым числом.',
-            'media_id.min' => 'Идентификатор видео некорректен.',
-            'variant.max' => 'Название варианта слишком длинное.',
-            'audio_language.max' => 'Название языка слишком длинное.',
-            'quality.in' => 'Выбрано неподдерживаемое качество.',
-            'format.in' => 'Выбран неподдерживаемый формат.',
+            'episode_id.integer' => __('api.validation.playback.episode_id_integer'),
+            'episode_id.min' => __('api.validation.playback.episode_id_invalid'),
+            'media_id.integer' => __('api.validation.playback.media_id_integer'),
+            'media_id.min' => __('api.validation.playback.media_id_invalid'),
+            'variant.max' => __('api.validation.playback.variant_maximum'),
+            'audio_language.max' => __('api.validation.playback.audio_language_maximum'),
+            'quality.in' => __('api.validation.playback.quality_unsupported'),
+            'format.in' => __('api.validation.playback.format_unsupported'),
         ];
     }
 

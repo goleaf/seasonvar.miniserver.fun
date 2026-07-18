@@ -29,13 +29,13 @@ class CatalogPeopleLookupRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'type.required' => 'Выберите тип поиска людей.',
-            'type.string' => 'Тип поиска людей должен быть строкой.',
-            'type.in' => 'Поддерживается поиск только по актёрам и режиссёрам.',
-            'q.required' => 'Введите имя для поиска.',
-            'q.string' => 'Имя для поиска должно быть строкой.',
-            'q.min' => 'Введите не менее 2 символов для поиска.',
-            'q.max' => 'Поисковый запрос слишком длинный.',
+            'type.required' => __('catalog.search.validation.people_type_required'),
+            'type.string' => __('catalog.search.validation.people_type_string'),
+            'type.in' => __('catalog.search.validation.people_type_supported'),
+            'q.required' => __('catalog.search.validation.people_query_required'),
+            'q.string' => __('catalog.search.validation.people_query_string'),
+            'q.min' => __('catalog.search.validation.people_query_minimum'),
+            'q.max' => __('catalog.search.validation.people_query_maximum'),
         ];
     }
 
@@ -45,7 +45,7 @@ class CatalogPeopleLookupRequest extends FormRequest
         return [
             function (Validator $validator): void {
                 if (mb_strlen(app(CatalogSearchNormalizer::class)->key($this->queryValue())) < 2) {
-                    $validator->errors()->add('q', 'Введите не менее 2 букв или цифр для поиска.');
+                    $validator->errors()->add('q', __('catalog.search.validation.people_query_meaningful'));
                 }
             },
         ];

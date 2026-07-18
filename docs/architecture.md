@@ -2,6 +2,22 @@
 
 Обновлено: 18.07.2026
 
+## Third-party и upgrade boundaries
+
+- Используются framework-supported public APIs, а не undocumented internals. Version-specific решения подтверждаются официальной документацией.
+- Third-party usage изолируется application-owned services/adapters, когда это practically отделяет provider/package contract. Provider-specific classes не распространяются по несвязанным features.
+- Package objects не передаются в Blade или Livewire public state; provider/package statuses отображаются в stable application enums/codes, а не package text.
+- Package configuration централизована; `env()` вне `config/*.php` запрещён.
+- Service-container bindings не создают скрытых global side effects. Duplicate providers, listeners, middleware, route macros и cache stores запрещены.
+- Package facade не добавляется только ради удобства, когда важна dependency isolation.
+- Package removal охватывает config, providers, aliases, migrations, assets, translations, docs, deployment, environment и cache cleanup.
+- Package replacement сохраняет transition adapter, когда persisted data/public contracts зависят от прежнего package.
+- Deprecated code не suppress-ится бессрочно. Каждый shim документирует owner, purpose, dependants и removal condition.
+- Reflection, dynamic class resolution, monkey patching и undocumented hooks не используются без подтверждённой архитектурной необходимости.
+- Payment, mail, storage, search, media, cache и external providers используют стабильные application contracts; optional package failure деградирует через documented fallback.
+- Framework upgrade сохраняет route names/public URLs, event/notification codes, cache identities, translation/permission keys и DB identity values либо предоставляет полную compatibility migration.
+- Канонические package purposes, runtime states, decisions, shims и removal conditions находятся только в [`maintenance/`](maintenance/dependency-inventory.md); этот раздел задаёт architectural boundary, но не копирует registry.
+
 ## Целевая архитектура и data flow
 
 Цель — сохранить Laravel-native слои и текущие доменные сервисы, уменьшая только доказанные god boundaries. Не вводится универсальный repository/action/interface слой.

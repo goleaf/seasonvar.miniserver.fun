@@ -44,6 +44,10 @@ return [
         ],
     ],
 
+    'integration_doctor' => [
+        'operator_home' => env('SEASONVAR_INTEGRATION_HOME', $_SERVER['HOME'] ?? null),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

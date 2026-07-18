@@ -2,6 +2,15 @@
 
 Обновлено: 18.07.2026
 
+## Maintenance visibility boundary
+
+- Administration может показывать read-only maintenance summary только из real repository/runtime registry data и только authorized operational roles.
+- Summary states: `current`, `update available`, `deprecated`, `unsupported`, `blocked by compatibility`, `under review`, `unknown`; fake update notice запрещён.
+- Browser UI не исполняет Composer/npm, не редактирует lock files, не запускает uncontrolled updates и не предоставляет shell access.
+- Package credentials, private repository URLs и exploit details не показываются unrelated roles.
+- Approved plans, compatibility warnings, registry counts и documentation links допустимы; package changes остаются repository/deployment workflow в `main`.
+- Permissions для summary, compatibility matrix, debt, deprecations, approval, advisories и production compatibility разделяются по least privilege; content admin не управляет dependencies.
+
 ## Доступ и границы
 
 - Full-page Livewire 4 компонент `App\Livewire\CatalogAdministrationManager` доступен по `/admin/catalog` только authenticated user из `SEASONVAR_IMPORT_ADMIN_EMAILS`.

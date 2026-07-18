@@ -2,6 +2,17 @@
 
 Обновлено: 18.07.2026
 
+## Security requirements для upgrades
+
+- Advisories оцениваются только verified package tooling или authoritative source; package не называется compromised/vulnerable без evidence применимости к installed version.
+- Updates не ослабляют CSRF, sessions, cookies, OAuth, webhooks, uploads, storage, authorization, CSP/CORS, SSRF, redirects, payment integrity и secret redaction.
+- Package auto-discovery, service providers, middleware, routes, commands, scheduler tasks, queue jobs, public assets и browser permissions проходят отдельный review.
+- Новые environment variables документируются без значений; package removal включает secret/environment cleanup.
+- Third-party telemetry запрещена без explicit approval. Analytics/error/usage packages проверяются на передачу private data.
+- Abandoned security-sensitive package получает evidence-backed staged replacement plan.
+- Source maps, debug packages, toolbars, profilers и local diagnostics не включаются в production случайно.
+- Broad CORS, debug output и new public endpoints не принимаются как package defaults без authorization/privacy review.
+
 ## Правила
 
 - `.env`, ключи, токены, cookies, приватные логи и локальные базы не коммитятся; публично отслеживается только `.env.example` без значений секретов.

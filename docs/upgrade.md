@@ -1,50 +1,44 @@
 # Обновление Laravel и runtime
 
-Обновлено: 17.07.2026. Детальный package inventory и решения находятся в [`audits/dependency-report.md`](audits/dependency-report.md), исполняемый порядок — в [`plans/laravel-video-portal-modernization.md`](plans/laravel-video-portal-modernization.md). Этот файл — короткий owner-контракт controlled upgrades.
+Обновлено: 18.07.2026. Канонические правила находятся в [`requirements/maintenance-and-upgrades.md`](requirements/maintenance-and-upgrades.md), точные direct packages — в [`maintenance/dependency-inventory.md`](maintenance/dependency-inventory.md), runtime evidence — в [`maintenance/runtime-compatibility.md`](maintenance/runtime-compatibility.md), а каждое решение — в [`maintenance/update-decisions.md`](maintenance/update-decisions.md).
 
 ## Текущее состояние
 
-- PHP 8.5.8 — актуальный stable PHP 8.5 patch.
-- Laravel Framework 13.20.0.
-- Livewire 4.3.3, Laravel Boost 2.4.12, Pint 1.29.3, Larastan 3.10.0, PHPUnit 12.5.31.
-- `wddyousuf/eloquent-autocache` 0.2.3 закреплён как контролируемая production dependency для двух opt-in query моделей.
-- Tailwind CSS 4.3.2, Vite 8.1.4, Laravel Vite plugin 3.1.0; для plugin доступен 3.1.3 patch.
-- Node 26.4.0; официальный current — 26.5.0. npm 12.0.1 и Composer 2.10.2 актуальны.
+- Laravel Framework `13.20.0`, Livewire `4.3.3`, PHP constraint `^8.3`; локальные CLI/FPM `8.5.8`.
+- Tailwind CSS и `@tailwindcss/vite` `4.3.2`, Vite `8.1.4`, Laravel Vite plugin `3.1.3`.
+- `wddyousuf/eloquent-autocache` `0.2.4` остаётся узкой opt-in production dependency Country/Genre queries.
+- Node `26.4.0` и npm `12.0.1` наблюдались локально. Node 26 находится в Current, не LTS; переход на проверенную LTS-линию отделён в `UD-R-001` и `TD-001`.
+- Composer `2.10.2`; self-update public keys на текущем host отсутствуют и зарегистрированы как `TD-002`.
+- Flux/Volt, payment/OAuth/search provider SDK и service worker не установлены.
 
-Laravel 13 требует PHP >=8.3. Vite 8 требует Node 20.19+ или 22.12+; текущий Node совместим. PHPUnit 13 — отдельный major и не обновляется в рамках Laravel 13 modernization: существующие 826 PHPUnit tests и Laravel upgrade guidance используют PHPUnit 12.
+## Решение Task 29
 
-## Обязательный процесс
+Version constraints и lock-файлы не обновлялись. PHPUnit 13, `concurrently` 10, Tailwind/plugin patches, Vite patch, FontAwesome patch и Node LTS migration разделены и отложены: ни verified advisory, ни текущий defect не обосновали их объединение с maintenance architecture work.
 
-Перед update:
+Единственное Composer configuration исправление — удаление разрешений для двух отсутствующих и незаблокированных plugins. Оно описано как `UD-CFG-001`, не меняет installed packages и повторно проходит validate/platform/audit gates.
 
-1. Зафиксировать installed/latest versions и hashes обоих lockfiles.
-2. Прочитать официальные upgrade/release notes и найти затронутые API в репозитории.
-3. Записать rollback: восстановление предыдущего фазового commit/lockfiles, `composer install`, `npm ci`, cache rebuild.
-4. Не смешивать Laravel patch, frontend patch и system Node в один change set.
+## Обязательный staged process
 
-После каждого update:
+1. Обновить requirements и task-specific decision record.
+2. Зафиксировать current/proposed exact versions, purpose, official guidance и affected modules.
+3. Проверить direct usage, relevant transitive changes, configuration/providers/routes/commands/assets/data.
+4. Описать migration, backward compatibility, production impact и rollback до lock change.
+5. Изменить smallest coherent group; не удалять lock-файлы и не принимать unrelated rewrite.
+6. Выполнить доступные static, audit, build, browser/manual gates по task policy.
+7. Повторно найти old API usage, обновить inventory/matrix/decision/deprecation/debt/deployment/changelog.
+8. Commit и push выполняются только из `main`.
 
-```bash
-composer validate --strict
-composer audit
-composer check-platform-reqs
-./vendor/bin/pint --test --format agent
-./vendor/bin/phpstan analyse --no-progress --memory-limit=1G
-php artisan test
-npm ci
-npm audit --audit-level=high
-npm run build
-npm run test:browser
-```
+Подробные последовательности: [`framework-upgrade-checklist.md`](maintenance/framework-upgrade-checklist.md), [`frontend-upgrade-checklist.md`](maintenance/frontend-upgrade-checklist.md), [`production-compatibility-checklist.md`](maintenance/production-compatibility-checklist.md).
 
-Laravel 13.20.0 release добавляет/fixes QueueFake hooks, worker memory event data, session prefix support, HTTP header normalization, sensitive parameters and several Eloquent/Storage helpers. Перед update выполняется targeted search по этим API; новые features не принимаются автоматически.
+## Rollback
 
-Любое обновление `wddyousuf/eloquent-autocache` выполняется отдельным allowlisted Composer change set. Обязательны проверка совместимости с текущим Laravel 13, review config defaults и payload format, а также focused lifecycle tests `EloquentAutoCacheDependencyTest` и `EloquentAutoCacheIntegrationTest`: opt-in isolation, cache hit, warming, create/update/delete invalidation, model isolation, rollback и hydration при `cache.serializable_classes=false`.
+Для version update сохраняются old manifest/lock/config/assets, deployment order и immutable assets. Отдельно проверяются schema, persisted identities, cache/session serialization, pending jobs, provider callbacks и service-worker clients. `git revert` недостаточен, когда хотя бы одна из этих границ изменилась; тогда decision обязан содержать data rollback либо forward-fix.
 
 ## Запрещено
 
-- Одновременный широкий `composer update` без package allowlist.
-- Major update PHPUnit/Node/package ради номера версии без compatibility/value evidence.
-- Lockfile change без install/audit/build/tests.
-- Production dependency install из незакоммиченного или непроверенного состояния.
-- Огромный static-analysis baseline или подавление diagnostics для создания ложного green status.
+- Обновлять package только из-за доступной версии.
+- Выполнять широкий Composer/npm update или `npm audit fix --force`.
+- Смешивать unrelated framework/runtime/frontend/database/cache/provider majors.
+- Менять lock без понимания direct и relevant transitive diff.
+- Объявлять install/build доказательством полной функциональной совместимости.
+- Вводить Volt, competing architecture, fake admin updater или browser shell access.

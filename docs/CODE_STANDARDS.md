@@ -10,6 +10,18 @@
 
 `CODE_STANDARDS.md` владеет правилами PHP/Laravel и именования. Архитектурные boundaries принадлежат `architecture.md`, интерфейсные правила — `UI_STANDARDS.md`, а эксплуатационная история — `MAINTENANCE_LOG.md`.
 
+## Постоянные требования к dependencies и runtime
+
+- Проект поддерживает canonical dependency inventory, runtime compatibility matrix и package-purpose registry; каждая direct dependency имеет документированный purpose.
+- Unnecessary package удаляется только после полного dependency/usage verification и записи решения.
+- Framework/package updates сохраняют все публичные функции, locale, SQLite compatibility, настроенные production database engines, Redis/Memcached responsibilities и service-worker private-cache exclusions.
+- Обновление не вводит Volt, `@php`, прямые model/service calls из Blade или конкурирующие actions, services, DTO, query objects, policies, cache services, translations и administration modules.
+- Payment, advertiser, legal, premium, region, permission и private-data boundaries остаются server-owned.
+- Obsolete compatibility adapter удаляется только после подтверждения миграции всех dependants.
+- Technical debt и unresolved maintenance risk остаются видимыми в current plan и registries; security update приоритетен, но всё равно требует compatibility/rollback review.
+- Новый package не заменяет малую стабильную internal function без justified value и требует purpose, maintenance, security, license, bundle/memory/runtime/deployment и removal assessment.
+- Lock files не удаляются и не переписываются другим package manager без явного migration plan.
+
 ## Правила Laravel
 
 - Не менять серверную конфигурацию в рамках прикладных задач.

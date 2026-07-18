@@ -2,6 +2,10 @@
 
 Обновлено: 18.07.2026
 
+## Upgrade compatibility
+
+Изменение cache client, serializer, compression, prefix, tags, locks или payload classes требует versioned keys либо bounded stale-key handling, failure fallback, rollout order и rollback. Session/queue serializers проверяются отдельно от application cache. Update package не получает права на store-wide flush и не превращает Redis/Memcached в domain storage.
+
 Production rollout 15.07.2026 подтвердил, что исторические `cache-warm` envelopes имеют истёкший `retryUntil`: Laravel отклоняет их до application `handle()`, поэтому no-op compatibility не может безопасно drain-ить эту очередь. Pending/failed legacy payload не удаляются и не retry-ятся автоматически. Новый coalesced intent, heartbeat и единственный worker используют `cache-warm-v2`; job не публикует absolute retry deadline и ограничивает реальные ошибки тремя attempts. Redis/Memcached transports остаются раздельными, а отсутствие evictions не является доказательством корректной инвалидации.
 
 ## Неподвижные границы

@@ -214,9 +214,11 @@
                         </div>
                     </div>
 
-                    <div class="mt-4 h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar" aria-label="{{ __('catalog.importer.progress') }}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $run['progress'] }}">
-                        <div class="h-full rounded-full bg-emerald-600" style="width: {{ $run['progress'] }}%"></div>
-                    </div>
+                    <x-ui.progress
+                        class="mt-4"
+                        :value="$run['progress']"
+                        :label="__('catalog.importer.progress')"
+                    />
 
                     <div class="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                         @foreach ([

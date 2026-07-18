@@ -34,21 +34,21 @@ class CatalogShowRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'season.integer' => 'Номер выбранного сезона должен быть числом.',
-            'season.min' => 'Номер выбранного сезона должен быть больше нуля.',
-            'episode.integer' => 'Номер выбранной серии должен быть числом.',
-            'episode.min' => 'Номер выбранной серии должен быть больше нуля.',
-            'media.integer' => 'Номер выбранного видео должен быть числом.',
-            'media.min' => 'Номер выбранного видео должен быть больше нуля.',
-            'variant.string' => 'Вариант просмотра должен быть строкой.',
-            'variant.max' => 'Вариант просмотра слишком длинный.',
-            'variant.regex' => 'Вариант просмотра имеет неверный формат.',
-            'quality.string' => 'Качество должно быть строкой.',
-            'quality.max' => 'Качество слишком длинное.',
-            'quality.in' => 'Выбрано неподдерживаемое качество.',
-            'format.string' => 'Формат должен быть строкой.',
-            'format.max' => 'Формат слишком длинный.',
-            'format.in' => 'Выбран неподдерживаемый формат.',
+            'season.integer' => __('catalog.player.validation.season_integer'),
+            'season.min' => __('catalog.player.validation.season_minimum'),
+            'episode.integer' => __('catalog.player.validation.episode_integer'),
+            'episode.min' => __('catalog.player.validation.episode_minimum'),
+            'media.integer' => __('catalog.player.validation.media_integer'),
+            'media.min' => __('catalog.player.validation.media_minimum'),
+            'variant.string' => __('catalog.player.validation.variant_string'),
+            'variant.max' => __('catalog.player.validation.variant_maximum'),
+            'variant.regex' => __('catalog.player.validation.variant_format'),
+            'quality.string' => __('catalog.player.validation.quality_string'),
+            'quality.max' => __('catalog.player.validation.quality_maximum'),
+            'quality.in' => __('catalog.player.validation.quality_supported'),
+            'format.string' => __('catalog.player.validation.format_string'),
+            'format.max' => __('catalog.player.validation.format_maximum'),
+            'format.in' => __('catalog.player.validation.format_supported'),
         ];
     }
 
@@ -58,12 +58,12 @@ class CatalogShowRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'season' => 'сезон',
-            'episode' => 'серия',
-            'media' => 'видео',
-            'variant' => 'вариант просмотра',
-            'quality' => 'качество',
-            'format' => 'формат',
+            'season' => __('catalog.player.attributes.season'),
+            'episode' => __('catalog.player.attributes.episode'),
+            'media' => __('catalog.player.attributes.media'),
+            'variant' => __('catalog.player.attributes.variant'),
+            'quality' => __('catalog.player.attributes.quality'),
+            'format' => __('catalog.player.attributes.format'),
         ];
     }
 
