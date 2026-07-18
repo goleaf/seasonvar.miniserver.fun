@@ -1,7 +1,7 @@
 @props(['siteName', 'footer'])
 
 <footer data-site-footer {{ $attributes->class(['mt-10 border-t border-slate-200 bg-white']) }}>
-    <div class="mx-auto max-w-[1760px] px-3 sm:px-6 lg:px-8">
+    <div class="app-safe-inline mx-auto max-w-[1760px]">
         <div class="grid gap-8 py-8 md:grid-cols-2 md:py-10 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,0.7fr)] xl:gap-10">
             <div data-site-footer-brand class="min-w-0 md:col-span-2 xl:col-span-1 xl:max-w-xl">
                 <a href="{{ $footer['home_url'] }}" class="inline-flex min-w-0 items-center gap-3 rounded-control">

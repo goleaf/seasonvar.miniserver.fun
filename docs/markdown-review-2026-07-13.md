@@ -2,6 +2,8 @@
 
 Проверены все project-owned Markdown-файлы, найденные через tracked и non-ignored untracked inventory. Ignored dependency trees (`vendor`, `node_modules`) не являются документацией репозитория. В исходном проходе просмотрено 195 файлов. Завершённые временные implementation/QA plans позднее удалены из текущей документации; их содержимое и первоначальный inventory остаются в Git history.
 
+Повторный corpus-pass Task 22 от 18.07.2026 прочитал каждый из 254 существовавших tracked/non-ignored Markdown-файлов (58 671 строка) до реализации Premium-домена. Новым владельцем темы стал один [`premium.md`](premium.md); конкурирующие billing documents не создавались. Живой аудит, риски, phased checklist и verification evidence сохранены в Task 22 общего плана.
+
 ## Изменены
 
 - `CHANGELOG.md`

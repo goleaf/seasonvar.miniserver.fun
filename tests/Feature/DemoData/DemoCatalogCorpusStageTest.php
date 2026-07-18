@@ -23,6 +23,7 @@ use App\Services\DemoData\Stages\DemoCatalogActivityStage;
 use App\Services\DemoData\Stages\DemoOrganizationStage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -141,6 +142,63 @@ final class DemoCatalogCorpusStageTest extends TestCase
 
         $this->assertFalse($duplicatePersonalPivot);
         $this->assertFalse($duplicateCollectionPivot);
+    }
+
+    public function test_organization_stage_generates_public_tags_when_normalized_hashes_already_exist(): void
+    {
+        CatalogTitle::factory()->count(2)->create();
+        $existingTag = Tag::query()->create([
+            'name' => 'Существующая метка',
+            'slug' => 'sushchestvuiushchaia-metka',
+        ]);
+        $options = DemoDataOptions::fromConfig();
+        app(DemoAccountStage::class)->run($options);
+
+        $report = app(DemoOrganizationStage::class)->run($options);
+
+        $this->assertSame(12, $report->counters['public_tags']);
+        $this->assertModelExists($existingTag);
+    }
+
+    public function test_title_contexts_hydrate_only_boundary_release_records(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $season = Season::factory()->create([
+            'catalog_title_id' => $title->id,
+            'number' => 1,
+        ]);
+        $episodes = collect(range(1, 5))->map(fn (int $number): Episode => Episode::factory()->create([
+            'season_id' => $season->id,
+            'number' => $number,
+            'sort_order' => $number,
+        ]));
+        $media = $episodes->map(fn (Episode $episode): LicensedMedia => LicensedMedia::factory()->create([
+            'catalog_title_id' => $title->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'status' => 'published',
+            'published_at' => now()->subDay(),
+            'duration_seconds' => 2_400,
+        ]));
+        $retrievedEpisodes = 0;
+        $retrievedMedia = 0;
+        Event::listen('eloquent.retrieved: '.Episode::class, function () use (&$retrievedEpisodes): void {
+            $retrievedEpisodes++;
+        });
+        Event::listen('eloquent.retrieved: '.LicensedMedia::class, function () use (&$retrievedMedia): void {
+            $retrievedMedia++;
+        });
+
+        $context = (new DemoTitleSelector(DemoDataOptions::fromConfig()))
+            ->contexts([$title->id])
+            ->get($title->id);
+
+        $this->assertNotNull($context);
+        $this->assertSame($episodes->first()?->id, $context->firstEpisodeId);
+        $this->assertSame($episodes->last()?->id, $context->lastEpisodeId);
+        $this->assertSame($media->first()?->id, $context->licensedMediaId);
+        $this->assertLessThanOrEqual(2, $retrievedEpisodes);
+        $this->assertSame(1, $retrievedMedia);
     }
 
     public function test_catalog_activity_stage_fills_exact_state_feedback_and_real_progress_idempotently(): void

@@ -1,9 +1,9 @@
 @if ($paginator->hasPages())
-    <nav role="navigation" aria-label="Страницы каталога" class="flex flex-col gap-3 rounded-panel border border-slate-200 bg-white p-3 shadow-panel sm:flex-row sm:items-center sm:justify-between">
+    <nav role="navigation" aria-label="{{ __('pagination.navigation') }}" class="flex flex-col gap-3 rounded-panel border border-slate-200 bg-white p-3 shadow-panel sm:flex-row sm:items-center sm:justify-between">
         <p class="text-sm font-semibold text-slate-600">
-            Показано
+            {{ __('pagination.showing') }}
             <span class="font-black text-slate-800">{{ $paginator->firstItem() ?? 0 }}–{{ $paginator->lastItem() ?? 0 }}</span>
-            из <span class="font-black text-slate-800">{{ $paginator->total() }}</span>
+            {{ __('pagination.of') }} <span class="font-black text-slate-800">{{ $paginator->total() }}</span>
         </p>
 
         <div class="flex flex-wrap items-center gap-1.5">
@@ -29,7 +29,7 @@
                         @if ($page === $paginator->currentPage())
                             <span aria-current="page" class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control bg-emerald-700 px-3 py-2 text-sm font-black text-white">{{ $page }}</span>
                         @else
-                            <a href="{{ $url }}" aria-label="Страница {{ $page }}" class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">{{ $page }}</a>
+                            <a href="{{ $url }}" aria-label="{{ __('pagination.page', ['page' => $page]) }}" class="inline-flex min-h-11 min-w-11 items-center justify-center rounded-control bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700">{{ $page }}</a>
                         @endif
                     @endforeach
                 @endif

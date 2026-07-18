@@ -222,3 +222,31 @@ Requester/support directories используют deterministic secondary `id`,
 ## Query contract календаря релизов
 
 Calendar query всегда ограничен day/week/month либо configurable upcoming/recent window, eager-loads title/season/episode/media и использует deterministic ID tie-break. Индексы `(is_public,status,starts_at,id)`, `(entry_type,status,starts_at,id)` и target-prefixed lookup соответствуют public range, filter и merge/observer identity; correction и subscription timelines имеют отдельные owner indexes. Month summary агрегирует один bounded set, а partial/unknown dates не инициируют full catalogue scan. Personal exclusions применяются owner subqueries и не загружаются по карточке. Migration проверена на чистой SQLite; полный contract — в [`release-calendar.md`](release-calendar.md).
+
+## Mobile asset и runtime budget Task 23
+
+Перед изменением production build показывал примерно 36 KB initial app JavaScript, 172 KB app CSS, 16 KB player JavaScript, 32 KB player CSS, 112 KB Plyr и 328 KB HLS. Финальная production-сборка Vite 8.1.4 собрала 22 modules: initial `app` — 23,86 KB / 7,80 KB gzip, CSS — 181,18 / 37,43 KB gzip; optional chunks — calendar 0,87 KB, player bridge 1,50 KB, collections 1,75 KB, reviews 2,02 KB, comments 2,87 KB, issues 2,91 KB, help 4,25 KB, settings 5,64 KB. Player остаётся отдельным 18,99 KB chunk, Plyr 111,81 KB, HLS 331,90 KB и загружается только на player route/HLS source. CSS growth включает responsive safe-area/dynamic-viewport rules и уже находившийся в рабочем дереве Help Center UI.
+
+Project-specific target: initial public app JS не выше 30 KB uncompressed при текущем feature set; optional page module не выше 10 KB без отдельного review; player/Plyr/HLS не входят в unrelated route; initial cards не создают per-card network request; poster dimensions/ratio сохраняют layout; hidden desktop media не должны загружаться отдельным `<img>`. CSS target — удерживать gzip ниже 40 KB и не вводить route-duplicated styles. Это guardrails текущего baseline, не универсальные Web Vitals promises.
+
+Mobile runtime использует event-driven listeners, один requestAnimationFrame для visual viewport, bounded 4-second restored banner и cleanup на navigation. Нет global polling, canvas effect, second-by-second server write, background video preload или retry storm. Player heartbeat остаётся 30 seconds/minimum delta, visibility-aware; `saveData` отключает autoplay/preload и откладывает HLS load, не меняя explicit quality. Route-specific Help/settings/upload/player code не инициализируется при отсутствии DOM target.
+
+Livewire catalog сохраняет scalar/array Form state, paginated results, grouped facet query и one user-state overlay; phone не получает отдельный hidden desktop graph или one-request-per-card. Mobile filters deferred до Apply, people/header search debounced/abort stale requests. Task 23 не добавляет polling, complete model serialization, client catalogue cache или database index/migration.
+
+## Query contract Premium
+
+Resolver выполняет один indexed запрос active entitlements пользователя и eager-load только status/period/grace/cancellation subscription fields; feature не запрашивается отдельно. Account payment history детерминированно пагинируется по 15 строк, refund totals eager-loaded; audit/history также bounded. Public plan query выбирает только active/public rows, provider API на render не вызывается.
+
+Индексы соответствуют active entitlement, user/status/time histories, provider object/event identity и retry/admin audit lookups; webhook list не загружает raw payload, потому что raw payload вообще не сохраняется. Provider call разрешён только checkout/mutation/explicit reconciliation. Подробные uniqueness/index основания — [`premium.md`](premium.md).
+
+## Query budget центра помощи
+
+Home/category/article/search используют eager active+fallback translations/category, grouped counts, bounded explicit/fallback relations и пагинацию. Search выбирает максимум 120 candidates, suggestions 7, related 4, featured/popular 6; revision page ограничена 20, admin queues пагинированы. Нельзя добавлять category/translation/relation/feedback query на card или Eloquent/service call из Blade.
+
+Composite indexes поддерживают publication/audience/date, category order, feature/featured/review, locale/slug/publication, aliases, relations/context, feedback aggregate и reports queue. Search использует portable normalized `LIKE`, без обязательного FTS/queue/external index. Полный query/index contract: [`help-center.md`](help-center.md).
+
+## Query contract playback Task 07
+
+Title page загружает season summaries/counts, active-season episode metadata/counts и одной выборкой authorized source summaries только выбранной серии. Полный season source graph, subtitle body и per-option query запрещены. API episodes сохраняет совместимый opt-in full media profile, mobile navigation использует summary mode. Navigation пересекает границу сезона одним canonical ordered query и не делает N+1.
+
+Progress — one unique user/episode row с `insertOrIgnore`, transaction lock и idempotent session/sequence; browser пишет не чаще 30-second/10-second meaningful cadence плюс lifecycle events. Существующие indexes обслуживают episode season/order, media title/season/episode/availability/health и progress owner/episode/last-watched; speculative migration/index Task 07 не добавляет. Полный budget и manual plan inspection: [`audits/video-playback-report.md`](audits/video-playback-report.md).

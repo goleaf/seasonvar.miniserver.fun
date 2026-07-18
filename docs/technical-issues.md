@@ -14,7 +14,7 @@
 - source health уже принадлежит `LicensedMedia` и его manager/service boundary;
 - private upload disk и database notifications уже доступны;
 - интерфейс поддерживает `ru` и `en`;
-- отдельного release-calendar, premium billing, rights-holder или territory-license workflow в текущем приложении нет;
+- release-calendar и канонический Premium entitlement/billing ledger существуют, но платёжный provider, invoices/refund request UI, rights-holder и territory-license workflow не настроены;
 - sitemap формируется явным allowlist и private account/admin routes в него не входят.
 
 ## Границы, identity и видимость
@@ -45,7 +45,7 @@ Create требует authenticated account; подтверждение email н
 
 Allowlisted target codes: `title`, `season`, `episode`, `media`, `translation`, `page`, `account`, `notification`, `calendar`, `search`, `general`. В БД используются явные nullable FKs вместо произвольного morph class. Resolver проверяет published/access-visible title и цепочки ownership season → title, episode → season, media → episode/title, translation → title. Нельзя подставить source/track ID из другого episode. Page-rendering, Livewire, browser/mobile, accessibility, performance и broken-link типы разрешают server-resolved page/general/account/notification/calendar/search context, а также title/season/episode/media context, чтобы реальная страница портала не теряла canonical feature/content identity. Account и notification targets автоматически сохраняют requester-private duplicate scope.
 
-Поскольку самостоятельных audio/subtitle track models нет, такие обращения используют канонический episode/media target и server-validated stable language code; storage path или имя subtitle-файла не принимается. Regional/premium/account типы описывают симптом, но canonical entitlement/access state всегда читается сервером; формы не принимают premium/region truth, password, MFA, payment или recovery credentials. Calendar тип доступен через general/page context до появления самостоятельной calendar entity.
+Поскольку самостоятельных audio/subtitle track models нет, такие обращения используют канонический episode/media target и server-validated stable language code; storage path или имя subtitle-файла не принимается. Regional/premium/account типы описывают симптом, но canonical entitlement/access state всегда читается сервером через существующие boundaries; формы не принимают premium/region truth, password, MFA, card data, payment или recovery credentials. Calendar target разрешается через существующую calendar entity, когда она есть в контексте.
 
 Metadata error создаёт evidence для editor и никогда непосредственно не изменяет каталог. Если обращение является запросом на новый контент, staff выбирает безопасный reroute code `content_request`; технические diagnostics/attachments автоматически в Task 19 не копируются.
 
@@ -152,7 +152,7 @@ Create boundary повторно строит DTO только из полей, 
 - нет anonymous intake, public known-issues page, automatic elapsed-time closure или ETA;
 - нет first-class audio/subtitle track entities, поэтому используется episode/media плюс language code; для выбранного media сервер дополнительно связывает существующий canonical `Translation` по точному каталожному имени, когда такая связь уже существует, но не выдумывает studio ID при её отсутствии;
 - нет external malware scanner: действует raster re-encode/private storage boundary;
-- нет canonical calendar/premium billing/territory/licensing/rightsholder records; ticket фиксирует симптом, но не выдумывает состояние или bypass guidance;
+- canonical calendar и Premium entitlement records не копируются в ticket; provider billing, territory/licensing/rightsholder records отсутствуют, поэтому ticket фиксирует симптом, но не выдумывает состояние или bypass guidance;
 - нет безопасного универсального automatic conversion между доменами; reroute сохраняет историю и даёт guidance без копирования private context;
 - retention command не требует нового scheduler и должен запускаться оператором.
 
@@ -172,3 +172,15 @@ Create boundary повторно строит DTO только из полей, 
 - Vite production build; managed Chromium requester/list/detail/create и staff queue smoke в RU/EN на desktop/mobile подтвердил policy denial, noindex canonical metadata, отсутствие horizontal overflow и console errors на разрешённых страницах.
 
 Перед production rollout выполнить обе additive migrations, обновить application code одновременно, rebuild config/route/view caches штатным deployment workflow и проверить private routes под requester/staff accounts. Не запускать destructive migration commands и не очищать весь application cache.
+
+## Интеграция с центром помощи Task 21
+
+Help article остаётся public/editorial aggregate и не хранит diagnostics, screenshots, correspondence или resolution. При переходе в Task 20 `HelpEscalationService` передаёт только stable article UUID внутри существующего encrypted expiring context; `TechnicalIssueTargetResolver` повторно проверяет опубликованную identity и сохраняет nullable `technical_issues.help_article_id`. Search query, provider/source URL, feedback actor и private article note не передаются.
+
+Ticket form показывает contextual troubleshooting link, но решение о типе/target, duplicate detection, attachment/diagnostic preview, privacy и submit остаётся только у Task 20. Broken published media — ticket; отсутствующий title/season/episode/translation/subtitle/quality/metadata — Task 19. Полный help contract: [`help-center.md`](help-center.md).
+
+## Player failure context Task 07
+
+Player report link передаёт только stable title/season/episode IDs, opaque media ID, selected quality/audio/subtitle codes и allowlisted capability summary, уже подготовленные `TechnicalIssueContext`. Signed/provider URL, storage path, credentials, token, cookie, raw HLS error и private user history не передаются. Categories охватывают start/buffering/wrong episode/source/audio/subtitles/translation/quality/order/fullscreen/mobile/other через существующий тип обращения, duplicate detection и rate limits.
+
+Client fallback не записывает health verdict сам и не отключает source. Staff source action повторно авторизуется и использует существующий health/admin/import boundary. Полный playback recovery/report privacy contract: [`audits/video-playback-report.md`](audits/video-playback-report.md).

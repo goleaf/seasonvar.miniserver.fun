@@ -67,6 +67,8 @@ final class TechnicalIssueTextSanitizer
                 'authorization' => '/\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+\/-]{12,}={0,2}\b/iu',
                 'jwt' => '/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/u',
                 'secret' => '/\b(?:password|passwd|token|secret|session|cookie|api[_-]?key|authorization)\s*[:=]\s*[^\s,;]{4,}/iu',
+                'payment_card' => '/(?<!\d)(?:\d[\s-]*){13,19}(?!\d)/u',
+                'card_security_code' => '/\b(?:cvv|cvc|card\s+security\s+code|код\s+безопасности)\s*[:=]?\s*\d{3,4}\b/iu',
                 'email' => '/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/iu',
                 'phone' => '/(?<!\d)(?:\+?\d[\s().-]*){9,15}(?!\d)/u',
                 'private_url' => '/https?:\/\/[^\s]+[?&](?:token|key|secret|signature|code|session|auth)=[^\s&#]+/iu',

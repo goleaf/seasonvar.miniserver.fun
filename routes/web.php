@@ -32,7 +32,16 @@ use App\Livewire\ContentRequests\ContentRequestDirectory;
 use App\Livewire\ContentRequests\ContentRequestFormPage;
 use App\Livewire\ContentRequests\MyContentRequestsPage;
 use App\Livewire\GlobalSearchPage;
+use App\Livewire\HelpCenter\HelpArticlePage;
+use App\Livewire\HelpCenter\HelpArticlePreviewPage;
+use App\Livewire\HelpCenter\HelpCategoryPage;
+use App\Livewire\HelpCenter\HelpCenterAdministrationPage;
+use App\Livewire\HelpCenter\HelpCenterHome;
+use App\Livewire\HelpCenter\HelpSearchPage;
 use App\Livewire\Library\UserLibraryPage;
+use App\Livewire\Premium\PremiumAdministrationManager;
+use App\Livewire\Premium\PremiumPaymentReturnPage;
+use App\Livewire\Premium\PremiumPricingPage;
 use App\Livewire\Profile\DiscussionPage;
 use App\Livewire\Profile\ProfilePage;
 use App\Livewire\Profile\PublicProfilePage;
@@ -66,6 +75,7 @@ use App\Services\Collections\CatalogCollectionLegacyRedirectResponder;
 use App\Services\Comments\CommentDirectLinkResponder;
 use App\Services\Media\LicensedMediaDownloadResponder;
 use App\Services\Operations\InfrastructureHealthResponder;
+use App\Services\Premium\PremiumWebhookResponder;
 use App\Services\Profiles\UserProfileMediaResponder;
 use App\Services\Reviews\ReviewDirectLinkResponder;
 use App\Services\TechnicalIssues\TechnicalIssueAttachmentResponder;
@@ -88,6 +98,15 @@ $discoveryRouteTypes = collect(CatalogRecommendationType::values())
 Route::get('/', CatalogHomePage::class)
     ->middleware('public.page:homepage')
     ->name('home');
+Route::get('/premium', PremiumPricingPage::class)->name('premium.index');
+Route::get('/{locale}/premium', PremiumPricingPage::class)
+    ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+    ->middleware('collection.locale')
+    ->name('localized.premium.index');
+Route::post('/billing/webhooks/{provider}', fn (Request $request, string $provider, PremiumWebhookResponder $webhooks) => $webhooks->response($request, $provider))
+    ->where('provider', '[a-z0-9][a-z0-9_-]{1,31}')
+    ->middleware('throttle:premium-webhooks')
+    ->name('premium.webhook');
 Route::get('/calendar', ReleaseCalendarPage::class)
     ->defaults('view', 'upcoming')
     ->middleware('public.page:calendar')
@@ -124,6 +143,17 @@ Route::prefix('{locale}')
     });
 Route::redirect('/schedule', '/calendar', 301)->name('legacy.calendar.schedule');
 Route::redirect('/release-calendar', '/calendar', 301)->name('legacy.calendar.index');
+Route::get('/help', HelpCenterHome::class)->name('help.index');
+Route::get('/help/search', HelpSearchPage::class)->name('help.search');
+Route::get('/help/categories/{categorySlug}', HelpCategoryPage::class)
+    ->where('categorySlug', '[^/]+')
+    ->name('help.categories.show');
+Route::get('/help/articles/{articleSlug}', HelpArticlePage::class)
+    ->where('articleSlug', '[^/]+')
+    ->name('help.articles.show');
+Route::redirect('/faq', '/help', 301)->name('legacy.help.faq');
+Route::redirect('/support', '/help', 301)->name('legacy.help.support');
+Route::redirect('/help-center', '/help', 301)->name('legacy.help.center');
 Route::get('/search', GlobalSearchPage::class)->name('search.index');
 Route::get('/{locale}', CatalogHomePage::class)
     ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
@@ -162,6 +192,14 @@ Route::get('/email/verify/{id}/{hash}', fn (int $id, string $hash, AccountEmailV
     ->name('verification.verify');
 
 Route::middleware(['auth', 'auth.session', 'account.private'])->group(function (): void {
+    Route::get('/premium/return/{checkout}', PremiumPaymentReturnPage::class)
+        ->whereUuid('checkout')
+        ->name('premium.return');
+    Route::get('/{locale}/premium/return/{checkout}', PremiumPaymentReturnPage::class)
+        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->whereUuid('checkout')
+        ->middleware('collection.locale')
+        ->name('localized.premium.return');
     Route::get('/calendar/mine', ReleaseCalendarPage::class)
         ->defaults('view', 'personal')
         ->name('calendar.mine');
@@ -271,6 +309,7 @@ Route::middleware('public.cache:documents')
         Route::get('/sitemap-requests-{page}.xml', fn (int $page, CatalogSitemapResponder $sitemaps) => $sitemaps->requests($page))
             ->whereNumber('page')
             ->name('sitemap.requests');
+        Route::get('/sitemap-help.xml', fn (CatalogSitemapResponder $sitemaps) => $sitemaps->help())->name('sitemap.help');
         Route::get('/feed.xml', fn (CatalogSitemapResponder $sitemaps) => $sitemaps->feed())->name('feed');
         Route::get('/opensearch.xml', fn (CatalogSitemapResponder $sitemaps) => $sitemaps->openSearch())->name('opensearch');
         Route::get('/llms.txt', fn (CatalogSitemapResponder $sitemaps) => $sitemaps->llms())->name('llms');
@@ -346,6 +385,29 @@ Route::get('/profiles/{userPublicId}/collections', CatalogCollectionProfile::cla
     ->name('profiles.collections');
 
 Route::middleware('collection.locale')->group(function () use ($discoveryRouteTypes): void {
+    Route::get('/{locale}/help', HelpCenterHome::class)
+        ->whereIn('locale', config('help-center.supported_locales', ['ru']))
+        ->name('localized.help.index');
+    Route::get('/{locale}/help/search', HelpSearchPage::class)
+        ->whereIn('locale', config('help-center.supported_locales', ['ru']))
+        ->name('localized.help.search');
+    Route::get('/{locale}/help/categories/{categorySlug}', HelpCategoryPage::class)
+        ->whereIn('locale', config('help-center.supported_locales', ['ru']))
+        ->where('categorySlug', '[^/]+')
+        ->name('localized.help.categories.show');
+    Route::get('/{locale}/help/articles/{articleSlug}', HelpArticlePage::class)
+        ->whereIn('locale', config('help-center.supported_locales', ['ru']))
+        ->where('articleSlug', '[^/]+')
+        ->name('localized.help.articles.show');
+    Route::get('/{locale}/faq', fn (string $locale) => redirect()->route('localized.help.index', ['locale' => $locale], 301))
+        ->whereIn('locale', config('help-center.supported_locales', ['ru']))
+        ->name('localized.legacy.help.faq');
+    Route::get('/{locale}/support', fn (string $locale) => redirect()->route('localized.help.index', ['locale' => $locale], 301))
+        ->whereIn('locale', config('help-center.supported_locales', ['ru']))
+        ->name('localized.legacy.help.support');
+    Route::get('/{locale}/help-center', fn (string $locale) => redirect()->route('localized.help.index', ['locale' => $locale], 301))
+        ->whereIn('locale', config('help-center.supported_locales', ['ru']))
+        ->name('localized.legacy.help.center');
     Route::get('/{locale}/search', GlobalSearchPage::class)
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->name('localized.search.index');
@@ -437,25 +499,25 @@ Route::get('/titles', CatalogSeries::class)
     ->middleware('public.page:catalog')
     ->name('titles.index');
 Route::get('/admin/imports', SeasonvarImportManager::class)
-    ->middleware('can:manage-seasonvar-imports')
+    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-seasonvar-imports'])
     ->name('admin.imports');
 Route::get('/admin/catalog', CatalogAdministrationManager::class)
-    ->middleware('can:manage-catalog')
+    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-catalog'])
     ->name('admin.catalog');
 Route::get('/admin/collections', CatalogCollectionAdministrationManager::class)
-    ->middleware('can:manage-catalog')
+    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-catalog'])
     ->name('admin.collections');
 Route::get('/admin/comments', CommentAdministrationManager::class)
-    ->middleware('can:manage-comments')
+    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-comments'])
     ->name('admin.comments');
 Route::get('/admin/reviews', ReviewModerationManager::class)
-    ->middleware('can:manage-reviews')
+    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-reviews'])
     ->name('admin.reviews');
 Route::get('/admin/profiles', UserProfileAdministrationManager::class)
-    ->middleware('can:manage-catalog')
+    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-catalog'])
     ->name('admin.profiles');
 Route::get('/admin/tags', TagAdministrationManager::class)
-    ->middleware('can:manage-catalog')
+    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-catalog'])
     ->name('admin.tags');
 Route::get('/admin/requests', ContentRequestAdministrationManager::class)
     ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-content-requests'])
@@ -466,6 +528,17 @@ Route::get('/admin/issues', TechnicalIssueAdministrationManager::class)
 Route::get('/admin/calendar', ReleaseCalendarAdministrationManager::class)
     ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-release-calendar'])
     ->name('admin.calendar');
+Route::get('/admin/premium', PremiumAdministrationManager::class)
+    ->middleware(['auth', 'auth.session', 'account.private', 'can:view-premium-administration'])
+    ->name('admin.premium');
+Route::get('/admin/help', HelpCenterAdministrationPage::class)
+    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-help-center'])
+    ->name('admin.help');
+Route::get('/admin/help/articles/{helpArticle}/preview/{locale}', HelpArticlePreviewPage::class)
+    ->whereUuid('helpArticle')
+    ->whereIn('locale', config('help-center.supported_locales', ['ru']))
+    ->middleware(['auth', 'auth.session', 'account.private', 'can:manage-help-center'])
+    ->name('admin.help.preview');
 Route::get('/titles/year/{year}', CatalogSeries::class)
     ->where('year', '(?:19|20)\d{2}')
     ->middleware('public.page:catalog')

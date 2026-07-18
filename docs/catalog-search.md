@@ -185,3 +185,15 @@ Canonical discovery URL — `/discover/{type}` и `/{locale}/discover/{type}`; d
 Filters reuse `CatalogTaxonomyRegistry`, task 04 facet SQL and canonical visibility. Interface locale does not change media preference or title identity. Personal feedback/history/current user/recent IDs/seed never enter query. Filtered/authenticated/personal/random pages are noindex and canonicalize to stable public type; default filters are omitted. Search empty state links to clearly labelled popular discovery and never treats those cards as search matches.
 
 Search/filter technical defects use the private Task 20 form with allowlisted `search`/`page` context; arbitrary query strings, signed/private parameters and raw search history are not copied. Ticket search is a separate viewer-scoped DB query and does not alter catalogue ranking, filters, public cache or URL contract. См. [`technical-issues.md`](technical-issues.md).
+
+## Mobile search и filters Task 23
+
+Phone header, desktop header и SSR fallback используют один `x-layout.header-search`, те же localized routes и два bounded API scopes. Dropdown ограничивается visual viewport/keyboard, result rows имеют 44px targets, clear/close/keyboard semantics сохраняются; AbortController/sequence исключают stale response. Voice/microphone control отсутствует.
+
+Каталог использует одну `CatalogSeriesFilters` Form и один URL contract на всех viewport. Mobile disclosure не создаёт второй filter service: inputs deferred до explicit Apply, Cancel восстанавливает server-rendered applied state без mutation, Clear переходит к clean catalog route. На wide viewport та же форма развёрнута. Facets загружаются grouped, people search debounced, result cards получают grouped user overlay; per-card network/database query не добавляется.
+
+Grid/card poster aspect ratio, dimensions/lazy loading, title wrapping, year/status/action labels и pagination остаются responsive CSS behavior. Нет horizontal carousel, user-agent route, hidden downloadable desktop card tree или public cache of owner bookmark/filter state.
+
+## Help-center search integration Task 21
+
+Header portal registry теперь содержит public раздел помощи, но catalog/title suggestions и help suggestions не смешивают ranking или DTO. Внутри `/help` отдельный `HelpSearchService` повторно использует только `CatalogSearchNormalizer`: active/fallback editorial translation, aliases и bounded deterministic ranking. Он не ищет catalog content, не хранит query и не подключает внешний/AI index. Public autocomplete endpoint исключает draft/internal/authenticated/premium articles и возвращает `private, no-store`; полный контракт — [`help-center.md`](help-center.md).

@@ -316,11 +316,15 @@ final class CatalogTitlePlaybackQuery
     }
 
     /** @return Collection<int, Episode> */
-    public function episodesForSeason(CatalogTitle $catalogTitle, Season $season, ?User $user): Collection
-    {
+    public function episodesForSeason(
+        CatalogTitle $catalogTitle,
+        Season $season,
+        ?User $user,
+        bool $withMedia = true,
+    ): Collection {
         $availableMediaIds = $this->availableMedia($catalogTitle, $user)
             ->select((new LicensedMedia)->qualifyColumn('id'));
-        $episodes = Episode::query()
+        $episodesQuery = Episode::query()
             ->availableTo($user)
             ->where('season_id', $season->id)
             ->whereIn(
@@ -346,7 +350,14 @@ final class CatalogTitlePlaybackQuery
                 'available_until',
                 'deleted_at',
             ])
-            ->with([
+            ->withCount([
+                'licensedMedia as available_media_count' => fn (Builder $query): Builder => $query
+                    ->whereIn((new LicensedMedia)->qualifyColumn('id'), clone $availableMediaIds)
+                    ->where('catalog_title_id', $catalogTitle->id),
+            ]);
+
+        if ($withMedia) {
+            $episodesQuery->with([
                 'licensedMedia' => function (Relation $relation) use ($availableMediaIds, $catalogTitle): void {
                     if (! $relation instanceof HasMany) {
                         throw new LogicException('Episode media eager loading requires a has-many relation.');
@@ -390,7 +401,10 @@ final class CatalogTitlePlaybackQuery
                         ->latest('published_at')
                         ->latest();
                 },
-            ])
+            ]);
+        }
+
+        $episodes = $episodesQuery
             ->orderBy('kind')
             ->orderBy('sort_order')
             ->orderBy('number')
@@ -399,6 +413,11 @@ final class CatalogTitlePlaybackQuery
 
         $episodes->each(function (Episode $episode) use ($catalogTitle, $season): void {
             $episode->setRelation('season', $season);
+
+            if (! $episode->relationLoaded('licensedMedia')) {
+                $episode->setRelation('licensedMedia', collect());
+            }
+
             $episode->licensedMedia->each(function (LicensedMedia $media) use ($catalogTitle, $season, $episode): void {
                 $media->setRelation('catalogTitle', $catalogTitle);
                 $media->setRelation('season', $season);
@@ -408,6 +427,33 @@ final class CatalogTitlePlaybackQuery
         $season->setRelation('episodes', $episodes);
 
         return $episodes;
+    }
+
+    /** @return Collection<int, LicensedMedia> */
+    public function mediaForEpisode(
+        CatalogTitle $catalogTitle,
+        Season $season,
+        Episode $episode,
+        ?User $user,
+    ): Collection {
+        if ((int) $season->catalog_title_id !== $catalogTitle->id || (int) $episode->season_id !== $season->id) {
+            return collect();
+        }
+
+        $mediaItems = $this->playbackMedia($catalogTitle, $user)
+            ->where('season_id', $season->id)
+            ->where('episode_id', $episode->id)
+            ->latest('published_at')
+            ->latest()
+            ->get();
+
+        $mediaItems->each(function (LicensedMedia $media) use ($catalogTitle, $season, $episode): void {
+            $media->setRelation('catalogTitle', $catalogTitle);
+            $media->setRelation('season', $season);
+            $media->setRelation('episode', $episode);
+        });
+
+        return $mediaItems;
     }
 
     public function bestMediaForEpisode(

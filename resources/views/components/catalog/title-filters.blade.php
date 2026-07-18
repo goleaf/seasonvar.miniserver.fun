@@ -30,7 +30,7 @@
                             @if ($routeYear === $filterView->bucketYear($bucket))
                                 <input type="checkbox" checked wire:click="removeYear({{ $filterView->bucketYear($bucket) }})" name="year[]" value="{{ $filterView->bucketYear($bucket) }}" class="h-5 w-5 shrink-0 accent-emerald-700">
                             @else
-                                <input type="checkbox" wire:model.live="filters.years" wire:replace.self name="year[]" value="{{ $filterView->bucketYear($bucket) }}" class="h-5 w-5 shrink-0 accent-emerald-700">
+                                <input type="checkbox" wire:model="filters.years" name="year[]" value="{{ $filterView->bucketYear($bucket) }}" class="h-5 w-5 shrink-0 accent-emerald-700">
                             @endif
                             <x-ui.icon name="fa-solid fa-calendar-days text-[0.85em] text-slate-400" />
                             <span class="min-w-0 break-words">{{ $filterView->bucketYear($bucket) }}</span>
@@ -64,7 +64,7 @@
                         'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! in_array($option->value, $filterView->listState('publication_type'), true),
                     ])>
                         <span class="inline-flex min-w-0 items-center gap-2">
-                            <input type="checkbox" wire:model.live="filters.publicationTypes" wire:replace.self name="publication_type[]" value="{{ $option->value }}" class="h-5 w-5 shrink-0 accent-emerald-700">
+                            <input type="checkbox" wire:model="filters.publicationTypes" name="publication_type[]" value="{{ $option->value }}" class="h-5 w-5 shrink-0 accent-emerald-700">
                             <span class="min-w-0 break-words">{{ $option->label }}</span>
                         </span>
                         <span class="shrink-0 text-xs font-bold tabular-nums">{{ $option->context_titles_count }}</span>
@@ -96,7 +96,7 @@
                         'bg-transparent text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! in_array($option->value, $filterView->listState('subtitles'), true),
                     ])>
                         <span class="inline-flex min-w-0 items-center gap-2">
-                            <input type="checkbox" wire:model.live="filters.subtitles" wire:replace.self name="subtitles[]" value="{{ $option->value }}" class="h-5 w-5 shrink-0 accent-emerald-700">
+                            <input type="checkbox" wire:model="filters.subtitles" name="subtitles[]" value="{{ $option->value }}" class="h-5 w-5 shrink-0 accent-emerald-700">
                             <span class="min-w-0 break-words">{{ $option->label }}</span>
                         </span>
                         <span class="shrink-0 text-xs font-bold tabular-nums">{{ $option->context_titles_count }}</span>
@@ -120,7 +120,17 @@
                     @endif
                 </div>
                 @if (in_array($filterType, ['actor', 'director'], true))
-                    <div data-catalog-people-combobox data-people-type="{{ $filterType }}" data-people-endpoint="{{ url('/api/catalog/people') }}" class="relative mb-2">
+                    <div
+                        data-catalog-people-combobox
+                        data-people-type="{{ $filterType }}"
+                        data-people-endpoint="{{ url('/api/catalog/people') }}"
+                        data-people-empty="{{ __('catalog.catalog.filters.people_empty') }}"
+                        data-people-found="{{ __('catalog.catalog.filters.people_found') }}"
+                        data-people-minimum="{{ __('catalog.catalog.filters.people_minimum') }}"
+                        data-people-searching="{{ __('catalog.catalog.filters.people_searching') }}"
+                        data-people-failed="{{ __('catalog.catalog.filters.people_failed') }}"
+                        class="relative mb-2"
+                    >
                         <label class="sr-only" for="catalog-filter-search-{{ $filterType }}">{{ __('catalog.catalog.filters.search_group', ['group' => $label]) }}</label>
                         <div data-focus-frame class="flex min-h-11 items-center gap-2 rounded-control border border-transparent bg-slate-50 px-3 py-2 text-sm text-slate-500">
                             <x-ui.icon name="fa-solid fa-magnifying-glass text-slate-400" />
@@ -167,7 +177,7 @@
                                 @if ($routeFilterType === $filterType && $routeTaxonomy === $taxonomy->slug)
                                     <input type="checkbox" checked wire:click="removeTaxonomy('{{ $filterType }}', '{{ $taxonomy->slug }}')" name="{{ $filterType }}[]" value="{{ $taxonomy->slug }}" class="h-5 w-5 shrink-0 accent-emerald-700">
                                 @else
-                                    <input type="checkbox" wire:model.live="filters.{{ $filterType }}" wire:replace.self name="{{ $filterType }}[]" value="{{ $taxonomy->slug }}" class="h-5 w-5 shrink-0 accent-emerald-700">
+                                    <input type="checkbox" wire:model="filters.{{ $filterType }}" name="{{ $filterType }}[]" value="{{ $taxonomy->slug }}" class="h-5 w-5 shrink-0 accent-emerald-700">
                                 @endif
                                 <x-ui.icon name="{{ $filterView->icon($filterType) }} text-[0.85em] text-slate-400" />
                                 <span class="min-w-0 break-words">{{ $taxonomy->name }}</span>

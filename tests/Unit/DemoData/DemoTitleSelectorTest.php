@@ -16,7 +16,9 @@ use App\Services\DemoData\DemoBulkWriter;
 use App\Services\DemoData\DemoRasterAsset;
 use App\Services\DemoData\DemoStableValue;
 use App\Services\DemoData\DemoTitleSelector;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -135,5 +137,28 @@ final class DemoTitleSelectorTest extends TestCase
         ]], ['email'], ['name', 'updated_at']));
 
         $this->assertSame('Новое имя', $user->fresh()->name);
+    }
+
+    public function test_bulk_writer_limits_each_statement_to_a_memory_safe_row_count(): void
+    {
+        config()->set('demo-data.chunk_size', 1_000);
+        DB::statement('CREATE TEMP TABLE demo_bulk_rows (id INTEGER PRIMARY KEY, payload TEXT NOT NULL)');
+        $bindingCounts = [];
+        DB::listen(function (QueryExecuted $query) use (&$bindingCounts): void {
+            if (str_contains($query->sql, 'demo_bulk_rows') && str_starts_with($query->sql, 'insert')) {
+                $bindingCounts[] = count($query->bindings);
+            }
+        });
+        $rows = collect(range(1, 250))
+            ->map(fn (int $id): array => ['id' => $id, 'payload' => str_repeat('x', 100)])
+            ->all();
+
+        $affected = (new DemoBulkWriter(DemoDataOptions::fromConfig()))
+            ->upsert('demo_bulk_rows', $rows, ['id'], ['payload']);
+
+        $this->assertSame(250, $affected);
+        $this->assertCount(3, $bindingCounts);
+        $this->assertLessThanOrEqual(200, max($bindingCounts));
+        $this->assertSame(250, DB::table('demo_bulk_rows')->count());
     }
 }

@@ -13,7 +13,7 @@
     data-minimum-label="{{ __('catalog.header_search.minimum') }}"
     data-empty-label="{{ __('catalog.header_search.empty') }}"
     data-error-label="{{ __('catalog.header_search.error') }}"
-    class="relative min-w-0 flex-1"
+    {{ $attributes->class(['relative min-w-0 flex-1']) }}
 >
     <form action="{{ $searchUrl }}" method="GET" role="search" aria-label="{{ __('catalog.header_search.form_label') }}" class="flex min-w-0 items-start gap-2" data-header-search-form>
         <div class="relative min-w-0 flex-1">

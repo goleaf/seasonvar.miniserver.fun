@@ -59,6 +59,7 @@ final readonly class HeaderPortalSectionRegistry
             ['route_name' => 'discover.index', 'parameters' => ['type' => 'popular'], 'translation' => 'discovery'],
             ['route_name' => 'collections.index', 'parameters' => [], 'translation' => 'collections'],
             ['route_name' => 'requests.index', 'parameters' => [], 'translation' => 'requests'],
+            ['route_name' => 'help.index', 'parameters' => [], 'translation' => 'help'],
             ['route_name' => 'stats', 'parameters' => [], 'translation' => 'stats'],
             ['route_name' => 'genres.index', 'parameters' => [], 'translation' => 'genres'],
             ['route_name' => 'countries.index', 'parameters' => [], 'translation' => 'countries'],

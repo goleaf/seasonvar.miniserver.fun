@@ -26,6 +26,8 @@ return [
         'open_library' => 'Перейти в библиотеку',
         'back_to_login' => 'Вернуться ко входу',
         'logout' => 'Выйти',
+        'show_password' => 'Показать пароль',
+        'hide_password' => 'Скрыть пароль',
     ],
     'loading' => [
         'checking' => 'Проверка…',

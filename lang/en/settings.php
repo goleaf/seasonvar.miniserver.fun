@@ -2,7 +2,7 @@
 
 return [
     'title' => 'Account settings',
-    'description' => 'Profile, language, playback, privacy, notifications, and security in one place.',
+    'description' => 'Profile, language, playback, privacy, Premium, notifications, and security in one place.',
     'navigation' => [
         'label' => 'Account settings sections',
         'settings' => 'Settings',
@@ -12,6 +12,7 @@ return [
         'privacy' => 'Privacy',
         'notifications' => 'Notifications',
         'collections' => 'Collections',
+        'premium' => 'Premium and billing',
         'security' => 'Security',
         'data' => 'Account data',
     ],
@@ -81,7 +82,7 @@ return [
         'description' => 'These values apply to the existing player and never change history, progress, or your library.',
         'behaviour' => 'Player behaviour',
         'autoplay' => 'Autoplay',
-        'autoplay_hint' => 'The player will attempt to start automatically; the browser may still block playback with sound.',
+        'autoplay_hint' => 'The player will attempt to start and continue to the next playable episode automatically; the browser may still block playback with sound.',
         'remember_volume' => 'Remember volume',
         'remember_volume_hint' => 'Allows volume and mute state to be stored for this device.',
         'muted' => 'Start muted',

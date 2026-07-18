@@ -3,6 +3,12 @@
         <p class="text-xs font-black uppercase tracking-widest text-emerald-700">{{ __('issues.title') }}</p>
         <h1 class="mt-2 text-2xl font-black text-slate-900 sm:text-3xl">{{ __('issues.create.title') }}</h1>
         <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">{{ __('issues.create.description') }}</p>
+        @if ($helpArticle !== null)
+            <a href="{{ $helpArticle->url }}" class="mt-4 inline-flex min-h-11 items-center gap-2 rounded-control bg-sky-50 px-4 py-2 text-sm font-bold text-sky-900 hover:bg-sky-100">
+                <x-ui.icon name="fa-regular fa-circle-question" />
+                <span>{{ $helpArticle->title }}</span>
+            </a>
+        @endif
     </header>
 
     @if ($statusMessage)

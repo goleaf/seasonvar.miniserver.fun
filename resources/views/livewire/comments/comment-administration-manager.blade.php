@@ -129,7 +129,7 @@
     @endif
 
     @if (! $queryFailed && $selectedCommentId !== null)
-        <dialog data-comment-dialog data-comment-dialog-open class="max-h-[calc(100vh-2rem)] w-[min(48rem,calc(100%-2rem))] overflow-y-auto rounded-panel border-0 bg-white p-0 shadow-2xl backdrop:bg-slate-950/60" aria-labelledby="comment-moderation-dialog-title">
+        <dialog data-comment-dialog data-comment-dialog-open class="w-[min(48rem,calc(100%-2rem))] overflow-y-auto rounded-panel border-0 bg-white p-0 shadow-2xl backdrop:bg-slate-950/60" aria-labelledby="comment-moderation-dialog-title">
             <div class="p-5 sm:p-6">
                 <div class="flex items-start justify-between gap-4">
                     <div>

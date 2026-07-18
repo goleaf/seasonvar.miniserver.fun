@@ -16,6 +16,7 @@ final readonly class TechnicalIssueTargetData
         public ?int $episodeId = null,
         public ?int $licensedMediaId = null,
         public ?int $translationId = null,
+        public ?int $helpArticleId = null,
         public ?string $featureCode = null,
         public ?string $routeName = null,
         public ?string $routePath = null,

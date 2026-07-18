@@ -254,6 +254,30 @@ class User extends Authenticatable implements HasLocalePreference, MustVerifyEma
         return $this->hasOne(UserAccountSetting::class);
     }
 
+    /** @return HasMany<PremiumEntitlement, $this> */
+    public function premiumEntitlements(): HasMany
+    {
+        return $this->hasMany(PremiumEntitlement::class);
+    }
+
+    /** @return HasMany<PremiumSubscription, $this> */
+    public function premiumSubscriptions(): HasMany
+    {
+        return $this->hasMany(PremiumSubscription::class);
+    }
+
+    /** @return HasMany<PremiumPayment, $this> */
+    public function premiumPayments(): HasMany
+    {
+        return $this->hasMany(PremiumPayment::class);
+    }
+
+    /** @return HasMany<PremiumCouponRedemption, $this> */
+    public function premiumCouponRedemptions(): HasMany
+    {
+        return $this->hasMany(PremiumCouponRedemption::class);
+    }
+
     protected static function booted(): void
     {
         static::creating(function (self $user): void {

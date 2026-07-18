@@ -1,4 +1,4 @@
-<details id="catalog-filters" data-catalog-advanced-filters data-catalog-unified-filters class="group mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3" open>
+<details id="catalog-filters" data-catalog-advanced-filters data-catalog-unified-filters data-active-filter-count="{{ $filterView->activeFilterCount() }}" class="group mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3" open>
     <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-control px-1 text-sm font-bold text-slate-700">
         <span class="inline-flex min-w-0 items-center gap-2">
             <x-ui.icon name="fa-solid fa-sliders text-emerald-700" />
@@ -41,7 +41,7 @@
                     </label>
                     <label class="w-full text-xs font-bold text-slate-600 sm:w-auto">
                         <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.updated') }}</span>
-                        <select wire:model.live="filters.updated" name="updated" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-56">
+                        <select wire:model="filters.updated" name="updated" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-56">
                             <option value="">{{ __('catalog.catalog.exact_filters.any_time') }}</option>
                             <option value="day" @selected($filterView->scalarState('updated') === 'day')>{{ __('catalog.catalog.exact_filters.updated_day') }}</option>
                             <option value="week" @selected($filterView->scalarState('updated') === 'week')>{{ __('catalog.catalog.exact_filters.updated_week') }}</option>
@@ -97,7 +97,7 @@
                 <div class="mt-3 flex flex-wrap items-end gap-2 sm:gap-3">
                     <label class="w-full text-xs font-bold text-slate-600 sm:w-auto">
                         <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.source') }}</span>
-                        <select wire:model.live="filters.ratingSource" name="rating_source" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-52">
+                        <select wire:model="filters.ratingSource" name="rating_source" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-52">
                             <option value="">{{ __('catalog.catalog.exact_filters.any_source') }}</option>
                             <option value="kinopoisk" @selected($filterView->scalarState('rating_source') === 'kinopoisk')>{{ __('catalog.catalog.advanced_filter_values.rating_kinopoisk') }}</option>
                             <option value="imdb" @selected($filterView->scalarState('rating_source') === 'imdb')>{{ __('catalog.catalog.advanced_filter_values.rating_imdb') }}</option>
@@ -124,7 +124,7 @@
                 <p class="mt-1 text-xs leading-5 text-slate-500">{{ __('catalog.catalog.exact_filters.video_description') }}</p>
                 <label class="mt-3 block text-xs font-bold text-slate-600">
                     <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.availability') }}</span>
-                    <select wire:model.live="filters.video" name="video" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-48">
+                    <select wire:model="filters.video" name="video" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-48">
                         <option value="">{{ __('catalog.catalog.exact_filters.availability_any') }}</option>
                         <option value="available" @selected($filterView->scalarState('video') === 'available')>{{ __('catalog.catalog.exact_filters.video_available') }}</option>
                         <option value="missing" @selected($filterView->scalarState('video') === 'missing')>{{ __('catalog.catalog.exact_filters.video_missing') }}</option>
@@ -139,7 +139,7 @@
                                 'bg-emerald-50 text-emerald-700' => in_array($quality, $filterView->listState('quality'), true),
                                 'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! in_array($quality, $filterView->listState('quality'), true),
                             ])>
-                                <input type="checkbox" wire:model.live="filters.qualities" wire:replace.self name="quality[]" value="{{ $quality }}" class="h-5 w-5 accent-emerald-700">
+                                <input type="checkbox" wire:model="filters.qualities" name="quality[]" value="{{ $quality }}" class="h-5 w-5 accent-emerald-700">
                                 <span>{{ $quality }}</span>
                             </label>
                         @endforeach
@@ -171,6 +171,10 @@
             <button type="submit" wire:loading.attr="disabled" wire:target="applyFilters" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:cursor-wait disabled:opacity-60">
                 <x-ui.icon name="fa-solid fa-filter" />
                 <span>{{ __('catalog.catalog.exact_filters.show_results') }}</span>
+            </button>
+            <button type="button" data-catalog-filter-cancel class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100">
+                <x-ui.icon name="fa-solid fa-xmark" />
+                <span>{{ __('catalog.catalog.exact_filters.cancel') }}</span>
             </button>
             <a href="{{ route('titles.index') }}" rel="nofollow" wire:click.prevent="resetAll" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control px-3 py-2 text-sm font-bold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700">
                 <x-ui.icon name="fa-solid fa-rotate-left" />

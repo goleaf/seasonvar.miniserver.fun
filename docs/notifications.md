@@ -82,3 +82,9 @@ php artisan test --filter=ConfigurationEnvironmentTest
 ## Уведомления календаря релизов
 
 `ReleaseCalendarActivityNotification` использует существующий database channel. Доставка требует и category flag подписки на тайтл, и общую настройку аккаунта. Deterministic UUID включает recipient, schedule UUID, revision и category, поэтому observer/import retry не создаёт дубль. Payload не содержит media/provider URL, private correction note, email, progress или список подписчиков; inbox заново проверяет видимость. Отдельный гарантированный pre-release scheduler не заявлен и не добавлен. Полный matrix — в [`release-calendar.md`](release-calendar.md).
+
+## Уведомления Premium
+
+`PremiumActivityNotification` использует database channel, stable event code, public resource reference и optional expiration. Deterministic UUID подавляет повтор activation, payment success/failure, renewal, cancellation schedule, refund, dispute, manual grant/revoke и promotion redemption. Payload не содержит card data, provider/customer/subscription identity, webhook payload или private admin note; owner panel повторно ограничен current user.
+
+Новый scheduler/queue для обещанных expiry reminders не вводится. Provider-triggered и synchronous domain notifications работают через существующую инфраструктуру; delivery failure не меняет entitlement. Полный contract — [`premium.md`](premium.md).

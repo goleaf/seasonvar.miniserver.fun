@@ -116,3 +116,29 @@ Homepage показывает не более одной recommendation section;
 `livewire/technical-issues/*` и `components/technical-issues/*` получают prepared DTO/options из Livewire/query/presenter. Create, My Tickets, detail, notifications и staff queue используют existing light Tailwind panels/forms/badges, stable `wire:key`, responsive wrapping, visible focus, minimum touch targets, labelled upload/status/timeline controls и ARIA live regions. Follower view не получает requester evidence; internal notes/raw diagnostics никогда не передаются в normal-user view.
 
 `resources/js/issues.js` — единственный Vite boundary для optional client summary, attachment preview cleanup, player position и focus/live announcements. Blade не содержит model/service/database calls, `@php`, inline CSS или ticket business JavaScript. Полный responsive/accessibility contract: [`technical-issues.md`](technical-issues.md).
+
+## Responsive shell и mobile presentation Task 23
+
+`layouts/app.blade.php`, `components/layout/site-header.blade.php` и `site-footer.blade.php` образуют единственную responsive shell. `AppLayoutData` готовит общие navigation items/active state и private-page marker; Blade не определяет устройство, entitlement, player capability, PWA eligibility или cache policy. Mobile native `<details>` и desktop row выводят те же DTO items, а header search остаётся одной progressive GET form.
+
+Главный контент, route announcer и online/offline status server-rendered. Safe-area/dynamic-viewport styling находится в `resources/css/app.css`; interaction — в Vite modules. Изменённые templates не содержат `@php`, inline style, inline business script, model/service/facade/database calls или raw user output. Password visibility, public share, player bridge, filter draft и keyboard viewport не дублируются в Blade.
+
+Catalog filter presentation остаётся одним component tree: `<details>` даёт compact disclosure, wide viewport использует тот же inline form, Apply/Cancel/Clear имеют отдельную семантику. Player template передаёт только prepared localized copy, public Media Session metadata, authorized navigation URLs и opaque progress endpoint state; protected source decision остаётся PHP boundary.
+
+## Представления Premium
+
+`livewire/premium/*` и settings Premium section получают `PremiumPlanData`, `PremiumAccessSummary` либо подготовленные safe arrays. Pricing, return, owner history, coupon, notifications и admin grant/promotion screens не вычисляют access, amount, currency, expiry, refund или permission в Blade и не обращаются к моделям/сервисам. Provider objects/secrets не входят в Livewire state.
+
+Шаблоны используют существующие light Tailwind panels/buttons/forms/tables, responsive wrapping/overflow, visible focus, minimum touch targets, `wire:loading`, disabled duplicate actions и translated ARIA status/error labels. Fake checkout, invoice, discount, recurring disclosure или feature card не выводятся. Полный presentation contract — [`premium.md`](premium.md).
+
+## Представления центра помощи
+
+`livewire/help-center/*` и `components/help/*` получают только prepared DTO, enum options и paginator. Home/category/article/search/preview/admin не вызывают model/service/facade/database из Blade, не содержат `@php`, inline CSS или business JavaScript. Visibility, locale fallback, relation/ranking/escalation, canonical и sanitizer принадлежат PHP boundary.
+
+Server-rendered article/TOC/FAQ, search form/results, category/article cards, feedback/report и escalation повторно используют existing light UI, focus/touch/loading/live-region/empty/error patterns. `help-center.js` отвечает только за autocomplete interaction и editor unsaved guard. Полный responsive/accessibility contract: [`help-center.md`](help-center.md).
+
+## Представление канонического плеера Task 07
+
+`livewire/catalog-title-player.blade.php` получает prepared DTO/view-model data: stable IDs, localized labels, canonical navigation, one selected signed grant и grouped authorized options выбранной серии. Шаблон не разрешает source URL, не запрашивает БД/service, не содержит `@php`, inline CSS или business JavaScript. Empty menus для отсутствующих audio/subtitle/quality capability не выводятся.
+
+Native buttons/links/dialog имеют семантику, visible focus, минимум 44 px, translated ARIA/live regions, mobile wrapping и working href fallback. Plyr остаётся владельцем core controls; portal controls не имитируют unsupported browser features. Полный presentation checklist: [`audits/video-playback-report.md`](audits/video-playback-report.md).

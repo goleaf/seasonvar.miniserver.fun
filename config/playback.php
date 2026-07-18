@@ -2,6 +2,7 @@
 
 return [
     'signed_url_ttl_seconds' => (int) env('PLAYBACK_SIGNED_URL_TTL_SECONDS', 300),
+    'autoplay_countdown_seconds' => (int) env('PLAYBACK_AUTOPLAY_COUNTDOWN_SECONDS', 8),
     'progress' => [
         'session_ttl_seconds' => (int) env('PLAYBACK_PROGRESS_SESSION_TTL_SECONDS', 21600),
         'max_duration_seconds' => (int) env('PLAYBACK_PROGRESS_MAX_DURATION_SECONDS', 86400),

@@ -178,6 +178,15 @@ return [
             'wait_milliseconds' => 250,
             'jitter_percent' => 10,
         ],
+        'help-center' => [
+            'fresh' => 300,
+            'stale' => 3_600,
+            'hot' => 120,
+            'negative' => 30,
+            'lock' => 60,
+            'wait_milliseconds' => 250,
+            'jitter_percent' => 10,
+        ],
         'sitemap' => [
             'fresh' => 1_800,
             'stale' => 21_600,

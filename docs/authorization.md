@@ -203,3 +203,52 @@ Discovery type route ограничен implemented enum cases; similar/related 
 | Private correction history | нет | нет | да |
 
 Client не выбирает user, logical key, revision, actor или notification recipient; target ancestry, enum, IANA timezone и status transition повторно проверяются. Полный contract: [`release-calendar.md`](release-calendar.md).
+
+## Mobile presentation authorization Task 23
+
+Responsive state не даёт прав. Phone/tablet/standalone, orientation, fullscreen/PiP/Media Session, online/save-data hint, local storage и client-reported device category не участвуют в policy/gate/service decisions. Header может не выводить недоступное действие, но every Livewire/route/API mutation повторно authorizes server-side.
+
+Все staff full-page routes — imports, catalog, collections, comments, reviews, profiles, tags, requests, issues, calendar, premium и help — используют `auth`, `auth.session`, `account.private` до соответствующего gate. Это сохраняет private/no-store initial response и Livewire hydration; gate-only UI больше не является единственной initial boundary. Public canonical routes и route names не менялись.
+
+Task 23 не добавляет push/download/offline entitlement. Existing online direct-file download остаётся `LicensedMediaPolicy` + canonical entitlement/region/publication/health/format checks; mobile UI/local record не может разрешить его. Existing mobile API token abilities остаются отдельными от web session и не дают ticket/payment/admin/source access.
+
+## Матрица Premium-доступа и биллинга
+
+| Действие | Guest | Authenticated owner | Premium admin |
+| --- | --- | --- | --- |
+| Просмотр `/premium` | да, только реальные public plans | да плюс собственный summary | да |
+| Создать checkout | нет; safe intended login | verified current user, server plan/amount/currency/provider | без impersonation |
+| Return/settings/history/coupon | нет | только current user/public checkout UUID ownership | без чтения чужой страницы |
+| Grant/revoke manual access | нет | нет | `manage-premium-grants`, повторная action authorization |
+| Campaign/coupon | нет | только redeem current user | `manage-premium-promotions` |
+| Вход в Premium administration | нет | нет | `view-premium-administration` |
+| Audit/provider health/reconciliation | нет | нет | отдельные `view-premium-billing-audit`/`reconcile-premium` gates |
+| Webhook | без browser auth/CSRF | нет | registered provider signature + environment + throttle |
+
+Client никогда не задаёт user/customer/subscription/payment identity, amount, currency, provider, feature/source, lifetime, expiry, refund или status. Premium не обходит publication, media policy или region rule. Полный contract — [`premium.md`](premium.md).
+
+## Матрица центра помощи
+
+| Действие | Guest | Authenticated/Premium | Help editor |
+| --- | --- | --- | --- |
+| Public published `everyone` | да | да | да |
+| `anonymous` / `authenticated` / `premium` | только anonymous | policy + реальный entitlement | да |
+| Staff/draft/preview/revision | нет | нет | `manage-help-center` |
+| Feedback/report | CSRF + HMAC session actor + rate limit | CSRF + HMAC user actor + rate limit | те же public rules |
+| Create/edit/review/publish/archive/restore/merge | нет | нет | route/hydration/action authorization |
+
+Client не задаёт editor/reporter identity, произвольный status/type/locale/audience/route/escalation или publication timestamp. Public search/API/cache/sitemap всегда повторяют audience/publication boundary; hide button не является authorization. Полный contract: [`help-center.md`](help-center.md).
+
+## Матрица playback access Task 07
+
+| Действие | Гость | Verified account | Server checks |
+| --- | --- | --- | --- |
+| Открыть public title/episode/source | да | да | title→season→episode→media hierarchy, publication, window, audience, health |
+| Открыть authenticated audience | нет | да | `CatalogEntitlementService`, session/user binding |
+| Получить/обновить signed grant | да для public | да | signed viewer, opaque media ID, URL/DNS/path/format revalidation, rate limit |
+| Сохранить anonymous progress/preferences | local device only | local mirror | bounded stable values, no source URL/token |
+| Сохранить server progress/restart/settings | нет | да | verified interaction, encrypted progress session, event sequence, CSRF/Livewire, rate limit |
+| Скачать direct file | нет | да | auth/session/private middleware, policy, source/hierarchy/range guard |
+| Source fallback | public equivalent only | authorized equivalent only | failed ID list + full canonical resolver; no rule bypass |
+
+Current schema не назначает source Premium/region-country/age rule; клиентский Premium/region/age signal не принимается. При появлении реальной policy она должна входить в тот же entitlement resolver до выдачи source. Полный access/threat contract: [`audits/video-playback-report.md`](audits/video-playback-report.md).

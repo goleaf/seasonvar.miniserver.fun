@@ -160,6 +160,7 @@ class ProjectDocumentationRefresher
             'Обновлено командой `php artisan project:docs-refresh`: '.$this->today().'.',
             'Основная карта сайта портала: `https://seasonvar.miniserver.fun/sitemap-index.xml`.',
             'Совместимый адрес `/sitemap.xml` отдает индекс карты сайта, чтобы поисковые системы получали все разделы карты.',
+            'Опубликованные общедоступные статьи и непустые разделы центра помощи входят в отдельный потоковый `/sitemap-help.xml`.',
             '`public/robots.txt` объявляет стабильный индекс карты сайта без ручного перечисления страниц `sitemap-titles-*` и `sitemap-videos-*`.',
             'Git-хук `.githooks/post-commit` запускает обновление файлов документации и при изменениях делает отдельный коммит документации; автоматическая отправка в Git включается только через `SEASONVAR_DOCS_AUTO_PUSH=1`.',
         ]);
@@ -197,6 +198,7 @@ class ProjectDocumentationRefresher
     {
         return $this->section('Публичная индексация', array_merge([
             'Индекс карты сайта собирает статические страницы, годы, активные справочники, программные посадочные страницы, карточки тайтлов и карту видео.',
+            'Раздел `/sitemap-help.xml` включает только канонические опубликованные public translations и непустые категории центра помощи.',
             'Карточки тайтлов попадают в `sitemap-titles-{page}.xml` только при `is_published=true` и заполненном `slug`.',
             'Карта видео строится по `licensed_media` со статусом `published` и абсолютной внешней ссылкой в `playback_url` или `path`.',
             '`robots.txt` объявляет только индекс карты сайта, потому что количество страниц `sitemap-titles-*` и `sitemap-videos-*` зависит от базы.',
@@ -367,6 +369,7 @@ class ProjectDocumentationRefresher
             'sitemap.landings',
             'sitemap.titles',
             'sitemap.videos',
+            'sitemap.help',
         ])
             ->map(fn (string $name): string => '`'.$this->routePath($name).'` (`'.$name.'`)')
             ->all();

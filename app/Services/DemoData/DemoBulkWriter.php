@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\DB;
 
 final readonly class DemoBulkWriter
 {
+    private const int MAX_STATEMENT_ROWS = 100;
+
     public function __construct(private DemoDataOptions $options) {}
 
     /**
@@ -24,8 +26,11 @@ final readonly class DemoBulkWriter
 
         DB::connection()->disableQueryLog();
         $affected = 0;
+        $statementRows = min($this->options->chunkSize, self::MAX_STATEMENT_ROWS);
+        $rowCount = count($rows);
 
-        foreach (array_chunk($rows, $this->options->chunkSize) as $chunk) {
+        for ($offset = 0; $offset < $rowCount; $offset += $statementRows) {
+            $chunk = array_slice($rows, $offset, $statementRows);
             $affected += DB::transaction(
                 fn (): int => $update === []
                     ? DB::table($table)->insertOrIgnore($chunk)

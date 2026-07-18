@@ -19,6 +19,7 @@
     </div>
 
     <livewire:technical-issues.technical-issue-notifications-panel />
+    <livewire:premium.premium-notifications-panel />
 
     @if (! $available)
         <div class="rounded-panel border border-slate-200 bg-white p-6 text-center shadow-panel">

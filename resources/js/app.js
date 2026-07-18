@@ -2,16 +2,34 @@ import '@fortawesome/fontawesome-free/css/fontawesome.min.css';
 import '@fortawesome/fontawesome-free/css/solid.min.css';
 import '@fortawesome/fontawesome-free/css/regular.min.css';
 import '../css/app.css';
-import { initializeCollectionInterfaces } from './collections.js';
-import { initializeCommentInterfaces } from './comments.js';
-import { initializeAccountPreferenceMigration, initializeAccountSettings } from './settings.js';
 import { initializeHeaderSearchInterfaces } from './header-search.js';
-import './reviews.js';
-import './issues.js';
-import { initializeReleaseCountdowns } from './release-calendar.js';
+import { initializeMobileRuntime } from './mobile-runtime.js';
 
 let catalogPlayerModule = null;
 let catalogPlayerModulePromise = null;
+let playerNavigationModule = null;
+let playerNavigationModulePromise = null;
+
+const optionalModulePromises = new Map();
+
+const loadOptionalModule = (key, selector, loader, initialize) => {
+    if (!document.querySelector(selector)) {
+        return;
+    }
+
+    const promise = optionalModulePromises.get(key) || loader().catch(() => {
+        optionalModulePromises.delete(key);
+
+        return null;
+    });
+
+    optionalModulePromises.set(key, promise);
+    void promise.then((module) => {
+        if (module) {
+            initialize(module);
+        }
+    });
+};
 
 const loadCatalogPlayerModule = async () => {
     catalogPlayerModulePromise ??= import('./player.js').then((module) => {
@@ -39,6 +57,25 @@ const flushCatalogPlayersWithin = (root, reason) => {
 
 const destroyCatalogPlayersWithin = (root, options = {}) => {
     catalogPlayerModule?.destroyCatalogPlayersWithin(root, options);
+};
+
+const loadPlayerNavigation = async (root = document) => {
+    if (!root.querySelector?.('[data-active-player-session]')) {
+        return;
+    }
+
+    playerNavigationModulePromise ??= import('./player-navigation.js').then((module) => {
+        playerNavigationModule = module;
+
+        return module;
+    });
+
+    const module = await playerNavigationModulePromise;
+    module.initializePlayerNavigation(root);
+};
+
+const destroyPlayerNavigationWithin = (root) => {
+    playerNavigationModule?.destroyPlayerNavigationWithin(root);
 };
 
 const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -185,13 +222,17 @@ const normalizeCatalogFilterText = (value) => value
     .replace(/\s+/g, ' ')
     .trim();
 
+const initializedCatalogFilterSearch = new WeakSet();
+
 const loadCatalogFilterSearch = () => {
     document.querySelectorAll('[data-catalog-filter-group]').forEach((group) => {
         const input = group.querySelector('[data-catalog-filter-search]');
 
-        if (!(input instanceof HTMLInputElement)) {
+        if (!(input instanceof HTMLInputElement) || initializedCatalogFilterSearch.has(input)) {
             return;
         }
+
+        initializedCatalogFilterSearch.add(input);
 
         const options = [...group.querySelectorAll('[data-catalog-filter-option]')];
         const emptyState = group.querySelector('[data-catalog-filter-empty]');
@@ -265,6 +306,13 @@ const loadCatalogPeopleComboboxes = () => {
         const loading = combobox.querySelector('[data-catalog-people-loading]');
         const type = combobox.getAttribute('data-people-type');
         const endpoint = combobox.getAttribute('data-people-endpoint');
+        const copy = {
+            empty: combobox.getAttribute('data-people-empty') || '',
+            found: combobox.getAttribute('data-people-found') || '',
+            minimum: combobox.getAttribute('data-people-minimum') || '',
+            searching: combobox.getAttribute('data-people-searching') || '',
+            failed: combobox.getAttribute('data-people-failed') || '',
+        };
 
         if (!(input instanceof HTMLInputElement)
             || !(options instanceof HTMLElement)
@@ -334,8 +382,8 @@ const loadCatalogPeopleComboboxes = () => {
 
             activeIndex = -1;
             status.textContent = people.length === 0
-                ? 'Совпадений не найдено.'
-                : `Найдено вариантов: ${people.length}.`;
+                ? copy.empty
+                : copy.found.replace(':count', String(people.length));
             setExpanded(true);
         };
 
@@ -346,7 +394,7 @@ const loadCatalogPeopleComboboxes = () => {
             requestController = null;
 
             if (query.length < 2) {
-                status.textContent = 'Введите не менее двух символов.';
+                status.textContent = copy.minimum;
                 options.replaceChildren();
                 optionLinks = [];
                 closeOptions();
@@ -360,7 +408,7 @@ const loadCatalogPeopleComboboxes = () => {
             url.searchParams.set('type', type);
             url.searchParams.set('q', query);
             loading?.classList.remove('hidden');
-            status.textContent = 'Ищем варианты…';
+            status.textContent = copy.searching;
 
             try {
                 const response = await fetch(url, {
@@ -386,7 +434,7 @@ const loadCatalogPeopleComboboxes = () => {
 
                 options.replaceChildren();
                 optionLinks = [];
-                status.textContent = 'Не удалось загрузить варианты. Повторите поиск.';
+                status.textContent = copy.failed;
                 setExpanded(true);
             } finally {
                 if (requestController === controller) {
@@ -398,6 +446,8 @@ const loadCatalogPeopleComboboxes = () => {
 
         input.addEventListener('input', () => {
             window.clearTimeout(debounceTimer);
+            requestController?.abort();
+            requestController = null;
             debounceTimer = window.setTimeout(() => void lookup(), 300);
         });
 
@@ -484,12 +534,37 @@ const loadCatalogInterfaces = () => {
     loadCatalogFilterSearch();
     loadCatalogPeopleComboboxes();
     loadPaginationScroll();
-    initializeCollectionInterfaces();
-    initializeCommentInterfaces();
-    initializeAccountSettings();
-    initializeAccountPreferenceMigration();
     initializeHeaderSearchInterfaces();
-    initializeReleaseCountdowns();
+    initializeMobileRuntime();
+    void loadPlayerNavigation();
+
+    loadOptionalModule('collections', '[data-collection-dialog], [data-collection-share], [data-collection-dialog-trigger]',
+        () => import('./collections.js'),
+        (module) => module.initializeCollectionInterfaces(document));
+    loadOptionalModule('comments', '[data-comment-dialog], [data-comment-focused], [data-comment-character-counter], [data-preserve-discussion-state]',
+        () => import('./comments.js'),
+        (module) => module.initializeCommentInterfaces(document));
+    loadOptionalModule('reviews', '[data-review-draft], [id^="review-"]',
+        () => import('./reviews.js'),
+        (module) => module.initializeReviews(document));
+    loadOptionalModule('issues', '[data-technical-issue-form], [data-player-issue-link]',
+        () => import('./issues.js'),
+        (module) => module.initializeTechnicalIssueInterfaces(document));
+    loadOptionalModule('release-calendar', '[data-release-countdown]',
+        () => import('./release-calendar.js'),
+        (module) => module.initializeReleaseCountdowns(document));
+    loadOptionalModule('help-center', '[data-help-search]',
+        () => import('./help-center.js'),
+        (module) => module.initializeHelpCenterInterfaces(document));
+
+    if (document.querySelector('[data-account-settings]') || document.body.dataset.accountMigrationUrl) {
+        loadOptionalModule('settings', 'body',
+            () => import('./settings.js'),
+            (module) => {
+                module.initializeAccountSettings(document);
+                module.initializeAccountPreferenceMigration();
+            });
+    }
 };
 
 if (document.readyState === 'loading') {
@@ -515,6 +590,7 @@ document.addEventListener('livewire:init', () => {
     window.Livewire.hook('island.morphed', reloadAfterLivewireMorph);
     window.Livewire.hook('morph.removing', ({ el }) => {
         destroyCatalogPlayersWithin(el);
+        destroyPlayerNavigationWithin(el);
     });
 });
 
@@ -522,6 +598,7 @@ document.addEventListener('livewire:navigating', () => {
     pendingPaginationScrollTo = null;
     flushCatalogPlayersWithin(document, 'navigation');
     destroyCatalogPlayersWithin(document, { flush: false });
+    destroyPlayerNavigationWithin(document);
 });
 
 document.addEventListener('livewire:navigated', () => {
@@ -532,14 +609,17 @@ document.addEventListener('livewire:navigated', () => {
 window.addEventListener('pagehide', () => {
     flushCatalogPlayersWithin(document, 'pagehide');
     destroyCatalogPlayersWithin(document, { flush: false });
+    destroyPlayerNavigationWithin(document);
 });
 
 window.addEventListener('pageshow', (event) => {
     if (event.persisted) {
-        void loadCatalogPlayers();
-    }
-});
+        if (document.body.dataset.privatePage === '1') {
+            return;
+        }
 
-window.addEventListener('beforeunload', () => {
-    flushCatalogPlayersWithin(document, 'beforeunload');
+        void loadCatalogPlayers();
+        void loadPlayerNavigation();
+        loadCatalogInterfaces();
+    }
 });

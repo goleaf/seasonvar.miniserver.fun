@@ -400,3 +400,33 @@ Stable types/sources, user-signal/exclusion policy, routes, fallback и SEO оп
 ## Архитектурная граница календаря релизов
 
 Full-page Livewire `ReleaseCalendarPage` отвечает только за locked route/URL state, подготовленные DTO и пользовательские actions. `ReleaseCalendarQuery` владеет bounded выборкой и видимостью, `ReleaseDateValue`/presenters — точностью, timezone и countdown, `ReleaseScheduleService` — mutation/status/history, notification/cache services — post-commit side effects. Admin и importer observers вызывают ту же service boundary; Blade не обращается к модели и не вычисляет даты. Полный contract: [`release-calendar.md`](release-calendar.md).
+
+## Каноническая mobile web boundary Task 23
+
+Mobile experience является responsive presentation существующего Laravel/Livewire portal, а не вторым frontend. Все phone/tablet/desktop requests используют одинаковые named routes, route model binding, page builders, policies, cache/SEO identity и server-rendered content. Device class, orientation, user agent, client storage, network hint и PWA state никогда не участвуют в authorization, premium, region, source или download decision.
+
+`AppLayoutData` — единый navigation/private-page presenter; `app.css` — единая mobile-first design boundary; `mobile-runtime.js` — малый progressive enhancement; `CatalogTitlePlayer`/`player.js` — единственный playback lifecycle. Header menu, filters, forms и player меняют presentation по viewport/capability, не бизнес-логику или route. HTML остаётся содержательным без JavaScript; optional share, Media Session, visual viewport и Network Information деградируют безопасно.
+
+Существующий `/api/v1` mobile sync — versioned Sanctum API для публичного каталога, owner library/progress и encrypted-cursor/idempotent state mutations. Он не является PWA shell или native application, не даёт ticket/payment/push/offline-license API и не кеширует video. Web session/Livewire и mobile bearer boundaries не смешиваются.
+
+Repository не содержит web-app manifest, canonical service worker, install lifecycle, push-subscription storage/delivery или legal offline-video license/storage. Поэтому Task 23 не добавляет install/push/offline-download controls и не заявляет соответствующие возможности. On-demand `titles.media.download` остаётся online authenticated bounded stream без server/browser persistence; HLS segments не собираются. Реализация PWA/push/offline-video потребует отдельного legal/product/security design и не может быть presentation patch.
+
+Изменений базы Task 23 не требует: viewport, safe areas, disclosure state, network hint и password visibility — ephemeral device presentation. Не создаются device fingerprint, install-dismissal, IndexedDB, push или download-record tables. Existing account preferences, local Plyr-compatible keys, cookie/session names, API cursor/cache identities и routes сохраняются.
+
+## Канонический Premium-домен
+
+`PremiumAccessResolver` читает explicit `premium_entitlements` и возвращает один request-scoped `PremiumAccessSummary`; user boolean, session, provider status, Blade и browser redirect не являются источником доступа. `PremiumPlanQuery → CreatePremiumCheckout → PremiumPaymentGateway → PremiumWebhookResponder → PremiumBillingReconciler → PremiumEntitlementService` образует единственный billing flow. Provider registry, currencies и public plans сейчас пусты, поэтому hosted checkout не показывается и никакая оплата не имитируется.
+
+Единственный реальный feature code — `premium_access`; качество, источники, реклама, скачивания, комментарии, профиль и поддержка не получают Premium-привилегий. Manual/lifetime/promotion records, account settings/export/delete guard, database notifications и разделённые admin gates используют тот же resolver/service. Полные identity, precedence, money, webhook, refund/dispute, privacy/cache/SEO/rollout contracts находятся в [`premium.md`](premium.md).
+
+## Канонический центр помощи Task 21
+
+`HelpCenterQuery`/`HelpArticleResolver` → prepared DTO/presenter → полноэкранные Livewire pages образуют единственный read boundary. `SaveHelpArticle`, `TransitionHelpArticle`, revision/merge/feedback/report actions образуют авторизованный mutation boundary. Blade получает только DTO/options и не вычисляет visibility, fallback, ranking, relation, SEO или escalation.
+
+Base article/category UUID и code стабильны; title/slug/locale/status/order не являются identity. Editorial Markdown хранится по translation в БД, interface labels — в `lang/{ru,en}/help.php`. Public resolver допускает только published audience-aware content; preview/internal/revisions обходят public search/cache/sitemap. Task 19 requests, Task 20 tickets и moderation сохраняют собственные aggregates, а help передаёт им только allowlisted безопасный контекст. Полный контракт: [`help-center.md`](help-center.md).
+
+## Каноническая playback boundary Task 07
+
+`CatalogTitlePlayer` orchestrates только prepared current title/season/episode context. `CatalogTitlePlaybackQuery` владеет stable episode identity, playability и editorial ordering; `CatalogPlaybackSourceResolver` вместе с `CatalogEntitlementService` владеют hierarchy/access/source selection и short-lived grant; `CatalogUserStateService` владеет authenticated progress/restart/completion. `player.js` управляет только realtime video/Plyr/HLS lifecycle, а `player-navigation.js` передаёт meaningful Livewire actions без `timeupdate` traffic.
+
+HTML season lane получает episode metadata/counts, source summaries — только выбранная серия. Raw provider URLs, full models, progress/preferences/entitlement не являются Livewire public state. Отдельного player route/system/cache/progress store нет. Полная matrix форматов, fallback, subtitles/audio truth, progress concurrency, mobile/a11y/security/SEO и rollback находится в [`audits/video-playback-report.md`](audits/video-playback-report.md).

@@ -71,16 +71,16 @@
         @vite('resources/js/app.js')
     </head>
     <body @class([
-        'min-h-screen bg-slate-50 text-slate-700 antialiased',
+        'app-shell bg-slate-50 text-slate-700 antialiased',
         'account-reduced-motion' => $accountReducedMotion ?? false,
-    ]) data-account-settings-version="{{ $accountSettingsVersion ?? 1 }}" data-account-storage-key="{{ $accountAnonymousStorageKey ?? '' }}" @if (($accountPreferenceMigrationUrl ?? null) !== null) data-account-migration-url="{{ $accountPreferenceMigrationUrl }}" data-account-migration-scope="{{ $accountPreferenceMigrationScope }}" @endif>
-        <a href="#main-content" class="fixed left-3 top-3 z-[100] -translate-y-24 rounded-control bg-emerald-700 px-4 py-3 font-bold text-white shadow-lg transition focus:translate-y-0">
+    ]) data-account-settings-version="{{ $accountSettingsVersion ?? 1 }}" data-account-storage-key="{{ $accountAnonymousStorageKey ?? '' }}" @if ($isPrivatePage) data-private-page="1" @endif @if (($accountPreferenceMigrationUrl ?? null) !== null) data-account-migration-url="{{ $accountPreferenceMigrationUrl }}" data-account-migration-scope="{{ $accountPreferenceMigrationScope }}" @endif>
+        <a href="#main-content" data-skip-link class="fixed z-[100] -translate-y-24 rounded-control bg-emerald-700 px-4 py-3 font-bold text-white shadow-lg transition focus:translate-y-0">
             {{ __('catalog.layout.skip_to_content') }}
         </a>
 
         <x-layout.site-header :site-name="$siteName" :search-query="$layoutSearchQuery" :header="$layoutHeader" />
 
-        <main id="main-content" class="mx-auto max-w-[1760px] px-3 py-4 sm:px-6 sm:py-6 lg:px-8" itemscope itemtype="https://schema.org/WebPageElement" itemid="{{ $canonicalUrl }}#main-content">
+        <main id="main-content" class="app-safe-inline app-shell-main mx-auto max-w-[1760px] py-4 sm:py-6" itemscope itemtype="https://schema.org/WebPageElement" itemid="{{ $canonicalUrl }}#main-content">
             @if ($showBreadcrumbs)
                 <nav aria-label="{{ __('catalog.layout.breadcrumbs') }}" class="mb-4 rounded-panel border border-slate-200 bg-white px-3 py-2 text-sm shadow-panel">
                     <ol class="flex flex-wrap items-center gap-2 text-slate-500">
@@ -102,6 +102,18 @@
             @yield('content')
         </main>
         <x-layout.site-footer :site-name="$siteName" :footer="$layoutFooter" />
+
+        <div data-connection-status hidden role="status" aria-live="polite" aria-atomic="true" class="fixed inset-x-3 z-[90] mx-auto max-w-lg rounded-control border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 shadow-panel sm:inset-x-6">
+            <span data-connection-offline hidden class="items-center gap-2">
+                <x-ui.icon name="fa-solid fa-wifi text-rose-700" />
+                <span>{{ __('mobile.network.offline') }}</span>
+            </span>
+            <span data-connection-restored hidden class="items-center gap-2">
+                <x-ui.icon name="fa-solid fa-circle-check text-emerald-700" />
+                <span>{{ __('mobile.network.restored') }}</span>
+            </span>
+        </div>
+        <p data-route-announcer data-route-announcement="{{ __('mobile.navigation.page_loaded') }}" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
         @livewireScripts
     </body>
 </html>

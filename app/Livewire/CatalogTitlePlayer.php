@@ -8,7 +8,9 @@ use App\DTOs\AccountSettingsData;
 use App\DTOs\CatalogEpisodeNavigation;
 use App\DTOs\CatalogPrimaryAction;
 use App\DTOs\PlaybackPreferencesData;
+use App\DTOs\PlaybackSettingsData;
 use App\Enums\CatalogWatchStatus;
+use App\Enums\HelpFeature;
 use App\Enums\ReleaseKind;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
@@ -21,6 +23,7 @@ use App\Services\Catalog\CatalogPlaybackSourceResolver;
 use App\Services\Catalog\CatalogPrimaryActionResolver;
 use App\Services\Catalog\CatalogTitlePlaybackQuery;
 use App\Services\Catalog\CatalogUserStateService;
+use App\Services\HelpCenter\HelpContextualLinkService;
 use App\Services\Media\ExternalMediaFileType;
 use App\Services\Media\ExternalMediaMetadata;
 use App\Services\Media\LicensedMediaDownloadFilename;
@@ -31,6 +34,7 @@ use App\View\ViewModels\CatalogShowViewModel;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -61,6 +65,13 @@ class CatalogTitlePlayer extends Component
     #[Url(except: '')]
     public ?string $format = '';
 
+    #[Locked]
+    public int $authorizationVersion = 0;
+
+    /** @var list<int> */
+    #[Locked]
+    public array $failedMediaIds = [];
+
     protected CatalogTitlePlaybackQuery $playback;
 
     protected CatalogPrimaryActionResolver $primaryActions;
@@ -83,6 +94,8 @@ class CatalogTitlePlayer extends Component
 
     protected TechnicalIssueContext $technicalIssueContext;
 
+    protected HelpContextualLinkService $helpLinks;
+
     protected ?AccountSettingsData $resolvedAccountSettings = null;
 
     protected ?CatalogTitle $resolvedTitle = null;
@@ -104,6 +117,7 @@ class CatalogTitlePlayer extends Component
         ExternalMediaFileType $mediaFileTypes,
         HumanFileSizeFormatter $fileSizes,
         TechnicalIssueContext $technicalIssueContext,
+        HelpContextualLinkService $helpLinks,
     ): void {
         $this->playback = $playback;
         $this->primaryActions = $primaryActions;
@@ -116,6 +130,7 @@ class CatalogTitlePlayer extends Component
         $this->mediaFileTypes = $mediaFileTypes;
         $this->fileSizes = $fileSizes;
         $this->technicalIssueContext = $technicalIssueContext;
+        $this->helpLinks = $helpLinks;
     }
 
     public function mount(int $catalogTitleId): void
@@ -150,6 +165,7 @@ class CatalogTitlePlayer extends Component
 
     public function selectSeason(mixed $seasonId): void
     {
+        $this->resetPlaybackRecovery();
         $seasonId = $this->positiveId($seasonId);
 
         if ($seasonId === null) {
@@ -176,6 +192,7 @@ class CatalogTitlePlayer extends Component
 
     public function selectEpisode(mixed $episodeId): void
     {
+        $this->resetPlaybackRecovery();
         $episodeId = $this->positiveId($episodeId);
 
         if ($episodeId === null) {
@@ -221,6 +238,7 @@ class CatalogTitlePlayer extends Component
 
     public function selectMedia(mixed $mediaId): void
     {
+        $this->resetPlaybackRecovery();
         $mediaId = $this->positiveId($mediaId);
 
         if ($mediaId === null) {
@@ -243,6 +261,138 @@ class CatalogTitlePlayer extends Component
         $this->episode = $media->episode_id !== null ? (string) $media->episode_id : '';
         $this->syncMediaProfile($media);
         $this->dispatchDiscussionTarget();
+    }
+
+    public function selectFallbackMedia(mixed $failedMediaId): void
+    {
+        $failedMediaId = $this->positiveId($failedMediaId);
+        $episodeId = $this->positiveId($this->episode);
+        $title = $this->title();
+        $user = $this->user();
+        $episode = $episodeId !== null ? $this->playback->watchableEpisode($title, $user, $episodeId) : null;
+        $failedMedia = $failedMediaId !== null
+            ? $this->playback->findAvailableMedia($title, $user, $failedMediaId)
+            : null;
+
+        if ($episode === null
+            || $failedMedia === null
+            || (int) $failedMedia->episode_id !== $episode->id
+            || ! $this->attemptPlaybackAction('fallback', 12)) {
+            $this->addError('playback', __('catalog.player.fallback_unavailable'));
+            $this->dispatch('playback-fallback-unavailable');
+
+            return;
+        }
+
+        $this->failedMediaIds = collect([...$this->failedMediaIds, $failedMedia->id])
+            ->filter(fn (int $mediaId): bool => $mediaId > 0)
+            ->unique()
+            ->take(100)
+            ->values()
+            ->all();
+        $source = $this->sources->resolve(
+            $title,
+            $user,
+            $episode,
+            null,
+            $this->playbackPreferences(),
+            $this->failedMediaIds,
+        );
+        $fallbackMedia = $source->mediaId !== null
+            ? $this->playback->findAvailableMedia($title, $user, $source->mediaId)
+            : null;
+
+        if ($fallbackMedia === null || (int) $fallbackMedia->episode_id !== $episode->id) {
+            $this->addError('playback', __('catalog.player.fallback_unavailable'));
+            $this->dispatch('playback-fallback-unavailable');
+
+            return;
+        }
+
+        $this->resetErrorBag('playback');
+        $this->media = (string) $fallbackMedia->id;
+        $this->season = (string) $episode->season_id;
+        $this->episode = (string) $episode->id;
+        $this->authorizationVersion++;
+        $this->syncMediaProfile($fallbackMedia);
+        $this->dispatchDiscussionTarget();
+    }
+
+    public function refreshPlaybackAuthorization(): void
+    {
+        if (! $this->attemptPlaybackAction('authorization-refresh', 6)) {
+            $this->addError('playback', __('catalog.player.authorization_refresh_limited'));
+
+            return;
+        }
+
+        $this->resetErrorBag('playback');
+        $this->authorizationVersion++;
+    }
+
+    #[Renderless]
+    public function restartEpisodeProgress(mixed $episodeId, mixed $playbackSessionToken): void
+    {
+        $user = $this->authenticatedUser();
+        $episodeId = $this->positiveId($episodeId);
+
+        if ($episodeId === null
+            || ! is_string($playbackSessionToken)
+            || mb_strlen($playbackSessionToken) > 2048
+            || ! $this->attemptPlaybackAction('restart', 12)) {
+            return;
+        }
+
+        $this->userState->restartProgress(
+            $user,
+            $this->title(),
+            $episodeId,
+            $playbackSessionToken,
+        );
+    }
+
+    #[Renderless]
+    public function setAutoplay(mixed $enabled): void
+    {
+        $user = $this->authenticatedUser();
+        $enabled = filter_var($enabled, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
+
+        if ($enabled === null || ! $this->attemptPlaybackAction('preferences', 30)) {
+            return;
+        }
+
+        $this->resolvedAccountSettings = $this->accountSettings->updatePlayback(
+            $user,
+            $this->playbackSettings(autoplay: $enabled),
+        );
+    }
+
+    #[Renderless]
+    public function persistPlayerPreferences(mixed $volume, mixed $muted, mixed $speed): void
+    {
+        $user = $this->authenticatedUser();
+        $volume = $this->nonNegativeInteger($volume);
+        $muted = filter_var($muted, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
+        $speed = is_numeric($speed) ? number_format((float) $speed, 2, '.', '') : null;
+
+        if ($volume === null
+            || $volume > 100
+            || $muted === null
+            || $speed === null
+            || ! in_array($speed, (array) config('account-settings.playback_speeds', []), true)
+            || ! $this->attemptPlaybackAction('preferences', 30)) {
+            return;
+        }
+
+        $preferences = $this->accountPreferences();
+        $this->resolvedAccountSettings = $this->accountSettings->updatePlayback(
+            $user,
+            $this->playbackSettings(
+                volume: $preferences->rememberVolume ? $volume : $preferences->volume,
+                muted: $preferences->rememberVolume ? $muted : $preferences->muted,
+                speed: $speed,
+            ),
+        );
     }
 
     public function setWatchlist(mixed $inWatchlist): void
@@ -354,7 +504,7 @@ class CatalogTitlePlayer extends Component
 
         $activeSeason = $this->activeSeason($seasons, $requestedEpisodeModel, $primaryAction);
         $episodes = $activeSeason !== null
-            ? $this->playback->episodesForSeason($title, $activeSeason, $user)
+            ? $this->playback->episodesForSeason($title, $activeSeason, $user, withMedia: false)
             : collect();
         $selectedEpisode = $this->selectedEpisode($episodes, $requestedEpisodeModel, $primaryAction, $activeSeason);
         $episodeNavigation = $selectedEpisode !== null && $activeSeason !== null
@@ -367,9 +517,13 @@ class CatalogTitlePlayer extends Component
                 $seasons,
             )
             : new CatalogEpisodeNavigation;
-        $mediaItems = $episodes
-            ->flatMap(fn (Episode $episode): Collection => $episode->licensedMedia)
-            ->values();
+        $mediaItems = $selectedEpisode !== null && $activeSeason !== null
+            ? $this->playback->mediaForEpisode($title, $activeSeason, $selectedEpisode, $user)
+            : collect();
+
+        if ($selectedEpisode !== null) {
+            $selectedEpisode->setRelation('licensedMedia', $mediaItems);
+        }
         $selectedMedia = $this->selectedMedia($mediaItems, $selectedEpisode, $primaryAction, $title, $user);
         $requestedMedia = $this->positiveId($this->media);
 
@@ -391,11 +545,7 @@ class CatalogTitlePlayer extends Component
             $user,
             $selectedEpisode,
             $exactMediaId,
-            new PlaybackPreferencesData(
-                variant: $this->effectiveVariant(),
-                quality: $this->effectiveQuality(),
-                format: $this->normalizedFormat(),
-            ),
+            $this->playbackPreferences(),
         );
         $selectedMedia = $playbackSource->mediaId !== null
             ? ($mediaItems->firstWhere('id', $playbackSource->mediaId) ?? $selectedMedia)
@@ -431,10 +581,10 @@ class CatalogTitlePlayer extends Component
         $downloadUrl = $user !== null && $isDirectDownload
             ? route('titles.media.download', [$title, $selectedMedia])
             : null;
-        $downloadFilename = $isDirectDownload && $selectedMedia !== null && $downloadExtension !== null
-                ? $this->downloadFilenames->generate($title, $selectedMedia, $downloadExtension)
-                : null;
-        $fileSizeLabel = $isDirectDownload && $selectedMedia !== null
+        $downloadFilename = $isDirectDownload
+            ? $this->downloadFilenames->generate($title, $selectedMedia, $downloadExtension)
+            : null;
+        $fileSizeLabel = $isDirectDownload
             ? ($this->fileSizes->format($selectedMedia->file_size_bytes) ?? __('catalog.download.size_unknown'))
             : null;
 
@@ -467,6 +617,14 @@ class CatalogTitlePlayer extends Component
         $technicalIssueUrl = (bool) config('technical-issues.enabled', true) && $user !== null
             ? $this->technicalIssueContext->playerUrl($title, $activeSeason, $selectedEpisode, $selectedMedia)
             : null;
+        $routeLocale = request()->route('locale');
+        $routeLocale = is_string($routeLocale) ? $routeLocale : null;
+        $playerHelp = $this->helpLinks->primary(
+            HelpFeature::Player,
+            $playbackSource->isPlayable() ? 'controls' : 'error',
+            app()->getLocale(),
+            $routeLocale,
+        );
 
         return view('livewire.catalog-title-player', [
             'title' => $title,
@@ -481,6 +639,8 @@ class CatalogTitlePlayer extends Component
             'playbackSource' => $playbackSource,
             'playbackSourceIsPlayable' => $playbackSource->isPlayable(),
             'playerSessionKey' => $playerSessionKey,
+            'authorizationVersion' => $this->authorizationVersion,
+            'autoplayCountdownSeconds' => max(3, min(30, (int) config('playback.autoplay_countdown_seconds', 8))),
             'progressSessionToken' => $progressSessionToken,
             'mediaItems' => $mediaItems,
             'showView' => $showView,
@@ -495,7 +655,16 @@ class CatalogTitlePlayer extends Component
             'isAuthenticated' => $user !== null,
             'canInteract' => $user?->hasVerifiedEmail() === true,
             'technicalIssueUrl' => $technicalIssueUrl,
+            'playerHelp' => $playerHelp,
             'playerCopy' => $playerCopy->current(),
+            'mediaSession' => [
+                'title' => $selectedEpisode?->title ?: ($selectedEpisode !== null
+                    ? $this->episodeDisplayLabel($selectedEpisode)
+                    : $title->display_title),
+                'artist' => $title->display_title,
+                'album' => $activeSeason !== null ? $this->seasonDisplayLabel($activeSeason) : '',
+                'artwork' => $title->poster_url,
+            ],
             'accountPlaybackPreferences' => [
                 'autoplay' => $this->accountPreferences()->autoplay,
                 'rememberVolume' => $this->accountPreferences()->rememberVolume,
@@ -504,6 +673,7 @@ class CatalogTitlePlayer extends Component
                 'speed' => $this->accountPreferences()->playbackSpeed,
                 'subtitlesEnabled' => $this->accountPreferences()->subtitlesEnabled,
                 'keyboardShortcutsEnabled' => $this->accountPreferences()->keyboardShortcutsEnabled,
+                'reducedMotion' => $this->accountPreferences()->reducedMotion,
             ],
         ]);
     }
@@ -669,6 +839,58 @@ class CatalogTitlePlayer extends Component
     private function accountPreferences(): AccountSettingsData
     {
         return $this->resolvedAccountSettings ??= $this->accountSettings->resolve($this->user());
+    }
+
+    private function playbackPreferences(): PlaybackPreferencesData
+    {
+        return new PlaybackPreferencesData(
+            variant: $this->effectiveVariant(),
+            quality: $this->effectiveQuality(),
+            format: $this->normalizedFormat(),
+        );
+    }
+
+    private function playbackSettings(
+        ?bool $autoplay = null,
+        ?int $volume = null,
+        ?bool $muted = null,
+        ?string $speed = null,
+    ): PlaybackSettingsData {
+        $current = $this->accountPreferences();
+
+        return new PlaybackSettingsData(
+            autoplay: $autoplay ?? $current->autoplay,
+            rememberVolume: $current->rememberVolume,
+            volume: $volume ?? $current->volume,
+            muted: $muted ?? $current->muted,
+            playbackSpeed: $speed ?? $current->playbackSpeed,
+            preferredQuality: $current->preferredQuality,
+            preferredVariant: $current->preferredVariant,
+            subtitlesEnabled: $current->subtitlesEnabled,
+            keyboardShortcutsEnabled: $current->keyboardShortcutsEnabled,
+        );
+    }
+
+    private function attemptPlaybackAction(string $action, int $maxAttempts): bool
+    {
+        $user = $this->user();
+        $viewer = $user !== null
+            ? 'user:'.$user->id
+            : 'guest:'.hash('sha256', (string) request()->ip());
+
+        return RateLimiter::attempt(
+            'catalog-player:'.$action.':'.$viewer,
+            $maxAttempts,
+            fn (): bool => true,
+            60,
+        ) === true;
+    }
+
+    private function resetPlaybackRecovery(): void
+    {
+        $this->failedMediaIds = [];
+        $this->authorizationVersion = 0;
+        $this->resetErrorBag('playback');
     }
 
     private function resetSelection(): void

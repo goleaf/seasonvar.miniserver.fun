@@ -70,3 +70,17 @@
 - Profile display name продолжает `UserPlainText` normalization и запрещает control/bidi; generic profile fill allowlisted только `name|email`. Session action token должен быть 64-char HMAC и повторно разрешается внутри own session set; password/export/delete rules остаются в существующих security boundaries.
 
 - Technical issue input сначала преобразуется в typed DTO, затем registry проверяет eligible target и type-specific actual/steps/timestamp/language fields. Context resolver повторно проверяет catalog/media ownership chain и allowlists route/feature/path/codes. Text limits/control/bidi/secret redaction применяются до persistence; optional diagnostics принимают только browser/OS/device enums и bounded numeric values. Screenshots проходят upload/MIME/decoded raster/bytes/pixels/dimensions/re-encode checks. Полный matrix: [`technical-issues.md`](technical-issues.md).
+
+## Валидация Premium
+
+- Public checkout принимает только stable plan code и opaque request UUID; server query заново проверяет active/public/nonlegacy plan, provider capability, region, positive integer minor amount, allowlisted ISO currency и registry-backed entitlements. User/provider/customer/amount/currency/status/expiry не являются form fields.
+- Provider adapter проверяет signature на raw body и возвращает typed normalized event. Reconciler повторно проверяет provider/environment/event/object identity, checkout ownership, exact amount/currency, period chronology, stable status mapping и event timestamp; raw exception наружу не выходит.
+- Admin grant использует enum feature/source/reason, bounded duration/date/private note и current authorized actor; coupon/campaign codes, windows и limits нормализуются server-side. User coupon form принимает только bounded code и не задаёт duration/discount.
+- Payment, refund, dispute и entitlement models имеют explicit `$fillable`; private account UI работает через owner query/action, а audit context допускает только bounded scalar values. Полный matrix — [`premium.md`](premium.md).
+
+## Валидация центра помощи
+
+- Locale, article type/status/audience/owner/feature/escalation, feedback/report reason и issue/request subtype принимаются только из enum/config allowlist; article/category/revision/relation/replacement ID разрешаются заново.
+- Code/slug имеют bounded Unicode/ASCII patterns и uniqueness с учётом current/history slug. Category parent ограничен двумя уровнями, replacement/related не допускают self/cycle.
+- Markdown максимум 60 000 символов проходит canonical renderer и link validator; summary/SEO/callout/alias/details/private note имеют отдельные bounds. Raw HTML/template/script/style/form/iframe/image и unsafe scheme не сохраняются в public rendering.
+- Feedback/report используют server actor key, rate limit, exact published translation ownership, idempotent unique/dedupe и sanitized optional reason/details. Полный matrix: [`help-center.md`](help-center.md).

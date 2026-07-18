@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Localization;
 
+use App\Services\HelpCenter\HelpLocalizedRouteResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Router;
@@ -24,12 +25,19 @@ final class LocalizedRouteResolver
     public function __construct(
         private readonly Router $router,
         private readonly UrlGenerator $urls,
+        private readonly HelpLocalizedRouteResolver $help,
     ) {}
 
     public function targetFor(Request $request, string $locale): string
     {
         if (! $this->supported($locale)) {
             return $this->localizedHome((string) config('app.fallback_locale', 'ru'));
+        }
+
+        $helpTarget = $this->help->targetFor($request, $locale);
+
+        if ($helpTarget !== null) {
+            return $helpTarget;
         }
 
         $route = $request->route();

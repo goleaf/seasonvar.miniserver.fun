@@ -11,6 +11,8 @@ use App\Services\DemoData\DemoStableValue;
 use App\ValueObjects\CommentBody;
 use App\ValueObjects\ProfileUsername;
 use App\ValueObjects\ReviewBody;
+use App\ValueObjects\ReviewTitle;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 final class DemoRussianTextTest extends TestCase
@@ -78,6 +80,21 @@ final class DemoRussianTextTest extends TestCase
         }
 
         $this->assertCount(250, array_unique($bodies));
+    }
+
+    public function test_review_titles_fit_the_domain_limit_for_long_catalog_names(): void
+    {
+        $stable = new DemoStableValue('seasonvar-demo-v1');
+        $fingerprints = new DemoLexicalFingerprint;
+        $persona = (new DemoPersonaFactory($stable, $fingerprints))->make(1);
+        $text = new DemoRussianText($stable, $fingerprints);
+
+        $generated = $text->reviewTitle($persona, str_repeat('Очень длинное название ', 20), 42);
+        $title = ReviewTitle::from($generated);
+
+        $this->assertLessThanOrEqual((int) config('reviews.title.maximum_length'), Str::length($title->value));
+        $this->assertStringContainsString('«', $title->value);
+        $this->assertStringContainsString('»', $title->value);
     }
 
     public function test_public_tag_vocabulary_has_at_least_eight_hundred_unique_natural_names(): void

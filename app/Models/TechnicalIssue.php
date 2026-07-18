@@ -60,6 +60,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'episode_id',
     'licensed_media_id',
     'translation_id',
+    'help_article_id',
     'feature_code',
     'route_name',
     'route_path',
@@ -143,6 +144,12 @@ final class TechnicalIssue extends Model
     public function translation(): BelongsTo
     {
         return $this->belongsTo(Translation::class);
+    }
+
+    /** @return BelongsTo<HelpArticle, $this> */
+    public function helpArticle(): BelongsTo
+    {
+        return $this->belongsTo(HelpArticle::class);
     }
 
     /** @return BelongsTo<TechnicalIssue, $this> */

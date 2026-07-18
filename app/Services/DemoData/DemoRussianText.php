@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\DemoData;
 
 use App\DTOs\DemoData\DemoPersona;
+use Illuminate\Support\Str;
 
 final readonly class DemoRussianText
 {
@@ -55,7 +56,11 @@ final readonly class DemoRussianText
             'Разговор о героях сериала «%s»',
         ];
 
-        return sprintf($this->stable->pick($this->scope($persona, 'review-title', $ordinal), $templates), $titleName);
+        $template = $this->stable->pick($this->scope($persona, 'review-title', $ordinal), $templates);
+        $maximum = max(1, (int) config('reviews.title.maximum_length', 120));
+        $titleNameLimit = max(1, $maximum - Str::length(sprintf($template, '')));
+
+        return sprintf($template, Str::limit($titleName, $titleNameLimit, ''));
     }
 
     public function reviewBody(DemoPersona $persona, string $titleName, int $ordinal): string

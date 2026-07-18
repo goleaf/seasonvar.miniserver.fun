@@ -26,6 +26,8 @@ return [
         'open_library' => 'Open library',
         'back_to_login' => 'Back to sign in',
         'logout' => 'Sign out',
+        'show_password' => 'Show password',
+        'hide_password' => 'Hide password',
     ],
     'loading' => [
         'checking' => 'Checking…',

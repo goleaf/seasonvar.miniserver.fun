@@ -148,6 +148,7 @@ final readonly class CreateTechnicalIssue
                     'episode_id' => $target->episodeId,
                     'licensed_media_id' => $target->licensedMediaId,
                     'translation_id' => $target->translationId,
+                    ...($target->helpArticleId !== null ? ['help_article_id' => $target->helpArticleId] : []),
                     'feature_code' => $target->featureCode,
                     'route_name' => $target->routeName,
                     'route_path' => $target->routePath,

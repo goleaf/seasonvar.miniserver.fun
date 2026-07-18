@@ -12,9 +12,9 @@
             @endif
         </div>
 
-        <nav class="mt-5 flex gap-2 overflow-x-auto pb-1" aria-label="{{ __('calendar.navigation') }}">
+        <nav class="mt-5 flex flex-wrap gap-2" aria-label="{{ __('calendar.navigation') }}">
             @foreach ($viewUrls as $viewCode => $viewUrl)
-                <a href="{{ $viewUrl }}" wire:navigate @class(['inline-flex min-h-11 shrink-0 items-center rounded-control px-4 py-2 text-sm font-bold', 'bg-emerald-700 text-white' => $calendarView->value === $viewCode, 'bg-slate-100 text-slate-700 hover:bg-slate-200' => $calendarView->value !== $viewCode]) @if ($calendarView->value === $viewCode) aria-current="page" @endif>{{ __('calendar.views.'.$viewCode) }}</a>
+                <a href="{{ $viewUrl }}" wire:navigate @class(['inline-flex min-h-11 min-w-0 items-center rounded-control px-4 py-2 text-sm font-bold', 'bg-emerald-700 text-white' => $calendarView->value === $viewCode, 'bg-slate-100 text-slate-700 hover:bg-slate-200' => $calendarView->value !== $viewCode]) @if ($calendarView->value === $viewCode) aria-current="page" @endif>{{ __('calendar.views.'.$viewCode) }}</a>
             @endforeach
         </nav>
     </header>

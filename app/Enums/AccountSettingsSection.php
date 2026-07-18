@@ -12,6 +12,7 @@ enum AccountSettingsSection: string
     case Privacy = 'privacy';
     case Notifications = 'notifications';
     case Collections = 'collections';
+    case Premium = 'premium';
     case Security = 'security';
     case Data = 'data';
 
@@ -29,6 +30,7 @@ enum AccountSettingsSection: string
             self::Privacy => 'fa-solid fa-user-shield',
             self::Notifications => 'fa-solid fa-bell',
             self::Collections => 'fa-solid fa-layer-group',
+            self::Premium => 'fa-solid fa-crown',
             self::Security => 'fa-solid fa-shield-halved',
             self::Data => 'fa-solid fa-file-shield',
         };

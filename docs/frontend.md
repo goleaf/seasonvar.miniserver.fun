@@ -207,3 +207,35 @@ Dropdown реализует `combobox`/`listbox`, `aria-expanded`, `aria-actived
 ## Calendar frontend lifecycle
 
 Public/personal calendar рендерится full-page Livewire и остаётся содержательным без JavaScript. `resources/js/release-calendar.js` отвечает только за presentation countdown из trusted server ISO timestamp: minute-level interval, stop at zero, `livewire:navigating` cleanup и reinitialization после navigation. Он не определяет release status, timezone, visibility или notification eligibility. Month table скрывается в пользу server-rendered agenda на телефоне; loading/empty/error/live status и keyboard focus принадлежат Blade/Livewire. Полный contract: [`release-calendar.md`](release-calendar.md).
+
+## Mobile runtime и capability enhancement Task 23
+
+`resources/js/app.js` оставляет eager только header search и малый `mobile-runtime`; collections, comments, reviews, technical issues, help, settings, release calendar и player bridge импортируются по DOM selector. Player загружает Plyr/HLS только при наличии `[data-catalog-player]`, HLS — только для HLS source. Module initialization использует `WeakSet`/abort cleanup и повторяется безопасно после Livewire morph/navigation; `livewire:navigating` закрывает menu, уничтожает player/listeners/timers и сохраняет meaningful progress.
+
+`mobile-runtime.js` владеет только presentation/capability concerns: native details navigation, explicit public share with Web Share or write-only clipboard fallback, visual viewport CSS variable, truthful connection banner, route announcement/focus, deferred mobile filter presentation и private bfcache revalidation. Он не читает clipboard, camera, microphone, location, sensors, contacts, cookies, auth tokens, media URL или private history; не запрашивает permissions; не определяет premium/region/download access.
+
+Player по-прежнему использует один `CatalogTitlePlayer`. Progress отправляется bounded 30-second heartbeat с minimum delta, а также на pause, meaningful seek, visibility hidden, `pagehide`, Livewire navigation и destroy; orientation не создаёт новый instance или отдельную запись. `beforeunload` для player removed: тяжёлая blocking unload boundary не используется. Media Session получает только public title/episode/season/poster metadata и capability-gated play/pause/seek/previous/next actions; raw media URL/grant/token не передаются. Position state обновляется bounded interval и очищается вместе с action handlers. Plyr управляет standards fullscreen/PiP/captions/speed/quality controls и скрывает unsupported controls.
+
+`navigator.connection.saveData` — необязательная подсказка только при `auto`/browser-managed выборе: autoplay выключается, video preload становится `none`, HLS start откладывается до play и buffer уменьшается. Явный quality/source choice не переписывается. `navigator.onLine === false` позволяет показать known-offline player error, но timeout/provider failure не называется offline; retry остаётся user-initiated и bounded.
+
+Page restoration с persisted bfcache перезагружает только route, помеченный `PrivateAccountResponse`, чтобы history/settings/admin/private state не показывался после logout/account switch. Public pages сохраняют browser scroll/restoration. Standalone/PWA-specific lifecycle отсутствует: web portal не зависит от service worker на first load.
+
+Web Share используется только на public title canonical URL, без query token/private state; explicit copy fallback не читает clipboard. Deep links — обычные canonical localized web routes и работают без установки. Нет fake voice search, biometric login, install/push/download control или gesture-only player command.
+
+## Premium frontend lifecycle
+
+`PremiumPricingPage`, settings section, payment return, notification panel и `PremiumAdministrationManager` — full-page/embedded Livewire components с typed scalar state и prepared DTO/arrays. Они не сериализуют gateway/provider objects, tokens или customer/payment IDs. Checkout revalidates plan server-side, использует `wire:loading`/disabled state и external HTTPS redirect; return отображает только local reconciled state. Blade не содержит `@php`, model/service calls, inline CSS или billing JavaScript.
+
+Пока provider и public plans отсутствуют, pricing показывает локализованный unavailable/empty state без dead checkout. Responsive cards/tables имеют visible focus, ARIA live status, touch targets и accessible overflow. Реальные features и prices приходят только из registry/query. Полный UI, accessibility и locale contract — [`premium.md`](premium.md).
+
+## Help-center frontend lifecycle
+
+Help home/category/article/search/admin — full-page Livewire со scalar locked/validated state и prepared DTO. Article/FAQ/TOC server-rendered и полезен без JavaScript. `help-center.js` владеет только 250 ms autocomplete, AbortController/sequence, keyboard combobox/listbox и admin unsaved navigation/locale guard; visibility/ranking/fallback/publication/escalation остаются PHP.
+
+Module подключается Vite только при соответствующем DOM target, очищает stale response и повторно инициализируется после Livewire navigation. Loading/empty/error/fallback/feedback/report states локализованы; current content сохраняется во время secondary action. Полный contract: [`help-center.md`](help-center.md).
+
+## Playback frontend lifecycle Task 07
+
+Native `<video>` + один Plyr + один optional HLS.js light остаются единственным player stack. Vite-managed `player.js` инициализируется один раз, применяет RU/EN prepared dictionary, feature-detect fullscreen/PiP/native HLS, ограничивает HLS/progressive recovery, ведёт local heartbeat и уничтожает HLS, timers, listeners, dialog, Media Session и detached playback при Livewire navigation.
+
+Portal controls добавляют server-resolved previous/next, autoplay countdown/cancel/play-now, restart, grouped authorized source options и shortcut help. Anonymous progress (`seasonvar.playback-progress.v1`) хранит только bounded episode position; signed/source URLs и tokens не попадают в storage. Phone/coarse pointer/safe-area/captions/reduced-motion/data-saver contracts и known browser limitations описаны в [`audits/video-playback-report.md`](audits/video-playback-report.md).

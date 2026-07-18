@@ -36,6 +36,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->validateCsrfTokens(except: [
+            'billing/webhooks/*',
+        ]);
         $middleware->redirectGuestsTo(
             function (Request $request): ?string {
                 if ($request->is('api/*')) {

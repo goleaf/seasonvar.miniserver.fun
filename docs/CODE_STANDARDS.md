@@ -1,6 +1,6 @@
 # Стандарты кода
 
-Обновлено: 17.07.2026
+Обновлено: 18.07.2026
 
 ## Обязательный процесс
 
@@ -125,6 +125,12 @@
 - Original, translation, subtitle и portal publication нельзя объединять в один generic date; `updated_at`/`created_at` не являются release date.
 - Все partial/unknown значения сохраняют точность, manual lock имеет приоритет над observer/import, side effects запускаются after commit. Полный contract: [`release-calendar.md`](release-calendar.md).
 
+## Центр помощи
+
+- Long-form editorial content хранится только в `help_article_translations`; UI labels — только в `lang/{ru,en}/help.php`. Blade не строит visibility/fallback/search/related/escalation/SEO и не обращается к БД.
+- Help type/status/audience/feature/escalation/category code — stable enum/code, не translated label. Base UUID/code не меняется с title/slug/locale.
+- Markdown рендерится единственным sanitizer, internal links используют `help:`/allowlisted `route:`, а public mutation проходит policy/action/transaction/cache invalidation. Полный contract: [`help-center.md`](help-center.md).
+
 <!-- project-docs:start -->
 ## Автоматизация документации, карты сайта и robots
 
@@ -139,4 +145,5 @@
 - `/sitemap-landings.xml` (`sitemap.landings`)
 - `/sitemap-titles-{page}.xml` (`sitemap.titles`)
 - `/sitemap-videos-{page}.xml` (`sitemap.videos`)
+- `/sitemap-help.xml` (`sitemap.help`)
 <!-- project-docs:end -->

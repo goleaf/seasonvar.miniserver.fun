@@ -17,6 +17,8 @@ use App\Models\UserProfile;
 use App\Services\Collections\CatalogCollectionQuery;
 use App\Services\Collections\CatalogCollectionSchema;
 use App\Services\ContentRequests\ContentRequestSchema;
+use App\Services\HelpCenter\HelpSitemapQuery;
+use App\Services\HelpCenter\HelpUrlGenerator;
 use App\Services\ReleaseCalendar\ReleaseCalendarPeriod;
 use App\Services\ReleaseCalendar\ReleaseCalendarQuery;
 use App\Services\ReleaseCalendar\ReleaseCalendarSchema;
@@ -49,6 +51,8 @@ class CatalogSitemapResponder
         private readonly ReleaseCalendarTimezone $releaseCalendarTimezone,
         private readonly CatalogRecommendationService $recommendations,
         private readonly CatalogTopListQuery $topLists,
+        private readonly HelpSitemapQuery $helpSitemap,
+        private readonly HelpUrlGenerator $helpUrls,
     ) {}
 
     public function index(): StreamedResponse
@@ -69,6 +73,10 @@ class CatalogSitemapResponder
             $this->writeSitemapIndexUrl(route('sitemap.landings'), now());
             $this->writeSitemapIndexUrl(route('sitemap.collections'), now());
             $this->writeSitemapIndexUrl(route('sitemap.profiles'), now());
+
+            if ($this->helpSitemap->available()) {
+                $this->writeSitemapIndexUrl(route('sitemap.help'), now());
+            }
 
             for ($page = 1; $page <= $titleSitemapPages; $page++) {
                 $this->writeSitemapIndexUrl(route('sitemap.titles', ['page' => $page]), now());
@@ -497,6 +505,51 @@ class CatalogSitemapResponder
         }, 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
     }
 
+    public function help(): StreamedResponse
+    {
+        return response()->stream(function (): void {
+            echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
+            echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
+
+            if ($this->helpSitemap->available()) {
+                $fallback = (string) config('help-center.fallback_locale', 'ru');
+
+                foreach (config('help-center.supported_locales', ['ru']) as $locale) {
+                    $routeLocale = $locale === $fallback ? null : $locale;
+                    $this->writeSitemapUrl($this->helpUrls->home($routeLocale), now(), 'weekly', '0.7');
+                }
+
+                $this->helpSitemap->categories()
+                    ->chunkById(500, function (Collection $translations) use ($fallback): void {
+                        foreach ($translations as $translation) {
+                            $routeLocale = $translation->locale === $fallback ? null : $translation->locale;
+                            $this->writeSitemapUrl(
+                                $this->helpUrls->category($translation, $routeLocale),
+                                $translation->category?->updated_at ?: $translation->updated_at,
+                                'weekly',
+                                '0.6',
+                            );
+                        }
+                    });
+
+                $this->helpSitemap->articles()
+                    ->chunkById(500, function (Collection $translations) use ($fallback): void {
+                        foreach ($translations as $translation) {
+                            $routeLocale = $translation->locale === $fallback ? null : $translation->locale;
+                            $this->writeSitemapUrl(
+                                $this->helpUrls->article($translation, $routeLocale),
+                                $translation->article?->last_reviewed_at ?: $translation->updated_at,
+                                'monthly',
+                                '0.6',
+                            );
+                        }
+                    });
+            }
+
+            echo '</urlset>'."\n";
+        }, 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
+    }
+
     /** @return Builder<ContentRequest> */
     private function requestSitemapQuery(): Builder
     {
@@ -589,6 +642,7 @@ class CatalogSitemapResponder
             echo '- Индекс карты сайта: '.route('sitemap.index')."\n";
             echo '- Лента обновлений: '.route('feed')."\n";
             echo '- Описание поиска: '.route('opensearch')."\n\n";
+            echo '- Справочный центр: '.$this->helpUrls->home()."\n\n";
             echo "## Поиск\n\n";
             echo 'Используйте '.route('titles.index')."?q={query} для поиска только по основным, оригинальным и альтернативным названиям. Актеры, режиссеры, жанры и страны доступны через отдельные справочники и фильтры.\n";
         }, 200, ['Content-Type' => 'text/plain; charset=UTF-8']);

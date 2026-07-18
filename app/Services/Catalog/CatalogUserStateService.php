@@ -312,6 +312,66 @@ class CatalogUserStateService
         }, attempts: 3);
     }
 
+    public function restartProgress(
+        User $user,
+        CatalogTitle $catalogTitle,
+        int $episodeId,
+        string $playbackSessionToken,
+    ): ?EpisodeViewProgress {
+        $this->authorizeInteraction($user, $catalogTitle);
+        $session = $this->progressSessions->resolve(
+            $playbackSessionToken,
+            $user,
+            $catalogTitle,
+            $episodeId,
+        );
+
+        if ($session === null) {
+            return null;
+        }
+
+        $episode = $this->playback->watchableEpisode($catalogTitle, $user, $episodeId);
+
+        abort_if($episode === null, 404);
+
+        $media = $this->playback->findAvailableMedia($catalogTitle, $user, $session->mediaId);
+
+        if ($media === null || (int) $media->episode_id !== $episode->id) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($user, $catalogTitle, $episode, $media, $session): ?EpisodeViewProgress {
+            $progress = EpisodeViewProgress::query()
+                ->whereBelongsTo($user)
+                ->whereBelongsTo($episode)
+                ->lockForUpdate()
+                ->first();
+
+            if ($progress === null) {
+                return null;
+            }
+
+            $wasMeaningful = $this->isMeaningfulProgress($progress);
+            $progress->forceFill([
+                'catalog_title_id' => $catalogTitle->id,
+                'licensed_media_id' => $media->id,
+                'position_seconds' => 0,
+                'progress_percent' => 0,
+                'completed_at' => null,
+                'playback_session_id' => $session->id,
+                'playback_event_sequence' => 0,
+                'last_watched_at' => now(),
+            ])->save();
+            $this->syncChanges->publishProgress($user, $catalogTitle, $episode->id);
+
+            if ($wasMeaningful) {
+                $this->recommendationCache->publicSignalsChanged('progress-restarted');
+            }
+
+            return $progress;
+        }, attempts: 3);
+    }
+
     /**
      * @param  array{in_watchlist: bool}|array{rating: int|null}  $attributes
      * @return array{applied: bool, state: CatalogTitleUserState|null, version: int}

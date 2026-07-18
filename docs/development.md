@@ -136,3 +136,9 @@ Pest и `npm run lint` сейчас не установлены. Rector 2 исп
 3. Для homepage dates используйте `AccountDateTimeFormatter`, для чисел `Number::format(..., locale: app()->currentLocale())`, для nouns `trans_choice` с уже форматированным named `:count`.
 4. Статически выполните `php -l` для изменённых catalogs, рекурсивную key/placeholder parity сверку, scan изменённых Blade/PHP/JS на hardcoded user copy, route inspection с актуальным route source, Pint, Vite build и `project:docs-refresh --check`. Missing runtime key безопасно падает в configured `ru`, но новая parity-проверка не должна оставлять такой долг.
 5. Изменение PHP translation, используемого public home/layout, автоматически меняет translation fingerprint в full-response key; DB content translation инвалидируется через существующий Homepage/domain version path. После translation deploy выполняется обычный bounded catalog warm, который строит обе locale variants; store-wide flush не нужен.
+
+### Изменение центра помощи
+
+Полные help articles редактируются в canonical DB/admin boundary, а не в Blade/PHP translation. Initial immutable corpus меняют только до первого production rollout; после него используется новая revision через `/admin/help`. Interface key добавляется синхронно в `lang/ru/help.php` и `lang/en/help.php` с parity placeholders.
+
+Перед завершением проверьте enum/category/route allowlists, sanitizer/link validation, draft/internal exclusion, locale fallback, cache/SEO/sitemap и Task 19/20 links по [`help-center.md`](help-center.md). Новую очередь, cron, external search/CMS или article media package без отдельного решения не добавлять.

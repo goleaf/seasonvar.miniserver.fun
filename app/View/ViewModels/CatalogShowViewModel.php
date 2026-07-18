@@ -139,7 +139,7 @@ class CatalogShowViewModel
     public Collection $selectedMediaBadges;
 
     /**
-     * @var array<int, array{label: string, icon: string, options: list<array{label: string, detail: string|null, icon: string, url: string, active: bool}>}>
+     * @var array<int, array{key: string, label: string, icon: string, options: list<array{mediaId: int, label: string, detail: string|null, icon: string, url: string, active: bool}>}>
      */
     public array $playbackOptionGroups;
 
@@ -414,7 +414,7 @@ class CatalogShowViewModel
     }
 
     /**
-     * @return array<int, array{label: string, icon: string, options: list<array{label: string, detail: string|null, icon: string, url: string, active: bool}>}>
+     * @return array<int, array{key: string, label: string, icon: string, options: list<array{mediaId: int, label: string, detail: string|null, icon: string, url: string, active: bool}>}>
      */
     private function buildPlaybackOptionGroups(): array
     {
@@ -427,6 +427,7 @@ class CatalogShowViewModel
 
         return collect([
             [
+                'key' => 'variant',
                 'label' => __('catalog.player.translation_variants'),
                 'icon' => 'fa-solid fa-language',
                 'options' => $this->playbackOptions(
@@ -438,6 +439,7 @@ class CatalogShowViewModel
                 ),
             ],
             [
+                'key' => 'quality',
                 'label' => __('catalog.player.quality'),
                 'icon' => 'fa-solid fa-display',
                 'options' => $this->playbackOptions(
@@ -449,6 +451,7 @@ class CatalogShowViewModel
                 ),
             ],
             [
+                'key' => 'format',
                 'label' => __('catalog.player.format'),
                 'icon' => 'fa-solid fa-file-video',
                 'options' => $this->playbackOptions(
@@ -461,6 +464,7 @@ class CatalogShowViewModel
             ],
         ])
             ->map(fn (array $group): array => [
+                'key' => $group['key'],
                 'label' => $group['label'],
                 'icon' => $group['icon'],
                 'options' => $group['options'],
@@ -472,7 +476,7 @@ class CatalogShowViewModel
 
     /**
      * @param  Collection<int, LicensedMedia>  $mediaItems
-     * @return list<array{label: string, detail: string|null, icon: string, url: string, active: bool}>
+     * @return list<array{mediaId: int, label: string, detail: string|null, icon: string, url: string, active: bool}>
      */
     private function playbackOptions(Collection $mediaItems, string $key, callable $valueResolver, callable $labelResolver, string $icon): array
     {
@@ -488,6 +492,7 @@ class CatalogShowViewModel
                 $query[$key] = $value;
 
                 return [
+                    'mediaId' => $media->id,
                     'label' => $labelResolver($media),
                     'detail' => $this->mediaDetailsLabel($media),
                     'icon' => $icon,

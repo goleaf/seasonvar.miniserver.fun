@@ -12,6 +12,7 @@ use App\DTOs\AccountSettingsData;
 use App\DTOs\PlaybackSettingsData;
 use App\Enums\AccountSettingsSection;
 use App\Enums\CatalogCollectionVisibility;
+use App\Enums\HelpFeature;
 use App\Models\CatalogTitleReviewNotificationPreference;
 use App\Models\CommentNotificationPreference;
 use App\Models\ContentRequestNotificationPreference;
@@ -22,6 +23,10 @@ use App\Services\Auth\AccountSettingsService;
 use App\Services\Catalog\PlaybackPreferenceOptions;
 use App\Services\Comments\CommentSchema;
 use App\Services\ContentRequests\ContentRequestSchema;
+use App\Services\HelpCenter\HelpContextualLinkService;
+use App\Services\Premium\PremiumAccountQuery;
+use App\Services\Premium\PremiumPaymentGatewayRegistry;
+use App\Services\Premium\PremiumPromotionService;
 use App\Services\ReleaseCalendar\ReleaseCalendarSchema;
 use App\Services\Reviews\ReviewSchema;
 use App\ValueObjects\AccountTimezone;
@@ -29,15 +34,19 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
+use Livewire\WithPagination;
 use Throwable;
 
 final class AccountSettingsPage extends Component
 {
+    use WithPagination;
+
     #[Locked]
     public string $section = 'profile';
 
@@ -108,6 +117,8 @@ final class AccountSettingsPage extends Component
     public ?string $statusMessage = null;
 
     public ?string $actionError = null;
+
+    public string $couponCode = '';
 
     public function mount(
         AccountSettingsService $settings,
@@ -411,6 +422,31 @@ final class AccountSettingsPage extends Component
         $this->dispatch('account-settings-persisted');
     }
 
+    public function redeemPremiumCoupon(PremiumPromotionService $promotions): void
+    {
+        $user = $this->user();
+        Gate::forUser($user)->authorize('update-account-settings');
+
+        if (! RateLimiter::attempt(
+            'premium-coupon:user:'.$user->id,
+            max(1, (int) config('premium.rate_limits.coupon_per_minute', 8)),
+            static fn (): bool => true,
+            60,
+        )) {
+            throw ValidationException::withMessages(['couponCode' => [__('premium.errors.coupon_rate_limited')]]);
+        }
+
+        $this->validate([
+            'couponCode' => ['required', 'string', 'max:64'],
+        ]);
+        $promotions->redeem($user, $this->couponCode);
+        $this->reset('couponCode');
+        $this->resetPage(pageName: 'premiumPaymentsPage');
+        $this->statusMessage = __('premium.settings.coupon_success');
+        $this->actionError = null;
+        $this->dispatch('account-settings-persisted');
+    }
+
     public function render(
         AccountDateTimeFormatter $dateTimes,
         PlaybackPreferenceOptions $playbackOptions,
@@ -418,6 +454,9 @@ final class AccountSettingsPage extends Component
         ReviewSchema $reviewSchema,
         ContentRequestSchema $contentRequestSchema,
         ReleaseCalendarSchema $releaseCalendarSchema,
+        PremiumAccountQuery $premium,
+        PremiumPaymentGatewayRegistry $premiumGateways,
+        HelpContextualLinkService $helpLinks,
     ): View {
         $active = AccountSettingsSection::from($this->section);
         $navigation = collect(AccountSettingsSection::cases())->map(fn (AccountSettingsSection $section): array => [
@@ -430,6 +469,19 @@ final class AccountSettingsPage extends Component
         $variantOptions = $active === AccountSettingsSection::Playback
             ? $playbackOptions->variants($this->preferredVariant !== '' ? $this->preferredVariant : null, $this->user())
             : [];
+        $premiumOverview = $active === AccountSettingsSection::Premium
+            ? $premium->overview($this->user(), $this->locale, $this->timezone)
+            : null;
+        $premiumPayments = $active === AccountSettingsSection::Premium
+            ? $premium->payments($this->user(), $this->locale, $this->timezone)
+            : null;
+        $helpFeature = match ($active) {
+            AccountSettingsSection::Playback => HelpFeature::Player,
+            AccountSettingsSection::Premium => HelpFeature::Premium,
+            AccountSettingsSection::Security => HelpFeature::Authentication,
+            default => HelpFeature::Privacy,
+        };
+        $helpContext = $active === AccountSettingsSection::Playback ? 'controls' : 'general';
 
         return view('livewire.settings.account-settings-page', [
             'activeSection' => $active,
@@ -458,6 +510,16 @@ final class AccountSettingsPage extends Component
             'releaseCalendarNotificationsAvailable' => $releaseCalendarSchema->ready(),
             'databaseSessionsAvailable' => config('session.driver') === 'database',
             'anonymousStorageKey' => (string) config('account-settings.anonymous_storage_key'),
+            'premiumOverview' => $premiumOverview,
+            'premiumPayments' => $premiumPayments,
+            'premiumProviderAvailable' => $premiumGateways->hostedCheckoutAvailable(),
+            'premiumPricingUrl' => route('premium.index'),
+            'settingsHelp' => $helpLinks->primary(
+                $helpFeature,
+                $helpContext,
+                App::getLocale(),
+                is_string(request()->route('locale')) ? request()->route('locale') : null,
+            ),
             'profileSummary' => [
                 'name' => (string) $this->user()->name,
                 'email' => (string) $this->user()->email,

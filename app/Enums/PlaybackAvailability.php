@@ -18,17 +18,7 @@ enum PlaybackAvailability: string
 
     public function message(): string
     {
-        return match ($this) {
-            self::Ready => 'Видео доступно.',
-            self::AuthenticationRequired => 'Для просмотра необходимо войти.',
-            self::PlanRequired => 'Для просмотра нужен подходящий тариф.',
-            self::RegionBlocked => 'Видео недоступно в вашем регионе.',
-            self::ProfileRestricted => 'Контент ограничен настройками профиля.',
-            self::NotYetPublished => 'Видео ещё не опубликовано.',
-            self::Expired => 'Срок доступности видео истёк.',
-            self::TemporarilyUnavailable => 'Видео временно недоступно.',
-            self::NotFound => 'Видео не найдено.',
-        };
+        return __('catalog.player.availability.'.$this->value);
     }
 
     public function httpStatus(): int

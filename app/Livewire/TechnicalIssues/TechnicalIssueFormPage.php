@@ -6,10 +6,12 @@ namespace App\Livewire\TechnicalIssues;
 
 use App\Actions\TechnicalIssues\CreateTechnicalIssue;
 use App\DTOs\TechnicalIssues\TechnicalIssueInput;
+use App\Enums\HelpFeature;
 use App\Enums\TechnicalIssueType;
 use App\Exceptions\TechnicalIssues\TechnicalIssueActionException;
 use App\Models\TechnicalIssue;
 use App\Models\User;
+use App\Services\HelpCenter\HelpContextualLinkService;
 use App\Services\TechnicalIssues\TechnicalIssueDuplicateService;
 use App\Services\TechnicalIssues\TechnicalIssueSchema;
 use App\Services\TechnicalIssues\TechnicalIssueTargetResolver;
@@ -175,6 +177,7 @@ final class TechnicalIssueFormPage extends Component
     public function findSimilar(
         TechnicalIssueTargetResolver $targets,
         TechnicalIssueTypeRegistry $types,
+        HelpContextualLinkService $helpLinks,
         TechnicalIssueDuplicateService $duplicates,
     ): void {
         $this->perform(function (User $user) use ($targets, $types, $duplicates): void {
@@ -288,6 +291,12 @@ final class TechnicalIssueFormPage extends Component
                 TechnicalIssueType::QualityLabelMismatch,
             ], true),
             'maximumAttachments' => max(1, (int) config('technical-issues.maximum_attachments', 3)),
+            'helpArticle' => $helpLinks->primary(
+                HelpFeature::Tickets,
+                'form',
+                App::getLocale(),
+                is_string(request()->route('locale')) ? request()->route('locale') : null,
+            ),
         ])->extends('layouts.app', [
             'title' => __('issues.create.title'),
             'seo' => [

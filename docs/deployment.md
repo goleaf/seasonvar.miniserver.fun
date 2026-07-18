@@ -484,3 +484,42 @@ Rollback до первых writes удаляет `235200`, затем четыр
 3. Smoke authenticated requester create/My Tickets/detail/notification, включая unverified account для verification-email delivery issue; отдельно проверьте exact duplicate second verified user, clarification/reply, resolution/verification/reopen, merged route и own/foreign attachment denial. Staff smoke queue/filter/assign/internal note/resolve/source action. Убедитесь, что Task 19 `/requests`, moderation, player/progress и sitemap не изменились.
 4. Privacy retention не требует нового scheduler. Operator периодически запускает bounded `php artisan technical-issues:prune-private-data --limit=200`; defaults — terminal diagnostics 180 дней и closed/withdrawn screenshots 365 дней. Failed file delete оставляет reference для повторного запуска.
 5. Rollback перед удалением schema требует backup/export новых ticket records/attachments и отдельного восстановления media health через canonical manager. `down()` удаляет только Task 20 tables, но уже отправленные notifications и staff source action автоматически не отменяются. Предпочтителен roll-forward. Полный checklist: [`technical-issues.md`](technical-issues.md).
+
+## Responsive mobile web rollout Task 23
+
+Task 23 не добавляет migration, package, environment variable, queue, native application, manifest, service worker, push key или background delivery. Rollout состоит из обычного PHP/Blade/Vite deployment: собрать hashed assets, обновить PHP/route/view cache штатным процессом и не удалять прежние assets до завершения переключения HTML manifest. CDN/proxy не должен превращать `PrivateAccountResponse` или media download в public cache.
+
+Post-deploy smoke проверяет один canonical URL на 320/390 px, tablet portrait/landscape и desktop: header menu/search, catalog filter Apply/Cancel/back, title/player, auth forms/password visibility, settings/tickets/help/premium presentation и admin local table overflow. Проверить отсутствие page horizontal overflow, console errors и unexpected player/Plyr/HLS downloads на non-player route. iOS Safari/Android Chromium capability checks выполняются на реальных устройствах отдельно; Chromium emulation не является их заменой.
+
+PWA deployment отсутствует намеренно: `public` не содержит зарегистрированного worker/manifest/install UI, поэтому scope, service-worker HTTP cache/update, icons/maskable, standalone OAuth/payment return и Web Push production keys не настраиваются. Если capability будет спроектирована позднее, до UI обязательны HTTPS, stable manifest identity/icons, one canonical worker, versioned static allowlist/private denylist, offline noindex response, logout/account-switch cleanup, backend subscription storage/delivery/revocation и verified install/update flows.
+
+Rollback — вернуть PHP/Blade/JS/CSS commit и восстановить соответствующий Vite manifest/assets; DB rollback не нужен. Поскольку worker отсутствует, клиент не остаётся trapped на obsolete shell. Во время active playback не требуется forced page reload; новый asset hash применяется при следующей normal navigation/reload.
+
+## Rollout Premium Task 22
+
+1. Перед deploy сделать backup и применить только additive migration `2026_07_18_070229_create_premium_domain_tables.php`. Она не меняет `users` и существующие catalog/account/payment данные; до migration `PremiumSchema` возвращает безопасный inactive/unavailable state. Не выполняйте `migrate:fresh`/`db:wipe`.
+2. Пересобрать config/routes/views/Vite assets и reload PHP-FPM обычным workflow. Проверить public/localized `premium.index`, private owner return/settings, `admin.premium` и JSON webhook route; proxy/CDN не должен кешировать private/no-store или webhook responses.
+3. По умолчанию оставить `premium.providers=[]`, `supported_currencies=[]` и public plans отсутствующими. Это корректный production state без checkout. Не добавлять provider secret, price или currency ради smoke.
+4. `SEASONVAR_IMPORT_ADMIN_EMAILS` открывает только обзор `/admin/premium`. Grants, promotions, billing audit и reconciliation включаются независимо через `PREMIUM_GRANT_ADMIN_EMAILS`, `PREMIUM_PROMOTION_ADMIN_EMAILS`, `PREMIUM_BILLING_AUDIT_EMAILS` и `PREMIUM_RECONCILIATION_ADMIN_EMAILS`; списки пусты по умолчанию, а capability email должен одновременно оставаться базовым catalog admin. После изменения пересобрать config cache.
+5. Реальный provider подключать отдельным reviewed rollout: официальный SDK, raw-body signature adapter, test/live environment isolation, allowlisted currencies и exact `checkout_hosts`, реальные product/price mappings и end-to-end signed payment/refund/cancellation fixtures. Только после этого plan получает `is_active=true` и `is_public=true`.
+6. Smoke без provider проверяет unavailable pricing, owner settings/coupon, разрешённые admin grant/revoke/promotion, exact expiry/lifetime, audit/notification/export/delete guard и отсутствие влияния на free player/download/region/catalog. Signed webhook smoke возможен только с реальным adapter.
+7. Наблюдать failed `premium_provider_events`, duplicate provider identities, unresolved active subscriptions и entitlement discrepancy. Никакой новый queue/cron/scheduler не обязателен; provider retries обрабатываются синхронно и идемпотентно.
+8. Rollback до реальных writes удаляет только 12 новых tables. После checkout/payment/grant сначала отключить публикацию plans/webhook, экспортировать billing records и выбрать roll-forward; schema down без retention plan недопустим. Полный contract: [`premium.md`](premium.md).
+
+## Rollout центра помощи Task 21
+
+1. Сделать backup и применить additive migrations `2026_07_18_210000_create_help_center_domain.php` и `2026_07_18_210100_publish_initial_help_center_content.php`; не использовать `migrate:fresh`/`db:wipe`.
+2. Одновременно развернуть PHP/Blade/lang/Vite и штатно обновить config/route/view cache. Initial corpus записывается транзакционно, не требует seeder/network/queue.
+3. Smoke default/localized/legacy help, search/suggestions, fallback, article/category, preview/admin, player/settings/request/ticket/Premium context и `/sitemap-help.xml`; проверить public/private cache headers и draft/staff exclusions.
+4. Проверить Markdown sanitizer, publication/revision/merge, feedback/report, Task 19/20 escalation и RU/EN parity. Search query/view analytics и external link crawler не включаются.
+5. После появления feedback/reports/revisions перед rollback нужен export/backup; предпочтителен roll-forward. `down()` удаляет только help tables и nullable Task 20 relation, не requests/tickets/catalog/users. Полный checklist: [`help-center.md`](help-center.md).
+
+## Rollout playback Task 07
+
+1. Migration/dependency/backfill нет; развернуть PHP/Blade/lang/Vite/config одновременно, установить `PLAYBACK_AUTOPLAY_COUNTDOWN_SECONDS=8` или bounded `3..30` и сохранить short signed TTL.
+2. Сверить `PLAYBACK_ALLOWED_HOSTS` с реально разрешёнными HTTPS providers. Те же exact origins добавить в `SECURITY_CSP_MEDIA_SOURCES`/`SECURITY_CSP_CONNECT_SOURCES`; не возвращать общий `https:`. До CSP enforcement проанализировать report-only violations.
+3. На provider/CDN проверить MIME, CORS для manifest/segments/tracks, HEAD/Range/`206` и отсутствие credential requirement. PHP generic proxy не добавлять.
+4. Обновить Vite assets/cache и smoke title player на guest/verified user: source grant, progress/resume/restart, variant/quality, previous/next, autoplay countdown/final, failure/fallback/refresh, phone/tablet/desktop, keyboard/focus/live regions.
+5. Проверить, что signed grant отсутствует в JSON-LD/OG/sitemap/shared cache/log/report context, а title page загружает source summaries только текущей серии.
+
+Rollback — revert Task 07 assets/code/config/docs; database data repair не требуется, grants истекают по TTL. Полный checklist и browser limitations: [`audits/video-playback-report.md`](audits/video-playback-report.md).

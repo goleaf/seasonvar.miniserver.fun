@@ -1,0 +1,19 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+#[Fillable(['help_article_id', 'locale', 'alias', 'normalized_alias', 'priority'])]
+final class HelpArticleAlias extends Model
+{
+    /** @return BelongsTo<HelpArticle, $this> */
+    public function article(): BelongsTo
+    {
+        return $this->belongsTo(HelpArticle::class, 'help_article_id');
+    }
+}

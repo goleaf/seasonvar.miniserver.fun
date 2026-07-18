@@ -185,6 +185,10 @@ class CatalogTitleDetail extends Component
                 ? route('requests.create', ['type' => 'broken_content_restoration', 'catalog_title_id' => $this->catalogTitleId])
                 : route('login'),
             'releaseCalendarUrl' => route('calendar.upcoming', ['title' => $this->catalogTitleId]),
+            'shareData' => [
+                'url' => (string) ($seo['canonical'] ?? route('titles.show', $title)),
+                'title' => $title->display_title,
+            ],
         ])->extends('layouts.app', [
             'title' => $seo['title'] ?? $title->display_title,
             'seo' => $seo,

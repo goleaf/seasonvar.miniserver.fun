@@ -7,6 +7,7 @@ namespace App\Livewire\ContentRequests;
 use App\Actions\ContentRequests\CreateContentRequest;
 use App\Enums\ContentRequestExternalProvider;
 use App\Enums\ContentRequestType;
+use App\Enums\HelpFeature;
 use App\Exceptions\ContentRequests\ContentRequestActionException;
 use App\Models\CatalogTitle;
 use App\Models\ContentRequest;
@@ -16,6 +17,7 @@ use App\Models\User;
 use App\Services\ContentRequests\ContentRequestInputFactory;
 use App\Services\ContentRequests\ContentRequestQuery;
 use App\Services\ContentRequests\ContentRequestSchema;
+use App\Services\HelpCenter\HelpContextualLinkService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -225,8 +227,11 @@ final class ContentRequestFormPage extends Component
         }
     }
 
-    public function render(ContentRequestQuery $query, ContentRequestSchema $schema): View
-    {
+    public function render(
+        ContentRequestQuery $query,
+        ContentRequestSchema $schema,
+        HelpContextualLinkService $helpLinks,
+    ): View {
         $suggestions = [];
         $this->searchFailed = false;
 
@@ -258,6 +263,12 @@ final class ContentRequestFormPage extends Component
             'translationTypeOptions' => collect((array) config('content-requests.translation_types', []))->map(fn (string $value): array => ['value' => $value, 'label' => __('requests.translation_types.'.$value)])->all(),
             'qualityOptions' => (array) config('playback.supported_qualities', []),
             'correctionOptions' => collect((array) config('content-requests.correction_fields', []))->map(fn (string $value): array => ['value' => $value, 'label' => __('requests.correction_fields.'.$value)])->all(),
+            'helpArticle' => $helpLinks->primary(
+                HelpFeature::Requests,
+                'form',
+                app()->getLocale(),
+                is_string(request()->route('locale')) ? request()->route('locale') : null,
+            ),
         ])->extends('layouts.app', [
             'title' => __('requests.form.title'),
             'seo' => ['title' => __('requests.form.title'), 'description' => __('requests.form.description'), 'robots' => 'noindex, nofollow', 'canonical' => route('requests.create')],

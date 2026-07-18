@@ -79,20 +79,49 @@ final class DemoTitleSelector
             ->orderBy('sort_order')
             ->orderBy('number')
             ->orderBy('id')
+            ->groupLimit(1, 'catalog_title_id')
             ->get()
-            ->groupBy('catalog_title_id');
+            ->keyBy('catalog_title_id');
 
-        $episodes = Episode::query()
+        $firstEpisodes = Episode::query()
             ->published()
-            ->select(['id', 'season_id', 'kind', 'sort_order', 'number'])
-            ->with('season:id,catalog_title_id')
-            ->whereHas('season', fn ($query) => $query->whereIn('catalog_title_id', $titleIds))
-            ->orderBy('kind')
-            ->orderBy('sort_order')
-            ->orderBy('number')
-            ->orderBy('id')
+            ->join('seasons', 'seasons.id', '=', 'episodes.season_id')
+            ->select([
+                'episodes.id',
+                'episodes.season_id',
+                'episodes.kind',
+                'episodes.sort_order',
+                'episodes.number',
+                'seasons.catalog_title_id',
+            ])
+            ->whereIn('seasons.catalog_title_id', $titleIds)
+            ->orderBy('episodes.kind')
+            ->orderBy('episodes.sort_order')
+            ->orderBy('episodes.number')
+            ->orderBy('episodes.id')
+            ->groupLimit(1, 'seasons.catalog_title_id')
             ->get()
-            ->groupBy(fn (Episode $episode): int => (int) $episode->season->catalog_title_id);
+            ->keyBy('catalog_title_id');
+
+        $lastEpisodes = Episode::query()
+            ->published()
+            ->join('seasons', 'seasons.id', '=', 'episodes.season_id')
+            ->select([
+                'episodes.id',
+                'episodes.season_id',
+                'episodes.kind',
+                'episodes.sort_order',
+                'episodes.number',
+                'seasons.catalog_title_id',
+            ])
+            ->whereIn('seasons.catalog_title_id', $titleIds)
+            ->orderByDesc('episodes.kind')
+            ->orderByDesc('episodes.sort_order')
+            ->orderByDesc('episodes.number')
+            ->orderByDesc('episodes.id')
+            ->groupLimit(1, 'seasons.catalog_title_id')
+            ->get()
+            ->keyBy('catalog_title_id');
 
         $media = LicensedMedia::query()
             ->published()
@@ -101,18 +130,19 @@ final class DemoTitleSelector
             ->whereIn('catalog_title_id', $titleIds)
             ->whereNotNull('episode_id')
             ->orderBy('id')
+            ->groupLimit(1, 'catalog_title_id')
             ->get()
-            ->groupBy('catalog_title_id');
+            ->keyBy('catalog_title_id');
 
-        return $titles->mapWithKeys(function (CatalogTitle $title) use ($seasons, $episodes, $media): array {
+        return $titles->mapWithKeys(function (CatalogTitle $title) use ($seasons, $firstEpisodes, $lastEpisodes, $media): array {
             /** @var Season|null $firstSeason */
-            $firstSeason = $seasons->get($title->id)?->first();
+            $firstSeason = $seasons->get($title->id);
             /** @var Episode|null $firstEpisode */
-            $firstEpisode = $episodes->get($title->id)?->first();
+            $firstEpisode = $firstEpisodes->get($title->id);
             /** @var Episode|null $lastEpisode */
-            $lastEpisode = $episodes->get($title->id)?->last();
+            $lastEpisode = $lastEpisodes->get($title->id);
             /** @var LicensedMedia|null $firstMedia */
-            $firstMedia = $media->get($title->id)?->first();
+            $firstMedia = $media->get($title->id);
 
             return [$title->id => new DemoTitleContext(
                 titleId: (int) $title->id,

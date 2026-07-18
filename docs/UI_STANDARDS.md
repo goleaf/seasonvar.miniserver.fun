@@ -1,6 +1,6 @@
 # Стандарты интерфейса
 
-Обновлено: 17.07.2026
+Обновлено: 18.07.2026
 
 ## Текущее визуальное направление
 
@@ -250,3 +250,31 @@ Blade и Livewire Blade являются только presentation layer: зап
 - View/date/filter state остаётся в URL, loading/empty/error и mutation result объявляются live region, длинные title/locale labels переносятся без overlap.
 - Countdown получает trusted server timestamp, обновляется Vite-модулем не чаще минуты, имеет статичную screen-reader summary и очищается после Livewire navigation.
 - Personal/admin controls не скрывают authorization CSS; private state и correction note вообще отсутствуют из public presenter. Полный UI contract: [`release-calendar.md`](release-calendar.md).
+
+## Канонический responsive mobile web Task 23
+
+Portal использует один mobile-first HTML/Livewire tree и те же canonical routes на всех устройствах. Отдельного `m.` namespace, user-agent redirect, mobile Blade tree, второго player или native-app имитации нет. Практические классы определяются viewport, а не моделью устройства: базовый слой покрывает compact/standard/large phone, `sm`/`md` — tablet portrait, `lg` — tablet landscape/laptop, `xl`/`2xl` — desktop. Используются только стандартные Tailwind breakpoints; произвольные device-specific media queries в шаблонах запрещены.
+
+- Layout применяет единые mobile gutters, `min-width: 0`, перенос длинных слов, стабильные poster ratios и `overflow-x: clip`. Обычные страницы остаются document-flow; viewport height ограничивает только меню, autocomplete, dialogs и player overlays.
+- Единственный viewport meta — `width=device-width, initial-scale=1, viewport-fit=cover`: `maximum-scale`, `user-scalable=no` и orientation lock запрещены. CSS задаёт fallback `vh`, затем `svh`/`dvh`, а `visualViewport` только уточняет доступную высоту и состояние экранной клавиатуры.
+- `env(safe-area-inset-*)` применяется к shell, header/footer, status banner, player controls/captions и fullscreen overlays. На устройствах без inset padding остаётся нулевым; sticky/fixed control не должен перекрывать home indicator, browser chrome или focused input.
+- Базовый текст и form controls остаются читаемыми, input text на телефоне не меньше 16 px, заголовки/metadata/translated labels переносятся. User zoom и text scaling не ограничиваются.
+- Primary links/buttons имеют не менее 44×44 CSS px hit area. Hover может быть дополнительным состоянием, но bookmark, collection, comment/review/report/edit/filter/player actions всегда доступны tap, focus и keyboard. Gesture-only essential action запрещён; Task 23 намеренно не добавляет конфликтующие swipe/double-tap gestures.
+
+На телефоне header показывает одну SSR search form и native `<details>` menu из того же `AppLayoutData`, что desktop navigation. Menu имеет текстовые labels, active state, Escape/route-close и safe-area padding; отдельный bottom navigation не используется, поэтому ничего не перекрывает player или keyboard. На `sm` и выше сохраняется desktop link row. Browser back остаётся обычным route history.
+
+Каталожные фильтры остаются одной Livewire state boundary: на compact viewport `<details>` закрыт при пустом applied state, input changes deferred, Apply отправляет draft, Cancel возвращает server-rendered defaults и не применяет draft, Clear сбрасывает канонический query. На wide viewport та же форма разворачивается inline. Search autocomplete, people lookup, help suggestions и request suggestions ограничены visual viewport, поддерживают stale-request cancellation и доступны без hover.
+
+Player сохраняет один responsive 16:9 container. Plyr/HLS controls получают coarse-pointer hit areas, safe-area padding и bounded menu; captions смещаются выше controls/home indicator и переносят длинные строки. Portrait и page-landscape не переинициализируют media; standards fullscreen/PiP показываются только по capability Plyr/browser, iOS может использовать native video fullscreen. Автоматической блокировки orientation и fake fullscreen нет.
+
+Forms используют native `type`, `autocomplete`, `inputmode`, visible labels, associated errors/live status и responsive one-column fallback. Password fields имеют доступный Vite-managed show/hide control. Visual viewport удерживает dialogs/autocomplete в доступной зоне; `.app-keyboard-visible` скрывает только необязательный connection banner. Native scrolling, focus restoration и server/Livewire state остаются основой, поэтому закрытие keyboard или orientation change не выполняет submit.
+
+Dialogs/sheets должны использовать native focus semantics, bounded `max-height`, scrollable body и safe action area. Task 23 не вводит отдельный bottom-sheet framework: существующие responsive panels/details/dialogs покрывают filters, option menus, forms и confirmations без duplicate business logic. Wide administration tables могут иметь локальный horizontal scroll, но page-level overflow и drag-only actions запрещены.
+
+`prefers-reduced-motion` отключает декоративные transitions/shimmer/large motion, сохраняя functional progress. Status, selection, disabled, premium и error states имеют текст/ARIA и не полагаются только на цвет. Verification matrix включает 320×568, 390×844, tablet portrait/landscape, wide-short/square viewport, browser zoom/text scaling/reduced motion/offline hint; эмуляция не называется real-device проверкой.
+
+## Центр помощи
+
+Help pages повторно используют светлые panels, controls, badges, breadcrumbs, pagination, readable prose и visible focus. Search/combobox, category cards, native FAQ details, TOC, callouts, tables, feedback/report и escalation имеют localized accessible names, `aria-live`, keyboard/touch controls и минимум 44 px. Essential text не помещается только в tooltip, hover или цвет.
+
+Article column ограничивает длину строки; `min-w-0`, wrapping и responsive overflow защищают 320 px, landscape, tablet, desktop и browser zoom. Один H1 принадлежит page, editorial headings становятся H2/H3. Image media пока запрещена renderer, поэтому нет layout shift или недоступного screenshot. Полный UI contract: [`help-center.md`](help-center.md).

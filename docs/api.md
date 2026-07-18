@@ -173,3 +173,19 @@ On-demand direct-file download существует только как session-
 ## Technical issues API boundary
 
 Task 20 не добавляет public/mobile JSON ticket API: private Livewire/session routes являются единственным текущим intake/tracking workflow. Ни один public Resource/OpenAPI/offline-sync response не содержит ticket, requester, diagnostics, attachment, staff note, source-health action или notification preference. Будущий mobile support потребует отдельный versioned authenticated owner Resource и attachment grant contract; текущий UUID/`ISS-…` сам по себе не является API authorization. Полный домен: [`technical-issues.md`](technical-issues.md).
+
+## Mobile web и offline-sync distinction Task 23
+
+Responsive web portal не вызывает отдельный device API для каждой card и не меняет API shape по viewport/user agent. Existing v1 mobile sync сохраняет Sanctum abilities, encrypted cursor, idempotency, bounded pagination и `private, no-store` owner responses; bootstrap/sync errors используют текущий locale catalog. Он синхронизирует только разрешённые catalog/user-state records и не является service-worker cache.
+
+Manifest в sync API — API change manifest, не Web App Manifest. `offline mutations` означают отложенную отправку idempotent library/progress state клиентом, а не offline HTML/video playback. API не выдаёт source/signed download URL, PWA install metadata, push subscription, payment, invoice, ticket attachment или offline license. Deep links остаются canonical web URLs и проходят обычную authorization/locale boundary.
+
+## Help suggestions API
+
+`GET /api/v1/help/suggestions` — единственный JSON endpoint центра помощи. Валидируются bounded query и supported locale; controller всегда использует guest/public visibility и возвращает не более семи `HelpSuggestionResource` с stable UUID, plain localized title/category и canonical URL. Draft/internal/authenticated/premium content, body, revision, feedback, report, search query history и escalation state не выдаются. Response — `private, no-store`; route не заменяет полноэкранный noindex search и не является external/AI index. Полный contract: [`help-center.md`](help-center.md).
+
+## Playback API compatibility Task 07
+
+`POST /api/v1/titles/{titleSlug}/playback-sessions` остаётся единственным mobile context resolver: validated stable episode/media selection, canonical navigation, safe media metadata, progress token only for verified owner и short-lived signed API grant. `GET /api/v1/playback/{licensedMedia}` повторно проверяет signed opaque grant и entitlement. `PUT .../episodes/{episode}/progress` использует authenticated user, session/sequence и stable episode identity; user ID/source URL из request не доверяются.
+
+Task 07 не переименовывает route/API fields и не раскрывает raw provider URL, full model, preferences, private entitlement или issue diagnostics. Web autoplay/fallback bridge не становится high-frequency API. Full contract: [`audits/video-playback-report.md`](audits/video-playback-report.md).

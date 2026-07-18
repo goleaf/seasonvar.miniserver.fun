@@ -359,7 +359,7 @@ final readonly class DemoOrganizationStage implements DemoDataStage
         $existingHashes = Tag::query()
             ->whereNotNull('normalized_name_hash')
             ->pluck('normalized_name_hash')
-            ->filter('is_string')
+            ->filter(static fn (mixed $hash): bool => is_string($hash))
             ->flip();
         $missing = $options->publicTagTarget - $eligible->count();
         $rows = [];

@@ -78,7 +78,7 @@ const focusDirectReview = () => {
     });
 };
 
-const initializeReviews = () => {
+export const initializeReviews = () => {
     bindReviewDrafts();
     focusDirectReview();
 };
@@ -101,17 +101,9 @@ const focusReviewTarget = (event) => {
     }));
 };
 
-document.addEventListener('DOMContentLoaded', initializeReviews);
-document.addEventListener('livewire:navigated', () => {
-    focusedReviewHash = null;
-    initializeReviews();
-});
 window.addEventListener('hashchange', () => {
     focusedReviewHash = null;
     focusDirectReview();
-});
-document.addEventListener('livewire:init', () => {
-    window.Livewire.hook('morphed', initializeReviews);
 });
 window.addEventListener('review-draft-clear', (event) => {
     const key = event.detail?.key;

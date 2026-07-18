@@ -9,16 +9,21 @@ use App\Enums\TechnicalIssueTargetType;
 use App\Exceptions\TechnicalIssues\TechnicalIssueActionException;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
+use App\Models\HelpArticle;
 use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\Translation;
 use App\Models\User;
+use App\Services\HelpCenter\HelpCenterSchema;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
 final readonly class TechnicalIssueTargetResolver
 {
-    public function __construct(private TechnicalIssueContext $contexts) {}
+    public function __construct(
+        private TechnicalIssueContext $contexts,
+        private HelpCenterSchema $helpSchema,
+    ) {}
 
     public function resolve(User $user, string $contextToken, string $fallbackFeature = 'general'): TechnicalIssueTargetData
     {
@@ -37,6 +42,7 @@ final readonly class TechnicalIssueTargetResolver
                 is_string($payload['feature'] ?? null) ? $payload['feature'] : $fallbackFeature,
                 $this->safeRouteName($payload['route'] ?? null),
                 $this->safePath($payload['path'] ?? null),
+                $this->helpArticleId($payload['help_article_public_id'] ?? null),
             );
         }
 
@@ -132,8 +138,12 @@ final readonly class TechnicalIssueTargetResolver
         );
     }
 
-    private function featureTarget(string $feature, ?string $routeName = null, ?string $routePath = null): TechnicalIssueTargetData
-    {
+    private function featureTarget(
+        string $feature,
+        ?string $routeName = null,
+        ?string $routePath = null,
+        ?int $helpArticleId = null,
+    ): TechnicalIssueTargetData {
         $feature = $this->safeFeature($feature) ?? 'general';
         $type = match ($feature) {
             'account' => TechnicalIssueTargetType::Account,
@@ -147,10 +157,24 @@ final readonly class TechnicalIssueTargetResolver
         return new TechnicalIssueTargetData(
             type: $type,
             label: __("issues.features.{$feature}"),
+            helpArticleId: $helpArticleId,
             featureCode: $feature,
             routeName: $routeName,
             routePath: $routePath,
         );
+    }
+
+    private function helpArticleId(mixed $publicId): ?int
+    {
+        if (! $this->helpSchema->ready() || ! is_string($publicId) || ! Str::isUuid($publicId)) {
+            return null;
+        }
+
+        return HelpArticle::query()
+            ->published()
+            ->where('public_id', Str::lower($publicId))
+            ->where('audience', '!=', 'staff')
+            ->value('id');
     }
 
     private function safeFeature(mixed $feature): ?string

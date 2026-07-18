@@ -2,6 +2,12 @@
     <header class="rounded-panel border border-slate-200 bg-white p-5 shadow-panel sm:p-6">
         <h1 class="text-2xl font-black text-slate-800 sm:text-3xl">{{ __('requests.form.title') }}</h1>
         <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{{ __('requests.form.description') }}</p>
+        @if ($helpArticle !== null)
+            <a href="{{ $helpArticle->url }}" class="mt-4 inline-flex min-h-11 items-center gap-2 rounded-control bg-sky-50 px-4 py-2 text-sm font-bold text-sky-900 hover:bg-sky-100">
+                <x-ui.icon name="fa-regular fa-circle-question" />
+                <span>{{ $helpArticle->title }}</span>
+            </a>
+        @endif
     </header>
 
     @if (! $schemaReady)

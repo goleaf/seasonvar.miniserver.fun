@@ -87,23 +87,39 @@
                         <x-ui.icon name="fa-solid fa-arrow-left" />
                         <span>{{ __('catalog.title.back_to_catalog') }}</span>
                     </a>
-                    @if ($refreshStatus !== null)
-                        <span @class([
-                            'inline-flex min-h-9 items-center gap-2 rounded-control px-3 py-2 text-xs font-bold',
-                            'bg-sky-50 text-sky-700' => $refreshStatus['tone'] === 'active',
-                            'bg-emerald-50 text-emerald-700' => $refreshStatus['tone'] === 'completed',
-                            'bg-rose-50 text-rose-700' => $refreshStatus['tone'] === 'failed',
-                        ]) data-title-refresh-status>
-                            <x-ui.icon :name="$refreshStatus['icon']" />
-                            <span>{{ $refreshStatus['label'] }}</span>
-                        </span>
-                    @endif
+                    <div class="flex flex-wrap items-center justify-end gap-2">
+                        <button
+                            type="button"
+                            data-public-share
+                            data-share-url="{{ $shareData['url'] }}"
+                            data-share-title="{{ $shareData['title'] }}"
+                            data-share-success="{{ __('mobile.share.success') }}"
+                            data-share-error="{{ __('mobile.share.error') }}"
+                            aria-describedby="catalog-title-share-status"
+                            class="inline-flex min-h-11 items-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-60"
+                        >
+                            <x-ui.icon name="fa-solid fa-share-nodes" />
+                            <span>{{ __('mobile.share.action') }}</span>
+                        </button>
+                        @if ($refreshStatus !== null)
+                            <span @class([
+                                'inline-flex min-h-9 items-center gap-2 rounded-control px-3 py-2 text-xs font-bold',
+                                'bg-sky-50 text-sky-700' => $refreshStatus['tone'] === 'active',
+                                'bg-emerald-50 text-emerald-700' => $refreshStatus['tone'] === 'completed',
+                                'bg-rose-50 text-rose-700' => $refreshStatus['tone'] === 'failed',
+                            ]) data-title-refresh-status>
+                                <x-ui.icon :name="$refreshStatus['icon']" />
+                                <span>{{ $refreshStatus['label'] }}</span>
+                            </span>
+                        @endif
+                    </div>
+                    <p id="catalog-title-share-status" class="sr-only" role="status" aria-live="polite"></p>
                 </div>
 
                 <article class="grid gap-5 bg-gradient-to-br from-white via-white to-emerald-50 p-4 md:grid-cols-[minmax(150px,220px)_minmax(0,1fr)] md:p-5">
                     <x-ui.poster-frame
                         :src="$title->poster_url"
-                        alt="Постер {{ $title->display_title }}"
+                        :alt="__('catalog.seo.poster_alt', ['title' => $title->display_title])"
                         loading="eager"
                         class="mx-auto aspect-[2/3] w-44 max-w-full rounded-panel shadow-panel sm:w-52 md:w-full"
                     />

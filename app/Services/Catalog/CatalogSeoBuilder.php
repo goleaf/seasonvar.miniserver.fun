@@ -449,19 +449,6 @@ class CatalogSeoBuilder
             ]),
         ], fn (array $item): bool => $item !== []));
 
-        if ($selectedMediaUrl !== null) {
-            $jsonLd[] = $this->withoutEmpty([
-                '@context' => 'https://schema.org',
-                '@type' => 'VideoObject',
-                'name' => PlainText::clean($selectedMedia?->title) ?: $displayTitle,
-                'description' => $description,
-                'thumbnailUrl' => $catalogTitle->poster_url,
-                'uploadDate' => $this->sitemapDate($catalogTitle->indexed_at ?: $catalogTitle->updated_at),
-                'contentUrl' => $selectedMediaUrl,
-                'url' => route('titles.show', $catalogTitle).'#player',
-            ]);
-        }
-
         return [
             'title' => $pageTitle,
             'description' => $description,
@@ -470,7 +457,7 @@ class CatalogSeoBuilder
             'canonical' => route('titles.show', $catalogTitle),
             'image' => $catalogTitle->poster_url,
             'image_alt' => __('catalog.seo.poster_alt', ['title' => $displayTitle]),
-            'video' => $selectedMediaUrl,
+            'video' => null,
             'published_time' => $this->sitemapDate($catalogTitle->created_at),
             'updated_time' => $this->sitemapDate($catalogTitle->indexed_at ?: $catalogTitle->updated_at),
             'section' => __('catalog.seo.section'),

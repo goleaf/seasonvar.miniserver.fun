@@ -11,11 +11,11 @@ return [
         ),
         'media_sources' => array_merge(
             ["'self'", 'blob:'],
-            preg_split('/\s*,\s*/', (string) env('SECURITY_CSP_MEDIA_SOURCES', 'https:'), -1, PREG_SPLIT_NO_EMPTY) ?: [],
+            preg_split('/\s*,\s*/', (string) env('SECURITY_CSP_MEDIA_SOURCES', 'https://11cdn.org,https://*.11cdn.org'), -1, PREG_SPLIT_NO_EMPTY) ?: [],
         ),
         'connect_sources' => array_merge(
             ["'self'"],
-            preg_split('/\s*,\s*/', (string) env('SECURITY_CSP_CONNECT_SOURCES', 'https:'), -1, PREG_SPLIT_NO_EMPTY) ?: [],
+            preg_split('/\s*,\s*/', (string) env('SECURITY_CSP_CONNECT_SOURCES', 'https://11cdn.org,https://*.11cdn.org'), -1, PREG_SPLIT_NO_EMPTY) ?: [],
         ),
     ],
 ];

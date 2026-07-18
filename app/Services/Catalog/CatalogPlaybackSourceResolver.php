@@ -30,12 +30,14 @@ class CatalogPlaybackSourceResolver
         private readonly CatalogEntitlementService $entitlements,
     ) {}
 
+    /** @param list<int> $excludedMediaIds */
     public function resolve(
         CatalogTitle $catalogTitle,
         ?User $user,
         ?Episode $episode,
         ?int $requestedMediaId,
         PlaybackPreferencesData $preferences,
+        array $excludedMediaIds = [],
     ): PlaybackSourceData {
         $titleStatus = $this->entitlements->decide($user, $catalogTitle)->status;
 
@@ -76,6 +78,17 @@ class CatalogPlaybackSourceResolver
 
         if ($requestedMediaId !== null) {
             $query->whereKey($requestedMediaId);
+        }
+
+        $excludedMediaIds = collect($excludedMediaIds)
+            ->filter(fn (int $mediaId): bool => $mediaId > 0)
+            ->unique()
+            ->take(100)
+            ->values()
+            ->all();
+
+        if ($excludedMediaIds !== []) {
+            $query->whereNotIn((new LicensedMedia)->qualifyColumn('id'), $excludedMediaIds);
         }
 
         $mediaItems = $query->limit(100)->get();

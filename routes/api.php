@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\CatalogHomeController;
 use App\Http\Controllers\Api\V1\CatalogRecommendationController;
 use App\Http\Controllers\Api\V1\CatalogReviewController;
 use App\Http\Controllers\Api\V1\CatalogTitleController as V1CatalogTitleController;
+use App\Http\Controllers\Api\V1\HelpSuggestionController;
 use App\Http\Controllers\Api\V1\PersonalTagAssignmentController;
 use App\Http\Controllers\Api\V1\PersonalTagController;
 use App\Http\Controllers\Api\V1\PlaybackProgressController;
@@ -76,6 +77,10 @@ Route::middleware(['auth.optional.sanctum', 'public.cache:api'])->group(function
             ->name('titles.reviews');
     });
 });
+
+Route::get('/v1/help/suggestions', HelpSuggestionController::class)
+    ->middleware('throttle:api-search-suggestions')
+    ->name('api.v1.help.suggestions');
 
 Route::middleware(['auth.optional.sanctum', 'public.cache:collection_api'])
     ->prefix('v1')

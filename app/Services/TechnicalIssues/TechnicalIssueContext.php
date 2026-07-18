@@ -68,6 +68,19 @@ final class TechnicalIssueContext
         ]));
     }
 
+    public function helpUrl(string $feature, string $articlePublicId): string
+    {
+        $feature = in_array($feature, config('technical-issues.feature_codes', []), true) ? $feature : 'general';
+
+        return $this->url($this->encode([
+            'target' => 'feature',
+            'feature' => $feature,
+            'help_article_public_id' => Str::isUuid($articlePublicId) ? Str::lower($articlePublicId) : null,
+            'route' => 'help.articles.show',
+            'path' => request()->getPathInfo(),
+        ]));
+    }
+
     /** @return array<string, mixed>|null */
     public function decode(string $token): ?array
     {

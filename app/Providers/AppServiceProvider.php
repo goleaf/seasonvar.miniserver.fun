@@ -3,17 +3,23 @@
 namespace App\Providers;
 
 use App\Models\Episode;
+use App\Models\HelpArticle;
 use App\Models\LicensedMedia;
 use App\Models\TechnicalIssue;
 use App\Models\User;
 use App\Observers\EpisodeReleaseScheduleObserver;
 use App\Observers\LicensedMediaReleaseScheduleObserver;
 use App\Policies\AccountSettingsPolicy;
+use App\Policies\HelpArticlePolicy;
 use App\Policies\TechnicalIssuePolicy;
 use App\Services\Auth\AccountSettingsSchema;
 use App\Services\Collections\CatalogCollectionSchema;
 use App\Services\Comments\CommentSchema;
 use App\Services\ContentRequests\ContentRequestSchema;
+use App\Services\HelpCenter\HelpCenterSchema;
+use App\Services\Premium\PremiumAccessResolver;
+use App\Services\Premium\PremiumPaymentGatewayRegistry;
+use App\Services\Premium\PremiumSchema;
 use App\Services\ReleaseCalendar\ReleaseCalendarSchema;
 use App\Services\Reviews\ReviewSchema;
 use App\Services\Tags\TagSchema;
@@ -54,6 +60,10 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scopedIf(ContentRequestSchema::class);
         $this->app->scopedIf(ReviewSchema::class);
         $this->app->scopedIf(ReleaseCalendarSchema::class);
+        $this->app->scopedIf(HelpCenterSchema::class);
+        $this->app->scopedIf(PremiumSchema::class);
+        $this->app->scopedIf(PremiumAccessResolver::class);
+        $this->app->singleton(PremiumPaymentGatewayRegistry::class, static fn (): PremiumPaymentGatewayRegistry => new PremiumPaymentGatewayRegistry);
         $this->app->scopedIf(TagSchema::class);
         $this->app->scopedIf(TechnicalIssueSchema::class);
     }
@@ -108,6 +118,10 @@ class AppServiceProvider extends ServiceProvider
                 ));
         });
 
+        RateLimiter::for('premium-webhooks', fn (Request $request): Limit => Limit::perMinute(
+            max(1, (int) config('premium.rate_limits.webhook_per_minute', 120)),
+        )->by(hash('sha256', (string) $request->ip())));
+
         Event::listen(CacheHit::class, fn (CacheHit $event) => app(CacheEventReporter::class)->record($event, 'hit'));
         Event::listen(CacheMissed::class, fn (CacheMissed $event) => app(CacheEventReporter::class)->record($event, 'miss'));
         Event::listen(KeyWritten::class, fn (KeyWritten $event) => app(CacheEventReporter::class)->record($event, 'write'));
@@ -129,7 +143,21 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-content-requests', $catalogAdministrator);
         Gate::define('manage-technical-issues', $catalogAdministrator);
         Gate::define('manage-release-calendar', $catalogAdministrator);
+        Gate::define('manage-help-center', $catalogAdministrator);
+        Gate::define('view-premium-administration', $catalogAdministrator);
+        $premiumAdministrator = static fn (string $capability): callable => static function (User $user) use ($catalogAdministrator, $capability): bool {
+            return $catalogAdministrator($user) && in_array(
+                Str::lower($user->email),
+                (array) config("premium.administration.{$capability}_emails", []),
+                true,
+            );
+        };
+        Gate::define('manage-premium-grants', $premiumAdministrator('grant'));
+        Gate::define('manage-premium-promotions', $premiumAdministrator('promotion'));
+        Gate::define('view-premium-billing-audit', $premiumAdministrator('billing_audit'));
+        Gate::define('reconcile-premium', $premiumAdministrator('reconciliation'));
         Gate::policy(TechnicalIssue::class, TechnicalIssuePolicy::class);
+        Gate::policy(HelpArticle::class, HelpArticlePolicy::class);
         Gate::define('view-account-settings', [AccountSettingsPolicy::class, 'view']);
         Gate::define('update-account-settings', [AccountSettingsPolicy::class, 'update']);
 

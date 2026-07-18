@@ -116,12 +116,9 @@ const initializePlayerIssueLinks = (root = document) => {
     });
 };
 
-const initialize = () => {
-    initializeTechnicalIssueForms();
-    initializePlayerIssueLinks();
+export const initializeTechnicalIssueInterfaces = (root = document) => {
+    initializeTechnicalIssueForms(root);
+    initializePlayerIssueLinks(root);
 };
-
-document.addEventListener('DOMContentLoaded', initialize);
-document.addEventListener('livewire:navigated', initialize);
 
 export { initializeTechnicalIssueForms, initializePlayerIssueLinks };

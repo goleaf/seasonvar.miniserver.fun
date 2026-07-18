@@ -48,7 +48,7 @@ final class SyncController extends Controller
                 'changes' => route('api.v1.sync.changes'),
                 'openapi' => route('api.openapi'),
             ],
-            'bootstrap' => 'Сохраните курсор, загрузите текущий каталог постранично, затем запросите изменения от сохранённого курсора.',
+            'bootstrap' => __('api.sync.bootstrap'),
         ]], headers: ['Cache-Control' => 'private, no-store']);
     }
 
@@ -153,7 +153,7 @@ final class SyncController extends Controller
             return $errors->make(
                 $request,
                 'sync_cursor_expired',
-                'Курсор синхронизации устарел. Выполните полную загрузку заново.',
+                __('api.sync.cursor_expired'),
                 410,
             );
         }
@@ -161,9 +161,9 @@ final class SyncController extends Controller
         return $errors->make(
             $request,
             'validation_failed',
-            'Переданные данные некорректны.',
+            __('api.errors.validation_failed'),
             422,
-            ['cursor' => ['Некорректный курсор синхронизации.']],
+            ['cursor' => [__('api.sync.cursor_invalid')]],
         );
     }
 
@@ -172,7 +172,7 @@ final class SyncController extends Controller
         return $errors->make(
             $request,
             'sync_unavailable',
-            'Синхронизация временно недоступна.',
+            __('api.sync.unavailable'),
             503,
         );
     }

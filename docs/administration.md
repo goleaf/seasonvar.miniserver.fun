@@ -111,3 +111,21 @@ Bulk ограничен 10 explicit selected tickets и только priority/as
 ## Редактор календаря релизов
 
 `/admin/calendar` требует `manage-release-calendar` на route, Livewire hydration и save. Редактор ищет каноническую цель, задаёт stable type/precision/status/source, IANA timezone, partial/exact date, public/notification flags и manual lock; target ancestry и status transition валидируются server-side. История показывает public reason отдельно от private note. Обычный importer не перезаписывает locked event. Bulk editor и iCalendar token controls не добавлены без подтверждённой product boundary. Полный contract: [`release-calendar.md`](release-calendar.md).
+
+## Администрирование Premium
+
+`/admin/premium` повторно использует private admin shell и входной `view-premium-administration` из `SEASONVAR_IMPORT_ADMIN_EMAILS`. Отдельные action gates `manage-premium-grants`, `manage-premium-promotions`, `view-premium-billing-audit`, `reconcile-premium` требуют соответственно `PREMIUM_GRANT_ADMIN_EMAILS`, `PREMIUM_PROMOTION_ADMIN_EMAILS`, `PREMIUM_BILLING_AUDIT_EMAILS` и `PREMIUM_RECONCILIATION_ADMIN_EMAILS`; пустой список запрещает capability и скрывает control. Уполномоченный staff может найти account по public ID/email, выдать duration/lifetime `premium_access` с stable reason/private note, отозвать ровно одну administrative/promotion запись, создать campaign и одноразово получить generated coupon. Payment entitlements не отзываются manual action.
+
+Safe audit показывает stable action/resource/time; provider summary раскрывает только registered code. Environment, secrets и raw payload отсутствуют. Cancel/refund/replay/reconciliation controls не имитируются до появления реального adapter/policy. Полный least-privilege и rollout contract — [`premium.md`](premium.md).
+
+## Редактура центра помощи
+
+`/admin/help` требует private admin middleware и `manage-help-center` на route, hydration и каждом action. Редактор управляет stable article/category, обеими translations, aliases, SEO/callout, related/context/escalation/order/featured, preview, review/publication/archive, freshness, revision restore, merge/replacement и queue outdated reports. Published content сначала выводится из publication; restore возвращает draft. Articles, feedback и reports пагинированы, revision timeline ограничен.
+
+Editor не задаёт произвольный route/class/HTML/CSS/media URL/status/type/locale/escalation. Встроенная link validation и broken filter не выполняют внешний crawl. Private notes/reporter/actor/revisions/internal articles отсутствуют в public payload. Полный workflow, permission matrix, ownership/review и rollback: [`help-center.md`](help-center.md).
+
+## Управление playback sources Task 07
+
+Existing catalog administration остаётся единственной write surface для source status, health, priority, format, quality, translation/variant/type, subtitle flag, audience и availability window. Каждая mutation авторизуется и сохраняет importer/editorial ownership; provider credentials/raw response не выводятся в списках. Technical issue source action проходит отдельную Task 20 staff boundary и не отключает source после одного client failure.
+
+Отдельные audio tracks, subtitle bodies/languages, Premium source feature, region-country и age-profile rules не добавлены, поскольку текущие schema/importer не могут управлять ими правдиво. При появлении таких данных сначала расширяются canonical source/import/admin contracts, затем player DTO. Подробности: [`audits/video-playback-report.md`](audits/video-playback-report.md).

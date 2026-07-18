@@ -10,6 +10,8 @@ use App\Services\Catalog\CatalogRecommendationCacheInvalidator;
 use App\Services\Collections\CatalogCollectionAccountService;
 use App\Services\Comments\CommentAccountService;
 use App\Services\ContentRequests\ContentRequestAccountService;
+use App\Services\HelpCenter\HelpAccountService;
+use App\Services\Premium\PremiumAccountService;
 use App\Services\Profiles\UserProfileMediaService;
 use App\Services\Reviews\ReviewAccountService;
 use App\Services\TechnicalIssues\TechnicalIssueAccountService;
@@ -32,6 +34,8 @@ final class AccountService
         private readonly TechnicalIssueAccountService $technicalIssues,
         private readonly UserProfileMediaService $profileMedia,
         private readonly CatalogRecommendationCacheInvalidator $recommendationCache,
+        private readonly PremiumAccountService $premium,
+        private readonly HelpAccountService $helpCenter,
         private readonly AuthenticationAuditService $audit,
     ) {}
 
@@ -178,11 +182,14 @@ final class AccountService
                 ]);
             }
 
+            $this->premium->ensureDeletionSafe($lockedUser);
+
             $this->collections->purgeOwned($lockedUser);
             $this->comments->prepareForDeletion($lockedUser);
             $this->reviews->prepareForDeletion($lockedUser);
             $this->contentRequests->prepareForDeletion($lockedUser);
             $this->technicalIssues->prepareForDeletion($lockedUser);
+            $this->helpCenter->prepareForDeletion($lockedUser);
             $profile = $lockedUser->profile()->first();
 
             if ($profile !== null) {

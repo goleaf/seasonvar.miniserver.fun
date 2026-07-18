@@ -12,6 +12,8 @@ use App\Models\UserTag;
 use App\Services\Collections\CatalogCollectionAccountService;
 use App\Services\Comments\CommentAccountService;
 use App\Services\ContentRequests\ContentRequestAccountService;
+use App\Services\HelpCenter\HelpAccountService;
+use App\Services\Premium\PremiumAccountService;
 use App\Services\ReleaseCalendar\ReleaseCalendarAccountService;
 use App\Services\Reviews\ReviewAccountService;
 use App\Services\TechnicalIssues\TechnicalIssueAccountService;
@@ -26,6 +28,8 @@ final class AccountDataExportService
         private readonly ContentRequestAccountService $contentRequests,
         private readonly TechnicalIssueAccountService $technicalIssues,
         private readonly ReleaseCalendarAccountService $releaseCalendar,
+        private readonly PremiumAccountService $premium,
+        private readonly HelpAccountService $helpCenter,
         private readonly AccountSettingsService $settings,
     ) {}
 
@@ -92,6 +96,8 @@ final class AccountDataExportService
             'content_requests' => $this->contentRequests->export($user),
             'technical_issues' => $this->technicalIssues->export($user),
             'release_calendar' => $this->releaseCalendar->export($user),
+            'premium' => $this->premium->export($user),
+            'help_center' => $this->helpCenter->export($user),
             'library' => CatalogTitleUserState::query()
                 ->whereBelongsTo($user)
                 ->with('catalogTitle:id,slug,title')

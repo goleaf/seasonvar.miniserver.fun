@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\View\ViewData;
 
 use App\DTOs\CatalogDirectoryDefinition;
+use App\Http\Middleware\PrivateAccountResponse;
 use App\Models\CatalogTitle;
 use App\Services\Auth\AuthenticationRedirectService;
 use App\Services\Catalog\CatalogDirectoryRegistry;
@@ -52,6 +53,9 @@ final class AppLayoutData
             : $this->route('home');
         $authenticatedUser = $this->request->user();
         $isAuthenticated = $authenticatedUser !== null;
+        $isPrivatePage = collect($this->request->route()?->gatherMiddleware() ?? [])->contains(
+            fn (string $middleware): bool => in_array($middleware, ['account.private', PrivateAccountResponse::class], true),
+        );
         $canManageImports = $authenticatedUser !== null
             && $this->gate->forUser($authenticatedUser)->allows('manage-seasonvar-imports');
         $canManageCatalog = $authenticatedUser !== null
@@ -66,6 +70,10 @@ final class AppLayoutData
             && $this->gate->forUser($authenticatedUser)->allows('manage-technical-issues');
         $canManageReleaseCalendar = $authenticatedUser !== null
             && $this->gate->forUser($authenticatedUser)->allows('manage-release-calendar');
+        $canManagePremium = $authenticatedUser !== null
+            && $this->gate->forUser($authenticatedUser)->allows('view-premium-administration');
+        $canManageHelpCenter = $authenticatedUser !== null
+            && $this->gate->forUser($authenticatedUser)->allows('manage-help-center');
         $canCreateTechnicalIssue = (bool) config('technical-issues.enabled', true)
             && $authenticatedUser !== null;
         $layoutHeaderNavigation = [
@@ -118,6 +126,15 @@ final class AppLayoutData
                 'fa-solid fa-list-check',
                 __('requests.directory.title'),
                 $this->request->routeIs('requests.*', 'localized.requests.*'),
+            );
+        }
+
+        if ($this->router->has('help.index')) {
+            $layoutHeaderNavigation[] = $this->headerLink(
+                'help.index',
+                'fa-regular fa-circle-question',
+                __('help.navigation'),
+                $this->request->routeIs('help.*', 'localized.help.*'),
             );
         }
 
@@ -249,6 +266,22 @@ final class AppLayoutData
                     $this->request->routeIs('admin.calendar'),
                 );
             }
+            if ($canManagePremium && $this->router->has('admin.premium')) {
+                $layoutHeaderNavigation[] = $this->headerLink(
+                    'admin.premium',
+                    'fa-solid fa-crown',
+                    __('premium.admin.title'),
+                    $this->request->routeIs('admin.premium'),
+                );
+            }
+            if ($canManageHelpCenter && $this->router->has('admin.help')) {
+                $layoutHeaderNavigation[] = $this->headerLink(
+                    'admin.help',
+                    'fa-solid fa-book-open',
+                    __('help.admin.title'),
+                    $this->request->routeIs('admin.help*'),
+                );
+            }
         } else {
             $layoutHeaderActions[] = $this->headerLinkUrl(
                 $this->authenticationRoutes->guestUrl('login'),
@@ -341,7 +374,9 @@ final class AppLayoutData
             ->map(fn (CatalogDirectoryDefinition $directory): LayoutNavigationItem => $this->directoryLink($directory))
             ->values();
         $layoutFooterServiceLinks = [
+            $this->footerLink('help.index', 'fa-regular fa-circle-question text-slate-400', __('help.navigation'), $this->request->routeIs('help.*', 'localized.help.*')),
             $this->footerLink('stats', 'fa-solid fa-chart-simple text-slate-400', __('catalog.layout.catalog_statistics'), $this->request->routeIs('stats')),
+            $this->footerLink('premium.index', 'fa-solid fa-crown text-slate-400', __('premium.title'), $this->request->routeIs('premium.*', 'localized.premium.*')),
             $this->footerLink('sitemap', 'fa-solid fa-sitemap text-slate-400', __('catalog.layout.sitemap'), false),
             $this->footerLink('feed', 'fa-solid fa-rss text-slate-400', __('catalog.layout.rss_feed'), false),
         ];
@@ -427,6 +462,7 @@ final class AppLayoutData
             'layoutFooter',
             'layoutHeadUrls',
             'layoutSearchQuery',
+            'isPrivatePage',
             'htmlLang',
             'robots',
             'seoDescription',

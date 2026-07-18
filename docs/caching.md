@@ -295,3 +295,29 @@ Private ticket/list/detail/messages/attachments/diagnostics/internal notes/assig
 ## Cache lifecycle календаря релизов
 
 `CacheDomain::ReleaseCalendar` версионирует только public schedule data/response. Public profile ограничивает `type`, `status`, `sort`, stable title ID и page; locale и canonical public timezone разделены. Произвольный пользовательский timezone группируется request-side и не размножает shared keys. Personal calendar, subscription, notification preferences/read state, library, premium/region context никогда не кэшируются глобально. Material schedule mutation after commit повышает календарь, homepage, sitemap и affected title generation без flush или wildcard scan. Полный key/invalidation contract — в [`release-calendar.md`](release-calendar.md).
+
+## Browser cache и service-worker boundary Task 23
+
+В текущем продукте нет service worker или Cache Storage namespace: browser получает hashed Vite assets по обычной HTTP static policy, а HTML/API продолжают использовать server response/cache contracts этого документа. Task 23 не создаёт application shell cache, offline HTML, authenticated page cache, IndexedDB data cache или user-agent/device cache variant.
+
+Потенциальная будущая allowlist ограничена immutable hashed CSS/JS, локальными public fonts/icons, public placeholder и отдельной public noindex offline-help page. Denylist без исключений: authenticated HTML, owner profile/settings/security, premium/checkout/invoice/provider callback, tickets/attachments, personal library/history/progress/recommendations/calendar, notification/push state, protected media/grants/downloads и любые response с `private`, `no-store`, `Authorization`, signed/query credentials или non-GET method. Навигационный timeout нельзя автоматически называть offline или сохранять как fallback.
+
+Asset deployment полагается на новый content hash; отсутствие worker исключает stale-worker trap. Изменение mobile navigation/translations/player/CSS требует обычного Vite build и deployment manifest, но не global server-cache flush. Mobile API sync responses остаются explicit public/private HTTP-cache contracts и не превращаются в browser video/offline cache.
+
+## Cache lifecycle Premium
+
+Premium не создаёт shared user cache: `PremiumAccessResolver` memoizes summary только внутри request и проверяет database UTC boundaries при следующем request. Payment/refund/dispute history, provider customer/subscription identity, checkout, coupon redemption и event payload глобально не кэшируются. Grant/revoke/payment/refund/chargeback/promotion path сбрасывает request memo, поэтому запись не остаётся активной за `ends_at`.
+
+Public plans пока не кэшируются, а provider/currency registry пуст. Если измерения потребуют cache, key обязан включить locale, trusted region, allowlisted currency и plan/promotion/provider/feature versions; user key — opaque user ID/version/region с TTL не длиннее ближайшего expiry/grace. Полный flush, email/provider ID/token в key и public/private payload mixing запрещены. Полный contract — [`premium.md`](premium.md).
+
+## Cache lifecycle центра помощи
+
+`CacheDomain::HelpCenter` хранит только guest categories/featured/popular/contextual snapshots и sanitized published content. Key dimensions включают locale/fallback/route locale, stable article UUID, audience class, content/translation/presentation version. Arbitrary search query, current-user feedback, report, ticket context, preview/draft/staff/internal note не кэшируются глобально.
+
+Mutation после commit повышает HelpCenter/SearchSuggestions, scoped article UUID и при public изменении Sitemap; feedback не трогает sitemap. Full flush, wildcard scan и user/search secret в key запрещены. Cache failure не блокирует reading. Полный контракт: [`help-center.md`](help-center.md).
+
+## Cache lifecycle playback Task 07
+
+Playback использует существующие versioned title/catalog/API/sitemap domains и guest HTML signed-link transformer; отдельный store/key/domain не создан. Public episode metadata/source summaries без private URL могут жить только в существующем title scope. Signed grants, raw providers, user progress, playback session, account/device preferences, failed-source IDs, audience/Premium/region/age decision и private playback context никогда не shared-cache-ятся.
+
+Source publication/health/profile/import/admin mutation сохраняет targeted invalidation. Progress/restart публикуют owner sync и только material recommendation signal; global flush не выполняется. TTL кеша никогда не продлевает grant TTL. Полный key/privacy/invalidation contract: [`audits/video-playback-report.md`](audits/video-playback-report.md).

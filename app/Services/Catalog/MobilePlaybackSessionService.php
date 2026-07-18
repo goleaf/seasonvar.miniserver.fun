@@ -77,7 +77,7 @@ final readonly class MobilePlaybackSessionService
                 return MobilePlaybackSessionData::blocked(PlaybackAvailability::NotFound);
             }
 
-            $episodes = $this->playback->episodesForSeason($title, $season, $user);
+            $episodes = $this->playback->episodesForSeason($title, $season, $user, withMedia: false);
             $selectedEpisode = $episodes->firstWhere('id', $episode->id);
 
             if (! $selectedEpisode instanceof Episode) {
