@@ -21,6 +21,8 @@ final class ReviewModerationAudit
             'moderation_reason' => $review->moderation_reason?->value,
             'moderator_note_hash' => $this->privateTextHash($review->moderator_note),
             'moderated_at' => $review->moderated_at?->toAtomString(),
+            'deletion_reason' => $review->deletion_reason?->value,
+            'deleted_by_id' => $review->deleted_by_id,
             'deleted_at' => $review->deleted_at?->toAtomString(),
         ]);
     }

@@ -34,6 +34,7 @@ final class PublicUserProfileQuery
             (int) $profile->user_id,
             $viewer,
             max(1, (int) config('user-profiles.pagination.reviews', 10)),
+            interfaceLocale: app()->getLocale(),
         );
     }
 

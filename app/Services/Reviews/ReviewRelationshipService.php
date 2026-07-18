@@ -17,7 +17,8 @@ final class ReviewRelationshipService
         private readonly ReviewSchema $schema,
     ) {}
 
-    public function context(?User $viewer): ReviewViewerContext
+    /** @param list<int>|null $relevantUserIds */
+    public function context(?User $viewer, ?array $relevantUserIds = null): ReviewViewerContext
     {
         if ($viewer !== null && ! $this->schema->writable()) {
             return new ReviewViewerContext(
@@ -29,7 +30,7 @@ final class ReviewRelationshipService
             );
         }
 
-        $context = $this->relationships->context($viewer);
+        $context = $this->relationships->context($viewer, $relevantUserIds);
 
         return new ReviewViewerContext(
             userId: $context->userId,

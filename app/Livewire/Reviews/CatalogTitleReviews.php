@@ -455,6 +455,7 @@ final class CatalogTitleReviews extends Component
                 $this->revealedReviewIds,
                 $this->highlightedReviewId,
                 $restriction !== null,
+                interfaceLocale: $this->locale,
             );
             $aggregate = $this->aggregates->forTitle($title);
             $existingReview = $this->existingReview($user);

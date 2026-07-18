@@ -919,6 +919,15 @@ Must remain semantically unchanged: provider `catalog_title_reviews`, imported r
 
 Status: implementation, owner documentation, post-Task-14 integration verification and scoped `main` commit complete on 2026-07-16. Push was attempted against the configured HTTPS remote and the same GitHub repository over SSH, but this environment has neither valid HTTPS credentials nor an SSH key; remote publication remains an external credential blocker. This is the only Task 13 implementation plan. It extends the deployed `catalog_title_reviews` domain in place and does not introduce a competing review table.
 
+### Повторный аудит 18.07.2026
+
+- [x] Fresh route/schema/code/data/privacy/SEO audit сохранил прежний canonical design: только title reviews, отдельные comments, optional portal rating `1–10`, one-current-review ownership, stable aliases, server verification, plain-text spoilers, helpfulness, reports/restrictions/notifications/admin/account/merge/API boundaries.
+- [x] Production-style census `1 720 085` reviews, `3 294 158` votes и `79` aliases дал zero duplicate current ownership/submission/vote, self vote, orphan target/user/vote и invalid enum/rating; единственная removed user row без deletion evidence публично уже была fail-closed.
+- [x] Исправлен canonical writer: moderator `removed` создаёт reason/actor/timestamp, повторное решение не меняет исходного remover, выход из состояния восстанавливает только moderator tombstone и сохраняет author/merge deletion. Demo writer/auditor применяют тот же invariant.
+- [x] Additive idempotent `2026_07_18_220000_repair_removed_review_deletion_state.php` исправляет только отсутствующее evidence и остаётся pending на рабочей базе до verified backup/writer pause; destructive reconciliation, новый constraint или speculative index не добавлены.
+- [x] `ReviewSchema` требует полный lifecycle column set; profile review list/count переиспользуют один bounded viewer relationship builder; `localized.reviews.show` сохраняет RU/EN direct link через прежний responder и не заменяет `reviews.show`.
+- [x] Финальные allowed diagnostics и documentation diff прошли без automated tests; scoped local `main` commit создан, configured HTTPS push выполнен и отклонён только из-за отсутствующего GitHub credential (`could not read Username`). Remote/secrets не менялись; публикация остаётся внешним blocker.
+
 ### Audited baseline and discovered risks
 
 - [x] The deployed review domain is title-only: `CatalogTitle::reviews()` owns `catalog_title_reviews`; neither `Season` nor `Episode` has a review relation or review route. Season/episode discussion belongs to the separate comment domain, so Task 13 will not invent season or episode reviews.

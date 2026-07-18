@@ -19,6 +19,7 @@ final class ReviewNotificationQuery
     public function __construct(
         private readonly AccountSettingsService $settings,
         private readonly AccountDateTimeFormatter $dateTimes,
+        private readonly ReviewPresenter $presenter,
     ) {}
 
     /** @return LengthAwarePaginator<int, ReviewNotificationData> */
@@ -61,7 +62,7 @@ final class ReviewNotificationQuery
                     $review->status === ReviewStatus::Published
                     && $review->deleted_at === null
                 )) {
-                    $url = route('reviews.show', ['review' => $review->id]);
+                    $url = $this->presenter->directUrl($review, $accountSettings->locale);
                 }
             }
 

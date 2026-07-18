@@ -128,6 +128,7 @@ final class DemoDataAuditor
         $this->auditDuplicates($userIds->all(), $violations);
         $this->auditSelfInteractions($userIds->all(), $violations);
         $this->auditChronology($userIds->all(), $violations);
+        $this->auditReviewIntegrity($userIds->all(), $violations);
         $this->auditCommentIntegrity($userIds->all(), $violations);
         $this->auditEnumCoverage($userIds->all(), $violations);
         $counters['asset_files'] = $this->auditAssets($userIds->all(), $violations);
@@ -161,6 +162,37 @@ final class DemoDataAuditor
             count($report->violations),
             implode("\n", array_slice($report->violations, 0, 20)),
         ));
+    }
+
+    /**
+     * @param  list<int>  $userIds
+     * @param  list<string>  $violations
+     */
+    private function auditReviewIntegrity(array $userIds, array &$violations): void
+    {
+        $reviewTable = (new CatalogTitleReview)->getTable();
+        $demoReviews = DB::table($reviewTable)
+            ->whereIn('user_id', $userIds)
+            ->where('origin', ReviewOrigin::User->value);
+
+        if ((clone $demoReviews)
+            ->where('status', ReviewStatus::Removed->value)
+            ->where(static function (Builder $query): void {
+                $query
+                    ->whereNull('deleted_at')
+                    ->orWhereNull('deletion_reason')
+                    ->orWhereNull('deleted_by_id');
+            })
+            ->exists()) {
+            $violations[] = 'Удалённая модератором рецензия не имеет полного доказательства удаления.';
+        }
+
+        if ((clone $demoReviews)
+            ->whereNotNull('deleted_at')
+            ->whereNull('deletion_reason')
+            ->exists()) {
+            $violations[] = 'Удалённая рецензия не имеет стабильной причины удаления.';
+        }
     }
 
     /**

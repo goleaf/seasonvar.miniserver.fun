@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Reviews;
 
 use App\Enums\AdminAuditAction;
+use App\Enums\ReviewDeletionReason;
 use App\Enums\ReviewModerationReason;
 use App\Enums\ReviewOrigin;
 use App\Enums\ReviewStatus;
@@ -62,7 +63,7 @@ final class ModerateCatalogTitleReview
 
         $this->rateLimiter->hit('moderate', $moderator, 'review:'.$review->id);
 
-        /** @var array{review: CatalogTitleReview, changed: bool, was_public: bool, status_changed: bool, spoiler_changed: bool} $result */
+        /** @var array{review: CatalogTitleReview, changed: bool, was_public: bool, status_changed: bool, spoiler_changed: bool, deletion_state_changed: bool} $result */
         $result = DB::transaction(function () use (
             $review,
             $moderator,
@@ -79,10 +80,24 @@ final class ModerateCatalogTitleReview
             $spoilerChanged = $isSpoiler !== null && $locked->is_spoiler !== $isSpoiler;
             $reasonChanged = $locked->moderation_reason !== $reason;
             $noteChanged = $locked->moderator_note !== $privateNote;
+            $protectedDeletion = $locked->deleted_at !== null
+                && in_array(
+                    $locked->deletion_reason,
+                    [ReviewDeletionReason::Author, ReviewDeletionReason::Merged],
+                    true,
+                );
+            $deletionStateChanged = $status === ReviewStatus::Removed
+                ? $locked->deleted_at === null
+                    || (! $protectedDeletion
+                        && ($locked->deletion_reason !== ReviewDeletionReason::Moderator
+                            || $locked->deleted_by_id === null))
+                : ! $protectedDeletion
+                    && $locked->deletion_reason === ReviewDeletionReason::Moderator;
 
             if ($locked->status === $status
                 && $locked->moderation_reason === $reason
                 && $locked->moderator_note === $privateNote
+                && ! $deletionStateChanged
                 && ($isSpoiler === null || $locked->is_spoiler === $isSpoiler)) {
                 return [
                     'review' => $locked,
@@ -90,6 +105,7 @@ final class ModerateCatalogTitleReview
                     'was_public' => $wasPublic,
                     'status_changed' => false,
                     'spoiler_changed' => false,
+                    'deletion_state_changed' => false,
                 ];
             }
 
@@ -110,6 +126,18 @@ final class ModerateCatalogTitleReview
                 $updates['is_spoiler'] = $isSpoiler;
             }
 
+            if ($status === ReviewStatus::Removed && ! $protectedDeletion) {
+                $updates['deletion_reason'] = ReviewDeletionReason::Moderator;
+                $updates['deleted_by_id'] = $locked->deleted_by_id ?? $moderator->id;
+                $updates['deleted_at'] = $locked->deleted_at ?? now();
+            } elseif ($status !== ReviewStatus::Removed
+                && ! $protectedDeletion
+                && $locked->deletion_reason === ReviewDeletionReason::Moderator) {
+                $updates['deletion_reason'] = null;
+                $updates['deleted_by_id'] = null;
+                $updates['deleted_at'] = null;
+            }
+
             $locked->forceFill($updates)->save();
             $this->auditRecorder->record(
                 $moderator,
@@ -122,6 +150,7 @@ final class ModerateCatalogTitleReview
                     ...($spoilerChanged ? ['is_spoiler'] : []),
                     ...($reasonChanged ? ['moderation_reason'] : []),
                     ...($noteChanged ? ['moderator_note'] : []),
+                    ...($deletionStateChanged ? ['deletion_reason', 'deleted_by_id', 'deleted_at'] : []),
                 ],
             );
 
@@ -131,6 +160,7 @@ final class ModerateCatalogTitleReview
                 'was_public' => $wasPublic,
                 'status_changed' => $statusChanged,
                 'spoiler_changed' => $spoilerChanged,
+                'deletion_state_changed' => $deletionStateChanged,
             ];
         }, attempts: 3);
 
@@ -143,7 +173,7 @@ final class ModerateCatalogTitleReview
         $isPublic = $review->status === ReviewStatus::Published && ! $review->isDeleted();
         $visibilityChanged = $result['was_public'] !== $isPublic;
 
-        if ($result['status_changed'] || $result['spoiler_changed']) {
+        if ($result['status_changed'] || $result['spoiler_changed'] || $result['deletion_state_changed']) {
             $this->cache->titleChanged(
                 (int) $review->catalog_title_id,
                 recommendations: $visibilityChanged,

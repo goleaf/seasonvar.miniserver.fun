@@ -111,7 +111,9 @@ final readonly class DemoCommunityStage implements DemoDataStage
                         $titleId,
                         $this->stable->uuid("community:review:{$globalOrdinal}:submission"),
                     );
-                    $reviewDeleted = $globalOrdinal % 50 === 0;
+                    $reviewRemoved = $reviewStatus === ReviewStatus::Removed;
+                    $reviewDeletedByAuthor = ! $reviewRemoved && $globalOrdinal % 50 === 0;
+                    $reviewDeleted = $reviewRemoved || $reviewDeletedByAuthor;
                     $reviewEdited = $globalOrdinal % 7 === 0;
                     $moderator = $users->get($this->otherUserIndex($userIndex, 1, $options->userCount));
                     $moderated = $reviewStatus !== ReviewStatus::Published;
@@ -132,8 +134,16 @@ final readonly class DemoCommunityStage implements DemoDataStage
                         'status' => $reviewStatus->value,
                         'version' => $reviewEdited ? 2 : 1,
                         'edited_at' => $reviewEdited ? $createdAt->addDays(2) : null,
-                        'deletion_reason' => $reviewDeleted ? ReviewDeletionReason::Author->value : null,
-                        'deleted_by_id' => $reviewDeleted ? $user->id : null,
+                        'deletion_reason' => match (true) {
+                            $reviewRemoved => ReviewDeletionReason::Moderator->value,
+                            $reviewDeletedByAuthor => ReviewDeletionReason::Author->value,
+                            default => null,
+                        },
+                        'deleted_by_id' => match (true) {
+                            $reviewRemoved => $moderator?->id,
+                            $reviewDeletedByAuthor => $user->id,
+                            default => null,
+                        },
                         'moderated_by_id' => $moderated ? $moderator?->id : null,
                         'moderation_reason' => $moderated ? $this->reviewModerationReason($reviewStatus)->value : null,
                         'moderator_note' => $moderated ? 'Статус установлен для демонстрации очереди и истории модерации.' : null,
@@ -146,8 +156,16 @@ final readonly class DemoCommunityStage implements DemoDataStage
                         'ownership_released_at' => null,
                         'published_at' => $reviewStatus === ReviewStatus::Published ? $createdAt : null,
                         'created_at' => $createdAt,
-                        'updated_at' => $reviewEdited ? $createdAt->addDays(2) : $createdAt,
-                        'deleted_at' => $reviewDeleted ? $createdAt->addDays(5) : null,
+                        'updated_at' => match (true) {
+                            $reviewRemoved => $createdAt->addHours(8),
+                            $reviewEdited => $createdAt->addDays(2),
+                            default => $createdAt,
+                        },
+                        'deleted_at' => match (true) {
+                            $reviewRemoved => $createdAt->addHours(8),
+                            $reviewDeletedByAuthor => $createdAt->addDays(5),
+                            default => null,
+                        },
                     ];
                     $reviewSpecs[$ownershipKey] = [
                         'author_index' => $userIndex,

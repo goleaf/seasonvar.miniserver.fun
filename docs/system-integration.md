@@ -16,6 +16,8 @@ Portal использует Laravel 13.20.0, class-based Livewire 4.3.3, Eloquen
 
 Shared services владеют entitlement/playback (`CatalogEntitlementService`), progress и canonical user overlay, library transitions, cache invalidation, search, recommendations, notifications, audit, imports и account lifecycle. `AccountService` теперь одинаково обновляет identity-dependent profile/search/collection/comment/review projections для Livewire и API. Feature components не создают parallel resolver.
 
+Review integration использует один `CatalogTitleReviewQuery`/`ReviewPresenter` для title, own history, public profile и notification destinations. Profile list/count передают только relevant author в общий block/mute service, а localized/unlocalized direct routes делегируют одному responder; следовательно locale, profile privacy и notification presentation не создают параллельный review visibility или URL resolver.
+
 ## 4. Identity model
 
 `User`, `CatalogTitle`, `Season`, `Episode`, `LicensedMedia` и stable UUID/code columns являются identity. Translated text, display title, slug, provider URL и episode number используются только как presentation/routing/provider context. Контентные merge выполняются application services до destructive identity removal; полного merge двух user accounts в продукте нет.

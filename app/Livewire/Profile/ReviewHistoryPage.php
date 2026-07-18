@@ -140,6 +140,7 @@ final class ReviewHistoryPage extends Component
                     ReviewSort::tryFrom($this->sort) ?? ReviewSort::Newest,
                     $this->status !== '' ? ReviewStatus::tryFrom($this->status) : null,
                     $this->revealedReviewIds,
+                    interfaceLocale: $this->locale,
                 );
             } catch (Throwable $exception) {
                 report($exception);

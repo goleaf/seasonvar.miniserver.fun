@@ -146,6 +146,7 @@
 - User title/body проходят `ReviewTitle`/`ReviewBody`/`UserPlainText`, остаются original-language escaped plain text. Не добавлять unrestricted HTML, Markdown, automatic translation/link preview/sentiment/reaction/schema без отдельного audited contract.
 - Public query/presenter готовит counts, canonical rating, permissions, spoiler body, author and vote totals; viewer vote/block/mute/restriction/pending state — отдельный overlay. Blade не lazy-load-ит models и не рассчитывает permission/average/helpfulness/verified/spoiler.
 - Stable ID/aliases переживают edit/delete/restore/slug/title merge. Create/vote/report must be idempotent and transaction-safe; cache invalidation is after commit and scoped. Visible actions require localized success/error/loading/confirmation and exact `lang/ru/reviews.php`/`lang/en/reviews.php` parity.
+- Stable `removed` review обязан иметь deletion reason, actor при наличии moderation evidence и timestamp; переход статуса восстанавливает только moderator tombstone и не отменяет author/merge deletion. Public/list/profile/notification direct URL строится одним presenter helper через route name, включая optional supported locale; Blade/JavaScript не конкатенируют review URL.
 
 ## Рейтинги Top 100
 

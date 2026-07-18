@@ -476,6 +476,10 @@ Route::middleware('collection.locale')->group(function () use ($discoveryRouteTy
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->whereNumber('comment')
         ->name('localized.comments.show');
+    Route::get('/{locale}/reviews/{review}', fn (Request $request, string $locale, string $review, ReviewDirectLinkResponder $reviews) => $reviews->response($request, $review))
+        ->whereIn('locale', config('reviews.supported_locales', ['ru']))
+        ->whereNumber('review')
+        ->name('localized.reviews.show');
     Route::get('/{locale}/collections', CatalogCollectionDirectory::class)
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->middleware('public.page:collections')

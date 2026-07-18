@@ -44,6 +44,7 @@ final class CatalogTitleReviewQuery
         ?int $highlightedReviewId = null,
         bool $viewerRestricted = false,
         string $pageName = 'reviewPage',
+        ?string $interfaceLocale = null,
     ): LengthAwarePaginator {
         $context = $this->relationships->context($viewer);
         $context = new ReviewViewerContext(
@@ -94,6 +95,7 @@ final class CatalogTitleReviewQuery
             $votes[(int) $review->id] ?? null,
             in_array((int) $review->id, $revealedReviewIds, true),
             $highlightedReviewId === (int) $review->id,
+            $interfaceLocale,
         ));
     }
 
@@ -107,6 +109,7 @@ final class CatalogTitleReviewQuery
         ?ReviewStatus $status,
         array $revealedReviewIds = [],
         string $pageName = 'reviewPage',
+        ?string $interfaceLocale = null,
     ): LengthAwarePaginator {
         $context = $this->relationships->context($author);
         $query = $this->communityQuery()
@@ -134,6 +137,7 @@ final class CatalogTitleReviewQuery
             $context,
             null,
             in_array((int) $review->id, $revealedReviewIds, true),
+            interfaceLocale: $interfaceLocale,
         ));
     }
 
@@ -143,6 +147,7 @@ final class CatalogTitleReviewQuery
         ?User $viewer,
         int $perPage,
         string $pageName = 'reviewsPage',
+        ?string $interfaceLocale = null,
     ): LengthAwarePaginator {
         $perPage = max(1, $perPage);
 
@@ -150,13 +155,7 @@ final class CatalogTitleReviewQuery
             return new LengthAwarePaginator([], 0, $perPage, options: ['pageName' => $pageName]);
         }
 
-        return CatalogTitleReview::query()
-            ->where('user_id', $authorId)
-            ->publiclyVisible()
-            ->whereIn(
-                'catalog_title_id',
-                $this->titles->visibleTo($viewer)->select('catalog_titles.id'),
-            )
+        return $this->publicAuthorQuery($authorId, $viewer)
             ->with([
                 'catalogTitle' => fn ($query) => $query
                     ->select(['id', 'slug', 'title', 'original_title']),
@@ -177,7 +176,10 @@ final class CatalogTitleReviewQuery
                 $pageName,
             )
             ->withQueryString()
-            ->through(fn (CatalogTitleReview $review): PublicReviewActivityData => $this->presenter->publicAuthorItem($review));
+            ->through(fn (CatalogTitleReview $review): PublicReviewActivityData => $this->presenter->publicAuthorItem(
+                $review,
+                $interfaceLocale,
+            ));
     }
 
     public function publicCountForAuthor(int $authorId, ?User $viewer): int
@@ -186,14 +188,27 @@ final class CatalogTitleReviewQuery
             return 0;
         }
 
-        return CatalogTitleReview::query()
+        return $this->publicAuthorQuery($authorId, $viewer)->count();
+    }
+
+    /** @return Builder<CatalogTitleReview> */
+    private function publicAuthorQuery(int $authorId, ?User $viewer): Builder
+    {
+        $query = CatalogTitleReview::query()
             ->where('user_id', $authorId)
             ->publiclyVisible()
             ->whereIn(
                 'catalog_title_id',
                 $this->titles->visibleTo($viewer)->select('catalog_titles.id'),
-            )
-            ->count();
+            );
+
+        if ($viewer !== null
+            && (int) $viewer->id !== $authorId
+            && $this->relationships->context($viewer, [$authorId])->hides($authorId)) {
+            $query->whereRaw('1 = 0');
+        }
+
+        return $query;
     }
 
     public function pageForPublicReview(

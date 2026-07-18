@@ -62,7 +62,7 @@
 - `CatalogTitleReviewVote`, `CatalogTitleReviewReport`, `CatalogTitleReviewRestriction`, `CatalogTitleReviewNotificationPreference` и `CatalogTitleReviewAlias` имеют explicit foreign keys, enum casts и узкие relations. Это не Eloquent morph domain; произвольный target class не хранится.
 - Rating не является review attribute/relation copy: query соединяет canonical `CatalogTitleUserState` той же пары author/title. Review average/vote totals/current viewer state не являются model columns и готовятся query/presenter.
 - Provider import может сохранять исторические bodies длиннее community limits; model accessor не переписывает и не рендерит HTML. User text проходит value objects при mutation, а Blade получает prepared escaped DTO. Queries eager-load author/title/reports and grouped totals; views не вызывают lazy relations.
-- Merge архивирует duplicate row и сохраняет alias вместо hard delete. Account deletion anonymizes nullable ownership; ordinary review deletion использует explicit `deleted_at` lifecycle, не удаляет canonical portal rating и не меняет user library/progress.
+- Merge архивирует duplicate row и сохраняет alias вместо hard delete. Account deletion anonymizes nullable ownership; ordinary review deletion использует explicit `deleted_at` lifecycle, не удаляет canonical portal rating и не меняет user library/progress. Moderator `removed` дополнительно требует stable `deletion_reason`, `deleted_by_id` при доступном actor evidence и `deleted_at`; восстановление другого moderation status очищает только moderator tombstone, сохраняя author/merge state.
 
 ## Модели тегов
 

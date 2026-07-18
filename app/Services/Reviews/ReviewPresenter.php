@@ -16,6 +16,7 @@ use App\Models\CatalogTitleReview;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
 final class ReviewPresenter
@@ -35,6 +36,7 @@ final class ReviewPresenter
         array $viewerVotes,
         array $revealedReviewIds,
         ?int $highlightedReviewId = null,
+        ?string $interfaceLocale = null,
     ): Collection {
         return $reviews->map(fn (CatalogTitleReview $review): ReviewItemData => $this->item(
             $review,
@@ -43,6 +45,7 @@ final class ReviewPresenter
             $viewerVotes[(int) $review->id] ?? null,
             in_array((int) $review->id, $revealedReviewIds, true),
             $highlightedReviewId === (int) $review->id,
+            $interfaceLocale,
         ));
     }
 
@@ -53,6 +56,7 @@ final class ReviewPresenter
         ?ReviewVoteType $viewerVote,
         bool $revealed,
         bool $highlighted = false,
+        ?string $interfaceLocale = null,
     ): ReviewItemData {
         $community = $this->schema->communityAvailable();
         $writable = $this->schema->writable();
@@ -83,7 +87,7 @@ final class ReviewPresenter
             && ! $isDeleted
             && $review->merged_into_id === null
         )
-            ? route('reviews.show', ['review' => $review->id])
+            ? $this->directUrl($review, $interfaceLocale)
             : null;
 
         return new ReviewItemData(
@@ -142,8 +146,10 @@ final class ReviewPresenter
         );
     }
 
-    public function publicAuthorItem(CatalogTitleReview $review): PublicReviewActivityData
-    {
+    public function publicAuthorItem(
+        CatalogTitleReview $review,
+        ?string $interfaceLocale = null,
+    ): PublicReviewActivityData {
         $title = $review->relationLoaded('catalogTitle') ? $review->catalogTitle : null;
         $isSpoiler = (bool) $review->is_spoiler;
 
@@ -156,8 +162,22 @@ final class ReviewPresenter
             isSpoiler: $isSpoiler,
             targetTitle: $title instanceof CatalogTitle ? $title->display_title : null,
             targetUrl: $title instanceof CatalogTitle ? route('titles.show', $title) : null,
-            directUrl: route('reviews.show', ['review' => $review->id]),
+            directUrl: $this->directUrl($review, $interfaceLocale),
             publishedAt: ($review->published_at ?? $review->created_at)?->diffForHumans() ?? '',
         );
+    }
+
+    public function directUrl(CatalogTitleReview $review, ?string $interfaceLocale = null): string
+    {
+        if ($interfaceLocale !== null
+            && in_array($interfaceLocale, config('reviews.supported_locales', []), true)
+            && Route::has('localized.reviews.show')) {
+            return route('localized.reviews.show', [
+                'locale' => $interfaceLocale,
+                'review' => $review,
+            ]);
+        }
+
+        return route('reviews.show', ['review' => $review]);
     }
 }
