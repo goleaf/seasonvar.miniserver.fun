@@ -115,7 +115,7 @@ final readonly class DemoCommunityStage implements DemoDataStage
                     $reviewEdited = $globalOrdinal % 7 === 0;
                     $moderator = $users->get($this->otherUserIndex($userIndex, 1, $options->userCount));
                     $moderated = $reviewStatus !== ReviewStatus::Published;
-                    $watchStatus = $states->get($titleId)?->watch_status;
+                    $watchStatus = $states->get($titleId)?->getAttribute('watch_status');
                     $reviewRows[] = [
                         'catalog_title_id' => $titleId,
                         'source_page_id' => null,
@@ -127,7 +127,8 @@ final readonly class DemoCommunityStage implements DemoDataStage
                         'body_hash' => $reviewBody->authorScopedHash((int) $user->id),
                         'original_body_hash' => $reviewEdited ? hash('sha256', 'original:'.$reviewBody->normalizedHash) : null,
                         'is_spoiler' => $this->stable->boolean("community:review:{$globalOrdinal}:spoiler", 14),
-                        'is_verified_watch' => in_array($watchStatus, [CatalogWatchStatus::Watching, CatalogWatchStatus::Completed], true),
+                        'is_verified_watch' => $watchStatus === CatalogWatchStatus::Watching
+                            || $watchStatus === CatalogWatchStatus::Completed,
                         'status' => $reviewStatus->value,
                         'version' => $reviewEdited ? 2 : 1,
                         'edited_at' => $reviewEdited ? $createdAt->addDays(2) : null,
@@ -162,7 +163,9 @@ final readonly class DemoCommunityStage implements DemoDataStage
                     );
                     $dialogue = $position % 4 === 0;
                     $commentStatus = $this->commentStatus($globalOrdinal, $dialogue);
-                    $commentDeleted = ! $dialogue && $globalOrdinal % 50 === 3;
+                    $commentRemoved = $commentStatus === CommentStatus::Removed;
+                    $commentDeletedByAuthor = ! $dialogue && $globalOrdinal % 50 === 3;
+                    $commentDeleted = $commentRemoved || $commentDeletedByAuthor;
                     $commentEdited = $globalOrdinal % 9 === 0;
                     $commentBody = CommentBody::from(
                         $this->text->commentBody($this->personas->make($userIndex), $context->displayTitle, $globalOrdinal),
@@ -181,16 +184,33 @@ final readonly class DemoCommunityStage implements DemoDataStage
                         'status' => $commentStatus->value,
                         'version' => $commentEdited ? 2 : 1,
                         'edited_at' => $commentEdited ? $createdAt->addHours(3) : null,
-                        'deletion_reason' => $commentDeleted ? CommentDeletionReason::Author->value : null,
-                        'deleted_by_id' => $commentDeleted ? $user->id : null,
+                        'deletion_reason' => match (true) {
+                            $commentRemoved => CommentDeletionReason::Moderator->value,
+                            $commentDeletedByAuthor => CommentDeletionReason::Author->value,
+                            default => null,
+                        },
+                        'deleted_by_id' => match (true) {
+                            $commentRemoved => $moderator?->id,
+                            $commentDeletedByAuthor => $user->id,
+                            default => null,
+                        },
                         'moderated_by_id' => $commentModerated ? $moderator?->id : null,
                         'moderation_reason' => $commentModerated ? $this->commentModerationReason($commentStatus)->value : null,
                         'moderator_note' => $commentModerated ? 'Комментарий оставлен в демонстрационном состоянии модерации.' : null,
                         'moderated_at' => $commentModerated ? $createdAt->addHours(2) : null,
                         'submission_key' => $commentSubmission,
                         'created_at' => $createdAt->addMinute(),
-                        'updated_at' => $commentEdited ? $createdAt->addHours(3) : $createdAt->addMinute(),
-                        'deleted_at' => $commentDeleted ? $createdAt->addDays(4) : null,
+                        'updated_at' => match (true) {
+                            $commentRemoved => $createdAt->addHours(2),
+                            $commentDeletedByAuthor => $createdAt->addDays(4),
+                            $commentEdited => $createdAt->addHours(3),
+                            default => $createdAt->addMinute(),
+                        },
+                        'deleted_at' => match (true) {
+                            $commentRemoved => $createdAt->addHours(2),
+                            $commentDeletedByAuthor => $createdAt->addDays(4),
+                            default => null,
+                        },
                     ];
                     $rootSpecs[$commentSubmission] = [
                         'author_index' => $userIndex,

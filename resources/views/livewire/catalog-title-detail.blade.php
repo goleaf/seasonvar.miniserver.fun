@@ -352,7 +352,7 @@
                 target-type="title"
                 :target-id="$title->id"
                 :wire:key="'title-discussion-'.$title->id"
-                lazy
+                :lazy="$highlightedCommentId === null"
             />
 
             @if (! empty($seo['faq']))

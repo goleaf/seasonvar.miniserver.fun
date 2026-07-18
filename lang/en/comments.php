@@ -37,6 +37,7 @@ return [
         'verification_required' => 'Verify your email address to comment.', 'no_comments' => 'There are no comments yet.',
         'no_replies' => 'There are no replies yet.', 'query_failed' => 'The discussion could not be loaded. Refresh the page.',
         'end_of_replies' => 'All replies are loaded.',
+        'reply_window_limited' => 'A bounded part of this large thread is shown. A direct reply link still opens that reply.',
     ],
     'spoiler' => [
         'label' => 'Spoiler', 'warning' => 'This comment contains a spoiler. Its text stays hidden until you choose to reveal it.',

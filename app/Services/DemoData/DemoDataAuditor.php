@@ -128,6 +128,7 @@ final class DemoDataAuditor
         $this->auditDuplicates($userIds->all(), $violations);
         $this->auditSelfInteractions($userIds->all(), $violations);
         $this->auditChronology($userIds->all(), $violations);
+        $this->auditCommentIntegrity($userIds->all(), $violations);
         $this->auditEnumCoverage($userIds->all(), $violations);
         $counters['asset_files'] = $this->auditAssets($userIds->all(), $violations);
 
@@ -162,7 +163,10 @@ final class DemoDataAuditor
         ));
     }
 
-    /** @param list<int> $userIds @param list<string> $violations */
+    /**
+     * @param  list<int>  $userIds
+     * @param  list<string>  $violations
+     */
     private function auditDuplicates(array $userIds, array &$violations): void
     {
         $checks = [
@@ -208,7 +212,10 @@ final class DemoDataAuditor
         }
     }
 
-    /** @param list<int> $userIds @param list<string> $violations */
+    /**
+     * @param  list<int>  $userIds
+     * @param  list<string>  $violations
+     */
     private function auditSelfInteractions(array $userIds, array &$violations): void
     {
         $reviewTable = (new CatalogTitleReview)->getTable();
@@ -253,7 +260,10 @@ final class DemoDataAuditor
         }
     }
 
-    /** @param list<int> $userIds @param list<string> $violations */
+    /**
+     * @param  list<int>  $userIds
+     * @param  list<string>  $violations
+     */
     private function auditChronology(array $userIds, array &$violations): void
     {
         $commentTable = (new Comment)->getTable();
@@ -282,7 +292,47 @@ final class DemoDataAuditor
         }
     }
 
-    /** @param list<int> $userIds @param list<string> $violations */
+    /**
+     * @param  list<int>  $userIds
+     * @param  list<string>  $violations
+     */
+    private function auditCommentIntegrity(array $userIds, array &$violations): void
+    {
+        $commentTable = (new Comment)->getTable();
+        $demoComments = DB::table($commentTable)->whereIn('user_id', $userIds);
+
+        if ((clone $demoComments)
+            ->where('status', CommentStatus::Removed->value)
+            ->whereNull('deleted_at')
+            ->exists()) {
+            $violations[] = 'Удалённый модератором комментарий не имеет отметки удаления.';
+        }
+
+        if ((clone $demoComments)
+            ->whereNotNull('deleted_at')
+            ->whereNull('deletion_reason')
+            ->exists()) {
+            $violations[] = 'Удалённый комментарий не имеет стабильной причины удаления.';
+        }
+
+        if (DB::table($commentTable.' as replies')
+            ->join($commentTable.' as parents', 'parents.id', '=', 'replies.parent_id')
+            ->whereIn('replies.user_id', $userIds)
+            ->where(static function (Builder $query): void {
+                $query
+                    ->whereColumn('replies.target_type', '!=', 'parents.target_type')
+                    ->orWhereColumn('replies.target_id', '!=', 'parents.target_id')
+                    ->orWhereNotNull('parents.parent_id');
+            })
+            ->exists()) {
+            $violations[] = 'Ответ демонстрационного обсуждения нарушает target scope или допустимую глубину.';
+        }
+    }
+
+    /**
+     * @param  list<int>  $userIds
+     * @param  list<string>  $violations
+     */
     private function auditEnumCoverage(array $userIds, array &$violations): void
     {
         $this->requireEnumCases(

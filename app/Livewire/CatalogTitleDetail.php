@@ -34,6 +34,9 @@ class CatalogTitleDetail extends Component
     #[Locked]
     public ?int $highlightedReviewId = null;
 
+    #[Locked]
+    public ?int $highlightedCommentId = null;
+
     protected CatalogTitlePageBuilder $pages;
 
     protected CatalogTitleRefreshCoordinator $refreshes;
@@ -78,6 +81,8 @@ class CatalogTitleDetail extends Component
         $this->catalogTitleId = $catalogTitle->id;
         $highlightedReviewId = $request->integer('review');
         $this->highlightedReviewId = $highlightedReviewId > 0 ? $highlightedReviewId : null;
+        $highlightedCommentId = $request->integer('comment');
+        $this->highlightedCommentId = $highlightedCommentId > 0 ? $highlightedCommentId : null;
     }
 
     public function startRefresh(): void
@@ -171,6 +176,11 @@ class CatalogTitleDetail extends Component
             'review_rating',
             'review_spoiler',
             'review_verified',
+            'discussion_scope',
+            'discussion_sort',
+            'comments_page',
+            'thread',
+            'comment',
         ])) {
             $seo['robots'] = 'noindex,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1';
         }

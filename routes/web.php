@@ -472,7 +472,7 @@ Route::middleware('collection.locale')->group(function () use ($discoveryRouteTy
     })
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->name('localized.legacy.recommendations.index');
-    Route::get('/{locale}/comments/{comment}', fn (Request $request, string $comment, CommentDirectLinkResponder $comments) => $comments->response($request, $comment))
+    Route::get('/{locale}/comments/{comment}', fn (Request $request, string $locale, string $comment, CommentDirectLinkResponder $comments) => $comments->response($request, $comment))
         ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
         ->whereNumber('comment')
         ->name('localized.comments.show');

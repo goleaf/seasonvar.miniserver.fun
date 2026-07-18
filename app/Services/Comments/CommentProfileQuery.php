@@ -32,6 +32,7 @@ final class CommentProfileQuery
     public function __construct(
         private readonly CatalogTitleQuery $titles,
         private readonly CommentPresenter $presenter,
+        private readonly CommentRelationshipService $relationships,
     ) {}
 
     /** @return LengthAwarePaginator<int, PublicCommentActivityData> */
@@ -193,11 +194,52 @@ final class CommentProfileQuery
     /** @return Builder<Comment> */
     private function publicActivityQuery(int $authorId, ?User $viewer): Builder
     {
-        return Comment::query()
+        $query = Comment::query()
             ->where('user_id', $authorId)
             ->published()
             ->whereNotNull('catalog_title_id')
-            ->whereIn('catalog_title_id', $this->titles->visibleTo($viewer)->select('id'));
+            ->where($this->accessibleCatalogTargets($viewer));
+
+        if ($viewer !== null
+            && (int) $viewer->id !== $authorId
+            && $this->relationships->context($viewer, [$authorId])->hides($authorId)) {
+            $query->whereRaw('1 = 0');
+        }
+
+        return $query;
+    }
+
+    private function accessibleCatalogTargets(?User $viewer): callable
+    {
+        return function (Builder $query) use ($viewer): void {
+            $query->where(function (Builder $query) use ($viewer): void {
+                $query
+                    ->where(function (Builder $query) use ($viewer): void {
+                        $query
+                            ->where('target_type', CommentTargetType::Title->value)
+                            ->whereIn('target_id', $this->titles->visibleTo($viewer)->select('id'));
+                    })
+                    ->orWhere(function (Builder $query) use ($viewer): void {
+                        $query
+                            ->where('target_type', CommentTargetType::Season->value)
+                            ->whereIn('target_id', Season::query()
+                                ->availableTo($viewer)
+                                ->whereIn('catalog_title_id', $this->titles->visibleTo($viewer)->select('id'))
+                                ->select('id'));
+                    })
+                    ->orWhere(function (Builder $query) use ($viewer): void {
+                        $query
+                            ->where('target_type', CommentTargetType::Episode->value)
+                            ->whereIn('target_id', Episode::query()
+                                ->availableTo($viewer)
+                                ->whereIn('season_id', Season::query()
+                                    ->availableTo($viewer)
+                                    ->whereIn('catalog_title_id', $this->titles->visibleTo($viewer)->select('id'))
+                                    ->select('id'))
+                                ->select('id'));
+                    });
+            });
+        };
     }
 
     private function accessibleTargets(User $user): callable

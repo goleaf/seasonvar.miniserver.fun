@@ -144,7 +144,7 @@ final class CommentDiscussion extends Component
         $this->baseTargetId = $targetId;
         $this->submissionToken = (string) Str::uuid();
         $this->replySubmissionToken = (string) Str::uuid();
-        $this->replyLimit = max(1, (int) config('comments.pagination.replies_per_page', 20));
+        $this->replyLimit = $this->repliesPerPage();
         $this->interfaceLocale = in_array($interfaceLocale, config('catalog-collections.supported_locales', []), true)
             ? $interfaceLocale
             : null;
@@ -574,7 +574,7 @@ final class CommentDiscussion extends Component
         $this->expandedThreadId = $this->expandedThreadId === (int) $root->id
             ? null
             : (int) $root->id;
-        $this->replyLimit = max(1, (int) config('comments.pagination.replies_per_page', 20));
+        $this->replyLimit = $this->repliesPerPage();
     }
 
     public function loadMoreReplies(): void
@@ -583,8 +583,11 @@ final class CommentDiscussion extends Component
             return;
         }
 
-        $increment = max(1, (int) config('comments.pagination.replies_per_page', 20));
-        $this->replyLimit = min(PHP_INT_MAX - $increment, $this->replyLimit) + $increment;
+        $increment = $this->repliesPerPage();
+        $this->replyLimit = min(
+            $this->maximumRepliesLoaded(),
+            $this->replyLimit + $increment,
+        );
     }
 
     public function render(
@@ -600,6 +603,7 @@ final class CommentDiscussion extends Component
         $replies = collect();
         $publicCount = 0;
         $hasMoreReplies = false;
+        $replyLimitReached = false;
         $scopeOptions = [];
 
         if ($available) {
@@ -632,7 +636,11 @@ final class CommentDiscussion extends Component
                     $expandedRoot = $comments->getCollection()
                         ->first(fn (mixed $item): bool => $item->id === $this->expandedThreadId);
                     $hasMoreReplies = $expandedRoot !== null
-                        && $replies->count() < $expandedRoot->visibleReplyCount;
+                        && $replies->count() < $expandedRoot->visibleReplyCount
+                        && $this->replyLimit < $this->maximumRepliesLoaded();
+                    $replyLimitReached = $expandedRoot !== null
+                        && $replies->count() < $expandedRoot->visibleReplyCount
+                        && $this->replyLimit >= $this->maximumRepliesLoaded();
                 }
             } catch (Throwable $exception) {
                 report($exception);
@@ -665,6 +673,7 @@ final class CommentDiscussion extends Component
             'comments' => $comments,
             'replies' => $replies,
             'hasMoreReplies' => $hasMoreReplies,
+            'replyLimitReached' => $replyLimitReached,
             'publicCount' => $publicCount,
             'sortOptions' => array_map(static fn (CommentSort $option): array => [
                 'value' => $option->value,
@@ -974,6 +983,19 @@ final class CommentDiscussion extends Component
         return is_string($value) && ctype_digit($value) && (int) $value > 0
             ? (int) $value
             : null;
+    }
+
+    private function repliesPerPage(): int
+    {
+        return min(
+            max(1, (int) config('comments.pagination.replies_per_page', 20)),
+            $this->maximumRepliesLoaded(),
+        );
+    }
+
+    private function maximumRepliesLoaded(): int
+    {
+        return max(1, (int) config('comments.pagination.maximum_replies_loaded', 200));
     }
 
     /**

@@ -25,6 +25,7 @@ return [
     'pagination' => [
         'comments_per_page' => 15,
         'replies_per_page' => 20,
+        'maximum_replies_loaded' => 200,
         'administration_per_page' => 25,
         'profile_per_page' => 15,
     ],

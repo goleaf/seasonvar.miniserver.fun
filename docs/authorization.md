@@ -81,6 +81,8 @@ Private и pending/rejected/hidden/deleted records не дают redirect/canoni
 
 `CommentPolicy` и focused actions остаются единственной mutation boundary. Verified requirement, active temporary/permanent restriction и block relation проверяются server-side даже при подделанном Livewire payload. Mute не является блоком: он скрывает presentation и suppress-ит notifications только для muter. Direct `/comments/{id}` сначала проверяет view/target; inaccessible public state отвечает 404, а moderator-only hidden/deleted context перенаправляется в защищённый `/admin/comments?comment={id}`.
 
+Публичная вкладка комментариев профиля не обходит эту matrix: canonical `CommentProfileQuery` повторно ограничивает exact title/season/episode target через те же audience/region/premium/publication scopes и полностью скрывает author, если viewer relationship context содержит block или mute. Numeric profile/comment/season/episode IDs не меняют это решение.
+
 `/profile/discussions`, `/notifications` и `/profile/export` защищены `auth` + `auth.session`; export дополнительно `password.confirm` и throttle. Они всегда используют текущего user и не принимают owner/profile ID. `/admin/comments` имеет route gate и повторный gate/policy в component/actions. Comment-only restriction не влияет на login, library, playback, rating, collection или review access.
 
 ## Матрица доступа отзывов

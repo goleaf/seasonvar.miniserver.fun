@@ -149,6 +149,7 @@
                         :thread-expanded="$expandedThreadId === $comment->id"
                         :replies="$expandedThreadId === $comment->id ? $replies : []"
                         :has-more-replies="$expandedThreadId === $comment->id && $hasMoreReplies"
+                        :reply-limit-reached="$expandedThreadId === $comment->id && $replyLimitReached"
                         :editing-comment-id="$editingCommentId"
                         :reply-to-comment-id="$replyToCommentId"
                         :maximum-length="$maximumLength"

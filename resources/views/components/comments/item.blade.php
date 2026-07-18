@@ -4,6 +4,7 @@
     'threadExpanded' => false,
     'replies' => [],
     'hasMoreReplies' => false,
+    'replyLimitReached' => false,
     'editingCommentId' => null,
     'replyToCommentId' => null,
     'maximumLength' => 5000,
@@ -269,6 +270,8 @@
                 <button type="button" wire:click="loadMoreReplies" wire:loading.attr="disabled" aria-controls="comment-thread-{{ $comment->id }}" class="ml-3 inline-flex min-h-11 items-center gap-2 rounded-control bg-sky-50 px-4 text-sm font-bold text-sky-700 hover:bg-sky-100 sm:ml-8">
                     <x-ui.icon name="fa-solid fa-chevron-down" />{{ __('comments.actions.load_more_replies') }}
                 </button>
+            @elseif ($replyLimitReached)
+                <p class="ml-3 rounded-control bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 sm:ml-8" role="status">{{ __('comments.states.reply_window_limited') }}</p>
             @elseif ($comment->visibleReplyCount > 0)
                 <p class="ml-3 text-xs font-semibold text-slate-500 sm:ml-8">{{ __('comments.states.end_of_replies') }}</p>
             @endif
