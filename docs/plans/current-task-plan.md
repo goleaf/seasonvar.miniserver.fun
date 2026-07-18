@@ -245,7 +245,7 @@ Governance gate был повторно прочитан до запуска pac
 | Production | Runtime/deploy/rollback compatibility | Complete with external limitations | No version/schema/serialization change; locked runbook preserved; unavailable host evidence and degraded cache recorded |
 | Cross-feature | All 28 systems classified | Complete | Matrix above records affected, unaffected or not applicable with reason |
 | Verification | Static/audit/build/browser/manual, no tests | Complete within available environment | Static analyzers, audit, build/manifest, Laravel diagnostics and partial Chromium smoke recorded below |
-| Git | Commit/push only on `main` | Pending final action | Branch confirmed `main`; commit/push result recorded after this preserved plan is staged |
+| Git | Commit only on `main`; push externally blocked | Complete locally / remote blocked | Implementation commit `fa4d09f503d717fc737955902585737f34cf713a` created on `main`; configured HTTPS `origin` rejected push because credentials are unavailable, and `gh` is not installed |
 
 ## Manual acceptance checklist
 
@@ -259,7 +259,7 @@ Governance gate был повторно прочитан до запуска pac
 - [x] Architecture drift scan classified and safe mandatory findings resolved.
 - [x] Affected journeys were statically inspected and available browser journeys were exercised; timeout/credential/device gaps are explicit.
 - [x] Documentation links, syntax, README relevance, changelog and diff verified.
-- [ ] Branch/status checked, commit created, push attempted with actual result recorded.
+- [x] Branch/status checked, commit created on `main`, push attempted and the external credential blocker recorded without changing the remote.
 
 ## Verification actually performed
 
@@ -272,7 +272,7 @@ Governance gate был повторно прочитан до запуска pac
 
 ## Unresolved limitations
 
-- Remote push authentication was unavailable at task start in the previous task; final push will be retried and reported honestly.
+- Configured HTTPS `origin` push was attempted after commit and failed with `could not read Username for 'https://github.com'`; no credential helper or `gh` authentication is available, so the local branch remains ahead of `origin/main`.
 - Production database/web-server/PHP-FPM/provider consoles may not be locally inspectable; those states remain `documented compatible`, `unknown` or `requires review`, never falsely `verified`.
 - Local Memcached is not listening and cache warming remains degraded while application readiness falls back safely; operational restoration is `TD-010`, not hidden as a code pass.
 - Home/catalog/admin browser smoke timed out during active SQLite/import load; static routes/config/build were inspected, but those live journeys are not claimed complete.
@@ -280,4 +280,4 @@ Governance gate был повторно прочитан до запуска pac
 
 ## Final commit reference
 
-Task 29 is committed on `main`; the exact immutable hash is reported in the final response because a commit cannot embed its own hash without changing that hash.
+Implementation commit: `fa4d09f503d717fc737955902585737f34cf713a` on `main`. The exact follow-up documentation commit that records the push result is reported in the final response because a commit cannot embed its own hash without changing that hash.
