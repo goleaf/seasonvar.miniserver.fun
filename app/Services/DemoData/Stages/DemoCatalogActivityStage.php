@@ -170,6 +170,7 @@ final readonly class DemoCatalogActivityStage implements DemoDataStage
         $percent = match ($status) {
             CatalogWatchStatus::Planned => $this->stable->integer($scope.':percent', 1, 8),
             CatalogWatchStatus::Watching => $this->stable->integer($scope.':percent', 20, 89),
+            CatalogWatchStatus::Paused => $this->stable->integer($scope.':percent', 10, 80),
             CatalogWatchStatus::Completed => $this->stable->integer($scope.':percent', 95, 100),
             CatalogWatchStatus::Dropped => $this->stable->integer($scope.':percent', 5, 75),
         };

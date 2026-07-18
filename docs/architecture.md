@@ -1,6 +1,6 @@
 # Архитектура приложения
 
-Обновлено: 16.07.2026
+Обновлено: 18.07.2026
 
 ## Целевая архитектура и data flow
 
@@ -430,3 +430,13 @@ Base article/category UUID и code стабильны; title/slug/locale/status/
 `CatalogTitlePlayer` orchestrates только prepared current title/season/episode context. `CatalogTitlePlaybackQuery` владеет stable episode identity, playability и editorial ordering; `CatalogPlaybackSourceResolver` вместе с `CatalogEntitlementService` владеют hierarchy/access/source selection и short-lived grant; `CatalogUserStateService` владеет authenticated progress/restart/completion. `player.js` управляет только realtime video/Plyr/HLS lifecycle, а `player-navigation.js` передаёт meaningful Livewire actions без `timeupdate` traffic.
 
 HTML season lane получает episode metadata/counts, source summaries — только выбранная серия. Raw provider URLs, full models, progress/preferences/entitlement не являются Livewire public state. Отдельного player route/system/cache/progress store нет. Полная matrix форматов, fallback, subtitles/audio truth, progress concurrency, mobile/a11y/security/SEO и rollback находится в [`audits/video-playback-report.md`](audits/video-playback-report.md).
+
+## Каноническая личная библиотека Task 09
+
+Личная библиотека расширяет существующие `CatalogTitleUserState`, `EpisodeViewProgress`, коллекции и календарь релизов; второй bookmark, status, progress, blacklist или collection aggregate не создаётся. `in_watchlist` остаётся единственным bookmark/favorite flag на уникальной паре user/title. `planned`, `watching`, `paused`, `completed` и `dropped` — стабильные serial-level status codes; «просмотрено» как история выводится из progress, а не хранится переводной строкой. `not_interested` и более сильный `blacklisted` остаются отдельным recommendation feedback dimension с централизованным precedence.
+
+`UserLibraryQuery` и `UserLibrarySummaryQuery` владеют owner-scoped pagination, grouped counters, filters, deterministic sorting и update predicate. `CatalogWatchStatusTransitionService` — единственная boundary автоматических переходов: meaningful playback может изменить только empty/planned → watching, а completed ставится после завершения всех доступных воспроизводимых серий. Явные paused/dropped/completed не перезаписываются открытием страницы или обычным heartbeat; новый сезон/эпизод сохраняет исторический completed и создаёт отдельный update indicator.
+
+`CatalogManualPlaybackService` хранит episode-level manual completion provenance в существующем progress и ровно один явный playback marker на user/episode. Маркер является независимой resume-точкой и не переписывает automatic progress до явного перехода пользователя. `CatalogPersonalUpdateQuery` сравнивает только опубликованные и доступные meaningful `ReleaseScheduleEntry` с server-owned acknowledgment; технический `updated_at`, hidden/unpublished/deleted/inaccessible content не считается обновлением. Existing calendar subscriptions/notification preferences не заменяются.
+
+Один full-page `UserLibraryPage` обслуживает `/library` и совместимые section/locale aliases. URL хранит только allowlisted section/filter/sort/page codes, а Livewire public state не содержит owner ID, Eloquent graph, marker row, private progress или collection membership. Collection CRUD/visibility/order остаются у существующего collection domain; библиотека только ведёт к нему и не связывает membership с bookmark/status/progress. Anonymous bookmark/status/blacklist merge отсутствует и не симулируется; anonymous playback progress продолжает принадлежать playback boundary.

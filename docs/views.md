@@ -1,6 +1,6 @@
 # Blade-шаблоны
 
-Обновлено: 16.07.2026
+Обновлено: 18.07.2026
 
 ## Правило без inline PHP
 
@@ -142,3 +142,9 @@ Server-rendered article/TOC/FAQ, search form/results, category/article cards, fe
 `livewire/catalog-title-player.blade.php` получает prepared DTO/view-model data: stable IDs, localized labels, canonical navigation, one selected signed grant и grouped authorized options выбранной серии. Шаблон не разрешает source URL, не запрашивает БД/service, не содержит `@php`, inline CSS или business JavaScript. Empty menus для отсутствующих audio/subtitle/quality capability не выводятся.
 
 Native buttons/links/dialog имеют семантику, visible focus, минимум 44 px, translated ARIA/live regions, mobile wrapping и working href fallback. Plyr остаётся владельцем core controls; portal controls не имитируют unsupported browser features. Полный presentation checklist: [`audits/video-playback-report.md`](audits/video-playback-report.md).
+
+## Представление личной библиотеки Task 09
+
+`resources/views/livewire/library/user-library-page.blade.php` отображает только prepared tabs, paginator items, grouped counts, filter/sort options, update indicators и safe action flags. Вычисление status, update predicate, progress percentage, marker time и URL принадлежит typed PHP/query/service boundary. Шаблон не содержит `@php`, inline CSS, direct model/service query или application JavaScript.
+
+Табы, фильтры, cards, marker rows, empty/loading/error/live-region состояния адаптивны, keyboard-operable и используют `library.*` переводы для ru/en. Existing collection pages остаются единственным CRUD/ordering/visibility UI; library не создаёт competing modal или fake bulk actions.

@@ -1,6 +1,6 @@
 # Производительность запросов
 
-Обновлено: 16.07.2026
+Обновлено: 18.07.2026
 
 Основание общепроектного projection audit — [«Your Laravel with() Queries May Be Loading Too Much Data»](https://vivekmistry.in/lara-blogs/your-laravel-with-queries-may-be-loading-too-much-data): eager loading не должен забирать все столбцы связи, а explicit projection обязана сохранять ключ, по которому Eloquent сопоставляет модели.
 
@@ -250,3 +250,11 @@ Composite indexes поддерживают publication/audience/date, category o
 Title page загружает season summaries/counts, active-season episode metadata/counts и одной выборкой authorized source summaries только выбранной серии. Полный season source graph, subtitle body и per-option query запрещены. API episodes сохраняет совместимый opt-in full media profile, mobile navigation использует summary mode. Navigation пересекает границу сезона одним canonical ordered query и не делает N+1.
 
 Progress — one unique user/episode row с `insertOrIgnore`, transaction lock и idempotent session/sequence; browser пишет не чаще 30-second/10-second meaningful cadence плюс lifecycle events. Существующие indexes обслуживают episode season/order, media title/season/episode/availability/health и progress owner/episode/last-watched; speculative migration/index Task 07 не добавляет. Полный budget и manual plan inspection: [`audits/video-playback-report.md`](audits/video-playback-report.md).
+
+## Query contract личной библиотеки Task 09
+
+`UserLibraryQuery` начинает с owner index, eager-loads только prepared card relations и paginates каждый section независимо; full library и subtitle/media graphs в PHP не фильтруются. Status/feedback/watchlist/marker/update sections не выполняют per-card queries. Counts собираются grouped aggregates, marker count — одним aggregate, а update/no-update используют один и тот же correlated `EXISTS` predicate и его точное отрицание.
+
+Update predicate опирается на published/released `release_schedule_entries`, видимость и owner acknowledgment; detail labels hydrate одним bounded query на текущую страницу. Deterministic secondary `catalog_title_id`/marker ID сохраняет pagination. Existing owner/status/watchlist/history indexes используются подтверждёнными SQLite plans; новая unique marker identity и owner/recent indexes поддерживают marker lookup/list, а update-state unique owner/title — acknowledgment join. Redundant index на `(user_id,catalog_title_id)` поверх unique constraint намеренно не добавлен.
+
+Continue Watching сохраняет canonical ordering/playability, но строит episode window пакетами только для title IDs из latest owner activity вместо materialization всего видимого каталога. На текущем корпусе `UserLibrarySummaryQuery` после ограничения завершился примерно за 1,7 секунды при одновременно работающем импорте; server-render пустых status/update/marker sections занял около 2,2–2,4 секунды, а страницы с двенадцатью полными cards — 7–12 секунд под той же SQLite write/load contention. Это измеренный local-dev верхний уровень, не основание для shared personal cache.

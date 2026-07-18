@@ -401,6 +401,7 @@
 - `2026_07_17_160000_add_content_request_queue_indexes.php`
 - `2026_07_17_170000_create_release_calendar_domain.php`
 - `2026_07_18_070229_create_premium_domain_tables.php`
+- `2026_07_18_090000_add_canonical_personal_library_tracking.php`
 - `2026_07_18_210000_create_help_center_domain.php`
 - `2026_07_18_210100_publish_initial_help_center_content.php`
 <!-- project-docs:end -->

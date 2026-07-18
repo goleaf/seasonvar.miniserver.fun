@@ -1,6 +1,6 @@
 # Деплой
 
-Обновлено: 17.07.2026
+Обновлено: 18.07.2026
 
 ## Eloquent AutoCache rollout от 17.07.2026
 
@@ -523,3 +523,12 @@ Rollback — вернуть PHP/Blade/JS/CSS commit и восстановить 
 5. Проверить, что signed grant отсутствует в JSON-LD/OG/sitemap/shared cache/log/report context, а title page загружает source summaries только текущей серии.
 
 Rollback — revert Task 07 assets/code/config/docs; database data repair не требуется, grants истекают по TTL. Полный checklist и browser limitations: [`audits/video-playback-report.md`](audits/video-playback-report.md).
+
+## Rollout личной библиотеки Task 09
+
+1. До rollout сохранить backup и подтвердить отсутствие duplicate `(user_id,catalog_title_id)` state, `(user_id,episode_id)` progress и collection/title membership; сохранить текущие counts по status/feedback.
+2. Применить additive migration `2026_07_18_090000_add_canonical_personal_library_tracking.php`: nullable progress provenance и две owner-private tables. Migration SQLite-compatible, не backfill-ит legacy progress/status и не изменяет bookmarks/collections.
+3. Развернуть PHP и Vite assets вместе, затем проверить `/library` и localized aliases, status tabs/counts, bookmark/status/feedback, marker controls в player, update/no-update inverse, private/no-store/noindex и existing public collection routes.
+4. Проверить merge/export/account delete, query plans/index usage, absence owner data in public cache/API/SEO/sitemap и that notification/calendar/import paths still use canonical release entries.
+
+Rollback приложения должен предшествовать `down()`. Если после rollout появились marker/acknowledgment records, перед schema rollback нужен privacy-safe export/backup: `down()` удаляет только new tables/column и не переносит их в legacy fields. Existing bookmark/status/progress/collection data остаётся неизменным; global cache flush не требуется.

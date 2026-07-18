@@ -3313,6 +3313,7 @@
                         "enum": [
                             "planned",
                             "watching",
+                            "paused",
                             "completed",
                             "dropped",
                             null
@@ -3485,6 +3486,7 @@
                                 "enum": [
                                     "planned",
                                     "watching",
+                                    "paused",
                                     "completed",
                                     "dropped",
                                     null

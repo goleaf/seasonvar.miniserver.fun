@@ -1,6 +1,6 @@
 # Авторизация
 
-Обновлено: 16.07.2026
+Обновлено: 18.07.2026
 
 ## Правила
 
@@ -252,3 +252,16 @@ Client не задаёт editor/reporter identity, произвольный stat
 | Source fallback | public equivalent only | authorized equivalent only | failed ID list + full canonical resolver; no rule bypass |
 
 Current schema не назначает source Premium/region-country/age rule; клиентский Premium/region/age signal не принимается. При появлении реальной policy она должна входить в тот же entitlement resolver до выдачи source. Полный access/threat contract: [`audits/video-playback-report.md`](audits/video-playback-report.md).
+
+## Матрица личной библиотеки Task 09
+
+| Действие | Guest | Authenticated owner | Server boundary |
+| --- | --- | --- | --- |
+| Открыть `/library/*` | login redirect | да, включая unverified read | `auth`, `auth.session`, `account.private`, current session owner |
+| Bookmark/rating/status/feedback | нет | verified + visible title | `CatalogTitlePolicy::interact`, stable enum validation, current owner state |
+| Manual watched/unwatched и playback marker | нет | verified + visible playable hierarchy | `EpisodeViewProgressPolicy`, title/episode ownership, duration clamp, owner relation |
+| Acknowledge personal update | нет | verified + visible title | canonical release visibility, opaque title identity, bounded action rate |
+| Manage collections | нет | verified owner | existing `CatalogCollectionPolicy`; private/unlisted/public rules не меняются |
+| View public/unlisted collection | public according to policy | same + owner overlay | deny-as-not-found для private/hidden; private state never enters public DTO |
+
+Ни один mutation не принимает user ID. Marker/update/title/episode/collection identifiers повторно разрешаются через owner relation и policy; destructive actions остаются POST/Livewire с CSRF. Private library pages noindex/no-store, отсутствуют в sitemap и не раскрываются через numeric-ID probing. Administrator role не позволяет менять личное состояние другого пользователя через библиотечные controls.

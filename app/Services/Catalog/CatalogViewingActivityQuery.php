@@ -23,6 +23,7 @@ final class CatalogViewingActivityQuery
         private readonly CatalogPlaybackCompletionRule $completionRule,
         private readonly AccountSettingsService $accountSettings,
         private readonly AccountDateTimeFormatter $dateTimes,
+        private readonly PlaybackTimeFormatter $times,
     ) {}
 
     /** @return Collection<int, CatalogContinueWatchingItem> */
@@ -65,79 +66,94 @@ final class CatalogViewingActivityQuery
             "COALESCE({$episodeTable}.number, 0)",
             "{$episodeTable}.id",
         ]);
-        $watchableEpisodeIds = $this->playback
-            ->watchableEpisodesForVisibleTitles($user)
-            ->reorder()
-            ->select($episode->qualifyColumn('id'));
-        $latestActivityEpisodeIds = DB::query()
-            ->fromSub(clone $latestActivity, 'latest_activity_episode_ids')
-            ->select('episode_id');
-        $watchableSequence = $this->playback
-            ->orderedEpisodesForVisibleTitles($user)
-            ->leftJoinSub(clone $watchableEpisodeIds, 'watchable_episode_ids', function ($join) use ($episode): void {
-                $join->on('watchable_episode_ids.id', '=', $episode->qualifyColumn('id'));
-            })
-            ->where(function ($query) use ($episode, $latestActivityEpisodeIds): void {
-                $query
-                    ->whereNotNull('watchable_episode_ids.id')
-                    ->orWhereIn($episode->qualifyColumn('id'), clone $latestActivityEpisodeIds);
-            })
-            ->reorder()
-            ->addSelect('watchable_episode_ids.id as watchable_episode_id')
-            ->addSelect(DB::raw(
-                "LEAD({$episodeTable}.id) OVER (PARTITION BY {$seasonTable}.catalog_title_id, {$seasonTable}.kind, {$episodeTable}.kind ORDER BY {$episodeOrder}) AS next_episode_id",
-            ));
-
-        $activity = DB::query()
-            ->fromSub($latestActivity, 'latest_viewing_activity')
-            ->joinSub($watchableSequence->toBase(), 'watchable_episode_sequence', function ($join): void {
-                $join->on('watchable_episode_sequence.id', '=', 'latest_viewing_activity.episode_id')
-                    ->on('watchable_episode_sequence.playback_catalog_title_id', '=', 'latest_viewing_activity.catalog_title_id');
-            })
-            ->select([
-                'latest_viewing_activity.id',
-                'latest_viewing_activity.catalog_title_id',
-                'latest_viewing_activity.episode_id',
-                'latest_viewing_activity.position_seconds',
-                'latest_viewing_activity.duration_seconds',
-                'latest_viewing_activity.progress_percent',
-                'latest_viewing_activity.completed_at',
-                'latest_viewing_activity.last_watched_at',
-                'watchable_episode_sequence.watchable_episode_id',
-                'watchable_episode_sequence.next_episode_id',
-            ])
-            ->orderByDesc('latest_viewing_activity.last_watched_at')
-            ->orderByDesc('latest_viewing_activity.id');
-
         $selected = collect();
+        $activityOffset = 0;
+        $candidateBatchSize = max(96, $limit * 4);
 
-        foreach ($activity->cursor() as $row) {
-            $continueCurrent = $row->completed_at === null || $this->completionRule->isInProgress(
-                (int) $row->position_seconds,
-                (int) $row->duration_seconds,
-            );
+        while ($selected->count() < $limit) {
+            $activityRows = (clone $latestActivity)
+                ->orderByDesc('last_watched_at')
+                ->orderByDesc('id')
+                ->offset($activityOffset)
+                ->limit($candidateBatchSize)
+                ->get();
 
-            if ($continueCurrent && $row->watchable_episode_id === null) {
-                continue;
+            if ($activityRows->isEmpty()) {
+                break;
             }
 
-            $targetEpisodeId = $continueCurrent ? (int) $row->episode_id : (int) ($row->next_episode_id ?? 0);
+            $catalogTitleIds = $activityRows->pluck('catalog_title_id')->map(fn (mixed $id): int => (int) $id)->all();
+            $episodeIds = $activityRows->pluck('episode_id')->map(fn (mixed $id): int => (int) $id)->all();
+            $watchableEpisodeIds = $this->playback
+                ->watchableEpisodesForVisibleTitles($user)
+                ->whereIn($season->qualifyColumn('catalog_title_id'), $catalogTitleIds)
+                ->reorder()
+                ->select($episode->qualifyColumn('id'));
+            $watchableSequence = $this->playback
+                ->orderedEpisodesForVisibleTitles($user)
+                ->whereIn($season->qualifyColumn('catalog_title_id'), $catalogTitleIds)
+                ->leftJoinSub(clone $watchableEpisodeIds, 'watchable_episode_ids', function ($join) use ($episode): void {
+                    $join->on('watchable_episode_ids.id', '=', $episode->qualifyColumn('id'));
+                })
+                ->where(function ($query) use ($episode, $episodeIds): void {
+                    $query
+                        ->whereNotNull('watchable_episode_ids.id')
+                        ->orWhereIn($episode->qualifyColumn('id'), $episodeIds);
+                })
+                ->reorder()
+                ->addSelect('watchable_episode_ids.id as watchable_episode_id')
+                ->addSelect(DB::raw(
+                    "LEAD({$episodeTable}.id) OVER (PARTITION BY {$seasonTable}.catalog_title_id, {$seasonTable}.kind, {$episodeTable}.kind ORDER BY {$episodeOrder}) AS next_episode_id",
+                ));
+            $sequenceRows = DB::query()
+                ->fromSub($watchableSequence->toBase(), 'watchable_episode_sequence')
+                ->whereIn('id', $episodeIds)
+                ->get()
+                ->keyBy('id');
 
-            if ($targetEpisodeId < 1) {
-                continue;
+            foreach ($activityRows as $row) {
+                $sequence = $sequenceRows->get((int) $row->episode_id);
+
+                if ($sequence === null
+                    || (int) $sequence->playback_catalog_title_id !== (int) $row->catalog_title_id) {
+                    continue;
+                }
+
+                $continueCurrent = $row->completed_at === null || $this->completionRule->isInProgress(
+                    (int) $row->position_seconds,
+                    (int) $row->duration_seconds,
+                );
+
+                if ($continueCurrent && $sequence->watchable_episode_id === null) {
+                    continue;
+                }
+
+                $targetEpisodeId = $continueCurrent
+                    ? (int) $row->episode_id
+                    : (int) ($sequence->next_episode_id ?? 0);
+
+                if ($targetEpisodeId < 1) {
+                    continue;
+                }
+
+                $selected->push([
+                    'catalog_title_id' => (int) $row->catalog_title_id,
+                    'episode_id' => $targetEpisodeId,
+                    'action_type' => $continueCurrent ? 'continue' : 'next',
+                    'position_seconds' => $continueCurrent ? (int) $row->position_seconds : 0,
+                    'progress_percent' => $continueCurrent && $row->progress_percent !== null
+                        ? (int) $row->progress_percent
+                        : null,
+                ]);
+
+                if ($selected->count() === $limit) {
+                    break;
+                }
             }
 
-            $selected->push([
-                'catalog_title_id' => (int) $row->catalog_title_id,
-                'episode_id' => $targetEpisodeId,
-                'action_type' => $continueCurrent ? 'continue' : 'next',
-                'position_seconds' => $continueCurrent ? (int) $row->position_seconds : 0,
-                'progress_percent' => $continueCurrent && $row->progress_percent !== null
-                    ? (int) $row->progress_percent
-                    : null,
-            ]);
+            $activityOffset += $activityRows->count();
 
-            if ($selected->count() === $limit) {
+            if ($activityRows->count() < $candidateBatchSize) {
                 break;
             }
         }
@@ -200,7 +216,7 @@ final class CatalogViewingActivityQuery
                 episode: $episode,
                 actionType: $item['action_type'],
                 actionLabel: $item['action_type'] === 'continue'
-                    ? __('catalog.player.continue_from', ['position' => $this->formatPosition($position)])
+                    ? __('catalog.player.continue_from', ['position' => $this->times->compact($position)])
                     : __('catalog.player.next'),
                 positionSeconds: $position,
                 progressPercent: $item['progress_percent'],
@@ -268,12 +284,5 @@ final class CatalogViewingActivityQuery
         });
 
         return $history;
-    }
-
-    private function formatPosition(int $seconds): string
-    {
-        $seconds = max(0, $seconds);
-
-        return sprintf('%02d:%02d', intdiv($seconds, 60), $seconds % 60);
     }
 }

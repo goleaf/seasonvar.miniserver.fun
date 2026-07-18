@@ -1,6 +1,6 @@
 # Безопасность
 
-Обновлено: 16.07.2026
+Обновлено: 18.07.2026
 
 ## Правила
 
@@ -198,3 +198,11 @@ Markdown проходит CommonMark strip и DOM allowlist; raw HTML/script/sty
 Каждый source выбор и signed response повторно проверяют viewer, title/season/episode/media hierarchy, publication/audience/window/health, allowlisted format, HTTPS host/public DNS или safe relative storage path. Client передаёт только opaque media ID; arbitrary URL proxy, path traversal, SSRF, credential forwarding и full-file PHP buffering отсутствуют. Grant TTL ограничен 30–600 секундами, refresh/fallback/preferences/restart rate-limited, responses `private, no-store`, `no-referrer`, `nosniff`, `noindex`.
 
 Report-only CSP `media-src`/`connect-src` ограничен `'self'`, `blob:` и configured `11cdn.org` origins вместо общего `https:`. Provider CORS/Range/MIME остаются deployment contract. Signed URLs не попадают в SEO/shared cache/Livewire public state/storage/report context. Реальных source Premium/region/age полей нет, поэтому bypass и fake client checks не создаются. Полный threat matrix: [`audits/video-playback-report.md`](audits/video-playback-report.md).
+
+## Security и privacy личной библиотеки Task 09
+
+Bookmark, rating, status, feedback/blacklist, progress, marker, acknowledgment и private collection state private by default. `/library/*` использует authenticated owner из session, `account.private` no-store/noindex и policies; user ID, translated status, arbitrary sort column, source URL и collection owner не принимаются. Stable enum/filter allowlists, title→episode ownership, marker duration clamp, CSRF и scoped rate limits закрывают IDOR, mass assignment, duplicate submission и invalid-state paths.
+
+Manual marker хранит только stable episode identity и seconds; optional source/audio/subtitle/provider context намеренно не сохраняется. Personal update определяется server-side published release records и canonical visibility, поэтому client timestamp, technical `updated_at`, hidden/premium/region-inaccessible entry не может создать или снять badge. Public profile/API/SEO/sitemap/shared cache не получают exact status, marker, progress, blacklist или acknowledgment. Public collection presenter сохраняет существующий strict allowlist и не показывает owner private overlay.
+
+Account export содержит semantic codes/timestamps/positions без private media URL; account deletion использует existing cascade/lifecycle. Title merge выполняет server-side precedence и unique reconciliation, поэтому duplicate merge не ослабляет blacklist и не теряет explicit status/marker/update state. Anonymous bookmark/status/blacklist storage не добавлено; существующее anonymous playback storage не расширяется персональными списками.

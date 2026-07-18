@@ -45,9 +45,7 @@ final class LibraryFilters extends Form
 
     public function validateFor(string $section): void
     {
-        $sorts = $section === 'ratings'
-            ? ['updated', 'rating', 'title', 'year']
-            : ['updated', 'title', 'year'];
+        $sorts = $this->allowedSorts($section);
 
         $this->validate([
             'query' => ['nullable', 'string', 'max:160'],
@@ -57,22 +55,20 @@ final class LibraryFilters extends Form
             'sort' => ['required', Rule::in($sorts)],
             'direction' => ['required', Rule::in(['asc', 'desc'])],
         ], [
-            'query.max' => 'Поисковый запрос не должен быть длиннее 160 символов.',
-            'type.enum' => 'Выбран неизвестный тип публикации.',
-            'year.integer' => 'Год должен быть целым числом.',
-            'year.min' => 'Год должен быть не меньше 1900.',
-            'year.max' => 'Указан недопустимый год.',
+            'query.max' => __('library.validation.query_max'),
+            'type.enum' => __('library.validation.type'),
+            'year.integer' => __('library.validation.year_integer'),
+            'year.min' => __('library.validation.year_min'),
+            'year.max' => __('library.validation.year_max'),
             'personalTag.uuid' => __('tags.validation.personal_tag'),
-            'sort.in' => 'Выбран недоступный способ сортировки.',
-            'direction.in' => 'Выбрано недоступное направление сортировки.',
+            'sort.in' => __('library.validation.sort'),
+            'direction.in' => __('library.validation.direction'),
         ]);
     }
 
     public function toDto(string $section, int $perPage = 12): UserLibraryFilters
     {
-        $allowedSorts = $section === 'ratings'
-            ? ['updated', 'rating', 'title', 'year']
-            : ['updated', 'title', 'year'];
+        $allowedSorts = $this->allowedSorts($section);
         $type = CatalogPublicationType::tryFrom($this->type);
         $year = filter_var($this->year, FILTER_VALIDATE_INT);
 
@@ -87,5 +83,31 @@ final class LibraryFilters extends Form
             direction: in_array($this->direction, ['asc', 'desc'], true) ? $this->direction : 'desc',
             perPage: max(1, min(48, $perPage)),
         );
+    }
+
+    /** @return list<string> */
+    private function allowedSorts(string $section): array
+    {
+        $sorts = ['updated', 'title', 'year'];
+
+        if ($section === 'ratings') {
+            $sorts[] = 'rating';
+        }
+
+        if (in_array($section, [
+            'planned',
+            'watching',
+            'paused',
+            'completed',
+            'dropped',
+            'with-updates',
+            'without-updates',
+        ], true)) {
+            $sorts[] = 'recently-watched';
+            $sorts[] = 'progress';
+            $sorts[] = 'status';
+        }
+
+        return $sorts;
     }
 }

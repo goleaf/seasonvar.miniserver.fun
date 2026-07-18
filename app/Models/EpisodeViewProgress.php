@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\PlaybackCompletionSource;
 use App\Policies\EpisodeViewProgressPolicy;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -36,6 +37,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'playback_session_id',
     'playback_event_sequence',
     'completed_at',
+    'completion_source',
     'last_watched_at',
 ])]
 #[UsePolicy(EpisodeViewProgressPolicy::class)]
@@ -77,6 +79,7 @@ class EpisodeViewProgress extends Model
             'first_started_at' => 'datetime',
             'playback_event_sequence' => 'integer',
             'completed_at' => 'datetime',
+            'completion_source' => PlaybackCompletionSource::class,
             'last_watched_at' => 'datetime',
         ];
     }

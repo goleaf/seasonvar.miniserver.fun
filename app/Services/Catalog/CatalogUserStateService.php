@@ -7,6 +7,7 @@ namespace App\Services\Catalog;
 use App\DTOs\CatalogUserStateSummary;
 use App\Enums\CatalogRecommendationFeedback;
 use App\Enums\CatalogWatchStatus;
+use App\Enums\PlaybackCompletionSource;
 use App\Models\CatalogTitle;
 use App\Models\CatalogTitleUserState;
 use App\Models\EpisodeViewProgress;
@@ -30,6 +31,9 @@ class CatalogUserStateService
         private readonly UserSyncChangePublisher $syncChanges,
         private readonly ReviewCacheInvalidator $reviewCache,
         private readonly CatalogRecommendationCacheInvalidator $recommendationCache,
+        private readonly CatalogWatchStatusTransitionService $watchStatusTransitions,
+        private readonly CatalogPersonalUpdateService $personalUpdates,
+        private readonly PersonalLibrarySchema $personalLibrarySchema,
     ) {}
 
     public function state(User $user, CatalogTitle $catalogTitle): ?CatalogTitleUserState
@@ -78,7 +82,7 @@ class CatalogUserStateService
     {
         $range = $this->ratingRange();
 
-        return "Оценка должна быть от {$range['minimum']} до {$range['maximum']}.";
+        return __('library.validation.rating', $range);
     }
 
     public function setWatchlist(User $user, CatalogTitle $catalogTitle, bool $inWatchlist): ?CatalogTitleUserState
@@ -237,7 +241,8 @@ class CatalogUserStateService
             return null;
         }
 
-        return DB::transaction(function () use (
+        $shouldSynchronize = false;
+        $progress = DB::transaction(function () use (
             $user,
             $catalogTitle,
             $episode,
@@ -247,6 +252,7 @@ class CatalogUserStateService
             $positionSeconds,
             $mediaDuration,
             $ended,
+            &$shouldSynchronize,
         ): EpisodeViewProgress {
             $now = now();
 
@@ -284,9 +290,13 @@ class CatalogUserStateService
                 ? min($positionSeconds, $trustedDuration)
                 : $positionSeconds;
             $completedAt = $progress->completed_at;
+            $completionSource = $this->personalLibrarySchema->ready()
+                ? $progress->completion_source
+                : null;
 
             if ($completedAt === null && $this->completionRule->isComplete($trustedPosition, $trustedDuration, $ended)) {
                 $completedAt = $now;
+                $completionSource = PlaybackCompletionSource::Playback;
             }
 
             $progress->forceFill([
@@ -299,17 +309,26 @@ class CatalogUserStateService
                 'playback_session_id' => $session->id,
                 'playback_event_sequence' => $eventSequence,
                 'completed_at' => $completedAt,
+                ...($this->personalLibrarySchema->ready() ? ['completion_source' => $completionSource] : []),
                 'last_watched_at' => $now,
             ])->save();
             $this->syncChanges->publishProgress($user, $catalogTitle, $episode->id);
 
             if ((! $wasMeaningful && $this->isMeaningfulProgress($progress))
                 || (! $wasCompleted && $progress->completed_at !== null)) {
+                $shouldSynchronize = true;
                 $this->recommendationCache->publicSignalsChanged('meaningful-progress');
             }
 
             return $progress;
         }, attempts: 3);
+
+        if ($shouldSynchronize) {
+            $this->synchronizeWatchStatusFromProgress($user, $catalogTitle, $progress);
+            $this->personalUpdates->acknowledge($user, $catalogTitle, enforceRateLimit: false);
+        }
+
+        return $progress;
     }
 
     public function restartProgress(
@@ -358,6 +377,7 @@ class CatalogUserStateService
                 'position_seconds' => 0,
                 'progress_percent' => 0,
                 'completed_at' => null,
+                ...($this->personalLibrarySchema->ready() ? ['completion_source' => null] : []),
                 'playback_session_id' => $session->id,
                 'playback_event_sequence' => 0,
                 'last_watched_at' => now(),
@@ -370,6 +390,29 @@ class CatalogUserStateService
 
             return $progress;
         }, attempts: 3);
+    }
+
+    public function synchronizeWatchStatusFromProgress(
+        User $user,
+        CatalogTitle $catalogTitle,
+        EpisodeViewProgress $progress,
+    ): void {
+        $this->authorizeInteraction($user, $catalogTitle);
+        $current = $this->state($user, $catalogTitle)?->watch_status;
+        $next = $this->watchStatusTransitions->afterProgress($user, $catalogTitle, $progress, $current);
+
+        if ($next === $current) {
+            return;
+        }
+
+        $this->writeRecommendationState(
+            user: $user,
+            catalogTitle: $catalogTitle,
+            column: 'watch_status',
+            value: $next?->value,
+            versionColumn: 'watch_status_version',
+            timestamps: $this->semanticTimestamp('watch_status_updated_at'),
+        );
     }
 
     /**
@@ -481,9 +524,7 @@ class CatalogUserStateService
 
     private function isMeaningfulProgress(EpisodeViewProgress $progress): bool
     {
-        return $progress->completed_at !== null
-            || (int) $progress->position_seconds >= max(1, (int) config('recommendations.meaningful_progress_seconds', 180))
-            || (int) $progress->progress_percent >= max(1, (int) config('recommendations.meaningful_progress_percent', 10));
+        return $this->watchStatusTransitions->meaningful($progress);
     }
 
     /** @param array<string, mixed> $timestamps */

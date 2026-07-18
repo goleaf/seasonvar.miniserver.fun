@@ -13,6 +13,7 @@ use App\Policies\AccountSettingsPolicy;
 use App\Policies\HelpArticlePolicy;
 use App\Policies\TechnicalIssuePolicy;
 use App\Services\Auth\AccountSettingsSchema;
+use App\Services\Catalog\PersonalLibrarySchema;
 use App\Services\Collections\CatalogCollectionSchema;
 use App\Services\Comments\CommentSchema;
 use App\Services\ContentRequests\ContentRequestSchema;
@@ -62,6 +63,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scopedIf(ReleaseCalendarSchema::class);
         $this->app->scopedIf(HelpCenterSchema::class);
         $this->app->scopedIf(PremiumSchema::class);
+        $this->app->scopedIf(PersonalLibrarySchema::class);
         $this->app->scopedIf(PremiumAccessResolver::class);
         $this->app->singleton(PremiumPaymentGatewayRegistry::class, static fn (): PremiumPaymentGatewayRegistry => new PremiumPaymentGatewayRegistry);
         $this->app->scopedIf(TagSchema::class);

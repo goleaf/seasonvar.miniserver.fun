@@ -1,6 +1,6 @@
 # Eloquent-модели
 
-Обновлено: 15.07.2026
+Обновлено: 18.07.2026
 
 ## Правила связей
 
@@ -94,3 +94,11 @@
 - `ReleaseScheduleCorrection` — owned append-style history; actor nullable, private note не входит в public presenter.
 - `ReleaseCalendarSubscription` и `ReleaseCalendarNotificationPreference` — owner-only unique state; follower identity не публикуется.
 - Relations добавлены к `CatalogTitle`, `Season`, `Episode`, `LicensedMedia` и `User`; title merge выполняется до hard-delete дубля. Полная семантика: [`release-calendar.md`](release-calendar.md).
+
+## Модели личной библиотеки Task 09
+
+- `CatalogTitleUserState` остаётся canonical serial/user aggregate для bookmark/favorite, rating, watch status и recommendation feedback; status/feedback cast к enum, translated labels не сохраняются.
+- `EpisodeViewProgress` остаётся progress/history aggregate и получает nullable `PlaybackCompletionSource` только для provenance manual/playback completion.
+- `EpisodePlaybackMarker` — owner-private single marker с UUID, stable title/episode relations, numeric position и optimistic version.
+- `CatalogTitleUpdateState` — owner-private monotonic acknowledgment последнего meaningful `ReleaseScheduleEntry` для title.
+- `CatalogCollection`/`CatalogCollectionItem` остаются независимыми canonical collection models; personal-library models не дублируют visibility, membership или ordering.

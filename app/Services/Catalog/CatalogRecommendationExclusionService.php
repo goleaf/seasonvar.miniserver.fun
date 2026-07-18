@@ -51,6 +51,7 @@ final class CatalogRecommendationExclusionService
                 ->whereBelongsTo($context->user)
                 ->whereIn('watch_status', [
                     CatalogWatchStatus::Watching->value,
+                    CatalogWatchStatus::Paused->value,
                     CatalogWatchStatus::Completed->value,
                     CatalogWatchStatus::Dropped->value,
                 ])

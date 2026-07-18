@@ -227,7 +227,11 @@ final class CatalogPersonalizedRecommendationQuery
         if (Schema::hasColumn('catalog_title_user_states', 'watch_status')) {
             $statusTitleIds = $this->orderBySignalActivity(CatalogTitleUserState::query()
                 ->whereBelongsTo($user)
-                ->whereIn('watch_status', [CatalogWatchStatus::Planned->value, CatalogWatchStatus::Watching->value]), 'watch_status_updated_at')
+                ->whereIn('watch_status', [
+                    CatalogWatchStatus::Planned->value,
+                    CatalogWatchStatus::Watching->value,
+                    CatalogWatchStatus::Paused->value,
+                ]), 'watch_status_updated_at')
                 ->limit(80)
                 ->pluck('catalog_title_id');
 

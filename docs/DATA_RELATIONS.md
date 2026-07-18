@@ -528,3 +528,17 @@ Revisions append-only и не загружаются public query. Feedback/repo
 `Episode.id` — stable logical playback identity; `LicensedMedia.id` — replaceable source variant. Один episode имеет много variants/qualities/formats, но source row не создаёт новую серию. `episode_view_progress` уникален для `(user_id, episode_id)`, optional `licensed_media_id` хранит last source context, а session ID/event sequence защищают от stale write. Explicit restart сбрасывает row отдельно; completion threshold централизован (`95%`, `15` remaining seconds или trusted ended).
 
 Task 07 не добавляет таблиц или columns. Existing episode ordering, media availability/health indexes, progress identity/last-watched indexes и account JSON/settings остаются каноническими. Independent audio/subtitle/region/age relations отсутствуют и не симулируются. Полная схема selection/query/invalidation: [`audits/video-playback-report.md`](audits/video-playback-report.md).
+
+## Личная библиотека и manual markers Task 09
+
+| Хранилище | Каноническая семантика и целостность |
+| --- | --- |
+| `catalog_title_user_states` | Одна unique `(user_id,catalog_title_id)` запись объединяет bookmark/favorite `in_watchlist`, rating, serial status, recommendation feedback и независимые semantic timestamps. Bookmark не означает `planned`; `not_interested` и `blacklisted` не удаляют bookmark/status/progress/collection membership. |
+| `episode_view_progress` | Одна unique `(user_id,episode_id)` запись остаётся источником automatic position/history/completion. Nullable `completion_source=playback|manual` различает provenance без копии progress. Manual unwatch снимает только manual completion; automatic completion и позиция сохраняются. |
+| `episode_playback_markers` | Одна unique `(user_id,episode_id)` explicit resume-точка с stable UUID, title/episode ownership, bounded non-negative seconds, optimistic version и timestamps. Маркер не содержит source URL, provider ID или переведённый label. |
+| `catalog_title_update_states` | Одна unique `(user_id,catalog_title_id)` acknowledgment с последним видимым `release_schedule_entry_id`, timestamp и version. Отсутствующая строка использует semantic library/progress baseline, а не technical title update. |
+| `catalog_collections` / `catalog_collection_items` | Existing stable collection identity, private/unlisted/public visibility и unique collection/title membership. Membership полностью независима от bookmark/status/history/progress/blacklist. |
+
+Status precedence при merge: `dropped > completed > paused > watching > planned`; recommendation feedback — `blacklisted > not_interested`. Merge переносит bookmark/rating/status/feedback, marker, acknowledgment и progress на canonical title/episode, reconciles unique conflicts и сохраняет наиболее значимое состояние. Soft-deleted/inaccessible titles исключаются normal library queries; account delete удаляет owner state через существующие FK/lifecycle, account export включает только safe semantic values и marker positions без media URL.
+
+Индексы добавлены только для выполняемых запросов: marker unique owner/episode, recent owner list и title/episode ownership lookup; update-state unique owner/title. Existing user-state indexes обслуживают owner/status/watchlist/feedback/time queries, existing progress indexes — history/continue/completion. Дубликаты user/title и user/episode до migration audit отсутствовали; additive schema не выполняет destructive backfill и откатывается удалением только новых tables/column.

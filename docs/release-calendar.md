@@ -1,6 +1,6 @@
 # Календарь релизов
 
-Обновлено: 17.07.2026.
+Обновлено: 18.07.2026.
 
 Этот документ — единственный владелец доменного контракта календаря релизов. Он описывает публичное расписание, личный календарь, редакционные правки, уведомления и синхронизацию с импортом. Общие правила публикации каталога остаются в [`DATA_RELATIONS.md`](DATA_RELATIONS.md), кеша — в [`caching.md`](caching.md), уведомлений — в [`notifications.md`](notifications.md), импорта — в [`importer.md`](importer.md).
 
@@ -184,3 +184,9 @@ Migration расширяющая и SQLite-compatible. Перед production mig
 - Автоматический прогноз перевода, recurrence generation, гарантированный pre-release scheduler, iCalendar feed и bulk editor отсутствуют.
 - Отдельные premium/region entitlement tables и provider market timezone отсутствуют; применяется существующая publication/audience/availability boundary.
 - Доступные интерфейсные locale — RU и EN; пользовательский текст и provider labels автоматически не переводятся.
+
+## Интеграция личной библиотеки Task 09
+
+`CatalogPersonalUpdateQuery` не создаёт второй release feed: он применяет существующий `ReleaseScheduleVisibility` к опубликованным/released событиям и сравнивает их с owner/title acknowledgment. New episode/season/translation/subtitle/quality badges используют stable event type, а technical `updated_at`, duplicate source и hidden/unpublished/inaccessible event не считаются личным обновлением.
+
+Первый baseline берётся из semantic bookmark/status/progress activity; acknowledge monotonic и не меняет status или progress. Historical `completed` сохраняется после нового сезона, а новый event остаётся отдельным indicator. `not_interested`/`blacklisted`, notification preferences, Premium/region visibility и existing calendar subscriptions продолжают применяться каноническими boundaries; UI-бейдж не отправляет обязательное уведомление и не требует нового scheduler.

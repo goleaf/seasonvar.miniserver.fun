@@ -276,8 +276,26 @@ Route::middleware(['auth', 'auth.session', 'account.private'])->group(function (
         ->defaults('section', 'watchlist')
         ->name('library.index');
     Route::get('/library/{section}', UserLibraryPage::class)
-        ->whereIn('section', ['watchlist', 'ratings', 'continue-watching', 'history', 'hidden-recommendations'])
+        ->whereIn('section', [
+            'watchlist', 'ratings', 'planned', 'watching', 'paused', 'completed', 'dropped',
+            'not-interested', 'blacklisted', 'with-updates', 'without-updates', 'markers',
+            'continue-watching', 'history', 'hidden-recommendations',
+        ])
         ->name('library.section');
+    Route::get('/{locale}/library', UserLibraryPage::class)
+        ->defaults('section', 'watchlist')
+        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->middleware('collection.locale')
+        ->name('localized.library.index');
+    Route::get('/{locale}/library/{section}', UserLibraryPage::class)
+        ->whereIn('locale', config('catalog-collections.supported_locales', ['ru']))
+        ->whereIn('section', [
+            'watchlist', 'ratings', 'planned', 'watching', 'paused', 'completed', 'dropped',
+            'not-interested', 'blacklisted', 'with-updates', 'without-updates', 'markers',
+            'continue-watching', 'history', 'hidden-recommendations',
+        ])
+        ->middleware('collection.locale')
+        ->name('localized.library.section');
     Route::get('/library/tags/manage', PersonalTagManager::class)
         ->name('personal-tags.index');
     Route::redirect('/watching', '/library/continue-watching')

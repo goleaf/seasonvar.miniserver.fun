@@ -362,6 +362,7 @@ class CatalogPlayerSession {
         this.autoplayCancelButton = this.shell?.querySelector('[data-player-autoplay-cancel]') || null;
         this.autoplayToggle = this.root?.querySelector('[data-player-autoplay-toggle]') || null;
         this.restartButton = this.root?.querySelector('[data-player-restart-episode]') || null;
+        this.saveMarkerButton = this.root?.querySelector('[data-player-save-marker]') || null;
         this.shortcutsOpenButton = this.root?.querySelector('[data-player-shortcuts-open]') || null;
         this.shortcutsDialog = this.shell?.querySelector('[data-player-shortcuts-dialog]') || null;
         this.shortcutsCloseButton = this.shell?.querySelector('[data-player-shortcuts-close]') || null;
@@ -432,6 +433,7 @@ class CatalogPlayerSession {
         this.autoplayCancelButton?.addEventListener('click', () => this.cancelAutoplayCountdown(true), { signal });
         this.autoplayToggle?.addEventListener('click', () => this.toggleAutoplayPreference(), { signal });
         this.restartButton?.addEventListener('click', () => this.requestRestart(), { signal });
+        this.saveMarkerButton?.addEventListener('click', () => this.requestSaveMarker(), { signal });
         this.shortcutsOpenButton?.addEventListener('click', () => this.openShortcutHelp(), { signal });
         this.shortcutsCloseButton?.addEventListener('click', () => this.closeShortcutHelp(), { signal });
         this.root?.addEventListener('click', (event) => this.handleRootClick(event), { capture: true, signal });
@@ -938,6 +940,21 @@ class CatalogPlayerSession {
                 playbackSessionToken: this.playbackSessionToken,
                 complete: () => this.applyRestart(),
                 fail: () => this.showNotice('restartFailed'),
+            },
+        }));
+    }
+
+    requestSaveMarker() {
+        if (!Number.isInteger(this.episodeId) || this.episodeId < 1 || !Number.isFinite(this.video.currentTime)) {
+            return;
+        }
+
+        this.video.dispatchEvent(new CustomEvent('catalog-save-playback-marker', {
+            bubbles: true,
+            detail: {
+                sessionKey: this.sessionKey,
+                episodeId: this.episodeId,
+                positionSeconds: Math.max(0, Math.floor(this.video.currentTime)),
             },
         }));
     }

@@ -8,6 +8,7 @@ enum CatalogWatchStatus: string
 {
     case Planned = 'planned';
     case Watching = 'watching';
+    case Paused = 'paused';
     case Completed = 'completed';
     case Dropped = 'dropped';
 

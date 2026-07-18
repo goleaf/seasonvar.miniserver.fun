@@ -463,6 +463,77 @@ Status: application, route, translation, SEO, sitemap, cache, documentation and 
 - [x] Document locale selection/fallback, translation storage/admin workflow, Livewire lifecycle, cache, SEO and translator validation.
 - [x] Complete the explicitly non-test static/Pint/Vite/docs/diff gate, commit the reviewed Task 01/20 overlap as one coherent change and verify the pushed `main` SHA.
 
+## Task 09 — canonical personal library, statuses, markers and update tracking
+
+Status: repository-wide audit, compatible in-place implementation and manual acceptance are complete on 2026-07-18. This is the single Task 09 plan; it extends the existing owner-scoped user-state, progress, release-calendar and Task 10 collection boundaries instead of introducing a second bookmark, status, history, blacklist, collection or update system.
+
+### Audited baseline and discovered risks
+
+- [x] All tracked Markdown files were read before implementation. Routes, middleware, models, schema, relationships, policies, services, queries, DTOs, Livewire/Blade/Vite, translations, browser/session state, cache, recommendations, release notifications, account export/deletion, import merge and API boundaries were inventoried.
+- [x] `catalog_title_user_states` is the only bookmark/favorite/title-status row and already enforces `(user_id, catalog_title_id)` uniqueness. `in_watchlist` is the lightweight bookmark; visitor terminology «Избранное»/«Буду смотреть» remains a compatibility label, not another table. Intentional future viewing is the independent stable `planned` status.
+- [x] Existing status codes are `planned`, `watching`, `completed`, `dropped`; labels live in the PHP translation catalogs. There is no conflicting status table or translated database value. `paused` is the only required missing code. “Watched” is viewing-history semantics (at least one meaningfully started episode), not a second serial status.
+- [x] `recommendation_feedback` intentionally distinguishes `not_interested` and stronger `blacklisted`; both suppress personalization and release notifications, neither destroys bookmark/status/progress/collection data nor blocks the direct catalog URL. Blacklist wins only when duplicate-title state is reconciled.
+- [x] `episode_view_progress` is the canonical automatic task 08 playback/history row, unique per owner/episode, with bounded event sequence/session concurrency and episode identity independent of source URL. No manual watched source or manual playback-position marker exists. Manual completion must therefore preserve position while remaining distinguishable; one explicit marker per owner/episode is sufficient and avoids speculative multi-marker labels/order.
+- [x] `/library/{section}` is an authenticated/private/no-store/noindex full-page Livewire boundary. It currently exposes watchlist, ratings, continue-watching, history and hidden recommendations only; it lacks localized aliases, status/update/marker navigation, grouped counts and a collection link. Filtering is already URL-bound and paginated but only applied to watchlist/ratings; the Blade contains hard-coded Russian copy and one inline progress width.
+- [x] Task 10 collections are already canonical: stable UUID/slug identity, `private|unlisted|public`, owner policy, unique serial membership, keyboard/touch ordering, public SEO/sitemap, private cache isolation, account export/deletion and title-merge reconciliation. Task 09 will link to that dashboard and preserve membership independence rather than recreate collection CRUD.
+- [x] `release_schedule_entries` is the meaningful content-update source, with explicit episode/season/translation/subtitle/portal-publication/quality types and access-aware visibility. Technical model `updated_at` is not an update. No per-owner/title acknowledgement watermark exists; without one a library cannot represent the exact inverse “with/without updates” or explicit acknowledgement safely.
+- [x] Recommendations and release-calendar notifications already exclude `not_interested`/`blacklisted`, respect current visibility/media access and use stable title identity. No anonymous bookmark/status storage or merge workflow exists, so Task 09 preserves authenticated-only mutations and does not invent anonymous blacklist/collection state.
+- [x] Account export includes canonical title state, progress, collections and release subscriptions; account deletion relies on owner foreign-key cascades after explicit collection/media cleanup. New marker/update-state rows must cascade, export safe fields, and join title/episode identities without URLs.
+- [x] Existing title merge reconciles title state/progress and collection membership. New acknowledgement rows and episode markers must join that transaction and collapse duplicates deterministically before the duplicate title/episode can be removed.
+
+### Canonical domain and transition contract
+
+- Bookmark/favorite is `CatalogTitleUserState::in_watchlist`; add/remove is idempotent and never clears progress, history, status, blacklist or collection membership. `planned` remains the distinct “want to watch” intent.
+- One nullable `CatalogWatchStatus` per owner/title supports stable `planned`, `watching`, `paused`, `completed`, `dropped`. Manual transitions are centralized, authorized and idempotent. Page views never mutate state; meaningful task 08 playback may move only no-status/`planned` to `watching`, while explicit `paused`, `dropped` and `completed` choices are not overwritten. New releases preserve historical `completed` and create an update indicator.
+- “Watched” is derived from canonical progress/history. Manual episode watched/unwatched mutates only completion metadata on the same progress row: watched preserves the existing position/duration, records `manual` completion and creates the row when needed; unwatched clears only manual completion and leaves playback-derived completion/history intact. Playback completion records `playback` provenance.
+- One `EpisodePlaybackMarker` per owner/episode stores opaque UUID, stable title/episode identity and validated position only. Save/update/delete are owner-authorized and idempotent; creating it never changes automatic progress. Resume is explicit, revalidates the marker against the current owner and playable episode, and never stores media/source URLs.
+- One `CatalogTitleUpdateState` per owner/title stores the greatest acknowledged meaningful release ID and timestamp. A missing row uses the latest semantic owner interaction as the historical baseline so old release events do not become false “new” updates. Acknowledgement advances monotonically to the greatest currently visible release; it never rewrites status/progress.
+- Update qualification reuses `ReleaseScheduleVisibility`, released/public events and access rules. The canonical predicate owns both “with updates” and its inverse; hidden/unpublished/deleted/inaccessible premium or regional content cannot qualify. Type summaries are loaded in one grouped query for the current page, never one query per card.
+- Collections remain serial-only and independent. `/library/collections` is a compatibility navigation boundary to `/my/collections`; existing public/private/unlisted policy, cache, ordering and SEO semantics remain authoritative.
+
+### Route, query, privacy, cache and compatibility architecture
+
+- Preserve all existing `/library` routes/names and add only allowlisted status, update and marker sections plus `/{locale}/library...` aliases through the existing locale middleware. Stable codes, never translated labels or user IDs, appear in URL state. Private response middleware supplies `no-store`/`noindex`; personal pages remain absent from sitemaps and public structured data.
+- Extend the existing `UserLibraryQuery`, `LibraryFilters`, summary DTO/query and one Livewire page. Status/watchlist/update/marker rows use deterministic pagination, title visibility subqueries, bounded projections and grouped card hydration. Collections reuse their own dashboard instead of loading collection graphs into the library.
+- Every mutation derives the owner from authentication, revalidates visible title/episode identity, authorizes through the existing catalog/progress policies, validates enum/filter/sort/position allowlists and uses transactions plus bounded rate limiting where abuse is plausible.
+- Personal rows are never shared-cached. Existing public catalog/title/cache domains may be invalidated only through their current targeted services when a public recommendation signal changes; no store-wide flush and no email or raw personal value in cache keys.
+- Additive schema only: nullable completion provenance on progress, an empty one-row-per-owner/episode marker table and an empty one-row-per-owner/title acknowledgement table, with exact uniqueness/order indexes for implemented queries. No legacy backfill, destructive rewrite or source/provider field is required.
+- Compatibility risks: rolling code must fail closed until additive tables/columns exist; old null completion provenance remains valid playback-derived history; mobile/API sync fields stay backward-compatible; imported/title merge workflows preserve stable identities; deleting a bookmark/history/collection item remains independent.
+
+### Phased implementation checklist
+
+- [x] Add enum/model/schema guards and one reversible additive migration with justified uniqueness/order indexes and safe account cascades.
+- [x] Add centralized status transitions, manual completion/marker actions, update acknowledgement/query/presenter and merge/export integration.
+- [x] Extend owner library filters/sorts/counts/pagination and section navigation without per-card queries or full-library PHP filtering.
+- [x] Add localized Livewire controls, status/update/marker states, collection link, responsive single-list layout, focus/live-region/loading/empty/error behavior and remove changed-template inline presentation logic.
+- [x] Add localized aliases and preserve existing private middleware, legacy `/watching`, canonical title links, API/resource fields and collection routes.
+- [x] Update architecture/data/authorization/cache/release/privacy/frontend/deployment documentation, README visitor history, English Task 09 changelog entry and this living plan.
+- [x] Perform the task-authorized non-test static/schema/query/route/translation/security/cache/Vite/browser acceptance and inspect changed/related files. Repository commit/push are performed by the mandatory completion workflow after this evidence is recorded.
+
+### Files expected to change and rollback
+
+Expected: one additive migration; status enum; progress/user/title relations; marker/update-state models; catalog state/transition/marker/update/query services; title merger and account export; one Livewire library page/form and its Blade; title player bridge only where explicit marker/completion controls need it; routes; `ru`/`en` translation catalogs; existing CSS/Vite module only if required; architecture/data/authorization/cache/release/frontend/views/deployment docs, README, this plan and changelog.
+
+Must remain semantically unchanged: catalog/season/episode/media identity and ordering, existing bookmark/rating/progress/history records and public API fields, source grants/player URLs, recommendation scoring candidates, notification preferences/subscriptions, collection tables/routes/policies, public catalog/search/SEO/sitemap routes, Seasonvar import command/provider data and anonymous playback preferences.
+
+Rollback before writes: revert code/assets and roll back the additive migration. After marker/acknowledgement writes, export/backup the new private rows and prefer roll-forward; rollback would remove only manual markers/acknowledgements and provenance, never bookmarks, statuses, progress positions, history, collections, releases or catalog data. Existing `paused` values must be mapped deliberately before rolling code back because an old enum cannot cast that new stable value.
+
+### Final manual verification checklist
+
+- [x] Inspect current/legacy/localized routes, noindex/no-store/sitemap behavior, owner/verified-email mutation boundaries and safe owner-scoped lookup behavior for title/episode/marker IDs.
+- [x] Verify bookmark/favorite/planned/watching/paused/completed/dropped/not-interested/blacklist distinctions, idempotency, centralized transitions and independence from progress/history/collections.
+- [x] Verify manual watched/unwatched provenance, marker validation/resume/delete, source replacement, title/episode merge, account export/deletion and no source URLs/private IDs in HTML or public API.
+- [x] Verify with/without-update exact inversion, type badges, acknowledgement, completed-with-new-content, access visibility, notification preference/exclusion and absence of title `updated_at` false positives.
+- [x] Verify bounded projections/eager loads/grouped counts/stable pagination and index plans; no per-card status/progress/collection/update query, shared personal cache or redundant index. Continue Watching was additionally constrained to bounded latest-owner title batches instead of a catalog-wide episode window.
+- [x] Verify `ru`/`en` key parity, locale hydration/aliases, desktop/mobile/long labels, keyboard/focus/touch targets/live regions/loading/empty/failure states, and absence of `@php`, Blade queries, inline CSS, business JS, dead controls, debug output and duplicate domain code.
+
+### Final verification evidence
+
+- Existing corpus inspection: `1,646,903` title-state rows and `1,600,840` progress rows; zero duplicate user/title states, user/episode progress, marker, acknowledgement or collection membership rows; zero invalid status/feedback/marker-position values. The new marker and acknowledgement tables are initially empty and legacy progress provenance remains nullable.
+- Migration was applied in the current environment and separately verified against a clean temporary SQLite schema: rollback removed exactly both new tables and the progress column; reapply restored two tables, one column, four marker indexes and the acknowledgement unique index.
+- PHP syntax, `Pint`, PHPStan, Blade cache, route/middleware inspection, OpenAPI JSON parsing, RU/EN recursive key parity, documentation refresh check, Composer/npm security audit and Vite production build passed. Automated tests were neither created nor run, as required by Task 09.
+- Managed-Chromium smoke used an isolated current-checkout server. RU watchlist/paused/with-updates/without-updates/markers and EN watching returned `200`, `private, no-store`, `noindex`, no horizontal overflow, duplicate IDs or raw translation keys. Axe reported no serious/critical findings on RU/EN populated views; mobile width remained `390/390`, player manual-watched/save-moment controls rendered, and no local console/page/network failure occurred. External poster/media images were intentionally blocked during the bounded read-only pass.
+
 ## Task 10 — canonical serial collections and curated lists
 
 Status: implementation and disposable-browser acceptance complete; final static release gates, commit and push are in progress on 2026-07-15. This section replaces the former deferred named-collections decision and is the single implementation plan for the collection domain.

@@ -71,7 +71,7 @@ return [
     ],
     'watch_status' => [
         'label' => 'Watch status', 'none' => 'No status', 'planned' => 'Plan to watch',
-        'watching' => 'Watching', 'completed' => 'Completed', 'dropped' => 'Dropped',
+        'watching' => 'Watching', 'paused' => 'Paused', 'completed' => 'Completed', 'dropped' => 'Dropped',
     ],
     'library' => [
         'hidden' => 'Hidden', 'title' => 'Hidden recommendations',

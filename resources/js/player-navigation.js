@@ -36,6 +36,7 @@ const restoreSelectionFromLocation = async (root) => {
         wire.$set('variant', query.get('variant') ?? '', false),
         wire.$set('quality', query.get('quality') ?? '', false),
         wire.$set('format', query.get('format') ?? '', false),
+        wire.$set('marker', query.get('marker') ?? '', false),
     ]);
     await wire.$refresh();
     window.history.replaceState({}, '', targetUrl);
@@ -172,6 +173,15 @@ const bindRoot = (root) => {
         };
 
         void restart();
+    }, { signal });
+    root.addEventListener('catalog-save-playback-marker', (event) => {
+        const detail = event.detail;
+
+        if (!detail || detail.sessionKey !== root.dataset.activePlayerSession) {
+            return;
+        }
+
+        void wireFor(root)?.savePlaybackMarker(detail.episodeId, detail.positionSeconds);
     }, { signal });
     root.addEventListener('click', (event) => {
         const target = event.target instanceof Element ? event.target : null;

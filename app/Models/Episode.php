@@ -87,6 +87,12 @@ class Episode extends Model
         return $this->hasMany(EpisodeViewProgress::class);
     }
 
+    /** @return HasMany<EpisodePlaybackMarker, $this> */
+    public function playbackMarkers(): HasMany
+    {
+        return $this->hasMany(EpisodePlaybackMarker::class);
+    }
+
     /** @return HasMany<Comment, $this> */
     public function comments(): HasMany
     {

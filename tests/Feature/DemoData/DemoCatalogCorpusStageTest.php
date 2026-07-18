@@ -242,7 +242,7 @@ final class DemoCatalogCorpusStageTest extends TestCase
             $states = CatalogTitleUserState::query()->where('user_id', $user->id)->get();
             $this->assertCount(50, $states);
             $this->assertEqualsCanonicalizing(
-                ['planned', 'watching', 'completed', 'dropped'],
+                ['planned', 'watching', 'paused', 'completed', 'dropped'],
                 $states->pluck('watch_status')->map->value->unique()->values()->all(),
             );
             $this->assertSame(2, $states->where('recommendation_feedback.value', 'not_interested')->count());

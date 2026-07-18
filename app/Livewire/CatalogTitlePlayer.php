@@ -11,6 +11,7 @@ use App\DTOs\PlaybackPreferencesData;
 use App\DTOs\PlaybackSettingsData;
 use App\Enums\CatalogWatchStatus;
 use App\Enums\HelpFeature;
+use App\Enums\PlaybackCompletionSource;
 use App\Enums\ReleaseKind;
 use App\Models\CatalogTitle;
 use App\Models\Episode;
@@ -18,11 +19,13 @@ use App\Models\LicensedMedia;
 use App\Models\Season;
 use App\Models\User;
 use App\Services\Auth\AccountSettingsService;
+use App\Services\Catalog\CatalogManualPlaybackService;
 use App\Services\Catalog\CatalogPlaybackProgressSession;
 use App\Services\Catalog\CatalogPlaybackSourceResolver;
 use App\Services\Catalog\CatalogPrimaryActionResolver;
 use App\Services\Catalog\CatalogTitlePlaybackQuery;
 use App\Services\Catalog\CatalogUserStateService;
+use App\Services\Catalog\PlaybackTimeFormatter;
 use App\Services\HelpCenter\HelpContextualLinkService;
 use App\Services\Media\ExternalMediaFileType;
 use App\Services\Media\ExternalMediaMetadata;
@@ -65,6 +68,9 @@ class CatalogTitlePlayer extends Component
     #[Url(except: '')]
     public ?string $format = '';
 
+    #[Url(except: '')]
+    public ?string $marker = '';
+
     #[Locked]
     public int $authorizationVersion = 0;
 
@@ -81,6 +87,10 @@ class CatalogTitlePlayer extends Component
     protected CatalogPlaybackProgressSession $progressSessions;
 
     protected CatalogUserStateService $userState;
+
+    protected CatalogManualPlaybackService $manualPlayback;
+
+    protected PlaybackTimeFormatter $playbackTimes;
 
     protected ExternalMediaMetadata $mediaMetadata;
 
@@ -105,12 +115,17 @@ class CatalogTitlePlayer extends Component
     /** @var Collection<int, Season>|null */
     protected ?Collection $resolvedSeasons = null;
 
+    #[Locked]
+    public ?string $personalPlaybackNotice = null;
+
     public function boot(
         CatalogTitlePlaybackQuery $playback,
         CatalogPrimaryActionResolver $primaryActions,
         CatalogPlaybackSourceResolver $sources,
         CatalogPlaybackProgressSession $progressSessions,
         CatalogUserStateService $userState,
+        CatalogManualPlaybackService $manualPlayback,
+        PlaybackTimeFormatter $playbackTimes,
         ExternalMediaMetadata $mediaMetadata,
         AccountSettingsService $accountSettings,
         LicensedMediaDownloadFilename $downloadFilenames,
@@ -124,6 +139,8 @@ class CatalogTitlePlayer extends Component
         $this->sources = $sources;
         $this->progressSessions = $progressSessions;
         $this->userState = $userState;
+        $this->manualPlayback = $manualPlayback;
+        $this->playbackTimes = $playbackTimes;
         $this->mediaMetadata = $mediaMetadata;
         $this->accountSettings = $accountSettings;
         $this->downloadFilenames = $downloadFilenames;
@@ -443,6 +460,42 @@ class CatalogTitlePlayer extends Component
         $this->userState->setWatchStatus($user, $this->title(), $watchStatus);
     }
 
+    public function setEpisodeWatched(mixed $episodeId, mixed $watched): void
+    {
+        $user = $this->authenticatedUser();
+        $episodeId = $this->positiveId($episodeId);
+        $watched = filter_var($watched, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
+
+        if ($episodeId === null || $watched === null || ! $this->attemptPlaybackAction('manual-watched', 20)) {
+            return;
+        }
+
+        $this->manualPlayback->setWatched($user, $this->title(), $episodeId, $watched);
+        $this->personalPlaybackNotice = __($watched
+            ? 'catalog.player.manual_watched_saved'
+            : 'catalog.player.manual_watched_removed');
+    }
+
+    public function savePlaybackMarker(mixed $episodeId, mixed $positionSeconds): void
+    {
+        $user = $this->authenticatedUser();
+        $episodeId = $this->positiveId($episodeId);
+        $positionSeconds = $this->nonNegativeInteger($positionSeconds);
+
+        if ($episodeId === null || $positionSeconds === null || ! $this->attemptPlaybackAction('marker', 20)) {
+            return;
+        }
+
+        $this->manualPlayback->saveMarker($user, $this->title(), $episodeId, $positionSeconds);
+        $this->personalPlaybackNotice = __('catalog.player.marker_saved');
+    }
+
+    public function deletePlaybackMarker(string $publicId): void
+    {
+        $this->manualPlayback->deleteMarker($this->authenticatedUser(), $publicId);
+        $this->personalPlaybackNotice = __('catalog.player.marker_deleted');
+    }
+
     #[Renderless]
     public function recordProgress(
         mixed $episodeId,
@@ -625,6 +678,22 @@ class CatalogTitlePlayer extends Component
             app()->getLocale(),
             $routeLocale,
         );
+        $selectedProgress = $user !== null && $selectedEpisode !== null
+            ? $this->manualPlayback->progress($user, $title, $selectedEpisode->id)
+            : null;
+        $requestedMarker = $user !== null && $selectedEpisode !== null && is_string($this->marker) && $this->marker !== ''
+            ? $this->manualPlayback->markerFor($user, $title, $selectedEpisode->id, $this->marker)
+            : null;
+
+        if ($this->marker !== '' && $requestedMarker === null) {
+            $this->marker = '';
+        }
+
+        $playbackMarker = $user !== null && $selectedEpisode !== null
+            ? ($requestedMarker ?? $this->manualPlayback->markerFor($user, $title, $selectedEpisode->id))
+            : null;
+        $progressResumePosition = $requestedMarker?->position_seconds
+            ?? ($primaryAction->episodeId === $selectedEpisode?->id ? $primaryAction->positionSeconds : 0);
 
         return view('livewire.catalog-title-player', [
             'title' => $title,
@@ -642,12 +711,19 @@ class CatalogTitlePlayer extends Component
             'authorizationVersion' => $this->authorizationVersion,
             'autoplayCountdownSeconds' => max(3, min(30, (int) config('playback.autoplay_countdown_seconds', 8))),
             'progressSessionToken' => $progressSessionToken,
+            'progressResumePosition' => $progressResumePosition,
             'mediaItems' => $mediaItems,
             'showView' => $showView,
             'inWatchlist' => (bool) ($state->in_watchlist ?? false),
             'userRating' => $state?->rating,
             'watchStatus' => $state?->watch_status,
             'watchStatusOptions' => CatalogWatchStatus::cases(),
+            'selectedEpisodeManualWatched' => $selectedProgress?->completion_source === PlaybackCompletionSource::Manual,
+            'selectedEpisodeCompleted' => $selectedProgress?->completed_at !== null,
+            'playbackMarker' => $playbackMarker,
+            'playbackMarkerPositionLabel' => $playbackMarker !== null
+                ? $this->playbackTimes->compact($playbackMarker->position_seconds)
+                : null,
             'recommendationStateAvailable' => Schema::hasColumns('catalog_title_user_states', ['watch_status', 'watch_status_version']),
             'userStateSummary' => $stateSummary,
             'ratingOptions' => $this->userState->ratingOptions(),
@@ -890,6 +966,8 @@ class CatalogTitlePlayer extends Component
     {
         $this->failedMediaIds = [];
         $this->authorizationVersion = 0;
+        $this->marker = '';
+        $this->personalPlaybackNotice = null;
         $this->resetErrorBag('playback');
     }
 

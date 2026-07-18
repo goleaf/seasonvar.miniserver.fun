@@ -1,6 +1,6 @@
 # API
 
-Обновлено: 16.07.2026
+Обновлено: 18.07.2026
 
 ## Версии и discovery
 
@@ -189,3 +189,9 @@ Manifest в sync API — API change manifest, не Web App Manifest. `offline mu
 `POST /api/v1/titles/{titleSlug}/playback-sessions` остаётся единственным mobile context resolver: validated stable episode/media selection, canonical navigation, safe media metadata, progress token only for verified owner и short-lived signed API grant. `GET /api/v1/playback/{licensedMedia}` повторно проверяет signed opaque grant и entitlement. `PUT .../episodes/{episode}/progress` использует authenticated user, session/sequence и stable episode identity; user ID/source URL из request не доверяются.
 
 Task 07 не переименовывает route/API fields и не раскрывает raw provider URL, full model, preferences, private entitlement или issue diagnostics. Web autoplay/fallback bridge не становится high-frequency API. Full contract: [`audits/video-playback-report.md`](audits/video-playback-report.md).
+
+## Personal-library API compatibility Task 09
+
+Existing `/api/v1/me` library/title-state/sync resources remain the mobile compatibility boundary; no second marker, blacklist or collection API was added. `watch_status` accepts/returns stable `planned|watching|paused|completed|dropped|null`; bookmark remains `in_watchlist`, feedback remains `not_interested|blacklisted|null`, and optimistic version fields keep their names. OpenAPI mirrors the additive `paused` enum without translated values.
+
+Manual markers and personal update acknowledgments are currently web/Livewire owner actions and are absent from public API payloads. Public title resources never expose exact progress, marker position, blacklist, acknowledgment or private collection membership; authenticated resources derive owner from Sanctum/session and remain `private, no-store`.

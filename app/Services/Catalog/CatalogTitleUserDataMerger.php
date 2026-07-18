@@ -7,8 +7,10 @@ namespace App\Services\Catalog;
 use App\Enums\CatalogRecommendationFeedback;
 use App\Enums\CatalogWatchStatus;
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleUpdateState;
 use App\Models\CatalogTitleUserState;
 use App\Models\Episode;
+use App\Models\EpisodePlaybackMarker;
 use App\Models\EpisodeViewProgress;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Schema;
@@ -96,8 +98,9 @@ final class CatalogTitleUserDataMerger
                         [
                             CatalogWatchStatus::Planned->value => 1,
                             CatalogWatchStatus::Watching->value => 2,
-                            CatalogWatchStatus::Completed->value => 3,
-                            CatalogWatchStatus::Dropped->value => 4,
+                            CatalogWatchStatus::Paused->value => 3,
+                            CatalogWatchStatus::Completed->value => 4,
+                            CatalogWatchStatus::Dropped->value => 5,
                         ],
                     );
                     $updates['recommendation_feedback'] = $feedback['value'];
@@ -127,6 +130,47 @@ final class CatalogTitleUserDataMerger
                 'catalog_title_id' => $canonical->id,
                 'updated_at' => now(),
             ]);
+
+        if (Schema::hasTable('episode_playback_markers')) {
+            EpisodePlaybackMarker::query()
+                ->where('catalog_title_id', $duplicate->id)
+                ->update(['catalog_title_id' => $canonical->id, 'updated_at' => now()]);
+        }
+
+        if (Schema::hasTable('catalog_title_update_states')) {
+            CatalogTitleUpdateState::query()
+                ->where('catalog_title_id', $duplicate->id)
+                ->eachById(function (CatalogTitleUpdateState $incoming) use ($canonical): void {
+                    $existing = CatalogTitleUpdateState::query()
+                        ->where('catalog_title_id', $canonical->id)
+                        ->where('user_id', $incoming->user_id)
+                        ->first();
+
+                    if ($existing === null) {
+                        $incoming->forceFill(['catalog_title_id' => $canonical->id])->save();
+
+                        return;
+                    }
+
+                    $useIncoming = $incoming->acknowledged_release_id > $existing->acknowledged_release_id
+                        || ($incoming->acknowledged_release_id === $existing->acknowledged_release_id
+                            && $incoming->acknowledged_at !== null
+                            && ($existing->acknowledged_at === null
+                                || $incoming->acknowledged_at->isAfter($existing->acknowledged_at)));
+                    $existing->forceFill([
+                        'acknowledged_release_id' => max(
+                            $existing->acknowledged_release_id,
+                            $incoming->acknowledged_release_id,
+                        ),
+                        'acknowledged_at' => $useIncoming
+                            ? $incoming->acknowledged_at
+                            : $existing->acknowledged_at,
+                        'version' => max($existing->version, $incoming->version),
+                    ])->save();
+
+                    $incoming->delete();
+                });
+        }
     }
 
     public function moveEpisode(
@@ -177,6 +221,9 @@ final class CatalogTitleUserDataMerger
                         $existing->completed_at,
                         $incoming->completed_at,
                     ])->filter()->min(),
+                    ...(Schema::hasColumn('episode_view_progress', 'completion_source') ? [
+                        'completion_source' => $this->mergedCompletionSource($existing, $incoming),
+                    ] : []),
                     'last_watched_at' => collect([
                         $existing->last_watched_at,
                         $incoming->last_watched_at,
@@ -184,6 +231,54 @@ final class CatalogTitleUserDataMerger
                 ])->save();
                 $incoming->delete();
             });
+
+        if (Schema::hasTable('episode_playback_markers')) {
+            EpisodePlaybackMarker::query()
+                ->where('episode_id', $duplicate->id)
+                ->eachById(function (EpisodePlaybackMarker $incoming) use ($duplicate, $canonical, $canonicalTitle): void {
+                    if ($duplicate->is($canonical)) {
+                        $incoming->forceFill(['catalog_title_id' => $canonicalTitle->id])->save();
+
+                        return;
+                    }
+
+                    $existing = EpisodePlaybackMarker::query()
+                        ->where('episode_id', $canonical->id)
+                        ->where('user_id', $incoming->user_id)
+                        ->first();
+
+                    if ($existing === null) {
+                        $incoming->forceFill([
+                            'catalog_title_id' => $canonicalTitle->id,
+                            'episode_id' => $canonical->id,
+                        ])->save();
+
+                        return;
+                    }
+
+                    $useIncoming = $incoming->updated_at?->isAfter($existing->updated_at) === true;
+                    $existing->forceFill([
+                        'catalog_title_id' => $canonicalTitle->id,
+                        'position_seconds' => $useIncoming
+                            ? $incoming->position_seconds
+                            : $existing->position_seconds,
+                        'version' => max($existing->version, $incoming->version),
+                    ])->save();
+
+                    $incoming->delete();
+                });
+        }
+    }
+
+    private function mergedCompletionSource(
+        EpisodeViewProgress $existing,
+        EpisodeViewProgress $incoming,
+    ): mixed {
+        if ($existing->completion_source?->value === 'manual' || $incoming->completion_source?->value === 'manual') {
+            return 'manual';
+        }
+
+        return $existing->completion_source ?? $incoming->completion_source;
     }
 
     private function advancedProgress(

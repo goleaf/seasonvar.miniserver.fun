@@ -97,7 +97,7 @@
                                 data-player-authorization-version="{{ $authorizationVersion }}"
                                 data-progress-episode="{{ $selectedEpisode?->id }}"
                                 data-progress-session="{{ $progressSessionToken }}"
-                                data-progress-position="{{ $primaryAction->episodeId === $selectedEpisode?->id ? $primaryAction->positionSeconds : 0 }}"
+                                data-progress-position="{{ $progressResumePosition }}"
                                 data-progress-enabled="{{ $canInteract ? '1' : '0' }}"
                                 data-account-autoplay="{{ $accountPlaybackPreferences['autoplay'] ? '1' : '0' }}"
                                 data-account-remember-volume="{{ $accountPlaybackPreferences['rememberVolume'] ? '1' : '0' }}"
@@ -393,6 +393,53 @@
                             <p class="text-sm font-semibold text-rose-700">{{ $message }}</p>
                         @enderror
                     </div>
+                    @if ($selectedEpisode)
+                        <div class="mt-3 grid gap-3 border-t border-slate-200 pt-3 sm:grid-cols-2 lg:grid-cols-3">
+                            @if ($selectedEpisodeManualWatched || ! $selectedEpisodeCompleted)
+                                <button
+                                    type="button"
+                                    wire:click="setEpisodeWatched({{ $selectedEpisode->id }}, {{ $selectedEpisodeManualWatched ? 'false' : 'true' }})"
+                                    wire:loading.attr="disabled"
+                                    wire:target="setEpisodeWatched"
+                                    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-60"
+                                >
+                                    <x-ui.icon name="{{ $selectedEpisodeManualWatched ? 'fa-solid fa-rotate-left' : 'fa-solid fa-circle-check' }}" />
+                                    <span>{{ $selectedEpisodeManualWatched ? __('catalog.player.remove_watched') : __('catalog.player.mark_watched') }}</span>
+                                </button>
+                            @else
+                                <div class="flex min-h-11 items-center justify-center gap-2 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800" role="status">
+                                    <x-ui.icon name="fa-solid fa-circle-check" />
+                                    <span>{{ __('catalog.player.watched') }}</span>
+                                </div>
+                            @endif
+
+                            @if ($playbackSourceIsPlayable)
+                                <button
+                                    type="button"
+                                    data-player-save-marker
+                                    wire:loading.attr="disabled"
+                                    wire:target="savePlaybackMarker"
+                                    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-control bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-60"
+                                >
+                                    <x-ui.icon name="fa-solid fa-location-dot" />
+                                    <span>{{ __('catalog.player.save_moment') }}</span>
+                                </button>
+                            @endif
+
+                            @if ($playbackMarker)
+                                <div class="flex flex-wrap items-center justify-between gap-2 rounded-control bg-white px-3 py-2 text-sm text-slate-600 sm:col-span-2 lg:col-span-1">
+                                    <span class="font-bold">{{ __('catalog.player.saved_moment', ['position' => $playbackMarkerPositionLabel]) }}</span>
+                                    <button type="button" wire:click="deletePlaybackMarker('{{ $playbackMarker->public_id }}')" wire:confirm="{{ __('catalog.player.delete_moment_confirm') }}" class="inline-flex min-h-11 items-center gap-2 rounded-control px-3 py-2 font-bold text-rose-700 hover:bg-rose-50">
+                                        <x-ui.icon name="fa-solid fa-trash-can" />
+                                        <span>{{ __('catalog.player.delete_moment') }}</span>
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+                    @if ($personalPlaybackNotice)
+                        <p class="mt-3 rounded-control bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800" role="status" aria-live="polite">{{ $personalPlaybackNotice }}</p>
+                    @endif
                 @elseif ($isAuthenticated)
                     <div class="mt-3 rounded-control border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
                         <p class="font-bold">{{ __('catalog.player.verification_title') }}</p>

@@ -1,6 +1,6 @@
 # Кеширование и Redis/Memcached
 
-Обновлено: 17.07.2026
+Обновлено: 18.07.2026
 
 Production rollout 15.07.2026 подтвердил, что исторические `cache-warm` envelopes имеют истёкший `retryUntil`: Laravel отклоняет их до application `handle()`, поэтому no-op compatibility не может безопасно drain-ить эту очередь. Pending/failed legacy payload не удаляются и не retry-ятся автоматически. Новый coalesced intent, heartbeat и единственный worker используют `cache-warm-v2`; job не публикует absolute retry deadline и ограничивает реальные ошибки тремя attempts. Redis/Memcached transports остаются раздельными, а отсутствие evictions не является доказательством корректной инвалидации.
 
@@ -321,3 +321,9 @@ Mutation после commit повышает HelpCenter/SearchSuggestions, scoped
 Playback использует существующие versioned title/catalog/API/sitemap domains и guest HTML signed-link transformer; отдельный store/key/domain не создан. Public episode metadata/source summaries без private URL могут жить только в существующем title scope. Signed grants, raw providers, user progress, playback session, account/device preferences, failed-source IDs, audience/Premium/region/age decision и private playback context никогда не shared-cache-ятся.
 
 Source publication/health/profile/import/admin mutation сохраняет targeted invalidation. Progress/restart публикуют owner sync и только material recommendation signal; global flush не выполняется. TTL кеша никогда не продлевает grant TTL. Полный key/privacy/invalidation contract: [`audits/video-playback-report.md`](audits/video-playback-report.md).
+
+## Cache lifecycle личной библиотеки Task 09
+
+Library HTML, counters, bookmarks, statuses, feedback, markers, progress, acknowledgments, private collection membership и filters всегда читаются owner-scoped и `private, no-store`; отдельный cache store/domain и глобальный user-state cache не добавлены. Public title/card metadata может переиспользовать существующие catalog versions, но owner overlay накладывается после shared boundary и никогда не записывается в public payload.
+
+Bookmark/status/feedback/marker/acknowledgment/progress mutations используют существующие targeted title/user/recommendation/sync invalidators либо читаются непосредственно на следующем private request. Collection mutations остаются в collection cache lifecycle; смена public → private немедленно инвалидирует public collection scopes. Global flush, wildcard scan, email в key, shared signed URL и смешивание private/public collection payload запрещены.

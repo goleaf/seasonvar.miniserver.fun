@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Services\Auth;
 
 use App\Models\CatalogTitle;
+use App\Models\CatalogTitleUpdateState;
 use App\Models\CatalogTitleUserState;
+use App\Models\EpisodePlaybackMarker;
 use App\Models\EpisodeViewProgress;
 use App\Models\User;
 use App\Models\UserTag;
+use App\Services\Catalog\PersonalLibrarySchema;
 use App\Services\Collections\CatalogCollectionAccountService;
 use App\Services\Comments\CommentAccountService;
 use App\Services\ContentRequests\ContentRequestAccountService;
@@ -31,6 +34,7 @@ final class AccountDataExportService
         private readonly PremiumAccountService $premium,
         private readonly HelpAccountService $helpCenter,
         private readonly AccountSettingsService $settings,
+        private readonly PersonalLibrarySchema $personalLibrarySchema,
     ) {}
 
     /** @return array<string, mixed> */
@@ -111,6 +115,9 @@ final class AccountDataExportService
                     'watch_status' => $state->watch_status?->value,
                     'recommendation_feedback' => $state->recommendation_feedback?->value,
                     'recommendation_feedback_updated_at' => $state->recommendation_feedback_updated_at?->toAtomString(),
+                    'watchlist_updated_at' => $state->watchlist_updated_at?->toAtomString(),
+                    'rating_updated_at' => $state->rating_updated_at?->toAtomString(),
+                    'watch_status_updated_at' => $state->watch_status_updated_at?->toAtomString(),
                     'updated_at' => $state->updated_at?->toAtomString(),
                 ])->all(),
             'view_progress' => EpisodeViewProgress::query()
@@ -127,8 +134,54 @@ final class AccountDataExportService
                     'duration_seconds' => $progress->duration_seconds,
                     'progress_percent' => $progress->progress_percent,
                     'completed_at' => $progress->completed_at?->toAtomString(),
+                    'completion_source' => $progress->completion_source?->value,
                     'last_watched_at' => $progress->last_watched_at->toAtomString(),
                 ])->all(),
+            'playback_markers' => $this->playbackMarkers($user),
+            'library_update_acknowledgements' => $this->updateAcknowledgements($user),
         ];
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function playbackMarkers(User $user): array
+    {
+        if (! $this->personalLibrarySchema->ready()) {
+            return [];
+        }
+
+        return EpisodePlaybackMarker::query()
+            ->whereBelongsTo($user)
+            ->with(['catalogTitle:id,slug,title', 'episode:id,season_id,number,title'])
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn (EpisodePlaybackMarker $marker): array => [
+                'public_id' => $marker->public_id,
+                'title_slug' => $marker->catalogTitle?->slug,
+                'title' => $marker->catalogTitle?->title,
+                'episode_number' => $marker->episode?->number,
+                'position_seconds' => $marker->position_seconds,
+                'created_at' => $marker->created_at?->toAtomString(),
+                'updated_at' => $marker->updated_at?->toAtomString(),
+            ])->all();
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function updateAcknowledgements(User $user): array
+    {
+        if (! $this->personalLibrarySchema->ready()) {
+            return [];
+        }
+
+        return CatalogTitleUpdateState::query()
+            ->whereBelongsTo($user)
+            ->with('catalogTitle:id,slug,title')
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn (CatalogTitleUpdateState $state): array => [
+                'title_slug' => $state->catalogTitle?->slug,
+                'title' => $state->catalogTitle?->title,
+                'acknowledged_release_id' => $state->acknowledged_release_id,
+                'acknowledged_at' => $state->acknowledged_at?->toAtomString(),
+            ])->all();
     }
 }

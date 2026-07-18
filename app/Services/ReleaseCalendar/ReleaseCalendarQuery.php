@@ -200,6 +200,7 @@ final readonly class ReleaseCalendarQuery
                             ->orWhereIn('watch_status', [
                                 CatalogWatchStatus::Planned->value,
                                 CatalogWatchStatus::Watching->value,
+                                CatalogWatchStatus::Paused->value,
                                 CatalogWatchStatus::Completed->value,
                             ]);
                     })

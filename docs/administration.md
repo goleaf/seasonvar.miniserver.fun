@@ -1,6 +1,6 @@
 # Управление каталогом
 
-Обновлено: 16.07.2026
+Обновлено: 18.07.2026
 
 ## Доступ и границы
 
@@ -129,3 +129,9 @@ Editor не задаёт произвольный route/class/HTML/CSS/media URL
 Existing catalog administration остаётся единственной write surface для source status, health, priority, format, quality, translation/variant/type, subtitle flag, audience и availability window. Каждая mutation авторизуется и сохраняет importer/editorial ownership; provider credentials/raw response не выводятся в списках. Technical issue source action проходит отдельную Task 20 staff boundary и не отключает source после одного client failure.
 
 Отдельные audio tracks, subtitle bodies/languages, Premium source feature, region-country и age-profile rules не добавлены, поскольку текущие schema/importer не могут управлять ими правдиво. При появлении таких данных сначала расширяются canonical source/import/admin contracts, затем player DTO. Подробности: [`audits/video-playback-report.md`](audits/video-playback-report.md).
+
+## Administration boundary личной библиотеки Task 09
+
+Bookmark, status, feedback/blacklist, exact progress, markers и acknowledgments являются owner-private состоянием и не получают общего staff editor/list. Existing catalog admin управляет только title/episode/media publication и canonical release events; collection moderation сохраняет существующие отдельные policy/gates. Изменение контента отражается в personal update query через visibility и release identity, а не через ручное редактирование пользовательских строк.
+
+Merge tooling обязано вызывать existing `CatalogTitleUserDataMerger` до удаления duplicate identity. Администратор не может через UI подменить owner ID, открыть private marker или сбросить progress; account export/delete выполняются владельцем через existing privacy workflow.
