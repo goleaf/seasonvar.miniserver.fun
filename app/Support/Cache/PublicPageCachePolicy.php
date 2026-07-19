@@ -53,13 +53,6 @@ final class PublicPageCachePolicy
         'format',
     ];
 
-    private const COLLECTION_QUERY_KEYS = [
-        'page',
-        'collectionsPage',
-        'profileCollectionsPage',
-        'sort',
-    ];
-
     private const CONTENT_REQUEST_QUERY_KEYS = [
         'requestsPage',
         'type',
@@ -139,7 +132,6 @@ final class PublicPageCachePolicy
                 ? new PublicPageCacheContext(CacheDomain::CatalogStats, $dimensions)
                 : null,
             'title' => $this->titleContext($request, $dimensions),
-            'collections' => new PublicPageCacheContext(CacheDomain::Collections, $dimensions),
             'requests' => $this->contentRequestContext($request, $dimensions),
             'discovery' => $this->discoveryContext($request, $dimensions),
             'calendar' => new PublicPageCacheContext(CacheDomain::ReleaseCalendar, $dimensions),
@@ -215,7 +207,9 @@ final class PublicPageCachePolicy
 
         $query = $request->query();
 
-        if (array_key_exists('q', $query) || ($profile !== 'calendar' && array_key_exists('title', $query))) {
+        if (array_key_exists('q', $query)
+            || array_key_exists('collections_q', $query)
+            || ($profile !== 'calendar' && array_key_exists('title', $query))) {
             return null;
         }
 
@@ -226,9 +220,8 @@ final class PublicPageCachePolicy
                 ...array_keys(CatalogSeriesFilters::TAXONOMY_PROPERTIES),
             ])),
             'title' => self::TITLE_QUERY_KEYS,
-            'collections' => self::COLLECTION_QUERY_KEYS,
             'requests' => self::CONTENT_REQUEST_QUERY_KEYS,
-            'discovery' => ['page'],
+            'discovery' => ['page', 'collectionsPage', 'collections_sort'],
             'calendar' => ['calendarPage', 'type', 'status', 'sort', 'title'],
             default => null,
         };

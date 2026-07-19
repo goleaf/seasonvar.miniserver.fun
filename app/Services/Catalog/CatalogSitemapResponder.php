@@ -108,7 +108,6 @@ class CatalogSitemapResponder
             }
 
             $this->writeSitemapUrl(route('titles.index'), now(), 'daily', '0.9');
-            $this->writeSitemapUrl(route('collections.index'), now(), 'daily', '0.8');
 
             foreach (CatalogTopListCategory::cases() as $category) {
                 if (! $this->topLists->hasItems($category)) {
@@ -644,7 +643,7 @@ class CatalogSitemapResponder
             echo "## Основные URL\n\n";
             echo '- Главная: '.route('home')."\n";
             echo '- Каталог: '.route('titles.index')."\n";
-            echo '- Подборки: '.route('collections.index')."\n";
+            echo '- Подборки: '.route('discover.index', ['type' => 'popular']).'#collections'."\n";
             echo '- Сериалы текущего года: '.route('titles.year', ['year' => now()->year])."\n";
             echo '- Карта посадочных страниц: '.route('sitemap.landings')."\n";
             echo '- Индекс карты сайта: '.route('sitemap.index')."\n";

@@ -87,7 +87,7 @@ final class AppLayoutData
                 'discover.index',
                 'fa-solid fa-compass',
                 __('recommendations.navigation.discover'),
-                $this->request->routeIs('discover.*', 'localized.discover.*'),
+                $this->request->routeIs('discover.*', 'localized.discover.*', 'collections.show', 'localized.collections.show', 'profiles.collections', 'localized.profiles.collections'),
                 ['type' => 'popular'],
             );
         }
@@ -108,15 +108,6 @@ final class AppLayoutData
                 __('top_lists.navigation'),
                 $this->request->routeIs('top.*', 'localized.top.*'),
                 ['category' => 'movies'],
-            );
-        }
-
-        if ($this->router->has('collections.index')) {
-            $layoutHeaderNavigation[] = $this->headerLink(
-                'collections.index',
-                'fa-solid fa-layer-group',
-                __('collections.navigation.collections'),
-                $this->request->routeIs('collections.index', 'collections.show', 'localized.collections.*', 'profiles.collections'),
             );
         }
 
@@ -210,12 +201,12 @@ final class AppLayoutData
                 );
             }
 
-            if ($canManageCatalog && $this->router->has('admin.collections')) {
+            if ($canManageCatalog && $this->router->has('admin.catalog')) {
                 $layoutHeaderNavigation[] = $this->headerLink(
-                    'admin.collections',
+                    'admin.catalog',
                     'fa-solid fa-list-check',
                     __('collections.navigation.admin'),
-                    $this->request->routeIs('admin.collections'),
+                    $this->request->routeIs('admin.catalog'),
                 );
             }
             if ($canManageComments && $this->router->has('admin.comments')) {
@@ -310,7 +301,7 @@ final class AppLayoutData
                 'discover.index',
                 'fa-solid fa-compass text-slate-400',
                 __('recommendations.navigation.discover'),
-                $this->request->routeIs('discover.*', 'localized.discover.*'),
+                $this->request->routeIs('discover.*', 'localized.discover.*', 'collections.show', 'localized.collections.show', 'profiles.collections', 'localized.profiles.collections'),
                 ['type' => 'popular'],
             );
         }
@@ -331,15 +322,6 @@ final class AppLayoutData
                 __('top_lists.navigation'),
                 $this->request->routeIs('top.*', 'localized.top.*'),
                 ['category' => 'movies'],
-            );
-        }
-
-        if ($this->router->has('collections.index')) {
-            $layoutFooterNavigation[] = $this->footerLink(
-                'collections.index',
-                'fa-solid fa-layer-group text-slate-400',
-                __('collections.navigation.collections'),
-                $this->request->routeIs('collections.*', 'localized.collections.*'),
             );
         }
 
