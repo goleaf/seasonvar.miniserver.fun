@@ -23,6 +23,7 @@ use App\Services\Catalog\CatalogTitleQuery;
 use App\Services\Catalog\CatalogUserCardStateLoader;
 use App\Services\Catalog\Search\CatalogSearchNormalizer;
 use App\Services\Comments\CommentRelationshipService;
+use App\Services\UserPortal\UserPortalCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -37,6 +38,7 @@ final class CatalogCollectionQuery
         private readonly CatalogSearchNormalizer $search,
         private readonly CatalogCollectionSchema $schema,
         private readonly CommentRelationshipService $relationships,
+        private readonly UserPortalCache $userPortalCache,
     ) {}
 
     /** @return LengthAwarePaginator<int, CatalogCollection> */
@@ -153,24 +155,35 @@ final class CatalogCollectionQuery
     }
 
     /** @return array{total: int, public: int, unlisted: int, private: int} */
-    public function ownerCounts(User $owner): array
+    public function ownerCounts(User $owner, bool $refresh = false): array
     {
         if (! $this->schema->available()) {
             return ['total' => 0, 'public' => 0, 'unlisted' => 0, 'private' => 0];
         }
 
-        $counts = CatalogCollection::query()
-            ->where('owner_id', $owner->id)
-            ->selectRaw('visibility, COUNT(*) as aggregate')
-            ->groupBy('visibility')
-            ->pluck('aggregate', 'visibility');
+        /** @var array{total: int, public: int, unlisted: int, private: int} $snapshot */
+        $snapshot = $this->userPortalCache->remember(
+            $owner,
+            'profile-collection-counts',
+            ['projection' => 'visibility-counts-v1'],
+            function () use ($owner): array {
+                $counts = CatalogCollection::query()
+                    ->where('owner_id', $owner->id)
+                    ->selectRaw('visibility, COUNT(*) as aggregate')
+                    ->groupBy('visibility')
+                    ->pluck('aggregate', 'visibility');
 
-        return [
-            'total' => (int) $counts->sum(),
-            'public' => (int) ($counts[CatalogCollectionVisibility::Public->value] ?? 0),
-            'unlisted' => (int) ($counts[CatalogCollectionVisibility::Unlisted->value] ?? 0),
-            'private' => (int) ($counts[CatalogCollectionVisibility::Private->value] ?? 0),
-        ];
+                return [
+                    'total' => (int) $counts->sum(),
+                    'public' => (int) ($counts[CatalogCollectionVisibility::Public->value] ?? 0),
+                    'unlisted' => (int) ($counts[CatalogCollectionVisibility::Unlisted->value] ?? 0),
+                    'private' => (int) ($counts[CatalogCollectionVisibility::Private->value] ?? 0),
+                ];
+            },
+            $refresh,
+        );
+
+        return $snapshot;
     }
 
     /** @return Collection<int, CatalogCollection> */
@@ -200,9 +213,13 @@ final class CatalogCollectionQuery
             return collect();
         }
 
+        $collectionIds = CatalogCollectionItem::query()
+            ->where('catalog_title_id', $titleId)
+            ->select('catalog_collection_id');
+
         return $this->summaryQuery()
             ->publiclyListed()
-            ->whereHas('items', fn (Builder $query): Builder => $query->where('catalog_title_id', $titleId))
+            ->whereIn('catalog_collections.id', $collectionIds)
             ->orderByDesc('is_featured')
             ->orderByDesc('updated_at')
             ->orderByDesc('id')

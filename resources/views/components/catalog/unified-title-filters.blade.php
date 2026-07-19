@@ -33,15 +33,15 @@
                 <div class="mt-3 flex flex-wrap items-end gap-2 sm:gap-3">
                     <label class="min-w-28 flex-1 text-xs font-bold text-slate-600 sm:flex-none">
                         <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.year_from') }}</span>
-                        <input type="number" wire:model="filters.yearFrom" name="year_from" min="1900" max="{{ $filterView->maximumCatalogYear() }}" value="{{ $filterView->scalarState('year_from') }}" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-28">
+                        <input type="number" wire:model.live="filters.yearFrom" name="year_from" min="1900" max="{{ $filterView->maximumCatalogYear() }}" value="{{ $filterView->scalarState('year_from') }}" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-28">
                     </label>
                     <label class="min-w-28 flex-1 text-xs font-bold text-slate-600 sm:flex-none">
                         <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.year_to') }}</span>
-                        <input type="number" wire:model="filters.yearTo" name="year_to" min="1900" max="{{ $filterView->maximumCatalogYear() }}" value="{{ $filterView->scalarState('year_to') }}" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-28">
+                        <input type="number" wire:model.live="filters.yearTo" name="year_to" min="1900" max="{{ $filterView->maximumCatalogYear() }}" value="{{ $filterView->scalarState('year_to') }}" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-28">
                     </label>
                     <label class="w-full text-xs font-bold text-slate-600 sm:w-auto">
                         <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.updated') }}</span>
-                        <select wire:model="filters.updated" name="updated" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-56">
+                        <select wire:model.live="filters.updated" name="updated" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-56">
                             <option value="">{{ __('catalog.catalog.exact_filters.any_time') }}</option>
                             <option value="day" @selected($filterView->scalarState('updated') === 'day')>{{ __('catalog.catalog.exact_filters.updated_day') }}</option>
                             <option value="week" @selected($filterView->scalarState('updated') === 'week')>{{ __('catalog.catalog.exact_filters.updated_week') }}</option>
@@ -65,22 +65,22 @@
                         <span class="w-full text-xs font-black text-slate-700 sm:w-16">{{ __('catalog.catalog.exact_filters.seasons') }}</span>
                         <label class="min-w-24 flex-1 text-xs font-bold text-slate-500 sm:flex-none">
                             <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.from') }}</span>
-                            <input type="number" wire:model="filters.seasonsMin" name="seasons_min" min="0" value="{{ $filterView->scalarState('seasons_min') }}" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-24">
+                            <input type="number" wire:model.live="filters.seasonsMin" name="seasons_min" min="0" value="{{ $filterView->scalarState('seasons_min') }}" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-24">
                         </label>
                         <label class="min-w-24 flex-1 text-xs font-bold text-slate-500 sm:flex-none">
                             <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.to') }}</span>
-                            <input type="number" wire:model="filters.seasonsMax" name="seasons_max" min="0" value="{{ $filterView->scalarState('seasons_max') }}" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-24">
+                            <input type="number" wire:model.live="filters.seasonsMax" name="seasons_max" min="0" value="{{ $filterView->scalarState('seasons_max') }}" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-24">
                         </label>
                     </div>
                     <div class="flex flex-wrap items-end gap-2 sm:gap-3">
                         <span class="w-full text-xs font-black text-slate-700 sm:w-16">{{ __('catalog.catalog.exact_filters.episodes') }}</span>
                         <label class="min-w-28 flex-1 text-xs font-bold text-slate-500 sm:flex-none">
                             <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.from') }}</span>
-                            <input type="number" wire:model="filters.episodesMin" name="episodes_min" min="0" value="{{ $filterView->scalarState('episodes_min') }}" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-28">
+                            <input type="number" wire:model.live="filters.episodesMin" name="episodes_min" min="0" value="{{ $filterView->scalarState('episodes_min') }}" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-28">
                         </label>
                         <label class="min-w-28 flex-1 text-xs font-bold text-slate-500 sm:flex-none">
                             <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.to') }}</span>
-                            <input type="number" wire:model="filters.episodesMax" name="episodes_max" min="0" value="{{ $filterView->scalarState('episodes_max') }}" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-28">
+                            <input type="number" wire:model.live="filters.episodesMax" name="episodes_max" min="0" value="{{ $filterView->scalarState('episodes_max') }}" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-28">
                         </label>
                     </div>
                 </div>
@@ -97,7 +97,7 @@
                 <div class="mt-3 flex flex-wrap items-end gap-2 sm:gap-3">
                     <label class="w-full text-xs font-bold text-slate-600 sm:w-auto">
                         <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.source') }}</span>
-                        <select wire:model="filters.ratingSource" name="rating_source" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-52">
+                        <select wire:model.live="filters.ratingSource" name="rating_source" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-52">
                             <option value="">{{ __('catalog.catalog.exact_filters.any_source') }}</option>
                             <option value="kinopoisk" @selected($filterView->scalarState('rating_source') === 'kinopoisk')>{{ __('catalog.catalog.advanced_filter_values.rating_kinopoisk') }}</option>
                             <option value="imdb" @selected($filterView->scalarState('rating_source') === 'imdb')>{{ __('catalog.catalog.advanced_filter_values.rating_imdb') }}</option>
@@ -105,11 +105,11 @@
                     </label>
                     <label class="min-w-24 flex-1 text-xs font-bold text-slate-600 sm:flex-none">
                         <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.rating_from') }}</span>
-                        <input type="number" wire:model="filters.ratingMin" name="rating_min" min="0" max="10" step="0.1" value="{{ $filterView->scalarState('rating_min') }}" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-24">
+                        <input type="number" wire:model.live="filters.ratingMin" name="rating_min" min="0" max="10" step="0.1" value="{{ $filterView->scalarState('rating_min') }}" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-24">
                     </label>
                     <label class="min-w-36 flex-1 text-xs font-bold text-slate-600 sm:flex-none">
                         <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.votes_from') }}</span>
-                        <input type="number" wire:model="filters.votesMin" name="votes_min" min="0" value="{{ $filterView->scalarState('votes_min') }}" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-36">
+                        <input type="number" wire:model.live="filters.votesMin" name="votes_min" min="0" value="{{ $filterView->scalarState('votes_min') }}" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-36">
                     </label>
                 </div>
             </fieldset>
@@ -124,7 +124,7 @@
                 <p class="mt-1 text-xs leading-5 text-slate-500">{{ __('catalog.catalog.exact_filters.video_description') }}</p>
                 <label class="mt-3 block text-xs font-bold text-slate-600">
                     <span class="mb-1 block">{{ __('catalog.catalog.exact_filters.availability') }}</span>
-                    <select wire:model="filters.video" name="video" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-48">
+                    <select wire:model.live="filters.video" name="video" class="min-h-11 w-full rounded-control border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 sm:w-48">
                         <option value="">{{ __('catalog.catalog.exact_filters.availability_any') }}</option>
                         <option value="available" @selected($filterView->scalarState('video') === 'available')>{{ __('catalog.catalog.exact_filters.video_available') }}</option>
                         <option value="missing" @selected($filterView->scalarState('video') === 'missing')>{{ __('catalog.catalog.exact_filters.video_missing') }}</option>
@@ -139,7 +139,7 @@
                                 'bg-emerald-50 text-emerald-700' => in_array($quality, $filterView->listState('quality'), true),
                                 'bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700' => ! in_array($quality, $filterView->listState('quality'), true),
                             ])>
-                                <input type="checkbox" wire:model="filters.qualities" name="quality[]" value="{{ $quality }}" class="h-5 w-5 accent-emerald-700">
+                                <input type="checkbox" wire:model.live="filters.qualities" name="quality[]" value="{{ $quality }}" class="h-5 w-5 accent-emerald-700">
                                 <span>{{ $quality }}</span>
                             </label>
                         @endforeach

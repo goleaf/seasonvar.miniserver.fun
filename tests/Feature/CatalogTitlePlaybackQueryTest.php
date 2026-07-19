@@ -78,6 +78,22 @@ class CatalogTitlePlaybackQueryTest extends TestCase
         $this->assertStringNotContainsString('episode_id is null or exists (select * from episodes where licensed_media.episode_id = episodes.id', $sql);
     }
 
+    public function test_title_watchable_query_is_bounded_without_global_release_lists(): void
+    {
+        $title = CatalogTitle::factory()->create();
+        $playback = app(CatalogTitlePlaybackQuery::class);
+        $specific = str($playback->watchableEpisodes($title, null)->toSql())->replace(['`', '"'], '')->lower()->squish()->toString();
+        $global = str($playback->watchableEpisodesForVisibleTitles(null)->toSql())->replace(['`', '"'], '')->lower()->squish()->toString();
+
+        $this->assertStringContainsString('seasons.catalog_title_id = ?', $specific);
+        $this->assertStringNotContainsString('seasons.catalog_title_id in (select', $specific);
+        $this->assertStringContainsString('episodes.season_id in (select id from seasons', $specific);
+        $this->assertStringContainsString('seasons.catalog_title_id = ?', $specific);
+        $this->assertStringContainsString('exists (select 1 from catalog_titles', $global);
+        $this->assertStringContainsString('exists (select 1 from seasons where', $global);
+        $this->assertStringContainsString('seasons.id = episodes.season_id', $global);
+    }
+
     public function test_episode_navigation_uses_the_loaded_season_lane_without_database_queries(): void
     {
         $title = CatalogTitle::factory()->create();

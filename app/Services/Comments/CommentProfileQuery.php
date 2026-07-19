@@ -21,6 +21,7 @@ use App\Models\User;
 use App\Models\UserBlock;
 use App\Models\UserMute;
 use App\Services\Catalog\CatalogTitleQuery;
+use App\Services\UserPortal\UserPortalIdPaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -33,6 +34,7 @@ final class CommentProfileQuery
         private readonly CatalogTitleQuery $titles,
         private readonly CommentPresenter $presenter,
         private readonly CommentRelationshipService $relationships,
+        private readonly UserPortalIdPaginator $paginator,
     ) {}
 
     /** @return LengthAwarePaginator<int, PublicCommentActivityData> */
@@ -59,7 +61,7 @@ final class CommentProfileQuery
     }
 
     /** @return LengthAwarePaginator<int, CommentActivityData> */
-    public function activity(User $user): LengthAwarePaginator
+    public function activity(User $user, bool $refresh = false): LengthAwarePaginator
     {
         $query = Comment::query()
             ->where('user_id', $user->id)
@@ -71,15 +73,20 @@ final class CommentProfileQuery
                 CommentStatus::Spam->value,
             ])
             ->where($this->accessibleTargets($user))
-            ->latest('created_at')
-            ->orderByDesc('id');
-        $paginator = $query->paginate(
-            max(1, (int) config('comments.pagination.profile_per_page', 15)),
-            [
+            ->select([
                 'id', 'target_type', 'target_id', 'body', 'is_spoiler', 'status',
                 'created_at', 'edited_at',
-            ],
+            ])
+            ->latest('created_at')
+            ->orderByDesc('id');
+        $paginator = $this->paginator->paginate(
+            $user,
+            'profile-comment-activity',
+            ['projection' => 'comment-activity-v1'],
+            $query,
+            max(1, (int) config('comments.pagination.profile_per_page', 15)),
             'activity_page',
+            $refresh,
         );
 
         return $paginator->through(

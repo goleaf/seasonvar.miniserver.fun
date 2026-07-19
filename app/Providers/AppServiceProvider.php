@@ -2,13 +2,24 @@
 
 namespace App\Providers;
 
+use App\Models\CatalogCollection;
+use App\Models\CatalogTitleReview;
+use App\Models\CatalogTitleUpdateState;
+use App\Models\CatalogTitleUserState;
+use App\Models\Comment;
 use App\Models\Episode;
+use App\Models\EpisodePlaybackMarker;
+use App\Models\EpisodeViewProgress;
 use App\Models\HelpArticle;
 use App\Models\LicensedMedia;
 use App\Models\TechnicalIssue;
 use App\Models\User;
+use App\Models\UserAccountSetting;
+use App\Models\UserProfile;
+use App\Models\UserTag;
 use App\Observers\EpisodeReleaseScheduleObserver;
 use App\Observers\LicensedMediaReleaseScheduleObserver;
+use App\Observers\UserPortalCacheObserver;
 use App\Policies\AccountSettingsPolicy;
 use App\Policies\HelpArticlePolicy;
 use App\Policies\TechnicalIssuePolicy;
@@ -25,6 +36,7 @@ use App\Services\ReleaseCalendar\ReleaseCalendarSchema;
 use App\Services\Reviews\ReviewSchema;
 use App\Services\Tags\TagSchema;
 use App\Services\TechnicalIssues\TechnicalIssueSchema;
+use App\Services\UserPortal\UserPortalCacheInvalidator;
 use App\Support\Cache\CacheEventReporter;
 use App\View\ViewData\AppLayoutData;
 use Illuminate\Cache\Events\CacheFailedOver;
@@ -67,6 +79,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scopedIf(PremiumAccessResolver::class);
         $this->app->singleton(PremiumPaymentGatewayRegistry::class, static fn (): PremiumPaymentGatewayRegistry => new PremiumPaymentGatewayRegistry);
         $this->app->scopedIf(TagSchema::class);
+        $this->app->scopedIf(UserPortalCacheInvalidator::class);
         $this->app->scopedIf(TechnicalIssueSchema::class);
     }
 
@@ -171,6 +184,21 @@ class AppServiceProvider extends ServiceProvider
 
         Episode::observe(EpisodeReleaseScheduleObserver::class);
         LicensedMedia::observe(LicensedMediaReleaseScheduleObserver::class);
+
+        foreach ([
+            CatalogCollection::class,
+            CatalogTitleReview::class,
+            CatalogTitleUpdateState::class,
+            CatalogTitleUserState::class,
+            Comment::class,
+            EpisodePlaybackMarker::class,
+            EpisodeViewProgress::class,
+            UserAccountSetting::class,
+            UserProfile::class,
+            UserTag::class,
+        ] as $ownerModel) {
+            $ownerModel::observe(UserPortalCacheObserver::class);
+        }
 
         Model::shouldBeStrict(! $this->app->isProduction());
         DB::prohibitDestructiveCommands($this->app->isProduction());

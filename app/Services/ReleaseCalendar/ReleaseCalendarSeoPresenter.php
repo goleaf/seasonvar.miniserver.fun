@@ -14,7 +14,8 @@ final class ReleaseCalendarSeoPresenter
      */
     public function page(ReleaseCalendarView $view, ?string $period, bool $filtered, ?string $locale, iterable $items = []): array
     {
-        $eligible = $view === ReleaseCalendarView::Upcoming && ! $filtered;
+        $eligible = in_array($view, [ReleaseCalendarView::Recent, ReleaseCalendarView::Upcoming], true)
+            && ! $filtered;
         $canonical = $this->url($view, $period, $locale);
         $locales = (array) config('release-calendar.supported_locales', ['ru']);
         $itemList = [];
@@ -69,7 +70,7 @@ final class ReleaseCalendarSeoPresenter
             ReleaseCalendarView::Day => 'calendar.day',
             ReleaseCalendarView::Week => 'calendar.week',
             ReleaseCalendarView::Month => 'calendar.month',
-            ReleaseCalendarView::Recent => 'calendar.recent',
+            ReleaseCalendarView::Recent => 'calendar.index',
             ReleaseCalendarView::Personal => 'calendar.mine',
         };
         $parameters = $period !== null ? ['period' => $period] : [];

@@ -62,14 +62,16 @@ final class CatalogRecommendationTitleLoader
             ->selectRaw('catalog_title_id, COUNT(*) AS aggregate_count')
             ->groupBy('catalog_title_id')
             ->pluck('aggregate_count', 'catalog_title_id');
+        $availableSeasons = Season::query()
+            ->availableTo($context->user)
+            ->whereIn('catalog_title_id', $titleIds)
+            ->select(['id', 'catalog_title_id']);
         $episodeCounts = Episode::query()
             ->availableTo($context->user)
-            ->join('seasons', 'seasons.id', '=', 'episodes.season_id')
-            ->whereIn('seasons.id', Season::query()->availableTo($context->user)->select('seasons.id'))
-            ->whereIn('seasons.catalog_title_id', $titleIds)
-            ->selectRaw('seasons.catalog_title_id, COUNT(*) AS aggregate_count')
-            ->groupBy('seasons.catalog_title_id')
-            ->pluck('aggregate_count', 'seasons.catalog_title_id');
+            ->joinSub($availableSeasons, 'available_seasons', 'available_seasons.id', '=', 'episodes.season_id')
+            ->selectRaw('available_seasons.catalog_title_id, COUNT(*) AS aggregate_count')
+            ->groupBy('available_seasons.catalog_title_id')
+            ->pluck('aggregate_count', 'available_seasons.catalog_title_id');
         $mediaCounts = LicensedMedia::query()
             ->availableTo($context->user)
             ->forAvailableReleases($context->user)

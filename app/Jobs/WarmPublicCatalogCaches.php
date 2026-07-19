@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Models\SeasonvarImportRun;
 use App\Services\Catalog\PublicCatalogWarmStateStore;
 use App\Services\Catalog\PublicCatalogWarmTargetSource;
 use App\Services\Catalog\PublicPageCacheWarmer;
+use App\Services\Seasonvar\SeasonvarImportActivity;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
@@ -48,8 +48,9 @@ final class WarmPublicCatalogCaches implements ShouldBeUniqueUntilProcessing, Sh
         PublicCatalogWarmStateStore $states,
         PublicCatalogWarmTargetSource $targets,
         PublicPageCacheWarmer $warmer,
+        SeasonvarImportActivity $imports,
     ): void {
-        if ($this->importIsActive()) {
+        if ($imports->active()) {
             $this->release(max(30, (int) config(
                 'cache-architecture.warming.full_import_pause_seconds',
                 300,
@@ -119,15 +120,5 @@ final class WarmPublicCatalogCaches implements ShouldBeUniqueUntilProcessing, Sh
         $requestTimeout = max(1, (int) config('cache-architecture.page_cache.warm_timeout_seconds', 10));
 
         return min($configured, max(1, intdiv($budget, $requestTimeout)));
-    }
-
-    private function importIsActive(): bool
-    {
-        return SeasonvarImportRun::query()->whereIn('status', [
-            'queued',
-            'discovering',
-            'running',
-            'finalizing',
-        ])->exists();
     }
 }

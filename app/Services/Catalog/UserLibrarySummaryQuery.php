@@ -9,6 +9,7 @@ use App\Models\CatalogTitleUserState;
 use App\Models\EpisodePlaybackMarker;
 use App\Models\EpisodeViewProgress;
 use App\Models\User;
+use App\Services\UserPortal\UserPortalCache;
 use Illuminate\Support\Carbon;
 
 final readonly class UserLibrarySummaryQuery
@@ -18,9 +19,38 @@ final readonly class UserLibrarySummaryQuery
         private CatalogViewingActivityQuery $viewingActivity,
         private CatalogPersonalUpdateQuery $personalUpdates,
         private PersonalLibrarySchema $personalLibrarySchema,
+        private UserPortalCache $cache,
     ) {}
 
-    public function get(User $user): UserLibrarySummary
+    public function get(User $user, bool $refresh = false): UserLibrarySummary
+    {
+        $snapshot = $this->cache->remember(
+            $user,
+            'library-summary',
+            ['locale' => app()->getLocale()],
+            fn (): array => $this->snapshot($user),
+            $refresh,
+        );
+
+        return new UserLibrarySummary(
+            watchlistCount: (int) ($snapshot['watchlist_count'] ?? 0),
+            ratingsCount: (int) ($snapshot['ratings_count'] ?? 0),
+            continueWatchingCount: (int) ($snapshot['continue_watching_count'] ?? 0),
+            historyCount: (int) ($snapshot['history_count'] ?? 0),
+            lastWatchedAt: $this->lastWatchedAt($snapshot['last_watched_at'] ?? null),
+            links: [
+                'self' => route('api.v1.me.library.summary'),
+                'watchlist' => route('api.v1.me.watchlist.index'),
+                'ratings' => route('api.v1.me.ratings.index'),
+                'continue_watching' => route('api.v1.me.continue-watching.index'),
+                'history' => route('api.v1.me.history.index'),
+            ],
+            sectionCounts: is_array($snapshot['section_counts'] ?? null) ? $snapshot['section_counts'] : [],
+        );
+    }
+
+    /** @return array<string, mixed> */
+    private function snapshot(User $user): array
     {
         $visibleTitleIds = $this->titles->visibleTo($user)->select('id');
         $stateCounts = CatalogTitleUserState::query()
@@ -61,20 +91,13 @@ final readonly class UserLibrarySummaryQuery
                 ->count()
             : 0;
 
-        return new UserLibrarySummary(
-            watchlistCount: (int) ($stateCounts?->getAttribute('watchlist_count') ?? 0),
-            ratingsCount: (int) ($stateCounts?->getAttribute('ratings_count') ?? 0),
-            continueWatchingCount: $this->viewingActivity->continueWatching($user, 24)->count(),
-            historyCount: (int) ($history?->getAttribute('history_count') ?? 0),
-            lastWatchedAt: $this->lastWatchedAt($history?->getAttribute('last_watched_at')),
-            links: [
-                'self' => route('api.v1.me.library.summary'),
-                'watchlist' => route('api.v1.me.watchlist.index'),
-                'ratings' => route('api.v1.me.ratings.index'),
-                'continue_watching' => route('api.v1.me.continue-watching.index'),
-                'history' => route('api.v1.me.history.index'),
-            ],
-            sectionCounts: [
+        return [
+            'watchlist_count' => (int) ($stateCounts?->getAttribute('watchlist_count') ?? 0),
+            'ratings_count' => (int) ($stateCounts?->getAttribute('ratings_count') ?? 0),
+            'continue_watching_count' => $this->viewingActivity->continueWatching($user, 24)->count(),
+            'history_count' => (int) ($history?->getAttribute('history_count') ?? 0),
+            'last_watched_at' => $this->lastWatchedAt($history?->getAttribute('last_watched_at'))?->toAtomString(),
+            'section_counts' => [
                 'planned' => (int) ($stateCounts?->getAttribute('planned_count') ?? 0),
                 'watching' => (int) ($stateCounts?->getAttribute('watching_count') ?? 0),
                 'paused' => (int) ($stateCounts?->getAttribute('paused_count') ?? 0),
@@ -86,7 +109,7 @@ final readonly class UserLibrarySummaryQuery
                 'without-updates' => max(0, $updateEligibleCount - $withUpdates),
                 'markers' => $markerCount,
             ],
-        );
+        ];
     }
 
     private function lastWatchedAt(mixed $value): ?Carbon

@@ -57,7 +57,7 @@ class CatalogVisualSystemTest extends TestCase
             strpos($html, 'data-site-header-actions'),
             strpos($html, 'data-header-search-autocomplete'),
         );
-        $this->assertStringContainsString('flex flex-wrap', $component);
+        $this->assertMatchesRegularExpression('/data-site-header-primary[^>]*class="[^"]*\bflex\b[^"]*\bflex-wrap\b/', $component);
         $this->assertStringContainsString('<span class="sr-only sm:not-sr-only">{{ $item->label }}</span>', $component);
         $this->assertStringContainsString(
             '<span class="sr-only sm:not-sr-only">{{ __(\'auth.actions.logout\') }}</span>',
@@ -489,6 +489,20 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertSame(4, substr_count($catalogTemplate, "@island(name: 'catalog-live'"));
     }
 
+    public function test_catalog_people_search_uses_targeted_livewire_loading_inside_the_catalog_island(): void
+    {
+        $filterTemplate = file_get_contents(resource_path('views/components/catalog/title-filters.blade.php'));
+        $script = file_get_contents(resource_path('js/app.js'));
+
+        $this->assertIsString($filterTemplate);
+        $this->assertIsString($script);
+        $this->assertStringContainsString('wire:model.live.debounce.300ms="optionSearch.{{ $filterType }}"', $filterTemplate);
+        $this->assertStringContainsString('wire:loading.delay wire:target="optionSearch.{{ $filterType }}"', $filterTemplate);
+        $this->assertStringNotContainsString('fa-spinner fa-spin hidden', $filterTemplate);
+        $this->assertStringNotContainsString('data-catalog-people-combobox', $filterTemplate);
+        $this->assertStringNotContainsString('loadCatalogPeopleComboboxes', $script);
+    }
+
     public function test_catalog_unified_filters_open_for_any_active_filter(): void
     {
         $genre = Genre::query()->create([
@@ -538,10 +552,12 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertStringContainsString('wire:model.live="filters.qualities"', $content);
 
         $template = file_get_contents(resource_path('views/components/catalog/unified-title-filters.blade.php'));
+        $facetTemplate = file_get_contents(resource_path('views/components/catalog/title-filters.blade.php'));
 
         $this->assertIsString($template);
+        $this->assertIsString($facetTemplate);
         $this->assertDoesNotMatchRegularExpression('/wire:model\.live=.*@checked/m', $template);
-        $this->assertSame(1, substr_count($template, 'wire:replace.self'));
+        $this->assertSame(4, substr_count($facetTemplate, 'wire:replace.self'));
 
         foreach (['year_from', 'year_to', 'seasons_min', 'seasons_max', 'episodes_min', 'episodes_max', 'rating_min', 'votes_min'] as $name) {
             $this->assertMatchesRegularExpression('/name="'.preg_quote($name, '/').'"[^>]*class="[^"]*w-full[^"]*sm:w-/s', $content);
@@ -576,17 +592,15 @@ class CatalogVisualSystemTest extends TestCase
         $this->assertSame(1, substr_count($filters[0], 'name="year_from"'));
     }
 
-    public function test_catalog_frontend_script_contract_keeps_people_keyboard_support_without_dialog_code(): void
+    public function test_catalog_frontend_script_contract_leaves_people_search_to_livewire_without_dialog_code(): void
     {
         $script = file_get_contents(resource_path('js/app.js'));
 
         $this->assertIsString($script);
-        $this->assertStringContainsString('AbortController', $script);
         $this->assertStringNotContainsString('showModal()', $script);
-        $this->assertStringContainsString("case 'ArrowDown'", $script);
-        $this->assertStringContainsString("case 'ArrowUp'", $script);
-        $this->assertStringContainsString("case 'Enter'", $script);
-        $this->assertStringContainsString("case 'Escape'", $script);
+        $this->assertStringNotContainsString('data-catalog-people-combobox', $script);
+        $this->assertStringNotContainsString('loadCatalogPeopleComboboxes', $script);
+        $this->assertStringNotContainsString('peopleFilterUrl', $script);
         $this->assertStringNotContainsString('returnFocus', $script);
     }
 

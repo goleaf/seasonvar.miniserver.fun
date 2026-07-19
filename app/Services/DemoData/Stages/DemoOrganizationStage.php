@@ -48,8 +48,14 @@ final readonly class DemoOrganizationStage implements DemoDataStage
 
     public function run(DemoDataOptions $options, ?Closure $progress = null): DemoStageReport
     {
-        $startedAt = microtime(true);
         $options->assertEnvironment(app()->environment());
+
+        return $this->repairKnownDemoUsers($options, $progress);
+    }
+
+    public function repairKnownDemoUsers(DemoDataOptions $options, ?Closure $progress = null): DemoStageReport
+    {
+        $startedAt = microtime(true);
         $selector = new DemoTitleSelector($options);
         $writer = new DemoBulkWriter($options);
         $assets = new DemoRasterAsset($options, $this->stable);

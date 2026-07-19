@@ -1,6 +1,6 @@
 # Формы
 
-Обновлено: 16.07.2026
+Обновлено: 19.07.2026
 
 ## Публичные формы
 
@@ -9,7 +9,7 @@
 - `CatalogSeriesFilters` хранит только нормализуемые scalar/list значения. Livewire actions сбрасывают страницу при изменении поиска, фильтров, сортировки или размера выдачи; скрытые поля сохраняют те же активные параметры для GET fallback.
 - Multi-value свойства используют `#[Url(history: true)]`, поэтому выбранные значения сохраняются при сортировке, пагинации, обновлении страницы и browser back/forward. Удаление одного chip меняет только одно значение, групповой сброс очищает только указанную группу.
 - Empty-state свойства формы допускают `null` на границе Livewire hydration, потому что Laravel преобразует пустые JSON-строки до lifecycle hooks; `CatalogSeriesFilters::toRequestInput()` отбрасывает `null`, а успешная нормализация возвращает UI-default `''`.
-- Актёры и режиссёры подбираются через read-only `GET /api/catalog/people`: `CatalogPeopleLookupRequest` разрешает только типы `actor`/`director`, нормализует запрос 2–80 символов, а `CatalogPersonOptionResource` отдаёт максимум 20 публичных slug/name/count. Выбранный slug остаётся обычным повторяемым GET-параметром и после перезагрузки поднимается в начало группы.
+- Поля актёров и режиссёров внутри `/titles` привязаны через `wire:model.live.debounce.300ms` к bounded `CatalogSeries::$optionSearch`; они обновляют contextual options в grouped island `catalog-live`, а spinner имеет отдельный точный `wire:target`. Выбранный checkbox остаётся обычным повторяемым GET-параметром и после перезагрузки поднимается в начало группы. Read-only `GET /api/catalog/people` с `CatalogPeopleLookupRequest` и `CatalogPersonOptionResource` сохраняется как отдельный совместимый API contract максимум на 20 публичных slug/name/count.
 - Карточка тайтла использует Livewire actions для watchlist/rating; rating принимает только 1–10 и показывает русскую ошибку в component error bag. Season/episode/media controls остаются ссылками с GET fallback и одновременно используют `wire:click.prevent` для обновления без полной перезагрузки.
 
 ## Компоненты

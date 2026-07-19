@@ -100,6 +100,9 @@ final class PortalDemoSeederTest extends TestCase
         $this->assertSame(120, $first->counters['user_title_states']);
         $this->assertSame(120, $first->counters['user_reviews']);
         $this->assertSame(120, $first->counters['root_title_comments']);
+        $this->assertSame(100, $first->counters['content_requests']);
+        $this->assertSame(120, $first->counters['personal_tags']);
+        $this->assertSame(80, $first->counters['collections']);
         $this->assertSame(200, $first->counters['notifications']);
         $this->assertSame(24, CatalogTitle::query()->count());
         $this->assertSame(ReviewOrigin::Provider, $providerReview->fresh()?->origin);
@@ -109,6 +112,8 @@ final class PortalDemoSeederTest extends TestCase
         );
 
         $profile = UserProfile::query()->firstOrFail();
+        $this->assertSame('image/webp', $profile->avatar_mime_type);
+        $this->assertSame('image/webp', $profile->cover_mime_type);
         Storage::disk(self::TEST_DISK)->assertExists((string) $profile->avatar_path);
         Storage::disk(self::TEST_DISK)->assertExists((string) $profile->cover_path);
         Mail::assertNothingSent();

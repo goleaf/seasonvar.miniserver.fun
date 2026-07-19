@@ -1,3 +1,24 @@
+# Текущая задача — demo user portal, owner cache и WebP media
+
+Updated: 19.07.2026
+
+Полный design и пошаговый план: [`../superpowers/specs/2026-07-19-demo-user-portal-cache-and-media-design.md`](../superpowers/specs/2026-07-19-demo-user-portal-cache-and-media-design.md) и [`../superpowers/plans/2026-07-19-demo-user-portal-cache-and-media.md`](../superpowers/plans/2026-07-19-demo-user-portal-cache-and-media.md).
+
+| Требование | Статус | Evidence |
+| --- | --- | --- |
+| Requests/library/tags заполнены штатным demo seed | `completed` | stage/auditor/PortalDemoSeeder tests |
+| Profile и collection images доступны по responder-compatible WebP paths | `completed` | stage/media tests; production repair dry-run |
+| Owner-scoped cache и automatic background recache | `completed` | version invalidation, unique job, single/multi-user command tests |
+| Security/session/token/notification action state не кэшируется | `already_compliant` | bounded array/ID projections и existing private response middleware |
+| Profile upload WebP conversion и design resize | `completed` | actual MIME/pixel checks и 320×320/1280×360 assertions |
+| Новые migrations/dependencies | `not_applicable` | schema и Composer/npm inventory не изменены |
+| Production data repair | `unresolved` | dry-run выполнен; active importer исключает backup-consistent writer window |
+| Полная verification/commit/push | `unresolved` | выполняется после docs/repository audit |
+
+Cross-feature review охватывает authentication, authorization, translations, cache/queue, search/SEO, notifications, privacy, mobile/Livewire, administration, imports, premium/rights, public routes, storage, deployment, backup и rollback. Никакая access decision, session, token, exact progress или signed media identity не перенесена в cache.
+
+---
+
 # Task 15 — canonical registration, authentication and session architecture
 
 > Параллельная задача объединения discovery/collections не смешивается с этим планом; её полный plan, compliance matrix и verification evidence находятся в [`discovery-collections-admin-unification.md`](discovery-collections-admin-unification.md).
@@ -180,3 +201,75 @@ The user explicitly prohibits creating or running automated tests for Task 15. E
 | Full repository suite | unresolved | 1 268 tests выполнены: 1 214 passed; 37 failures и 6 errors принадлежат существующим Blade/`CacheDomain::UserPortal` проблемам вне Debugbar |
 | README/CHANGELOG/canonical docs | completed | Отдельные русские записи и реестры обновлены; managed project-docs block проверен штатной командой и не требовал изменения |
 | Commit/push | unresolved | Завершается на `main`; remote success не заявляется без фактического результата |
+
+---
+
+# Параллельная ограниченная задача: непустой стартовый календарь релизов
+
+Обновлено: 19.07.2026
+
+Статус: реализация завершена; финальная доставка заблокирована активными параллельными изменениями общего рабочего дерева.
+
+## Решение и evidence
+
+- [`../superpowers/specs/2026-07-19-calendar-default-recent-design.md`](../superpowers/specs/2026-07-19-calendar-default-recent-design.md);
+- [`../superpowers/plans/2026-07-19-calendar-default-recent.md`](../superpowers/plans/2026-07-19-calendar-default-recent.md).
+- Рабочая база содержит 4 342 публичных фактических события за последние 60 дней и ноль подтверждённых будущих событий в пределах года: пустоту создавал только стартовый `upcoming` route.
+- `/calendar` переведён на bounded recent, `/calendar/upcoming` оставлен для будущих событий, а recent-адреса получили постоянные перенаправления.
+
+## Compliance matrix
+
+| Требование | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Requirements/read order и links | completed | Прочитаны index, calendar, UI, cache, SEO, maintenance, production и integration owners; ссылки плана проверены |
+| Root cause/data safety | completed | Read-only census; импорт, schema, migrations, storage и рабочие строки не менялись |
+| Routes/SEO/sitemap/cache | completed | Canonical index/upcoming, redirects, shared visibility, `noindex` пустого окна и cache profile покрыты направленными тестами |
+| Auth/privacy/premium/region/legal | already_compliant | Канонический `ReleaseScheduleVisibility` и personal boundary сохранены |
+| Notifications/translations/mobile | completed | Общие links/notifications ведут на index; future-specific links сохранены; RU/EN и desktop/mobile проверены |
+| Dependencies/runtime/build | not_applicable | Новых packages/runtime changes нет; Vite build прошёл |
+| Focused tests/Pint | completed | Свежий результат: 24 tests, 180 assertions; explicit Pint прошёл |
+| Full suite | unresolved | Combined run: 1 268 tests, 32 failures в параллельно изменяемых Blade/cache/player областях; календарные тесты проходят |
+| README/CHANGELOG/canonical docs | completed | Русские записи и release-calendar owner обновлены; managed blocks вручную не менялись |
+| Legacy scan | completed | Остаточные `calendar.upcoming` относятся только к future-specific consumers; duplicate recent content отсутствует |
+| Commit/push | unresolved | Другие задачи многократно stash-ят дерево и меняют dependency/cache/demo files; их поглощение запрещено |
+
+## Production impact и rollback
+
+- Доставка code/routes/docs-only; после deploy нужна обычная безопасная компиляция config/route/view cache без store-wide flush.
+- Rollback возвращает прежний route mapping и consumers; database/storage recovery не требуется.
+
+---
+
+# Параллельная ограниченная задача: realtime-поиск актёров и режиссёров
+
+Обновлено: 19.07.2026
+
+Статус: реализация и направленная verification завершены; task-only доставка ожидает прекращения параллельных записей в общем рабочем дереве.
+
+## Решение и evidence
+
+- [`../superpowers/specs/2026-07-19-catalog-people-live-search-spinner-design.md`](../superpowers/specs/2026-07-19-catalog-people-live-search-spinner-design.md);
+- [`../superpowers/plans/2026-07-19-catalog-people-live-search-spinner.md`](../superpowers/plans/2026-07-19-catalog-people-live-search-spinner.md).
+- Root cause подтверждён в Chromium: нелайерный `FontAwesome display` перекрывал layered `Tailwind hidden`, поэтому idle-иконка фактически оставалась видимой и анимированной.
+- Web-поиск людей теперь принадлежит `CatalogSeries::$optionSearch`; `wire:model.live.debounce.300ms`, grouped `catalog-live` islands и точный `wire:loading.delay` target обновляют варианты и фильмы без второго browser `fetch`.
+
+## Compliance matrix
+
+| Требование | Статус | Evidence / ограничение |
+| --- | --- | --- |
+| Requirements/read order и links | completed | Канонический индекс, maintenance, production, search, forms, frontend и UI owners прочитаны; план и design сохранены отдельно |
+| Root cause и input preservation | completed | Search input сохранён; CSS-cascade defect устранён wrapper-видимостью без удаления формы |
+| Realtime Livewire/islands | completed | `optionSearch.actor|director`, debounce 300 мс, grouped `catalog-live` и realtime checkbox/URL state используют существующий `CatalogSeries` boundary |
+| Spinner ownership | completed | Точный property `wire:target` реагирует только на поиск соответствующей группы и скрыт в idle |
+| Public routes/API/backward compatibility | already_compliant | `/titles`, taxonomy/query URLs и read-only `GET /api/catalog/people` сохранены; migrations/schema/data отсутствуют |
+| Auth/authorization/privacy/admin | already_compliant | Новых write routes, client-trusted access state, персональных данных и administrative controls нет |
+| Cache/search/SEO/imports/notifications | already_compliant | Меняется только UI transport уже исключённых из full-response cache Livewire updates; canonical visibility и importer не затронуты |
+| Premium/region/legal restrictions | already_compliant | Существующая server-side visibility остаётся единственным источником допустимых titles и people options |
+| RU/EN/a11y/mobile/tablet | completed | RU/EN parity сохранён; label, 80-character bound, status live region и 44 px control сохранены; responsive browser matrix входит в финальную проверку |
+| Dependencies/runtime/database | not_applicable | Packages, lock files, `.env`, migrations, storage, queue и persistent data не меняются |
+| Production impact/rollback | completed | Code/assets-only deploy; rollback — revert task commit и предыдущий Vite manifest, без cache-store flush или data restore |
+| Focused tests/Pint/build/browser | completed | Свежие результаты после последнего восстановления: 9 tests, 118 assertions; targeted Pint; Vite 23 modules; Chromium idle/active/final и changed result cards на 390 px, idle на 768/1440 px, без console errors и horizontal overflow |
+| Broad catalog/visual classes | unresolved | Независимый прогон 112 tests / 948 assertions: оба новых regression-теста прошли; 10 прежних тестов падают в параллельно изменяемых directory/admin/cache/header/filter contracts вне task scope |
+| Documentation/README/changelog | completed | Канонические owners и русские visitor/technical history дополнены без изменения managed blocks |
+| Legacy/duplicate scan | completed | Production scan не нашёл old people combobox/fetch/loading identifiers или `fa-spinner fa-spin hidden`; controller/request/resource и API regression сохранили read-only endpoint |
+| Commit/push | unresolved | Task-only commit возможен только без поглощения продолжающихся чужих изменений; configured push должен быть фактически проверен |

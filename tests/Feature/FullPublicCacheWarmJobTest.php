@@ -10,6 +10,7 @@ use App\Models\SeasonvarImportRun;
 use App\Services\Catalog\PublicCatalogWarmStateStore;
 use App\Services\Catalog\PublicCatalogWarmTargetSource;
 use App\Services\Catalog\PublicPageCacheWarmer;
+use App\Services\Seasonvar\SeasonvarImportActivity;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -61,6 +62,7 @@ final class FullPublicCacheWarmJobTest extends TestCase
             $store,
             app(PublicCatalogWarmTargetSource::class),
             app(PublicPageCacheWarmer::class),
+            app(SeasonvarImportActivity::class),
         );
 
         $updated = $store->read();
@@ -83,6 +85,7 @@ final class FullPublicCacheWarmJobTest extends TestCase
             $store,
             app(PublicCatalogWarmTargetSource::class),
             app(PublicPageCacheWarmer::class),
+            app(SeasonvarImportActivity::class),
         );
 
         $job->assertReleased(300);
@@ -106,6 +109,7 @@ final class FullPublicCacheWarmJobTest extends TestCase
             $store,
             app(PublicCatalogWarmTargetSource::class),
             app(PublicPageCacheWarmer::class),
+            app(SeasonvarImportActivity::class),
         );
 
         $this->assertSame('completed', $store->read()['status'] ?? null);

@@ -2,10 +2,18 @@
 
 namespace Tests\Feature;
 
+use App\Enums\ReleaseDatePrecision;
+use App\Enums\ReleaseScheduleEntryType;
+use App\Enums\ReleaseScheduleSource;
+use App\Enums\ReleaseScheduleStatus;
 use App\Models\CatalogTitle;
 use App\Models\Country;
+use App\Models\Episode;
 use App\Models\Genre;
 use App\Models\LicensedMedia;
+use App\Models\ReleaseScheduleEntry;
+use App\Models\Season;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -74,6 +82,19 @@ class SitemapAndRobotsTest extends TestCase
 
         $this->assertStringNotContainsString('/genres/drama', $content);
         $this->assertStringNotContainsString('/years/2026', $content);
+    }
+
+    public function test_static_sitemap_includes_non_empty_default_calendar_without_empty_upcoming(): void
+    {
+        $this->createReleasedCalendarEntry('Календарь в карте сайта');
+
+        $content = $this->get('/sitemap-static.xml')
+            ->assertOk()
+            ->assertStreamed()
+            ->streamedContent();
+
+        $this->assertStringContainsString('<loc>'.route('calendar.index').'</loc>', $content);
+        $this->assertStringNotContainsString('<loc>'.route('calendar.upcoming').'</loc>', $content);
     }
 
     public function test_title_sitemap_contains_published_titles_and_poster_images(): void
@@ -246,5 +267,43 @@ class SitemapAndRobotsTest extends TestCase
         $this->assertStringContainsString('Sitemap: https://seasonvar.miniserver.fun/sitemap-index.xml', $robots);
         $this->assertStringNotContainsString('sitemap-videos-1.xml', $robots);
         $this->assertStringNotContainsString('sitemap-landings.xml', $robots);
+    }
+
+    private function createReleasedCalendarEntry(string $titleText): ReleaseScheduleEntry
+    {
+        $title = CatalogTitle::factory()->create([
+            'title' => $titleText,
+            'slug' => 'sitemap-calendar-'.str()->uuid(),
+        ]);
+        $season = Season::factory()->for($title)->create(['number' => 1]);
+        $episode = Episode::factory()->for($season)->create(['number' => 1]);
+        $publishedAt = CarbonImmutable::now()->subDay();
+        $media = LicensedMedia::withoutEvents(fn (): LicensedMedia => LicensedMedia::factory()->create([
+            'catalog_title_id' => $title->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'status' => 'published',
+            'published_at' => $publishedAt,
+            'path' => 'licensed/sitemap-calendar-test.mp4',
+        ]));
+
+        return ReleaseScheduleEntry::query()->create([
+            'logical_key' => 'sitemap-portal-publication-test-'.$media->id,
+            'entry_type' => ReleaseScheduleEntryType::PortalPublication,
+            'status' => ReleaseScheduleStatus::Released,
+            'precision' => ReleaseDatePrecision::ExactDateTime,
+            'source' => ReleaseScheduleSource::Portal,
+            'catalog_title_id' => $title->id,
+            'season_id' => $season->id,
+            'episode_id' => $episode->id,
+            'licensed_media_id' => $media->id,
+            'season_number' => 1,
+            'episode_number' => 1,
+            'starts_at' => $publishedAt,
+            'original_timezone' => 'UTC',
+            'is_public' => true,
+            'notifications_enabled' => true,
+            'released_at' => $publishedAt,
+        ]);
     }
 }

@@ -14,6 +14,7 @@ use App\Models\EpisodePlaybackMarker;
 use App\Models\EpisodeViewProgress;
 use App\Models\User;
 use App\Services\Api\V1\Sync\ApiSyncReadiness;
+use App\Services\UserPortal\UserPortalIdPaginator;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Schema;
@@ -25,6 +26,7 @@ final readonly class UserLibraryQuery
         private CatalogTaxonomyRegistry $taxonomies,
         private ApiSyncReadiness $syncReadiness,
         private CatalogPersonalUpdateQuery $personalUpdates,
+        private UserPortalIdPaginator $paginator,
     ) {}
 
     /** @return LengthAwarePaginator<int, CatalogTitleUserState> */
@@ -32,12 +34,21 @@ final readonly class UserLibraryQuery
         User $user,
         UserLibraryFilters $filters,
         string $pageName = 'page',
+        bool $refresh = false,
     ): LengthAwarePaginator {
-        return $this->applyFilters($this->base($user), $filters, $user)
+        $query = $this->applyFilters($this->base($user), $filters, $user)
             ->where('in_watchlist', true)
-            ->tap(fn (Builder $query): Builder => $this->applyOrder($query, $filters, 'watchlist_updated_at'))
-            ->paginate($filters->perPage, pageName: $pageName)
-            ->withQueryString();
+            ->tap(fn (Builder $query): Builder => $this->applyOrder($query, $filters, 'watchlist_updated_at'));
+
+        return $this->paginator->paginate(
+            $user,
+            'library-watchlist',
+            $this->dimensions($filters),
+            $query,
+            $filters->perPage,
+            $pageName,
+            $refresh,
+        );
     }
 
     /** @return LengthAwarePaginator<int, CatalogTitleUserState> */
@@ -46,11 +57,11 @@ final readonly class UserLibraryQuery
         UserLibraryFilters $filters,
         string $pageName = 'page',
     ): LengthAwarePaginator {
-        return $this->applyFilters($this->base($user), $filters, $user)
+        $query = $this->applyFilters($this->base($user), $filters, $user)
             ->whereNotNull('rating')
-            ->tap(fn (Builder $query): Builder => $this->applyOrder($query, $filters, 'rating_updated_at'))
-            ->paginate($filters->perPage, pageName: $pageName)
-            ->withQueryString();
+            ->tap(fn (Builder $query): Builder => $this->applyOrder($query, $filters, 'rating_updated_at'));
+
+        return $this->paginator->paginate($user, 'library-ratings', $this->dimensions($filters), $query, $filters->perPage, $pageName);
     }
 
     /** @return LengthAwarePaginator<int, CatalogTitleUserState> */
@@ -64,11 +75,9 @@ final readonly class UserLibraryQuery
             $query->whereNotNull('recommendation_feedback');
         }
 
-        return $query
-            ->orderByDesc('recommendation_feedback_updated_at')
-            ->orderByDesc('id')
-            ->paginate(24, pageName: $pageName)
-            ->withQueryString();
+        $query->orderByDesc('recommendation_feedback_updated_at')->orderByDesc('id');
+
+        return $this->paginator->paginate($user, 'library-recommendation-feedback', [], $query, 24, $pageName);
     }
 
     /** @return LengthAwarePaginator<int, CatalogTitleUserState> */
@@ -78,11 +87,18 @@ final readonly class UserLibraryQuery
         UserLibraryFilters $filters,
         string $pageName = 'page',
     ): LengthAwarePaginator {
-        return $this->applyFilters($this->base($user), $filters, $user)
+        $query = $this->applyFilters($this->base($user), $filters, $user)
             ->where('watch_status', $status->value)
-            ->tap(fn (Builder $query): Builder => $this->applyOrder($query, $filters, 'watch_status_updated_at'))
-            ->paginate($filters->perPage, pageName: $pageName)
-            ->withQueryString();
+            ->tap(fn (Builder $query): Builder => $this->applyOrder($query, $filters, 'watch_status_updated_at'));
+
+        return $this->paginator->paginate(
+            $user,
+            'library-watch-status',
+            [...$this->dimensions($filters), 'status' => $status->value],
+            $query,
+            $filters->perPage,
+            $pageName,
+        );
     }
 
     /** @return LengthAwarePaginator<int, CatalogTitleUserState> */
@@ -99,11 +115,16 @@ final readonly class UserLibraryQuery
             $query->where('recommendation_feedback', $feedback->value);
         }
 
-        return $query
-            ->orderByDesc('recommendation_feedback_updated_at')
-            ->orderByDesc('id')
-            ->paginate(24, pageName: $pageName)
-            ->withQueryString();
+        $query->orderByDesc('recommendation_feedback_updated_at')->orderByDesc('id');
+
+        return $this->paginator->paginate(
+            $user,
+            'library-recommendation-feedback-type',
+            ['feedback' => $feedback->value],
+            $query,
+            24,
+            $pageName,
+        );
     }
 
     /** @return LengthAwarePaginator<int, CatalogTitleUserState> */
@@ -126,10 +147,15 @@ final readonly class UserLibraryQuery
             });
         $this->personalUpdates->constrain($query, $user, $hasUpdates);
 
-        $paginator = $query
-            ->tap(fn (Builder $query): Builder => $this->applyOrder($query, $filters))
-            ->paginate($filters->perPage, pageName: $pageName)
-            ->withQueryString();
+        $query->tap(fn (Builder $query): Builder => $this->applyOrder($query, $filters));
+        $paginator = $this->paginator->paginate(
+            $user,
+            'library-updates',
+            [...$this->dimensions($filters), 'has_updates' => $hasUpdates],
+            $query,
+            $filters->perPage,
+            $pageName,
+        );
         $this->personalUpdates->hydrateIndicators($user, $paginator->getCollection());
 
         return $paginator;
@@ -197,10 +223,16 @@ final readonly class UserLibraryQuery
             default => $query->orderBy('updated_at', $filters->direction),
         };
 
-        return $query
-            ->orderBy('id', $filters->direction)
-            ->paginate($filters->perPage, pageName: $pageName)
-            ->withQueryString();
+        $query->orderBy('id', $filters->direction);
+
+        return $this->paginator->paginate(
+            $user,
+            'library-markers',
+            $this->dimensions($filters),
+            $query,
+            $filters->perPage,
+            $pageName,
+        );
     }
 
     public function recommendationFeedbackCount(User $user): int
@@ -372,5 +404,18 @@ final readonly class UserLibraryQuery
             ->orderByDesc('last_watched_at')
             ->orderByDesc('id')
             ->limit(1);
+    }
+
+    /** @return array<string, mixed> */
+    private function dimensions(UserLibraryFilters $filters): array
+    {
+        return [
+            'query' => $filters->query,
+            'type' => $filters->type,
+            'year' => $filters->year,
+            'personal_tag' => $filters->personalTagPublicId,
+            'sort' => $filters->sort,
+            'direction' => $filters->direction,
+        ];
     }
 }

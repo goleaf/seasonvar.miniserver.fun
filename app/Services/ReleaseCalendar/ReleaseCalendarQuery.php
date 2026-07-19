@@ -106,6 +106,15 @@ final readonly class ReleaseCalendarQuery
         return $query->exists();
     }
 
+    public function hasRecent(ReleaseCalendarPeriod $period, string $timezone): bool
+    {
+        $query = ReleaseScheduleEntry::query();
+        $this->visibility->constrain($query, null);
+        $this->constrainWindow($query, ReleaseCalendarView::Recent, $period, $timezone);
+
+        return $query->where('status', ReleaseScheduleStatus::Released->value)->exists();
+    }
+
     /** @param Builder<ReleaseScheduleEntry> $query */
     private function constrainWindow(Builder $query, ReleaseCalendarView $view, ReleaseCalendarPeriod $period, string $timezone): void
     {

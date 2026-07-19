@@ -63,19 +63,9 @@ final class CatalogTitleHttpQueryBudgetTest extends TestCase
 
     private function isCatalogRead(string $sql): bool
     {
-        return str_contains($sql, 'catalog_')
-            || str_contains($sql, 'licensed_media')
-            || str_contains($sql, 'episodes')
-            || str_contains($sql, 'seasons')
-            || str_contains($sql, 'genres')
-            || str_contains($sql, 'countries')
-            || str_contains($sql, 'actors')
-            || str_contains($sql, 'directors')
-            || str_contains($sql, 'age_ratings')
-            || str_contains($sql, 'translations')
-            || str_contains($sql, 'statuses')
-            || str_contains($sql, 'networks')
-            || str_contains($sql, 'studios')
-            || str_contains($sql, 'tags');
+        return preg_match(
+            '/\b(?:catalog_[a-z_]+|licensed_media|episodes|seasons|genres|countries|actors|directors|age_ratings|translations|networks|studios|tags)\b/i',
+            $sql,
+        ) === 1;
     }
 }

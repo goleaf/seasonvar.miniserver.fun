@@ -17,6 +17,7 @@ final class UserProfileMediaService
 {
     public function __construct(
         private readonly PrivateUploadStorage $uploads,
+        private readonly UserProfileImageProcessor $images,
         private readonly UserProfileCacheInvalidator $cache,
     ) {}
 
@@ -26,7 +27,13 @@ final class UserProfileMediaService
         $this->validateKind($kind);
         $this->ensureRateLimit($actor, $kind);
         $profile->loadMissing('user:id,public_id');
-        $stored = $this->uploads->store($file, 'user-profiles/'.$profile->user->public_id.'/'.$kind);
+        $prepared = $this->images->process($file, $kind);
+        $stored = $this->uploads->storeBytes(
+            $prepared->bytes,
+            'user-profiles/'.$profile->user->public_id.'/'.$kind,
+            $prepared->extension,
+            $prepared->mimeType,
+        );
 
         try {
             [$oldDisk, $oldPath, $previousVersion] = DB::transaction(function () use ($actor, $profile, $kind, $stored): array {

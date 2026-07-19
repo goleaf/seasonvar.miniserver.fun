@@ -19,6 +19,7 @@ use App\Models\CatalogTitleReviewRestriction;
 use App\Models\CatalogTitleReviewVote;
 use App\Models\User;
 use App\Services\Catalog\CatalogTitleQuery as CatalogVisibilityQuery;
+use App\Services\UserPortal\UserPortalIdPaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -30,6 +31,7 @@ final class CatalogTitleReviewQuery
         private readonly ReviewRelationshipService $relationships,
         private readonly ReviewPresenter $presenter,
         private readonly CatalogVisibilityQuery $titles,
+        private readonly UserPortalIdPaginator $userPortalPaginator,
     ) {}
 
     /**
@@ -110,6 +112,7 @@ final class CatalogTitleReviewQuery
         array $revealedReviewIds = [],
         string $pageName = 'reviewPage',
         ?string $interfaceLocale = null,
+        bool $refresh = false,
     ): LengthAwarePaginator {
         $context = $this->relationships->context($author);
         $query = $this->communityQuery()
@@ -122,9 +125,19 @@ final class CatalogTitleReviewQuery
             ->when($status !== null, fn (Builder $query): Builder => $query->where('catalog_title_reviews.status', $status->value));
         $this->applySort($query, $sort);
         $this->addPresentationRelations($query, $sort);
-        $paginator = $query
-            ->paginate(max(1, (int) config('reviews.profile_per_page', 12)), pageName: $pageName)
-            ->withQueryString();
+        $paginator = $this->userPortalPaginator->paginate(
+            $author,
+            'profile-review-history',
+            [
+                'sort' => $sort->value,
+                'status' => $status?->value,
+                'locale' => $interfaceLocale,
+            ],
+            $query,
+            max(1, (int) config('reviews.profile_per_page', 12)),
+            $pageName,
+            $refresh,
+        );
         $paginator->setPath(route('profile.reviews'));
         $paginator->appends(array_filter([
             'sort' => $sort === ReviewSort::Newest ? null : $sort->value,

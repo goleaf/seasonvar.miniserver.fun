@@ -44,7 +44,7 @@ Collection cover хранится только через `PrivateUploadStorage`
 
 ## Avatar и cover профиля
 
-`UserProfileMediaService` reuses `PrivateUploadStorage` and stores JPEG/PNG/WebP only below `user-profiles/{public_id}/{avatar|cover}` with server-generated names. Database keeps private disk/path/MIME/size/version metadata; public HTML receives only the same-origin versioned controller URL. Replacement/removal deletes only a path on the configured owned disk, account deletion schedules both paths after commit, and public delivery is policy-checked, `private, no-store` and `nosniff`. SVG, executable files, arbitrary paths and public-disk URLs are unsupported. Responsive derivatives/EXIF stripping are not claimed because the repository has no approved processor.
+`UserProfileMediaService` accepts bounded JPEG/PNG/WebP sources, then an approved GD processor verifies actual MIME/bytes/pixels, applies JPEG EXIF orientation, center-crops/resamples and writes a fresh WebP: `320×320` for avatar and `1280×360` for cover. Re-encoding strips source metadata/client filename. `PrivateUploadStorage::storeBytes()` saves only below `user-profiles/{public_id}/{avatar|cover}` with generated names and private visibility. Database keeps private disk/path/WebP MIME/size/version metadata; public HTML receives only the same-origin versioned controller URL. Replacement stores and validates the new derivative before the locked DB switch, removes orphan output on failure and deletes only the previous owned path after success. Public delivery remains policy-checked, `private, no-store` and `nosniff`; SVG, executable files, arbitrary paths and public-disk URLs are unsupported.
 
 ## Screenshots технических обращений
 

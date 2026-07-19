@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Models\SeasonvarImportRun;
 use App\Services\Catalog\CatalogCacheWarmRequestStore;
 use App\Services\Catalog\CatalogTitleRecommendationBuilder;
+use App\Services\Seasonvar\SeasonvarImportActivity;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
@@ -57,8 +57,9 @@ final class RebuildCatalogRecommendationsAfterCollectionSync implements ShouldBe
     public function handle(
         CatalogTitleRecommendationBuilder $recommendations,
         CatalogCacheWarmRequestStore $warmRequests,
+        SeasonvarImportActivity $imports,
     ): void {
-        if ($this->importIsActive()) {
+        if ($imports->active()) {
             Log::info('Перестроение рекомендаций отложено до активного импортного pipeline.');
 
             return;
@@ -112,16 +113,6 @@ final class RebuildCatalogRecommendationsAfterCollectionSync implements ShouldBe
             'catalog-collection-imports.hdrezka.lock_store',
             'redis-locks',
         ));
-    }
-
-    private function importIsActive(): bool
-    {
-        return SeasonvarImportRun::query()->whereIn('status', [
-            'queued',
-            'discovering',
-            'running',
-            'finalizing',
-        ])->exists();
     }
 
     public function failed(?Throwable $exception): void

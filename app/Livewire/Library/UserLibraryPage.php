@@ -72,7 +72,7 @@ final class UserLibraryPage extends Component
 
     public LibraryFilters $filters;
 
-    public ?string $notice = null;
+    public ?string $status = null;
 
     protected UserLibraryQuery $library;
 
@@ -124,7 +124,15 @@ final class UserLibraryPage extends Component
 
     public function mount(string $section = 'watchlist', ?string $locale = null): void
     {
-        abort_unless(in_array($section, self::SECTIONS, true), 404);
+        if (! in_array($section, self::SECTIONS, true)) {
+            if (request()->routeIs('library.section', 'localized.library.section')) {
+                $this->redirectRoute('home');
+
+                return;
+            }
+
+            abort(404);
+        }
 
         $this->section = $section;
     }
@@ -138,7 +146,7 @@ final class UserLibraryPage extends Component
         $this->filters->normalize();
         $this->filters->validateFor($this->section);
         $this->resetLibraryPages();
-        $this->notice = null;
+        $this->status = null;
     }
 
     public function resetFilters(): void
@@ -146,14 +154,14 @@ final class UserLibraryPage extends Component
         $this->filters->reset();
         $this->resetValidation();
         $this->resetLibraryPages();
-        $this->notice = null;
+        $this->status = null;
     }
 
     public function setWatchlist(int $catalogTitleId, bool $inWatchlist): void
     {
         $this->userState->setWatchlist($this->user(), $this->title($catalogTitleId), $inWatchlist);
         $this->resetLibraryPages();
-        $this->notice = __($inWatchlist ? 'library.notices.bookmark_added' : 'library.notices.bookmark_removed');
+        $this->status = __($inWatchlist ? 'library.notices.bookmark_added' : 'library.notices.bookmark_removed');
     }
 
     public function setRating(int $catalogTitleId, mixed $rating): void
@@ -171,7 +179,7 @@ final class UserLibraryPage extends Component
         $this->resetErrorBag('rating');
         $this->userState->setRating($this->user(), $this->title($catalogTitleId), $normalizedRating);
         $this->resetLibraryPages();
-        $this->notice = __($normalizedRating === null ? 'library.notices.rating_removed' : 'library.notices.rating_saved');
+        $this->status = __($normalizedRating === null ? 'library.notices.rating_removed' : 'library.notices.rating_saved');
     }
 
     public function setWatchStatus(int $catalogTitleId, mixed $status): void
@@ -188,14 +196,14 @@ final class UserLibraryPage extends Component
 
         $this->userState->setWatchStatus($this->user(), $this->title($catalogTitleId), $watchStatus);
         $this->resetLibraryPages();
-        $this->notice = __('library.notices.status_saved');
+        $this->status = __('library.notices.status_saved');
     }
 
     public function acknowledgeUpdates(int $catalogTitleId): void
     {
         $this->personalUpdates->acknowledge($this->user(), $this->title($catalogTitleId));
         $this->resetLibraryPages();
-        $this->notice = __('library.notices.updates_acknowledged');
+        $this->status = __('library.notices.updates_acknowledged');
     }
 
     public function deleteMarker(string $publicId): void
@@ -203,28 +211,28 @@ final class UserLibraryPage extends Component
         abort_unless(preg_match('/^[a-f0-9-]{36}$/iD', $publicId) === 1, 404);
         $this->manualPlayback->deleteMarker($this->user(), $publicId);
         $this->resetPage(pageName: 'markersPage');
-        $this->notice = __('library.notices.marker_deleted');
+        $this->status = __('library.notices.marker_deleted');
     }
 
     public function removeHistoryItem(int $progressId): void
     {
         $this->activityActions->removeOwned($this->user(), $progressId);
         $this->resetPage(pageName: 'historyPage');
-        $this->notice = __('library.notices.history_item_removed');
+        $this->status = __('library.notices.history_item_removed');
     }
 
     public function clearHistory(): void
     {
         $this->activityActions->clear($this->user());
         $this->resetPage(pageName: 'historyPage');
-        $this->notice = __('library.notices.history_cleared');
+        $this->status = __('library.notices.history_cleared');
     }
 
     public function undoRecommendationFeedback(int $catalogTitleId): void
     {
         $this->userState->undoRecommendationFeedback($this->user(), $this->title($catalogTitleId));
         $this->resetLibraryPages();
-        $this->notice = __('recommendations.feedback.undone');
+        $this->status = __('recommendations.feedback.undone');
     }
 
     public function render(

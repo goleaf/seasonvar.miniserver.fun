@@ -10,6 +10,7 @@ use App\Models\UserTag;
 use App\Services\Catalog\CatalogTaxonomyRegistry;
 use App\Services\Catalog\CatalogTitleQuery;
 use App\Services\Catalog\CatalogUserCardStateLoader;
+use App\Services\UserPortal\UserPortalCache;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -21,25 +22,77 @@ final readonly class PersonalTagLibraryQuery
         private CatalogTitleQuery $titles,
         private CatalogTaxonomyRegistry $taxonomies,
         private CatalogUserCardStateLoader $cardStates,
+        private UserPortalCache $cache,
     ) {}
 
     /** @return Collection<int, UserTag> */
-    public function active(User $user, string $search = ''): Collection
+    public function active(User $user, string $search = '', bool $refresh = false): Collection
     {
-        return $this->tags->personal($user, $search);
+        $snapshot = $this->cache->remember(
+            $user,
+            'personal-tags-active',
+            ['search' => $search],
+            fn (): array => ['ids' => $this->tags->personal($user, $search)->modelKeys()],
+            $refresh,
+        );
+        $ids = collect($snapshot['ids'] ?? [])
+            ->map(fn (mixed $id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->take(250)
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        $tags = UserTag::query()
+            ->ownedBy($user)
+            ->whereKey($ids)
+            ->select(['id', 'public_id', 'user_id', 'name', 'description', 'content_locale', 'content_version', 'updated_at'])
+            ->withCount('catalogTitles')
+            ->get()
+            ->keyBy('id');
+
+        return $ids->map(fn (int $id): ?UserTag => $tags->get($id))->filter()->values();
     }
 
     /** @return Collection<int, UserTag> */
-    public function restorable(User $user): Collection
+    public function restorable(User $user, bool $refresh = false): Collection
     {
-        return UserTag::query()
+        $snapshot = $this->cache->remember(
+            $user,
+            'personal-tags-restorable',
+            ['restoration_days' => max(1, (int) config('tags.restoration_days', 30))],
+            fn (): array => ['ids' => UserTag::query()
+                ->onlyTrashed()
+                ->ownedBy($user)
+                ->where('deleted_at', '>=', now()->subDays(max(1, (int) config('tags.restoration_days', 30))))
+                ->orderByDesc('deleted_at')
+                ->limit(50)
+                ->pluck('id')
+                ->all()],
+            $refresh,
+        );
+        $ids = collect($snapshot['ids'] ?? [])
+            ->map(fn (mixed $id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->take(50)
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        $tags = UserTag::query()
             ->onlyTrashed()
             ->ownedBy($user)
+            ->whereKey($ids)
             ->where('deleted_at', '>=', now()->subDays(max(1, (int) config('tags.restoration_days', 30))))
             ->select(['id', 'public_id', 'user_id', 'name', 'description', 'content_locale', 'content_version', 'deleted_at'])
-            ->orderByDesc('deleted_at')
-            ->limit(50)
-            ->get();
+            ->get()
+            ->keyBy('id');
+
+        return $ids->map(fn (int $id): ?UserTag => $tags->get($id))->filter()->values();
     }
 
     public function owned(User $user, string $publicId, bool $withTrashed = false): ?UserTag

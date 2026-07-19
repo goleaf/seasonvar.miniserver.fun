@@ -76,18 +76,7 @@ final class CatalogTitlePlaybackQuery
             return $this->seasonSummaryCollections[$key];
         }
 
-        $watchableEpisodeIds = $this->availableMedia($catalogTitle, $user)
-            ->whereNotNull('episode_id')
-            ->select('episode_id')
-            ->groupBy('episode_id');
-        $availableEpisodeIds = Episode::query()
-            ->availableTo($user)
-            ->whereIn((new Episode)->qualifyColumn('id'), clone $watchableEpisodeIds)
-            ->select((new Episode)->qualifyColumn('id'));
-        $availableMediaIds = $this->availableMedia($catalogTitle, $user)
-            ->select((new LicensedMedia)->qualifyColumn('id'));
-
-        return $this->seasonSummaryCollections[$key] = $catalogTitle->seasons()
+        $seasons = $catalogTitle->seasons()
             ->availableTo($user)
             ->select([
                 'id',
@@ -106,13 +95,35 @@ final class CatalogTitlePlaybackQuery
                 'available_until',
                 'deleted_at',
             ])
-            ->withCount([
-                'episodes as available_episodes_count' => fn (Builder $query): Builder => $query
-                    ->whereIn((new Episode)->qualifyColumn('id'), clone $availableEpisodeIds),
-                'licensedMedia as available_media_count' => fn (Builder $query): Builder => $query
-                    ->whereIn((new LicensedMedia)->qualifyColumn('id'), clone $availableMediaIds),
-            ])
             ->get();
+
+        if ($seasons->isEmpty()) {
+            return $this->seasonSummaryCollections[$key] = $seasons;
+        }
+
+        $episode = new Episode;
+        $media = new LicensedMedia;
+        $seasonIds = $seasons->modelKeys();
+        $episodeCounts = $this->watchableEpisodes($catalogTitle, $user)
+            ->whereIn($episode->qualifyColumn('season_id'), $seasonIds)
+            ->reorder()
+            ->select($episode->qualifyColumn('season_id'))
+            ->selectRaw('COUNT(*) AS aggregate_count')
+            ->groupBy($episode->qualifyColumn('season_id'))
+            ->pluck('aggregate_count', $episode->qualifyColumn('season_id'));
+        $mediaCounts = $this->availableMedia($catalogTitle, $user)
+            ->whereIn($media->qualifyColumn('season_id'), $seasonIds)
+            ->select($media->qualifyColumn('season_id'))
+            ->selectRaw('COUNT(*) AS aggregate_count')
+            ->groupBy($media->qualifyColumn('season_id'))
+            ->pluck('aggregate_count', $media->qualifyColumn('season_id'));
+
+        $seasons->each(function (Season $season) use ($episodeCounts, $mediaCounts): void {
+            $season->setAttribute('available_episodes_count', (int) $episodeCounts->get($season->id, 0));
+            $season->setAttribute('available_media_count', (int) $mediaCounts->get($season->id, 0));
+        });
+
+        return $this->seasonSummaryCollections[$key] = $seasons;
     }
 
     private function requestKey(int $catalogTitleId, ?User $user): string
@@ -129,12 +140,17 @@ final class CatalogTitlePlaybackQuery
     /** @return Builder<Episode> */
     public function watchableEpisodes(CatalogTitle $catalogTitle, ?User $user): Builder
     {
-        return $this->watchableEpisodesForVisibleTitles($user)
-            ->where((new Season)->qualifyColumn('catalog_title_id'), $catalogTitle->id);
+        return $this->watchableEpisodeQuery($user, $catalogTitle->id);
     }
 
     /** @return Builder<Episode> */
     public function watchableEpisodesForVisibleTitles(?User $user): Builder
+    {
+        return $this->watchableEpisodeQuery($user);
+    }
+
+    /** @return Builder<Episode> */
+    private function watchableEpisodeQuery(?User $user, ?int $catalogTitleId = null): Builder
     {
         $episode = new Episode;
         $media = new LicensedMedia;
@@ -148,18 +164,43 @@ final class CatalogTitlePlaybackQuery
             ->whereColumn($media->qualifyColumn('catalog_title_id'), $season->qualifyColumn('catalog_title_id'))
             ->selectRaw('1');
 
-        return Episode::query()
+        $query = Episode::query()
             ->availableTo($user)
             ->join($season->getTable(), $season->qualifyColumn('id'), '=', $episode->qualifyColumn('season_id'))
-            ->whereIn(
-                $season->qualifyColumn('catalog_title_id'),
-                $this->titles->visibleTo($user)->select('id'),
-            )
-            ->whereIn(
-                $episode->qualifyColumn('season_id'),
-                Season::query()->availableTo($user)->select('id'),
-            )
-            ->whereExists($availableMedia->toBase())
+            ->whereExists($availableMedia->toBase());
+
+        if ($catalogTitleId !== null) {
+            $query
+                ->where($season->qualifyColumn('catalog_title_id'), $catalogTitleId)
+                ->whereExists(
+                    $this->titles->visibleTo($user)->whereKey($catalogTitleId)->selectRaw('1')->toBase(),
+                )
+                ->whereIn(
+                    $episode->qualifyColumn('season_id'),
+                    Season::query()
+                        ->availableTo($user)
+                        ->where('catalog_title_id', $catalogTitleId)
+                        ->select('id'),
+                );
+        } else {
+            $query
+                ->whereExists(
+                    $this->titles
+                        ->visibleTo($user)
+                        ->whereColumn((new CatalogTitle)->qualifyColumn('id'), $season->qualifyColumn('catalog_title_id'))
+                        ->selectRaw('1')
+                        ->toBase(),
+                )
+                ->whereExists(
+                    Season::query()
+                        ->availableTo($user)
+                        ->whereColumn($season->qualifyColumn('id'), $episode->qualifyColumn('season_id'))
+                        ->selectRaw('1')
+                        ->toBase(),
+                );
+        }
+
+        return $query
             ->select([
                 $episode->qualifyColumn('id'),
                 $episode->qualifyColumn('season_id'),

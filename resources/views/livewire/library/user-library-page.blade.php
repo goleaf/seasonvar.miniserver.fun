@@ -45,8 +45,8 @@
         <span wire:loading>{{ __('library.loading') }}</span>
     </div>
 
-    @if ($notice)
-        <x-form.status-message :message="$notice" />
+    @if ($status)
+        <x-form.status-message :message="$status" />
     @endif
 
     @unless ($canInteract)
@@ -142,7 +142,7 @@
                     </div>
                 </div>
             @else
-                <div class="divide-y divide-slate-200" aria-live="polite">
+                <div data-library-{{ $section }}-list class="divide-y divide-slate-200" aria-live="polite">
                     @foreach ($stateItems as $state)
                         <article wire:key="library-state-{{ $section }}-{{ $state->id }}" class="min-w-0">
                             <x-catalog.title-card
@@ -268,7 +268,7 @@
                     <p class="mt-3 text-sm font-bold text-slate-700">{{ __('library.empty.continue-watching') }}</p>
                 </div>
             @else
-                <div class="divide-y divide-slate-200">
+                <div data-library-continue-list class="divide-y divide-slate-200">
                     @foreach ($continueWatching as $item)
                         <x-ui.poster-card :src="$item->title->poster_url" :alt="__('library.poster_alt', ['title' => $item->title->display_title])" layout="list" wire:key="continue-watching-{{ $item->title->id }}">
                             <p class="text-xs font-semibold text-slate-500">{{ __('library.episode_context', ['season' => $item->episode->season?->number ?? '—', 'episode' => $item->episode->number ?? '—']) }}</p>
@@ -299,7 +299,7 @@
                         </button>
                     </div>
                 @endif
-                <div class="divide-y divide-slate-200">
+                <div data-library-history-list class="divide-y divide-slate-200">
                     @foreach ($history as $progress)
                         <x-ui.poster-card :src="$progress->is_accessible && $progress->catalogTitle ? $progress->catalogTitle->poster_url : null" :alt="$progress->is_accessible && $progress->catalogTitle ? __('library.poster_alt', ['title' => $progress->catalogTitle->display_title]) : __('library.unavailable_episode')" layout="compact" wire:key="history-{{ $progress->id }}">
                             <div class="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">

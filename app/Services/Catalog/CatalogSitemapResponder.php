@@ -129,10 +129,20 @@ class CatalogSitemapResponder
             }
 
             $calendarTimezone = $this->releaseCalendarTimezone->public();
-            $calendarPeriod = ReleaseCalendarPeriod::resolve(ReleaseCalendarView::Upcoming, null, $calendarTimezone);
+            $recentPeriod = ReleaseCalendarPeriod::resolve(ReleaseCalendarView::Recent, null, $calendarTimezone);
+            $upcomingPeriod = ReleaseCalendarPeriod::resolve(ReleaseCalendarView::Upcoming, null, $calendarTimezone);
 
             if ($this->releaseCalendarSchema->ready()
-                && $this->releaseCalendarQuery->hasUpcoming($calendarPeriod, $calendarTimezone)) {
+                && $this->releaseCalendarQuery->hasRecent($recentPeriod, $calendarTimezone)) {
+                $this->writeSitemapUrl(route('calendar.index'), now(), 'daily', '0.7');
+
+                foreach (config('release-calendar.supported_locales', ['ru']) as $locale) {
+                    $this->writeSitemapUrl(route('localized.calendar.index', ['locale' => $locale]), now(), 'daily', '0.7');
+                }
+            }
+
+            if ($this->releaseCalendarSchema->ready()
+                && $this->releaseCalendarQuery->hasUpcoming($upcomingPeriod, $calendarTimezone)) {
                 $this->writeSitemapUrl(route('calendar.upcoming'), now(), 'daily', '0.7');
 
                 foreach (config('release-calendar.supported_locales', ['ru']) as $locale) {

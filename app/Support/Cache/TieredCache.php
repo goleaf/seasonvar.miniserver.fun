@@ -26,6 +26,38 @@ final class TieredCache
     ) {}
 
     /**
+     * Inspect the authoritative cache namespace without rebuilding it.
+     *
+     * @param  array<string, mixed>  $dimensions
+     */
+    public function state(
+        CacheDomain $domain,
+        string $resource,
+        array $dimensions,
+        string $versionScope = 'public',
+    ): CacheEntryState {
+        try {
+            $version = $this->versions->version($domain, $versionScope);
+            $key = $this->keys->data($domain, $resource, $dimensions, $version);
+            $store = Cache::memo($this->domainStore());
+
+            if ($this->isEnvelope($store->get($key))) {
+                return CacheEntryState::Fresh;
+            }
+
+            if ($this->isEnvelope($store->get($this->keys->stale($key)))) {
+                return CacheEntryState::Stale;
+            }
+
+            return CacheEntryState::Missing;
+        } catch (Throwable $exception) {
+            $this->reportFailure($domain, 'state-read', $exception);
+
+            return CacheEntryState::Unavailable;
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $dimensions
      * @param  Closure(): mixed  $rebuild
      */
@@ -348,7 +380,7 @@ final class TieredCache
         try {
             $value = Cache::memo($store)->get($key);
 
-            if (is_array($value) && ($value['format'] ?? null) === self::ENVELOPE_FORMAT && array_key_exists('value', $value)) {
+            if ($this->isEnvelope($value)) {
                 $this->telemetry->increment($domain, $layer.'-hit');
 
                 return [
@@ -364,6 +396,13 @@ final class TieredCache
         }
 
         return null;
+    }
+
+    private function isEnvelope(mixed $value): bool
+    {
+        return is_array($value)
+            && ($value['format'] ?? null) === self::ENVELOPE_FORMAT
+            && array_key_exists('value', $value);
     }
 
     /** @param array{format: int, negative: bool, value: mixed} $envelope */

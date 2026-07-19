@@ -60,6 +60,7 @@ return [
 
     'warming' => [
         'enabled' => env('CACHE_WARMING_ENABLED', true),
+        'user_portal_enabled' => env('CACHE_USER_PORTAL_WARMING_ENABLED', true),
         'connection' => env('CACHE_WARM_QUEUE_CONNECTION', 'redis'),
         'queue' => env('CACHE_WARM_QUEUE', 'cache-warm-v2'),
         'timeout' => (int) env('CACHE_WARM_TIMEOUT', 600),
@@ -76,6 +77,13 @@ return [
         'full_import_pause_seconds' => (int) env('CACHE_WARM_FULL_IMPORT_PAUSE_SECONDS', 300),
         'full_stale_seconds' => (int) env('CACHE_WARM_FULL_STALE_SECONDS', 900),
         'full_state_retention_seconds' => (int) env('CACHE_WARM_FULL_STATE_RETENTION_SECONDS', 2_592_000),
+        'visible_titles' => [
+            'enabled' => env('CACHE_VISIBLE_TITLE_WARM_ENABLED', true),
+            'max_titles' => (int) env('CACHE_VISIBLE_TITLE_WARM_MAX_TITLES', 96),
+            'import_pause_seconds' => (int) env('CACHE_VISIBLE_TITLE_WARM_IMPORT_PAUSE_SECONDS', 300),
+            'unavailable_pause_seconds' => (int) env('CACHE_VISIBLE_TITLE_WARM_UNAVAILABLE_PAUSE_SECONDS', 60),
+            'unique_seconds' => (int) env('CACHE_VISIBLE_TITLE_WARM_UNIQUE_SECONDS', 600),
+        ],
     ],
 
     'domains' => [
@@ -202,6 +210,15 @@ return [
             'hot' => 30,
             'negative' => 20,
             'lock' => 30,
+            'wait_milliseconds' => 250,
+            'jitter_percent' => 10,
+        ],
+        'user-portal' => [
+            'fresh' => 300,
+            'stale' => 1_800,
+            'hot' => 120,
+            'negative' => 15,
+            'lock' => 60,
             'wait_milliseconds' => 250,
             'jitter_percent' => 10,
         ],

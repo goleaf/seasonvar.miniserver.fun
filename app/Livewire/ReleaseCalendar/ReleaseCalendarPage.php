@@ -255,7 +255,7 @@ final class ReleaseCalendarPage extends Component
             ReleaseCalendarView::Day => 'calendar.day',
             ReleaseCalendarView::Week => 'calendar.week',
             ReleaseCalendarView::Month => 'calendar.month',
-            ReleaseCalendarView::Recent => 'calendar.recent',
+            ReleaseCalendarView::Recent => 'calendar.index',
             ReleaseCalendarView::Personal => 'calendar.mine',
         };
         $parameters = $period !== null ? ['period' => $period] : [];

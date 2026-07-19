@@ -6,6 +6,7 @@ namespace App\Services\Storage;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -53,6 +54,34 @@ final class PrivateUploadStorage
         }
 
         return Storage::disk($disk)->delete($path);
+    }
+
+    public function storeBytes(string $bytes, string $directory, string $extension, string $mimeType): StoredPrivateUpload
+    {
+        if ($bytes === '' || preg_match('/^[a-z0-9]+$/D', $extension) !== 1) {
+            throw new InvalidArgumentException('Некорректное содержимое производного файла.');
+        }
+
+        $disk = (string) config('uploads.disk', 'uploads');
+        $visibility = (string) config('uploads.visibility', 'private');
+
+        if ($visibility !== 'private') {
+            throw new RuntimeException('Uploaded files must use private visibility.');
+        }
+
+        $path = $this->normalizeDirectory($directory).'/'.Str::uuid().'.'.$extension;
+
+        if (! Storage::disk($disk)->put($path, $bytes, ['visibility' => $visibility])) {
+            throw new RuntimeException('Не удалось сохранить производный файл.');
+        }
+
+        return new StoredPrivateUpload(
+            disk: $disk,
+            path: $path,
+            visibility: $visibility,
+            mimeType: $mimeType,
+            size: strlen($bytes),
+        );
     }
 
     private function normalizeDirectory(string $directory): string

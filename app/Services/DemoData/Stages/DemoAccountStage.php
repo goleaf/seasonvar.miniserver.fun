@@ -99,8 +99,22 @@ final readonly class DemoAccountStage implements DemoDataStage
             $user->saveQuietly();
             $user->timestamps = true;
             $users[$userIndex] = $user;
-            $avatar = $asset->store('avatars', (string) $user->public_id, 320, 320);
-            $cover = $asset->store('profile-covers', (string) $user->public_id, 1_280, 360);
+            $avatar = $asset->store(
+                'avatars',
+                (string) $user->public_id,
+                320,
+                320,
+                'user-profiles/'.$user->public_id.'/avatar/demo',
+                'webp',
+            );
+            $cover = $asset->store(
+                'profile-covers',
+                (string) $user->public_id,
+                1_280,
+                360,
+                'user-profiles/'.$user->public_id.'/cover/demo',
+                'webp',
+            );
             $visibility = $this->stable->boolean("account:{$userIndex}:public-profile", 72)
                 ? UserProfileVisibility::Public->value
                 : UserProfileVisibility::Private->value;

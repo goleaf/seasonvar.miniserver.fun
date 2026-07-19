@@ -72,8 +72,22 @@ final class DemoAccountStageTest extends TestCase
             $this->assertGreaterThan(100, mb_strlen((string) $user->profile->biography));
             $this->assertNotNull($user->profile->avatar_path);
             $this->assertNotNull($user->profile->cover_path);
+            $this->assertSame('image/webp', $user->profile->avatar_mime_type);
+            $this->assertSame('image/webp', $user->profile->cover_mime_type);
+            $this->assertStringStartsWith('user-profiles/'.$user->public_id.'/avatar/', (string) $user->profile->avatar_path);
+            $this->assertStringStartsWith('user-profiles/'.$user->public_id.'/cover/', (string) $user->profile->cover_path);
+            $this->assertStringEndsWith('.webp', (string) $user->profile->avatar_path);
+            $this->assertStringEndsWith('.webp', (string) $user->profile->cover_path);
             Storage::disk('uploads')->assertExists($user->profile->avatar_path);
             Storage::disk('uploads')->assertExists($user->profile->cover_path);
+            $this->assertSame(
+                [320, 320],
+                array_slice(getimagesize(Storage::disk('uploads')->path($user->profile->avatar_path)) ?: [], 0, 2),
+            );
+            $this->assertSame(
+                [1280, 360],
+                array_slice(getimagesize(Storage::disk('uploads')->path($user->profile->cover_path)) ?: [], 0, 2),
+            );
             $this->assertNotNull($user->accountSetting->locale);
             $this->assertNotNull($user->accountSetting->timezone);
             $this->assertNotNull($user->accountSetting->playback_speed);

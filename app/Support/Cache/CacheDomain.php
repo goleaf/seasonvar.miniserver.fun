@@ -20,5 +20,6 @@ enum CacheDomain: string
     case HelpCenter = 'help-center';
     case Sitemap = 'sitemap';
     case Api = 'api';
+    case UserPortal = 'user-portal';
     case Operational = 'operational';
 }

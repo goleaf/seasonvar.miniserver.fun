@@ -45,6 +45,7 @@ use App\Models\UserBlock;
 use App\Models\UserMute;
 use App\Models\UserProfile;
 use App\Models\UserProfileReport;
+use App\Models\UserTag;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -88,6 +89,9 @@ final class DemoDataAuditor
             'user_title_states' => DB::table($stateTable)->whereIn('user_id', $userIds)->count(),
             'user_reviews' => (clone $userReviewQuery)->count(),
             'root_title_comments' => (clone $rootTitleCommentQuery)->count(),
+            'content_requests' => ContentRequest::query()->whereIn('requester_id', $userIds)->count(),
+            'personal_tags' => UserTag::query()->whereIn('user_id', $userIds)->count(),
+            'collections' => CatalogCollection::query()->whereIn('owner_id', $userIds)->count(),
             'notifications' => DB::table($notificationTable)->whereIn('notifiable_id', $userIds)->count(),
         ];
 
@@ -123,6 +127,31 @@ final class DemoDataAuditor
             || $counters['user_reviews'] !== $expectedPairs
             || $counters['root_title_comments'] !== $expectedPairs) {
             $violations[] = 'Половинное покрытие каталога расходится между состояниями, рецензиями и комментариями.';
+        }
+
+        foreach ([
+            'заявок' => [ContentRequest::query()->whereIn('requester_id', $userIds), 'requester_id', $options->requestMinimum, $options->requestMaximum],
+            'личных тегов' => [UserTag::query()->whereIn('user_id', $userIds), 'user_id', $options->personalTagMinimum, $options->personalTagMaximum],
+            'коллекций' => [CatalogCollection::query()->whereIn('owner_id', $userIds), 'owner_id', $options->collectionMinimum, $options->collectionMaximum],
+        ] as $label => [$query, $ownerColumn, $minimum, $maximum]) {
+            $counts = $query->selectRaw("{$ownerColumn}, COUNT(*) AS aggregate")
+                ->groupBy($ownerColumn)
+                ->pluck('aggregate', $ownerColumn);
+
+            foreach ($userIds as $userId) {
+                $actual = (int) ($counts[$userId] ?? 0);
+
+                if ($actual < $minimum || $actual > $maximum) {
+                    $violations[] = sprintf(
+                        'У пользователя %d неверное количество %s: ожидалось %d–%d, найдено %d.',
+                        $userId,
+                        $label,
+                        $minimum,
+                        $maximum,
+                        $actual,
+                    );
+                }
+            }
         }
 
         $this->auditDuplicates($userIds->all(), $violations);
@@ -421,9 +450,19 @@ final class DemoDataAuditor
         $assets = [];
         $profiles = DB::table((new UserProfile)->getTable())
             ->whereIn('user_id', $userIds)
-            ->get(['avatar_disk', 'avatar_path', 'cover_disk', 'cover_path']);
+            ->get(['user_id', 'avatar_disk', 'avatar_path', 'avatar_mime_type', 'cover_disk', 'cover_path', 'cover_mime_type']);
+        $publicIds = User::query()->whereIn('id', $userIds)->pluck('public_id', 'id');
 
         foreach ($profiles as $profile) {
+            $expectedPrefix = 'user-profiles/'.($publicIds[$profile->user_id] ?? '').'/';
+
+            if ($profile->avatar_mime_type !== 'image/webp'
+                || $profile->cover_mime_type !== 'image/webp'
+                || ! str_starts_with((string) $profile->avatar_path, $expectedPrefix.'avatar/')
+                || ! str_starts_with((string) $profile->cover_path, $expectedPrefix.'cover/')) {
+                $violations[] = 'Профиль демонстрационного пользователя содержит недоставляемое изображение.';
+            }
+
             $assets[] = [(string) $profile->avatar_disk, (string) $profile->avatar_path];
             $assets[] = [(string) $profile->cover_disk, (string) $profile->cover_path];
         }
@@ -431,9 +470,14 @@ final class DemoDataAuditor
         $collections = DB::table((new CatalogCollection)->getTable())
             ->whereIn('owner_id', $userIds)
             ->whereNotNull('cover_path')
-            ->get(['cover_disk', 'cover_path']);
+            ->get(['public_id', 'cover_disk', 'cover_path', 'cover_mime_type']);
 
         foreach ($collections as $collection) {
+            if ($collection->cover_mime_type !== 'image/webp'
+                || ! str_starts_with((string) $collection->cover_path, 'catalog-collections/'.$collection->public_id.'/')) {
+                $violations[] = 'Демонстрационная коллекция содержит недоставляемую обложку.';
+            }
+
             $assets[] = [(string) $collection->cover_disk, (string) $collection->cover_path];
         }
 
@@ -448,7 +492,7 @@ final class DemoDataAuditor
 
         foreach ($assets as [$disk, $path]) {
             if ($disk === '' || $path === '' || ! Storage::disk($disk)->exists($path)) {
-                $violations[] = "Не найден демонстрационный PNG-файл {$disk}:{$path}.";
+                $violations[] = "Не найден демонстрационный файл {$disk}:{$path}.";
 
                 if (count($violations) >= 100) {
                     break;

@@ -105,15 +105,7 @@ final class PublicPageCachePolicy
         }
 
         $parameters = $this->parameters($request);
-        $dimensions = [
-            'audience' => 'public',
-            'assets' => $this->assetBuildFingerprint(),
-            'origin' => $canonicalOrigin,
-            'locale' => app()->getLocale(),
-            'route' => $routeName,
-            'parameters' => $parameters,
-            'query' => hash('sha256', json_encode($query, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)),
-        ];
+        $dimensions = $this->dimensions($canonicalOrigin, $routeName, $parameters, $query);
 
         if ($profile === 'homepage') {
             $dimensions['translations'] = $this->homepageTranslationFingerprint();
@@ -121,6 +113,10 @@ final class PublicPageCachePolicy
 
         if ($profile === 'calendar') {
             $dimensions['timezone'] = $this->releaseCalendarTimezone->public();
+        }
+
+        if ($profile === 'catalog') {
+            $dimensions['response_contract'] = 2;
         }
 
         return match ($profile) {
@@ -137,6 +133,46 @@ final class PublicPageCachePolicy
             'calendar' => new PublicPageCacheContext(CacheDomain::ReleaseCalendar, $dimensions),
             default => null,
         };
+    }
+
+    public function canonicalTitleContext(CatalogTitle $title): ?PublicPageCacheContext
+    {
+        $canonicalOrigin = $this->canonicalOrigin();
+        $titleId = $title->getKey();
+        $slug = $title->getRouteKey();
+
+        if ($canonicalOrigin === null
+            || ! (bool) config('cache-architecture.page_cache.enabled', true)
+            || ! is_int($titleId)
+            || ! is_string($slug)
+            || $slug === '') {
+            return null;
+        }
+
+        return $this->titleContextFor($title, $this->dimensions(
+            $canonicalOrigin,
+            'titles.show',
+            ['catalogTitle' => $slug],
+            [],
+        ));
+    }
+
+    /**
+     * @param  array<string, scalar|null>  $parameters
+     * @param  array<string, mixed>  $query
+     * @return array<string, mixed>
+     */
+    private function dimensions(string $origin, string $route, array $parameters, array $query): array
+    {
+        return [
+            'audience' => 'public',
+            'assets' => $this->assetBuildFingerprint(),
+            'origin' => $origin,
+            'locale' => app()->getLocale(),
+            'route' => $route,
+            'parameters' => $parameters,
+            'query' => hash('sha256', json_encode($query, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE)),
+        ];
     }
 
     /** @param array<string, scalar|null> $parameters */
@@ -160,6 +196,12 @@ final class PublicPageCachePolicy
             return null;
         }
 
+        return $this->titleContextFor($title, $dimensions);
+    }
+
+    /** @param array<string, mixed> $dimensions */
+    private function titleContextFor(CatalogTitle $title, array $dimensions): PublicPageCacheContext
+    {
         $dimensions['global_title_version'] = $this->versions->version(CacheDomain::TitleDetail);
 
         return new PublicPageCacheContext(
@@ -358,11 +400,11 @@ final class PublicPageCachePolicy
 
         if (! in_array($scheme, ['http', 'https'], true)
             || $host === ''
-            || ($port !== null && (! is_int($port) || $port < 1 || $port > 65_535))) {
+            || ($port !== null && $port < 1)) {
             return null;
         }
 
-        $portSuffix = is_int($port)
+        $portSuffix = $port !== null
             && ! (($scheme === 'http' && $port === 80) || ($scheme === 'https' && $port === 443))
                 ? ':'.$port
                 : '';

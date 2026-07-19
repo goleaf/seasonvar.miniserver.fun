@@ -76,7 +76,7 @@ final class UserLibraryPageTest extends TestCase
             ->call('setWatchlist', $wanted->id, false)
             ->assertHasNoErrors()
             ->assertDontSeeText('Нужный сериал')
-            ->assertSet('status', 'Тайтл удалён из списка.');
+            ->assertSet('status', 'Закладка удалена. Прогресс, статус и коллекции сохранены.');
 
         $this->assertDatabaseHas('catalog_title_user_states', [
             'user_id' => $user->id,

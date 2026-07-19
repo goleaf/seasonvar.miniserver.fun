@@ -11,6 +11,7 @@ use App\Http\Requests\CatalogTitlesRequest;
 use App\Livewire\Forms\CatalogSeriesFilters;
 use App\Rules\CatalogFilterSlug;
 use App\Services\Catalog\CatalogTitlesPageBuilder;
+use App\Services\Catalog\VisibleCatalogTitleCacheWarmScheduler;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -47,9 +48,14 @@ class CatalogSeries extends Component
 
     protected CatalogTitlesPageBuilder $pages;
 
-    public function boot(CatalogTitlesPageBuilder $pages): void
-    {
+    protected VisibleCatalogTitleCacheWarmScheduler $titleCacheWarm;
+
+    public function boot(
+        CatalogTitlesPageBuilder $pages,
+        VisibleCatalogTitleCacheWarmScheduler $titleCacheWarm,
+    ): void {
         $this->pages = $pages;
+        $this->titleCacheWarm = $titleCacheWarm;
     }
 
     public function mount(?int $year = null, ?string $type = null, ?string $taxonomy = null): void
@@ -315,6 +321,11 @@ class CatalogSeries extends Component
         if ($titles->currentPage() > $titles->lastPage()) {
             $this->setPage(max(1, $titles->lastPage()));
             $this->redirect($this->catalogUrl($titles->lastPage()), navigate: true);
+        } else {
+            $this->titleCacheWarm->capture(
+                $titles->getCollection()->pluck('id')->all(),
+                request(),
+            );
         }
 
         return view('catalog.titles', $data)

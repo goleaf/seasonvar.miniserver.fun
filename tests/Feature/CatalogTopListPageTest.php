@@ -71,7 +71,7 @@ final class CatalogTopListPageTest extends TestCase
         }
 
         $this->get('/top')->assertRedirect(route('top.show', ['category' => CatalogTopListCategory::Movies->value]));
-        $this->get('/top/not-a-category')->assertRedirect(route('home'));
+        $this->get('/top/not-a-category')->assertNotFound();
     }
 
     public function test_ranking_uses_kinopoisk_then_imdb_and_smooths_sparse_scores(): void

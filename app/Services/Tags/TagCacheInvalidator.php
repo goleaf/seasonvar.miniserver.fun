@@ -6,6 +6,7 @@ namespace App\Services\Tags;
 
 use App\Models\User;
 use App\Services\Catalog\CatalogCacheInvalidator;
+use App\Services\UserPortal\UserPortalCacheInvalidator;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheVersionRegistry;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,7 @@ final readonly class TagCacheInvalidator
     public function __construct(
         private CacheVersionRegistry $versions,
         private CatalogCacheInvalidator $catalog,
+        private UserPortalCacheInvalidator $userPortal,
     ) {}
 
     /** @param iterable<int, int|string> $titleIds */
@@ -34,10 +36,10 @@ final readonly class TagCacheInvalidator
 
     public function personalChanged(User $user): void
     {
-        $this->personalChangedId((int) $user->getKey());
+        $this->personalChangedId((int) $user->getKey(), $user);
     }
 
-    public function personalChangedId(int $userId): void
+    public function personalChangedId(int $userId, ?User $user = null): void
     {
         if ($userId < 1) {
             return;
@@ -47,10 +49,14 @@ final readonly class TagCacheInvalidator
 
         if (DB::transactionLevel() > 0) {
             DB::afterCommit($invalidate);
-
-            return;
+        } else {
+            $invalidate();
         }
 
-        $invalidate();
+        $owner = $user ?? User::query()->find($userId);
+
+        if ($owner instanceof User) {
+            $this->userPortal->changed($owner);
+        }
     }
 }

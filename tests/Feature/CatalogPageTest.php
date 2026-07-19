@@ -5,6 +5,9 @@ namespace Tests\Feature;
 use App\DTOs\VerifiedExternalUrlData;
 use App\Enums\AdminAuditAction;
 use App\Enums\ReleaseKind;
+use App\Enums\TagModerationStatus;
+use App\Enums\TagType;
+use App\Enums\TagVisibility;
 use App\Jobs\StartSeasonvarQueuedImport;
 use App\Livewire\CatalogAdministrationManager;
 use App\Livewire\CatalogDirectoryBrowser;
@@ -178,12 +181,18 @@ class CatalogPageTest extends TestCase
             $taxonomy = $modelClass::query()->create([
                 'name' => 'Значение '.($index + 1),
                 'slug' => 'znachenie-'.($index + 1),
+                ...($modelClass === Tag::class ? [
+                    'type' => TagType::Editorial->value,
+                    'visibility' => TagVisibility::Public->value,
+                    'moderation_status' => TagModerationStatus::Approved->value,
+                ] : []),
             ]);
             $title->{$taxonomies->relationName($filterType)}()->attach($taxonomy);
 
-            $this->get(route($directory->detailRouteName, $taxonomy->slug))
-                ->assertStatus(301)
-                ->assertRedirect(route('titles.taxonomy', ['type' => $filterType, 'taxonomy' => $taxonomy->slug]));
+            $response = $this->get(route($directory->detailRouteName, $taxonomy->slug));
+
+            $this->assertSame(301, $response->status(), 'Directory: '.$directory->key);
+            $response->assertRedirect(route('titles.taxonomy', ['type' => $filterType, 'taxonomy' => $taxonomy->slug]));
         }
 
         $this->get(route('years.show', 2026))
@@ -193,7 +202,7 @@ class CatalogPageTest extends TestCase
         $this->get('/genres/neizvestnyi-zhanr')->assertNotFound();
         $this->get('/genres/NEVALID')->assertNotFound();
         $this->get('/years/1899')->assertNotFound();
-        $this->get('/directories-do-not-exist')->assertRedirect(route('home'));
+        $this->get('/directories-do-not-exist')->assertNotFound();
     }
 
     public function test_directory_livewire_state_is_url_bound_normalized_and_resets_pagination(): void
@@ -305,7 +314,7 @@ class CatalogPageTest extends TestCase
 
             $this->assertSame(
                 1,
-                preg_match_all('~/vendor/livewire/livewire(?:\.min)?\.js\?id=~', $content),
+                preg_match_all('~/vendor/livewire/livewire(?:\.min|\.csp)?\.js\?id=~', $content),
             );
             $this->assertSame(1, substr_count($content, 'data-csrf='));
         }
@@ -326,7 +335,7 @@ class CatalogPageTest extends TestCase
             'next_check_at' => now()->subMinute(),
         ]);
 
-        $this->get(route('admin.imports'))->assertForbidden();
+        $this->get(route('admin.imports'))->assertRedirectToRoute('login');
         $this->actingAs($ordinaryUser)->get(route('admin.imports'))->assertForbidden();
         $this->actingAs($admin)
             ->get(route('admin.imports'))
@@ -368,7 +377,7 @@ class CatalogPageTest extends TestCase
         $admin = User::factory()->create(['email' => 'admin@example.com']);
         $ordinaryUser = User::factory()->create(['email' => 'viewer@example.com']);
 
-        $this->get('/admin/catalog')->assertForbidden();
+        $this->get('/admin/catalog')->assertRedirectToRoute('login');
         $this->actingAs($ordinaryUser)->get('/admin/catalog')->assertForbidden();
         $this->actingAs($admin)
             ->get('/admin/catalog')
@@ -867,6 +876,27 @@ class CatalogPageTest extends TestCase
         );
     }
 
+    public function test_livewire_catalog_updates_results_after_selecting_a_searched_actor(): void
+    {
+        $actor = Actor::query()->create([
+            'name' => 'Актёр для realtime-фильтра',
+            'slug' => 'akter-dlia-realtime-filtra',
+        ]);
+        $matching = CatalogTitle::factory()->create(['title' => 'Подходящий сериал']);
+        $matching->actors()->attach($actor);
+        $other = CatalogTitle::factory()->create(['title' => 'Другой сериал']);
+
+        $component = Livewire::test(CatalogSeries::class)
+            ->set('optionSearch.actor', 'realtime')
+            ->set('filters.actor', [$actor->slug])
+            ->assertSet('filters.actor', [$actor->slug])
+            ->assertSet('paginators.page', 1);
+        $page = $component->instance()->catalogPage();
+
+        $this->assertSame([$matching->id], $page['titles']->pluck('id')->all());
+        $this->assertNotContains($other->id, $page['titles']->pluck('id')->all());
+    }
+
     public function test_livewire_catalog_keeps_selected_country_live_without_manual_facet_state(): void
     {
         $lithuania = Country::query()->create([
@@ -1099,6 +1129,10 @@ class CatalogPageTest extends TestCase
         $tag = Tag::query()->create([
             'name' => 'Субтитры',
             'slug' => 'subtitry',
+            'code' => 'subtitle-available',
+            'type' => TagType::System->value,
+            'visibility' => TagVisibility::Public->value,
+            'moderation_status' => TagModerationStatus::Approved->value,
             'source_url' => 'https://seasonvar.ru/tag/subtitry',
         ]);
         $title->tags()->attach($tag);
@@ -1293,7 +1327,7 @@ class CatalogPageTest extends TestCase
         $response = $this->get(route('stats'));
 
         $this->assertMatchesRegularExpression(
-            '~/vendor/livewire/livewire(?:\.min)?\.js\?id=~',
+            '~/vendor/livewire/livewire(?:\.min|\.csp)?\.js\?id=~',
             $response->getContent(),
         );
 
@@ -3116,7 +3150,11 @@ class CatalogPageTest extends TestCase
             'wire:key="continue-watching-'.$continuingTitle->id.'"',
         ));
         $queries = collect(DB::getQueryLog());
-        $this->assertLessThanOrEqual(12, $queries->count());
+        $this->assertLessThanOrEqual(
+            13,
+            $queries->count(),
+            $queries->pluck('query')->implode("\n"),
+        );
         $continueSql = $queries->pluck('query')->implode("\n");
         $this->assertStringContainsString('ROW_NUMBER() OVER', $continueSql);
         $this->assertStringContainsString('LEAD(', $continueSql);

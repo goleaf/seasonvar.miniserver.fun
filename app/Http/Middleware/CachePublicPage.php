@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Services\Catalog\PublicPageCacheManifest;
+use App\Services\Catalog\VisibleCatalogTitleCacheWarmScheduler;
 use App\Support\Cache\CacheRebuildTimeout;
 use App\Support\Cache\CacheTtlPolicy;
 use App\Support\Cache\PublicPageCachePolicy;
@@ -27,6 +28,7 @@ final class CachePublicPage
         private readonly TieredCache $cache,
         private readonly CacheTtlPolicy $ttl,
         private readonly PublicPageCacheManifest $manifest,
+        private readonly VisibleCatalogTitleCacheWarmScheduler $visibleTitleWarm,
     ) {}
 
     public function handle(Request $request, Closure $next, string $profile): Response
@@ -34,7 +36,10 @@ final class CachePublicPage
         $context = $this->policy->context($request, $profile);
 
         if ($context === null || ! $request->acceptsHtml()) {
-            return $this->withStatus($next($request), 'BYPASS');
+            $response = $next($request);
+            $this->visibleTitleWarm->defer($this->visibleTitleWarm->captured($request));
+
+            return $this->withStatus($response, 'BYPASS');
         }
 
         $uncachedResponse = null;
@@ -62,13 +67,22 @@ final class CachePublicPage
                     return [
                         ...$payload,
                         'content_type' => (string) $uncachedResponse->headers->get('Content-Type', 'text/html; charset=UTF-8'),
+                        'visible_title_ids' => $this->visibleTitleWarm->captured($request),
                     ];
                 },
                 versionScope: $context->versionScope,
             );
         } catch (CacheRebuildTimeout) {
-            return $this->withStatus($uncachedResponse ?? $next($request), 'BYPASS');
+            $response = $uncachedResponse ?? $next($request);
+            $this->visibleTitleWarm->defer($this->visibleTitleWarm->captured($request));
+
+            return $this->withStatus($response, 'BYPASS');
         }
+
+        $visibleTitleIds = is_array($result->value)
+            ? ($result->value['visible_title_ids'] ?? [])
+            : $this->visibleTitleWarm->captured($request);
+        $this->visibleTitleWarm->defer(is_iterable($visibleTitleIds) ? $visibleTitleIds : []);
 
         if ($result->source === 'rebuild' && $uncachedResponse instanceof Response) {
             if ($result->value !== null) {

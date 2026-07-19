@@ -7,12 +7,16 @@ namespace App\Services\Catalog;
 use App\Models\EpisodeViewProgress;
 use App\Models\User;
 use App\Services\Api\V1\Sync\UserSyncChangePublisher;
+use App\Services\UserPortal\UserPortalCacheInvalidator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 final class CatalogViewingActivityService
 {
-    public function __construct(private readonly UserSyncChangePublisher $syncChanges) {}
+    public function __construct(
+        private readonly UserSyncChangePublisher $syncChanges,
+        private readonly UserPortalCacheInvalidator $userPortalCache,
+    ) {}
 
     public function remove(User $user, int $progressId): void
     {
@@ -55,5 +59,7 @@ final class CatalogViewingActivityService
                 $this->syncChanges->publishHistoryClear($user);
             }
         }, attempts: 3);
+
+        $this->userPortalCache->changed($user);
     }
 }

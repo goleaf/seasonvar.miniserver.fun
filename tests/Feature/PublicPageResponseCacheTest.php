@@ -207,6 +207,8 @@ final class PublicPageResponseCacheTest extends TestCase
         $expected = [
             'home' => 'public.page:homepage',
             'stats' => 'public.page:stats',
+            'calendar.index' => 'public.page:calendar',
+            'calendar.upcoming' => 'public.page:calendar',
             'titles.index' => 'public.page:catalog',
             'titles.year' => 'public.page:catalog',
             'titles.taxonomy' => 'public.page:catalog',

@@ -90,7 +90,7 @@ final readonly class ReleaseCalendarNotificationQuery
                 isRead: $notification->read_at !== null,
                 label: $kind?->label() ?? __('calendar.notifications.title'),
                 detail: $detail,
-                url: route('calendar.upcoming'),
+                url: route('calendar.index'),
                 createdAtIso: $notification->created_at?->toAtomString() ?? '',
                 createdAtLabel: $notification->created_at !== null
                     ? $this->dateTimes->value($notification->created_at, $settings->locale, $settings->timezone)

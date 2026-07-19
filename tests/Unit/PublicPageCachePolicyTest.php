@@ -16,6 +16,13 @@ use Tests\TestCase;
 
 final class PublicPageCachePolicyTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['app.url' => 'http://localhost']);
+    }
+
     public function test_it_maps_profiles_to_bounded_canonical_contexts(): void
     {
         $homepage = app(PublicPageCachePolicy::class)->context(

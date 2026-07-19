@@ -92,9 +92,9 @@ final class AppLayoutData
             );
         }
 
-        if ($this->router->has('calendar.upcoming')) {
+        if ($this->router->has('calendar.index')) {
             $layoutHeaderNavigation[] = $this->headerLink(
-                'calendar.upcoming',
+                'calendar.index',
                 'fa-regular fa-calendar-days',
                 __('calendar.title'),
                 $this->request->routeIs('calendar.*', 'localized.calendar.*'),
@@ -306,9 +306,9 @@ final class AppLayoutData
             );
         }
 
-        if ($this->router->has('calendar.upcoming')) {
+        if ($this->router->has('calendar.index')) {
             $layoutFooterNavigation[] = $this->footerLink(
-                'calendar.upcoming',
+                'calendar.index',
                 'fa-regular fa-calendar-days text-slate-400',
                 __('calendar.title'),
                 $this->request->routeIs('calendar.*', 'localized.calendar.*'),

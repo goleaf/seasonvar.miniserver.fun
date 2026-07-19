@@ -36,6 +36,13 @@ return [
     'uploads' => [
         'avatar_maximum_kilobytes' => 3072,
         'cover_maximum_kilobytes' => 6144,
+        'maximum_source_dimension' => 6000,
+        'maximum_source_pixels' => 24_000_000,
+        'avatar_width' => 320,
+        'avatar_height' => 320,
+        'cover_width' => 1280,
+        'cover_height' => 360,
+        'webp_quality' => 82,
     ],
     'reports' => [
         'maximum_details_length' => 1500,

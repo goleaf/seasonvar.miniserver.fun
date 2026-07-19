@@ -6,11 +6,11 @@ use Tests\TestCase;
 
 class RouteFallbackTest extends TestCase
 {
-    public function test_unknown_web_paths_redirect_to_the_catalog_homepage(): void
+    public function test_unknown_web_paths_return_not_found_without_redirecting(): void
     {
         $this
             ->get('/nesushchestvuyushchaya-stranica')
-            ->assertRedirect(route('home'));
+            ->assertNotFound();
     }
 
     public function test_unknown_api_paths_return_json_not_found(): void

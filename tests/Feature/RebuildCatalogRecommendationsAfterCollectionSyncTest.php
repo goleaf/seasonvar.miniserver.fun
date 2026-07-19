@@ -15,6 +15,7 @@ use App\Models\SeasonvarImportRun;
 use App\Services\Catalog\CatalogCacheWarmRequestStore;
 use App\Services\Catalog\CatalogRecommendationDirtyTitleTracker;
 use App\Services\Catalog\CatalogTitleRecommendationBuilder;
+use App\Services\Seasonvar\SeasonvarImportActivity;
 use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -88,6 +89,7 @@ final class RebuildCatalogRecommendationsAfterCollectionSyncTest extends TestCas
         (new RebuildCatalogRecommendationsAfterCollectionSync)->handle(
             app(CatalogTitleRecommendationBuilder::class),
             app(CatalogCacheWarmRequestStore::class),
+            app(SeasonvarImportActivity::class),
         );
 
         $recommendation = CatalogTitleRecommendation::query()
@@ -113,6 +115,7 @@ final class RebuildCatalogRecommendationsAfterCollectionSyncTest extends TestCas
         (new RebuildCatalogRecommendationsAfterCollectionSync)->handle(
             app(CatalogTitleRecommendationBuilder::class),
             app(CatalogCacheWarmRequestStore::class),
+            app(SeasonvarImportActivity::class),
         );
 
         $this->assertDatabaseHas('catalog_recommendation_dirty_titles', [
@@ -149,6 +152,7 @@ final class RebuildCatalogRecommendationsAfterCollectionSyncTest extends TestCas
         (new RebuildCatalogRecommendationsAfterCollectionSync)->handle(
             app(CatalogTitleRecommendationBuilder::class),
             app(CatalogCacheWarmRequestStore::class),
+            app(SeasonvarImportActivity::class),
         );
 
         $this->assertDatabaseHas('catalog_recommendation_dirty_titles', [

@@ -31,8 +31,14 @@ final readonly class DemoCatalogActivityStage implements DemoDataStage
 
     public function run(DemoDataOptions $options, ?Closure $progress = null): DemoStageReport
     {
-        $startedAt = microtime(true);
         $options->assertEnvironment(app()->environment());
+
+        return $this->repairKnownDemoUsers($options, $progress);
+    }
+
+    public function repairKnownDemoUsers(DemoDataOptions $options, ?Closure $progress = null): DemoStageReport
+    {
+        $startedAt = microtime(true);
         $selector = new DemoTitleSelector($options);
         $writer = new DemoBulkWriter($options);
         $users = $this->users($options);
@@ -119,11 +125,11 @@ final readonly class DemoCatalogActivityStage implements DemoDataStage
 
     private function watchStatus(int $position): CatalogWatchStatus
     {
-        if ($position < 4) {
+        if ($position < count(CatalogWatchStatus::cases())) {
             return CatalogWatchStatus::cases()[$position];
         }
 
-        return match (($position - 4) % 100) {
+        return match (($position - count(CatalogWatchStatus::cases())) % 100) {
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9 => CatalogWatchStatus::Planned,
             10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
             20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
