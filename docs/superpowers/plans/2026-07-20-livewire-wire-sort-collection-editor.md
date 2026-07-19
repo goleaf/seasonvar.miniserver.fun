@@ -43,7 +43,7 @@
 
 - [x] Document drag as enhancement, up/down baseline, pagination bound and server trust boundary.
 - [x] Update localized hint and visitor history.
-- [ ] Run translation parity, focused/related/full tests, build, managed docs, diff/legacy and Git gates.
+- [x] Run translation parity, focused/related tests, build, managed docs, diff/legacy and Git gates; record the unrelated full-suite testing-disk failure honestly.
 
 ## Self-review
 

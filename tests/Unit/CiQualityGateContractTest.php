@@ -78,6 +78,20 @@ final class CiQualityGateContractTest extends TestCase
         $this->assertStringContainsString('find "$VIEW_COMPILED_PATH" -maxdepth 1 -type f -delete', $qualityGate);
     }
 
+    public function test_workflow_installs_the_image_extension_used_by_backend_and_browser_fixtures(): void
+    {
+        $workflow = File::get(base_path('.github/workflows/ci.yml'));
+
+        $this->assertStringContainsString(
+            'extensions: mbstring, dom, fileinfo, pdo_sqlite, sqlite3, gd, redis, memcached',
+            $workflow,
+        );
+        $this->assertStringContainsString(
+            'extensions: mbstring, dom, fileinfo, pdo_sqlite, sqlite3, gd',
+            $workflow,
+        );
+    }
+
     public function test_unknown_profile_is_rejected_without_running_a_check(): void
     {
         $process = new Process(['bash', base_path('scripts/ci-check.sh'), 'unsupported']);

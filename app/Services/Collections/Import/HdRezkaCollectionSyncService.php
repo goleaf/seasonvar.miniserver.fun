@@ -16,7 +16,6 @@ use App\Services\Catalog\CatalogRecommendationDirtyTitleTracker;
 use App\Services\Crawler\PoliteHttpClient;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use LogicException;
 use RuntimeException;
@@ -205,7 +204,7 @@ final readonly class HdRezkaCollectionSyncService
                     true,
                 )) {
                     try {
-                        Bus::dispatch(new RebuildCatalogRecommendationsAfterCollectionSync);
+                        RebuildCatalogRecommendationsAfterCollectionSync::dispatch();
                     } catch (Throwable) {
                         $status = CatalogCollectionSyncStatus::Partial;
                         $this->addError($errors, 'Перестроение рекомендаций не удалось поставить в очередь.');

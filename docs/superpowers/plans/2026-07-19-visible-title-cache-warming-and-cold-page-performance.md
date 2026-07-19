@@ -2,7 +2,7 @@
 
 Дата: 19.07.2026
 
-Статус: implementation, production index rollout, rolling runtime activation и task-focused verification завершены. Fresh full repository verification и Git delivery остаются `unresolved` до завершения параллельных изменений общего рабочего дерева.
+Статус: implementation, production index rollout, rolling runtime activation и task-focused verification завершены. Post-delivery TDD follow-up исправляет обход `ShouldBeUniqueUntilProcessing` у общего `WarmCatalogCaches`, обнаруженный по production backlog во время run `#954`. Fresh full repository verification и Git delivery остаются `unresolved` до завершения параллельных изменений общего рабочего дерева.
 
 ## Наблюдаемая проблема
 
@@ -46,9 +46,13 @@
 - [x] Расширенный task-focused cache/route/query snapshot: 115 tests / 1 040 assertions; после новых параллельных admin-изменений свежий изолированный cache/runtime набор: 33 tests / 239 assertions. End-to-end `MISS→HIT` regression входит в оба evidence-набора.
 - [x] Pint, focused PHPStan, прежний Vite build, task docs refresh check и final legacy/duplicate scan.
 - [x] Production backup/write-pause window, target-only migration, index/query-plan verification и возврат application/workers для основной реализации.
-- [ ] Fresh full repository suite: прежние 7 admin `public_id` errors закрыты минимальным loaded-attribute fallback; соответствующие catalog/search группы прошли 85 tests / 812 assertions. Два следующих общих запуска пересеклись с параллельной записью новых admin/import/Livewire файлов: 1 380 tests / 1 365 passed / 11 skipped / 122 302 assertions и затем 1 385 tests / 1 369 passed / 11 skipped / 122 324 assertions. Их transient группы после стабилизации прошли 15 tests / 78 assertions и 43 tests / 229 assertions; восстановление legacy `seasonvar.admin_emails` для granular catalog permissions подтверждено отдельными 3 tests / 52 assertions и 12 tests / 60 assertions. Clean full snapshot всё ещё обязателен после прекращения параллельных записей.
+- [x] Fresh full repository suite после стабилизации admin/import snapshot и bounded queued-recommendation контракта: 1 407 tests, 11 expected skipped, 122 916 assertions. Дополнительно повторно прошли cache/runtime 33 tests / 239 assertions, importer 83 / 470 и recommendation 21 / 102.
 - [x] Rolling runtime activation: `cache-warm-v2` worker автоматически обновился в 00:20; read-only Redis inspection показал 175 ready payload с `maxTries=0`/absolute `retryUntil` и 74 legacy payload с прежним attempt-bound контрактом. Ручной общий FPM restart, queue rewrite и clear не выполнялись.
-- [ ] Clean-tree commit и configured push.
+- [x] Import recovery/live fan-out: run `#944` завершён с `last_recommendations.mode=deferred`, checkpoint удалён и dirty recommendations сохранены. Сразу после снятия pause Redis показал 373 отдельных ready `WarmCatalogTitlePage`; новый controlled sitemap-tail run `#954` снова включил ожидаемую паузу без queue rewrite/clear.
+- [x] Все найденные producers затронутых unique jobs используют pending dispatch: RED воспроизвёл `2→1` `WarmCatalogCaches` и `3→1` recommendation jobs, минимальные типизированные `::dispatch()` дали GREEN; cache/import и collection-sync наборы прошли 49 tests / 319 assertions. Production census после rollout остаётся отдельным незавершённым evidence.
+- [x] Актуальный общий PHPUnit после coalescing follow-up: 1 427 tests, 1 416 passed, 11 expected skipped, 122 945 assertions; Pint, PHP syntax, managed docs и diff gates прошли.
+- [x] Clean-tree product commit и configured push: snapshot с cache-реализацией опубликован в `main` как `eb4e7f9`.
+- [x] Отдельный live-evidence follow-up объединён с совместимыми admin/Livewire closure edits в общий documentation commit без перестройки или потери чужого staging.
 
 ## Compliance matrix
 
@@ -64,5 +68,5 @@
 | Bounded workload и existing infrastructure | completed | hard cap 96, existing Redis connection/locks/`cache-warm-v2` worker |
 | SQLite cold-path и index | completed | SQL-shape tests, covering-index rehearsal; повторный median HTTP 1 394,4 ms, SQL 1 075,0 ms и 56,8% improvement от 2 490 ms baseline выполняют только предусмотренный fallback >=50%, не абсолютные SQL ceilings |
 | Production database safety | completed | verified owner-only backup с `quick_check` и `foreign_key_check`, maintenance/write pause, target-only batch 30 migration, exact index columns и covering `EXPLAIN` |
-| Full repository delivery | unresolved | Свежий изолированный cache/runtime набор 33 tests / 239 assertions зелёный; прежние 7 admin projection errors исправлены и их 85-test группа зелёная, но два новых full run пересеклись с продолжающейся записью admin/import/Livewire файлов. Все извлечённые стабильные группы сейчас зелёные; единый clean snapshot и commit/push ещё невозможны |
-| Production rollout | completed | Backup, target-only index и основной runtime rollout завершены; автоматический recycle cache-warm worker и live new-format payload подтвердили retry/version/locale activation без ручного общего restart |
+| Full repository delivery | unresolved | Актуальный snapshot прошёл 1 427 tests / 1 416 passed / 11 expected skipped / 122 945 assertions, targeted Pint/syntax/static/docs/diff gates зелёные; остаются безопасный commit/push общего дерева и post-rollout census. |
+| Production rollout | unresolved | Backup, target-only index и основной title runtime rollout завершены. Во время run `#954` общий backlog вырос 121→186 из-за direct-dispatch bypass; source fix готов, но требует публикации, graceful worker uptake и повторного read-only census без queue clear/rewrite. |

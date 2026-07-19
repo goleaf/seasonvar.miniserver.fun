@@ -21,4 +21,4 @@
 ### Task 3: Verify
 
 - [x] Run the focused contract, Pint, managed-doc check and task-scoped inventory/diff checks.
-- [ ] Include the contract in the consolidated Livewire series test run.
+- [x] Include the contract in the consolidated Livewire series test run.

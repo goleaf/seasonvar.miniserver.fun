@@ -70,7 +70,7 @@ final class CacheInfrastructureIntegrationTest extends TestCase
         }
     }
 
-    public function test_readiness_endpoint_distinguishes_cache_session_queue_lock_and_warming_components(): void
+    public function test_readiness_endpoint_exposes_only_minimal_critical_status(): void
     {
         $this->requireInfrastructureTests();
 
@@ -82,46 +82,8 @@ final class CacheInfrastructureIntegrationTest extends TestCase
                 'status',
                 'ready',
                 'checked_at',
-                'components' => [
-                    'database',
-                    'redis_cache' => [
-                        'status',
-                        'latency_ms',
-                        'used_memory_bytes',
-                        'maxmemory_bytes',
-                        'evicted_keys',
-                    ],
-                    'redis_sessions',
-                    'redis_queues',
-                    'redis_locks',
-                    'memcached' => [
-                        'status',
-                        'latency_ms',
-                        'get_hits',
-                        'get_misses',
-                        'evictions',
-                        'curr_items',
-                        'bytes',
-                        'limit_maxbytes',
-                        'connections',
-                        'rejected_connections',
-                    ],
-                    'queue_workers',
-                    'horizon',
-                    'cache_warming',
-                    'full_cache_warming' => [
-                        'status',
-                        'estimated',
-                        'attempted',
-                        'warmed',
-                        'failed',
-                        'started_at',
-                        'updated_at',
-                        'finished_at',
-                    ],
-                ],
             ]);
-        $response->assertJsonMissingPath('components.redis_limiter');
+        $this->assertSame(['status', 'ready', 'checked_at'], array_keys($response->json()));
         $this->assertFalse($response->headers->has('Set-Cookie'));
     }
 

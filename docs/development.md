@@ -1,6 +1,6 @@
 # Разработка
 
-Обновлено: 19.07.2026
+Обновлено: 20.07.2026
 
 ## Постоянный execution workflow
 
@@ -216,6 +216,8 @@ php artisan project:docs-refresh --check
 ```
 
 Для изменений синхронизации редакционных подборок сначала запускайте focused contract `php artisan test --filter=HdRezkaCollection`, затем recommendation tests, полный backend suite и frontend build. Внешний HTTP в PHPUnit всегда закрывается через `Http::preventStrayRequests()` и fixtures/`Http::fake()`; тесты не должны обращаться к живому HDRezka.
+
+Обычные PHPUnit-процессы одного checkout не должны совместно использовать корень `Storage::fake()`: базовый `Tests\TestCase` задаёт process-local token только тогда, когда Laravel/Paratest ещё не предоставил собственный `ParallelTesting::token()`. Поэтому последовательные тесты одного процесса сохраняют привычную очистку fake-диска, независимые процессы получают разные суффиксы, а настоящий parallel-runner сохраняет свой канонический token. Удалять эту изоляцию можно только вместе с отказом от concurrent test processes в общем checkout; production storage/config она не изменяет.
 
 `scripts/ci-check.sh` является единым источником команд для локальной проверки, `pre-commit`, `pre-push` и GitHub Actions. Профили `docs`, `backend`, `frontend`, `browser`, `pre-push` и `full` используют одинаковые шаги в каждой среде; Laravel config/route/view cache проверяется только в ignored `output/ci`, поэтому локальный запуск не заменяет рабочий production cache. `docs` использует SQLite `:memory:` и проверяет managed Markdown без записи. Все профили изолируют maintenance state через process-local `cache` driver и `array` store: существующий `storage/framework/down` не даёт ложные `503` в тестах, но файл режима обслуживания не изменяется и production из него не выводится. Backend выполняет `composer rector:check` после Pint и до синтаксиса/Larastan; CI никогда не запускает `rector:fix`. Производный файловый кеш находится в ignored `output/rector`, не содержит исходных данных и может быть удалён без изменения приложения. GitHub Actions выполняет три отдельных задания на явном `ubuntu-24.04`, использует immutable action SHA без сохранения checkout credentials и загружает Playwright-отчёт даже при ошибке браузерной проверки.
 

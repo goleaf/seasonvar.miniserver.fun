@@ -1,6 +1,6 @@
 # CI
 
-Обновлено: 19.07.2026
+Обновлено: 20.07.2026
 
 ## Workflow
 
@@ -24,9 +24,9 @@ PHP syntax lint проверяет исходники в `app`, `bootstrap`, `co
 
 ## Backend
 
-Backend job использует PHP 8.5, устанавливает Composer dependencies и вызывает `bash scripts/ci-check.sh backend`. Профиль последовательно выполняет strict Composer validation, dependency audit, Pint в check-only режиме, обязательный zero-diff `composer rector:check`, PHP syntax lint, bounded Larastan, проверку документации, сборку изолированных Laravel caches и полный PHPUnit suite. Rector запускается только в dry-run после Pint и до syntax/Larastan; workflow не дублирует прямую команду и никогда не применяет изменения.
+Backend job использует PHP 8.5, устанавливает Composer dependencies и вызывает `bash scripts/ci-check.sh backend`. Профиль последовательно выполняет strict Composer validation, dependency audit, Pint в check-only режиме, обязательный zero-diff `composer rector:check`, PHP syntax lint, bounded Larastan, проверку документации, сборку изолированных Laravel caches и полный PHPUnit suite. Rector запускается только в dry-run после Pint и до syntax/Larastan; workflow не дублирует прямую команду и никогда не применяет изменения. Расширение `gd` устанавливается явно в backend и browser jobs, потому что тесты обработки обложек и подготовка растровых fixtures требуют PNG/WebP и не должны зависеть от случайного состава runner image.
 
-Тесты используют SQLite в памяти через `phpunit.xml`. Backend job поднимает один Redis 7 и один Memcached 1.6 service, устанавливает PhpRedis/Memcached extensions и задаёт run-specific prefixes/Redis DBs. Обычные тесты остаются на array cache; `RUN_CACHE_INFRASTRUCTURE_TESTS=true` включает exact-key integration tests реальных Redis cache/tags/locks/workload isolation, Memcached read/write и контролируемых outage fallbacks. Shared store никогда не flush-ится.
+Тесты используют SQLite в памяти через `phpunit.xml`. Backend job поднимает один Redis 7 и один Memcached 1.6 service, устанавливает PhpRedis/Memcached extensions и задаёт run-specific prefixes/Redis DBs. Обычные тесты остаются на array cache; `RUN_CACHE_INFRASTRUCTURE_TESTS=true` включает exact-key integration tests реальных Redis cache/tags/locks/workload isolation, Memcached read/write и контролируемых outage fallbacks. Публичный readiness regression при этом проверяет только безопасные `status`, `ready`, `checked_at`; подробные component metrics остаются CLI-only. Тест синхронизации внешних подборок использует файловую группу временного `Storage::fake`, а не production default `UPLOADS_RUNTIME_GROUP`, сохраняя настоящую проверку private permissions без зависимости от имени группы GitHub runner. Shared store никогда не flush-ится.
 
 ## Frontend
 

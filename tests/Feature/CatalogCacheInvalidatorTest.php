@@ -73,6 +73,17 @@ final class CatalogCacheInvalidatorTest extends TestCase
         Queue::assertPushed(WarmCatalogCaches::class, 1);
     }
 
+    public function test_repeated_invalidations_coalesce_the_pending_warm_job(): void
+    {
+        config(['cache-architecture.warming.enabled' => true]);
+        Queue::fake();
+
+        app(CatalogCacheInvalidator::class)->importedTitleChanged(17);
+        app(CatalogCacheInvalidator::class)->importedTitleChanged(23);
+
+        Queue::assertPushed(WarmCatalogCaches::class, 1);
+    }
+
     public function test_rolled_back_invalidation_does_not_create_warm_intent(): void
     {
         config(['cache-architecture.warming.enabled' => true]);

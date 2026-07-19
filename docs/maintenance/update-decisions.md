@@ -12,7 +12,7 @@
 - backward compatibility сохраняется неизменными manifest/lock/public contracts, а config correction не затрагивает installed или locked package;
 - migration отсутствует; rollback для Task 29 — возврат documentation/UI-component commit, без schema/cache/session/job/provider transition;
 - verification включает lock/manifest inspection, direct usage search, provider/route/command/assets review и перечисленные в текущем плане static/build/browser gates;
-- final commit заполняется после commit; до этого используется `pending Task 29 commit`.
+- canonical Task 29 implementation находится в `fa4d09f503d717fc737955902585737f34cf713a`; повторный audit/config integration вошёл в `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe` и опубликован в `origin/main`.
 
 ## Все прямые Composer decisions
 
@@ -34,7 +34,7 @@
 | UD-C-014 | `nunomaduro/collision` | `8.9.5` / current metadata | retain | Existing CLI error presentation | Development console | No production dependency reason |
 | UD-C-015 | `phpunit/phpunit` | `12.5.31` / `13.2.4` | retain; defer major | New major alone is not benefit; tests may not be run in Task 29 | Complete test suite/config/CI and Pao/Collision compatibility | PHPUnit 13 compatibility is unknown until a dedicated verified migration |
 | UD-C-016 | `rector/rector` | `2.5.7` / current metadata | retain | Owns required and maximum modernization inventory | Development/static analysis | Suggested refactors are not proof of deprecation or correctness |
-| UD-C-017 | `fruitcake/laravel-debugbar` | absent / `^4.4` (locked `4.4.0`) | add; package gates verified | Requested Laravel-native local request/SQL/Livewire diagnostics without a custom profiler | Development only; auto-discovery/config boot and local HTML responses; production uses `--no-dev` and remains fail-closed | Debugbar gates pass; full repository suite retains unrelated baseline failures and final Git delivery remains unresolved |
+| UD-C-017 | `fruitcake/laravel-debugbar` | absent / `^4.4` (locked `4.4.0`) | add; package gates verified | Requested Laravel-native local request/SQL/Livewire diagnostics without a custom profiler | Development only; auto-discovery/config boot and local HTML responses; production uses `--no-dev` and remains fail-closed | Debugbar gates pass; historical unrelated baseline failures remain documented, and the complete `main` history was published through `eb4e7f9e` |
 
 ### UD-C-017 — добавить Laravel Debugbar только для разработки
 
@@ -50,7 +50,7 @@
 10. Backward compatibility: public/application routes, APIs, persisted data, translations, cache identities and production responses remain unchanged. Local debug responses gain package assets/routes only while the approved gate is true.
 11. Rollback: remove direct dev package and minimal config, restore reviewed lock, rebuild Composer autoload and Laravel config/route caches; no database, asset, session, queue, cache-data or provider rollback.
 12. Verification: TDD RED/GREEN, exact three-package lock diff, installed metadata, MIT licences, zero locked advisories, local/false/production route boot, HTML injection/non-injection, platform checks, production `--no-dev` dry-run, documentation policies and repository-wide legacy/override search passed. The complete repository run executed 1 268 tests: 1 214 passed, while 37 failures and 6 errors came from pre-existing Blade contract violations and the unrelated missing `CacheDomain::UserPortal`; the 3 Debugbar tests passed with 9 assertions.
-13. Decision: `add` is accepted because all bounded package and environment gates pass. The independent full-suite baseline remains explicitly unresolved and is not expanded into this dependency task; final Git delivery is recorded separately.
+13. Decision: `add` is accepted because all bounded package and environment gates pass. Historical full-suite limitations remain recorded rather than retroactively rewritten; final Git delivery is included in the published `main` history through `eb4e7f9e`.
 
 ### UD-LW-CFG-001 — закрепить class-based generator Livewire
 
@@ -74,7 +74,7 @@
 18. Backward-compatibility strategy: existing class components, routes, public URLs, state, translations and generated files remain untouched.
 19. Rollback strategy: remove only the project `make_command` block to restore package defaults; no data, cache, session, queue, service-worker or asset rollback.
 20. Verification strategy: inspect effective config in an isolated process, confirm package/version metadata, scan for Volt/SFC/MFC usage and run allowed PHP syntax/Pint/static/documentation checks without invoking the generator or automated tests.
-21. Decision: `retain and configure`; package update/removal/replacement is not justified. Final commit remains `unresolved` until the shared worktree is safe.
+21. Decision: `retain and configure`; package update/removal/replacement is not justified. Repeat-audit integration commit `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe` is published in `origin/main`.
 
 ## Все прямые npm decisions
 
@@ -142,7 +142,7 @@ Package version changes: none. `composer.lock`, `package.json` and `package-lock
 10. Rollback: вернуть только exact allowlist entry после подтверждённого package-purpose/provider/script/security review; lock/data/cache/session/job transition отсутствует.
 11. Decision: remove stale configuration permission.
 
-Final commit: Task 29 commit on `main` (exact hash reported after commit).
+Final commit: canonical Task 29 implementation `fa4d09f503d717fc737955902585737f34cf713a`; repeat audit and unified publication `eb4e7f9e7dcf300328b35c527f65a39a743c2ebe` on `main`.
 
 ## CI-R-001 — воспроизводимый GitHub Actions без обновления major-версий
 
@@ -150,10 +150,10 @@ Final commit: Task 29 commit on `main` (exact hash reported after commit).
 2. Current/proposed: `ubuntu-latest` заменяется на GA `ubuntu-24.04`; floating tags `checkout@v6`, `cache@v5`, `setup-node@v6`, `upload-artifact@v7`, `setup-php@v2` заменяются полными SHA соответствующих текущих release commits с читаемым major-комментарием.
 3. Reason: последний remote failure вызван stale repository documentation, а не новой dependency; отдельный pre-commit docs gate закрывает root cause. Exact runner/action refs дополнительно устраняют OS migration и mutable-tag drift.
 4. Security: GitHub указывает полный commit SHA как единственную immutable форму action release. Checkout credentials не сохраняются; существующее разрешение `contents: read` не расширяется.
-5. Compatibility: PHP `8.5`, Node `26`, Redis `7`, Memcached `1.6`, action majors, inputs, cache keys, services и quality-gate команды сохранены. Каждый SHA проверен как commit канонического upstream repository.
-6. Affected modules: только `.github/workflows/ci.yml`, central CI/hook contract, CI tests и development/maintenance documentation; public application/runtime domains не меняются.
+5. Compatibility: PHP `8.5`, Node `26`, Redis `7`, Memcached `1.6`, action majors, inputs, cache keys, services и quality-gate команды сохранены. Каждый SHA проверен как commit канонического upstream repository. Уже требуемое приложением расширение `gd` теперь явно устанавливается в backend/browser jobs и не зависит от предустановленного состава runner image.
+6. Affected modules: только `.github/workflows/ci.yml`, central CI/hook contract, CI tests и development/maintenance documentation; public application/runtime domains не меняются. Remote run №213 дополнительно выявил два test-environment drift: устаревшее ожидание подробного публичного readiness и зависимость fake uploads от production-имени Unix-группы; оба исправлены без изменения application contract.
 7. Production/data: нет migration, schema/storage/cache/session/queue/provider/service-worker/deployment runtime change; backup не требуется.
-8. Rollout: focused contract, shell syntax, stale/fresh docs rehearsal, backend/frontend/browser gates, затем push `main` и проверка нового remote run.
+8. Rollout: focused contract, shell syntax, stale/fresh docs rehearsal, backend/frontend/browser gates, затем push `main` и проверка нового remote run; каждый remote-only отказ разбирается по job log и получает отдельный regression до повторной отправки.
 9. Rollback: Git revert CI/hook/docs commit; data restore, store-wide cache flush и worker restart не требуются.
 10. Limitation: pinning не гарантирует доступность GitHub/registries и не должно скрывать новые advisories или реальные regressions. Такие отказы остаются честно `failed` и требуют отдельного разбора.
 11. Decision: `retain majors; pin commits and runner` — достаточная reliability/security причина существует, unrelated upgrade не выполняется.

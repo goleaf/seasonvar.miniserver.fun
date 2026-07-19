@@ -43,6 +43,7 @@ final class HdRezkaCollectionSyncTest extends TestCase
             'catalog-collection-imports.hdrezka.max_collections' => 10,
             'catalog-collection-imports.hdrezka.lock_store' => 'array',
             'catalog-collection-imports.hdrezka.lock_seconds' => 300,
+            'uploads.runtime_group' => '',
             'catalog-collection-imports.hdrezka.cover.max_source_bytes' => 1_000_000,
             'catalog-collection-imports.hdrezka.cover.max_width' => 320,
             'catalog-collection-imports.hdrezka.cover.max_height' => 180,
@@ -350,6 +351,7 @@ final class HdRezkaCollectionSyncTest extends TestCase
             'signal_type' => 'editorial_collection',
         ]);
         $this->assertSame(2, CatalogCollection::query()->publiclyListed()->count());
+        Queue::assertPushed(RebuildCatalogRecommendationsAfterCollectionSync::class, 1);
     }
 
     public function test_active_distributed_lock_returns_safe_failed_result_without_http_or_writes(): void

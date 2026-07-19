@@ -4,12 +4,17 @@ namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\ParallelTesting;
 
 abstract class TestCase extends BaseTestCase
 {
     protected function setUp(): void
     {
         parent::setUp();
+
+        if (ParallelTesting::token() === false) {
+            ParallelTesting::resolveTokenUsing(static fn (): string => (string) getmypid());
+        }
 
         $this->withoutVite();
         $this->app->setLocale((string) config('account-settings.default_locale', 'ru'));

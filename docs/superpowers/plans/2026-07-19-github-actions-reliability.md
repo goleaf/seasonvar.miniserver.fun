@@ -97,5 +97,7 @@
 - [x] Run `bash scripts/ci-check.sh backend`, then `frontend`, then `browser` on the stable task snapshot; record `1 419` backend tests / `122 920` assertions, frontend audit 0 / Vite 23 modules, and `41` browser passes / `4` expected skips.
 - [x] Search the repository for `ubuntu-latest`, floating `uses: ...@v`, duplicate docs commands, stale managed docs and unfinished task code; review dependencies before removal.
 - [x] Re-read applicable requirements/design/current plan and finalize every compliance row honestly.
+- [x] Inspect remote runs `#213` and `#214`; reproduce the two backend failures from their authenticated job logs without weakening the public readiness or filesystem-permission contracts.
+- [x] Add RED/GREEN regressions for the minimal readiness payload, fake-upload Unix group isolation, and explicit `gd` provisioning in both PHP jobs.
 - [ ] Confirm `git status --short --branch` is clean on `main`, commit the coherent task, and push `origin main`.
-- [ ] Monitor the resulting GitHub Actions run through completion; if authentication or an external service blocks delivery, preserve it as `unresolved` with exact evidence.
+- [ ] Monitor a new GitHub Actions run containing the remote-only fixes through completion; if authentication or an external service blocks delivery, preserve it as `unresolved` with exact evidence.

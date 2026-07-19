@@ -101,7 +101,7 @@
 
 ## Текущий production verdict
 
-Repository baseline функционально зелёный, но безусловный production-ready verdict по-прежнему — **нет**. Debug mode выключен, все 110 migrations применены, maintenance mode снят, config/routes cached и PHP-FPM active. Финальный deployment preflight завершился `ready`, однако `app:health --json` честно остаётся `ready=true`/`degraded`: Memcached недоступен, а `cache-warm-v2` после worker restart имеет delayed work без свежего heartbeat; import/title-refresh pools отвечают. Кроме того, Task 29 не наблюдала pre-migration backup evidence внешних batches 31–33. Эти операционные пункты имеют более высокий приоритет, чем optional Octane, Pulse, Horizon, визуальный redesign или новые product capabilities.
+Repository baseline функционально зелёный, но безусловный production-ready verdict по-прежнему — **нет**. Debug mode выключен, все 110 migrations применены, maintenance mode снят, config/routes cached и PHP-FPM active. Финальный deployment preflight завершился `ready`; `app:health --json` честно остаётся `ready=true`/`degraded` из-за недоступного Memcached, хотя database, Redis roles и cache-warm/import/title-refresh pools сейчас `ok`, а cache warming сообщает `failed=0`. Кроме того, Task 29 не наблюдала pre-migration backup evidence внешних batches 31–33. Эти операционные пункты имеют более высокий приоритет, чем optional Octane, Pulse, Horizon, визуальный redesign или новые product capabilities.
 
 ## Task 10 — collections baseline and implemented boundary
 

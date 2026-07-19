@@ -9,7 +9,6 @@ use App\Services\Collections\CatalogCollectionCacheInvalidator;
 use App\Support\Cache\CacheDomain;
 use App\Support\Cache\CacheTelemetry;
 use App\Support\Cache\CacheVersionRegistry;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -133,14 +132,12 @@ final class CatalogCacheInvalidator
             return;
         }
 
-        $job = (new WarmCatalogCaches)
-            ->onConnection((string) config('cache-architecture.warming.connection', 'redis'))
-            ->onQueue((string) config('cache-architecture.warming.queue', 'cache-warm-v2'))
-            ->afterCommit();
-
         try {
             $this->warmRequests->request($titleIds, $refresh);
-            Bus::dispatch($job);
+            WarmCatalogCaches::dispatch()
+                ->onConnection((string) config('cache-architecture.warming.connection', 'redis'))
+                ->onQueue((string) config('cache-architecture.warming.queue', 'cache-warm-v2'))
+                ->afterCommit();
         } catch (Throwable $exception) {
             $this->telemetry->increment(CacheDomain::Operational, 'warming-dispatch-failure');
             Log::warning('Инвалидация каталога завершена, но отложенный прогрев не поставлен в очередь.', [

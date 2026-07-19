@@ -22,4 +22,4 @@
 ### Task 3: Verify
 
 - [x] Run RED/GREEN, Pint, managed docs and repository inventory.
-- [ ] Include the contract in the consolidated Livewire series suite and assess Git delivery.
+- [x] Include the contract in the consolidated Livewire series suite and assess Git delivery.
