@@ -1,5 +1,7 @@
 # Task 15 — canonical registration, authentication and session architecture
 
+> Параллельная задача объединения discovery/collections не смешивается с этим планом; её полный plan, compliance matrix и verification evidence находятся в [`discovery-collections-admin-unification.md`](discovery-collections-admin-unification.md).
+
 Updated: 19.07.2026
 
 Status: implementation, documentation and local commit complete on existing `main`; configured HTTPS push was attempted and remains externally blocked by absent GitHub credentials.
