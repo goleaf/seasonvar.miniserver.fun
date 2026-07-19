@@ -51,6 +51,8 @@
 
 `x-collections.collection-card` получает eager-loaded `CatalogCollection` summary и `CatalogCollectionCardViewModel`; Blade не считает visibility/count/URL и не запрашивает owner/cover/items. ViewModel превращает описание в escaped plain-text excerpt длиной не более 180 Unicode-символов, поэтому карточка не рендерит пользовательский HTML и не раздувается длинным текстом. Collection item rows переиспользуют `x-catalog.title-card`, prepared collection item attributes и stable `wire:key` по item ID. Public count и owner count подготовлены query-object раздельно.
 
+`CatalogDiscoveryPage` является единственным full-page owner публичного discovery. Только `popular` монтирует `CatalogCollectionExplorer`, который хранит отдельные URL-backed search/sort/page поля и рендерит компактные `x-collections.collection-card` в responsive 1/2/3/4-column grid. `CatalogAdministrationPage` аналогично владеет `/admin/catalog` и условно монтирует один из двух manager fragments; вложенные компоненты не расширяют layout и не создают второй `<h1>`.
+
 Collection Livewire views содержат только passive loops/conditions над prepared values. Locked UUID/title IDs остаются в component, policy and criteria — в PHP. Нет `@php`, model/service/database calls, inline CSS или inline business JavaScript. Empty/search-empty/unavailable/moderation/status/loading/error/report/share/delete/restore states имеют реальные controls или safe text; absent likes/follows/collaboration не изображаются неработающими кнопками.
 
 Editorial editor выводит одну форму без locale fieldset, RU/EN buttons и подписи «Русский»: locked PHP boundary загружает и сохраняет `ru`. Existing English translation rows остаются в базе, но не являются переключаемым authoring UI.
